@@ -145,6 +145,7 @@ class QRQueueService:
         from decimal import Decimal
         
         # Создаём Visit
+        # ✅ SSOT: source='online' для QR/Telegram регистрации
         visit = Visit(
             patient_id=patient_id,
             visit_date=visit_date,
@@ -152,6 +153,7 @@ class QRQueueService:
             discount_mode=discount_mode,
             approval_status="none",
             notes=notes or f"QR-регистрация ({visit_type})",
+            source="online",  # ✅ SSOT: Прямое присвоение source
         )
         self.db.add(visit)
         self.db.flush()  # Получаем ID

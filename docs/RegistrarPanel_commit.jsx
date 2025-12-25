@@ -12,9 +12,14 @@ import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
-import logger from '../utils/logger';
 
 const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const logger = {
+  info: () => { },
+  warn: () => { },
+  error: () => { },
+};
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -39,16 +44,9 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
 // Утилиты для работы с датами
 import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
 
-// ⭐ SSOT: Centralized service code resolver
-import { SPECIALTY_TO_CODE, toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
-
 // API client
 import { api } from '../api/client';
-// ⭐ BATCH API: Для атомарных операций с записями пациента (см. BATCH_UPDATE_ARCHITECTURE.md)
-import { cancelAllPatientEntries, formatDateForAPI } from '../api/registrarBatch';
 
-// ✅ Форс-мажор модальное окно
-import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
 
 const RegistrarPanel = () => {
   // Рендер компонента (debug отключен)
@@ -67,14 +65,8 @@ const RegistrarPanel = () => {
 
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
-  const [printData, setPrintData] = useState(null);
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
-  // ✅ State for rescheduling
-  const [rescheduleData, setRescheduleData] = useState(null);
-
-  // ✅ State for Force Majeure modal
-  const [forceMajeureModal, setForceMajeureModal] = useState({ open: false, specialistId: null, specialistName: '' });
 
   const [contextMenu, setContextMenu] = useState({ open: false, row: null, position: { x: 0, y: 0 } });
 
@@ -345,8 +337,6 @@ const RegistrarPanel = () => {
 
   // Состояния для управления данными
   const [appointments, setAppointments] = useState([]);
-  // ⭐ SSOT FIX: Сырые данные (flat list) до агрегации — для Tooltip
-  const [rawEntries, setRawEntries] = useState([]);
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
@@ -1012,7 +1002,7 @@ const RegistrarPanel = () => {
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   const loadAppointments = useCallback(async (options = {}) => {
-    // console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
+    logger.info('📥 loadAppointments called at:', new Date().toISOString(), options);
     const { silent = false, source: callSource = 'unknown' } = options || {};
     try {
       if (!silent) {
@@ -1022,9 +1012,9 @@ const RegistrarPanel = () => {
 
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
-      // console.log('🔍 loadAppointments: token exists:', !!token);
+      logger.info('🔍 loadAppointments: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
       if (!token) {
-        console.warn('Токен аутентификации отсутствует, показываем пустое состояние');
+        logger.warn('Токен аутентификации отсутствует, показываем пустое состояние');
         startTransition(() => {
           if (!silent) setDataSource('api');
           setAppointments([]);
@@ -1032,28 +1022,24 @@ const RegistrarPanel = () => {
         return;
       }
 
-
-      // console.log('🔍 loadAppointments: making request');
-
+      logger.info('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
 
       // Используем новый эндпоинт для получения очередей на указанную дату
       // Если календарь открыт, используем historyDate, иначе сегодня
       const dateParam = showCalendar && historyDate ? historyDate : getLocalDateString();
-      /* console.log('📅 Параметры для loadAppointments:', {
+      logger.info('📅 Параметры для loadAppointments:', {
         source: callSource,
         showCalendar,
         historyDate,
         dateParam,
         activeTab
-      }); */
+      });
 
       const params = new URLSearchParams();
       params.append('target_date', dateParam);
 
 
-
-      // console.log('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
-
+      logger.info('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
 
       const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } });
 
@@ -1064,95 +1050,266 @@ const RegistrarPanel = () => {
       let appointmentsData = [];
 
       if (data && typeof data === 'object') {
-        // Временно отключено логирование больших объектов для диагностики
-        // logger.info('📊 Получены данные от сервера:', data);
-        // console.log('📊 Получены данные от сервера (count):', data.queues?.length || 0);
-
+        logger.info('📊 Получены данные от сервера:', data);
 
         // Обрабатываем формат от эндпоинта registrar_integration.py
         if (data.queues && Array.isArray(data.queues)) {
-          // console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
-          // ✅ ОТЛАДКА: Логируем структуру данных от сервера
-          /*data.queues.forEach((q, idx) => {
-            logger.info(`  Очередь ${idx + 1}: specialty=${q.specialty}, entries=${q.entries?.length || 0}`);
-            if (q.entries && q.entries.length > 0) {
-              q.entries.slice(0, 2).forEach((e, eIdx) => {
-                const entryData = e.data || e;
-                logger.info(`    Запись ${eIdx + 1}: type=${e.type}, id=${entryData?.id}, patient_id=${entryData?.patient_id}, patient_name=${entryData?.patient_name}`);
+          logger.info('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+
+          // Ранее здесь был фильтр по activeTab. Убираем серверную фильтрацию —
+          // всегда объединяем все очереди, вкладки фильтруют на клиенте.
+          // Объединяем все очереди
+          logger.info('📊 Объединяем все очереди');
+
+          // ✅ ИСПРАВЛЕНО: Используем Map для дедупликации по ID записи
+          const appointmentsMap = new Map(); // id -> appointment object
+
+          data.queues.forEach(queue => {
+            logger.info(`📋 Обработка очереди: ${queue.specialty}, записей: ${queue.entries?.length || 0}`);
+            if (queue.entries && Array.isArray(queue.entries)) {
+              queue.entries.forEach((entry, index) => {
+                try {
+                  const fullEntry = entry;
+                  const entryId = fullEntry.id;
+
+                  // ✅ ИСПРАВЛЕНО: Проверяем, есть ли уже запись с таким ID
+                  if (appointmentsMap.has(entryId)) {
+                    // ✅ ИСПРАВЛЕНО: Если запись уже есть, добавляем номер очереди только если нет очереди с таким queue_tag (нормализованным)
+                    const existingAppointment = appointmentsMap.get(entryId);
+                    const queueNum = fullEntry.number !== undefined && fullEntry.number !== null ? fullEntry.number : (index + 1);
+                    const currentQueueTag = (queue.specialty || queue.queue_tag || '').toString().toLowerCase().trim();
+
+                    const queueTagExists = existingAppointment.queue_numbers.some((qn) => {
+                      const existingTag = (qn.queue_tag || qn.specialty || '').toString().toLowerCase().trim();
+                      // ✅ ИСПРАВЛЕНО: Проверяем только по queue_tag (не по номеру)
+                      // Если очередь с таким tag уже есть, не добавляем (даже если номер другой)
+                      return existingTag && existingTag === currentQueueTag;
+                    });
+
+                    if (!queueTagExists) {
+                      existingAppointment.queue_numbers.push({
+                        number: queueNum,
+                        status: fullEntry.status || 'waiting',
+                        specialty: queue.specialty || queue.queue_tag || null,
+                        queue_name: queue.specialist_name || queue.specialty || 'Очередь',
+                        queue_tag: queue.specialty || queue.queue_tag || null
+                      });
+                      logger.info(`🔄 Добавлен queue_number ${queueNum} (${queue.specialty}) для существующей записи ${entryId}`);
+                    } else {
+                      logger.info(`⏭️ Пропущен дубликат очереди ${queue.specialty} (номер ${queueNum}) для записи ${entryId}`);
+                    }
+                    return; // Пропускаем добавление дубликата
+                  }
+
+                  const patientBirthYear = fullEntry.patient_birth_year || fullEntry.birth_year || null;
+                  const patientPhone = fullEntry.phone || fullEntry.patient_phone || '';
+                  const address = fullEntry.address || '';
+                  const services = Array.isArray(fullEntry.services) ? fullEntry.services : [];
+                  const servicesFull = Array.isArray(fullEntry.services_full) ? fullEntry.services_full : services; // ✅ НОВОЕ: Полный формат для wizard
+                  const serviceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
+
+                  // ✅ ОТЛАДКА: Логируем каждую запись с её service_codes
+                  if (queue.specialty === 'echokg' || serviceCodes.includes('K10')) {
+                    logger.info('🔍 ЭКГ запись найдена:', {
+                      id: fullEntry.id,
+                      patient: fullEntry.patient_name,
+                      specialty: queue.specialty,
+                      services,
+                      serviceCodes,
+                      fullEntry
+                    });
+                  }
+                  const cost = fullEntry.cost || 0;
+                  const paymentStatus = fullEntry.payment_status || 'pending';
+                  const source = fullEntry.source || 'desk';
+                  const status = fullEntry.status || 'waiting';
+                  const createdAt = fullEntry.created_at || new Date().toISOString();
+                  // ⭐ ВАЖНО: Используем queue_time для сортировки (если есть), иначе created_at
+                  const queueTime = fullEntry.queue_time || fullEntry.created_at || new Date().toISOString();
+                  const calledAt = fullEntry.called_at || null;
+                  const visitTime = fullEntry.visit_time || null;
+                  const discountMode = fullEntry.discount_mode || 'none';
+                  const approvalStatus = fullEntry.approval_status || null; // ✅ ДОБАВЛЕНО: approval_status
+
+                  // ✅ ИСПРАВЛЕНИЕ: Используем номер из API (fullEntry.number), который уже отсортирован по времени регистрации
+                  // Если номер отсутствует, используем порядковый номер в отсортированном массиве
+                  const queueNum = fullEntry.number !== undefined && fullEntry.number !== null ? fullEntry.number : (index + 1);
+
+                  // ✅ ОТЛАДКА: Логируем номера для дерматологии
+                  if (queue.specialty === 'dermatology' || queue.specialty === 'derma') {
+                    logger.info(`🔢 Дерматология: Запись ${fullEntry.id} (${fullEntry.patient_name}) - номер из API: ${fullEntry.number}, использован: ${queueNum}, index: ${index}`);
+                  }
+
+                  const appointment = {
+                    id: entryId,
+                    // основной номер для сортировки по колонке "№"
+                    queue_number: queueNum,
+                    // совместимость с EnhancedAppointmentsTable: ожидает queue_numbers[]
+                    queue_numbers: [
+                      {
+                        number: queueNum,
+                        status: status,
+                        specialty: queue.specialty || null,
+                        queue_name: queue.specialist_name || queue.specialty || 'Очередь',  // ✅ ДОБАВЛЕНО: название очереди для tooltip
+                        queue_tag: queue.specialty || null
+                      }
+                    ],
+                    // даты для корректного отображения номера и индикаторов вкладок
+                    date: dateParam,
+                    appointment_date: dateParam,
+                    patient_id: fullEntry.patient_id,
+                    patient_fio: fullEntry.patient_name,
+                    patient_birth_year: patientBirthYear,
+                    patient_phone: patientPhone,
+                    address,
+                    services,
+                    services_full: servicesFull, // ✅ НОВОЕ: Полный формат с метаданными (для wizard)
+                    service_codes: serviceCodes,
+                    cost,
+                    payment_status: paymentStatus,
+                    source,
+                    status,
+                    created_at: createdAt,
+                    queue_time: queueTime,  // ⭐ ВАЖНО: queue_time для сортировки (приоритет над created_at)
+                    called_at: calledAt,
+                    visit_time: visitTime,
+                    discount_mode: discountMode,
+                    approval_status: approvalStatus, // ✅ ДОБАВЛЕНО: approval_status
+                    record_type: fullEntry.record_type || 'visit',
+                    specialty: queue.specialty || null,
+                    department: queue.specialty || null,
+                    department_key: fullEntry.department_key || null  // ✅ ДОБАВЛЕНО: для фильтрации по динамическим отделениям
+                  };
+
+                  // ✅ Сохраняем в Map для дедупликации
+                  appointmentsMap.set(entryId, appointment);
+
+                  // ✅ Отладка: проверяем queue_numbers
+                  logger.info(`✅ Добавлена запись ${entryId} с queue_numbers:`, appointment.queue_numbers);
+                } catch (err) {
+                  logger.error('❌ Ошибка обработки записи очереди:', err, entry);
+                }
               });
             }
-          });*/
+          });
 
+          // ✅ ИСПРАВЛЕНО: Преобразуем Map в массив
+          appointmentsData = Array.from(appointmentsMap.values());
 
-          // ⭐ SSOT: Simple flatMap - no deduplication, no aggregation
-          // Each backend entry = one frontend row
-          // Removed: appointmentsMap, mergedByPatientKey, getAppointmentKey, calcPriority, mergeAppointments
+          const mergedByPatientKey = new Map();
 
-          // Minimal field adaptation layer
-          const adaptEntry = (entry, queue) => {
-            const fullEntry = entry.data || entry;
-            const entryId = fullEntry?.id;
-            if (!entryId) return null; // Skip entries without ID
+          const getAppointmentKey = (appointment) => {
+            const patientKey = appointment.patient_id || appointment.patient_phone || appointment.patient_fio || appointment.id;
+            const dateKey = appointment.date || appointment.appointment_date || appointment.visit_date || '';
+            const specialtyKey = (appointment.specialty || appointment.department || '').toString().toLowerCase() || 'unknown';
 
-            const queueNum = fullEntry.number !== undefined && fullEntry.number !== null
-              ? fullEntry.number
-              : 0;
-            const queueTime = entry.queue_time || fullEntry.queue_time || fullEntry.created_at || new Date().toISOString();
-
-            return {
-              // SSOT passthrough
-              id: entryId,
-              patient_id: fullEntry.patient_id || entry.patient_id,
-              patient_fio: fullEntry.patient_name || entry.patient_name || 'Неизвестный пациент',
-              patient_birth_year: fullEntry.patient_birth_year || fullEntry.birth_year || null,
-              patient_phone: fullEntry.phone || fullEntry.patient_phone || '',
-              address: fullEntry.address || '',
-              services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
-              service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],
-              cost: fullEntry.cost || 0,
-              payment_status: fullEntry.payment_status || 'pending',
-              source: fullEntry.source || entry.source || 'desk',
-              status: fullEntry.status || 'waiting',
-              record_type: entry.type || fullEntry.type || entry.record_type || 'unknown',
-              created_at: fullEntry.created_at || new Date().toISOString(),
-              queue_time: queueTime,
-              discount_mode: fullEntry.discount_mode || 'none',
-              approval_status: fullEntry.approval_status || null,
-
-              // Queue info
-              queue_number: queueNum,
-              queue_numbers: [{
-                number: queueNum,
-                // ⚠️ TEMPORARY ADAPTER: queue_tag derived from queue.specialty
-                // until backend provides explicit queue_tag per entry
-                queue_tag: queue.specialty || null,
-                specialty: queue.specialty || null,
-                status: fullEntry.status || 'waiting',
-                queue_time: queueTime
-              }],
-              specialty: queue.specialty || null,
-              // ⚠️ TEMPORARY ADAPTER: Fallback to specialty
-              queue_tag: queue.specialty || null,
-              department: queue.specialty || null,
-              department_key: fullEntry.department_key || null,
-
-              // Derived fields (minimal)
-              visit_type: fullEntry.discount_mode === 'all_free' ? 'free' :
-                fullEntry.discount_mode === 'benefit' ? 'benefit' : 'paid',
-              payment_type: 'cash', // Backend doesn't return this yet
-              date: dateParam,
-              appointment_date: dateParam
-            };
+            // ✅ ИСПРАВЛЕНО: Добавляем specialty в ключ, чтобы одна запись пациента на один день
+            // создавалась отдельно для каждого отделения (cardio, lab, derma и т.д.)
+            return `${patientKey || 'unknown'}__${dateKey}__${specialtyKey}`;
           };
 
-          // ⭐ SSOT: flatMap all entries without any deduplication or aggregation
-          appointmentsData = data.queues.flatMap(queue =>
-            (queue.entries || [])
-              .map(entry => adaptEntry(entry, queue))
-              .filter(entry => entry !== null) // Remove entries without ID
-          );
+          const calcPriority = (appointment) => {
+            let priority = 0;
+            const isAllFreeApproved = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
+            const isAllFreePending = appointment.discount_mode === 'all_free' && appointment.approval_status !== 'approved';
 
-          logger.info(`📊 SSOT: Loaded ${appointmentsData.length} entries (no dedup, no aggregation)`);
+            if (isAllFreeApproved) priority += 1000;
+            else if (isAllFreePending) priority += 600;
+
+            if (appointment.discount_mode === 'benefit' && appointment.approval_status === 'approved') {
+              priority += 400;
+            }
+
+            const serviceCodes = Array.isArray(appointment.service_codes) ? appointment.service_codes : [];
+            const serviceNames = Array.isArray(appointment.services) ? appointment.services : [];
+            const uniqueServiceValues = new Set([
+              ...serviceCodes.map(code => String(code).toUpperCase()),
+              ...serviceNames.map(item => (typeof item === 'string' ? item.toUpperCase() : JSON.stringify(item)))
+            ]);
+            priority += uniqueServiceValues.size * 10;
+
+            priority += (appointment.queue_numbers || []).length * 5;
+
+            return priority;
+          };
+
+          const mergeAppointments = (primary, secondary) => {
+            const merged = { ...primary };
+
+            const mergeQueues = (current = [], pending = []) => {
+              const combined = [...current];
+              const seenTags = new Set(current.map(qn => (qn.queue_tag || qn.specialty || '').toLowerCase().trim()));
+
+              pending.forEach(qn => {
+                const tag = (qn.queue_tag || qn.specialty || '').toLowerCase().trim();
+                // ✅ ИСПРАВЛЕНО: Проверяем только по tag, игнорируем number
+                // Если очередь с таким tag уже есть, не добавляем
+                if (!seenTags.has(tag)) {
+                  combined.push({ ...qn });
+                  seenTags.add(tag);
+                }
+              });
+              return combined;
+            };
+
+            const mergeArrays = (base = [], extra = []) => {
+              const result = [];
+              const seen = new Set();
+              [...base, ...extra].forEach(item => {
+                if (item === null || item === undefined) return;
+                const key = typeof item === 'string' ? item : JSON.stringify(item);
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  result.push(item);
+                }
+              });
+              return result;
+            };
+
+            merged.queue_numbers = mergeQueues(primary.queue_numbers, secondary.queue_numbers);
+            merged.service_codes = mergeArrays(primary.service_codes, secondary.service_codes);
+            merged.services = mergeArrays(primary.services, secondary.services);
+
+            if (primary.all_patient_services || secondary.all_patient_services) {
+              merged.all_patient_services = mergeArrays(
+                Array.isArray(primary.all_patient_services) ? primary.all_patient_services : [],
+                Array.isArray(secondary.all_patient_services) ? secondary.all_patient_services : []
+              );
+            }
+
+            const primaryPriority = calcPriority(primary);
+            const secondaryPriority = calcPriority(secondary);
+            const preferred = secondaryPriority > primaryPriority ? secondary : primary;
+
+            merged.discount_mode = preferred.discount_mode;
+            merged.approval_status = preferred.approval_status;
+            if (preferred.total_amount !== undefined) merged.total_amount = preferred.total_amount;
+            if (preferred.payment_type !== undefined) merged.payment_type = preferred.payment_type;
+            if (preferred.payment_status !== undefined) merged.payment_status = preferred.payment_status;
+            if (preferred.cost !== undefined) merged.cost = preferred.cost;
+
+            return merged;
+          };
+
+          appointmentsData.forEach(appointment => {
+            const key = getAppointmentKey(appointment);
+            const existing = mergedByPatientKey.get(key);
+            if (!existing) {
+              mergedByPatientKey.set(key, appointment);
+              return;
+            }
+
+            const existingPriority = calcPriority(existing);
+            const newPriority = calcPriority(appointment);
+
+            if (newPriority > existingPriority) {
+              mergedByPatientKey.set(key, mergeAppointments(appointment, existing));
+            } else {
+              mergedByPatientKey.set(key, mergeAppointments(existing, appointment));
+            }
+          });
+
+          appointmentsData = Array.from(mergedByPatientKey.values());
         } else {
           // Обрабатываем старый формат для совместимости
           if (activeTab && data[activeTab]) {
@@ -1199,18 +1356,82 @@ const RegistrarPanel = () => {
         // Обогащаем данные записей информацией о пациентах
         const enriched = await enrichAppointmentsWithPatientData(appointmentsData);
 
-        // ⭐ SSOT: Просто устанавливаем данные без local overrides
-        // Removed: _locallyModified, localStorage overrides
+        // Сохраняем локальные изменения при обновлении
         startTransition(() => {
-          setAppointments(enriched);
-          setDataSource('api');
+          setAppointments(prev => {
+            const locallyModified = prev.filter(apt => apt._locallyModified);
+            // Также учитываем локальные оверрайды из localStorage (например, после оплаты)
+            let overrides = {};
+            try {
+              const overridesRaw = localStorage.getItem('appointments_local_overrides');
+              overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+            } catch {
+              // Игнорируем ошибки парсинга JSON
+            }
+
+            const enrichedWithLocal = enriched.map(apt => {
+              const localVersion = locallyModified.find(local => local.id === apt.id);
+              const override = overrides[String(apt.id)];
+              let merged = localVersion ? { ...apt, ...localVersion } : apt;
+              if (override && (!override.expiresAt || override.expiresAt > Date.now())) {
+                // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                merged = {
+                  ...merged,
+                  status: override.status !== undefined ? override.status : merged.status,
+                  payment_status: override.payment_status !== undefined ? override.payment_status : merged.payment_status
+                };
+              }
+              return merged;
+            });
+            // Обновляем только если реально изменилось
+            try {
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(enrichedWithLocal);
+              if (prevStr === nextStr) return prev;
+            } catch {
+              // Игнорируем ошибки сравнения JSON
+            }
+            return enrichedWithLocal;
+          });
+          // Не триггерим обновление, если значение не меняется
+          setDataSource(prev => (prev === 'api' ? prev : 'api'));
         });
-        logger.info('✅ SSOT: Загружено', enriched.length, 'записей (без local overrides)');
+        logger.info('✅ Загружены и обогащены данные из API:', enriched.length, 'записей');
+        logger.info('📊 Загруженные данные для даты', dateParam, ':', enriched);
+        logger.info('💾 Первая запись после обогащения:', enriched[0]);
       } else {
-        // ⭐ SSOT: Demo fallback без local overrides
+        // API вернул пустой массив - показываем демо-данные с учетом оверрайдов
+        let demo = demoAppointments;
+        try {
+          const overridesRaw = localStorage.getItem('appointments_local_overrides');
+          const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+          demo = demoAppointments.map(apt => {
+            const ov = overrides[String(apt.id)];
+            if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
+              // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+              return {
+                ...apt,
+                status: ov.status !== undefined ? ov.status : apt.status,
+                payment_status: ov.payment_status !== undefined ? ov.payment_status : apt.payment_status
+              };
+            }
+            return apt;
+          });
+        } catch {
+          // Игнорируем ошибки парсинга JSON
+        }
         startTransition(() => {
-          setAppointments(demoAppointments);
-          setDataSource('demo');
+          setAppointments(prev => {
+            try {
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(demo);
+              if (prevStr === nextStr) return prev;
+            } catch {
+              // Игнорируем ошибки сравнения JSON
+            }
+            return demo;
+          });
+          setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
         });
       }
     } catch (error) {
@@ -1219,10 +1440,38 @@ const RegistrarPanel = () => {
         // Токен недействителен
         logger.warn('Токен недействителен (401), очищаем и используем демо-данные');
         localStorage.removeItem('auth_token');
-        // ⭐ SSOT: Demo fallback без local overrides
         startTransition(() => {
-          if (!silent) setDataSource('demo');
-          setAppointments(demoAppointments);
+          if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
+          // Применяем оверрайды к демо-данным
+          let demo = demoAppointments;
+          try {
+            const overridesRaw = localStorage.getItem('appointments_local_overrides');
+            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+            demo = demoAppointments.map(apt => {
+              const ov = overrides[String(apt.id)];
+              if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
+                // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                return {
+                  ...apt,
+                  status: ov.status !== undefined ? ov.status : apt.status,
+                  payment_status: ov.payment_status !== undefined ? ov.payment_status : apt.payment_status
+                };
+              }
+              return apt;
+            });
+          } catch {
+            // Игнорируем ошибки парсинга JSON
+          }
+          setAppointments(prev => {
+            try {
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(demo);
+              if (prevStr === nextStr) return prev;
+            } catch {
+              // Игнорируем ошибки сравнения JSON
+            }
+            return demo;
+          });
         });
       } else {
         // Other errors (network, 404, 500, etc.)
@@ -1273,7 +1522,7 @@ const RegistrarPanel = () => {
         logger.info('✅ Загружены динамические отделения:', departmentsArray.map(d => d.key));
       }
     } catch (error) {
-      logger.error('Ошибка загрузки отделений:', error);
+      console.error('Ошибка загрузки отделений:', error);
     }
   }, []);
 
@@ -1450,17 +1699,14 @@ const RegistrarPanel = () => {
                   created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
                   visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
                   record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
-                  service_details: entry.service_details || [],  // ✅ НОВОЕ: Полные данные услуг
                   queue_numbers: [{
-                    id: entry.id, // ✅ ВАЖНО для AppointmentWizardV2: originalQueueIds использует это поле
                     queue_tag: targetQueue.specialty,
                     queue_name: targetQueue.specialist_name || targetQueue.specialty || 'Очередь',
                     number: entry.number,
                     status: entry.status,
                     specialty: targetQueue.specialty,
                     source: entry.source,
-                    created_at: entry.created_at,
-                    service_details: entry.service_details || []  // ✅ НОВОЕ: Полные данные услуг
+                    created_at: entry.created_at
                   }],
                   confirmation_status: 'none',
                   confirmed_at: null,
@@ -1494,17 +1740,14 @@ const RegistrarPanel = () => {
                     created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
                     visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
                     record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
-                    service_details: entry.service_details || [],  // ✅ НОВОЕ: Полные данные услуг
                     queue_numbers: [{
-                      id: entry.id, // ✅ ВАЖНО для AppointmentWizardV2: originalQueueIds использует это поле
                       queue_tag: queue.specialty,
                       queue_name: queue.specialist_name || queue.specialty || 'Очередь',
                       number: entry.number,
                       status: entry.status,
                       specialty: queue.specialty,
                       source: entry.source,
-                      created_at: entry.created_at,
-                      service_details: entry.service_details || []  // ✅ НОВОЕ: Полные данные услуг
+                      created_at: entry.created_at
                     }],
                     confirmation_status: 'none',
                     confirmed_at: null,
@@ -2041,22 +2284,414 @@ const RegistrarPanel = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showWizard, showSlotsModal, showQRModal, appointments, handleBulkAction, appointmentsSelected]);
 
-  // ⭐ SSOT: Simple department check - backend already assigned queue_tag
-  // Canonical field: queue_tag (from backend specialty via adaptEntry)
-  // Removed: ~465 lines of legacy heuristics, mappings, queue_numbers.some(), service inference
+  // ✅ УНИВЕРСАЛЬНАЯ СИСТЕМА ФИЛЬТРАЦИИ ПО ОТДЕЛАМ
   const isInDepartment = useCallback((appointment, departmentKey) => {
-    // "all" tab shows everything
-    if (departmentKey === 'все' || departmentKey === 'all' || !departmentKey) return true;
+    const standardDepartments = ['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'];
+    const isDynamicDepartment = !standardDepartments.includes(departmentKey);
 
-    // SSOT: Backend already assigned the canonical department field
-    // ⚠️ TEMPORARY ADAPTER: Remove specialty/queue_tag fallback
-    // when backend guarantees department_key consistency
-    // Target: return appointment.department_key === departmentKey;
-    return appointment.queue_tag === departmentKey ||
-      appointment.specialty === departmentKey ||
-      appointment.department_key === departmentKey;
-  }, []);
+    // ✅ Нормализуем department_key (null, undefined, "null" -> null)
+    const appointmentDeptKey = (appointment.department_key && appointment.department_key !== 'null')
+      ? appointment.department_key
+      : null;
 
+    // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Для нестандартных отделений используем ТОЛЬКО department_key
+    if (isDynamicDepartment) {
+      // Для динамических отделений единственный способ фильтрации - по department_key
+      return appointmentDeptKey === departmentKey;
+    }
+
+    // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Проверка по услугам
+    // Если хотя бы одна услуга привязана к этому отделению через department_key
+    const hasServiceInDepartment = appointment.services.some(service => {
+      if (services && typeof services === 'object') {
+        for (const groupName in services) {
+          const groupServices = services[groupName];
+          if (Array.isArray(groupServices)) {
+            let serviceObj = null;
+            if (typeof service === 'number' || (typeof service === 'string' && !isNaN(service))) {
+              serviceObj = groupServices.find(s => s.id === parseInt(service));
+            } else if (typeof service === 'string') {
+              serviceObj = groupServices.find(s => s.name === service);
+            }
+
+            if (serviceObj && serviceObj.department_key === departmentKey) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    });
+
+    if (hasServiceInDepartment) {
+      return true;
+    }
+
+    // ✅ Для стандартных отделений: приоритетная проверка по department_key
+    if (appointmentDeptKey) {
+      // Прямое совпадение department_key
+      if (appointmentDeptKey === departmentKey) {
+        return true;
+      }
+      // Если department_key записи - динамическое отделение, не показываем в стандартных вкладках
+      if (!standardDepartments.includes(appointmentDeptKey)) {
+        return false;
+      }
+      // Если department_key есть, но не совпадает, продолжаем проверку department ниже
+    }
+
+    // ✅ ИСПРАВЛЕНО: Проверка по полю department для всех записей (включая новые из сценария 5)
+    // Проверяем department если department_key отсутствует или не совпадает
+    if (appointment.department && appointment.department !== 'null' && appointment.department !== null) {
+      // Маппинг полных названий отделений на короткие ключи вкладок
+      const departmentMapping = {
+        'cardiology': 'cardio',
+        'laboratory': 'lab',
+        'dermatology': 'derma',
+        'stomatology': 'dental',
+        'dentistry': 'dental',
+        'echokg': 'echokg',
+        'procedures': 'procedures'
+        // 'general' не включаем - это значит "проверить по кодам услуг"
+      };
+
+      const deptLower = appointment.department.toLowerCase();
+      const normalizedDept = departmentMapping[deptLower] || deptLower;
+
+      // Прямое совпадение или совпадение через маппинг
+      if (normalizedDept === departmentKey || appointment.department === departmentKey) {
+        return true;
+      }
+
+      // Если department='general' или не найден в маппинге - это значит проверить по кодам услуг
+      if (deptLower === 'general' || !departmentMapping[deptLower]) {
+        // Продолжаем выполнение - проверка по кодам услуг будет ниже
+      }
+      // Если department записи - динамическое отделение (в маппинге, но не в стандартных отделениях), не показываем
+      else if (!standardDepartments.includes(normalizedDept) && !standardDepartments.includes(appointment.department)) {
+        return false;
+      }
+      // Если не совпадает, продолжаем проверку по кодам услуг
+    }
+
+    const dept = (appointment.department?.toLowerCase() || '');
+    const specialty = (appointment.doctor_specialty?.toLowerCase() || '');
+
+    // Получаем коды услуг из service_codes
+    const appointmentServiceCodes = appointment.service_codes || [];
+
+    // Получаем услуги (могут быть ID или названия)
+    const appointmentServicesList = appointment.services || [];
+
+    // Преобразуем услуги в коды услуг
+    const serviceCodesFromServices = appointmentServicesList.map(service => {
+      if (services && typeof services === 'object') {
+        // Ищем услугу по ID или названию во всех группах
+        for (const groupName in services) {
+          const groupServices = services[groupName];
+          if (Array.isArray(groupServices)) {
+            // Сначала пробуем найти по ID (если service - число)
+            if (typeof service === 'number' || (typeof service === 'string' && !isNaN(service))) {
+              const serviceId = parseInt(service);
+              const serviceByID = groupServices.find(s => s.id === serviceId);
+              if (serviceByID && serviceByID.service_code) {
+                return serviceByID.service_code;
+              }
+            }
+
+            // Затем пробуем найти по названию
+            const serviceByName = groupServices.find(s => s.name === service);
+            if (serviceByName && serviceByName.service_code) {
+              return serviceByName.service_code;
+            }
+          }
+        }
+      }
+
+      // ВАЖНО: Если service_code не найден, но название услуги содержит "ЭКГ", возвращаем 'K10'
+      if (typeof service === 'string' && (service.includes('ЭКГ') || service.includes('ЭКг') || service.includes('экг') || service.toUpperCase().includes('ECG'))) {
+        return 'K10';
+      }
+
+      return null;
+    }).filter(code => code !== null);
+
+    // Объединяем коды из service_codes и преобразованные из services
+    // ✅ НОРМАЛИЗУЕМ КОДЫ К ВЕРХНЕМУ РЕГИСТРУ для единообразия
+    const allServiceCodes = [
+      ...appointmentServiceCodes.map(code => String(code).toUpperCase()),
+      ...serviceCodesFromServices.map(code => String(code).toUpperCase())
+    ];
+
+    // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
+    const departmentCategoryMapping = {
+      'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
+      'echokg': ['ECG'],         // 🎯 ЭКГ - отдельная категория (возвращается getServiceCategoryByCode!)
+      'derma': ['D', 'DERM', 'DERM_PROC'],            // Дерматология: консультация и дерм. процедуры
+      'dental': ['S', 'DENT', 'STOM'],           // Стоматология: консультация, рентген
+      'lab': ['L'],              // Лаборатория: все лабораторные услуги
+      'procedures': ['P', 'C', 'D_PROC', 'PHYS', 'COSM']  // Процедуры: физио, косметология, дерм.процедуры
+    };
+
+    // Получаем коды категорий для данного отдела
+    const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
+
+    // Маппинг кодов услуг к категориям (обновлен согласно новым требованиям)
+    const getServiceCategoryByCode = (serviceCode) => {
+      if (!serviceCode) return null;
+
+      // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ для корректного распознавания
+      const normalizedCode = String(serviceCode).toUpperCase();
+
+      // ЭКГ - отдельная категория (только ЭКГ) - ВАЖНО: K10 это ЭКГ!
+      if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
+
+      // ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
+      if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
+
+      // Физиотерапия (дерматологическая) - коды P01-P05
+      if (normalizedCode.match(/^P\d+$/)) return 'P';
+
+      // Дерматологические процедуры - коды D_PROC01-D_PROC04
+      if (normalizedCode.match(/^D_PROC\d+$/)) return 'D_PROC';
+
+      // Косметологические процедуры - коды C01-C12
+      if (normalizedCode.match(/^C\d+$/)) return 'C';
+
+      // Кардиология - коды K01, K11 и т.д. (НО НЕ K10 - это ЭКГ!)
+      if (normalizedCode.match(/^K\d+$/) && normalizedCode !== 'K10') return 'K';
+
+      // Стоматология - коды S01, S10
+      if (normalizedCode.match(/^S\d+$/)) return 'S';
+
+      // Лаборатория - коды L01-L65
+      if (normalizedCode.match(/^L\d+$/)) return 'L';
+
+      // Дерматология - только консультации (D01)
+      if (normalizedCode === 'D01') return 'D';
+
+      // Старый формат кодов (префиксы) - обновленный
+      if (normalizedCode.startsWith('CONS_CARD')) return 'K';  // Консультации кардиолога
+      if (normalizedCode.startsWith('CONS_DERM') || normalizedCode.startsWith('DERMA_')) return 'DERM';  // Дерматология-косметология
+      if (normalizedCode.startsWith('CONS_DENT') || normalizedCode.startsWith('DENT_') || normalizedCode.startsWith('STOM_')) return 'DENT';  // Стоматология
+      if (normalizedCode.startsWith('LAB_')) return 'L';  // Лаборатория
+      if (normalizedCode.startsWith('COSM_')) return 'C';  // Косметология
+      if (normalizedCode.startsWith('PHYSIO_') || normalizedCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
+      if (normalizedCode.startsWith('DERM_PROC_') || normalizedCode.startsWith('DERM_')) return 'D_PROC';  // Дерматологические процедуры
+
+      // Дополнительные паттерны для кардиологии
+      if (normalizedCode.startsWith('CARD_') && !normalizedCode.includes('ECG')) return 'K';
+
+      return null;
+    };
+
+    // ✅ ИСПРАВЛЕНО: Вычисляем категории услуг для дальнейших проверок
+    const serviceCategoriesArray = allServiceCodes.map(getServiceCategoryByCode);
+    const serviceCategories = new Set(serviceCategoriesArray.filter(Boolean));
+
+    // Проверяем различными способами
+    const matchesByDepartment = dept.includes(departmentKey) ||
+      (departmentKey === 'derma' && (dept.includes('dermat') || dept.includes('dermatology'))) ||
+      (departmentKey === 'dental' && (dept.includes('dental') || dept.includes('stoma') || dept.includes('dentistry'))) ||
+      (departmentKey === 'cardio' && dept.includes('cardiology')) ||
+      (departmentKey === 'echokg' && (dept.includes('ecg') || dept.includes('экг'))) ||
+      (departmentKey === 'lab' && (dept.includes('lab') || dept.includes('laboratory'))) ||
+      (departmentKey === 'procedures' && (dept.includes('procedures') || dept.includes('cosmetology')));
+
+    const matchesBySpecialty = specialty.includes(departmentKey) ||
+      (departmentKey === 'derma' && specialty.includes('dermat')) ||
+      (departmentKey === 'dental' && (specialty.includes('dental') || specialty.includes('stoma'))) ||
+      (departmentKey === 'cardio' && specialty.includes('cardio')) ||
+      (departmentKey === 'echokg' && (specialty.includes('ecg') || specialty.includes('экг'))) ||
+      (departmentKey === 'lab' && (specialty.includes('lab') || specialty.includes('laboratory')));
+
+    // ✅ НОВАЯ ЛОГИКА: проверяем по кодам услуг
+    const matchesByServices = allServiceCodes.some(serviceCode => {
+      const serviceCategory = getServiceCategoryByCode(serviceCode);
+      return targetCategoryCodes.includes(serviceCategory);
+    });
+
+    // ✅ ИСПРАВЛЕНО: Для echokg показываем записи с ECG
+    // ИЛИ если specialty/department указывает на ЭКГ (для QR без услуг)
+    if (departmentKey === 'echokg') {
+      const hasECGService = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'ECG';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть ECG
+      // Если есть только услуги других категорий - НЕ показываем в echokg
+      if (allServiceCodes.length > 0) {
+        if (hasECGService) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для кардиологии показываем записи с K (кроме K10/ECG) или ECHO
+    // ИЛИ если specialty/department указывает на кардиологию (для QR без услуг)
+    if (departmentKey === 'cardio') {
+      const hasCardiologyServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'K' || category === 'ECHO';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть кардиологическими
+      // Если есть только услуги других категорий - НЕ показываем в cardio
+      if (allServiceCodes.length > 0) {
+        if (hasCardiologyServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для лаборатории показываем записи с L
+    // ИЛИ если specialty/department указывает на лабораторию (для QR без услуг)
+    if (departmentKey === 'lab') {
+      const hasLabServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'L';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть лабораторными
+      // Если есть только услуги других категорий - НЕ показываем в lab
+      if (allServiceCodes.length > 0) {
+        if (hasLabServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для стоматологии показываем записи с S, DENT, STOM
+    // Фильтрация услуг по вкладке выполняется в filterServicesByDepartment
+    // ИЛИ если specialty/department указывает на стоматологию (для QR без услуг)
+    if (departmentKey === 'dental') {
+      // Проверяем наличие стоматологических услуг
+      const hasDentalServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'S' || category === 'DENT' || category === 'STOM';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть стоматологическими
+      // Если есть только услуги других категорий (C, P, D, L, K и т.д.) - НЕ показываем в dental
+      if (allServiceCodes.length > 0) {
+        // Если есть хотя бы одна стоматологическая услуга - показываем
+        // filterServicesByDepartment отфильтрует и покажет только стоматологические
+        if (hasDentalServices) {
+          return true;
+        }
+        // Если есть услуги, но нет стоматологических - НЕ показываем
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для дерматологии показываем записи с D, DERM, DERM_PROC
+    // Фильтрация услуг по вкладке выполняется в filterServicesByDepartment
+    // ИЛИ если specialty/department указывает на дерматологию (для QR без услуг)
+    if (departmentKey === 'derma') {
+      const hasDermaServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'D' || category === 'DERM' || category === 'DERM_PROC';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть дерматологическими
+      // Если есть только услуги других категорий - НЕ показываем в derma
+      if (allServiceCodes.length > 0) {
+        if (hasDermaServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для процедур показываем записи с P, C, D_PROC, PHYS, COSM
+    // Фильтрация услуг по вкладке выполняется в filterServicesByDepartment
+    // ИЛИ если specialty/department указывает на процедуры (для QR без услуг)
+    if (departmentKey === 'procedures') {
+      const hasProcedureServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        // ✅ getServiceCategoryByCode возвращает 'P' для физиотерапии, 'C' для косметологии, 'D_PROC' для дерматологических процедур
+        return category === 'P' || category === 'C' || category === 'D_PROC';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть процедурными
+      // Если есть только услуги других категорий - НЕ показываем в procedures
+      if (allServiceCodes.length > 0) {
+        if (hasProcedureServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ НОВОЕ: Проверяем queue_tag как дополнительный источник (только если нет услуг)
+    // Приоритет: коды услуг > queue_tag > specialty/department
+    const queueTags = appointment.queue_numbers?.map(q => q.queue_tag).filter(Boolean) || [];
+
+    // Маппинг queue_tag → вкладки
+    const queueTagToTab = {
+      'cardiology_common': 'cardio',
+      'cardiology': 'cardio',
+      'cardio': 'cardio',
+      'general': 'cardio',  // Общие очереди попадают в кардиологию (только если нет услуг)
+      'ecg': 'echokg',
+      'echokg': 'cardio', // ЭхоКГ относится к кардиологии (вкладка echokg - это ЭКГ)
+      'lab': 'lab',
+      'laboratory': 'lab',
+      'procedures': 'procedures',
+      'stomatology': 'dental',
+      'dental': 'dental',
+      'dentistry': 'dental',
+      'dermatology': 'derma',
+      'derma': 'derma',
+      'dermat': 'derma',
+      'therapy': 'cardio',
+      'therapist': 'cardio'
+    };
+
+    // Проверяем queue_tag только если услуги не определили отдел
+    const matchesByQueueTag = queueTags.some(tag => queueTagToTab[tag] === departmentKey);
+
+    // ✅ ВАЖНО: Если у записи есть услуги, которые определили какой-то отдел,
+    // то queue_tag 'general' не должен переопределять это
+    // Проверяем, определили ли услуги какой-либо отдел (не обязательно текущий)
+    const hasAnyServiceCategory = serviceCategories.size > 0;
+
+    // Используем queue_tag только если услуг нет или если услуги не определили категорию
+    // Если услуги определили категорию (D, S, L, K и т.д.), то queue_tag игнорируется
+    const shouldUseQueueTag = !hasAnyServiceCategory;
+
+    // Итог: приоритет услуг выше queue_tag, который выше specialty/department
+    // Если услуги определили отдел (matchesByServices = true), используем их результат
+    // Если услуги есть, но не определили текущий отдел, НЕ используем queue_tag (чтобы избежать неправильной категоризации)
+    // Если услуг нет, используем queue_tag
+    // В последнюю очередь используем specialty/department
+    const result = matchesByServices || (shouldUseQueueTag && matchesByQueueTag) || matchesByDepartment || matchesBySpecialty;
+
+    // ✅ Возвращаем результат универсальной проверки
+    return result;
+  }, [services]);
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
@@ -2086,11 +2721,7 @@ const RegistrarPanel = () => {
     return stats;
   }, [appointments, todayStr, isInDepartment, dynamicDepartments]);
 
-
-  // 🎨 PRESENTATION-ONLY: Aggregation for "All departments" tab
-  // Groups entries by patient for visual display (1 patient = 1 row)
-  // ✅ ALLOWED by SSOT: This is view-model grouping, NOT business logic
-  // ⚠️ Do NOT use for: filtering, routing, department decisions
+  // Функция агрегации пациентов для вкладки "Все отделения"
   const aggregatePatientsForAllDepartments = useCallback((appointments) => {
     const patientGroups = {};
 
@@ -2131,21 +2762,11 @@ const RegistrarPanel = () => {
           confirmed_at: appointment.confirmed_at,
           confirmed_by: appointment.confirmed_by,
           record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
-          source: appointment.source, // ✅ FIX: Сохраняем источник (online/desk) для Wizard'а
           // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
           discount_mode: appointment.discount_mode,
-          approval_status: appointment.approval_status,
-          // ✅ FIX: Собираем ВСЕ ID записей для групповой отмены
-          // Если запись уже агрегирована в loadAppointments, берем её aggregated_ids
-          aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id]
+          approval_status: appointment.approval_status
         };
       } else {
-        // Добавляем ID в массив агрегированных
-        const newIds = appointment.aggregated_ids || [appointment.id];
-        patientGroups[patientKey].aggregated_ids.push(...newIds);
-        // Убираем возможные дубликаты
-        patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
-
         // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
         const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
         const existingIsAllFree = patientGroups[patientKey].discount_mode === 'all_free' &&
@@ -2158,34 +2779,6 @@ const RegistrarPanel = () => {
           patientGroups[patientKey].discount_mode = appointment.discount_mode;
           patientGroups[patientKey].approval_status = appointment.approval_status;
         }
-
-        // ✅ FIX: Агрегируем queue_numbers (добавляем новые очереди к существующему пациенту в таблице "Все")
-        // ⭐ ИСПРАВЛЕНО: Дедупликация по ID записи, а не по specialty
-        // Это позволяет сохранить несколько записей с одинаковой specialty (например, 2 консультации кардиолога)
-        if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
-          const existingQueueIds = new Set((patientGroups[patientKey].queue_numbers || []).map(qn =>
-            qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`
-          ));
-
-          appointment.queue_numbers.forEach(qn => {
-            const queueId = qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`;
-            if (!existingQueueIds.has(queueId)) {
-              patientGroups[patientKey].queue_numbers.push(qn);
-              existingQueueIds.add(queueId);
-            }
-          });
-        }
-
-        // ✅ SSOT: Только source='online' считается QR-записью
-        // confirmation больше не используется — backend теперь всегда возвращает 'online' или 'desk'
-        const isQRSource = (src) => src === 'online';
-        const currentIsQR = isQRSource(appointment.source);
-        const aggregatedIsQR = isQRSource(patientGroups[patientKey].source);
-
-        if (currentIsQR && !aggregatedIsQR) {
-          patientGroups[patientKey].source = appointment.source;
-          patientGroups[patientKey].record_type = appointment.record_type || patientGroups[patientKey].record_type;
-        }
       }
 
       // Суммируем стоимость для ВСЕХ записей пациента (включая первую)
@@ -2196,23 +2789,10 @@ const RegistrarPanel = () => {
       }
 
       // Добавляем услуги если их еще нет
-      // ⭐ DEBUG: Логируем что приходит в агрегацию
-      // console.log(`🔄 Aggregating ${appointment.patient_fio}: appointment.services=${JSON.stringify(appointment.services)}, current patientGroups[${patientKey}].services=${JSON.stringify(patientGroups[patientKey].services)}`);
-
       if (appointment.services && Array.isArray(appointment.services)) {
         appointment.services.forEach(service => {
           if (!patientGroups[patientKey].services.includes(service)) {
             patientGroups[patientKey].services.push(service);
-          }
-        });
-      }
-
-      // ✅ FIX: Агрегируем service_codes для корректной работы Wizard
-      if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-        if (!patientGroups[patientKey].service_codes) patientGroups[patientKey].service_codes = [];
-        appointment.service_codes.forEach(code => {
-          if (!patientGroups[patientKey].service_codes.includes(code)) {
-            patientGroups[patientKey].service_codes.push(code);
           }
         });
       }
@@ -2236,172 +2816,27 @@ const RegistrarPanel = () => {
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
 
   // ✅ Функция фильтрации услуг по вкладке
-  // ⭐ ИСПРАВЛЕНО: Для QR-записей с несколькими специалистами используем queue_numbers
   const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
-    // ⭐ SSOT: Используем централизованную функцию toServiceCode
-    // Расширяем её для обратной совместимости с fuzzy matching
-    const toServiceCode = (value) => {
-      if (!value) return null;
-
-      // Сначала пробуем SSOT резолвер
-      const ssotResult = ssotToServiceCode(value);
-      if (ssotResult) return ssotResult;
-
-      // Fallback для fuzzy matching (legacy support)
-      const normalized = String(value).toLowerCase().trim();
-      for (const [key, code] of Object.entries(SPECIALTY_TO_CODE)) {
-        if (normalized.includes(key) || key.includes(normalized)) {
-          return code;
-        }
-      }
-
-      // Ultimate fallback: первая буква + 01
-      // ⚠️ ТОЛЬКО для известных категорий, не для произвольных кириллических букв
-      const firstLetter = normalized.charAt(0).toUpperCase();
-      if (/[A-Z]/i.test(firstLetter)) {
-        // Только латинские буквы для кодов (K, D, S, L, P, C)
-        return `${firstLetter}01`;
-      }
-      // Кириллические буквы: конвертируем известные, игнорируем остальные
-      const ruToEn = { 'К': 'K', 'Д': 'D', 'С': 'S', 'Л': 'L', 'П': 'P' };
-      const mappedLetter = ruToEn[firstLetter];
-      if (mappedLetter) {
-        return `${mappedLetter}01`;
-      }
-      // ⛔ Не генерируем коды из неизвестных кириллических букв (О, Е, А и т.д.)
-      // Это предотвращает генерацию невалидных кодов вроде "О01"
-
-      return null;
-    };
-
-    // ⭐ Для QR-записей с queue_numbers - собираем услуги из всех queue_numbers
-    if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers) && appointment.queue_numbers.length > 0) {
-
-      // ⭐ Если НЕТ departmentKey (вкладка "Все отделения") - используем уже имеющиеся services
-      if (!departmentKey) {
-        // ✅ ИСПРАВЛЕНО: Используем appointment.services напрямую, т.к. они уже содержат правильные коды (K11, L02 и т.д.)
-        // Раньше мы генерировали коды из specialty/service_name, что приводило к fallback на K01/L01
-        if (appointment.services && Array.isArray(appointment.services) && appointment.services.length > 0) {
-          return appointment.services;
-        }
-
-        // Fallback: только если services пустой, генерируем из queue_numbers
-        const allCodes = [];
-        const seenCodes = new Set();
-
-        appointment.queue_numbers.forEach(qn => {
-          // Приоритет 1: service_name
-          const serviceNameCode = toServiceCode(qn.service_name);
-          if (serviceNameCode && !seenCodes.has(serviceNameCode)) {
-            allCodes.push(serviceNameCode);
-            seenCodes.add(serviceNameCode);
-            return;
-          }
-
-          // Приоритет 2: specialty
-          const specialtyCode = toServiceCode(qn.specialty || qn.queue_tag);
-          if (specialtyCode && !seenCodes.has(specialtyCode)) {
-            allCodes.push(specialtyCode);
-            seenCodes.add(specialtyCode);
-          }
-        });
-
-        return allCodes.length > 0 ? allCodes : [];
-      }
-
-      // ⭐ Для конкретной вкладки - фильтруем из существующих services по категории
-      // ✅ ИСПРАВЛЕНО: Используем appointment.services напрямую, фильтруя по категории отделения
-      const departmentCodePrefixes = {
-        'cardio': ['K'],  // K01, K11 и т.д. - все кардиоуслуги кроме ECG
-        'echokg': ['K10', 'ECG'],  // Только ЭКГ (K10)
-        'derma': ['D'],  // D01 и т.д. (только консультации, не D_PROC)
-        'dental': ['S'],  // S01, S10 и т.д.
-        'lab': ['L'],  // L01, L02, L11 и т.д.
-        'procedures': ['P', 'C', 'D_PROC']  // P01, P02, C01, C05, D_PROC02 и т.д.
-      };
-
-      const allowedPrefixes = departmentCodePrefixes[departmentKey] || [];
-
-      // ✅ Фильтруем существующие services по категории
-      if (appointment.services && Array.isArray(appointment.services) && appointment.services.length > 0) {
-        const filteredByDepartment = appointment.services.filter(serviceItem => {
-          // ✅ ИСПРАВЛЕНО: Извлекаем код из объекта если это объект, иначе используем как строку
-          // Backend может возвращать services как [{code: "L10", name: "Общий белок", ...}] или как ["L10"]
-          const code = (typeof serviceItem === 'object' && serviceItem?.code)
-            ? String(serviceItem.code).toUpperCase()
-            : String(serviceItem).toUpperCase();
-
-          // Специальная логика для echokg: только K10 и ECG коды
-          if (departmentKey === 'echokg') {
-            return code === 'K10' || code.startsWith('ECG');
-          }
-
-          // Специальная логика для cardio: все K-коды КРОМЕ K10 (ЭКГ)
-          if (departmentKey === 'cardio') {
-            return code.startsWith('K') && code !== 'K10';
-          }
-
-          // Для остальных отделений - проверяем по префиксу
-          return allowedPrefixes.some(prefix => code.startsWith(prefix));
-        });
-
-        if (filteredByDepartment.length > 0) {
-          return filteredByDepartment;
-        }
-      }
-
-      // Fallback: если в services нет подходящих кодов, генерируем из queue_numbers (для старых записей)
-      const tabToSpecialtyMap = {
-        'cardio': ['cardiology', 'cardio', 'cardiolog'],
-        'echokg': ['echokg', 'ecg', 'echo'],
-        'derma': ['dermatology', 'derma', 'dermatolog'],
-        'dental': ['stomatology', 'dentist', 'dental', 'stom'],
-        'lab': ['laboratory', 'lab'],
-        'procedures': ['procedures', 'procedure', 'cosmetology', 'physio']
-      };
-
-      const possibleSpecialties = tabToSpecialtyMap[departmentKey] || [departmentKey];
-
-      const matchingQueue = appointment.queue_numbers.find(qn => {
-        const qnSpecialty = (qn.specialty || qn.queue_tag || '').toLowerCase().trim();
-        return possibleSpecialties.some(spec => qnSpecialty.includes(spec) || spec.includes(qnSpecialty));
-      });
-
-      if (matchingQueue) {
-        const serviceNameCode = toServiceCode(matchingQueue.service_name);
-        if (serviceNameCode) {
-          return [serviceNameCode];
-        }
-
-        const specialtyCode = toServiceCode(matchingQueue.specialty || matchingQueue.queue_tag);
-        if (specialtyCode) {
-          return [specialtyCode];
-        }
-      }
-    }
-
-    // ⭐ Для обычных записей без queue_numbers
-    if (!departmentKey) {
-      return appointment.services;
-    }
-
-    // ⭐ Стандартная фильтрация по service_codes
-    if (!appointment.services || !Array.isArray(appointment.services) || appointment.services.length === 0) {
-      return appointment.services;
+    if (!departmentKey || !appointment.services) {
+      return appointment.services; // Если нет вкладки или услуг, возвращаем все
     }
 
     const appointmentServiceCodes = appointment.service_codes || [];
     const appointmentServices = appointment.services || [];
 
-    // Создаем маппинг service -> service_code
+    // ⭐ ВАЖНО: Создаем маппинг service -> service_code для точного сопоставления
+    // Это гарантирует, что каждая услуга сопоставляется с правильным кодом
     const serviceToCodeMap = new Map();
 
     appointmentServices.forEach((service, index) => {
+      // Приоритет 1: service_codes по индексу (если массивы совпадают по порядку)
+      // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ
       if (appointmentServiceCodes[index]) {
         serviceToCodeMap.set(service, String(appointmentServiceCodes[index]).toUpperCase());
         return;
       }
 
+      // Приоритет 2: ищем по ID или названию в справочнике услуг
       if (services && typeof services === 'object') {
         for (const groupName in services) {
           const groupServices = services[groupName];
@@ -2410,12 +2845,14 @@ const RegistrarPanel = () => {
               const serviceId = parseInt(service);
               const serviceByID = groupServices.find(s => s.id === serviceId);
               if (serviceByID && serviceByID.service_code) {
+                // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ
                 serviceToCodeMap.set(service, String(serviceByID.service_code).toUpperCase());
                 return;
               }
             }
             const serviceByName = groupServices.find(s => s.name === service);
             if (serviceByName && serviceByName.service_code) {
+              // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ
               serviceToCodeMap.set(service, String(serviceByName.service_code).toUpperCase());
               return;
             }
@@ -2431,15 +2868,19 @@ const RegistrarPanel = () => {
       'derma': ['D', 'DERM', 'DERM_PROC'],
       'dental': ['S', 'DENT', 'STOM'],
       'lab': ['L'],
+      // ✅ ИСПРАВЛЕНО: Используем категории, которые возвращает getServiceCategoryByCode
+      // 'P' для физиотерапии (PHYSIO_, PHYS_), 'C' для косметологии (COSM_), 'D_PROC' для дерматологических процедур
       'procedures': ['P', 'C', 'D_PROC']
     };
 
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
+      
+      // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ для корректного распознавания
       const normalizedCode = String(serviceCode).toUpperCase();
-
-      if (normalizedCode === 'K10' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
-      if (normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
+      
+      if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
+      if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
       if (normalizedCode.match(/^P\d+$/)) return 'P';
       if (normalizedCode.match(/^D_PROC\d+$/)) return 'D_PROC';
       if (normalizedCode.match(/^C\d+$/)) return 'C';
@@ -2460,96 +2901,142 @@ const RegistrarPanel = () => {
 
     const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
 
-    const filteredServices = appointmentServices
-      .filter((service) => {
-        const serviceCode = serviceToCodeMap.get(service);
-        if (!serviceCode) return false;
-        const category = getServiceCategoryByCode(serviceCode);
-        return targetCategoryCodes.includes(category);
-      });
+    // Фильтруем услуги: оставляем только те, которые относятся к текущей вкладке
+    // ⭐ ВАЖНО: Используем маппинг service -> service_code для точного сопоставления
+    const servicesWithCodes = appointmentServices.map((service) => {
+      // Получаем код услуги из маппинга
+      const serviceCode = serviceToCodeMap.get(service) || null;
 
-    return filteredServices;
+      return { service, serviceCode };
+    });
+
+    // Теперь фильтруем по категории
+    const filteredServices = servicesWithCodes
+      .filter(({ serviceCode }) => {
+        if (!serviceCode) {
+          // Если код не найден, НЕ показываем (чтобы избежать неправильной категоризации)
+          return false;
+        }
+
+        const category = getServiceCategoryByCode(serviceCode);
+        const shouldShow = targetCategoryCodes.includes(category);
+
+        return shouldShow;
+      })
+      .map(({ service }) => service); // Возвращаем только услуги
+
+    return filteredServices.length > 0 ? filteredServices : appointmentServices; // Если ничего не отфильтровалось, показываем все
   }, [services]);
 
   // ✅ filteredAppointments вычисляется здесь и сохраняется в ref
   const filteredAppointments = useMemo(() => {
-    // ⭐ FIX 14 (SSOT): Маппинг вкладки -> queue_tags
-    const tabToQueueTagMap = {
-      'cardio': ['cardiology', 'cardio'],
-      'echokg': ['echokg', 'ecg'],
-      'derma': ['dermatology', 'derma'],
-      'dental': ['stomatology', 'dentist', 'dental'],
-      'lab': ['laboratory', 'lab'],
-      'procedures': ['procedures']
-    };
-
-    // Если выбрана конкретная вкладка (не "Все отделения"), используем rawEntries с фильтрацией по queue_tag
+    // Если выбрана конкретная вкладка (не "Все отделения"), используем обычную фильтрацию
     if (activeTab) {
-      // ⭐ FIX 14: SSOT — используем rawEntries (flat list OnlineQueueEntry), НЕ агрегированные appointments
-      // Каждая rawEntry имеет свой queue_time — это решает проблему "одинакового времени на всех вкладках"
-      const possibleTags = tabToQueueTagMap[activeTab] || [activeTab];
-
-      // Фильтруем rawEntries по queue_tag вкладки
-      const entriesForTab = (rawEntries && rawEntries.length > 0 ? rawEntries : appointments).filter(entry => {
-        // Определяем queue_tag записи
-        const entryQueueTag = (
-          entry.queue_tag ||
-          entry.specialty ||
-          (entry.queue_numbers && entry.queue_numbers[0]?.queue_tag) ||
-          ''
-        ).toString().toLowerCase().trim();
-
-        // Проверяем соответствие вкладке
-        const matchesTab = possibleTags.some(tag => tag.toLowerCase() === entryQueueTag);
-        if (!matchesTab) return false;
-
-        // Фильтр по статусу
-        if (statusFilter && entry.status !== statusFilter) return false;
-
-        // Фильтр по поиску
-        if (searchQuery) {
-          const inFio = (entry.patient_fio || entry.patient_name || '').toLowerCase().includes(searchQuery);
-          const inId = String(entry.id).includes(searchQuery);
-          const phoneDigits = (entry.patient_phone || entry.phone || '').replace(/\D/g, '');
-          const searchDigits = searchQuery.replace(/\D/g, '');
-          const inPhone = phoneDigits.includes(searchDigits);
-          if (!inFio && !inId && !inPhone) return false;
+      const filtered = appointments.filter(appointment => {
+        // Фильтр по вкладке (отдел)
+        if (!isInDepartment(appointment, activeTab)) {
+          return false;
         }
+        // Фильтр по статусу (если задан)
+        if (statusFilter && appointment.status !== statusFilter) return false;
+        // Поиск по ФИО/телефону/услугам/ID записи (если задан)
+        if (searchQuery) {
+          const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
 
+          // Поиск по ID записи
+          const inId = String(appointment.id).includes(searchQuery);
+
+          // Улучшенный поиск по телефону - ищем и в исходном, и в отформатированном виде
+          const originalPhone = (appointment.patient_phone || '').toLowerCase();
+          const phoneDigits = originalPhone.replace(/\D/g, ''); // Только цифры
+          const searchDigits = searchQuery.replace(/\D/g, ''); // Только цифры из поиска
+
+          const inPhone = originalPhone.includes(searchQuery) ||
+            phoneDigits.includes(searchDigits) ||
+            (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+
+          const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
+          if (!inFio && !inPhone && !inServices && !inId) return false;
+        }
         return true;
       });
 
-      // Сортируем по queue_time ASC
-      const sorted = entriesForTab.sort((a, b) => {
-        const aTime = (a.queue_time ? new Date(a.queue_time) : new Date(a.created_at || 0)).getTime();
-        const bTime = (b.queue_time ? new Date(b.queue_time) : new Date(b.created_at || 0)).getTime();
-        return aTime - bTime;
+      // ⭐ ВАЖНО: Сортируем по queue_time ASC (согласно cursor.yaml), иначе по created_at
+      // Это обеспечивает правильный порядок записей во вкладках
+      const sorted = filtered.sort((a, b) => {
+        // Приоритет: queue_time > created_at
+        const aTime = (a.queue_time ? new Date(a.queue_time) : (a.created_at ? new Date(a.created_at) : null))?.getTime() || 0;
+        const bTime = (b.queue_time ? new Date(b.queue_time) : (b.created_at ? new Date(b.created_at) : null))?.getTime() || 0;
+        // Если время одинаковое или отсутствует, используем ID как fallback
+        if (aTime === bTime) {
+          return (a.id || 0) - (b.id || 0);
+        }
+        return aTime - bTime; // От раннего к позднему (ASC)
       });
 
-      logger.info('⭐ FIX 16: Вкладка', activeTab, '- найдено', sorted.length, 'записей из',
-        rawEntries?.length || 0, 'rawEntries');
+      // ✅ ИСПРАВЛЕНО: Используем номера из базы данных (queue_numbers), не пересчитываем
+      // Это гарантирует, что номера старых услуг не меняются при добавлении новых
+      // ⭐ ВАЖНО: Для каждой вкладки выбираем правильный номер очереди по queue_tag/specialty
+      const sortedWithNumbers = sorted.map((appointment) => {
+        // Маппинг активной вкладки на queue_tag/specialty
+        const tabToQueueTagMap = {
+          'cardio': ['cardiology', 'cardio'],
+          'echokg': ['echokg', 'ecg'],
+          'derma': ['dermatology', 'derma'],
+          'dental': ['stomatology', 'dentist', 'dental'],
+          'lab': ['laboratory', 'lab'],
+          'procedures': ['procedures']
+        };
+        
+        // Получаем возможные queue_tag для текущей вкладки
+        const possibleTags = tabToQueueTagMap[activeTab] || [activeTab];
+        
+        // Ищем номер очереди, соответствующий текущей вкладке
+        let queueNumberFromDB = null;
+        if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
+          // Ищем номер очереди с queue_tag или specialty, соответствующим активной вкладке
+          const matchingQueue = appointment.queue_numbers.find(q => {
+            const queueTag = (q.queue_tag || q.specialty || '').toString().toLowerCase().trim();
+            return possibleTags.some(tag => tag.toLowerCase() === queueTag);
+          });
+          
+          if (matchingQueue) {
+            queueNumberFromDB = matchingQueue.number;
+          } else {
+            // Fallback: используем первый номер, если не нашли совпадение
+            queueNumberFromDB = appointment.queue_numbers[0]?.number || null;
+          }
+        }
 
-      // ⭐ FIX 16: Подробный лог queue_time для каждой entry
-      sorted.forEach((entry, idx) => {
-        logger.info(`  📌 Entry[${idx}]: id=${entry.id}, queue_tag=${entry.queue_tag}, queue_time=${entry.queue_time}, patient=${entry.patient_fio}`);
+        // Приоритет 2: Используем queue_number из appointment (если есть)
+        const queueNumber = queueNumberFromDB || appointment.queue_number || null;
+
+        return {
+          ...appointment,
+          queue_number: queueNumber,  // ⭐ Используем номер из БД для текущей вкладки
+          queue_numbers: appointment.queue_numbers || []  // ⭐ Сохраняем оригинальные номера из БД
+        };
       });
 
-      // Каждая entry уже содержит свой queue_time — никакого переопределения не нужно
-      return sorted.map(entry => ({
-        ...entry,
-        // Нормализуем поля для совместимости с EnhancedAppointmentsTable
-        patient_fio: entry.patient_fio || entry.patient_name || 'Неизвестный пациент',
-        queue_number: entry.number || entry.queue_number,
-        queue_numbers: entry.queue_numbers || [{
-          number: entry.number,
-          queue_tag: entry.queue_tag || entry.specialty,
-          status: entry.status,
-          queue_time: entry.queue_time
-        }]
+      logger.info('🔍 Результат фильтрации для вкладки', activeTab, ':', sortedWithNumbers.length, 'записей');
+      logger.info('📅 Первые 5 записей с номерами:', sortedWithNumbers.slice(0, 5).map(a => ({
+        id: a.id,
+        patient: a.patient_fio,
+        number: a.queue_number,
+        created_at: a.created_at,
+        source: a.source
+      })));
+
+      // ✅ Фильтруем услуги по вкладке: показываем только релевантные услуги
+      const withFilteredServices = sortedWithNumbers.map(appointment => ({
+        ...appointment,
+        services: filterServicesByDepartment(appointment, activeTab)
       }));
+
+      return withFilteredServices;
     }
 
-    // Для вкладки "Все отделения" (activeTab === null или undefined) - агрегируем пациентов
+    // Для вкладки "Все отделения" (activeTab === null) - агрегируем пациентов
     if (!activeTab) {
       // Сначала фильтруем по статусу, если задан
       const filtered = appointments.filter(appointment => {
@@ -2570,15 +3057,7 @@ const RegistrarPanel = () => {
       });
 
       // Затем агрегируем пациентов
-      logger.info(`📊 Для вкладки "Все отделения": ${filtered.length} записей до агрегации`);
-      const qrInFiltered = filtered.filter(a => a.source === 'online');
-      logger.info(`🔍 QR-записей в фильтре: ${qrInFiltered.length}`);
-      qrInFiltered.forEach(a => {
-        logger.info(`  - ${a.patient_fio}: ${a.queue_numbers?.length || 0} queue_numbers`, a.queue_numbers);
-      });
-
       const aggregatedPatients = aggregatePatientsForAllDepartments(filtered);
-      logger.info(`📊 После агрегации: ${aggregatedPatients.length} пациентов`);
 
       // Применяем поиск к агрегированным данным
       if (searchQuery) {
@@ -2614,7 +3093,7 @@ const RegistrarPanel = () => {
       }
 
       // ⭐ ВАЖНО: Сортируем агрегированных пациентов по queue_time ASC (согласно cursor.yaml)
-      const sortedAggregated = aggregatedPatients.sort((a, b) => {
+      return aggregatedPatients.sort((a, b) => {
         // Приоритет: queue_time > created_at
         const aTime = (a.queue_time ? new Date(a.queue_time) : (a.created_at ? new Date(a.created_at) : null))?.getTime() || 0;
         const bTime = (b.queue_time ? new Date(b.queue_time) : (b.created_at ? new Date(b.created_at) : null))?.getTime() || 0;
@@ -2623,13 +3102,6 @@ const RegistrarPanel = () => {
         }
         return aTime - bTime; // От раннего к позднему (ASC)
       });
-
-      // ✅ ИСПРАВЛЕНО: Применяем правильное форматирование услуг для вкладки "Все отделения"
-      // Это гарантирует, что для QR-записей будут показаны все коды услуг (K01, S01 и т.д.)
-      return sortedAggregated.map(patient => ({
-        ...patient,
-        services: filterServicesByDepartment(patient, null)
-      }));
     }
 
     // ⭐ ВАЖНО: Сортируем все записи по queue_time ASC (согласно cursor.yaml), иначе по created_at
@@ -2642,7 +3114,7 @@ const RegistrarPanel = () => {
       }
       return aTime - bTime; // От раннего к позднему (ASC)
     });
-  }, [appointments, rawEntries, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments, filterServicesByDepartment]);
+  }, [appointments, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments, filterServicesByDepartment]);
 
   // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
   filteredAppointmentsRef.current = filteredAppointments;
@@ -2801,7 +3273,6 @@ const RegistrarPanel = () => {
         setPrintDialog({ open: true, type: 'ticket', data: row });
         break;
       case 'reschedule':
-        setRescheduleData(row);
         setShowSlotsModal(true);
         break;
       case 'cancel':
@@ -2811,14 +3282,6 @@ const RegistrarPanel = () => {
         if (row.patient_phone) {
           window.open(`tel:${row.patient_phone}`);
         }
-        break;
-      case 'force_majeure':
-        // Открываем модальное окно форс-мажора для специалиста
-        setForceMajeureModal({
-          open: true,
-          specialistId: row.doctor_id || row.specialist_id || null,
-          specialistName: row.doctor_name || row.specialist_name || 'Все специалисты'
-        });
         break;
       default:
         logger.info('Неизвестное действие:', action);
@@ -3460,7 +3923,6 @@ const RegistrarPanel = () => {
                     {(appointmentsLoading || filteredAppointments.length > 0) && (
                       <EnhancedAppointmentsTable
                         data={filteredAppointments}
-                        rawEntries={rawEntries}  // ⭐ SSOT FIX: Сырые данные для полного Tooltip
                         loading={appointmentsLoading}
                         theme={theme}
                         language={language}
@@ -3882,140 +4344,15 @@ const RegistrarPanel = () => {
         onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
         appointment={cancelDialog.row}
         onCancel={async (appointmentId, reason) => {
-          // ✅ FIX: Call backend to cancel visit OR appointment OR queue entry
-          // Supports cancelling multiple aggregated IDs (for multi-QR entries)
-
-          // ⭐ TODO: BATCH API MIGRATION
-          // После тестирования batch API замените текущую логику на:
-          // const patientId = data?.patient_id;
-          // const date = formatDateForAPI(data?.date);
-          // if (patientId && date) {
-          //   const result = await cancelAllPatientEntries(patientId, date, reason);
-          //   if (result.success) { ... }
-          // }
-          // См. docs/BATCH_UPDATE_ARCHITECTURE.md
-
-          try {
-            const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find(a => a.id === appointmentId);
-            const recordType = data?.record_type || 'visit';
-
-            // Определяем список ID для отмены (если это агрегированная запись - отменяем все)
-            const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
-
-            logger.info(`🔍 Отмена записи(ей). IDs: [${idsToCancel.join(', ')}]`, {
-              recordType,
-              source: data?.source,
-              fullData: data,
-              idsToCancel
-            });
-
-            // Функция отмены одной записи
-            const cancelSingleRecord = async (targetId) => {
-              const tryCancelVisit = async () => {
-                await api.post(`/visits/${targetId}/status`, null, {
-                  params: { status_new: 'canceled' }
-                });
-              };
-
-              const tryCancelOnlineQueue = async () => {
-                await api.post(`/online-queue/entries/${targetId}/cancel`);
-              };
-
-              const tryCancelAppointment = async () => {
-                try {
-                  await api.put(`/appointments/${targetId}`, { status: 'canceled' });
-                } catch (e) {
-                  logger.warn('PUT failed, trying DELETE for appointment cancellation');
-                  await api.delete(`/appointments/${targetId}`);
-                }
-              };
-
-              if (recordType === 'visit') {
-                try {
-                  await tryCancelVisit();
-                } catch (visitError) {
-                  if (visitError.response?.status === 404) {
-                    logger.warn(`⚠️ Попытка отмены как 'visit' вернула 404. Пробуем как 'online_queue' (ID=${targetId})`);
-                    await tryCancelOnlineQueue();
-                  } else {
-                    throw visitError;
-                  }
-                }
-              } else if (recordType === 'appointment') {
-                await tryCancelAppointment();
-              } else if (recordType === 'online_queue') {
-                await tryCancelOnlineQueue();
-              } else {
-                // Fallback default strategy
-                try {
-                  await tryCancelVisit();
-                } catch (err) {
-                  if (err.response?.status === 404) {
-                    logger.warn('Fallback visit cancel failed 404, trying online_queue...');
-                    await tryCancelOnlineQueue();
-                  } else {
-                    throw err;
-                  }
-                }
-              }
-            };
-
-            // Выполняем отмену для всех ID
-            // Используем Promise.allSettled или loop для попытки отмены всех
-            // Для надежности используем последовательную отмену
-            const cancelResults = [];
-            for (const id of idsToCancel) {
-              try {
-                await cancelSingleRecord(id);
-                cancelResults.push({ id, success: true });
-              } catch (err) {
-                // ✅ FIX: Не прерываем цикл при 404 (запись уже отменена или не существует)
-                if (err.response?.status === 404) {
-                  logger.warn(`⚠️ ID ${id} не найден (возможно уже отменён), продолжаем...`);
-                  cancelResults.push({ id, success: true, alreadyCancelled: true });
-                } else {
-                  logger.error(`❌ Ошибка отмены ID ${id}:`, err);
-                  cancelResults.push({ id, success: false, error: err });
-                }
-              }
-            }
-
-            const successCount = cancelResults.filter(r => r.success).length;
-            const failCount = cancelResults.filter(r => !r.success).length;
-
-            if (failCount > 0) {
-              logger.warn(`⚠️ Отменено ${successCount}/${idsToCancel.length} записей, ${failCount} ошибок`);
-              toast.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
-            } else {
-              logger.info(`✅ Все ${successCount} записи успешно отменены на сервере`);
-            }
-          } catch (error) {
-            logger.error('❌ Критическая ошибка отмены визита на сервере:', error);
-
-            // Если это 404 после всех попыток
-            if (error.response?.status === 404) {
-              toast.error(`Ошибка: Запись ${appointmentId} не найдена в базе данных`);
-            } else {
-              toast.error('Не удалось обновить статус на сервере: ' + (error.message || 'Unknown error'));
-            }
-            // Don't return here, still update locally to remove from view or let the user know
-          }
-
-          // Локальное обновление статуса (для всех ID)
-          const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find(a => a.id === appointmentId);
-          const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
-
+          // Локальное обновление статуса
           setAppointments(prev => prev.map(apt =>
-            idsToCancel.includes(apt.id) ? {
+            apt.id === appointmentId ? {
               ...apt,
               status: 'canceled',
               _locallyModified: true,
               _cancelReason: reason
             } : apt
           ));
-
-          // Refresh data to ensure consistency
-          setTimeout(() => loadAppointments({ silent: true, source: 'cancel_complete' }), 500);
         }}
       />
 
@@ -4149,46 +4486,13 @@ const RegistrarPanel = () => {
               <button onClick={() => setShowSlotsModal(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ display: 'grid', gap: '8px' }}>
-              <button style={buttonStyle} onClick={async () => {
-                if (!rescheduleData) return;
-                try {
-                  setShowSlotsModal(false);
-                  logger.info(`Перенос визита ${rescheduleData.id} на завтра`);
-                  await api.post(`/visits/${rescheduleData.id}/reschedule/tomorrow`);
-                  toast.success('Визит успешно перенесен на завтра');
-                  setRescheduleData(null);
-                  loadAppointments({ source: 'reschedule_tomorrow' });
-                } catch (e) {
-                  logger.error('Ошибка переноса на завтра:', e);
-                  toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
-                }
+              <button style={buttonStyle} onClick={() => {
+                setShowSlotsModal(false);
               }}>
                 🌅 {t('tomorrow')}
               </button>
-              <button style={buttonSecondaryStyle} onClick={async () => {
-                if (!rescheduleData) return;
-                const currentVal = getLocalDateString(rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date());
-                const dateStr = prompt('Введите дату переноса (YYYY-MM-DD):', currentVal);
-
-                if (dateStr) {
-                  // Simple validation YYYY-MM-DD
-                  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                    toast.error('Неверный формат даты. Используйте YYYY-MM-DD');
-                    return;
-                  }
-
-                  try {
-                    setShowSlotsModal(false);
-                    logger.info(`Перенос визита ${rescheduleData.id} на ${dateStr}`);
-                    await api.post(`/visits/${rescheduleData.id}/reschedule`, null, { params: { new_date: dateStr } });
-                    toast.success(`Визит перенесен на ${dateStr}`);
-                    setRescheduleData(null);
-                    loadAppointments({ source: 'reschedule_date' });
-                  } catch (e) {
-                    logger.error('Ошибка переноса на дату:', e);
-                    toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
-                  }
-                }
+              <button style={buttonSecondaryStyle} onClick={() => {
+                setShowSlotsModal(false);
               }}>
                 📅 {t('select_date')}
               </button>
@@ -4279,19 +4583,6 @@ const RegistrarPanel = () => {
             loadAppointments();
             loadIntegratedData();
           }
-        }}
-      />
-
-      {/* ✅ Форс-мажор модальное окно */}
-      <ForceMajeureModal
-        isOpen={forceMajeureModal.open}
-        onClose={() => setForceMajeureModal({ open: false, specialistId: null, specialistName: '' })}
-        specialistId={forceMajeureModal.specialistId}
-        specialistName={forceMajeureModal.specialistName}
-        onSuccess={(action, result) => {
-          logger.info('[RegistrarPanel] Force majeure action completed:', action, result);
-          toast.success(action === 'transfer' ? 'Записи перенесены на завтра' : 'Записи отменены с возвратом');
-          loadAppointments({ source: 'force_majeure' });
         }}
       />
     </div>

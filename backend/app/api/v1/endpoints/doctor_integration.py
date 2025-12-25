@@ -1198,6 +1198,7 @@ async def schedule_next_visit(
             confirmation_token=confirmation_token,
             confirmation_channel=request.confirmation_channel,
             confirmation_expires_at=expires_at,
+            source="desk",  # ✅ SSOT: Врач назначает = desk
         )
         db.add(visit)
         db.flush()  # Получаем ID визита

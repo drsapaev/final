@@ -80,6 +80,7 @@ def create_visit(
     approval_status: Optional[str] = None,
     confirmed_at: Optional[datetime] = None,
     confirmed_by: Optional[str] = None,
+    source: str = "desk",  # ✅ SSOT: 'online' | 'desk'
 ) -> Visit:
     """
     Создать новый визит - единая функция для всего проекта.
@@ -150,6 +151,7 @@ def create_visit(
         approval_status=approval_status,
         confirmed_at=confirmed_at,
         confirmed_by=confirmed_by,
+        source=source,  # ✅ SSOT: Явно передаём source
     )
 
     db.add(visit)

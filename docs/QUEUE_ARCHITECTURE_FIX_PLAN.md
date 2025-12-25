@@ -6,17 +6,25 @@
 - ✅ **Fix 1**: Создавать `patient_id` при QR-регистрации (`_find_or_create_patient`)
 - ✅ **Fix 3**: Backend вычисляет `aggregated_ids` сам (не зависит от frontend)
 - ✅ **Fix 4**: Запретить создание entries без услуг (предотвращает Entry #498)
-- ✅ **Fix 5 (queue_time)**: Первое заполнение QR-записи сохраняет оригинальное время регистрации
+- ✅ **Fix 5 (queue_time)**: Первое заполнение QR-записи сохраняет оригинальное время регистрации (реализовано 2025-12-22)
+- ✅ **Fix 12 (Root Architecture)**: Дифференциальное обновление (Differential Update). Новые услуги при повторном редактировании создаются как независимые `Independent Queue Entries` и не добавляются в JSON основной записи, исключая дублирование (реализовано 2025-12-22)
+- ✅ **Fix 13 (First Fill Time Separation)**: При First Fill ТОЛЬКО одна услуга-консультация (`is_consultation=True`) получает QR время. Все остальные услуги получают **текущее время** и создаются как Independent Queue Entries (реализовано 2025-12-23)
 
 ### TODO Backend:
 - ✅ **Fix 2**: Создавать `Visit` при первом заполнении QR-записи (реализовано 2025-12-19)
 - ⏳ **Fix 5 (filter)**: Silent ignore пустых entries в выборке (низкий приоритет)
 
 ### TODO Frontend (баги в отображении):
-- 🐛 **Frontend Bug 1**: Код услуги `О01` отображается вместо реальных кодов (K01, K10, L10)
-- 🐛 **Frontend Bug 2**: Новая лабораторная услуга показывает `queue_time = 17:07:47` вместо реального времени добавления (`17:28:12`)
-  - В БД данные корректные (Entry #505 имеет `queue_time=12:28:12 UTC = 17:28 local`)
-  - Проблема в frontend агрегации/отображении
+- ✅ **Frontend Bug 1**: Код услуги `О01` отображается вместо реальных кодов (K01, K10, L10) — Исправлено 2025-12-22
+- ✅ **Frontend Bug 2**: Новая лабораторная услуга показывает `queue_time = 17:07:47` вместо реального времени добавления (Исправлено 2025-12-22)
+  - Сортировка записей на backend + выбор наименьшего времени при слиянии на frontend.
+- ✅ **Frontend SSOT Fix** (реализовано 2025-12-22):
+  - ⭐ `rawEntries` prop передаётся в `EnhancedAppointmentsTable` — flat list всех записей ДО агрегации
+  - `getPatientEntries()` использует `rawEntries` для полного Tooltip (включая все Independent Queue Entries)
+  - Tooltip теперь строится из ВСЕХ записей для того же `patient_id` (flat lookup из `rawEntries`)
+  - Колонка времени использует ТОЛЬКО `queue_time` (не `created_at`)
+  - Единый парсер `safeParseDate` для нормализации timezone
+  - Helpers: `getPatientEntries()`, `getEarliestQueueTime()`, `buildPatientTooltip()`
 
 
 

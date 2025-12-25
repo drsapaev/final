@@ -72,6 +72,13 @@ class Visit(Base):
         String(64), nullable=True
     )  # user_id, telegram_id, или phone
 
+    # ✅ SSOT: Источник визита (единственный источник истины)
+    # 'online' = QR/Telegram регистрация
+    # 'desk' = Регистратура
+    source: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="desk", index=True
+    )
+
     services: Mapped[list["VisitService"]] = relationship(
         back_populates="visit", cascade="all, delete-orphan"
     )

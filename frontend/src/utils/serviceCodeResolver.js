@@ -380,6 +380,36 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         };
     };
 
+    /**
+     * Helper: Дедупликация и сортировка услуг
+     */
+    const finalizeItems = (rawItems) => {
+        const uniqueItems = [];
+        const seenKeys = new Set();
+
+        rawItems.forEach(item => {
+            // Формируем уникальный ключ: ID > Code > Name
+            // Используем toLowerCase для кодов и имен для надежности
+            let key = null;
+            if (item.service_id) {
+                key = `id:${item.service_id}`;
+            } else if (item.service_code) {
+                key = `code:${String(item.service_code).toUpperCase()}`;
+            } else if (item.service_name) {
+                key = `name:${String(item.service_name).toLowerCase()}`;
+            } else {
+                return; // Пропускаем пустые
+            }
+
+            if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                uniqueItems.push(item);
+            }
+        });
+
+        return uniqueItems;
+    };
+
     // ⭐ Приоритет 1: service_details (полные данные из backend)
     if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
         initialData.service_details.forEach(svc => {
@@ -387,7 +417,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                 items.push(createCartItem({ ...svc, _source: 'service_details' }));
             }
         });
-        return items;
+        return finalizeItems(items);
     }
 
     // ⭐ Приоритет 2: services (массив строк/кодов ИЛИ объектов)
@@ -432,7 +462,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                 }));
             }
         });
-        return items;
+        return finalizeItems(items);
     }
 
     // ⭐ Приоритет 3: service_codes (массив кодов)
@@ -453,7 +483,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                 }));
             }
         });
-        return items;
+        return finalizeItems(items);
     }
 
     // ⭐ Приоритет 4: queue_numbers с service_details
@@ -472,7 +502,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                     ));
                 }
             });
-            return items;
+            return finalizeItems(items);
         }
 
         // ⭐ Приоритет 5: queue_numbers (fallback на specialty/service_name)
@@ -497,10 +527,10 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                 _source: 'queue_numbers',
             }, q.id));
         });
-        return items;
+        return finalizeItems(items);
     }
 
-    return items;
+    return finalizeItems(items);
 }
 
 

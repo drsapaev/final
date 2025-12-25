@@ -1401,7 +1401,8 @@ const AppointmentWizardV2 = ({
 
         // ⭐ SSOT: Для чистых QR-записей (online_queue) обновляем существующую запись вместо создания новой
         const isOnlineQueueEntry = initialData.record_type === 'online_queue' && effectiveSource === 'online';
-        const queueEntryId = initialData.queue_numbers?.[0]?.id || initialData.id;
+        // ✅ SSOT FIX: queue_entry_id приходит из backend для QR-визитов, иначе из queue_numbers
+        const queueEntryId = initialData.queue_entry_id || initialData.queue_numbers?.[0]?.id || initialData.id;
 
         if (isOnlineQueueEntry && queueEntryId) {
           logger.log(`⭐ SSOT: QR-запись ID=${queueEntryId}, обновляем через full-update endpoint...`);
