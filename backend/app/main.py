@@ -127,31 +127,12 @@ app.include_router(graphql_router, prefix="/api")
 log.info("Included GraphQL router at /api/graphql")
 
 # -----------------------------------------------------------------------------
-# DEV fallback для аутентификации — регистрируем ТОЛЬКО если импорты auth упали
-# И разрешено явно через ENABLE_DEV_AUTH + не продакшн
+# DEV fallback для аутентификации — ОТКЛЮЧЕНО В RUNTIME
+# Используйте backend/app/debug_main.py для запуска с mock-auth в разработке
 # -----------------------------------------------------------------------------
 if _USE_DEV_AUTH_FALLBACK:
-    env = os.getenv("ENV", "dev").lower()
-    enable_dev_auth = os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true"
-
-    if env not in ("prod", "production") and enable_dev_auth:
-        log.warning("USING DEV AUTH FALLBACK at %s/auth (ENABLE_DEV_AUTH=true)", API_V1_STR)
-
-        def create_access_token(sub: str) -> str:  # type: ignore[no-redef]
-            # простой dev-токен
-            return f"dev.{sub}"
-
-        @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
-        async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
-            log.info("Using DEV fallback login for user: %s", form.username)
-            token = create_access_token(form.username)
-            return {"access_token": token, "token_type": "bearer"}
-
-        @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
-        async def _fallback_me():
-            return {"username": "dev", "role": "Admin", "is_active": True}
-    else:
-        log.error("DEV auth fallback import failed, but fallback endpoints disabled (ENV=%s, ENABLE_DEV_AUTH=%s)", env, enable_dev_auth)
+    log.error("DEV auth fallback import failed. Fallback routes are NOT enabled in main app.")
+    log.error("If you need mock auth, use: python backend/app/debug_main.py")
 
 
 # -----------------------------------------------------------------------------

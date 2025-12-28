@@ -157,7 +157,7 @@ export const ChatProvider = ({ children }) => {
         return () => {
             if (wsRef.current) {
                 // console.log('🧹 [Context] Cleaning up WS...');
-                wsRef.current.close(1000, "Unmount");
+                wsRef.current.close(1000, 'Unmount');
             }
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         };

@@ -149,8 +149,25 @@ _DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-pro
 @lru_cache(1)
 def get_settings() -> Settings:
     """Get application settings with validation"""
-    # ✅ ИСПРАВЛЕНО: Сначала проверяем env var, затем создаем Settings с аргументами
     import os
+    env = os.getenv("ENV", "dev").lower()
+
+    # ✅ PRODUCTION SAFETY CHECK: Fail fast if critical keys are missing
+    if env in ("prod", "production"):
+        if not os.getenv("SECRET_KEY"):
+            raise ValueError("CRITICAL: SECRET_KEY environment variable is missing in production!")
+        if not os.getenv("DATABASE_URL"):
+            raise ValueError("CRITICAL: DATABASE_URL environment variable is missing in production!")
+
+        # Ensure we don't use default values in production
+        secret_key = os.getenv("SECRET_KEY")
+        if secret_key == _DEFAULT_SECRET_KEY:
+             raise ValueError("CRITICAL: Default SECRET_KEY detected in production! Change it immediately.")
+
+        s = Settings()
+        return s
+
+    # ✅ DEV MODE: Fallback logic
     secret_key = os.getenv("SECRET_KEY")
     
     # Если SECRET_KEY в env - используем его
@@ -163,13 +180,6 @@ def get_settings() -> Settings:
     # Validate SECRET_KEY on load
     if not s.SECRET_KEY or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
         # In production, this should fail - but for dev we allow it with warning
-        import os
-        env = os.getenv("ENV", "dev").lower()
-        if env in ("prod", "production"):
-            raise ValueError(
-                "SECRET_KEY must be set via environment variable in production. "
-                "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
-            )
         # ✅ BUGFIX: In dev, use persistent key from file or generate once and save
         if s.SECRET_KEY == _DEFAULT_SECRET_KEY:
             import warnings

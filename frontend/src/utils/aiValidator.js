@@ -187,7 +187,7 @@ function validateAgainstSchema(data, schema) {
     const validated = {};
 
     for (const [key, rule] of Object.entries(schema)) {
-      if (data.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
         validated[key] = validateField(data[key], rule);
       } else if (rule.required) {
         throw new Error(`Required field missing: ${key}`);
