@@ -21,6 +21,8 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="Admin")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Требуется смена пароля при следующем входе
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Метаданные
     created_at: Mapped[Optional[DateTime]] = mapped_column(
@@ -87,13 +89,16 @@ class User(Base):
     )
 
     # Роли и группы (через единые M2M таблицы)
+    # passive_deletes=True - let DB handle cascade deletion
     roles: Mapped[List["Role"]] = relationship(
         "Role",
         secondary=user_roles_table,
         primaryjoin=lambda: User.id == user_roles_table.c.user_id,
         secondaryjoin=lambda: __import__('app').models.role_permission.Role.id
         == user_roles_table.c.role_id,
-        viewonly=False,
+        viewonly=True,  # Read-only to avoid conflicts with string role field
+        passive_deletes=True,
+        lazy="noload",  # Don't load by default to avoid query errors
     )
     groups: Mapped[List["UserGroup"]] = relationship(
         "UserGroup",
@@ -101,7 +106,9 @@ class User(Base):
         primaryjoin=lambda: User.id == user_groups_table.c.user_id,
         secondaryjoin=lambda: __import__('app').models.role_permission.UserGroup.id
         == user_groups_table.c.group_id,
-        viewonly=False,
+        viewonly=True,  # Read-only
+        passive_deletes=True,
+        lazy="noload",  # Don't load by default
     )
 
     # Переопределения разрешений

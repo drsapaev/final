@@ -937,3 +937,96 @@ DELETE /api/v1/registrar/batch/patients/{patient_id}/entries/{date}
     *   Новые: получают **Текущее время** (время редактирования).
     
 **Frontend:** Таблица отображает **самое раннее** время из всех записей пациента, чтобы визуально фиксировать его первоначальное место в очереди.
+
+---
+
+## Phase 3: Session ID & QueueProfile (26 декабря 2025)
+
+### 3.1 Session ID — Группировка услуг пациента
+
+**Проблема:** При множественных услугах одного пациента в одной очереди не было связи между записями, что затрудняло визуальную группировку на frontend.
+
+**Решение:**
+
+1. **Новое поле `session_id`** в модели `OnlineQueueEntry`:
+   ```python
+   session_id: Mapped[Optional[str]] = mapped_column(
+       String(100), nullable=True, index=True
+   )
+   ```
+
+2. **Формат:** Opaque string `{patient_id}_{queue_id}_{date}` — frontend НЕ парсит формат.
+
+3. **Правило:** Один пациент + одна очередь + один день = один session_id.
+
+4. **Helper функция:** `get_or_create_session_id()` в `app/services/queue_session.py`
+
+**Файлы изменены:**
+- `models/online_queue.py` — добавлено поле
+- `services/queue_session.py` — новый helper модуль
+- `api/v1/endpoints/qr_queue.py` — 3 места создания entries
+- `api/v1/endpoints/registrar_wizard.py` — 1 место
+- `services/queue_service.py` — метод create_queue_entry
+- `crud/online_queue.py` — 2 места
+- `api/v1/endpoints/registrar_integration.py` — API response
+
+**Миграция:** `20251226_0001_add_session_id.py`
+- Добавляет колонку session_id
+- Заполняет legacy данные
+- Создаёт partial unique index для защиты от race conditions
+
+---
+
+### 3.2 QueueProfile — Динамические вкладки очередей
+
+**Проблема:** Вкладки очередей (Кардиология, ЭКГ, Дерматология и т.д.) были захардкожены в frontend, что требовало изменения кода при добавлении новых отделений.
+
+**Решение:**
+
+1. **Новая модель `QueueProfile`** в `app/models/queue_profile.py`:
+   ```python
+   class QueueProfile(Base):
+       __tablename__ = "queue_profiles"
+       
+       key: Mapped[str]           # Уникальный ключ (cardiology, ecg)
+       title: Mapped[str]         # English name
+       title_ru: Mapped[str]      # Russian name
+       queue_tags: Mapped[List]   # ["cardio", "cardiology"]
+       order: Mapped[int]         # Порядок сортировки
+       is_active: Mapped[bool]    # Активен ли профиль
+       icon: Mapped[str]          # UI icon name
+       color: Mapped[str]         # UI color
+   ```
+
+2. **API Endpoint:** `GET /api/v1/queues/profiles`
+   - Возвращает список активных профилей
+   - Fallback на INITIAL_QUEUE_PROFILES если таблица пуста
+   - Frontend использует для динамического рендера вкладок
+
+3. **Маршрутизация:** Service.queue_tag → QueueProfile.queue_tags[]
+
+**Миграция:** `20251226_0002_add_queue_profile.py`
+- Создаёт таблицу queue_profiles
+- Seed data: 8 начальных профилей
+
+---
+
+### 3.3 SSOT Rules обновлены
+
+Добавлены правила в `.agent/workflows/ssot-rules.md`:
+
+**QueueProfile Rules:**
+- Frontend НЕ хардкодит вкладки — загружает из API
+- Новые вкладки добавляются ТОЛЬКО через QueueProfile
+- Service.queue_tag — основной ключ маршрутизации
+- QueueProfile.queue_tags — массив допустимых тегов
+
+**Session ID Rules:**
+- Frontend НЕ парсит session_id
+- Группировка только для presentation
+- Один patient + queue + day = один session_id
+
+---
+
+*Последнее обновление: 2025-12-26*
+

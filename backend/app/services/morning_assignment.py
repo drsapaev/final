@@ -36,6 +36,73 @@ class MorningAssignmentService:
         if self.db:
             self.db.close()
 
+    def ensure_daily_queues_for_all_tags(self, target_date: date) -> int:
+        """
+        ⭐ PHASE 2: Pre-create DailyQueues for all unique Service.queue_tag values.
+        This ensures queues exist BEFORE any registration/editing happens,
+        preventing race conditions and silent fallbacks.
+        
+        Returns: number of queues created/verified
+        """
+        # Get all unique non-null queue_tags from active services
+        unique_tags = (
+            self.db.query(Service.queue_tag)
+            .filter(Service.active == True, Service.queue_tag.isnot(None))
+            .distinct()
+            .all()
+        )
+        
+        created_count = 0
+        
+        # Get default resource doctor for fallback
+        default_doctor = (
+            self.db.query(Doctor)
+            .join(User, Doctor.user_id == User.id)
+            .filter(User.username == "general_resource", User.is_active == True)
+            .first()
+        )
+        
+        if not default_doctor:
+            # Fallback to any active doctor
+            default_doctor = self.db.query(Doctor).filter(Doctor.is_active == True).first()
+        
+        if not default_doctor:
+            logger.warning("No default doctor found for pre-creating queues")
+            return 0
+        
+        for (queue_tag,) in unique_tags:
+            try:
+                # Check if queue already exists for this tag on this day
+                existing = (
+                    self.db.query(DailyQueue)
+                    .filter(
+                        DailyQueue.day == target_date,
+                        DailyQueue.queue_tag == queue_tag,
+                        DailyQueue.active == True
+                    )
+                    .first()
+                )
+                
+                if not existing:
+                    # Create new DailyQueue for this tag
+                    queue_service.get_or_create_daily_queue(
+                        self.db,
+                        day=target_date,
+                        specialist_id=default_doctor.id,
+                        queue_tag=queue_tag,
+                    )
+                    created_count += 1
+                    logger.info(f"✅ Pre-created DailyQueue for queue_tag={queue_tag}")
+                    
+            except Exception as e:
+                logger.error(f"Error pre-creating queue for {queue_tag}: {e}")
+        
+        if created_count > 0:
+            self.db.flush()
+            logger.info(f"🏗️ Pre-created {created_count} DailyQueues for {len(unique_tags)} unique queue_tags")
+        
+        return created_count
+
     def run_morning_assignment(
         self, target_date: Optional[date] = None
     ) -> Dict[str, any]:
@@ -49,6 +116,12 @@ class MorningAssignmentService:
         logger.info(f"🌅 Запуск утренней сборки для {target_date}")
 
         try:
+            # ⭐ PHASE 2: Pre-create DailyQueues for all Service.queue_tag values
+            # This prevents silent fallbacks during QR editing and manual registration
+            precreated_count = self.ensure_daily_queues_for_all_tags(target_date)
+            if precreated_count > 0:
+                logger.info(f"🏗️ Pre-created {precreated_count} missing DailyQueues")
+            
             # Получаем все подтвержденные визиты на сегодня без номеров в очередях
             confirmed_visits = self._get_confirmed_visits_without_queues(target_date)
 

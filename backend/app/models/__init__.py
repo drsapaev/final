@@ -64,6 +64,7 @@ from .notification import (
 )
 from .online import OnlineDay
 from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from .queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
 from .refund_deposit import (
     RefundRequest,
     RefundRequestStatus,
@@ -207,6 +208,8 @@ __all__ = [
     "DailyQueue",
     "OnlineQueueEntry",
     "QueueToken",
+    "QueueProfile",
+    "INITIAL_QUEUE_PROFILES",
     "TelegramConfig",
     "TelegramTemplate",
     "TelegramUser",

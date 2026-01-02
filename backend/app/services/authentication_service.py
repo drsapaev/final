@@ -325,6 +325,7 @@ class AuthenticationService:
             },
             "requires_2fa": requires_2fa,
             "two_factor_method": two_factor_method,
+            "must_change_password": getattr(user, 'must_change_password', False),
         }
 
     def refresh_access_token(self, db: Session, refresh_token: str) -> Dict[str, Any]:
@@ -559,8 +560,9 @@ class AuthenticationService:
             if not verify_password(current_password, user.hashed_password):
                 return {"success": False, "message": "Неверный текущий пароль"}
 
-            # Обновляем пароль
+            # Обновляем пароль и сбрасываем флаг must_change_password
             user.hashed_password = get_password_hash(new_password)
+            user.must_change_password = False
             db.commit()
 
             # Отзываем все refresh токены пользователя

@@ -12,12 +12,12 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-const DoctorModal = ({ 
-  isOpen, 
-  onClose, 
-  doctor = null, 
-  onSave, 
-  loading = false 
+const DoctorModal = ({
+  isOpen,
+  onClose,
+  doctor = null,
+  onSave,
+  loading = false
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -76,15 +76,32 @@ const DoctorModal = ({
   useEffect(() => {
     if (isOpen) {
       if (doctor) {
+        // Маппинг данных из API в формат формы
+        // API возвращает: user.full_name, user.email, specialty, active
+        // Форма ожидает: name, email, specialization, status
+        const doctorName = doctor.user?.full_name || doctor.name || '';
+        const doctorEmail = doctor.user?.email || doctor.email || '';
+        const doctorPhone = doctor.user?.phone || doctor.phone || '';
+        const doctorSpecialization = doctor.specialty || doctor.specialization || '';
+        const doctorDepartment = doctor.specialty || doctor.department || doctor.department_key || '';
+        const doctorStatus = doctor.active !== undefined
+          ? (doctor.active ? 'active' : 'inactive')
+          : (doctor.status || 'active');
+
+        logger.log('🔵 Инициализация формы врача:', {
+          doctor,
+          mapped: { doctorName, doctorEmail, doctorPhone, doctorSpecialization, doctorDepartment, doctorStatus }
+        });
+
         setFormData({
-          name: doctor.name || '',
-          email: doctor.email || '',
-          phone: doctor.phone || '',
-          specialization: doctor.specialization || '',
-          department: doctor.department || doctor.department_key || '',
+          name: doctorName,
+          email: doctorEmail,
+          phone: doctorPhone,
+          specialization: doctorSpecialization,
+          department: doctorDepartment,
           experience: doctor.experience || '',
           schedule: doctor.schedule || '',
-          status: doctor.status || 'active',
+          status: doctorStatus,
           bio: doctor.bio || ''
         });
       } else {
@@ -142,13 +159,13 @@ const DoctorModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     logger.log('🔵 handleSubmit вызван', { formData, isSubmitting, loading });
-    
+
     // Валидация формы
     const validation = validateForm();
     logger.log('🔵 Валидация формы:', validation);
-    
+
     if (!validation.isValid) {
       logger.log('❌ Форма не прошла валидацию:', validation.errors);
       // Прокручиваем к первой ошибке
@@ -167,7 +184,7 @@ const DoctorModal = ({
 
     setIsSubmitting(true);
     setSubmitError(null);
-    
+
     try {
       const doctorData = {
         name: formData.name.trim(),
@@ -219,7 +236,7 @@ const DoctorModal = ({
             {submitError}
           </MacOSAlert>
         )}
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           {/* Имя */}
           <div>
@@ -237,10 +254,10 @@ const DoctorModal = ({
               error={errors.name}
             />
             {errors.name && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 marginTop: '4px',
                 fontSize: '12px',
                 color: 'var(--mac-error)'
@@ -267,10 +284,10 @@ const DoctorModal = ({
               error={errors.email}
             />
             {errors.email && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 marginTop: '4px',
                 fontSize: '12px',
                 color: 'var(--mac-error)'
@@ -312,10 +329,10 @@ const DoctorModal = ({
               error={errors.specialization}
             />
             {errors.specialization && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 marginTop: '4px',
                 fontSize: '12px',
                 color: 'var(--mac-error)'
@@ -347,10 +364,10 @@ const DoctorModal = ({
               disabled={loadingDepartments}
             />
             {errors.department && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 marginTop: '4px',
                 fontSize: '12px',
                 color: 'var(--mac-error)'
@@ -376,10 +393,10 @@ const DoctorModal = ({
               error={errors.experience}
             />
             {errors.experience && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 marginTop: '4px',
                 fontSize: '12px',
                 color: 'var(--mac-error)'

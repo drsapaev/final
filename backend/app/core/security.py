@@ -91,14 +91,24 @@ def require_roles(*roles: str):
 
         # Проверяем роль с учетом регистра
         role_lower = str(role).lower() if role else ""
+        
+        # ✅ ROLE NORMALIZATION: Map 'receptionist' to 'registrar' for compatibility
+        # DB stores 'Receptionist' but API endpoints expect 'Registrar'
+        role_normalized = role_lower
+        if role_normalized == "receptionist":
+            role_normalized = "registrar"
+        
         allowed_roles_lower = [r.lower() for r in roles]
+        # Also add 'receptionist' as allowed if 'registrar' is in allowed roles
+        if "registrar" in allowed_roles_lower and "receptionist" not in allowed_roles_lower:
+            allowed_roles_lower.append("receptionist")
 
         # ✅ DEBUG LOG: Explicitly log the mismatch
         print(f"DEBUG: Checking roles for user {current_user.id} ({current_user.username})")
-        print(f"DEBUG: User Role: '{role}', Normalized: '{role_lower}'")
+        print(f"DEBUG: User Role: '{role}', Normalized: '{role_normalized}'")
         print(f"DEBUG: Required Roles: {roles}, Normalized: {allowed_roles_lower}")
 
-        if role_lower not in allowed_roles_lower:
+        if role_normalized not in allowed_roles_lower and role_lower not in allowed_roles_lower:
             print(f"DEBUG: ACCESS DENIED for user {current_user.username}")
             # ✅ AUDIT LOG: Логируем попытку несанкционированного доступа
             from app.core.audit import log_critical_change

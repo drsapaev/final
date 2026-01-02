@@ -10,6 +10,8 @@ const MacOSButton = ({
   type = 'button',
   className = '',
   style = {},
+  startIcon, // Destructure to prevent passing to DOM (not implemented yet)
+  endIcon,   // Destructure to prevent passing to DOM (not implemented yet)
   ...props
 }) => {
   // Размеры кнопок

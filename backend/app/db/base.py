@@ -17,6 +17,8 @@ from app.models import (  # noqa: F401, E402; queue as _m_queue,  # Времен
     clinic as _m_clinic,
     department as _m_department,
     doctor_price_override as _m_doctor_price_override,
+    discount_benefits as _m_discount_benefits,  # ✅ FIX: Import discount models
+    dynamic_pricing as _m_dynamic_pricing,      # ✅ FIX: Import dynamic pricing models
     emr as _m_emr,
     enums as _m_enums,
     lab as _m_lab,

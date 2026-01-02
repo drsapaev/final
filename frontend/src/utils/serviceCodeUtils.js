@@ -51,12 +51,24 @@ export const normalizeCategoryCode = (code) => {
 };
 
 /**
- * Normalizes a service code (alias for normalizeCategoryCode for backwards compatibility)
+ * Normalizes a service code to standard SSOT format
+ * SSOT format: Letter + 1-2 digits (K01, D02, L14)
  * @param {string} code - Service code to normalize
- * @returns {string} Normalized code
+ * @returns {string} Normalized code (UPPERCASE for SSOT format, lowercase for legacy)
  */
 export const normalizeServiceCode = (code) => {
-    return normalizeCategoryCode(code);
+    if (!code) return '';
+
+    const trimmed = code.trim();
+
+    // SSOT format: одна буква + 1-2 цифры (K01, D02, L14)
+    // Эти коды должны быть в UPPERCASE
+    if (/^[A-Za-z]\d{1,2}$/.test(trimmed)) {
+        return trimmed.toUpperCase();  // K11, k11 -> K11
+    }
+
+    // Для legacy форматов - возвращаем как есть или lowercase
+    return trimmed;
 };
 
 /**

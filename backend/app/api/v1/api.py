@@ -390,6 +390,11 @@ api_router.include_router(
     user_management.router, prefix="/users", tags=["user-management"]
 )
 
+# Роли и разрешения
+from app.api.v1.endpoints import roles
+
+api_router.include_router(roles.router, prefix="/roles", tags=["roles"])
+
 # Legacy API удалён - используйте /api/v1/queue/* endpoints
 
 # Автозакрытие очередей

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ClinicSettingsBase(BaseModel):
     key: str = Field(..., max_length=100)
-    value: Optional[Dict[str, Any]] = None
+    value: Optional[Any] = None  # Can be any JSON-serializable value (string, dict, list, etc.)
     category: Optional[str] = Field(None, max_length=50)
     description: Optional[str] = None
 
@@ -23,7 +23,7 @@ class ClinicSettingsCreate(ClinicSettingsBase):
 
 
 class ClinicSettingsUpdate(BaseModel):
-    value: Optional[Dict[str, Any]] = None
+    value: Optional[Any] = None  # Can be any JSON-serializable value
     description: Optional[str] = None
 
 

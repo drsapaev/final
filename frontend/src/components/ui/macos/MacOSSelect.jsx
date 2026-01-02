@@ -116,8 +116,8 @@ const MacOSSelect = React.forwardRef(({
       {options && options.length > 0 ? (
         options.map((option) => (
           <option
-            key={option.value || option}
-            value={option.value || option}
+            key={option.value !== undefined ? option.value : option}
+            value={option.value !== undefined ? option.value : option}
             disabled={option.disabled}
           >
             {option.label || option}

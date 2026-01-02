@@ -64,7 +64,7 @@ AdminTabs.propTypes = {
   onTabChange: PropTypes.func.isRequired
 };
 
-const UnifiedUserManagement = ({ renderUsersList }) => {
+const UnifiedUserManagement = () => {
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'users';
   const { isDark } = useTheme();
@@ -96,7 +96,7 @@ const UnifiedUserManagement = ({ renderUsersList }) => {
   const renderContent = () => {
     switch (activeTab) {
       case 'management':
-        return renderUsersList ? renderUsersList() : <UserManagement />;
+        return <UserManagement />;
       case 'transfer':
         return <UserDataTransferManager />;
       case 'export':
@@ -104,7 +104,7 @@ const UnifiedUserManagement = ({ renderUsersList }) => {
       case 'permissions':
         return <GroupPermissionsManager />;
       default:
-        return renderUsersList ? renderUsersList() : <UserManagement />;
+        return <UserManagement />;
     }
   };
 
@@ -122,8 +122,6 @@ const UnifiedUserManagement = ({ renderUsersList }) => {
   );
 };
 
-UnifiedUserManagement.propTypes = {
-  renderUsersList: PropTypes.func
-};
+UnifiedUserManagement.propTypes = {};
 
 export default UnifiedUserManagement;

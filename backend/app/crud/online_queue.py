@@ -39,6 +39,7 @@ from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_service import queue_service  # ✅ SSOT for business logic
+from app.services.queue_session import get_or_create_session_id, generate_session_id_for_entry
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,11 @@ def join_online_queue(
     # Создаем запись в очереди
     # queue_time - бизнес-время регистрации, не меняется при редактировании
     queue_time = datetime.now(timezone)
+    
+    # ⭐ session_id: Для анонимных очередей генерируем временный ID
+    # Он будет обновлен при связке с пациентом
+    session_id = None  # Пока нет patient_id
+    
     queue_entry = OnlineQueueEntry(
         queue_id=daily_queue.id,
         number=next_number,
@@ -225,6 +231,7 @@ def join_online_queue(
         source="online",
         status="waiting",
         queue_time=queue_time,  # Устанавливаем время регистрации
+        session_id=session_id,  # ⭐ NEW: Session grouping (set after flush for anonymous)
     )
     db.add(queue_entry)
 
@@ -481,6 +488,11 @@ def join_online_queue_multiple(
                     )
 
             # Создаем запись в очереди с одинаковым queue_time
+            # ⭐ session_id для группировки услуг пациента в одной очереди
+            session_id = get_or_create_session_id(
+                db, patient_id, daily_queue.id, queue_token.day
+            ) if patient_id else None
+            
             queue_entry = OnlineQueueEntry(
                 queue_id=daily_queue.id,
                 number=next_number,
@@ -491,6 +503,7 @@ def join_online_queue_multiple(
                 source="online",
                 status="waiting",
                 queue_time=queue_time,  # Одинаковое время для всех записей
+                session_id=session_id,  # ⭐ NEW: Session grouping
             )
             db.add(queue_entry)
             db.flush()  # Получаем ID записи

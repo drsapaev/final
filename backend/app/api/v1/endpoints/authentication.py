@@ -116,6 +116,7 @@ async def login(
             requires_2fa=result["requires_2fa"],
             two_factor_method=result["two_factor_method"],
             pending_2fa_token=result.get("pending_2fa_token"),
+            must_change_password=result.get("must_change_password", False),
         )
 
     except HTTPException:

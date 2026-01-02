@@ -129,16 +129,58 @@ const EnhancedAppointmentsTable = ({
     try {
       let parseStr = dateStr;
 
-      // ⭐ FIX 17: Если строка заканчивается на 'Z', убираем его
-      // чтобы время парсилось как локальное, а не UTC
-      if (typeof parseStr === 'string' && parseStr.endsWith('Z')) {
-        parseStr = parseStr.slice(0, -1);
+      // ⭐ FIX: Handle timezone conversion for display
+      // Database stores times as UTC (naive) but we want to display in local time (Tashkent +5)
+
+      if (typeof parseStr === 'string') {
+        // If ends with 'Z', it's explicitly UTC
+        if (parseStr.endsWith('Z')) {
+          parseStr = parseStr.slice(0, -1);
+        }
+
+        // If has timezone offset (e.g., +05:00), parse normally
+        if (parseStr.includes('+') || parseStr.includes('-')) {
+          return new Date(parseStr);
+        }
+
+        // If no timezone info - assume it's UTC from database
+        // Add +05:00 offset for Tashkent timezone
+        // This ensures correct display regardless of browser timezone
+        const utcDate = new Date(parseStr + 'Z'); // Parse as UTC
+        // Convert to Tashkent (UTC+5) by adding 5 hours
+        const tashkentOffset = 5 * 60 * 60 * 1000; // 5 hours in ms
+        return new Date(utcDate.getTime() + tashkentOffset);
       }
 
       return new Date(parseStr);
     } catch {
       return null;
     }
+  }, []);
+
+  // ⭐ SSOT: Session ID Color Helper (presentation only)
+  // Generates consistent colors for entries with same session_id
+  // This enables visual grouping without modifying data structure
+  const SESSION_COLORS = [
+    '#3B82F6', // blue
+    '#10B981', // emerald
+    '#F59E0B', // amber
+    '#EF4444', // red
+    '#8B5CF6', // violet
+    '#EC4899', // pink
+    '#06B6D4', // cyan
+    '#84CC16', // lime
+  ];
+
+  const getSessionColor = useCallback((sessionId) => {
+    if (!sessionId) return null;
+    // Simple hash to get consistent color for same session_id
+    let hash = 0;
+    for (let i = 0; i < sessionId.length; i++) {
+      hash = ((hash << 5) - hash) + sessionId.charCodeAt(i);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return SESSION_COLORS[Math.abs(hash) % SESSION_COLORS.length];
   }, []);
 
   // ⭐ SSOT: Presentation-Only Grouping (1 patient = 1 visual row)
@@ -1512,320 +1554,299 @@ const EnhancedAppointmentsTable = ({
                 </td>
               </tr>
             ) : (
-              paginatedData.map((row, index) => (
-                <tr
-                  key={row.id}
-                  className="enhanced-table-row"
-                  style={{
-                    backgroundColor: selectedRows.has(row.id)
-                      ? withOpacity('var(--mac-accent-blue)', 0.06)
-                      : (index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)'),
-                    borderBottom: '1px solid var(--mac-border)',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!selectedRows.has(row.id)) {
-                      e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!selectedRows.has(row.id)) {
-                      // Восстанавливаем фон на основе индекса (для полосатой таблицы)
-                      const tr = e.target.closest('tr');
-                      if (tr) {
-                        tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
+              paginatedData.map((row, index) => {
+                // ⭐ SSOT: Get session color for visual grouping (presentation only)
+                const sessionColor = getSessionColor(row.session_id);
+
+                return (
+                  <tr
+                    key={row.id}
+                    className="enhanced-table-row"
+                    style={{
+                      backgroundColor: selectedRows.has(row.id)
+                        ? withOpacity('var(--mac-accent-blue)', 0.06)
+                        : (index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)'),
+                      borderBottom: '1px solid var(--mac-border)',
+                      cursor: 'pointer',
+                      // ⭐ SSOT: Visual session grouping indicator
+                      borderLeft: sessionColor ? `4px solid ${sessionColor}` : 'none',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!selectedRows.has(row.id)) {
+                        e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
                       }
-                    }
-                  }}
-                  onClick={() => onRowClick?.(row)}
-                >
-                  {/* Чекбокс */}
-                  {showCheckboxes && (
-                    <td style={{ padding: '12px 8px' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.has(row.id)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleRowSelect(row.id, e.target.checked);
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      />
-                    </td>
-                  )}
-
-                  {/* Номер */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: '14px'
-                  }}>
-                    {renderQueueNumbers(row)}
-                  </td>
-
-                  {/* Пациент */}
-                  <td style={{
-                    padding: '12px 8px',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    minWidth: isDoctorView ? '15%' : '200px',
-                    width: isDoctorView ? '15%' : 'auto',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                    title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!selectedRows.has(row.id)) {
+                        // Восстанавливаем фон на основе индекса (для полосатой таблицы)
+                        const tr = e.target.closest('tr');
+                        if (tr) {
+                          tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
+                        }
+                      }
+                    }}
+                    onClick={() => onRowClick?.(row)}
+                    title={row.session_id ? `Сессия: ${row.session_id}` : undefined}
                   >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span>{row.patient_fio || '—'}</span>
-                        {/* Ярлыки источника/приоритета */}
-                        {/* ✅ SSOT: Только source='online' показывает QR badge */}
-                        {row.source === 'online' && (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              color: 'white',
-                              fontWeight: '600',
-                              whiteSpace: 'nowrap'
-                            }}
-                            title="Приоритет: ранняя онлайн-регистрация"
-                          >
-                            QR
-                          </span>
-                        )}
-                        {row.source === 'desk' && (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'var(--mac-separator)',
-                              color: 'var(--mac-text-secondary)',
-                              fontWeight: '600',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            Manual
-                          </span>
-                        )}
-                      </div>
-                      {row.patient_birth_year && (
-                        <div style={{
-                          fontSize: '12px',
-                          color: 'var(--mac-text-secondary)',
-                          marginTop: '2px'
-                        }}>
-                          {new Date().getFullYear() - row.patient_birth_year} лет
-                        </div>
-                      )}
-                    </div>
-                  </td>
+                    {/* Чекбокс */}
+                    {showCheckboxes && (
+                      <td style={{ padding: '12px 8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.has(row.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleRowSelect(row.id, e.target.checked);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                    )}
 
-                  {/* Телефон - скрыт для doctor view */}
-                  {!isDoctorView && (
+                    {/* Номер */}
+                    <td style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      color: 'var(--mac-text-secondary)',
+                      fontSize: '14px'
+                    }}>
+                      {renderQueueNumbers(row)}
+                    </td>
+
+                    {/* Пациент */}
                     <td style={{
                       padding: '12px 8px',
                       color: 'var(--mac-text-primary)',
                       fontSize: '14px',
-                      minWidth: '170px',
+                      fontWeight: '500',
+                      minWidth: isDoctorView ? '15%' : '200px',
+                      width: isDoctorView ? '15%' : 'auto',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
-                        {formatPhoneNumber(row.patient_phone)}
+                    }}
+                      title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{row.patient_fio || '—'}</span>
+                          {/* Ярлыки источника/приоритета */}
+                          {/* ✅ SSOT: Только source='online' показывает QR badge */}
+                          {row.source === 'online' && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: 'white',
+                                fontWeight: '600',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title="Приоритет: ранняя онлайн-регистрация"
+                            >
+                              QR
+                            </span>
+                          )}
+                          {row.source === 'desk' && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'var(--mac-separator)',
+                                color: 'var(--mac-text-secondary)',
+                                fontWeight: '600',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              Manual
+                            </span>
+                          )}
+                        </div>
+                        {row.patient_birth_year && (
+                          <div style={{
+                            fontSize: '12px',
+                            color: 'var(--mac-text-secondary)',
+                            marginTop: '2px'
+                          }}>
+                            {new Date().getFullYear() - row.patient_birth_year} лет
+                          </div>
+                        )}
                       </div>
                     </td>
-                  )}
 
-                  {/* Год рождения */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
-                    width: isDoctorView ? '50px' : '60px',
-                    minWidth: isDoctorView ? '50px' : '60px',
-                    maxWidth: isDoctorView ? '50px' : '60px'
-                  }}>
-                    {row.patient_birth_year || '—'}
-                  </td>
-
-                  {/* Адрес - скрыт для doctor view */}
-                  {!isDoctorView && (
-                    <td style={{
-                      padding: '12px 8px',
-                      color: 'var(--mac-text-primary)',
-                      fontSize: '14px',
-                      minWidth: '140px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'normal',
-                      lineHeight: '1.4'
-                    }}
-                      className="hide-on-mobile"
-                      title={row.address}
-                    >
-                      {row.address ? (
+                    {/* Телефон - скрыт для doctor view */}
+                    {!isDoctorView && (
+                      <td style={{
+                        padding: '12px 8px',
+                        color: 'var(--mac-text-primary)',
+                        fontSize: '14px',
+                        minWidth: '170px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px'
                         }}>
-                          <Home size={18} style={{
-                            color: 'var(--mac-accent-blue)',
-                            fontWeight: 'bold',
-                            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
-                            flexShrink: 0
-                          }} />
-                          <span style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical'
-                          }}>
-                            {row.address}
-                          </span>
+                          <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
+                          {formatPhoneNumber(row.patient_phone)}
                         </div>
-                      ) : '—'}
+                      </td>
+                    )}
+
+                    {/* Год рождения */}
+                    <td style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      color: 'var(--mac-text-primary)',
+                      fontSize: '14px',
+                      width: isDoctorView ? '50px' : '60px',
+                      minWidth: isDoctorView ? '50px' : '60px',
+                      maxWidth: isDoctorView ? '50px' : '60px'
+                    }}>
+                      {row.patient_birth_year || '—'}
                     </td>
-                  )}
 
-                  {/* Тип обращения */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    minWidth: '80px'
-                  }}>
-                    {renderVisitType((() => {
-                      // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
-                      const discountMode = row.discount_mode;
-                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
-
-                      if (discountMode === 'benefit') return 'free';
-                      if (discountMode === 'repeat') return 'repeat';
-                      // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
-                      if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
-                      return 'paid';
-                    })())}
-                  </td>
-
-                  {/* Услуги */}
-                  <td style={{
-                    padding: '12px 8px',
-                    minWidth: '180px'
-                  }}>
-                    {/* ✅ ИСПРАВЛЕНО: Fallback для QR-записей (через service_name или queue_numbers) */}
-                    {renderServices(
-                      (() => {
-                        // Если есть services, используем их
-                        if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
-                          return row.services;
-                        }
-                        // Fallback 1: service_name из записи
-                        if (row.service_name) {
-                          return [row.service_name];
-                        }
-                        // Fallback 2: service_name из queue_numbers
-                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
-                          return [row.queue_numbers[0].service_name];
-                        }
-                        // Fallback 3: specialty из queue_numbers (для совместимости)
-                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
-                          return [row.queue_numbers[0].specialty];
-                        }
-                        return row.services;
-                      })(),
-                      row.all_patient_services
+                    {/* Адрес - скрыт для doctor view */}
+                    {!isDoctorView && (
+                      <td style={{
+                        padding: '12px 8px',
+                        color: 'var(--mac-text-primary)',
+                        fontSize: '14px',
+                        minWidth: '140px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'normal',
+                        lineHeight: '1.4'
+                      }}
+                        className="hide-on-mobile"
+                        title={row.address}
+                      >
+                        {row.address ? (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            <Home size={18} style={{
+                              color: 'var(--mac-accent-blue)',
+                              fontWeight: 'bold',
+                              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
+                              flexShrink: 0
+                            }} />
+                            <span style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical'
+                            }}>
+                              {row.address}
+                            </span>
+                          </div>
+                        ) : '—'}
+                      </td>
                     )}
-                  </td>
 
-                  {/* Вид оплаты */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    minWidth: '100px'
-                  }}>
-                    {renderPaymentType(
-                      // ✅ ИСПРАВЛЕНО: Для all_free (одобренных или нет) используем 'free', иначе payment_type или 'cash'
-                      (() => {
+                    {/* Тип обращения */}
+                    <td style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      minWidth: '80px'
+                    }}>
+                      {renderVisitType((() => {
+                        // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
                         const discountMode = row.discount_mode;
-                        const approvalStatus = row.approval_status;
-                        // Если discount_mode = 'all_free', показываем как 'free' независимо от approval_status
-                        // (так как пользователь уже выбрал all_free при редактировании)
-                        if (discountMode === 'all_free') {
-                          return 'free';
-                        }
-                        return row.payment_type || 'cash';
-                      })(),
-                      row.payment_status
-                    )}
-                  </td>
+                        const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
 
-                  {/* Дата и время регистрации */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: '14px',
-                    minWidth: '100px'
-                  }}>
-                    <div>
-                      {/* Дата и время регистрации */}
-                      {/* ✅ SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
-                      {(() => {
-                        // ⭐ SSOT: Use row.queue_time directly - no aggregation
-                        const displayDate = row.queue_time ? safeParseDate(row.queue_time) :
-                          row.created_at ? safeParseDate(row.created_at) : null;
+                        if (discountMode === 'benefit') return 'free';
+                        if (discountMode === 'repeat') return 'repeat';
+                        // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
+                        if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
+                        return 'paid';
+                      })())}
+                    </td>
 
-                        if (displayDate) {
-                          return (
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                                <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
-                                {displayDate.toLocaleDateString('ru-RU')}
-                              </div>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                justifyContent: 'center',
-                                marginTop: '2px',
-                                fontSize: '12px',
-                                color: 'var(--mac-text-secondary)'
-                              }}>
-                                <Clock size={10} />
-                                {displayDate.toLocaleTimeString('ru-RU', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit'
-                                })}
-                              </div>
-                            </div>
-                          );
-                        }
+                    {/* Услуги */}
+                    <td style={{
+                      padding: '12px 8px',
+                      minWidth: '180px'
+                    }}>
+                      {/* ✅ ИСПРАВЛЕНО: Fallback для QR-записей (через service_name или queue_numbers) */}
+                      {renderServices(
+                        (() => {
+                          // Если есть services, используем их
+                          if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
+                            return row.services;
+                          }
+                          // Fallback 1: service_name из записи
+                          if (row.service_name) {
+                            return [row.service_name];
+                          }
+                          // Fallback 2: service_name из queue_numbers
+                          if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
+                            return [row.queue_numbers[0].service_name];
+                          }
+                          // Fallback 3: specialty из queue_numbers (для совместимости)
+                          if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
+                            return [row.queue_numbers[0].specialty];
+                          }
+                          return row.services;
+                        })(),
+                        row.all_patient_services
+                      )}
+                    </td>
 
-                        // Fallback: use appointment_date/time for legacy records without queue_time
-                        if (row.appointment_date || row.appointment_time) {
-                          return (
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                                <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
-                                {row.appointment_date || '—'}
-                              </div>
-                              {row.appointment_time && (
+                    {/* Вид оплаты */}
+                    <td style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      minWidth: '100px'
+                    }}>
+                      {renderPaymentType(
+                        // ✅ ИСПРАВЛЕНО: Для all_free (одобренных или нет) используем 'free', иначе payment_type или 'cash'
+                        (() => {
+                          const discountMode = row.discount_mode;
+                          const approvalStatus = row.approval_status;
+                          // Если discount_mode = 'all_free', показываем как 'free' независимо от approval_status
+                          // (так как пользователь уже выбрал all_free при редактировании)
+                          if (discountMode === 'all_free') {
+                            return 'free';
+                          }
+                          return row.payment_type || 'cash';
+                        })(),
+                        row.payment_status
+                      )}
+                    </td>
+
+                    {/* Дата и время регистрации */}
+                    <td style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      color: 'var(--mac-text-primary)',
+                      fontSize: '14px',
+                      minWidth: '100px'
+                    }}>
+                      <div>
+                        {/* Дата и время регистрации */}
+                        {/* ✅ SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
+                        {(() => {
+                          // ⭐ SSOT: Use row.queue_time directly - no aggregation
+                          const displayDate = row.queue_time ? safeParseDate(row.queue_time) :
+                            row.created_at ? safeParseDate(row.created_at) : null;
+
+                          if (displayDate) {
+                            return (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                                  <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
+                                  {displayDate.toLocaleDateString('ru-RU')}
+                                </div>
                                 <div style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1836,140 +1857,194 @@ const EnhancedAppointmentsTable = ({
                                   color: 'var(--mac-text-secondary)'
                                 }}>
                                   <Clock size={10} />
-                                  {row.appointment_time}
+                                  {displayDate.toLocaleTimeString('ru-RU', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                  })}
                                 </div>
-                              )}
-                            </div>
-                          );
-                        }
+                              </div>
+                            );
+                          }
 
-                        return '-';
-                      })()}
-                    </div>
-                  </td>
+                          // Fallback: use appointment_date/time for legacy records without queue_time
+                          if (row.appointment_date || row.appointment_time) {
+                            return (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                                  <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
+                                  {row.appointment_date || '—'}
+                                </div>
+                                {row.appointment_time && (
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    justifyContent: 'center',
+                                    marginTop: '2px',
+                                    fontSize: '12px',
+                                    color: 'var(--mac-text-secondary)'
+                                  }}>
+                                    <Clock size={10} />
+                                    {row.appointment_time}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
 
-                  {/* Статус */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    minWidth: '80px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {renderStatus(row.status)}
-                  </td>
+                          return '-';
+                        })()}
+                      </div>
+                    </td>
 
-
-                  {/* Стоимость */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'right',
-                    color: (() => {
-                      // ✅ ИСПРАВЛЕНИЕ #3: Цвет зависит от реальной стоимости (cost из VisitService)
-                      const discountMode = row.discount_mode;
-                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
-                      if (isAllFreeApproved) return 'var(--mac-warning)';
-
-                      // ⭐ Используем ту же логику что и в отображении
-                      let amount = 0;
-                      if (row.has_shared_invoice) {
-                        amount = row.cost || 0;
-                      } else {
-                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
-                      }
-
-                      return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
-                    })(),
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    minWidth: '90px'
-                  }}>
-                    {(() => {
-                      // ✅ ИСПРАВЛЕНИЕ #3: Правильный приоритет отображения цен
-                      // 1. cost из VisitService (реальная цена с учётом скидок из wizard)
-                      // 2. invoice_amount (только если НЕ shared invoice)
-                      const discountMode = row.discount_mode;
-
-                      // Показываем "Бесплатно" если discount_mode = 'all_free'
-                      if (discountMode === 'all_free') {
-                        return 'Бесплатно';
-                      }
-
-                      // ⭐ НОВАЯ ЛОГИКА: Приоритет cost, затем invoice_amount (если не shared)
-                      let amount = 0;
-                      if (row.has_shared_invoice) {
-                        // Для shared invoice используем ТОЛЬКО cost (не показываем сумму всего invoice)
-                        amount = row.cost || 0;
-                      } else {
-                        // Для обычных случаев: приоритет cost, fallback invoice_amount
-                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
-                      }
-
-                      // Если есть сумма - показываем, иначе "—"
-                      return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
-                    })()}
-                  </td>
-
-                  {/* Действия */}
-                  <td
-                    style={{
+                    {/* Статус */}
+                    <td style={{
                       padding: '12px 8px',
                       textAlign: 'center',
-                      width: '200px',
-                      minWidth: '200px',
-                      maxWidth: '200px',
-                      position: 'relative',
-                      zIndex: 100
-                    }}
-                    onClick={(e) => {
-                      // Блокируем клик на строку при клике в ячейке действий
-                      e.stopPropagation();
-                    }}
-                    onMouseDown={(e) => {
-                      // Блокируем mousedown на строку при клике в ячейке действий
-                      e.stopPropagation();
-                    }}
-                  >
-                    <div
+                      minWidth: '80px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {renderStatus(row.status)}
+                    </td>
+
+
+                    {/* Стоимость */}
+                    <td style={{
+                      padding: '12px 8px',
+                      textAlign: 'right',
+                      color: (() => {
+                        // ✅ ИСПРАВЛЕНИЕ #3: Цвет зависит от реальной стоимости (cost из VisitService)
+                        const discountMode = row.discount_mode;
+                        const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
+                        if (isAllFreeApproved) return 'var(--mac-warning)';
+
+                        // ⭐ Используем ту же логику что и в отображении
+                        let amount = 0;
+                        if (row.has_shared_invoice) {
+                          amount = row.cost || 0;
+                        } else {
+                          amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                        }
+
+                        return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
+                      })(),
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      minWidth: '90px'
+                    }}>
+                      {(() => {
+                        // ✅ ИСПРАВЛЕНИЕ #3: Правильный приоритет отображения цен
+                        // 1. cost из VisitService (реальная цена с учётом скидок из wizard)
+                        // 2. invoice_amount (только если НЕ shared invoice)
+                        const discountMode = row.discount_mode;
+
+                        // Показываем "Бесплатно" если discount_mode = 'all_free'
+                        if (discountMode === 'all_free') {
+                          return 'Бесплатно';
+                        }
+
+                        // ⭐ НОВАЯ ЛОГИКА: Приоритет cost, затем invoice_amount (если не shared)
+                        let amount = 0;
+                        if (row.has_shared_invoice) {
+                          // Для shared invoice используем ТОЛЬКО cost (не показываем сумму всего invoice)
+                          amount = row.cost || 0;
+                        } else {
+                          // Для обычных случаев: приоритет cost, fallback invoice_amount
+                          amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                        }
+
+                        // Если есть сумма - показываем, иначе "—"
+                        return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
+                      })()}
+                    </td>
+
+                    {/* Действия */}
+                    <td
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                        flexWrap: 'wrap',
+                        padding: '12px 8px',
+                        textAlign: 'center',
+                        width: '200px',
+                        minWidth: '200px',
+                        maxWidth: '200px',
                         position: 'relative',
                         zIndex: 100
                       }}
                       onClick={(e) => {
-                        // Блокируем клик на строку при клике в контейнере действий
+                        // Блокируем клик на строку при клике в ячейке действий
                         e.stopPropagation();
                       }}
                       onMouseDown={(e) => {
-                        // Блокируем mousedown на строку при клике в контейнере действий
+                        // Блокируем mousedown на строку при клике в ячейке действий
                         e.stopPropagation();
                       }}
                     >
-                      {/* В режиме панели врача кнопки оплаты не показываем */}
-                      {!isDoctorView && (() => {
-                        const status = (row.status || '').toLowerCase();
-                        const paymentStatus = (row.payment_status || '').toLowerCase();
-                        return (
-                          status === 'paid_pending' ||
-                          paymentStatus === 'pending' ||
-                          (status === 'scheduled' && paymentStatus !== 'paid') ||
-                          (status === 'confirmed' && paymentStatus !== 'paid') ||
-                          (status === 'waiting' && paymentStatus !== 'paid') ||
-                          (status === 'queued' && paymentStatus !== 'paid') ||
-                          (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled')
-                        );
-                      })() && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          flexWrap: 'wrap',
+                          position: 'relative',
+                          zIndex: 100
+                        }}
+                        onClick={(e) => {
+                          // Блокируем клик на строку при клике в контейнере действий
+                          e.stopPropagation();
+                        }}
+                        onMouseDown={(e) => {
+                          // Блокируем mousedown на строку при клике в контейнере действий
+                          e.stopPropagation();
+                        }}
+                      >
+                        {/* В режиме панели врача кнопки оплаты не показываем */}
+                        {!isDoctorView && (() => {
+                          const status = (row.status || '').toLowerCase();
+                          const paymentStatus = (row.payment_status || '').toLowerCase();
+                          return (
+                            status === 'paid_pending' ||
+                            paymentStatus === 'pending' ||
+                            (status === 'scheduled' && paymentStatus !== 'paid') ||
+                            (status === 'confirmed' && paymentStatus !== 'paid') ||
+                            (status === 'waiting' && paymentStatus !== 'paid') ||
+                            (status === 'queued' && paymentStatus !== 'paid') ||
+                            (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled')
+                          );
+                        })() && (
+                            <button
+                              className="action-button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onActionClick?.('payment', row, e);
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                border: 'none',
+                                borderRadius: '4px',
+                                backgroundColor: 'var(--mac-success, #34c759)',
+                                color: 'var(--mac-text-primary)',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                              }}
+                              title="Оплата"
+                            >
+                              💸 Оплата
+                            </button>
+                          )}
+
+                        {/* Вызвать */}
+                        {(isDoctorView ? (row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid') : (row.status === 'queued' || row.status === 'waiting')) && (
                           <button
                             className="action-button"
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              onActionClick?.('payment', row, e);
+                              onActionClick?.('call', row, e);
                             }}
                             style={{
                               padding: '4px 8px',
@@ -1981,248 +2056,224 @@ const EnhancedAppointmentsTable = ({
                               fontSize: '12px',
                               fontWeight: '500'
                             }}
-                            title="Оплата"
+                            title="Вызвать"
                           >
-                            💸 Оплата
+                            📢 Вызвать
                           </button>
                         )}
 
-                      {/* Вызвать */}
-                      {(isDoctorView ? (row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid') : (row.status === 'queued' || row.status === 'waiting')) && (
-                        <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('call', row, e);
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--mac-success, #34c759)',
-                            color: 'var(--mac-text-primary)',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500'
-                          }}
-                          title="Вызвать"
-                        >
-                          📢 Вызвать
-                        </button>
-                      )}
-
-                      {/* Печать */}
-                      {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') && (
-                        <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('print', row, e);
-                          }}
-                          style={{
-                            padding: '4px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--mac-accent-blue)',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto'
-                          }}
-                          title="Печать"
-                        >
-                          <FileText size={14} />
-                        </button>
-                      )}
-
-                      {/* Завершить */}
-                      {(row.status === 'in_cabinet' || row.status === 'called') && (
-                        <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('complete', row, e);
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--mac-success, #34c759)',
-                            color: 'var(--mac-text-primary)',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500'
-                          }}
-                          title="Завершить"
-                        >
-                          ✅ Завершить
-                        </button>
-                      )}
-
-                      {/* ✅ НОВОЕ: Кнопки управления статусами очереди (для режима врача) */}
-                      {isDoctorView && (
-                        <QueueActionButtons
-                          entry={{
-                            id: row.queue_entry_id || row.id,
-                            queue_entry_id: row.queue_entry_id,
-                            status: row.status
-                          }}
-                          onStatusChange={(action, entry, result) => {
-                            logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
-                            // Передаём событие наружу для обновления списка
-                            onActionClick?.(`queue_${action}`, row, null);
-                          }}
-                          compact={true}
-                        />
-                      )}
-
-                      {/* Просмотр */}
-                      <button
-                        className="action-button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
-                          if (onActionClick) {
-                            onActionClick('view', row, e);
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          // Дублируем обработчик для надежности
-                          if (onActionClick) {
-                            onActionClick('view', row, e);
-                          }
-                        }}
-                        style={{
-                          padding: '4px',
-                          border: 'none',
-                          borderRadius: '4px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-text-secondary)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto',
-                          position: 'relative',
-                          zIndex: 101
-                        }}
-                        title="Просмотр"
-                      >
-                        <Eye size={14} />
-                      </button>
-
-                      {/* Редактировать */}
-                      <button
-                        className="action-button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
-                          if (onActionClick) {
-                            onActionClick('edit', row, e);
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          // Дублируем обработчик для надежности
-                          if (onActionClick) {
-                            onActionClick('edit', row, e);
-                          }
-                        }}
-                        style={{
-                          padding: '4px',
-                          border: 'none',
-                          borderRadius: '4px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-text-secondary)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto',
-                          position: 'relative',
-                          zIndex: 101
-                        }}
-                        title="Редактировать"
-                      >
-                        <Edit size={14} />
-                      </button>
-
-                      {/* Просмотр EMR (только для завершённых записей) */}
-                      {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
-                        (row.status === 'in_visit' && row.payment_status === 'paid')) && (
+                        {/* Печать */}
+                        {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') && (
                           <button
                             className="action-button"
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              onActionClick?.('view_emr', row, e);
+                              onActionClick?.('print', row, e);
                             }}
                             style={{
                               padding: '4px',
                               border: 'none',
                               borderRadius: '4px',
                               backgroundColor: 'transparent',
-                              color: 'var(--mac-accent-blue, #007aff)',
+                              color: 'var(--mac-accent-blue)',
                               cursor: 'pointer',
                               pointerEvents: 'auto'
                             }}
-                            title="Просмотр EMR"
+                            title="Печать"
                           >
                             <FileText size={14} />
                           </button>
                         )}
 
-                      {/* Еще */}
-                      <button
-                        className="action-button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onActionClick?.('more', row, e);
-                        }}
-                        style={{
-                          padding: '4px',
-                          border: 'none',
-                          borderRadius: '4px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--mac-text-secondary)',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto'
-                        }}
-                        title="Еще"
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
+                        {/* Завершить */}
+                        {(row.status === 'in_cabinet' || row.status === 'called') && (
+                          <button
+                            className="action-button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onActionClick?.('complete', row, e);
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              border: 'none',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--mac-success, #34c759)',
+                              color: 'var(--mac-text-primary)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '500'
+                            }}
+                            title="Завершить"
+                          >
+                            ✅ Завершить
+                          </button>
+                        )}
 
-                      {/* Назначить следующий визит */}
-                      {isDoctorView && row.status === 'done' && (
+                        {/* ✅ НОВОЕ: Кнопки управления статусами очереди (для режима врача) */}
+                        {isDoctorView && (
+                          <QueueActionButtons
+                            entry={{
+                              id: row.queue_entry_id || row.id,
+                              queue_entry_id: row.queue_entry_id,
+                              status: row.status
+                            }}
+                            onStatusChange={(action, entry, result) => {
+                              logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
+                              // Передаём событие наружу для обновления списка
+                              onActionClick?.(`queue_${action}`, row, null);
+                            }}
+                            compact={true}
+                          />
+                        )}
+
+                        {/* Просмотр */}
                         <button
                           className="action-button"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            onActionClick?.('schedule_next', row, e);
+                            logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
+                            if (onActionClick) {
+                              onActionClick('view', row, e);
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Дублируем обработчик для надежности
+                            if (onActionClick) {
+                              onActionClick('view', row, e);
+                            }
                           }}
                           style={{
-                            padding: '4px 8px',
+                            padding: '4px',
                             border: 'none',
                             borderRadius: '4px',
-                            backgroundColor: 'var(--mac-accent-blue, #007aff)',
-                            color: 'var(--mac-text-primary)',
+                            backgroundColor: 'transparent',
+                            color: 'var(--mac-text-secondary)',
                             cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500'
+                            pointerEvents: 'auto',
+                            position: 'relative',
+                            zIndex: 101
                           }}
-                          title="Назначить следующий визит"
+                          title="Просмотр"
                         >
-                          📅 Следующий
+                          <Eye size={14} />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+
+                        {/* Редактировать */}
+                        <button
+                          className="action-button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
+                            if (onActionClick) {
+                              onActionClick('edit', row, e);
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Дублируем обработчик для надежности
+                            if (onActionClick) {
+                              onActionClick('edit', row, e);
+                            }
+                          }}
+                          style={{
+                            padding: '4px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            backgroundColor: 'transparent',
+                            color: 'var(--mac-text-secondary)',
+                            cursor: 'pointer',
+                            pointerEvents: 'auto',
+                            position: 'relative',
+                            zIndex: 101
+                          }}
+                          title="Редактировать"
+                        >
+                          <Edit size={14} />
+                        </button>
+
+                        {/* Просмотр EMR (только для завершённых записей) */}
+                        {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
+                          (row.status === 'in_visit' && row.payment_status === 'paid')) && (
+                            <button
+                              className="action-button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onActionClick?.('view_emr', row, e);
+                              }}
+                              style={{
+                                padding: '4px',
+                                border: 'none',
+                                borderRadius: '4px',
+                                backgroundColor: 'transparent',
+                                color: 'var(--mac-accent-blue, #007aff)',
+                                cursor: 'pointer',
+                                pointerEvents: 'auto'
+                              }}
+                              title="Просмотр EMR"
+                            >
+                              <FileText size={14} />
+                            </button>
+                          )}
+
+                        {/* Еще */}
+                        <button
+                          className="action-button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onActionClick?.('more', row, e);
+                          }}
+                          style={{
+                            padding: '4px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            backgroundColor: 'transparent',
+                            color: 'var(--mac-text-secondary)',
+                            cursor: 'pointer',
+                            pointerEvents: 'auto'
+                          }}
+                          title="Еще"
+                        >
+                          <MoreHorizontal size={14} />
+                        </button>
+
+                        {/* Назначить следующий визит */}
+                        {isDoctorView && row.status === 'done' && (
+                          <button
+                            className="action-button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onActionClick?.('schedule_next', row, e);
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              border: 'none',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--mac-accent-blue, #007aff)',
+                              color: 'var(--mac-text-primary)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '500'
+                            }}
+                            title="Назначить следующий визит"
+                          >
+                            📅 Следующий
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );  // ⭐ End of return statement
+              })  // ⭐ End of paginatedData.map
             )}
           </tbody>
         </table>

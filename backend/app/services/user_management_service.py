@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, or_, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash, verify_password
@@ -50,6 +51,7 @@ class UserManagementService:
     """Сервис для управления пользователями"""
 
     def __init__(self):
+        # TODO(DB_ROLES): Move permissions to role_permissions table in Phase 4
         self.default_permissions = {
             "Admin": ["*"],  # Все права
             "Doctor": [
@@ -79,6 +81,18 @@ class UserManagementService:
                 "schedules:write",
                 "payments:read",
                 "payments:write",
+            ],
+            "Cashier": [
+                "payments:read",
+                "payments:write",
+                "patients:read",
+                "appointments:read",
+            ],
+            "Lab": [
+                "patients:read",
+                "emr:read",
+                "lab_results:read",
+                "lab_results:write",
             ],
             "Patient": [
                 "profile:read",
@@ -120,6 +134,7 @@ class UserManagementService:
                 role=user_data.role,
                 is_active=user_data.is_active,
                 is_superuser=user_data.is_superuser,
+                must_change_password=getattr(user_data, 'must_change_password', False),
             )
             db.add(user)
             db.flush()  # Получаем ID пользователя
@@ -255,6 +270,10 @@ class UserManagementService:
             db.commit()
 
             return True, "Пользователь успешно удален"
+
+        except IntegrityError:
+            db.rollback()
+            return False, "Невозможно удалить пользователя, так как существуют связанные данные (история действий, записи, платежи). Рекомендуется деактивировать пользователя вместо удаления."
 
         except Exception as e:
             db.rollback()

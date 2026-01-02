@@ -105,6 +105,17 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 
       // Обычный вход без 2FA
       if (data.access_token) {
+        // Проверяем, требуется ли смена пароля
+        if (data.must_change_password) {
+          setToken(data.access_token);
+          localStorage.setItem('auth_token', data.access_token);
+          navigate('/change-password-required', {
+            state: { currentPassword: formData.password },
+            replace: true
+          });
+          return;
+        }
+
         // Сохраняем токен единообразно для всех клиентов
         setToken(data.access_token);
         localStorage.setItem('auth_token', data.access_token);

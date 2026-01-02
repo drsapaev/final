@@ -14,7 +14,9 @@ import {
   Stethoscope,
   TestTube,
   Scissors,
-  FolderTree
+  FolderTree,
+  Sparkles,
+  Users
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api } from '../../api/client';
@@ -22,6 +24,7 @@ import logger from '../../utils/logger';
 import './ModernTabs.css';
 
 // Маппинг иконок из lucide-react
+// ⭐ SSOT: icon names from QueueProfile.icon field
 const iconMap = {
   Heart,
   Activity,
@@ -34,12 +37,16 @@ const iconMap = {
   Stethoscope,
   TestTube,
   Scissors,
-  FolderTree
+  FolderTree,
+  Sparkles,
+  Sparkle: Sparkles, // Alias for backend compatibility
+  Users
 };
 
 const ModernTabs = ({
   activeTab,
   onTabChange,
+  onProfilesLoaded,  // ⭐ NEW: Callback to pass loaded profiles to parent for SSOT filtering
   departmentStats = {},
   theme = 'light',
   language = 'ru'
@@ -59,61 +66,75 @@ const ModernTabs = ({
     }
   }[language] || {};
 
-  // Загрузка отделений из БД
-  const loadDepartments = async () => {
+  // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
+  // Tabs определяются в backend, frontend только отображает
+  const loadQueueProfiles = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/departments?active_only=true');
 
-      // Backend returns {success: true, data: [...], count: N}
-      // axios response.data contains the backend response body
-      const departments = response.data.data || [];
+      // ⭐ NEW API: /queues/profiles возвращает динамические вкладки
+      // Формат: { profiles: [{key, title, title_ru, queue_tags, icon, color}] }
+      const response = await api.get('/queues/profiles?active_only=true');
 
-      // ✅ ИСПРАВЛЕНО: Сортировка по display_order ASC
-      const sortedDepartments = [...departments].sort((a, b) => {
-        const aOrder = a.display_order || 999;
-        const bOrder = b.display_order || 999;
-        return aOrder - bOrder;
-      });
+      // Backend returns {success: true, profiles: [...], source: 'database'|'fallback'}
+      const profiles = response.data.profiles || [];
 
-      // Преобразуем данные из БД в формат для вкладок
-      const departmentsData = sortedDepartments.map(dept => ({
-        key: dept.key,
-        label: language === 'uz' ? (dept.name_uz || dept.name_ru) : dept.name_ru,
-        icon: iconMap[dept.icon] || Package, // Fallback на Package если иконка не найдена
-        color: dept.color,
-        gradient: dept.gradient || `linear-gradient(135deg, ${dept.color}, ${dept.color})`
+      if (profiles.length === 0) {
+        throw new Error('No profiles returned from API');
+      }
+
+      // Преобразуем данные из API в формат для вкладок
+      const profilesData = profiles.map(profile => ({
+        key: profile.key,
+        label: language === 'uz' ? (profile.title || profile.title_ru) : (profile.title_ru || profile.title),
+        // ⭐ SSOT: queue_tags используются для фильтрации записей на вкладке
+        queue_tags: profile.queue_tags || [profile.key],
+        icon: iconMap[profile.icon] || Package, // Fallback на Package если иконка не найдена
+        color: profile.color || '#6b7280',
+        gradient: `linear-gradient(135deg, ${profile.color || '#6b7280'}, ${profile.color || '#6b7280'})`
       }));
 
-      setTabs(departmentsData);
+      logger.info(`✅ SSOT: Loaded ${profilesData.length} queue profiles from API (source: ${response.data.source})`);
+      setTabs(profilesData);
+
+      // ⭐ SSOT: Notify parent component about loaded profiles for filtering
+      if (onProfilesLoaded) {
+        onProfilesLoaded(profilesData);
+      }
     } catch (error) {
-      logger.error('Ошибка загрузки отделений:', error);
+      logger.error('Ошибка загрузки профилей очередей:', error);
+
       // Fallback на hardcoded вкладки если API не работает
+      // ⚠️ TEMPORARY ADAPTER: Remove when API is stable
       setTabs([
         {
-          key: 'cardio',
+          key: 'cardiology',
           label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
+          queue_tags: ['cardio', 'cardiology', 'cardiology_common'],
           icon: Heart,
           color: '#ef4444',
           gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
         },
         {
-          key: 'echokg',
+          key: 'ecg',
           label: language === 'uz' ? 'EKG' : 'ЭКГ',
+          queue_tags: ['ecg', 'echokg'],
           icon: Activity,
           color: '#ec4899',
           gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
         },
         {
-          key: 'derma',
+          key: 'dermatology',
           label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
+          queue_tags: ['derma', 'dermatology'],
           icon: UserCheck,
           color: '#f59e0b',
           gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
         },
         {
-          key: 'dental',
+          key: 'stomatology',
           label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
+          queue_tags: ['dental', 'stomatology', 'dentist'],
           icon: Smile,
           color: '#3b82f6',
           gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
@@ -121,6 +142,7 @@ const ModernTabs = ({
         {
           key: 'lab',
           label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
+          queue_tags: ['lab', 'laboratory'],
           icon: FlaskConical,
           color: '#10b981',
           gradient: 'linear-gradient(135deg, #10b981, #059669)'
@@ -128,6 +150,7 @@ const ModernTabs = ({
         {
           key: 'procedures',
           label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
+          queue_tags: ['procedures', 'physio', 'therapy'],
           icon: Syringe,
           color: '#8b5cf6',
           gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
@@ -139,18 +162,24 @@ const ModernTabs = ({
   };
 
   useEffect(() => {
-    loadDepartments();
+    loadQueueProfiles();
   }, [language]);
 
-  // Слушаем обновления отделений
+  // Слушаем обновления профилей очередей
   useEffect(() => {
-    const handleDepartmentsUpdate = (event) => {
-      logger.log('ModernTabs: Получено обновление отделений', event.detail);
-      loadDepartments();
+    const handleProfilesUpdate = (event) => {
+      logger.log('ModernTabs: Получено обновление профилей очередей', event.detail);
+      loadQueueProfiles();
     };
 
-    window.addEventListener('departments:updated', handleDepartmentsUpdate);
-    return () => window.removeEventListener('departments:updated', handleDepartmentsUpdate);
+    window.addEventListener('queue-profiles:updated', handleProfilesUpdate);
+    // Также слушаем старое событие для обратной совместимости
+    window.addEventListener('departments:updated', handleProfilesUpdate);
+
+    return () => {
+      window.removeEventListener('queue-profiles:updated', handleProfilesUpdate);
+      window.removeEventListener('departments:updated', handleProfilesUpdate);
+    };
   }, []);
 
   // Используем ту же систему цветов, что и таблица

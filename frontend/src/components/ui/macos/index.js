@@ -4,6 +4,7 @@
 // Form Components
 export { default as MacOSInput } from './MacOSInput';
 export { default as MacOSSelect } from './MacOSSelect';
+export { default as Avatar } from './Avatar';
 export { default as MacOSTextarea } from './MacOSTextarea';
 export { default as MacOSCheckbox } from './MacOSCheckbox';
 export { default as MacOSRadio } from './MacOSRadio';

@@ -16,7 +16,7 @@ const useDoctors = () => {
   const loadDoctors = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await api.get('/admin/doctors');
       if (response.data) {
@@ -34,12 +34,12 @@ const useDoctors = () => {
   const createDoctor = useCallback(async (doctorData) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // Преобразуем данные формы в формат, ожидаемый бэкендом
       // Сначала нужно создать пользователя, если его нет
       let userId = null;
-      
+
       if (doctorData.email || doctorData.name) {
         try {
           // Создаем пользователя с ролью Doctor
@@ -59,9 +59,10 @@ const useDoctors = () => {
             phone: doctorData.phone,
             role: 'Doctor',
             is_active: doctorData.status === 'active',
-            password: 'TempPassword123!' // Временный пароль, нужно будет изменить при первом входе
+            password: 'TempPassword123!', // Временный пароль
+            must_change_password: true // Требуется смена пароля при первом входе
           });
-          
+
           if (userResponse.data?.id || userResponse.data?.user?.id) {
             userId = userResponse.data.id || userResponse.data.user.id;
           }
@@ -78,10 +79,10 @@ const useDoctors = () => {
           throw userError;
         }
       }
-      
+
       // Преобразуем department в specialty (если нужно)
       const specialty = doctorData.department || doctorData.specialization || 'general';
-      
+
       // Создаем врача
       const doctorPayload = {
         user_id: userId,
@@ -92,15 +93,15 @@ const useDoctors = () => {
         max_online_per_day: 15,
         active: doctorData.status === 'active' || doctorData.status !== 'inactive'
       };
-      
+
       const response = await api.post('/admin/doctors', doctorPayload);
-      
+
       if (response.data) {
         // Обновляем список врачей
         await loadDoctors();
         return response.data;
       }
-      
+
       throw new Error('Не удалось создать врача');
     } catch (err) {
       logger.error('Ошибка создания врача:', err);
@@ -116,24 +117,24 @@ const useDoctors = () => {
   const updateDoctor = useCallback(async (id, doctorData) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // Преобразуем данные формы в формат, ожидаемый бэкендом
       const specialty = doctorData.department || doctorData.specialization || 'general';
-      
+
       const doctorPayload = {
         specialty: specialty,
         active: doctorData.status === 'active' || doctorData.status !== 'inactive'
       };
-      
+
       const response = await api.put(`/admin/doctors/${id}`, doctorPayload);
-      
+
       if (response.data) {
         // Обновляем список врачей
         await loadDoctors();
         return response.data;
       }
-      
+
       throw new Error('Не удалось обновить врача');
     } catch (err) {
       logger.error('Ошибка обновления врача:', err);
@@ -149,7 +150,7 @@ const useDoctors = () => {
   const deleteDoctor = useCallback(async (id) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       await api.delete(`/admin/doctors/${id}`);
       // Обновляем список врачей
@@ -169,18 +170,18 @@ const useDoctors = () => {
     const doctorName = doctor.user?.full_name || doctor.name || '';
     const doctorEmail = doctor.user?.email || doctor.email || '';
     const doctorSpecialty = doctor.specialty || doctor.specialization || '';
-    
-    const matchesSearch = !searchTerm || 
+
+    const matchesSearch = !searchTerm ||
       doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doctorEmail.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesSpecialization = !filterSpecialization || 
+
+    const matchesSpecialization = !filterSpecialization ||
       doctorSpecialty.toLowerCase().includes(filterSpecialization.toLowerCase());
-    
+
     const matchesDepartment = !filterDepartment || doctorSpecialty === filterDepartment;
     const matchesStatus = !filterStatus || (doctor.active ? 'active' : 'inactive') === filterStatus;
-    
+
     return matchesSearch && matchesSpecialization && matchesDepartment && matchesStatus;
   });
 

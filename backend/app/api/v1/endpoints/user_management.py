@@ -103,10 +103,11 @@ async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: Optional[str] = Query(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+        # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
-    status: Optional[str] = Query(
-        None, pattern="^(active|inactive|suspended|pending|locked)$"
+    status_filter: Optional[str] = Query(
+        None, pattern="^(active|inactive|suspended|pending|locked)$", alias="status"
     ),
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None, min_length=1, max_length=100),
@@ -120,7 +121,7 @@ async def get_users(
             page=page,
             per_page=per_page,
             role=role,
-            status=status,
+            status=status_filter,
             is_active=is_active,
             query=search,
         )

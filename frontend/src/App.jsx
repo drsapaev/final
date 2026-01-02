@@ -130,6 +130,7 @@ const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
+const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
 
 // Стилизованные компоненты
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
@@ -1142,6 +1143,7 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginFormStyled />} />
           <Route path="/old-login" element={<Login />} />
+          <Route path="/change-password-required" element={<ChangePasswordRequired />} />
           <Route path="/health" element={<Health />} />
           <Route path="/" element={<Landing />} />
           <Route path="/medilab-demo" element={<MediLabDemo />} />
@@ -1186,26 +1188,26 @@ function AppContent() {
               <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar']}><RegistrarPanel /></RequireAuth>} />
+              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist']}><RegistrarPanel /></RequireAuth>} />
               <Route path="doctor-panel" element={<RequireAuth roles={['Admin', 'Doctor']}><DoctorPanel /></RequireAuth>} />
               <Route path="cardiologist" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio']}><CardiologistPanelUnified /></RequireAuth>} />
               <Route path="dermatologist" element={<RequireAuth roles={['Admin', 'Doctor', 'derma']}><DermatologistPanelUnified /></RequireAuth>} />
               <Route path="dentist" element={<RequireAuth roles={['Admin', 'Doctor', 'dentist']}><DentistPanelUnified /></RequireAuth>} />
               <Route path="lab-panel" element={<RequireAuth roles={['Admin', 'Lab']}><LabPanel /></RequireAuth>} />
-              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Patient', 'Registrar', 'Doctor']}><PatientPanel /></RequireAuth>} />
+              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Patient', 'Registrar', 'Receptionist', 'Doctor']}><PatientPanel /></RequireAuth>} />
               <Route path="queue-board" element={<DisplayBoardUnified />} />
               <Route path="display-board" element={<DisplayBoardUnified />} />
               <Route path="display-board/:role" element={<DisplayBoardUnified />} />
               <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
               <Route path="security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
               <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
-              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar']}><Scheduler /></RequireAuth>} />
-              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar']}><Appointments /></RequireAuth>} />
+              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist']}><Scheduler /></RequireAuth>} />
+              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist']}><Appointments /></RequireAuth>} />
               <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
               {/* Visit details - Medical staff only (security fix - contains PHI) */}
-              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
+              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
               {/* Search - Medical staff only (security fix) */}
-              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
+              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
 
               {/* Интегрированные скрытые компоненты */}
               <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />

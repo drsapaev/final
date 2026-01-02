@@ -18,7 +18,8 @@ import {
   Heart,
   Scissors,
   Stethoscope,
-  TestTube
+  TestTube,
+  Users
 } from 'lucide-react';
 import {
   MacOSCard,
@@ -47,6 +48,8 @@ const ServiceCatalog = () => {
   const [categories, setCategories] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [departments, setDepartments] = useState([]);
+  // ⭐ SSOT: Queue profiles for dynamic queue_tag selection
+  const [queueProfiles, setQueueProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState('all');
@@ -80,12 +83,13 @@ const ServiceCatalog = () => {
     try {
       setLoading(true);
 
-      // Загружаем услуги, категории, врачей и отделения параллельно
-      const [servicesRes, categoriesRes, doctorsRes, departmentsRes] = await Promise.allSettled([
+      // Загружаем услуги, категории, врачей, отделения и профили очередей параллельно
+      const [servicesRes, categoriesRes, doctorsRes, departmentsRes, queueProfilesRes] = await Promise.allSettled([
         api.get('/services'),
         api.get('/services/categories'),
         api.get('/services/admin/doctors'),
-        api.get('/departments')
+        api.get('/departments'),
+        api.get('/queues/profiles?active_only=false')  // ⭐ SSOT: Load queue profiles
       ]);
 
       if (servicesRes.status === 'fulfilled') {
@@ -111,6 +115,13 @@ const ServiceCatalog = () => {
         setDepartments(departmentsRes.value.data?.data || []);
       } else {
         logger.error('Ошибка загрузки отделений:', departmentsRes.reason);
+      }
+
+      // ⭐ SSOT: Load queue profiles for queue_tag selection
+      if (queueProfilesRes.status === 'fulfilled') {
+        setQueueProfiles(queueProfilesRes.value.data?.profiles || []);
+      } else {
+        logger.error('Ошибка загрузки профилей очередей:', queueProfilesRes.reason);
       }
 
     } catch (error) {
@@ -150,7 +161,7 @@ const ServiceCatalog = () => {
       await loadData();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      
+
       // ✅ ПАРСИНГ ДЕТАЛЬНЫХ ОШИБОК ОТ BACKEND
       let errorMessage = 'Ошибка сохранения услуги';
       const errorData = error.response?.data || {};
@@ -210,7 +221,7 @@ const ServiceCatalog = () => {
 
   if (loading) {
     return (
-      <MacOSCard 
+      <MacOSCard
         variant="default"
         style={{ padding: '24px' }}
       >
@@ -227,15 +238,15 @@ const ServiceCatalog = () => {
       {/* Заголовок */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
+          <h2 style={{
+            fontSize: 'var(--mac-font-size-xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             margin: 0
           }}>
             Справочник услуг
           </h2>
-          <p style={{ 
+          <p style={{
             color: 'var(--mac-text-secondary)',
             margin: '4px 0 0 0',
             fontSize: 'var(--mac-font-size-sm)'
@@ -243,7 +254,7 @@ const ServiceCatalog = () => {
             Управление услугами и ценами по специальностям
           </p>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '12px' }}>
           <MacOSButton variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw size={16} style={{ marginRight: '8px' }} />
@@ -266,22 +277,22 @@ const ServiceCatalog = () => {
       )}
 
       {/* Фильтры */}
-      <MacOSCard 
+      <MacOSCard
         variant="default"
         style={{ padding: '24px' }}
       >
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '16px'
         }}>
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Поиск по названию
             </label>
@@ -296,12 +307,12 @@ const ServiceCatalog = () => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Специальность
             </label>
@@ -368,26 +379,26 @@ const ServiceCatalog = () => {
       </MacOSCard>
 
       {/* Статистика */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '16px' 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px'
       }}>
-        <MacOSCard 
+        <MacOSCard
           variant="default"
           style={{ padding: '24px' }}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-info)',
               margin: 0
             }}>
               {services.length}
             </div>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-sm)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
               margin: '4px 0 0 0'
             }}>
@@ -395,21 +406,21 @@ const ServiceCatalog = () => {
             </div>
           </div>
         </MacOSCard>
-        <MacOSCard 
+        <MacOSCard
           variant="default"
           style={{ padding: '24px' }}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-success)',
               margin: 0
             }}>
               {services.filter(s => s.active).length}
             </div>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-sm)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
               margin: '4px 0 0 0'
             }}>
@@ -417,21 +428,21 @@ const ServiceCatalog = () => {
             </div>
           </div>
         </MacOSCard>
-        <MacOSCard 
+        <MacOSCard
           variant="default"
           style={{ padding: '24px' }}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-warning)',
               margin: 0
             }}>
               {categories.length}
             </div>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-sm)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
               margin: '4px 0 0 0'
             }}>
@@ -439,21 +450,21 @@ const ServiceCatalog = () => {
             </div>
           </div>
         </MacOSCard>
-        <MacOSCard 
+        <MacOSCard
           variant="default"
           style={{ padding: '24px' }}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-accent)',
               margin: 0
             }}>
               {filteredServices.length}
             </div>
-            <div style={{ 
-              fontSize: 'var(--mac-font-size-sm)', 
+            <div style={{
+              fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
               margin: '4px 0 0 0'
             }}>
@@ -464,7 +475,7 @@ const ServiceCatalog = () => {
       </div>
 
       {/* Таблица услуг */}
-      <MacOSCard 
+      <MacOSCard
         variant="default"
         style={{ padding: '0' }}
       >
@@ -482,30 +493,30 @@ const ServiceCatalog = () => {
             const specialty = getCategorySpecialty(service.category_id);
             const SpecialtyIcon = getSpecialtyIcon(specialty);
             const doctor = doctors.find(d => d.id === service.doctor_id);
-            
+
             return {
               id: service.id,
               service: (
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <SpecialtyIcon 
-                    size={20} 
-                    style={{ 
-                      marginRight: '12px', 
-                      color: specialtyColors[specialty] || 'var(--mac-text-tertiary)' 
-                    }} 
+                  <SpecialtyIcon
+                    size={20}
+                    style={{
+                      marginRight: '12px',
+                      color: specialtyColors[specialty] || 'var(--mac-text-tertiary)'
+                    }}
                   />
                   <div>
-                    <div style={{ 
-                      fontSize: '14px', 
-                      fontWeight: '500', 
+                    <div style={{
+                      fontSize: '14px',
+                      fontWeight: '500',
                       color: 'var(--mac-text-primary)',
                       margin: 0
                     }}>
                       {service.name}
                     </div>
                     {service.code && (
-                      <div style={{ 
-                        fontSize: '14px', 
+                      <div style={{
+                        fontSize: '14px',
                         color: 'var(--mac-text-secondary)',
                         margin: '2px 0 0 0'
                       }}>
@@ -521,9 +532,9 @@ const ServiceCatalog = () => {
                 </MacOSBadge>
               ),
               price: (
-                <div style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '500', 
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
                   color: 'var(--mac-text-primary)',
                   margin: 0
                 }}>
@@ -531,8 +542,8 @@ const ServiceCatalog = () => {
                 </div>
               ),
               duration: (
-                <div style={{ 
-                  fontSize: '14px', 
+                <div style={{
+                  fontSize: '14px',
                   color: 'var(--mac-text-primary)',
                   margin: 0
                 }}>
@@ -540,8 +551,8 @@ const ServiceCatalog = () => {
                 </div>
               ),
               doctor: (
-                <div style={{ 
-                  fontSize: '14px', 
+                <div style={{
+                  fontSize: '14px',
                   color: 'var(--mac-text-primary)',
                   margin: 0
                 }}>
@@ -559,7 +570,7 @@ const ServiceCatalog = () => {
                     size="sm"
                     variant="outline"
                     onClick={() => setEditingService(service)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -576,7 +587,7 @@ const ServiceCatalog = () => {
                     size="sm"
                     variant="outline"
                     onClick={() => handleDeleteService(service.id)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -624,6 +635,7 @@ const ServiceCatalog = () => {
           categories={categories}
           doctors={doctors}
           departments={departments}
+          queueProfiles={queueProfiles}
           onSave={handleSaveService}
           onCancel={() => {
             setShowAddForm(false);
@@ -635,11 +647,13 @@ const ServiceCatalog = () => {
   );
 };
 
-// Компонент формы услуги
-const ServiceForm = ({ service, categories, doctors, departments, onSave, onCancel }) => {
+// Компонент формы услуги с вкладками
+// ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
+const ServiceForm = ({ service, categories, doctors, departments, queueProfiles = [], onSave, onCancel }) => {
+  const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [formData, setFormData] = useState({
     name: service?.name || '',
-    code: service?.code || '',
+    code: service?.code || service?.service_code || '', // Unified: use code as primary
     category_id: service?.category_id || '',
     price: service?.price || '',
     currency: service?.currency || 'UZS',
@@ -647,18 +661,14 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
     doctor_id: service?.doctor_id || '',
     active: service?.active !== undefined ? service.active : true,
     department_key: service?.department_key || '',
-    // ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
-    category_code: service?.category_code || '',
-    service_code: service?.service_code || '',
-    requires_doctor: service?.requires_doctor || false,
     queue_tag: service?.queue_tag || '',
+    requires_doctor: service?.requires_doctor || false,
     is_consultation: service?.is_consultation || false,
     allow_doctor_price_override: service?.allow_doctor_price_override || false
   });
 
   // State для проверки дубликатов
   const [codeWarning, setCodeWarning] = useState('');
-  const [serviceCodeWarning, setServiceCodeWarning] = useState('');
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
 
   // Async проверка дубликатов для code
@@ -680,7 +690,7 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
         const response = await api.get('/services');
         const services = response.data;
         const duplicate = services.find(
-          s => s.code === normalizedCode && s.id !== service?.id
+          s => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
         );
         if (duplicate) {
           setCodeWarning(`⚠️ Код "${normalizedCode}" уже используется: ${duplicate.name}`);
@@ -692,67 +702,33 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
       } finally {
         setCheckingDuplicates(false);
       }
-    }, 500); // Debounce 500ms
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [formData.code, service?.id]);
 
-  // Async проверка дубликатов для service_code
-  useEffect(() => {
-    if (!formData.service_code || formData.service_code.length < 2) {
-      setServiceCodeWarning('');
-      return;
-    }
-
-    const normalizedCode = normalizeServiceCode(formData.service_code);
-    if (!isValidServiceCode(normalizedCode)) {
-      setServiceCodeWarning('');
-      return;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        setCheckingDuplicates(true);
-        const response = await api.get('/services');
-        const services = response.data;
-        const duplicate = services.find(
-          s => s.service_code === normalizedCode && s.id !== service?.id
-        );
-        if (duplicate) {
-          setServiceCodeWarning(`⚠️ Код "${normalizedCode}" уже используется: ${duplicate.name}`);
-        } else {
-          setServiceCodeWarning('');
-        }
-      } catch (error) {
-        logger.error('Ошибка проверки дубликатов:', error);
-      } finally {
-        setCheckingDuplicates(false);
-      }
-    }, 500); // Debounce 500ms
-
-    return () => clearTimeout(timeoutId);
-  }, [formData.service_code, service?.id]);
+  // Auto-extract category_code from code
+  const derivedCategoryCode = formData.code ? formData.code.charAt(0).toUpperCase() : '';
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Валидация
     if (!formData.name.trim()) {
       alert('Введите название услуги');
       return;
     }
 
     // Подготавливаем данные для API
+    const normalizedCode = formData.code ? normalizeServiceCode(formData.code) : null;
     const apiData = {
       ...formData,
       price: formData.price ? parseFloat(formData.price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
       duration_minutes: parseInt(formData.duration_minutes) || 30,
-      // ✅ ФИНАЛЬНАЯ НОРМАЛИЗАЦИЯ перед отправкой
-      code: formData.code ? normalizeServiceCode(formData.code) : null,
-      service_code: formData.service_code ? normalizeServiceCode(formData.service_code) : null,
-      category_code: formData.category_code ? normalizeCategoryCode(formData.category_code) : null
+      code: normalizedCode,
+      service_code: normalizedCode, // Sync for backwards compatibility
+      category_code: derivedCategoryCode || null // Auto-derived from code
     };
 
     // Убираем пустые строки
@@ -767,25 +743,20 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
   };
 
   const handleChange = (field, value) => {
-    // Нормализация кодов перед обновлением состояния
     let normalizedValue = value;
 
-    if (field === 'code' || field === 'service_code') {
-      // Применяем форматирование для кодов услуг
+    if (field === 'code') {
       normalizedValue = formatServiceCodeInput(value, formData[field]);
-    } else if (field === 'category_code') {
-      // Нормализация для категории (только первая буква, uppercase)
-      normalizedValue = normalizeCategoryCode(value);
     }
 
-    // ✅ Синхронизация queue_tag с department_key для динамических отделений
-    if (field === 'queue_tag') {
-      const standardQueueTags = ['ecg', 'cardiology_common', 'stomatology', 'dermatology', 'cosmetology', 'lab', 'physiotherapy', ''];
-      const isDynamicDepartment = !standardQueueTags.includes(normalizedValue);
+    // ⭐ SSOT: Sync queue_tag with department_key
+    if (field === 'queue_tag' && normalizedValue) {
+      const matchingProfile = queueProfiles.find(p =>
+        (p.queue_tags || []).includes(normalizedValue) || p.key === normalizedValue
+      );
 
-      if (isDynamicDepartment && normalizedValue) {
-        // Если выбрано динамическое отделение, синхронизируем с department_key
-        setFormData(prev => ({ ...prev, [field]: normalizedValue, department_key: normalizedValue }));
+      if (matchingProfile) {
+        setFormData(prev => ({ ...prev, [field]: normalizedValue, department_key: matchingProfile.key }));
         return;
       }
     }
@@ -793,260 +764,85 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
     setFormData(prev => ({ ...prev, [field]: normalizedValue }));
   };
 
+  const tabs = [
+    { key: 'basic', label: 'Основное', icon: Package },
+    { key: 'queue', label: 'Очередь', icon: Users },
+    { key: 'options', label: 'Опции', icon: Filter }
+  ];
+
   return (
-    <MacOSCard 
-      variant="default"
-      style={{ padding: '24px' }}
-    >
-      <h3 style={{ 
-        fontSize: '18px', 
-        fontWeight: '500', 
+    <MacOSCard variant="default" style={{ padding: '24px' }}>
+      <h3 style={{
+        fontSize: '18px',
+        fontWeight: '600',
         color: 'var(--mac-text-primary)',
-        marginBottom: '16px',
-        margin: '0 0 16px 0'
+        margin: '0 0 20px 0'
       }}>
         {service ? 'Редактирование услуги' : 'Добавление услуги'}
       </h3>
-      
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-          gap: '16px' 
-        }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
-            }}>
-              Название услуги *
-            </label>
-            <MacOSInput
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              required
-            />
-          </div>
 
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              Код услуги (формат: K01, D02)
-            </label>
-            <MacOSInput
-              type="text"
-              value={formData.code}
-              onChange={(e) => handleChange('code', e.target.value)}
-              placeholder="K01"
-              maxLength={3}
-            />
-            {formData.code && !isValidServiceCode(formData.code) && (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--mac-warning)',
-                marginTop: '4px'
-              }}>
-                Формат: 1 буква + 2 цифры (например: K01)
-              </div>
-            )}
-            {codeWarning && (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--mac-error)',
-                marginTop: '4px',
+      {/* Tab Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        marginBottom: '20px',
+        borderBottom: '1px solid var(--mac-border)',
+        paddingBottom: '0'
+      }}>
+        {tabs.map(tab => {
+          const TabIcon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '10px 16px',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
+                color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
-              }}>
-                <AlertCircle size={14} />
-                {codeWarning}
-              </div>
-            )}
-            {checkingDuplicates && formData.code && isValidServiceCode(formData.code) && !codeWarning && (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--mac-text-tertiary)',
-                marginTop: '4px'
-              }}>
-                Проверка дубликатов...
-              </div>
-            )}
-          </div>
+                gap: '6px',
+                fontSize: '14px',
+                fontWeight: isActive ? '600' : '500',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <TabIcon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              Категория *
-            </label>
-            <MacOSSelect
-              value={formData.category_id}
-              onChange={(e) => handleChange('category_id', e.target.value)}
-              options={[
-                { value: '', label: 'Выберите категорию' },
-                ...categories.map(category => ({
-                  value: category.id,
-                  label: `${category.name_ru} (${category.specialty})`
-                }))
-              ]}
-              required
-            />
-          </div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              Отделение
-            </label>
-            <MacOSSelect
-              value={formData.department_key}
-              onChange={(e) => handleChange('department_key', e.target.value)}
-              options={[
-                { value: '', label: 'Не привязано' },
-                ...departments.map(dept => ({
-                  value: dept.key,
-                  label: dept.name_ru
-                }))
-              ]}
-            />
-          </div>
-
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              Цена
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <MacOSInput
-                type="number"
-                value={formData.price}
-                onChange={(e) => handleChange('price', parseFloat(e.target.value) || '')}
-                min="0"
-                step="0.01"
-                style={{ flex: 1 }}
-              />
-              <MacOSSelect
-                value={formData.currency}
-                onChange={(e) => handleChange('currency', e.target.value)}
-                options={[
-                  { value: 'UZS', label: 'UZS' },
-                  { value: 'USD', label: 'USD' },
-                  { value: 'RUB', label: 'RUB' }
-                ]}
-                style={{ minWidth: '80px' }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
-            }}>
-              Длительность (мин)
-            </label>
-            <MacOSInput
-              type="number"
-              value={formData.duration_minutes}
-              onChange={(e) => handleChange('duration_minutes', parseInt(e.target.value) || 30)}
-              min="5"
-              step="5"
-            />
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
-            }}>
-              Врач (опционально)
-            </label>
-            <MacOSSelect
-              value={formData.doctor_id}
-              onChange={(e) => handleChange('doctor_id', e.target.value)}
-              options={[
-                { value: '', label: 'Все врачи' },
-                ...doctors.map(doctor => ({
-                  value: doctor.id,
-                  label: `${doctor.user?.full_name || `Врач #${doctor.id}`} (${doctor.specialty})`
-                }))
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ */}
-        <div style={{ 
-          borderTop: '1px solid var(--mac-border)', 
-          paddingTop: '16px' 
-        }}>
-          <h4 style={{ 
-            fontSize: '16px', 
-            fontWeight: '500', 
-            color: 'var(--mac-text-primary)', 
-            marginBottom: '16px',
-            margin: '0 0 16px 0'
-          }}>
-            Настройки для мастера регистрации
-          </h4>
-          
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-            gap: '16px' 
+        {/* TAB: Основное */}
+        {activeTab === 'basic' && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '16px'
           }}>
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '14px', 
-                fontWeight: '500', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
-                Код категории (K/D/C/L/S/O)
+                Название услуги *
               </label>
-              <MacOSSelect
-                value={formData.category_code}
-                onChange={(e) => handleChange('category_code', e.target.value)}
-                options={[
-                  { value: '', label: 'Выберите категорию' },
-                  { value: 'K', label: 'K - Кардиология' },
-                  { value: 'D', label: 'D - Дерматология' },
-                  { value: 'C', label: 'C - Косметология' },
-                  { value: 'L', label: 'L - Лабораторные анализы' },
-                  { value: 'S', label: 'S - Стоматология' },
-                  { value: 'P', label: 'P - Физиотерапия' },
-                  { value: 'O', label: 'O - Другие услуги' }
-                ]}
+              <MacOSInput
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleChange('name', e.target.value)}
+                required
               />
             </div>
 
@@ -1058,82 +854,206 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>
-                Код услуги (формат: K01, D02, L14)
+                Код услуги (K01, D02...)
               </label>
               <MacOSInput
                 type="text"
-                value={formData.service_code}
-                onChange={(e) => handleChange('service_code', e.target.value)}
+                value={formData.code}
+                onChange={(e) => handleChange('code', e.target.value)}
                 placeholder="K01"
                 maxLength={3}
               />
-              {formData.service_code && !isValidServiceCode(formData.service_code) && (
-                <div style={{
-                  fontSize: '12px',
-                  color: 'var(--mac-warning)',
-                  marginTop: '4px'
-                }}>
-                  Формат: 1 буква + 2 цифры (например: K01)
+              {formData.code && !isValidServiceCode(formData.code) && (
+                <div style={{ fontSize: '12px', color: 'var(--mac-warning)', marginTop: '4px' }}>
+                  Формат: 1 буква + 2 цифры
                 </div>
               )}
-              {serviceCodeWarning && (
-                <div style={{
-                  fontSize: '12px',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+              {codeWarning && (
+                <div style={{ fontSize: '12px', color: 'var(--mac-error)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <AlertCircle size={14} />
-                  {serviceCodeWarning}
+                  {codeWarning}
                 </div>
               )}
-              {checkingDuplicates && formData.service_code && isValidServiceCode(formData.service_code) && !serviceCodeWarning && (
-                <div style={{
-                  fontSize: '12px',
-                  color: 'var(--mac-text-tertiary)',
-                  marginTop: '4px'
-                }}>
-                  Проверка дубликатов...
+              {checkingDuplicates && !codeWarning && (
+                <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
+                  Проверка...
+                </div>
+              )}
+              {derivedCategoryCode && (
+                <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+                  Категория кода: {derivedCategoryCode}
                 </div>
               )}
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '14px', 
-                fontWeight: '500', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
-                Тег очереди
+                Категория *
+              </label>
+              <MacOSSelect
+                value={formData.category_id}
+                onChange={(e) => handleChange('category_id', e.target.value)}
+                options={[
+                  { value: '', label: 'Выберите категорию' },
+                  ...categories.map(category => ({
+                    value: category.id,
+                    label: `${category.name_ru} (${category.specialty})`
+                  }))
+                ]}
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Цена
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <MacOSInput
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => handleChange('price', parseFloat(e.target.value) || '')}
+                  min="0"
+                  step="0.01"
+                  style={{ flex: 1 }}
+                />
+                <MacOSSelect
+                  value={formData.currency}
+                  onChange={(e) => handleChange('currency', e.target.value)}
+                  options={[
+                    { value: 'UZS', label: 'UZS' },
+                    { value: 'USD', label: 'USD' }
+                  ]}
+                  style={{ minWidth: '80px' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Длительность (мин)
+              </label>
+              <MacOSInput
+                type="number"
+                value={formData.duration_minutes}
+                onChange={(e) => handleChange('duration_minutes', parseInt(e.target.value) || 30)}
+                min="5"
+                step="5"
+              />
+            </div>
+
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Врач (опционально)
+              </label>
+              <MacOSSelect
+                value={formData.doctor_id}
+                onChange={(e) => handleChange('doctor_id', e.target.value)}
+                options={[
+                  { value: '', label: 'Все врачи' },
+                  ...doctors.map(doctor => ({
+                    value: doctor.id,
+                    label: `${doctor.user?.full_name || `Врач #${doctor.id}`} (${doctor.specialty})`
+                  }))
+                ]}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* TAB: Очередь */}
+        {activeTab === 'queue' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              borderRadius: '8px',
+              marginBottom: '8px'
+            }}>
+              <p style={{ margin: 0, fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                Выберите вкладку регистратуры, на которой будет отображаться эта услуга.
+                Это определяет, в какую очередь попадёт пациент.
+              </p>
+            </div>
+
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Вкладка регистратуры
               </label>
               <MacOSSelect
                 value={formData.queue_tag}
                 onChange={(e) => handleChange('queue_tag', e.target.value)}
                 options={[
-                  { value: '', label: 'Без очереди' },
-                  { value: 'ecg', label: 'ECG (отдельная очередь)' },
-                  { value: 'cardiology_common', label: 'Кардиология (общая)' },
-                  { value: 'stomatology', label: 'Стоматология' },
-                  { value: 'dermatology', label: 'Дерматология' },
-                  { value: 'cosmetology', label: 'Косметология' },
-                  { value: 'lab', label: 'Лаборатория' },
-                  { value: 'physiotherapy', label: 'Физиотерапия' },
-                  // ✅ Динамические отделения из БД
-                  ...departments
-                    .filter(dept => !['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'].includes(dept.key))
-                    .map(dept => ({
-                      value: dept.key,
-                      label: dept.name_ru
+                  { value: '', label: 'Без очереди (услуга не появится в регистратуре)' },
+                  ...queueProfiles
+                    .filter(profile => profile.is_active !== false)
+                    .map(profile => ({
+                      value: profile.queue_tags?.[0] || profile.key,
+                      label: profile.title_ru || profile.title
                     }))
                 ]}
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {formData.queue_tag && (
+              <div style={{
+                padding: '12px 16px',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderRadius: '8px'
+              }}>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--mac-success)' }}>
+                  ✓ Услуга будет отображаться на вкладке с тегом: <strong>{formData.queue_tag}</strong>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: Опции */}
+        {activeTab === 'options' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px'
+            }}>
+              <MacOSCheckbox
+                id="active"
+                checked={formData.active}
+                onChange={(checked) => handleChange('active', checked)}
+                label="Услуга активна"
+              />
+
               <MacOSCheckbox
                 id="requires_doctor"
                 checked={formData.requires_doctor}
@@ -1155,42 +1075,49 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
                 label="Врач может изменить цену"
               />
             </div>
-          </div>
 
-          <div style={{ 
-            backgroundColor: 'var(--mac-info-bg)', 
-            padding: '12px', 
-            borderRadius: 'var(--mac-radius-md)', 
-            marginTop: '16px' 
-          }}>
-            <p style={{ 
-              fontSize: '14px', 
-              color: 'var(--mac-info)',
-              margin: 0
+            <div style={{
+              backgroundColor: 'var(--mac-bg-secondary)',
+              padding: '16px',
+              borderRadius: '8px',
+              marginTop: '8px'
             }}>
-              <strong>Подсказка:</strong> Только ЭхоКГ (кардиолог), Рентгенография зуб (стоматолог) и сложные дерматологические процедуры требуют врача.
-              Консультации участвуют в расчёте льгот и повторных визитов.
-              Физиотерапевтические процедуры могут выполняться медицинским персоналом среднего звена.
-            </p>
+              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
+                Подсказки:
+              </h5>
+              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                <li><strong>Требует врача</strong> — для ЭхоКГ, сложных процедур</li>
+                <li><strong>Консультация</strong> — участвует в расчёте льгот и повторных визитов</li>
+                <li><strong>Врач может изменить цену</strong> — для индивидуальных случаев</li>
+              </ul>
+            </div>
           </div>
-        </div>
+        )}
 
-        <MacOSCheckbox
-          id="active"
-          checked={formData.active}
-          onChange={(checked) => handleChange('active', checked)}
-          label="Услуга активна"
-        />
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <MacOSButton type="button" variant="outline" onClick={onCancel}>
-            <X size={16} style={{ marginRight: '8px' }} />
-            Отменить
-          </MacOSButton>
-          <MacOSButton type="submit">
-            <Save size={16} style={{ marginRight: '8px' }} />
-            Сохранить
-          </MacOSButton>
+        {/* Кнопки */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '16px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--mac-border)'
+        }}>
+          <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+            {activeTab === 'basic' && '1 / 3'}
+            {activeTab === 'queue' && '2 / 3'}
+            {activeTab === 'options' && '3 / 3'}
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <MacOSButton type="button" variant="outline" onClick={onCancel}>
+              <X size={16} style={{ marginRight: '8px' }} />
+              Отменить
+            </MacOSButton>
+            <MacOSButton type="submit">
+              <Save size={16} style={{ marginRight: '8px' }} />
+              Сохранить
+            </MacOSButton>
+          </div>
         </div>
       </form>
     </MacOSCard>

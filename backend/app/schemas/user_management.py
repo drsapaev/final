@@ -421,9 +421,11 @@ class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
-    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
+    must_change_password: Optional[bool] = False  # Требуется смена пароля при первом входе
 
     # Профиль
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -452,8 +454,9 @@ class UserUpdateRequest(BaseModel):
 
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
@@ -520,8 +523,9 @@ class UserSearchRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     query: Optional[str] = Field(None, min_length=1, max_length=100)
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     status: Optional[UserStatus] = None
     is_active: Optional[bool] = None
@@ -543,8 +547,9 @@ class UserBulkActionRequest(BaseModel):
     action: str = Field(
         ..., pattern="^(activate|deactivate|suspend|unsuspend|delete|change_role)$"
     )
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     reason: Optional[str] = Field(None, max_length=500)
 

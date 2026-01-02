@@ -65,6 +65,10 @@ const RegistrarPanel = () => {
   // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: состояние для хранения отделений из БД
   const [dynamicDepartments, setDynamicDepartments] = useState([]);
 
+  // ⭐ SSOT: Queue profiles loaded from API (via ModernTabs)
+  // Used for filtering entries by queue_tags instead of hardcoded mapping
+  const [queueProfiles, setQueueProfiles] = useState([]);
+
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
   const [printData, setPrintData] = useState(null);
@@ -1141,7 +1145,11 @@ const RegistrarPanel = () => {
                 fullEntry.discount_mode === 'benefit' ? 'benefit' : 'paid',
               payment_type: 'cash', // Backend doesn't return this yet
               date: dateParam,
-              appointment_date: dateParam
+              appointment_date: dateParam,
+
+              // ⭐ SSOT: session_id for visual grouping (presentation only)
+              // DO NOT parse this value - it's an opaque string from backend
+              session_id: fullEntry.session_id || null
             };
           };
 
@@ -2061,30 +2069,47 @@ const RegistrarPanel = () => {
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
     const stats = {};
-    // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Используем отделения из БД + стандартные как fallback
-    const standardDepartments = ['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'];
-    const dynamicDepartmentKeys = dynamicDepartments.map(d => d.key);
-    // Объединяем: динамические отделения имеют приоритет
-    const allDepartments = [...new Set([...dynamicDepartmentKeys, ...standardDepartments])];
 
-    allDepartments.forEach(dept => {
-      const deptAppointments = appointments.filter(a => isInDepartment(a, dept));
-      const todayAppointments = deptAppointments.filter(a => {
-        // Проверяем и текущую дату и поле date
+    // ⭐ SSOT: Use queue profile keys from API, not hardcoded department keys
+    // queueProfiles is loaded from GET /queues/profiles via ModernTabs
+    const profileKeys = queueProfiles.length > 0
+      ? queueProfiles.map(p => p.key)
+      : ['cardiology', 'ecg', 'dermatology', 'stomatology', 'lab', 'procedures']; // Fallback
+
+    // Get queue_tags for each profile for accurate matching
+    const profileTagsMap = {};
+    queueProfiles.forEach(p => {
+      profileTagsMap[p.key] = p.queue_tags || [p.key];
+    });
+
+    profileKeys.forEach(profileKey => {
+      // ⭐ SSOT: Match entries by queue_tags from profile
+      const possibleTags = profileTagsMap[profileKey] || [profileKey];
+
+      const profileAppointments = appointments.filter(a => {
+        const entryTag = (a.queue_tag || a.specialty || '').toLowerCase().trim();
+        return possibleTags.some(tag => tag.toLowerCase() === entryTag);
+      });
+
+      const todayAppointments = profileAppointments.filter(a => {
         const appointmentDate = a.date || a.appointment_date;
         return appointmentDate === todayStr;
       });
 
-      stats[dept] = {
+      stats[profileKey] = {
         todayCount: todayAppointments.length,
-        // ✅ ИСПРАВЛЕНО: Проверяем наличие queue_numbers вместо статуса 'queued'
-        hasActiveQueue: deptAppointments.some(a => a.queue_numbers && a.queue_numbers.length > 0),
-        hasPendingPayments: deptAppointments.some(a => a.status === 'paid_pending' || a.payment_status === 'pending')
+        hasActiveQueue: profileAppointments.some(a =>
+          a.queue_numbers && a.queue_numbers.length > 0 &&
+          ['waiting', 'called', 'in_service'].includes(a.status)
+        ),
+        hasPendingPayments: profileAppointments.some(a =>
+          a.status === 'paid_pending' || a.payment_status === 'pending'
+        )
       };
     });
 
     return stats;
-  }, [appointments, todayStr, isInDepartment, dynamicDepartments]);
+  }, [appointments, todayStr, queueProfiles]);
 
 
   // 🎨 PRESENTATION-ONLY: Aggregation for "All departments" tab
@@ -2473,21 +2498,26 @@ const RegistrarPanel = () => {
 
   // ✅ filteredAppointments вычисляется здесь и сохраняется в ref
   const filteredAppointments = useMemo(() => {
-    // ⭐ FIX 14 (SSOT): Маппинг вкладки -> queue_tags
-    const tabToQueueTagMap = {
-      'cardio': ['cardiology', 'cardio'],
-      'echokg': ['echokg', 'ecg'],
-      'derma': ['dermatology', 'derma'],
-      'dental': ['stomatology', 'dentist', 'dental'],
-      'lab': ['laboratory', 'lab'],
-      'procedures': ['procedures']
+    // ⭐ SSOT: Get queue_tags from loaded profiles instead of hardcoded mapping
+    // queueProfiles is populated by ModernTabs via onProfilesLoaded callback
+    const getQueueTagsForTab = (tabKey) => {
+      if (!tabKey) return [];
+
+      // Find profile by key
+      const profile = queueProfiles.find(p => p.key === tabKey);
+      if (profile && profile.queue_tags && profile.queue_tags.length > 0) {
+        return profile.queue_tags;
+      }
+
+      // Fallback: use tabKey itself as the only tag
+      // ⚠️ TEMPORARY ADAPTER: for backwards compatibility during transition
+      return [tabKey];
     };
 
     // Если выбрана конкретная вкладка (не "Все отделения"), используем rawEntries с фильтрацией по queue_tag
     if (activeTab) {
-      // ⭐ FIX 14: SSOT — используем rawEntries (flat list OnlineQueueEntry), НЕ агрегированные appointments
-      // Каждая rawEntry имеет свой queue_time — это решает проблему "одинакового времени на всех вкладках"
-      const possibleTags = tabToQueueTagMap[activeTab] || [activeTab];
+      // ⭐ SSOT: queue_tags from API profiles, not hardcoded
+      const possibleTags = getQueueTagsForTab(activeTab);
 
       // Фильтруем rawEntries по queue_tag вкладки
       const entriesForTab = (rawEntries && rawEntries.length > 0 ? rawEntries : appointments).filter(entry => {
@@ -2642,7 +2672,7 @@ const RegistrarPanel = () => {
       }
       return aTime - bTime; // От раннего к позднему (ASC)
     });
-  }, [appointments, rawEntries, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments, filterServicesByDepartment]);
+  }, [appointments, rawEntries, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments, filterServicesByDepartment, queueProfiles]);
 
   // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
   filteredAppointmentsRef.current = filteredAppointments;
@@ -2865,6 +2895,7 @@ const RegistrarPanel = () => {
           <ModernTabs
             activeTab={activeTab}
             onTabChange={setActiveTab}
+            onProfilesLoaded={setQueueProfiles}  // ⭐ SSOT: Store profiles for filtering
             departmentStats={departmentStats}
             theme={theme}
             language={language}

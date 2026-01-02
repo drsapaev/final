@@ -24,6 +24,7 @@ from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.feature_flags import is_feature_enabled
 from app.services.queue_service import queue_service
+from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
@@ -2546,6 +2547,11 @@ def _assign_queue_numbers_on_confirmation(
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
         queue_time = datetime.now(timezone)
 
+        # ⭐ session_id для группировки услуг пациента в одной очереди
+        session_id = get_or_create_session_id(
+            db, visit.patient_id, daily_queue.id, today
+        ) if visit.patient_id else f"confirmation_{visit.id}"
+
         queue_entry = OnlineQueueEntry(
             queue_id=daily_queue.id,
             patient_id=visit.patient_id,
@@ -2553,6 +2559,7 @@ def _assign_queue_numbers_on_confirmation(
             status="waiting",
             source="confirmation",  # Источник: подтверждение визита
             queue_time=queue_time,  # Устанавливаем время регистрации
+            session_id=session_id,  # ⭐ NEW: Session grouping
         )
         db.add(queue_entry)
 
