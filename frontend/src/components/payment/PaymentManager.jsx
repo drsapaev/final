@@ -4,16 +4,17 @@ import { CreditCard, DollarSign, Receipt, Clock, CheckCircle, XCircle } from 'lu
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
 import logger from '../../utils/logger';
+import { tokenManager } from '../../utils/tokenManager';
 import './PaymentManager.css';
 
 const API_BASE = '/api/v1';
 
-const PaymentManager = ({ 
-  isOpen, 
-  onClose, 
+const PaymentManager = ({
+  isOpen,
+  onClose,
   invoiceId = null,
   initialAmount = null,
-  patientInfo = null 
+  patientInfo = null
 }) => {
   // Состояние компонента
   const [selectedProvider, setSelectedProvider] = useState('click');
@@ -21,7 +22,7 @@ const PaymentManager = ({
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [createdInvoiceId, setCreatedInvoiceId] = useState(invoiceId);
-  
+
   // Состояние диалогов оплаты
   const [showClickPayment, setShowClickPayment] = useState(false);
   const [showPayMePayment, setShowPayMePayment] = useState(false);
@@ -38,7 +39,7 @@ const PaymentManager = ({
       setLoading(true);
       const response = await fetch(`${API_BASE}/payments/invoices/pending`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         }
       });
@@ -69,7 +70,7 @@ const PaymentManager = ({
       const response = await fetch(`${API_BASE}/payments/invoice/create`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -84,14 +85,14 @@ const PaymentManager = ({
       if (response.ok) {
         const result = await response.json();
         setCreatedInvoiceId(result.invoice_id);
-        
+
         // Открываем соответствующий диалог оплаты
         if (selectedProvider === 'click') {
           setShowClickPayment(true);
         } else if (selectedProvider === 'payme') {
           setShowPayMePayment(true);
         }
-        
+
         toast.success('Счет создан, переходим к оплате');
       } else {
         const errorData = await response.json();
@@ -109,7 +110,7 @@ const PaymentManager = ({
   const payExistingInvoice = (invoice) => {
     setCreatedInvoiceId(invoice.id);
     setPaymentAmount(invoice.amount);
-    
+
     if (invoice.provider === 'click') {
       setShowClickPayment(true);
     } else if (invoice.provider === 'payme') {
@@ -123,7 +124,7 @@ const PaymentManager = ({
     setShowClickPayment(false);
     setShowPayMePayment(false);
     loadPendingInvoices(); // Обновляем список счетов
-    
+
     // Уведомляем родительский компонент
     if (onClose) {
       onClose({ success: true, paymentData });
@@ -152,7 +153,7 @@ const PaymentManager = ({
               <CreditCard size={24} />
               Модуль онлайн оплаты
             </h2>
-            <button 
+            <button
               className="close-btn"
               onClick={() => onClose && onClose({ success: false })}
             >
@@ -167,7 +168,7 @@ const PaymentManager = ({
                 <DollarSign size={20} />
                 Новая оплата
               </h3>
-              
+
               <div className="payment-form">
                 <div className="form-row">
                   <label>Сумма оплаты (сум)</label>
@@ -193,7 +194,7 @@ const PaymentManager = ({
                       />
                       <span>Click</span>
                     </label>
-                    
+
                     <label className="radio-option">
                       <input
                         type="radio"
@@ -214,7 +215,7 @@ const PaymentManager = ({
                   </div>
                 )}
 
-                <button 
+                <button
                   className="create-payment-btn"
                   onClick={createPaymentInvoice}
                   disabled={loading || !paymentAmount}
@@ -230,7 +231,7 @@ const PaymentManager = ({
                 <Receipt size={20} />
                 Неоплаченные счета
               </h3>
-              
+
               {loading ? (
                 <div className="loading-state">
                   <Clock size={20} />
@@ -260,8 +261,8 @@ const PaymentManager = ({
                           </div>
                         )}
                       </div>
-                      
-                      <button 
+
+                      <button
                         className="pay-invoice-btn"
                         onClick={() => payExistingInvoice(invoice)}
                         disabled={loading}
@@ -287,7 +288,7 @@ const PaymentManager = ({
         onSuccess={handlePaymentSuccess}
         onError={handlePaymentError}
       />
-      
+
       <PaymentPayMe
         isOpen={showPayMePayment}
         onClose={handlePaymentClose}

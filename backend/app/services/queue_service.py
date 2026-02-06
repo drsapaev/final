@@ -18,6 +18,7 @@ from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.user import User
+from app.services.queue_session import get_or_create_session_id, generate_session_id_for_entry
 
 logger = logging.getLogger(__name__)
 
@@ -393,7 +394,19 @@ class QueueBusinessService:
         # DailyQueue.specialist_id должен быть doctor.id, а не doctor.user_id
         actual_specialist_id = doctor.id
         
-        # ✅ ИСПРАВЛЕНО: Используем actual_specialist_id (doctor.id) для ForeignKey
+        # ⭐ SSOT FIX: Сначала ищем очередь по (day, queue_tag), игнорируя specialist_id
+        # Это предотвращает создание дубликатов очередей с разными specialist_id
+        if queue_tag:
+            # Ищем существующую очередь по queue_tag (более приоритетно)
+            existing_by_tag = db.query(DailyQueue).filter(
+                DailyQueue.day == day,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            ).first()
+            if existing_by_tag:
+                return existing_by_tag
+        
+        # Fallback: ищем по specialist_id (для legacy совместимости или без queue_tag)
         query = db.query(DailyQueue).filter(
             DailyQueue.day == day,
             DailyQueue.specialist_id == actual_specialist_id,
@@ -718,38 +731,111 @@ class QueueBusinessService:
             if specialist_id_override is None:
                 raise QueueValidationError("Выберите специалиста для записи")
 
-            doctor = (
-                db.query(Doctor)
-                .filter(
-                    Doctor.active.is_(True),
-                    or_(
-                        Doctor.id == specialist_id_override,
-                        Doctor.user_id == specialist_id_override,
-                    ),
+            # ⭐ SSOT FIX: specialist_id_override может быть:
+            # 1. QueueProfile.id (когда пользователь выбирает профиль на QR странице)
+            # 2. Doctor.id (legacy)
+            # Сначала проверяем, не является ли это QueueProfile.id
+            from app.models.queue_profile import QueueProfile
+            
+            queue_profile = db.query(QueueProfile).filter(
+                QueueProfile.id == specialist_id_override,
+                QueueProfile.is_active == True
+            ).first()
+            
+            if queue_profile:
+                # ⭐ Это QueueProfile.id - ищем врача по specialty, соответствующему профилю
+                # QueueProfile.key - это "cardiology", "dermatology", etc.
+                # QueueProfile.queue_tags - это список возможных doctor.specialty значений
+                profile_key = queue_profile.key
+                queue_tags = queue_profile.queue_tags or [profile_key]
+                
+                # Ищем врача с specialty из queue_tags профиля
+                doctor = (
+                    db.query(Doctor)
+                    .filter(
+                        Doctor.active.is_(True),
+                        Doctor.specialty.in_(queue_tags),
+                    )
+                    .first()
                 )
-                .first()
-            )
-            if not doctor:
-                raise QueueValidationError("Специалист недоступен для записи")
+                
+                # Если не нашли - используем queue_tag напрямую из профиля
+                if not doctor:
+                    # Создаём/получаем очередь по queue_tag профиля
+                    # Используем первый доступный доктор как fallback
+                    fallback_doctor = db.query(Doctor).filter(Doctor.active.is_(True)).first()
+                    if not fallback_doctor:
+                        raise QueueValidationError("Нет доступных врачей")
+                    
+                    queue_user_id = fallback_doctor.user_id or fallback_doctor.id
+                    queue_tag = profile_key  # ⭐ Используем ключ профиля как queue_tag
+                    defaults = {
+                        "start_number": fallback_doctor.start_number_online,
+                        "max_online_entries": fallback_doctor.max_online_per_day,
+                    }
+                    daily_queue = self.get_or_create_daily_queue(
+                        db,
+                        day=day,
+                        specialist_id=queue_user_id,
+                        queue_tag=queue_tag,
+                        defaults=defaults,
+                    )
+                    specialist_name = queue_profile.title_ru or queue_profile.title
+                    cabinet = None
+                else:
+                    # Нашли врача - используем его данные
+                    queue_user_id = doctor.user_id or doctor.id
+                    queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
+                    defaults = {
+                        "start_number": doctor.start_number_online,
+                        "max_online_entries": doctor.max_online_per_day,
+                        "cabinet_number": doctor.cabinet,
+                    }
+                    daily_queue = self.get_or_create_daily_queue(
+                        db,
+                        day=day,
+                        specialist_id=queue_user_id,
+                        queue_tag=queue_tag,
+                        defaults=defaults,
+                    )
+                    if doctor.user:
+                        specialist_name = doctor.user.full_name or doctor.user.username
+                    specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
+                    cabinet = doctor.cabinet
+            else:
+                # Legacy: specialist_id_override is Doctor.id
+                doctor = (
+                    db.query(Doctor)
+                    .filter(
+                        Doctor.active.is_(True),
+                        or_(
+                            Doctor.id == specialist_id_override,
+                            Doctor.user_id == specialist_id_override,
+                        ),
+                    )
+                    .first()
+                )
+                if not doctor:
+                    raise QueueValidationError("Специалист недоступен для записи")
 
-            queue_user_id = doctor.user_id or doctor.id
-            queue_tag = doctor.specialty
-            defaults = {
-                "start_number": doctor.start_number_online,
-                "max_online_entries": doctor.max_online_per_day,
-                "cabinet_number": doctor.cabinet,
-            }
-            daily_queue = self.get_or_create_daily_queue(
-                db,
-                day=day,
-                specialist_id=queue_user_id,
-                queue_tag=queue_tag,
-                defaults=defaults,
-            )
-            if doctor.user:
-                specialist_name = doctor.user.full_name or doctor.user.username
-            specialist_name = specialist_name or f"Врач #{doctor.id}"
-            cabinet = doctor.cabinet
+                queue_user_id = doctor.user_id or doctor.id
+                queue_tag = doctor.specialty
+                defaults = {
+                    "start_number": doctor.start_number_online,
+                    "max_online_entries": doctor.max_online_per_day,
+                    "cabinet_number": doctor.cabinet,
+                }
+                daily_queue = self.get_or_create_daily_queue(
+                    db,
+                    day=day,
+                    specialist_id=queue_user_id,
+                    queue_tag=queue_tag,
+                    defaults=defaults,
+                )
+                if doctor.user:
+                    specialist_name = doctor.user.full_name or doctor.user.username
+                specialist_name = specialist_name or f"Врач #{doctor.id}"
+                cabinet = doctor.cabinet
         else:
             if specialist_id_override and token_obj.specialist_id:
                 if specialist_id_override not in {
@@ -893,6 +979,16 @@ class QueueBusinessService:
 
         queue_dt = queue_time or self.get_local_timestamp(db)
 
+        # ⭐ session_id для группировки услуг пациента в одной очереди
+        session_id = None
+        if patient_id:
+            session_id = get_or_create_session_id(
+                db, patient_id, queue_obj.id, queue_obj.day
+            )
+        else:
+            # Fallback for entries without patient
+            session_id = None  # Will be filled after flush with entry.id
+
         entry = OnlineQueueEntry(
             queue_id=queue_obj.id,
             number=number,
@@ -907,6 +1003,7 @@ class QueueBusinessService:
             status=status,
             queue_time=queue_dt,
             total_amount=total_amount or 0,
+            session_id=session_id,  # ⭐ NEW: Session grouping
         )
 
         if services is not None:

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
-import { 
-  Users, 
-  Phone, 
-  Clock, 
+import tokenManager from '../../utils/tokenManager';
+import {
+  Users,
+  Phone,
+  Clock,
   User,
   Play,
   CheckCircle,
@@ -14,9 +15,9 @@ import {
   Hash,
   Activity
 } from 'lucide-react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
+import {
+  MacOSCard,
+  MacOSButton,
   MacOSBadge,
   MacOSLoadingSkeleton,
   MacOSEmptyState,
@@ -27,16 +28,16 @@ import {
  * Панель очереди для врача - показывает пациентов из регистратуры
  * Основа: passport.md стр. 1417-1427
  */
-const DoctorQueuePanel = ({ 
+const DoctorQueuePanel = ({
   specialty = 'cardiology',
   onPatientSelect,
   className = ''
 }) => {
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
-  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                    (window.location.hostname === 'localhost' && 
-                     window.location.port === '5173');
-  
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    (window.location.hostname === 'localhost' &&
+      window.location.port === '5173');
+
   const [loading, setLoading] = useState(true);
   const [queueData, setQueueData] = useState(null);
   const [doctorInfo, setDoctorInfo] = useState(null);
@@ -60,87 +61,87 @@ const DoctorQueuePanel = ({
 
   useEffect(() => {
     // Проверяем, не находимся ли мы в демо-режиме
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                      window.location.hostname === 'localhost' && 
-                      window.location.port === '5173';
-    
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+      window.location.hostname === 'localhost' &&
+      window.location.port === '5173';
+
     logger.log('DoctorQueuePanel useEffect:', {
       pathname: window.location.pathname,
       isDemoMode,
       specialty
     });
-    
-  if (isDemoMode) {
-    // В демо-режиме используем моковые данные
-    logger.log('Setting demo data for DoctorQueuePanel');
-    setDoctorInfo({
-      id: 1,
-      name: 'Dr. Demo',
-      specialty: specialty,
-      department: 'Demo Department',
-      queue_settings: {
-        start_number: 'A000',
-        max_per_day: 50,
-        timezone: 'UTC+5'
-      },
-      doctor: {
-        cabinet: '101'
-      }
-    });
 
-    setQueueData({
-      queue_exists: true,
-      stats: { total: 2, waiting: 2, served: 0, online_entries: 1 },
-      doctor: { name: 'Dr. Demo', specialty, cabinet: '101' },
-      entries: [
-        {
-          id: 1,
-          number: 'A001',
-          patient_name: 'Иван Иванов',
-          status: 'waiting',
-          source: 'online',
-          phone: '+998 90 123-45-67',
-          created_at: '2024-01-15T09:00:00Z'
+    if (isDemoMode) {
+      // В демо-режиме используем моковые данные
+      logger.log('Setting demo data for DoctorQueuePanel');
+      setDoctorInfo({
+        id: 1,
+        name: 'Dr. Demo',
+        specialty: specialty,
+        department: 'Demo Department',
+        queue_settings: {
+          start_number: 'A000',
+          max_per_day: 50,
+          timezone: 'UTC+5'
         },
-        {
-          id: 2,
-          number: 'A002',
-          patient_name: 'Мария Петрова',
-          status: 'waiting',
-          source: 'desk',
-          phone: '+998 90 765-43-21',
-          created_at: '2024-01-15T09:15:00Z'
+        doctor: {
+          cabinet: '101'
         }
-      ]
-    });
-  } else {
+      });
+
+      setQueueData({
+        queue_exists: true,
+        stats: { total: 2, waiting: 2, served: 0, online_entries: 1 },
+        doctor: { name: 'Dr. Demo', specialty, cabinet: '101' },
+        entries: [
+          {
+            id: 1,
+            number: 'A001',
+            patient_name: 'Иван Иванов',
+            status: 'waiting',
+            source: 'online',
+            phone: '+998 90 123-45-67',
+            created_at: '2024-01-15T09:00:00Z'
+          },
+          {
+            id: 2,
+            number: 'A002',
+            patient_name: 'Мария Петрова',
+            status: 'waiting',
+            source: 'desk',
+            phone: '+998 90 765-43-21',
+            created_at: '2024-01-15T09:15:00Z'
+          }
+        ]
+      });
+    } else {
       logger.log('Loading real data for DoctorQueuePanel');
       loadDoctorData();
       loadQueueData();
-      
+
       // Обновляем каждые 30 секунд
       const interval = setInterval(() => {
         loadQueueData();
       }, 30000);
-      
+
       return () => clearInterval(interval);
     }
   }, [specialty]);
 
   const loadDoctorData = async () => {
     // Проверяем демо-режим еще раз
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                      window.location.hostname === 'localhost' && 
-                      window.location.port === '5173';
-    
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+      window.location.hostname === 'localhost' &&
+      window.location.port === '5173';
+
     if (isDemoMode) {
       logger.log('Skipping loadDoctorData in demo mode');
       return;
     }
-    
+
     try {
       const response = await fetch('http://127.0.0.1:8000/api/v1/doctor/my-info', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -154,20 +155,20 @@ const DoctorQueuePanel = ({
 
   const loadQueueData = async () => {
     // Проверяем демо-режим еще раз
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                      window.location.hostname === 'localhost' && 
-                      window.location.port === '5173';
-    
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+      window.location.hostname === 'localhost' &&
+      window.location.port === '5173';
+
     if (isDemoMode) {
       logger.log('Skipping loadQueueData in demo mode');
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/${specialty}/queue/today`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -195,11 +196,11 @@ const DoctorQueuePanel = ({
       }));
       return;
     }
-    
+
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/call`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -226,11 +227,11 @@ const DoctorQueuePanel = ({
       }));
       return;
     }
-    
+
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/start-visit`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -258,12 +259,12 @@ const DoctorQueuePanel = ({
       }));
       return;
     }
-    
+
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/complete`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -307,7 +308,7 @@ const DoctorQueuePanel = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Сообщения */}
       {message.text && (
-        <MacOSAlert 
+        <MacOSAlert
           type={message.type === 'success' ? 'success' : 'error'}
           title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
           description={message.text}
@@ -317,16 +318,16 @@ const DoctorQueuePanel = ({
 
       {/* Информация о враче и очереди */}
       <MacOSCard style={{ padding: '16px' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '16px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <User size={24} style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
             <div>
-              <h3 style={{ 
+              <h3 style={{
                 margin: 0,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-lg)',
@@ -334,8 +335,8 @@ const DoctorQueuePanel = ({
               }}>
                 {queueData.doctor.name}
               </h3>
-              <div style={{ 
-                display: 'flex', 
+              <div style={{
+                display: 'flex',
                 alignItems: 'center',
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-secondary)',
@@ -352,9 +353,9 @@ const DoctorQueuePanel = ({
               </div>
             </div>
           </div>
-          
+
           <div style={{ textAlign: 'right' }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
               marginBottom: '4px'
@@ -368,13 +369,13 @@ const DoctorQueuePanel = ({
         </div>
 
         {/* Статистика очереди */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: '16px'
         }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-accent)',
@@ -382,7 +383,7 @@ const DoctorQueuePanel = ({
             }}>
               {queueData.stats.total}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -390,7 +391,7 @@ const DoctorQueuePanel = ({
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-warning)',
@@ -398,7 +399,7 @@ const DoctorQueuePanel = ({
             }}>
               {queueData.stats.waiting}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -406,7 +407,7 @@ const DoctorQueuePanel = ({
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-success)',
@@ -414,7 +415,7 @@ const DoctorQueuePanel = ({
             }}>
               {queueData.stats.served}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -422,7 +423,7 @@ const DoctorQueuePanel = ({
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-info)',
@@ -430,7 +431,7 @@ const DoctorQueuePanel = ({
             }}>
               {queueData.stats.online_entries}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -442,17 +443,17 @@ const DoctorQueuePanel = ({
 
       {/* Список пациентов в очереди */}
       <MacOSCard style={{ overflow: 'hidden' }}>
-        <div style={{ 
+        <div style={{
           padding: '16px',
           backgroundColor: 'var(--mac-bg-secondary)',
           borderBottom: '1px solid var(--mac-border)'
         }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between' 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
           }}>
-            <h3 style={{ 
+            <h3 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-lg)',
@@ -479,10 +480,10 @@ const DoctorQueuePanel = ({
               const status = statusConfig[entry.status] || statusConfig.waiting;
               const source = sourceConfig[entry.source] || sourceConfig.desk;
               const StatusIcon = status.icon;
-              
+
               return (
-                <div 
-                  key={entry.id} 
+                <div
+                  key={entry.id}
                   style={{
                     padding: '16px',
                     cursor: 'pointer',
@@ -495,10 +496,10 @@ const DoctorQueuePanel = ({
                     if (onPatientSelect) onPatientSelect(entry);
                   }}
                 >
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between' 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       {/* Номер в очереди */}
@@ -512,7 +513,7 @@ const DoctorQueuePanel = ({
                         borderRadius: '50%',
                         border: '2px solid var(--mac-accent)'
                       }}>
-                        <span style={{ 
+                        <span style={{
                           fontSize: 'var(--mac-font-size-lg)',
                           fontWeight: 'var(--mac-font-weight-bold)',
                           color: 'var(--mac-accent)'
@@ -520,10 +521,10 @@ const DoctorQueuePanel = ({
                           {entry.number}
                         </span>
                       </div>
-                      
+
                       {/* Информация о пациенте */}
                       <div>
-                        <div style={{ 
+                        <div style={{
                           fontWeight: 'var(--mac-font-weight-semibold)',
                           color: 'var(--mac-text-primary)',
                           fontSize: 'var(--mac-font-size-md)',
@@ -532,8 +533,8 @@ const DoctorQueuePanel = ({
                           {entry.patient_name}
                         </div>
                         {entry.phone && (
-                          <div style={{ 
-                            display: 'flex', 
+                          <div style={{
+                            display: 'flex',
                             alignItems: 'center',
                             fontSize: 'var(--mac-font-size-sm)',
                             color: 'var(--mac-text-secondary)',
@@ -543,31 +544,31 @@ const DoctorQueuePanel = ({
                             {entry.phone}
                           </div>
                         )}
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '8px' 
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
                         }}>
                           <MacOSBadge variant="outline">
                             {source.icon} {source.label}
                           </MacOSBadge>
-                          <span style={{ 
+                          <span style={{
                             fontSize: 'var(--mac-font-size-xs)',
                             color: 'var(--mac-text-tertiary)'
                           }}>
-                            {new Date(entry.created_at).toLocaleTimeString('ru-RU', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
+                            {new Date(entry.created_at).toLocaleTimeString('ru-RU', {
+                              hour: '2-digit',
+                              minute: '2-digit'
                             })}
                           </span>
                         </div>
                       </div>
                     </div>
-                    
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '12px' 
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
                     }}>
                       {/* Статус */}
                       <div style={{ textAlign: 'center' }}>
@@ -576,23 +577,23 @@ const DoctorQueuePanel = ({
                           {status.label}
                         </MacOSBadge>
                         {entry.called_at && (
-                          <div style={{ 
+                          <div style={{
                             fontSize: 'var(--mac-font-size-xs)',
                             color: 'var(--mac-text-tertiary)',
                             marginTop: '4px'
                           }}>
-                            Вызван: {new Date(entry.called_at).toLocaleTimeString('ru-RU', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
+                            Вызван: {new Date(entry.called_at).toLocaleTimeString('ru-RU', {
+                              hour: '2-digit',
+                              minute: '2-digit'
                             })}
                           </div>
                         )}
                       </div>
-                      
+
                       {/* Действия */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {entry.status === 'waiting' && (
-                          <MacOSButton 
+                          <MacOSButton
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCallPatient(entry.id);
@@ -602,9 +603,9 @@ const DoctorQueuePanel = ({
                             Вызвать
                           </MacOSButton>
                         )}
-                        
+
                         {entry.status === 'called' && (
-                          <MacOSButton 
+                          <MacOSButton
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -615,9 +616,9 @@ const DoctorQueuePanel = ({
                             Начать
                           </MacOSButton>
                         )}
-                        
+
                         {entry.status === 'in_progress' && (
-                          <MacOSButton 
+                          <MacOSButton
                             variant="success"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -640,12 +641,12 @@ const DoctorQueuePanel = ({
 
       {/* Информация о настройках очереди */}
       {doctorInfo && (
-        <MacOSCard style={{ 
+        <MacOSCard style={{
           padding: '16px',
           backgroundColor: 'var(--mac-bg-accent)',
           border: '1px solid var(--mac-accent)'
         }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 8px 0',
             fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-accent)',
@@ -656,7 +657,7 @@ const DoctorQueuePanel = ({
           }}>
             ⚙️ Настройки очереди:
           </h4>
-          <div style={{ 
+          <div style={{
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-secondary)',
             display: 'flex',

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign, User, Stethoscope, Clock, Receipt, RefreshCw } from 'lucide-react';
 import { Card, Badge, Button, Progress, Icon } from '../components/ui/macos';
 import Tooltip from '../components/ui/macos/Tooltip';
@@ -13,6 +14,7 @@ import Input from '../components/ui/macos/Input';
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 import {
   Dialog,
   DialogTitle,
@@ -63,12 +65,51 @@ const useDebounce = (value, delay) => {
 
 const CashierPanel = () => {
   const { isMobile } = useBreakpoint();
-  const paymentsHook = usePayments();
-  const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+  const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
+  // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
 
-  // Search state
-  const [query, setQuery] = useState('');
+  // ✅ Получаем patientId из URL для автоматического поиска
+  const getPatientIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
+  // Search state - инициализируем с patientId если есть
+  const [query, setQuery] = useState(() => {
+    const patientId = new URLSearchParams(window.location.search).get('patientId');
+    return patientId ? `patient:${patientId}` : '';
+  });
   const debouncedQuery = useDebounce(query, 500); // 500ms debounce
+
+  // ✅ Эффект для загрузки пациента из URL
+  useEffect(() => {
+    const patientIdFromUrl = getPatientIdFromUrl();
+    if (patientIdFromUrl && !query.includes(`patient:${patientIdFromUrl}`)) {
+      // Загружаем данные пациента для поиска
+      const loadPatientForSearch = async () => {
+        try {
+          const token = tokenManager.getAccessToken();
+          if (!token) return;
+
+          const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+          const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (response.ok) {
+            const patientData = await response.json();
+            const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
+            setQuery(patientName);
+            logger.info('[Cashier] Загружен пациент из URL:', patientName);
+          }
+        } catch (error) {
+          logger.error('[Cashier] Не удалось загрузить пациента:', error);
+        }
+      };
+      loadPatientForSearch();
+    }
+  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [status, setStatus] = useState('all');
   const [payments, setPayments] = useState([]);
@@ -135,17 +176,20 @@ const CashierPanel = () => {
   }, [dateMode, selectedDate, dateFrom, dateTo]);
 
   // Load Data Effect
+  // ✅ v2.1: Отдельные loading состояния для каждой секции
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка статистики (только при изменении дат)
   useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-
+    const loadStats = async () => {
       const { date_from, date_to } = getDateParams();
+      logger.log('📊 Loading stats with params:', { date_from, date_to });
 
-      logger.log('📅 Loading data with params:', { date_from, date_to, query: debouncedQuery, page: currentPage, status });
-
-      // 0. Загружаем статистику
+      setStatsLoading(true);
       try {
-        const statsResult = await paymentsHook.getStats({
+        const statsResult = await getStats({
           date_from: date_from || undefined,
           date_to: date_to || undefined
         });
@@ -154,11 +198,31 @@ const CashierPanel = () => {
         }
       } catch (error) {
         logger.error('Error loading stats:', error);
+        setStats({
+          total_amount: 0,
+          cash_amount: 0,
+          card_amount: 0,
+          pending_count: 0,
+          pending_amount: 0,
+          paid_count: 0,
+          cancelled_count: 0
+        });
       }
+      setStatsLoading(false);
+    };
 
-      // 1. Загружаем записи ожидающие оплаты (Pending) с пагинацией
+    loadStats();
+  }, [getDateParams, refreshKey, getStats]);
+
+  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка pending payments (только при изменении pendingPage)
+  useEffect(() => {
+    const loadPending = async () => {
+      const { date_from, date_to } = getDateParams();
+      logger.log('📋 Loading pending payments:', { date_from, date_to, page: pendingPage });
+
+      setPendingLoading(true);
       try {
-        const pendingResult = await paymentsHook.getPendingPayments({
+        const pendingResult = await getPendingPayments({
           date_from: date_from || undefined,
           date_to: date_to || undefined,
           search: debouncedQuery || undefined,
@@ -170,7 +234,6 @@ const CashierPanel = () => {
           const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
           setAppointments(appointmentsData);
 
-          // Обновляем пагинацию для pending
           if (pendingResult.pagination) {
             setPendingTotalPages(pendingResult.pagination.pages);
             setPendingTotalItems(pendingResult.pagination.total);
@@ -181,15 +244,27 @@ const CashierPanel = () => {
         }
       } catch (error) {
         logger.error('Error loading pending payments:', error);
+        setAppointments([]);
       }
+      setPendingLoading(false);
+    };
 
-      // 2. Загружаем историю платежей (History) с Server-Side Pagination
+    loadPending();
+  }, [pendingPage, debouncedQuery, getDateParams, refreshKey, getPendingPayments]);
+
+  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка истории платежей (только при изменении currentPage)
+  useEffect(() => {
+    const loadHistory = async () => {
+      const { date_from, date_to } = getDateParams();
+      logger.log('📜 Loading payment history:', { date_from, date_to, page: currentPage, status });
+
+      setHistoryLoading(true);
       try {
-        const paymentsResult = await paymentsHook.getPayments({
+        const paymentsResult = await getPayments({
           date_from: date_from || undefined,
           date_to: date_to || undefined,
-          search: debouncedQuery || undefined, // Server-side search
-          status: status !== 'all' ? status : undefined, // Server-side status filter
+          search: debouncedQuery || undefined,
+          status: status !== 'all' ? status : undefined,
           page: currentPage,
           size: itemsPerPage
         });
@@ -198,12 +273,10 @@ const CashierPanel = () => {
           const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
           setPayments(paymentsData);
 
-          // Update pagination state if available
           if (paymentsResult.pagination) {
             setTotalPages(paymentsResult.pagination.pages);
             setTotalItems(paymentsResult.pagination.total);
           } else {
-            // Fallback logic if API doesn't return pagination metadata
             setTotalPages(1);
             setTotalItems(paymentsData.length);
           }
@@ -216,12 +289,14 @@ const CashierPanel = () => {
         logger.error('Error loading payment history:', error);
         setPayments([]);
       }
-
-      setIsLoading(false);
+      setHistoryLoading(false);
     };
 
-    load();
-  }, [debouncedQuery, currentPage, pendingPage, status, getDateParams, refreshKey]);
+    loadHistory();
+  }, [currentPage, debouncedQuery, status, getDateParams, refreshKey, getPayments]);
+
+  // ✅ v2.1: Вычисляемое общее состояние загрузки
+  const isLoading = statsLoading || pendingLoading || historyLoading;
 
   // Reset page when date or search changes
   useEffect(() => {
@@ -540,6 +615,7 @@ const CashierPanel = () => {
         content={tooltipContent}
         position="bottom"
         delay={200}
+        followCursor
       >
         <div style={{
           display: 'flex',
@@ -885,116 +961,98 @@ const CashierPanel = () => {
 
             {activeTab === 'pending' && (
               <div style={{ marginTop: '24px' }}>
-                {isLoading ? (
+                {pendingLoading ? (
                   <Skeleton style={{ height: '192px' }} />
                 ) : appointments.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {appointments.map((appointment, index) => (
-                      <div key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px',
-                        backgroundColor: 'var(--mac-bg-tertiary)',
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 'var(--mac-radius-sm)'
-                      }}>
-                        <div style={{ flex: '1' }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '12px',
-                            marginBottom: '6px'
-                          }}>
-                            <div style={{
-                              fontWeight: '500',
-                              color: 'var(--mac-text-primary)',
-                              fontSize: '14px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}>
-                              <User style={{ width: '14px', height: '14px', color: 'var(--mac-text-secondary)' }} />
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%' }}>
+                      <thead>
+                        <tr style={{
+                          backgroundColor: 'var(--mac-bg-tertiary)',
+                          borderBottom: '1px solid var(--mac-border)'
+                        }}>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуги</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Сумма</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Статус</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appointments.map((appointment, index) => (
+                          <tr
+                            key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`}
+                            style={{
+                              borderBottom: '1px solid var(--mac-border)',
+                              transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: '500' }}>
+                                  {appointment.created_at
+                                    ? new Date(appointment.created_at).toLocaleDateString('ru-RU', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      timeZone: 'Asia/Tashkent'
+                                    })
+                                    : appointment.appointment_date || '—'
+                                  }
+                                </span>
+                                <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                                  {appointment.created_at
+                                    ? new Date(appointment.created_at).toLocaleTimeString('ru-RU', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      timeZone: 'Asia/Tashkent'
+                                    })
+                                    : appointment.appointment_time || '—'
+                                  }
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                               {appointment.patient_last_name && appointment.patient_first_name
-                                ? `${appointment.patient_last_name} - ${appointment.patient_first_name}`
+                                ? `${appointment.patient_last_name} ${appointment.patient_first_name}`
                                 : appointment.patient_name || `Пациент #${appointment.patient_id}`
                               }
-                            </div>
-                            <div style={{
-                              fontSize: '12px',
-                              color: 'var(--mac-text-tertiary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}>
-                              <Clock style={{ width: '12px', height: '12px', color: 'var(--mac-text-tertiary)' }} />
-                              {appointment.created_at
-                                ? new Date(appointment.created_at).toLocaleString('ru-RU', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  timeZone: 'Asia/Tashkent'
-                                })
-                                : `${appointment.appointment_date} ${appointment.appointment_time || ''}`
-                              }
-                            </div>
-                          </div>
-
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '12px'
-                          }}>
-                            <div style={{
-                              fontSize: '13px',
-                              color: 'var(--mac-text-secondary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              flex: '1'
-                            }}>
-                              <Stethoscope style={{ width: '13px', height: '13px', color: 'var(--mac-text-tertiary)' }} />
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                               {renderServiceBadges(appointment.services, appointment.services_names)}
-                            </div>
-                            <div style={{
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              color: 'var(--mac-accent)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}>
-                              <Receipt style={{ width: '14px', height: '14px' }} />
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-accent)', fontSize: '14px', fontWeight: '600' }}>
                               {format(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0)}
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <Badge variant="warning">Ожидает оплаты</Badge>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openPaymentWidget(appointment)}
-                            >
-                              💳 Онлайн
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                paymentModal.openModal(appointment);
-                              }}
-                            >
-                              💵 Касса
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <Badge variant="warning">Ожидает оплаты</Badge>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openPaymentWidget(appointment)}
+                                >
+                                  💳 Онлайн
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    paymentModal.openModal(appointment);
+                                  }}
+                                >
+                                  💵 Касса
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
 
                     {/* ✅ v2.0: Пагинация для ожидающих оплаты */}
                     {pendingTotalPages > 1 && (
@@ -1009,7 +1067,7 @@ const CashierPanel = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={pendingPage === 1 || isLoading}
+                          disabled={pendingPage === 1 || pendingLoading}
                           onClick={() => setPendingPage(p => Math.max(1, p - 1))}
                         >
                           ← Назад
@@ -1020,7 +1078,7 @@ const CashierPanel = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={pendingPage === pendingTotalPages || isLoading}
+                          disabled={pendingPage === pendingTotalPages || pendingLoading}
                           onClick={() => setPendingPage(p => Math.min(pendingTotalPages, p + 1))}
                         >
                           Вперёд →
@@ -1043,7 +1101,7 @@ const CashierPanel = () => {
 
             {activeTab === 'history' && (
               <div style={{ marginTop: '24px' }}>
-                {isLoading ? (
+                {historyLoading ? (
                   <Skeleton style={{ height: '192px' }} />
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
@@ -1167,7 +1225,7 @@ const CashierPanel = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={currentPage === 1 || isLoading}
+                          disabled={currentPage === 1 || historyLoading}
                           onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         >
                           ← Назад
@@ -1178,7 +1236,7 @@ const CashierPanel = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={currentPage === totalPages || isLoading}
+                          disabled={currentPage === totalPages || historyLoading}
                           onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         >
                           Вперёд →
@@ -1436,8 +1494,8 @@ const CashierPanel = () => {
             </DialogActions>
           </Dialog>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 

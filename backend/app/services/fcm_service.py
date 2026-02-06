@@ -1,32 +1,23 @@
 """
 Firebase Cloud Messaging (FCM) сервис для push уведомлений
+Поддерживает HTTP v1 API
 """
 
 import asyncio
 import json
 import logging
-from datetime import datetime
+import os
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
+from google.oauth2 import service_account
+from google.auth.transport.requests import Request
 from pydantic import BaseModel
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-
-class FCMMessage(BaseModel):
-    """FCM сообщение"""
-
-    token: str
-    title: str
-    body: str
-    data: Optional[Dict[str, str]] = None
-    image: Optional[str] = None
-    click_action: Optional[str] = None
-    sound: str = "default"
-    badge: Optional[int] = None
 
 
 class FCMResponse(BaseModel):
@@ -39,16 +30,60 @@ class FCMResponse(BaseModel):
 
 
 class FCMService:
-    """Сервис для работы с Firebase Cloud Messaging"""
+    """Сервис для работы с Firebase Cloud Messaging (HTTP v1 API)"""
 
     def __init__(self):
-        self.server_key = getattr(settings, 'FCM_SERVER_KEY', None)
-        self.sender_id = getattr(settings, 'FCM_SENDER_ID', None)
-        self.fcm_url = "https://fcm.googleapis.com/fcm/send"
-        self.active = bool(self.server_key)
+        self.project_id = getattr(settings, 'FCM_PROJECT_ID', None)
+        self.fcm_url = f"https://fcm.googleapis.com/v1/projects/{self.project_id}/messages:send"
+        
+        # OAuth2 credentials
+        self.credentials = None
+        self.access_token = None
+        self.token_expiry = 0
+        
+        self._load_credentials()
 
-        if not self.active:
-            logger.warning("FCM не настроен: отсутствует FCM_SERVER_KEY")
+    def _load_credentials(self):
+        """Загрузка учетных данных сервисного аккаунта"""
+        try:
+            # Пытаемся найти путь к JSON файлу в env или settings
+            cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            
+            if cred_path and os.path.exists(cred_path):
+                scopes = ['https://www.googleapis.com/auth/firebase.messaging']
+                self.credentials = service_account.Credentials.from_service_account_file(
+                    cred_path, scopes=scopes
+                )
+                logger.info("FCM credentials loaded successfully")
+            else:
+                logger.warning("GOOGLE_APPLICATION_CREDENTIALS not found or invalid. FCM disabled.")
+                
+        except Exception as e:
+            logger.error(f"Failed to load FCM credentials: {e}")
+
+    def _get_access_token(self) -> Optional[str]:
+        """Получение валидного OAuth2 токена (синхронно, так как редко)"""
+        if not self.credentials:
+            return None
+            
+        current_time = time.time()
+        
+        if self.access_token and current_time < self.token_expiry - 60:
+            return self.access_token
+            
+        try:
+            self.credentials.refresh(Request())
+            self.access_token = self.credentials.token
+            # Токен обычно живет 1 час
+            self.token_expiry = current_time + 3500 
+            return self.access_token
+        except Exception as e:
+            logger.error(f"Failed to refresh FCM token: {e}")
+            return None
+
+    @property
+    def active(self) -> bool:
+        return bool(self.credentials and self.project_id)
 
     async def send_notification(
         self,
@@ -57,79 +92,77 @@ class FCMService:
         body: str,
         data: Optional[Dict[str, Any]] = None,
         image: Optional[str] = None,
-        click_action: Optional[str] = None,
         sound: str = "default",
         badge: Optional[int] = None,
     ) -> FCMResponse:
-        """Отправка push уведомления на одно устройство"""
+        """Отправка push уведомления (HTTP v1)"""
 
         if not self.active:
             return FCMResponse(success=False, error="FCM service not configured")
+        
+        token = self._get_access_token()
+        if not token:
+            return FCMResponse(success=False, error="Failed to get access token")
 
         try:
-            # Подготавливаем данные для FCM
-            notification_data = {"title": title, "body": body, "sound": sound}
-
-            if image:
-                notification_data["image"] = image
-
-            if click_action:
-                notification_data["click_action"] = click_action
-
-            if badge is not None:
-                notification_data["badge"] = str(badge)
-
-            # Подготавливаем payload
-            payload = {
-                "to": device_token,
-                "notification": notification_data,
-                "priority": "high",
-                "content_available": True,
+            # Формируем payload для v1 API
+            message = {
+                "token": device_token,
+                "notification": {
+                    "title": title,
+                    "body": body
+                },
+                "android": {
+                    "notification": {
+                        "sound": sound
+                    },
+                    "priority": "high"
+                },
+                "apns": {
+                    "payload": {
+                        "aps": {
+                            "sound": sound,
+                            "badge": badge if badge is not None else 0
+                        }
+                    }
+                }
             }
 
-            # Добавляем дополнительные данные
-            if data:
-                # Конвертируем все значения в строки (FCM требует)
-                string_data = {k: str(v) for k, v in data.items()}
-                payload["data"] = string_data
+            if image:
+                message["notification"]["image"] = image
 
-            # Отправляем запрос
+            if data:
+                # Все значения data должны быть строками
+                message["data"] = {k: str(v) for k, v in data.items()}
+
+            payload = {"message": message}
+
             headers = {
-                "Authorization": f"key={self.server_key}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             }
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
                     self.fcm_url, json=payload, headers=headers
                 )
-
+                
                 response_data = response.json()
 
                 if response.status_code == 200:
-                    if response_data.get("success", 0) > 0:
-                        return FCMResponse(
-                            success=True,
-                            message_id=response_data.get("results", [{}])[0].get(
-                                "message_id"
-                            ),
-                        )
-                    else:
-                        error_info = response_data.get("results", [{}])[0].get(
-                            "error", "Unknown error"
-                        )
-                        return FCMResponse(
-                            success=False, error=error_info, error_code=error_info
-                        )
+                    # Успешный ответ v1 содержит name (message_id)
+                    return FCMResponse(
+                        success=True,
+                        message_id=response_data.get("name"),
+                    )
                 else:
+                    error_data = response_data.get("error", {})
                     return FCMResponse(
                         success=False,
-                        error=f"HTTP {response.status_code}: {response_data.get('error', 'Unknown error')}",
+                        error=error_data.get("message", "Unknown error"),
+                        error_code=str(error_data.get("code")),
                     )
 
-        except httpx.TimeoutException:
-            logger.error("FCM request timeout")
-            return FCMResponse(success=False, error="Request timeout")
         except Exception as e:
             logger.error(f"FCM send error: {e}")
             return FCMResponse(success=False, error=str(e))
@@ -140,257 +173,42 @@ class FCMService:
         title: str,
         body: str,
         data: Optional[Dict[str, Any]] = None,
-        image: Optional[str] = None,
-        click_action: Optional[str] = None,
-        sound: str = "default",
-        badge: Optional[int] = None,
-        batch_size: int = 1000,
+        **kwargs
     ) -> Dict[str, Any]:
-        """Массовая отправка push уведомлений"""
-
-        if not self.active:
-            return {
-                "success": False,
-                "error": "FCM service not configured",
-                "sent_count": 0,
-                "failed_count": len(device_tokens),
-            }
-
-        if not device_tokens:
-            return {"success": True, "sent_count": 0, "failed_count": 0, "results": []}
-
-        try:
-            sent_count = 0
-            failed_count = 0
-            results = []
-
-            # Разбиваем на батчи
-            for i in range(0, len(device_tokens), batch_size):
-                batch_tokens = device_tokens[i : i + batch_size]
-
-                # Подготавливаем данные для батча
-                notification_data = {"title": title, "body": body, "sound": sound}
-
-                if image:
-                    notification_data["image"] = image
-
-                if click_action:
-                    notification_data["click_action"] = click_action
-
-                if badge is not None:
-                    notification_data["badge"] = str(badge)
-
-                payload = {
-                    "registration_ids": batch_tokens,
-                    "notification": notification_data,
-                    "priority": "high",
-                    "content_available": True,
-                }
-
-                if data:
-                    string_data = {k: str(v) for k, v in data.items()}
-                    payload["data"] = string_data
-
-                # Отправляем батч
-                headers = {
-                    "Authorization": f"key={self.server_key}",
-                    "Content-Type": "application/json",
-                }
-
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        self.fcm_url, json=payload, headers=headers
-                    )
-
-                    response_data = response.json()
-
-                    if response.status_code == 200:
-                        batch_results = response_data.get("results", [])
-
-                        for j, result in enumerate(batch_results):
-                            token_index = i + j
-                            if "message_id" in result:
-                                sent_count += 1
-                                results.append(
-                                    {
-                                        "token_index": token_index,
-                                        "success": True,
-                                        "message_id": result["message_id"],
-                                    }
-                                )
-                            else:
-                                failed_count += 1
-                                results.append(
-                                    {
-                                        "token_index": token_index,
-                                        "success": False,
-                                        "error": result.get("error", "Unknown error"),
-                                    }
-                                )
-                    else:
-                        # Весь батч провалился
-                        failed_count += len(batch_tokens)
-                        for j in range(len(batch_tokens)):
-                            results.append(
-                                {
-                                    "token_index": i + j,
-                                    "success": False,
-                                    "error": f"HTTP {response.status_code}",
-                                }
-                            )
-
-                # Небольшая задержка между батчами
-                if i + batch_size < len(device_tokens):
-                    await asyncio.sleep(0.1)
-
-            return {
-                "success": sent_count > 0,
-                "sent_count": sent_count,
-                "failed_count": failed_count,
-                "total_count": len(device_tokens),
-                "results": results,
-            }
-
-        except Exception as e:
-            logger.error(f"FCM multicast error: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "sent_count": 0,
-                "failed_count": len(device_tokens),
-            }
-
-    async def send_topic_notification(
-        self,
-        topic: str,
-        title: str,
-        body: str,
-        data: Optional[Dict[str, Any]] = None,
-        image: Optional[str] = None,
-        condition: Optional[str] = None,
-    ) -> FCMResponse:
-        """Отправка уведомления по топику"""
-
-        if not self.active:
-            return FCMResponse(success=False, error="FCM service not configured")
-
-        try:
-            notification_data = {"title": title, "body": body, "sound": "default"}
-
-            if image:
-                notification_data["image"] = image
-
-            payload = {
-                "notification": notification_data,
-                "priority": "high",
-                "content_available": True,
-            }
-
-            # Используем топик или условие
-            if condition:
-                payload["condition"] = condition
-            else:
-                payload["to"] = f"/topics/{topic}"
-
-            if data:
-                string_data = {k: str(v) for k, v in data.items()}
-                payload["data"] = string_data
-
-            headers = {
-                "Authorization": f"key={self.server_key}",
-                "Content-Type": "application/json",
-            }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.fcm_url, json=payload, headers=headers
-                )
-
-                response_data = response.json()
-
-                if response.status_code == 200:
-                    return FCMResponse(
-                        success=True, message_id=response_data.get("message_id")
-                    )
+        """
+        Массовая отправка (эмуляция через индивидуальные запросы, т.к. v1 не поддерживает multicast)
+        """
+        results = []
+        sent_count = 0
+        failed_count = 0
+        
+        # Отправляем параллельно
+        tasks = [
+            self.send_notification(token, title, body, data, **kwargs)
+            for token in device_tokens
+        ]
+        
+        # Ограничиваем concurrency если нужно, но пока просто gather
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for i, response in enumerate(responses):
+            if isinstance(response, FCMResponse):
+                if response.success:
+                    sent_count += 1
+                    results.append({"token_index": i, "success": True, "message_id": response.message_id})
                 else:
-                    return FCMResponse(
-                        success=False,
-                        error=f"HTTP {response.status_code}: {response_data.get('error', 'Unknown error')}",
-                    )
-
-        except Exception as e:
-            logger.error(f"FCM topic send error: {e}")
-            return FCMResponse(success=False, error=str(e))
-
-    async def subscribe_to_topic(
-        self, device_tokens: List[str], topic: str
-    ) -> Dict[str, Any]:
-        """Подписка устройств на топик"""
-
-        if not self.active:
-            return {"success": False, "error": "FCM service not configured"}
-
-        try:
-            url = f"https://iid.googleapis.com/iid/v1:batchAdd"
-
-            payload = {"to": f"/topics/{topic}", "registration_tokens": device_tokens}
-
-            headers = {
-                "Authorization": f"key={self.server_key}",
-                "Content-Type": "application/json",
-            }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response_data = response.json()
-
-                return {
-                    "success": response.status_code == 200,
-                    "response": response_data,
-                }
-
-        except Exception as e:
-            logger.error(f"FCM topic subscription error: {e}")
-            return {"success": False, "error": str(e)}
-
-    async def unsubscribe_from_topic(
-        self, device_tokens: List[str], topic: str
-    ) -> Dict[str, Any]:
-        """Отписка устройств от топика"""
-
-        if not self.active:
-            return {"success": False, "error": "FCM service not configured"}
-
-        try:
-            url = f"https://iid.googleapis.com/iid/v1:batchRemove"
-
-            payload = {"to": f"/topics/{topic}", "registration_tokens": device_tokens}
-
-            headers = {
-                "Authorization": f"key={self.server_key}",
-                "Content-Type": "application/json",
-            }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response_data = response.json()
-
-                return {
-                    "success": response.status_code == 200,
-                    "response": response_data,
-                }
-
-        except Exception as e:
-            logger.error(f"FCM topic unsubscription error: {e}")
-            return {"success": False, "error": str(e)}
-
-    def get_status(self) -> Dict[str, Any]:
-        """Статус FCM сервиса"""
+                    failed_count += 1
+                    results.append({"token_index": i, "success": False, "error": response.error})
+            else:
+                failed_count += 1
+                results.append({"token_index": i, "success": False, "error": str(response)})
+                
         return {
-            "active": self.active,
-            "server_key_configured": bool(self.server_key),
-            "sender_id_configured": bool(self.sender_id),
-            "fcm_url": self.fcm_url,
+            "success": sent_count > 0,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "total_count": len(device_tokens),
+            "results": results
         }
 
 
@@ -401,3 +219,4 @@ fcm_service = FCMService()
 def get_fcm_service() -> FCMService:
     """Получить экземпляр FCM сервиса"""
     return fcm_service
+

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -36,9 +36,18 @@ class Patient(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
+    
+    # ✅ SOFT-DELETE: Безопасное удаление пациентов
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )
 
     # Связь с пользователем
-    user: Mapped[Optional["User"]] = relationship("User", back_populates="patient")
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="patient", foreign_keys=[user_id])
 
     def short_name(self) -> str:
         """

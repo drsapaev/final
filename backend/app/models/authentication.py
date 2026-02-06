@@ -17,6 +17,40 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+class TokenBlacklist(Base):
+    """
+    Модель для черного списка access токенов.
+    
+    Используется для немедленного отзыва access токенов при:
+    - Logout
+    - Смене пароля
+    - Подозрительной активности
+    - Блокировке пользователя
+    """
+
+    __tablename__ = "token_blacklist"
+    __table_args__ = (
+        Index('idx_token_blacklist_jti', 'jti'),
+        Index('idx_token_blacklist_expires', 'expires_at'),
+        {'extend_existing': True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)  # JWT ID
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )
+    
+    # Метаданные
+    blacklisted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # "logout", "password_change", "security"
+
+
 class RefreshToken(Base):
     """Модель для refresh токенов"""
 

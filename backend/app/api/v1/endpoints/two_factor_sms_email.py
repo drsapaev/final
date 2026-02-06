@@ -192,7 +192,7 @@ async def resend_verification_code(
 
         if method == 'sms' and phone_number:
             success = await notification_service.send_sms(
-                phone_number=phone_number,
+                phone=phone_number,
                 message=f"Ваш код подтверждения: {code}. Код действителен 5 минут.",
             )
         elif method == 'email' and email_address:

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, Download, FileText, Receipt, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { Button } from '../ui/native';
-
+import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
  * Компонент кнопки печати с поддержкой разных типов документов
@@ -49,7 +49,7 @@ const PrintButton = ({
     try {
       setPrinting(true);
       setLastResult(null);
-      
+
       if (onPrintStart) onPrintStart();
 
       // Определяем API endpoint в зависимости от типа документа
@@ -75,7 +75,7 @@ const PrintButton = ({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(printData)
@@ -127,12 +127,11 @@ const PrintButton = ({
 
       {/* Результат печати */}
       {lastResult && (
-        <div 
-          className={`absolute top-full left-0 right-0 mt-2 p-2 rounded text-xs z-50 ${
-            lastResult.type === 'success' 
-              ? 'bg-green-100 text-green-700 border border-green-200' 
+        <div
+          className={`absolute top-full left-0 right-0 mt-2 p-2 rounded text-xs z-50 ${lastResult.type === 'success'
+              ? 'bg-green-100 text-green-700 border border-green-200'
               : 'bg-red-100 text-red-700 border border-red-200'
-          }`}
+            }`}
         >
           <div className="flex items-center">
             {lastResult.type === 'success' ? (

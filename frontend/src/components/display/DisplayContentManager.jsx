@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Image, 
-  Video, 
-  FileText, 
-  Plus, 
-  Trash2, 
+import {
+  Image,
+  Video,
+  FileText,
+  Plus,
+  Trash2,
   Edit,
   Eye,
   Upload,
@@ -16,11 +16,12 @@ import {
 import { Card, Button, Badge } from '../ui/native';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 /**
  * Управление контентом для табло
  * Основа: passport.md стр. 2571-3324
  */
-const DisplayContentManager = ({ 
+const DisplayContentManager = ({
   boardId,
   onContentUpdate,
   className = ''
@@ -49,10 +50,10 @@ const DisplayContentManager = ({
   const loadContent = async () => {
     try {
       setLoading(true);
-      
+
       // Загружаем контент для табло
       const response = await fetch(`/api/v1/admin/display-boards/${boardId}/content`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -75,7 +76,7 @@ const DisplayContentManager = ({
 
       const response = await fetch('/api/v1/admin/display-boards/content/upload', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` },
         body: formData
       });
 
@@ -92,7 +93,7 @@ const DisplayContentManager = ({
     try {
       const response = await fetch(`/api/v1/admin/display-boards/content/${contentId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -118,8 +119,8 @@ const DisplayContentManager = ({
           <Card key={banner.id} className="overflow-hidden">
             <div className="aspect-video bg-gray-100 flex items-center justify-center">
               {banner.file_url ? (
-                <img 
-                  src={banner.file_url} 
+                <img
+                  src={banner.file_url}
                   alt={banner.title}
                   className="w-full h-full object-cover"
                 />
@@ -141,8 +142,8 @@ const DisplayContentManager = ({
                   <Button size="sm" variant="outline">
                     <Edit size={12} />
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => handleDeleteContent(banner.id, 'banner')}
                   >
@@ -175,15 +176,15 @@ const DisplayContentManager = ({
                 <div className="font-medium mb-2">{announcement.title}</div>
                 <div className="text-gray-600 text-sm mb-3">{announcement.text}</div>
                 <div className="flex items-center space-x-3">
-                  <Badge 
+                  <Badge
                     variant={
                       announcement.priority === 'high' ? 'error' :
-                      announcement.priority === 'medium' ? 'warning' : 'info'
-                    } 
+                        announcement.priority === 'medium' ? 'warning' : 'info'
+                    }
                     size="sm"
                   >
                     {announcement.priority === 'high' ? 'Важное' :
-                     announcement.priority === 'medium' ? 'Среднее' : 'Обычное'}
+                      announcement.priority === 'medium' ? 'Среднее' : 'Обычное'}
                   </Badge>
                   <span className="text-xs text-gray-500">
                     Создано: {new Date(announcement.created_at).toLocaleDateString('ru-RU')}
@@ -194,8 +195,8 @@ const DisplayContentManager = ({
                 <Button size="sm" variant="outline">
                   <Edit size={14} />
                 </Button>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => handleDeleteContent(announcement.id, 'announcement')}
                 >
@@ -224,8 +225,8 @@ const DisplayContentManager = ({
           <Card key={video.id} className="overflow-hidden">
             <div className="aspect-video bg-gray-900 flex items-center justify-center relative">
               {video.thumbnail_url ? (
-                <img 
-                  src={video.thumbnail_url} 
+                <img
+                  src={video.thumbnail_url}
                   alt={video.title}
                   className="w-full h-full object-cover"
                 />
@@ -252,8 +253,8 @@ const DisplayContentManager = ({
                   <Button size="sm" variant="outline">
                     <Edit size={12} />
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => handleDeleteContent(video.id, 'video')}
                   >
@@ -271,7 +272,7 @@ const DisplayContentManager = ({
   const renderThemesTab = () => (
     <div className="space-y-4">
       <h3 className="text-lg font-medium">Темы оформления</h3>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { id: 'light', name: 'Светлая', preview: '#f8fafc' },
@@ -279,7 +280,7 @@ const DisplayContentManager = ({
           { id: 'medical', name: 'Медицинская', preview: '#f0fff4' }
         ].map(theme => (
           <Card key={theme.id} className="cursor-pointer hover:shadow-lg transition-shadow">
-            <div 
+            <div
               className="h-24 rounded-t-lg"
               style={{ background: theme.preview }}
             />
@@ -308,15 +309,14 @@ const DisplayContentManager = ({
         {contentTabs.map(tab => {
           const isActive = activeTab === tab.id;
           const TabIcon = tab.icon;
-          
+
           return (
             <button
               key={tab.id}
-              className={`flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                isActive
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${isActive
                   ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
                   : 'text-gray-500 hover:text-gray-700'
-              }`}
+                }`}
               onClick={() => setActiveTab(tab.id)}
             >
               <TabIcon size={16} className="mr-2" />
@@ -340,10 +340,10 @@ const DisplayContentManager = ({
           <Card className="w-full max-w-md mx-4">
             <div className="p-6">
               <h3 className="text-lg font-medium mb-4">
-                Загрузить {uploadDialog.type === 'banner' ? 'баннер' : 
-                          uploadDialog.type === 'video' ? 'видео' : 'контент'}
+                Загрузить {uploadDialog.type === 'banner' ? 'баннер' :
+                  uploadDialog.type === 'video' ? 'видео' : 'контент'}
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -355,7 +355,7 @@ const DisplayContentManager = ({
                     placeholder="Введите название..."
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Файл:
@@ -364,21 +364,21 @@ const DisplayContentManager = ({
                     type="file"
                     accept={
                       uploadDialog.type === 'banner' ? 'image/*' :
-                      uploadDialog.type === 'video' ? 'video/*' : '*/*'
+                        uploadDialog.type === 'video' ? 'video/*' : '*/*'
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-3 mt-6">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setUploadDialog({ open: false, type: '' })}
                 >
                   Отменить
                 </Button>
-                <Button onClick={() => {/* Логика загрузки */}}>
+                <Button onClick={() => {/* Логика загрузки */ }}>
                   <Upload size={16} className="mr-2" />
                   Загрузить
                 </Button>

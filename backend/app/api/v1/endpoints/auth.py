@@ -12,7 +12,7 @@ import inspect
 import logging
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -224,3 +224,30 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка входа: {str(e)}",
         )
+
+
+@router.get("/csrf-token")
+async def get_csrf_token(request: Request, response: Response):
+    """
+    Получить CSRF токен.
+    
+    Клиент должен вызвать этот эндпоинт и использовать
+    полученный токен в заголовке X-CSRF-Token для POST/PUT/PATCH/DELETE запросов.
+    """
+    import secrets
+    from app.middleware.csrf_middleware import CSRFMiddleware
+    
+    # Генерируем новый токен
+    token = secrets.token_hex(CSRFMiddleware.CSRF_TOKEN_LENGTH)
+    
+    # Устанавливаем в cookie
+    response.set_cookie(
+        key=CSRFMiddleware.CSRF_COOKIE_NAME,
+        value=token,
+        max_age=CSRFMiddleware.CSRF_TOKEN_LIFETIME_HOURS * 3600,
+        httponly=False,  # JS должен иметь доступ
+        samesite="strict",
+    )
+    
+    return {"csrf_token": token}
+

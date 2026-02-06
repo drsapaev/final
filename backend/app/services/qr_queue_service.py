@@ -115,6 +115,70 @@ class QRQueueService:
         
         return patient
 
+    def _create_visit_for_qr(
+        self,
+        patient_id: int,
+        visit_date: date,
+        services: List[Dict[str, Any]],
+        visit_type: str = "paid",
+        discount_mode: str = "none",
+        notes: Optional[str] = None,
+    ) -> "Visit":
+        """
+        ⭐ FIX 2: Создаёт Visit для QR-регистрации.
+        
+        Вызывается при первом заполнении QR-записи (когда регистратор добавляет услуги).
+        Visit создаётся сразу со списком услуг.
+        
+        Args:
+            patient_id: ID пациента
+            visit_date: Дата визита
+            services: Список услуг с полными данными (service_id, name, code, price, qty)
+            visit_type: Тип визита (paid, repeat, benefit)
+            discount_mode: Режим скидки (none, repeat, benefit, all_free)
+            notes: Заметки к визиту
+            
+        Returns:
+            Visit instance
+        """
+        from app.models.visit import Visit, VisitService
+        from decimal import Decimal
+        
+        # Создаём Visit
+        # ✅ SSOT: source='online' для QR/Telegram регистрации
+        visit = Visit(
+            patient_id=patient_id,
+            visit_date=visit_date,
+            status="open",
+            discount_mode=discount_mode,
+            approval_status="none",
+            notes=notes or f"QR-регистрация ({visit_type})",
+            source="online",  # ✅ SSOT: Прямое присвоение source
+        )
+        self.db.add(visit)
+        self.db.flush()  # Получаем ID
+        
+        # Добавляем услуги к Visit
+        for svc_data in services:
+            visit_service = VisitService(
+                visit_id=visit.id,
+                service_id=svc_data.get("service_id"),
+                code=svc_data.get("code"),
+                name=svc_data.get("name", "Услуга"),
+                qty=svc_data.get("quantity", 1),
+                price=Decimal(str(svc_data.get("price", 0))) if svc_data.get("price") else None,
+            )
+            self.db.add(visit_service)
+        
+        self.db.flush()
+        
+        logger.info(
+            "[QRQueueService._create_visit_for_qr] ✅ Создан Visit ID=%d для QR-пациента %d с %d услугами",
+            visit.id, patient_id, len(services)
+        )
+        
+        return visit
+
     def generate_qr_token(
         self,
         specialist_id: int,
@@ -960,6 +1024,7 @@ class QRQueueService:
         return {
             "success": True,
             "patient": {
+                "id": next_patient.id,
                 "number": next_patient.number,
                 "name": next_patient.patient_name,
                 "phone": next_patient.phone,

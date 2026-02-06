@@ -242,8 +242,34 @@ const ModernQueueManager = ({
   };
 
   // Мемоизация списка врачей для выпадающего списка
+  // ⭐ SSOT: queueProfiles загружаются из API и используются для фильтрации
+  const [queueProfiles, setQueueProfiles] = useState([]);
+
+  // ⭐ SSOT: Load queue profiles for filtering (show_on_qr_page=true)
+  useEffect(() => {
+    const loadQueueProfiles = async () => {
+      try {
+        // Используем публичный endpoint который возвращает только профили с show_on_qr_page=true
+        const response = await fetch('/api/v1/queues/profiles/public');
+        if (response.ok) {
+          const data = await response.json();
+          setQueueProfiles(data.specialists || []);
+          logger.log('[ModernQueueManager] SSOT: Loaded queue profiles for filtering:', data.specialists?.length || 0);
+        }
+      } catch (error) {
+        logger.error('[ModernQueueManager] Error loading queue profiles:', error);
+      }
+    };
+    loadQueueProfiles();
+  }, []);
+
   const doctorOptions = useMemo(() => {
     if (!doctors || doctors.length === 0) return [];
+
+    // ⭐ SSOT: Получаем список специальностей из queueProfiles (с show_on_qr_page=true)
+    const allowedSpecialties = new Set(
+      queueProfiles.map(p => p.specialty?.toLowerCase())
+    );
 
     // Группируем врачей по специальности, чтобы избежать дубликатов в списке выбора очереди
     // (если очередь привязана к специальности, а не к конкретному врачу)
@@ -270,7 +296,11 @@ const ModernQueueManager = ({
       'urology': 'Уролог',
       'endocrinology': 'Эндокринолог',
       'traumatology': 'Травматолог',
-      'ultrasound': 'УЗИ'
+      'ultrasound': 'УЗИ',
+      'ecg': 'ЭКГ',
+      'procedures': 'Процедуры',
+      'cosmetology': 'Косметология',
+      'general': 'Общая очередь'
     };
 
     const normalizeSpecialty = (spec) => {
@@ -284,6 +314,12 @@ const ModernQueueManager = ({
 
     return doctors
       .filter(d => d.specialty) // Только врачи со специальностью
+      .filter(d => {
+        // ⭐ SSOT Filter: Показываем только тех врачей, чья специальность есть в queueProfiles
+        if (allowedSpecialties.size === 0) return true; // Если профили не загружены - показываем всех
+        const normalizedSpec = normalizeSpecialty(d.specialty);
+        return allowedSpecialties.has(normalizedSpec);
+      })
       .reduce((acc, d) => {
         const normalizedSpec = normalizeSpecialty(d.specialty);
 
@@ -305,7 +341,7 @@ const ModernQueueManager = ({
         return acc;
       }, [])
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [doctors]);
+  }, [doctors, queueProfiles]);
 
   return (
     <div className="modern-queue-manager">

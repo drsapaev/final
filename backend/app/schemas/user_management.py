@@ -143,7 +143,7 @@ class UserPreferencesUpdate(UserPreferencesBase):
     working_hours_end: Optional[str] = Field(
         None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
     )
-    working_days: Optional[List[int]] = Field(None, min_items=1, max_items=7)
+    working_days: Optional[List[int]] = Field(None, min_length=1, max_length=7)
     break_duration: Optional[int] = Field(None, ge=0, le=480)  # 0-8 часов
     dashboard_layout: Optional[Dict[str, Any]] = None
     sidebar_collapsed: Optional[bool] = False
@@ -152,6 +152,24 @@ class UserPreferencesUpdate(UserPreferencesBase):
     session_timeout: Optional[int] = Field(None, ge=5, le=480)  # 5 минут - 8 часов
     require_2fa: Optional[bool] = False
     auto_logout: Optional[bool] = True
+
+    # ============================================
+    # EMR PREFERENCES (Smart Autocomplete)
+    # ============================================
+    # Режим умного поля (ghost | mvp | hybrid | word)
+    emr_smart_field_mode: Optional[str] = Field(None, pattern=r"^(ghost|mvp|hybrid|word)$")
+    # Показывать переключатель режимов
+    emr_show_mode_switcher: Optional[bool] = None
+    # Задержка debounce в мс
+    emr_debounce_ms: Optional[int] = Field(None, ge=100, le=2000)
+    # Недавно использованные коды МКБ-10
+    emr_recent_icd10: Optional[List[str]] = Field(None, max_length=20)
+    # Недавно использованные шаблоны назначений
+    emr_recent_templates: Optional[List[str]] = Field(None, max_length=20)
+    # Избранные шаблоны по специальностям
+    emr_favorite_templates: Optional[Dict[str, List[str]]] = None
+    # Кастомные шаблоны пользователя
+    emr_custom_templates: Optional[List[Dict[str, Any]]] = None
 
 
 class UserPreferencesResponse(UserPreferencesBase):
@@ -172,6 +190,16 @@ class UserPreferencesResponse(UserPreferencesBase):
     session_timeout: int
     require_2fa: bool
     auto_logout: bool
+
+    # EMR Preferences
+    emr_smart_field_mode: Optional[str] = "ghost"
+    emr_show_mode_switcher: Optional[bool] = True
+    emr_debounce_ms: Optional[int] = 500
+    emr_recent_icd10: Optional[List[str]] = None
+    emr_recent_templates: Optional[List[str]] = None
+    emr_favorite_templates: Optional[Dict[str, List[str]]] = None
+    emr_custom_templates: Optional[List[Dict[str, Any]]] = None
+
     created_at: datetime
     updated_at: datetime
 
@@ -421,9 +449,11 @@ class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
-    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
+    must_change_password: Optional[bool] = False  # Требуется смена пароля при первом входе
 
     # Профиль
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -452,8 +482,9 @@ class UserUpdateRequest(BaseModel):
 
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
@@ -520,8 +551,9 @@ class UserSearchRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     query: Optional[str] = Field(None, min_length=1, max_length=100)
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     status: Optional[UserStatus] = None
     is_active: Optional[bool] = None
@@ -543,8 +575,9 @@ class UserBulkActionRequest(BaseModel):
     action: str = Field(
         ..., pattern="^(activate|deactivate|suspend|unsuspend|delete|change_role)$"
     )
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     reason: Optional[str] = Field(None, max_length=500)
 

@@ -317,14 +317,14 @@ class QueuePositionNotificationService:
         priority: str = "normal"
     ) -> Dict[str, Any]:
         """
-        Отправить push-уведомление пациенту
-        
-        Ищет FCM токен по:
-        1. patient_id -> Patient -> User -> fcm_token
-        2. telegram_id -> User (через связку) -> fcm_token
+        Отправить уведомление пациенту (WebSocket + Push)
+        Использует NotificationSenderService для унифицированной отправки
         """
-        device_token = None
+        from app.services.notifications import notification_sender_service
         
+        user_id = None
+        
+        # Определяем user_id
         # Способ 1: Через patient_id
         if entry.patient_id:
             patient = self.db.query(Patient).filter(
@@ -332,56 +332,39 @@ class QueuePositionNotificationService:
             ).first()
             
             if patient and patient.user_id:
-                user = self.db.query(User).filter(
-                    User.id == patient.user_id
-                ).first()
-                
-                if user and hasattr(user, 'fcm_token') and user.fcm_token:
-                    device_token = user.fcm_token
+                user_id = patient.user_id
         
         # Способ 2: Через telegram_id (если есть связь)
-        if not device_token and entry.telegram_id:
+        if not user_id and entry.telegram_id:
             user = self.db.query(User).filter(
                 User.telegram_id == entry.telegram_id
             ).first()
             
-            if user and hasattr(user, 'fcm_token') and user.fcm_token:
-                device_token = user.fcm_token
-        
-        if not device_token:
-            logger.debug(
-                f"No FCM token found for entry {entry.id} "
-                f"(patient_id={entry.patient_id}, telegram_id={entry.telegram_id})"
-            )
-            return {
-                "success": True,
-                "sent": False,
-                "reason": "no_fcm_token"
-            }
-        
-        # Отправляем уведомление
-        try:
-            result = await self.fcm_service.send_notification(
-                device_token=device_token,
+            if user:
+                user_id = user.id
+
+        if user_id:
+            # Используем унифицированный сервис
+            # Он сам отправит и в WS, и в Push (если есть токен)
+            success = await notification_sender_service.send_push(
+                user_id=user_id,
                 title=title,
-                body=body,
+                message=body,
                 data=data,
-                sound=sound
+                db=self.db
             )
             
             return {
-                "success": result.success if hasattr(result, 'success') else True,
-                "sent": True,
-                "message_id": result.message_id if hasattr(result, 'message_id') else None
+                "success": True, # Считаем успешным если сервис принял (он сам ошибки логирует)
+                "sent": success,
+                "user_id": user_id
             }
-            
-        except Exception as e:
-            logger.error(f"FCM notification error for entry {entry.id}: {e}")
-            return {
-                "success": False,
-                "sent": False,
-                "error": str(e)
-            }
+        
+        return {
+            "success": True,
+            "sent": False,
+            "reason": "no_user_found"
+        }
     
     def get_queue_position_info(self, entry: OnlineQueueEntry) -> Dict[str, Any]:
         """

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 import {
   Key,
   Shield,
@@ -33,7 +34,7 @@ const AppActivation = ({ onClose }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken() || ''}`
         },
         body: JSON.stringify({
           activation_key: activationKey.trim(),

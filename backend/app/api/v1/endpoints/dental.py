@@ -13,7 +13,7 @@ from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
-from app.services.notification_service import NotificationService
+from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,6 @@ async def send_price_override_notification(
 ):
     """Отправить уведомление в регистратуру об изменении цены"""
     try:
-        notification_service = NotificationService(db)
 
         # Получаем всех пользователей с ролью Registrar
         registrars = db.query(User).filter(User.role == "Registrar").all()
@@ -70,7 +69,7 @@ async def send_price_override_notification(
             try:
                 # Отправляем через Telegram, если есть telegram_id
                 if hasattr(registrar, 'telegram_id') and registrar.telegram_id:
-                    await notification_service.send_telegram_message(
+                    await notification_sender_service.send_telegram_message(
                         user_id=registrar.telegram_id,
                         message=message,
                         parse_mode="HTML",
@@ -601,7 +600,6 @@ async def send_price_override_result_notification(
 ):
     """Отправить уведомление врачу о результате рассмотрения изменения цены"""
     try:
-        notification_service = NotificationService(db)
 
         # Получаем врача
         doctor = db.query(Doctor).filter(Doctor.id == price_override.doctor_id).first()
@@ -631,7 +629,7 @@ async def send_price_override_result_notification(
 
         # Отправляем уведомление врачу
         if hasattr(doctor.user, 'telegram_id') and doctor.user.telegram_id:
-            await notification_service.send_telegram_message(
+            await notification_sender_service.send_telegram_message(
                 user_id=doctor.user.telegram_id, message=message, parse_mode="HTML"
             )
 

@@ -37,6 +37,7 @@ import { api } from '../../api/client';
 import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const DEFAULT_STATS = {
@@ -250,7 +251,7 @@ const DepartmentManagement = () => {
             setFormData(DEFAULT_FORM);
             setIntegrationForm(DEFAULT_INTEGRATION_OPTIONS);
             setServiceMapping(DEFAULT_SERVICE_MAPPING);
-            
+
             // ✅ НОВОЕ: Создание услуги при создании отделения (если включено)
             if (serviceMapping.create_service && serviceMapping.service_name) {
                 try {
@@ -271,7 +272,7 @@ const DepartmentManagement = () => {
                     toast.warning('Отделение создано, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
                 }
             }
-            
+
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
@@ -308,7 +309,7 @@ const DepartmentManagement = () => {
         try {
             await api.put(`/admin/departments/${editingDepartment.id}`, formData);
             toast.success('Отделение обновлено');
-            
+
             // ✅ НОВОЕ: Создание услуги при редактировании (если включено)
             if (serviceMapping.create_service && serviceMapping.service_name) {
                 try {
@@ -329,7 +330,7 @@ const DepartmentManagement = () => {
                     toast.warning('Отделение обновлено, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
                 }
             }
-            
+
             setShowEditModal(false);
             setEditingDepartment(null);
             setServiceMapping(DEFAULT_SERVICE_MAPPING);
@@ -558,7 +559,7 @@ const DepartmentManagement = () => {
             }
 
             // Импорт данных
-            const token = localStorage.getItem('auth_token');
+            const token = tokenManager.getAccessToken();
             const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk`, {
                 method: 'POST',
                 headers: {
@@ -617,7 +618,7 @@ const DepartmentManagement = () => {
         if (!confirmed) return;
 
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = tokenManager.getAccessToken();
             const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk-delete`, {
                 method: 'DELETE',
                 headers: {
@@ -650,7 +651,7 @@ const DepartmentManagement = () => {
         }
 
         try {
-            const token = localStorage.getItem('auth_token');
+            const token = tokenManager.getAccessToken();
             const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk-activate`, {
                 method: 'PATCH',
                 headers: {
@@ -1057,7 +1058,7 @@ const DepartmentManagement = () => {
                                 }}>
                                     Настройка услуг для вкладки
                                 </h4>
-                                
+
                                 <div style={{ marginBottom: '16px' }}>
                                     <MacOSCheckbox
                                         checked={serviceMapping.create_service}
@@ -1632,7 +1633,7 @@ const DepartmentManagement = () => {
                     }}>
                         Настройка услуг для вкладки
                     </h4>
-                    
+
                     <div style={{ marginBottom: '16px' }}>
                         <MacOSCheckbox
                             checked={serviceMapping.create_service}

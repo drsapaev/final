@@ -21,7 +21,6 @@ from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.doctor_info_service import get_doctor_info_service
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
-from app.services.notification_service import NotificationService
 from app.services.telegram.bot import TelegramBotService
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,6 @@ class RegistrarNotificationService:
     def __init__(self, db: Session):
         self.db = db
         self.telegram_service = TelegramBotService()
-        self.notification_service = NotificationService(db)
         self.email_sms_service = EmailSMSEnhancedService()
         self.doctor_info_service = get_doctor_info_service(db)
 

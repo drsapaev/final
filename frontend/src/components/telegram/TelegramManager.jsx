@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/native';
-import { 
-  MessageSquare, 
-  Settings, 
-  Users, 
-  Send, 
-  Bot, 
-  CheckCircle, 
-  AlertCircle, 
+import tokenManager from '../../utils/tokenManager';
+import {
+  MessageSquare,
+  Settings,
+  Users,
+  Send,
+  Bot,
+  CheckCircle,
+  AlertCircle,
   RefreshCw,
   Plus,
   Edit,
@@ -63,7 +64,7 @@ const TelegramManager = () => {
     try {
       const response = await fetch('/api/v1/telegram/bot-status', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -77,7 +78,7 @@ const TelegramManager = () => {
     try {
       const response = await fetch('/api/v1/admin/telegram/settings', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -91,7 +92,7 @@ const TelegramManager = () => {
     try {
       const response = await fetch('/api/v1/admin/telegram/templates?language=ru', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -105,7 +106,7 @@ const TelegramManager = () => {
     try {
       const response = await fetch('/api/v1/telegram/users?limit=50', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -119,7 +120,7 @@ const TelegramManager = () => {
     try {
       const response = await fetch('/api/v1/admin/telegram/stats?days_back=30', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -137,12 +138,12 @@ const TelegramManager = () => {
       const response = await fetch('/api/v1/admin/telegram/test-bot', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setSuccess('Подключение к боту успешно');
         loadBotStatus();
@@ -170,7 +171,7 @@ const TelegramManager = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           chat_id: parseInt(testChatId),
@@ -179,7 +180,7 @@ const TelegramManager = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setSuccess('Тестовое сообщение отправлено');
         setShowTestModal(false);
@@ -204,13 +205,13 @@ const TelegramManager = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify(newSettings)
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setSuccess('Настройки обновлены');
         loadSettings();
@@ -233,13 +234,13 @@ const TelegramManager = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({ webhook_url: webhookUrl })
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setSuccess('Webhook установлен успешно');
         loadBotStatus();
@@ -379,7 +380,7 @@ const TelegramManager = () => {
     <div className="space-y-6">
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Настройки бота</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -568,9 +569,8 @@ const TelegramManager = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    user.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`text-xs px-2 py-1 rounded-full ${user.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
                     {user.active ? 'Активен' : 'Неактивен'}
                   </span>
                   <Button variant="ghost" size="sm">
@@ -618,11 +618,10 @@ const TelegramManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
+              className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <tab.icon className="w-4 h-4" />
               <span>{tab.label}</span>
@@ -661,7 +660,7 @@ const TelegramManager = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg max-w-md w-full mx-4 p-6">
             <h3 className="text-lg font-semibold mb-4">Отправить тестовое сообщение</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -675,7 +674,7 @@ const TelegramManager = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Сообщение

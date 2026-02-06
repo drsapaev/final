@@ -391,7 +391,8 @@ class BatchPatientService:
                 "id": entry.id,
                 "number": entry.number,
                 "queue_tag": entry.queue_tag,
-                "status": entry.status
+                "status": entry.status,
+                "queue_time": entry.queue_time.isoformat() if entry.queue_time else None  # ⭐ FIX 13
             })
         
         # Собираем данные из Visit

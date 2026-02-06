@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/native';
-import { 
-  Mail, 
-  Phone, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Mail,
+  Phone,
+  Clock,
+  CheckCircle,
+  AlertCircle,
   RefreshCw,
   Send,
   Shield,
@@ -13,12 +13,13 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { tokenManager } from '../../utils/tokenManager';
 
 /**
  * Компонент для SMS/Email двухфакторной аутентификации
  * Поддерживает отправку кодов по SMS и Email
  */
-const SMSEmail2FA = ({ 
+const SMSEmail2FA = ({
   method = 'sms', // 'sms' или 'email'
   onSuccess,
   onCancel,
@@ -57,7 +58,7 @@ const SMSEmail2FA = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           method: method,
@@ -97,7 +98,7 @@ const SMSEmail2FA = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           method: method,
@@ -117,7 +118,7 @@ const SMSEmail2FA = ({
       } else {
         setError(data.detail || 'Неверный код');
         setAttempts(prev => prev + 1);
-        
+
         if (attempts + 1 >= maxAttempts) {
           setError('Превышено количество попыток. Попробуйте позже.');
           setCanResend(false);

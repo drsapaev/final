@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
-import { 
-  Shield, 
-  Lock, 
-  Key, 
-  Eye, 
-  EyeOff, 
-  Save, 
+import {
+  Shield,
+  Lock,
+  Key,
+  Eye,
+  EyeOff,
+  Save,
   RefreshCw,
   AlertCircle,
   CheckCircle,
@@ -17,8 +17,8 @@ import {
   Edit,
   Ban
 } from 'lucide-react';
-import { 
-  MacOSInput, 
+import {
+  MacOSInput,
   MacOSSelect,
   MacOSButton,
   MacOSCheckbox,
@@ -27,7 +27,7 @@ import {
   MacOSCard
 } from '../ui/macos';
 
-const SecuritySettings = ({ 
+const SecuritySettings = ({
   settings = {},
   onSave,
   loading = false
@@ -37,34 +37,34 @@ const SecuritySettings = ({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    
+
     // Двухфакторная аутентификация
     twoFactorEnabled: false,
     twoFactorMethod: 'sms', // sms, email, app
-    
+
     // Сессии
     maxSessions: 5,
     sessionTimeout: 30, // минуты
     autoLogout: true,
-    
+
     // Безопасность
     passwordMinLength: 8,
     passwordRequireUppercase: true,
     passwordRequireNumbers: true,
     passwordRequireSymbols: true,
     passwordExpiryDays: 90,
-    
+
     // IP ограничения
     allowedIPs: [],
     blockSuspiciousIPs: true,
     maxLoginAttempts: 5,
     lockoutDuration: 15, // минуты
-    
+
     // Аудит
     logAllActions: true,
     logRetentionDays: 365,
     alertOnSuspiciousActivity: true,
-    
+
     // Резервное копирование
     autoBackup: true,
     backupFrequency: 'daily', // daily, weekly, monthly
@@ -185,8 +185,14 @@ const SecuritySettings = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (activeTab === 'password' && !validatePasswordForm()) return;
+
+    // Defensive check for onSave prop
+    if (typeof onSave !== 'function') {
+      logger.warn('SecuritySettings: onSave prop is not provided or not a function');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -271,9 +277,9 @@ const SecuritySettings = ({
         {/* Смена пароля */}
         {activeTab === 'password' && (
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               marginBottom: '20px',
               color: 'var(--mac-text-primary)'
             }}>
@@ -281,10 +287,10 @@ const SecuritySettings = ({
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -296,24 +302,25 @@ const SecuritySettings = ({
                     value={formData.currentPassword}
                     onChange={(e) => handleChange('currentPassword', e.target.value)}
                     placeholder="Введите текущий пароль"
+                    autoComplete="current-password"
                     style={{ paddingLeft: '40px', paddingRight: '40px' }}
                   />
-                  <Lock style={{ 
-                    position: 'absolute', 
-                    left: '12px', 
-                    top: '50%', 
+                  <Lock style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
                     transform: 'translateY(-50%)',
-                    width: '16px', 
-                    height: '16px', 
-                    color: 'var(--mac-text-tertiary)' 
+                    width: '16px',
+                    height: '16px',
+                    color: 'var(--mac-text-tertiary)'
                   }} />
                   <button
                     type="button"
                     onClick={() => togglePasswordVisibility('current')}
-                    style={{ 
-                      position: 'absolute', 
-                      right: '12px', 
-                      top: '50%', 
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
                       transform: 'translateY(-50%)',
                       background: 'none',
                       border: 'none',
@@ -325,9 +332,9 @@ const SecuritySettings = ({
                   </button>
                 </div>
                 {errors.currentPassword && (
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    color: 'var(--mac-danger)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-danger)',
                     marginTop: '4px',
                     display: 'flex',
                     alignItems: 'center',
@@ -340,10 +347,10 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -355,24 +362,25 @@ const SecuritySettings = ({
                     value={formData.newPassword}
                     onChange={(e) => handleChange('newPassword', e.target.value)}
                     placeholder="Введите новый пароль"
+                    autoComplete="new-password"
                     style={{ paddingLeft: '40px', paddingRight: '40px' }}
                   />
-                  <Key style={{ 
-                    position: 'absolute', 
-                    left: '12px', 
-                    top: '50%', 
+                  <Key style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
                     transform: 'translateY(-50%)',
-                    width: '16px', 
-                    height: '16px', 
-                    color: 'var(--mac-text-tertiary)' 
+                    width: '16px',
+                    height: '16px',
+                    color: 'var(--mac-text-tertiary)'
                   }} />
                   <button
                     type="button"
                     onClick={() => togglePasswordVisibility('new')}
-                    style={{ 
-                      position: 'absolute', 
-                      right: '12px', 
-                      top: '50%', 
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
                       transform: 'translateY(-50%)',
                       background: 'none',
                       border: 'none',
@@ -384,9 +392,9 @@ const SecuritySettings = ({
                   </button>
                 </div>
                 {errors.newPassword && (
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    color: 'var(--mac-danger)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-danger)',
                     marginTop: '4px',
                     display: 'flex',
                     alignItems: 'center',
@@ -399,10 +407,10 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -414,24 +422,25 @@ const SecuritySettings = ({
                     value={formData.confirmPassword}
                     onChange={(e) => handleChange('confirmPassword', e.target.value)}
                     placeholder="Подтвердите новый пароль"
+                    autoComplete="new-password"
                     style={{ paddingLeft: '40px', paddingRight: '40px' }}
                   />
-                  <Key style={{ 
-                    position: 'absolute', 
-                    left: '12px', 
-                    top: '50%', 
+                  <Key style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
                     transform: 'translateY(-50%)',
-                    width: '16px', 
-                    height: '16px', 
-                    color: 'var(--mac-text-tertiary)' 
+                    width: '16px',
+                    height: '16px',
+                    color: 'var(--mac-text-tertiary)'
                   }} />
                   <button
                     type="button"
                     onClick={() => togglePasswordVisibility('confirm')}
-                    style={{ 
-                      position: 'absolute', 
-                      right: '12px', 
-                      top: '50%', 
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
                       transform: 'translateY(-50%)',
                       background: 'none',
                       border: 'none',
@@ -443,9 +452,9 @@ const SecuritySettings = ({
                   </button>
                 </div>
                 {errors.confirmPassword && (
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    color: 'var(--mac-danger)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-danger)',
                     marginTop: '4px',
                     display: 'flex',
                     alignItems: 'center',
@@ -463,35 +472,35 @@ const SecuritySettings = ({
         {/* Двухфакторная аутентификация */}
         {activeTab === 'two-factor' && (
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               marginBottom: '20px',
               color: 'var(--mac-text-primary)'
             }}>
               Двухфакторная аутентификация
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between', 
-                padding: '16px', 
-                borderRadius: 'var(--mac-radius-md)', 
-                border: '1px solid var(--mac-border)', 
-                backgroundColor: 'var(--mac-bg-secondary)' 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)',
+                backgroundColor: 'var(--mac-bg-secondary)'
               }}>
                 <div>
-                  <h4 style={{ 
-                    fontSize: 'var(--mac-font-size-base)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
+                  <h4 style={{
+                    fontSize: 'var(--mac-font-size-base)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
                     color: 'var(--mac-text-primary)',
                     marginBottom: '4px'
                   }}>
                     Включить 2FA
                   </h4>
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
                     margin: 0
                   }}>
@@ -506,10 +515,10 @@ const SecuritySettings = ({
 
               {formData.twoFactorEnabled && (
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
                     marginBottom: '8px',
                     color: 'var(--mac-text-primary)'
                   }}>
@@ -535,9 +544,9 @@ const SecuritySettings = ({
         {activeTab === 'sessions' && (
           <MacOSCard style={{ padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ 
-                fontSize: 'var(--mac-font-size-lg)', 
-                fontWeight: 'var(--mac-font-weight-semibold)', 
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)',
                 margin: 0
               }}>
@@ -552,34 +561,34 @@ const SecuritySettings = ({
                 Завершить все остальные
               </MacOSButton>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {activeSessions.map((session) => (
-                <div key={session.id} style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  padding: '16px', 
-                  borderRadius: 'var(--mac-radius-md)', 
-                  border: '1px solid var(--mac-border)', 
-                  backgroundColor: 'var(--mac-bg-secondary)' 
+                <div key={session.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px',
+                  borderRadius: 'var(--mac-radius-md)',
+                  border: '1px solid var(--mac-border)',
+                  backgroundColor: 'var(--mac-bg-secondary)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ 
-                      width: '40px', 
-                      height: '40px', 
-                      borderRadius: '50%', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      backgroundColor: 'var(--mac-accent-blue)' 
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'var(--mac-accent-blue)'
                     }}>
                       <User style={{ width: '20px', height: '20px', color: 'white' }} />
                     </div>
                     <div>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-base)', 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-base)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
                         color: 'var(--mac-text-primary)',
                         margin: 0,
                         display: 'flex',
@@ -591,15 +600,15 @@ const SecuritySettings = ({
                           <MacOSBadge variant="success" size="sm">Текущая</MacOSBadge>
                         )}
                       </p>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-sm)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-sm)',
                         color: 'var(--mac-text-secondary)',
                         margin: '4px 0 0 0'
                       }}>
                         {session.location} • {session.ip}
                       </p>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-tertiary)',
                         margin: '4px 0 0 0'
                       }}>
@@ -607,7 +616,7 @@ const SecuritySettings = ({
                       </p>
                     </div>
                   </div>
-                  
+
                   {!session.current && (
                     <MacOSButton
                       variant="outline"
@@ -627,25 +636,25 @@ const SecuritySettings = ({
         {/* Настройки безопасности */}
         {activeTab === 'security' && (
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               marginBottom: '20px',
               color: 'var(--mac-text-primary)'
             }}>
               Настройки безопасности
             </h3>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: '16px',
               marginBottom: '24px'
             }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -661,10 +670,10 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -680,10 +689,10 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -699,10 +708,10 @@ const SecuritySettings = ({
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -749,48 +758,48 @@ const SecuritySettings = ({
         {/* Логи безопасности */}
         {activeTab === 'audit' && (
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               marginBottom: '20px',
               color: 'var(--mac-text-primary)'
             }}>
               Логи безопасности
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {securityLogs.map((log) => {
                 const StatusIcon = getStatusIcon(log.status);
                 return (
-                  <div key={log.id} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between', 
-                    padding: '16px', 
-                    borderRadius: 'var(--mac-radius-md)', 
-                    border: '1px solid var(--mac-border)', 
-                    backgroundColor: 'var(--mac-bg-secondary)' 
+                  <div key={log.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '16px',
+                    borderRadius: 'var(--mac-radius-md)',
+                    border: '1px solid var(--mac-border)',
+                    backgroundColor: 'var(--mac-bg-secondary)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <StatusIcon style={{ width: '20px', height: '20px', color: getStatusColor(log.status) }} />
                       <div>
-                        <p style={{ 
-                          fontSize: 'var(--mac-font-size-base)', 
-                          fontWeight: 'var(--mac-font-weight-medium)', 
+                        <p style={{
+                          fontSize: 'var(--mac-font-size-base)',
+                          fontWeight: 'var(--mac-font-weight-medium)',
                           color: 'var(--mac-text-primary)',
                           margin: 0
                         }}>
                           {log.action}
                         </p>
-                        <p style={{ 
-                          fontSize: 'var(--mac-font-size-sm)', 
+                        <p style={{
+                          fontSize: 'var(--mac-font-size-sm)',
                           color: 'var(--mac-text-secondary)',
                           margin: '4px 0 0 0'
                         }}>
                           {log.user} • {log.ip}
                         </p>
-                        <p style={{ 
-                          fontSize: 'var(--mac-font-size-xs)', 
+                        <p style={{
+                          fontSize: 'var(--mac-font-size-xs)',
                           color: 'var(--mac-text-tertiary)',
                           margin: '4px 0 0 0'
                         }}>
@@ -798,17 +807,17 @@ const SecuritySettings = ({
                         </p>
                       </div>
                     </div>
-                    
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MacOSBadge 
+                      <MacOSBadge
                         variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
                         size="sm"
                       >
                         {getStatusLabel(log.status)}
                       </MacOSBadge>
-                      <span style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
-                        color: 'var(--mac-text-tertiary)' 
+                      <span style={{
+                        fontSize: 'var(--mac-font-size-xs)',
+                        color: 'var(--mac-text-tertiary)'
                       }}>
                         {log.details}
                       </span>
@@ -821,20 +830,20 @@ const SecuritySettings = ({
         )}
 
         {/* Кнопки действий */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          paddingTop: '24px', 
-          borderTop: '1px solid var(--mac-border)' 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingTop: '24px',
+          borderTop: '1px solid var(--mac-border)'
         }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Настройки безопасности сохраняются автоматически
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <MacOSButton
               variant="outline"
@@ -844,7 +853,7 @@ const SecuritySettings = ({
               <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Сбросить
             </MacOSButton>
-            
+
             <MacOSButton
               type="submit"
               disabled={isSubmitting || loading}

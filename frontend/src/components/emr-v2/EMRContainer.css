@@ -1,0 +1,261 @@
+/**
+ * EMRContainer CSS - Phase 1: Minimal functional styling
+ */
+
+.emr-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Header */
+.emr-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.emr-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #333;
+}
+
+/* Status Badge */
+.emr-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.emr-status--idle {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.emr-status--dirty {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.emr-status--saving {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.emr-status--signed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.emr-status--conflict {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.emr-status--error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.emr-version {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+}
+
+/* Conflict Alert */
+.emr-conflict-alert {
+    background: #fff3e0;
+    border: 1px solid #ffb74d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.emr-conflict-alert strong {
+    color: #e65100;
+}
+
+.emr-conflict-alert p {
+    margin: 8px 0;
+    color: #666;
+}
+
+.emr-conflict-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.emr-conflict-actions button {
+    padding: 8px 16px;
+    border: 1px solid #ffb74d;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.emr-conflict-actions button:hover {
+    background: #fff8e1;
+}
+
+/* Toolbar */
+.emr-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.emr-toolbar button {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fafafa;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.emr-toolbar button:hover:not(:disabled) {
+    background: #f0f0f0;
+}
+
+.emr-toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Form */
+.emr-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.emr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.emr-field label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.875rem;
+}
+
+.emr-field input,
+.emr-field textarea {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.emr-field input:focus,
+.emr-field textarea:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.emr-field input:disabled,
+.emr-field textarea:disabled {
+    background: #f5f5f5;
+    color: #666;
+    cursor: not-allowed;
+}
+
+/* Actions */
+.emr-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.emr-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.emr-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.emr-btn--primary {
+    background: #2196f3;
+    color: white;
+}
+
+.emr-btn--primary:hover:not(:disabled) {
+    background: #1976d2;
+}
+
+.emr-btn--success {
+    background: #4caf50;
+    color: white;
+}
+
+.emr-btn--success:hover:not(:disabled) {
+    background: #388e3c;
+}
+
+.emr-btn--warning {
+    background: #ff9800;
+    color: white;
+}
+
+.emr-btn--warning:hover:not(:disabled) {
+    background: #f57c00;
+}
+
+/* Signed Badge */
+.emr-signed-badge {
+    padding: 10px 16px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+/* Amend Form */
+.emr-amend-form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.emr-amend-form textarea {
+    padding: 10px 12px;
+    border: 1px solid #ffb74d;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    resize: vertical;
+}
+
+.emr-amend-actions {
+    display: flex;
+    gap: 8px;
+}

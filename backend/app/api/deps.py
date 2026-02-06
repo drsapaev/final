@@ -81,6 +81,9 @@ def _username_from_token(token: str) -> Optional[str]:
     Tries 'username' field first, then falls back to 'sub' if it's a string.
     """
     try:
+        logger.debug(f"_username_from_token: SECRET_KEY starts with: {settings.SECRET_KEY[:10]}...")
+        logger.debug(f"_username_from_token: token starts with: {token[:50]}...")
+        
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,

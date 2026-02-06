@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Phone, 
-  MessageCircle, 
+import tokenManager from '../../utils/tokenManager';
+import {
+  Calendar,
+  Clock,
+  User,
+  Phone,
+  MessageCircle,
   Smartphone,
   X,
   Plus,
@@ -18,15 +19,15 @@ import {
  * Универсальный компонент для назначения следующих визитов
  * Используется во всех панелях врачей
  */
-const ScheduleNextModal = ({ 
-  isOpen, 
-  onClose, 
-  patient, 
+const ScheduleNextModal = ({
+  isOpen,
+  onClose,
+  patient,
   theme,
   specialtyFilter = null // Фильтр услуг по специальности
 }) => {
   const { isDark, getColor, getSpacing, getFontSize } = theme;
-  
+
   // Состояния формы
   const [formData, setFormData] = useState({
     patient_id: '',
@@ -37,7 +38,7 @@ const ScheduleNextModal = ({
     all_free: false,
     confirmation_channel: 'telegram'
   });
-  
+
   const [patients, setPatients] = useState([]);
   const [services, setServices] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
@@ -50,7 +51,7 @@ const ScheduleNextModal = ({
     if (isOpen) {
       loadPatients();
       loadServices();
-      
+
       // Если передан пациент, устанавливаем его
       if (patient) {
         setFormData(prev => ({ ...prev, patient_id: patient.id }));
@@ -62,49 +63,49 @@ const ScheduleNextModal = ({
   useEffect(() => {
     if (services.length > 0) {
       let filtered = services;
-      
+
       // Применяем фильтр по специальности если указан
       if (specialtyFilter) {
         filtered = services.filter(service => {
           const category = service.category?.toLowerCase();
           const name = service.name?.toLowerCase();
-          
+
           switch (specialtyFilter) {
             case 'cardiology':
-              return category?.includes('кардио') || 
-                     name?.includes('кардио') || 
-                     name?.includes('экг') ||
-                     service.code?.startsWith('K');
+              return category?.includes('кардио') ||
+                name?.includes('кардио') ||
+                name?.includes('экг') ||
+                service.code?.startsWith('K');
             case 'dermatology':
-              return category?.includes('дерма') || 
-                     name?.includes('дерма') || 
-                     name?.includes('кожа') ||
-                     service.code?.startsWith('D');
+              return category?.includes('дерма') ||
+                name?.includes('дерма') ||
+                name?.includes('кожа') ||
+                service.code?.startsWith('D');
             case 'dentistry':
-              return category?.includes('стомат') || 
-                     name?.includes('зуб') || 
-                     name?.includes('стомат') ||
-                     service.code?.startsWith('S');
+              return category?.includes('стомат') ||
+                name?.includes('зуб') ||
+                name?.includes('стомат') ||
+                service.code?.startsWith('S');
             default:
               return true;
           }
         });
       }
-      
+
       setFilteredServices(filtered);
     }
   }, [services, specialtyFilter]);
 
   const loadPatients = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch('/api/v1/patients/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setPatients(data);
@@ -116,14 +117,14 @@ const ScheduleNextModal = ({
 
   const loadServices = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch('/api/v1/services', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setServices(data);
@@ -176,7 +177,7 @@ const ScheduleNextModal = ({
         throw new Error('Выберите все услуги');
       }
 
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch('/api/v1/doctor/visits/schedule-next', {
         method: 'POST',
         headers: {
@@ -189,7 +190,7 @@ const ScheduleNextModal = ({
       if (response.ok) {
         const result = await response.json();
         setSuccess(`Визит успешно назначен! Токен подтверждения: ${result.confirmation.token}`);
-        
+
         // Сброс формы через 2 секунды
         setTimeout(() => {
           onClose();
@@ -461,9 +462,9 @@ const ScheduleNextModal = ({
           {/* Услуги */}
           <div style={formGroupStyle}>
             <label style={labelStyle}>
-              Услуги {specialtyFilter && `(${specialtyFilter === 'cardiology' ? 'Кардиология' : 
-                                                 specialtyFilter === 'dermatology' ? 'Дерматология' : 
-                                                 specialtyFilter === 'dentistry' ? 'Стоматология' : ''})`}
+              Услуги {specialtyFilter && `(${specialtyFilter === 'cardiology' ? 'Кардиология' :
+                specialtyFilter === 'dermatology' ? 'Дерматология' :
+                  specialtyFilter === 'dentistry' ? 'Стоматология' : ''})`}
             </label>
             {formData.services.map((service, index) => (
               <div key={index} style={serviceRowStyle}>

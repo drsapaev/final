@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Checkbox = React.forwardRef(({ 
+const Checkbox = React.forwardRef(({
   checked: checkedProp,
   defaultChecked = false,
   onChange,
@@ -50,7 +50,9 @@ const Checkbox = React.forwardRef(({
     width: dimension,
     height: dimension,
     borderRadius: '4px',
-    border: '1px solid var(--mac-border)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'var(--mac-border)',
     background: 'var(--mac-bg-elev-1)',
     position: 'relative',
     boxShadow: 'var(--mac-shadow-1)',

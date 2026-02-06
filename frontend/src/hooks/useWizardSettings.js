@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 const useWizardSettings = () => {
   const [settings, setSettings] = useState({
     use_new_wizard: true,  // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
@@ -15,8 +16,8 @@ const useWizardSettings = () => {
   const fetchSettings = async () => {
     try {
       setSettings(prev => ({ ...prev, loading: true, error: null }));
-      
-      const token = localStorage.getItem('auth_token');
+
+      const token = tokenManager.getAccessToken();
       if (!token) {
         logger.warn('No auth token found, using default wizard settings');
         setSettings({
@@ -26,7 +27,7 @@ const useWizardSettings = () => {
         });
         return;
       }
-      
+
       // Используем абсолютный URL для обхода dev proxy
       const response = await fetch('http://localhost:8000/api/v1/admin/wizard-settings', {
         headers: {
@@ -49,7 +50,7 @@ const useWizardSettings = () => {
       }
 
       const data = await response.json();
-      
+
       setSettings({
         use_new_wizard: data.use_new_wizard !== undefined ? data.use_new_wizard : true, // 🎯 Дефолт - НОВЫЙ мастер
         loading: false,

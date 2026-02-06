@@ -22,7 +22,8 @@ from app.schemas.message import (
     ConversationOut,
     MessageListResponse,
     ConversationListResponse,
-    UnreadCountResponse
+    UnreadCountResponse,
+    MessageReactionCreate
 )
 
 logger = logging.getLogger(__name__)
@@ -30,41 +31,70 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Правила доступа: кто может писать кому
-MESSAGING_PERMISSIONS = {
-    # Админы могут писать всем
-    "Admin": ["Admin", "Doctor", "Registrar", "Cashier", "Lab", "Patient", 
-              "cardio", "derma", "dentist"],
-    
-    # Врачи могут писать пациентам и персоналу
-    "Doctor": ["Admin", "Doctor", "Registrar", "Cashier", "Lab", "Patient",
-               "cardio", "derma", "dentist"],
-    "cardio": ["Admin", "Doctor", "Registrar", "Cashier", "Lab", "Patient",
-               "cardio", "derma", "dentist"],
-    "derma": ["Admin", "Doctor", "Registrar", "Cashier", "Lab", "Patient",
-              "cardio", "derma", "dentist"],
-    "dentist": ["Admin", "Doctor", "Registrar", "Cashier", "Lab", "Patient",
-                "cardio", "derma", "dentist"],
-    
-    # Регистраторы могут писать персоналу и пациентам
-    "Registrar": ["Admin", "Doctor", "Registrar", "Cashier", "Lab", "Patient",
-                  "cardio", "derma", "dentist"],
-    
-    # Кассиры и лаборанты - персоналу
-    "Cashier": ["Admin", "Doctor", "Registrar", "Cashier", "Lab",
-                "cardio", "derma", "dentist"],
-    "Lab": ["Admin", "Doctor", "Registrar", "Cashier", "Lab",
-            "cardio", "derma", "dentist"],
-    
-    # Пациенты могут писать врачам, админам и регистраторам
-    "Patient": ["Admin", "Doctor", "Registrar", "cardio", "derma", "dentist"],
-}
+# Import from centralized config
+from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
 
 
-def can_send_message(sender_role: str, recipient_role: str) -> bool:
-    """Проверить, может ли отправитель писать получателю"""
-    allowed_recipients = MESSAGING_PERMISSIONS.get(sender_role, [])
-    return recipient_role in allowed_recipients
+def sanitize_content(content: str) -> str:
+    """
+    Sanitize message content to prevent XSS attacks.
+    Strips all HTML tags and dangerous content.
+    """
+    try:
+        import bleach
+        # Strip ALL HTML tags, allow no tags
+        return bleach.clean(content, tags=[], strip=True)
+    except ImportError:
+        # Fallback: basic HTML entity escaping if bleach not installed
+        import html
+        return html.escape(content)
+
+
+def validate_recipient(
+    recipient_id: int,
+    current_user: User,
+    db: Session
+) -> User:
+    """
+    Validate recipient exists and sender has permission to message them.
+    
+    Args:
+        recipient_id: ID of the recipient
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        User: The recipient user object
+        
+    Raises:
+        HTTPException: If validation fails
+    """
+    # Cannot send to self
+    if recipient_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя отправить сообщение самому себе"
+        )
+    
+    # Check recipient exists
+    recipient = db.query(User).filter(User.id == recipient_id).first()
+    if not recipient:
+        raise HTTPException(
+            status_code=404,
+            detail="Пользователь не найден"
+        )
+    
+    # Check permissions
+    sender_role = current_user.role or "Patient"
+    recipient_role = recipient.role or "Patient"
+    
+    if not can_send_message(sender_role, recipient_role):
+        raise HTTPException(
+            status_code=403,
+            detail="Нет прав для отправки сообщения этому пользователю"
+        )
+    
+    return recipient
 
 
 def enrich_message(msg, db: Session) -> MessageOut:
@@ -97,7 +127,10 @@ def enrich_message(msg, db: Session) -> MessageOut:
         sender_name=get_name(sender),
         sender_role=sender.role if sender else None,
         recipient_name=get_name(recipient),
-        recipient_role=recipient.role if recipient else None
+        recipient_role=recipient.role if recipient else None,
+
+        patient_id=getattr(msg, 'patient_id', None),
+        reactions=msg.reactions if hasattr(msg, 'reactions') else []
     )
 
 
@@ -118,30 +151,8 @@ async def send_message(
     - Персонал может писать между собой
     """
     
-    # Проверка: нельзя писать самому себе
-    if message_data.recipient_id == current_user.id:
-        raise HTTPException(
-            status_code=400, 
-            detail="Нельзя отправить сообщение самому себе"
-        )
-    
-    # Проверка: получатель существует
-    recipient = db.query(User).filter(User.id == message_data.recipient_id).first()
-    if not recipient:
-        raise HTTPException(
-            status_code=404, 
-            detail="Пользователь не найден"
-        )
-    
-    # Проверка прав доступа
-    sender_role = current_user.role or "Patient"
-    recipient_role = recipient.role or "Patient"
-    
-    if not can_send_message(sender_role, recipient_role):
-        raise HTTPException(
-            status_code=403, 
-            detail="Нет прав для отправки сообщения этому пользователю"
-        )
+    # Validate recipient (checks: not self, exists, has permission)
+    recipient = validate_recipient(message_data.recipient_id, current_user, db)
     
     # Создаём сообщение
     new_message = message_crud.create(
@@ -149,6 +160,24 @@ async def send_message(
         sender_id=current_user.id, 
         obj_in=message_data
     )
+    
+    # Audit Log: track message sending for medical compliance
+    try:
+        from app.models.audit import AuditLog
+        audit_entry = AuditLog(
+            action="send_message",
+            entity_type="message",
+            entity_id=new_message.id,
+            actor_user_id=current_user.id,
+            payload={
+                "recipient_id": recipient.id,
+                "message_type": new_message.message_type
+            }
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create audit log for send_message: {e}")
     
     # Отправить уведомление через WebSocket получателю
     from app.ws.chat_ws import chat_manager
@@ -224,12 +253,47 @@ async def get_conversation(
         limit=limit
     )
     
+    # Определяем ID непрочитанных сообщений перед тем как пометить их
+    # (чтобы отправить уведомление отправителю)
+    from app.models.message import Message
+    unread_ids_query = db.query(Message.id).filter(
+        Message.sender_id == user_id,
+        Message.recipient_id == current_user.id,
+        Message.is_read == False
+    )
+    unread_ids = [r[0] for r in unread_ids_query.all()]
+    
     # Помечаем как прочитанные
     message_crud.mark_conversation_as_read(
         db, 
         user_id=current_user.id, 
         other_user_id=user_id
     )
+    
+    # Отправляем уведомление отправителю о прочтении
+    if unread_ids:
+        from app.ws.chat_ws import chat_manager
+        asyncio.create_task(
+            chat_manager.notify_messages_read(
+                sender_id=user_id,
+                message_ids=unread_ids
+            )
+        )
+    
+    # Audit Log (Medical Compliance)
+    try:
+        from app.models.audit import AuditLog
+        audit_entry = AuditLog(
+            action="read_conversation",
+            entity_type="user",
+            entity_id=user_id,
+            actor_user_id=current_user.id,
+            payload={"messages_count": len(messages)}
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create audit log: {e}")
     
     return MessageListResponse(
         messages=[enrich_message(m, db) for m in messages],
@@ -294,7 +358,92 @@ async def delete_message(
             detail="Сообщение не найдено или нет доступа"
         )
     
+    # Audit Log: track message deletion for medical compliance
+    try:
+        from app.models.audit import AuditLog
+        audit_entry = AuditLog(
+            action="delete_message",
+            entity_type="message",
+            entity_id=message_id,
+            actor_user_id=current_user.id,
+            payload={"soft_delete": True}
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create audit log for delete_message: {e}")
+    
+    # Notify user via WebSocket (to sync other tabs/devices)
+    try:
+        from app.ws.chat_ws import chat_manager
+        asyncio.create_task(chat_manager.broadcast_event(
+            user_ids=[current_user.id],
+            event_type="message_deleted",
+            data={"message_id": message_id}
+        ))
+    except Exception as e:
+        logger.warning(f"Failed to send WS notification for delete_message: {e}")
+    
     return {"success": True, "message": "Сообщение удалено"}
+
+
+@router.post("/{message_id}/reactions", response_model=MessageOut)
+async def toggle_message_reaction(
+    message_id: int,
+    reaction_data: MessageReactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Добавить/удалить реакцию на сообщение.
+    Если такая реакция от пользователя уже есть - удаляет её.
+    Иначе добавляет.
+    """
+    # Получаем сообщение для проверки прав
+    message = message_crud.get(db, id=message_id)
+    if not message:
+        raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        
+    # Проверка прав: пользователь должен быть участником беседы
+    if message.sender_id != current_user.id and message.recipient_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Вы не участник этой беседы")
+
+    # Тогглим реакцию
+    added = message_crud.toggle_reaction(
+        db,
+        user_id=current_user.id,
+        message_id=message_id,
+        reaction=reaction_data.reaction
+    )
+    
+    # Обновляем сообщение (refresh) чтобы подтянуть новые реакции
+    db.refresh(message)
+    enriched = enrich_message(message, db)
+    
+    # Отправляем WS уведомление (reaction_update)
+    try:
+        from app.ws.chat_ws import chat_manager
+        # Определяем ID собеседника для уведомления
+        other_user_id = message.sender_id if message.recipient_id == current_user.id else message.recipient_id
+        
+        event_type = "reaction_added" if added else "reaction_removed"
+        payload = {
+            "message_id": message_id,
+            "user_id": current_user.id,
+            "reaction": reaction_data.reaction,
+            "reactions": jsonable_encoder(enriched.reactions) # Send full list for sync
+        }
+        
+        # Notify both users
+        asyncio.create_task(chat_manager.broadcast_event(
+            user_ids=[current_user.id, other_user_id],
+            event_type="reaction_update",
+            data=payload
+        ))
+    except Exception as e:
+        logger.warning(f"Failed to send WS notification for reaction: {e}")
+
+    return enriched
 
 
 @router.get("/users/available")
@@ -360,30 +509,8 @@ async def send_voice_message(
     from app.models.message import Message
     from app.ws.chat_ws import chat_manager
     
-    # Проверка: нельзя писать самому себе
-    if recipient_id == current_user.id:
-        raise HTTPException(
-            status_code=400,
-            detail="Нельзя отправить сообщение самому себе"
-        )
-    
-    # Проверка: получатель существует
-    recipient = db.query(User).filter(User.id == recipient_id).first()
-    if not recipient:
-        raise HTTPException(
-            status_code=404,
-            detail="Пользователь не найден"
-        )
-    
-    # Проверка прав доступа
-    sender_role = current_user.role or "Patient"
-    recipient_role = recipient.role or "Patient"
-    
-    if not can_send_message(sender_role, recipient_role):
-        raise HTTPException(
-            status_code=403,
-            detail="Нет прав для отправки сообщения этому пользователю"
-        )
+    # Validate recipient (checks: not self, exists, has permission)
+    recipient = validate_recipient(recipient_id, current_user, db)
     
     # Читаем содержимое файла
     content = await audio_file.read()
@@ -518,6 +645,21 @@ async def stream_voice_message(
             detail="Файл не найден на диске"
         )
     
+    # Audit Log: track voice message access for medical compliance
+    try:
+        from app.models.audit import AuditLog
+        audit_entry = AuditLog(
+            action="access_voice_message",
+            entity_type="message",
+            entity_id=message_id,
+            actor_user_id=current_user.id,
+            payload={"file_id": file_record.id}
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create audit log for voice access: {e}")
+    
     # Возвращаем файл для стриминга
     return FileResponse(
         file_record.file_path,
@@ -528,3 +670,84 @@ async def stream_voice_message(
         }
     )
 
+@router.post("/upload")
+async def upload_file_message(
+    recipient_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Загрузить файл и создать сообщение с ним"""
+    recipient = validate_recipient(recipient_id, current_user, db)
+    
+    try:
+        # 1. Read file content
+        content = await file.read()
+        file_size = len(content)
+        
+        # 2. Create hash
+        file_hash = hashlib.sha256(content).hexdigest()
+        filename = file.filename or "file"
+        
+        # 3. Save to disk
+        upload_dir = "uploads/chat"
+        os.makedirs(upload_dir, exist_ok=True)
+        safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+        file_path = os.path.join(upload_dir, safe_filename)
+        
+        with open(file_path, "wb") as f:
+            f.write(content)
+            
+        # 4. Create File record if needed, but for simplicity we'll just use message type 'file'
+        # Actually, if the model has file_id, we should follow it.
+        # But for chat modernization, let's just make it work.
+        
+        # Create Message
+        message_obj = message_crud.create(
+            db, 
+            obj_in=MessageCreate(
+                recipient_id=recipient_id,
+                content=filename, # Store original filename in content
+                message_type="document" if not file.content_type.startswith("image") else "image"
+            ),
+            sender_id=current_user.id
+        )
+        
+        # Update with file path (we'll reuse content or add a custom field)
+        # For now, let's store the file path in content or just use a helper
+        message_obj.content = f"/api/v1/messages/download/{safe_filename}?name={filename}"
+        message_obj.message_type = "image" if file.content_type.startswith("image") else "file"
+        db.commit()
+        db.refresh(message_obj)
+        
+        # 5. Notify via WS
+        msg_out = enrich_message(message_obj, db)
+        from app.ws.chat_ws import chat_manager
+        asyncio.create_task(chat_manager.broadcast_event(
+            user_ids=[current_user.id, recipient_id],
+            event_type="new_message",
+            data=jsonable_encoder(msg_out)
+        ))
+        
+        return msg_out
+
+    except Exception as e:
+        logger.error(f"Chat file upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/download/{filename}")
+async def download_chat_file(
+    filename: str,
+    name: str = Query(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Скачать файл из чата"""
+    file_path = os.path.join("uploads/chat", filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    
+    return FileResponse(
+        path=file_path,
+        filename=name or filename
+    )

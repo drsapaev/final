@@ -46,15 +46,30 @@ import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js
 import useDoctorQueue from '../hooks/useDoctorQueue.js';
 import { useAppData } from '../contexts/AppDataContext';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import AIChatWidget from '../components/ai/AIChatWidget';
 
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 const DoctorPanel = () => {
   const location = useLocation();
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const isTouch = useTouchDevice();
 
+  // ✅ Получаем patientId из URL для автоматического выбора пациента
+  const getPatientIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
   // Состояние
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    // Если есть patientId, переходим на вкладку пациентов
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('patientId')) {
+      return 'patients';
+    }
+    return 'dashboard';
+  });
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +98,7 @@ const DoctorPanel = () => {
   // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
   const callFromDiagnostics = async (entryId) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch(`/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
         method: 'POST',
         headers: {
@@ -224,6 +239,62 @@ const DoctorPanel = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // ✅ Автоматическая загрузка пациента из URL параметра patientId
+  useEffect(() => {
+    const loadPatientFromUrl = async () => {
+      const patientIdFromUrl = getPatientIdFromUrl();
+      if (!patientIdFromUrl) return;
+
+      try {
+        const token = tokenManager.getAccessToken();
+        if (!token) return;
+
+        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+
+        // Загружаем данные пациента
+        const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (patientResponse.ok) {
+          const patientData = await patientResponse.json();
+
+          // Создаем объект пациента для отображения
+          const patientObj = {
+            id: patientData.id,
+            name: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
+            phone: patientData.phone || '',
+            gender: patientData.sex || '',
+            diagnosis: '',
+            status: 'active',
+            age: patientData.birth_date ? new Date().getFullYear() - new Date(patientData.birth_date).getFullYear() : null
+          };
+
+          // Добавляем пациента в список и устанавливаем поисковый запрос
+          setPatients(prev => {
+            const exists = prev.some(p => p.id === patientObj.id);
+            if (!exists) {
+              return [patientObj, ...prev];
+            }
+            return prev;
+          });
+
+          setSearchQuery(patientObj.name);
+          setActiveTab('patients');
+
+          // Открываем модальное окно с данными пациента
+          patientModal.openModal(patientObj);
+
+          logger.info('[Doctor] Загружен пациент из URL:', patientObj.name);
+        }
+      } catch (error) {
+        logger.error('[Doctor] Не удалось загрузить пациента из URL:', error);
+      }
+    };
+
+    loadPatientFromUrl();
+  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Измерение высоты заголовка
   useEffect(() => {
@@ -1498,6 +1569,14 @@ const DoctorPanel = () => {
           theme={{ isDark, getColor, getSpacing, getFontSize }}
         />
       )}
+
+      {/* AI Chat Widget */}
+      <AIChatWidget
+        contextType="general"
+        specialty="general"
+        useWebSocket={false}
+        position="bottom-right"
+      />
     </div>
   );
 };

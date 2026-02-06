@@ -1,0 +1,187 @@
+/**
+ * EMRDiffViewer CSS
+ */
+
+.emr-diff {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+}
+
+/* Header */
+.emr-diff__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.emr-diff__header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.emr-diff__close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.emr-diff__close:hover {
+    background: #e0e0e0;
+}
+
+/* Content */
+.emr-diff__content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+}
+
+.emr-diff__loading,
+.emr-diff__error,
+.emr-diff__no-changes {
+    padding: 24px;
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.emr-diff__error {
+    color: #c62828;
+}
+
+.emr-diff__no-changes {
+    color: #2e7d32;
+    background: #e8f5e9;
+    border-radius: 6px;
+}
+
+/* Summary */
+.emr-diff__summary {
+    padding: 10px 14px;
+    background: #e3f2fd;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #1565c0;
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+/* List */
+.emr-diff__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Change item */
+.emr-diff__change {
+    padding: 14px;
+    margin-bottom: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    border-left-width: 4px;
+}
+
+.emr-diff__change--added {
+    border-left-color: #4caf50;
+    background: #f9fff9;
+}
+
+.emr-diff__change--removed {
+    border-left-color: #f44336;
+    background: #fff9f9;
+}
+
+.emr-diff__change--modified {
+    border-left-color: #ff9800;
+    background: #fffdf5;
+}
+
+/* Change header */
+.emr-diff__change-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.emr-diff__field {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.emr-diff__change-type {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.emr-diff__change--added .emr-diff__change-type {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.emr-diff__change--removed .emr-diff__change-type {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.emr-diff__change--modified .emr-diff__change-type {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+/* Values */
+.emr-diff__values {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.emr-diff__value {
+    display: flex;
+    gap: 8px;
+    font-size: 0.85rem;
+    padding: 8px 10px;
+    border-radius: 4px;
+}
+
+.emr-diff__value--old {
+    background: #ffebee;
+    text-decoration: line-through;
+    color: #666;
+}
+
+.emr-diff__value--new {
+    background: #e8f5e9;
+    color: #333;
+}
+
+.emr-diff__value-label {
+    font-weight: 500;
+    color: #888;
+    min-width: 50px;
+}
+
+.emr-diff__value-content {
+    flex: 1;
+    word-break: break-word;
+}

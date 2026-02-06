@@ -728,6 +728,73 @@ class ReportingService:
             logger.error(f"Ошибка генерации отчета по производительности врачей: {e}")
             raise
 
+    def generate_daily_summary(self, target_date: date = None) -> Dict[str, Any]:
+        """Генерирует ежедневную сводку"""
+        try:
+            if not target_date:
+                target_date = datetime.now().date()
+
+            # Получаем визиты за день
+            visits = (
+                self.db.query(Visit)
+                .filter(Visit.visit_date == target_date)
+                .all()
+            )
+
+            # Получаем записи очереди за день
+            queue_entries = (
+                self.db.query(OnlineQueueEntry)
+                .filter(func.date(OnlineQueueEntry.created_at) == target_date)
+                .all()
+            )
+
+            # Получаем записи на прием за день
+            appointments = (
+                self.db.query(Appointment)
+                .filter(Appointment.appointment_date == target_date)
+                .all()
+            )
+
+            # Рассчитываем статистику
+            total_patients_served = len(visits)
+            total_revenue = sum(
+                float(v.total_amount) for v in visits if v.total_amount
+            )
+            
+            # Новые пациенты за сегодня
+            new_patients = (
+                self.db.query(Patient)
+                .filter(func.date(Patient.created_at) == target_date)
+                .count()
+            )
+
+            # Завершенные визиты
+            completed_visits = len([v for v in visits if v.status == "completed"])
+
+            # Статистика очереди
+            queue_completed = len([qe for qe in queue_entries if qe.status == "completed"])
+            queue_waiting = len([qe for qe in queue_entries if qe.status == "waiting"])
+
+            return {
+                "success": True,
+                "date": target_date.isoformat(),
+                "summary": {
+                    "total_patients_served": total_patients_served,
+                    "total_revenue": round(total_revenue, 2),
+                    "new_patients": new_patients,
+                    "completed_visits": completed_visits,
+                    "total_appointments": len(appointments),
+                    "queue_entries": len(queue_entries),
+                    "queue_completed": queue_completed,
+                    "queue_waiting": queue_waiting,
+                },
+                "generated_at": datetime.now().isoformat(),
+            }
+
+        except Exception as e:
+            logger.error(f"Ошибка генерации ежедневной сводки: {e}")
+            return {"error": str(e)}
+
     # ===================== ФОРМАТИРОВАНИЕ ОТЧЕТОВ =====================
 
     def _format_report(self, data: Dict[str, Any], format: str) -> Dict[str, Any]:

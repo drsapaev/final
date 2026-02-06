@@ -40,6 +40,7 @@ import {
   Delete
 } from 'lucide-react';
 import logger from '../../utils/logger';
+import { tokenManager } from '../../utils/tokenManager';
 
 const EMRInterface = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -87,8 +88,8 @@ const EMRInterface = () => {
   const loadEMRData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
-      
+      const token = tokenManager.getAccessToken();
+
       const [patientsRes, recordsRes, templatesRes] = await Promise.all([
         fetch('/api/v1/patients/', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -108,12 +109,12 @@ const EMRInterface = () => {
         // Fallback: пустой массив или тестовые данные только для разработки
         const mockPatients = import.meta.env.MODE === 'development'
           ? Array.from({ length: 3 }, (_, i) => ({
-              id: i + 1,
-              full_name: `Пациент ${i + 1}`,
-              phone: `+7 (900) ${String(i + 1).padStart(7, '0')}`,
-              email: `patient${i + 1}@test.local`,
-              date_of_birth: `198${i}-0${i + 1}-15`
-            }))
+            id: i + 1,
+            full_name: `Пациент ${i + 1}`,
+            phone: `+7 (900) ${String(i + 1).padStart(7, '0')}`,
+            email: `patient${i + 1}@test.local`,
+            date_of_birth: `198${i}-0${i + 1}-15`
+          }))
           : [];
         setPatients(mockPatients);
       }
@@ -125,23 +126,23 @@ const EMRInterface = () => {
         // Fallback: пустой массив или тестовые данные только для разработки
         const mockRecords = import.meta.env.MODE === 'development'
           ? [
-              {
-                id: 1,
-                patient_id: 1,
-                patient: { full_name: 'Пациент 1' },
-                record_type: 'general',
-                chief_complaint: 'Тестовая жалоба 1',
-                created_at: new Date().toISOString()
-              },
-              {
-                id: 2,
-                patient_id: 2,
-                patient: { full_name: 'Пациент 2' },
-                record_type: 'consultation',
-                chief_complaint: 'Тестовая жалоба 2',
-                created_at: new Date().toISOString()
-              }
-            ]
+            {
+              id: 1,
+              patient_id: 1,
+              patient: { full_name: 'Пациент 1' },
+              record_type: 'general',
+              chief_complaint: 'Тестовая жалоба 1',
+              created_at: new Date().toISOString()
+            },
+            {
+              id: 2,
+              patient_id: 2,
+              patient: { full_name: 'Пациент 2' },
+              record_type: 'consultation',
+              chief_complaint: 'Тестовая жалоба 2',
+              created_at: new Date().toISOString()
+            }
+          ]
           : [];
         setMedicalRecords(mockRecords);
       }
@@ -166,7 +167,7 @@ const EMRInterface = () => {
 
   const handleCreateRecord = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch('/api/v1/medical-records/', {
         method: 'POST',
         headers: {
@@ -192,7 +193,7 @@ const EMRInterface = () => {
 
   const handleUpdateRecord = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch(`/api/v1/medical-records/${selectedRecord.id}`, {
         method: 'PUT',
         headers: {
@@ -218,7 +219,7 @@ const EMRInterface = () => {
 
   const handleDeleteRecord = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch(`/api/v1/medical-records/${recordToDelete.id}`, {
         method: 'DELETE',
         headers: {
@@ -252,7 +253,7 @@ const EMRInterface = () => {
 
   const handleDeleteTemplate = async (template) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch(`/api/v1/emr/templates/${template.id}`, {
         method: 'DELETE',
         headers: {
@@ -359,7 +360,7 @@ const EMRInterface = () => {
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       return 'Проблема с подключением к серверу';
     }
-    
+
     if (error.status) {
       switch (error.status) {
         case 401:
@@ -372,7 +373,7 @@ const EMRInterface = () => {
           return error.message || 'Произошла ошибка';
       }
     }
-    
+
     return error.message || 'Произошла неизвестная ошибка';
   };
 
@@ -454,14 +455,14 @@ const EMRInterface = () => {
                     fontSize: 14
                   }}
                 />
-                <Search style={{ 
-                  position: 'absolute', 
-                  left: 12, 
-                  top: '50%', 
-                  transform: 'translateY(-50%)', 
-                  width: 16, 
-                  height: 16, 
-                  color: 'var(--mac-text-secondary)' 
+                <Search style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 16,
+                  height: 16,
+                  color: 'var(--mac-text-secondary)'
                 }} />
               </div>
               <Button onClick={loadEMRData}>
@@ -469,7 +470,7 @@ const EMRInterface = () => {
                 Обновить
               </Button>
             </div>
-            
+
             <div style={{ overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -668,10 +669,10 @@ const EMRInterface = () => {
             </div>
             {/* Основная информация */}
             <details open style={{ marginBottom: 16 }}>
-              <summary style={{ 
-                cursor: 'pointer', 
-                padding: '12px 16px', 
-                backgroundColor: 'var(--mac-background-secondary)', 
+              <summary style={{
+                cursor: 'pointer',
+                padding: '12px 16px',
+                backgroundColor: 'var(--mac-background-secondary)',
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 16,
@@ -713,10 +714,10 @@ const EMRInterface = () => {
             </details>
             {/* Жалобы и анамнез */}
             <details open style={{ marginBottom: 16 }}>
-              <summary style={{ 
-                cursor: 'pointer', 
-                padding: '12px 16px', 
-                backgroundColor: 'var(--mac-background-secondary)', 
+              <summary style={{
+                cursor: 'pointer',
+                padding: '12px 16px',
+                backgroundColor: 'var(--mac-background-secondary)',
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 16,
@@ -766,10 +767,10 @@ const EMRInterface = () => {
             </details>
             {/* Осмотр и диагностика */}
             <details open style={{ marginBottom: 16 }}>
-              <summary style={{ 
-                cursor: 'pointer', 
-                padding: '12px 16px', 
-                backgroundColor: 'var(--mac-background-secondary)', 
+              <summary style={{
+                cursor: 'pointer',
+                padding: '12px 16px',
+                backgroundColor: 'var(--mac-background-secondary)',
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 16,
@@ -837,10 +838,10 @@ const EMRInterface = () => {
             </details>
             {/* План лечения */}
             <details open style={{ marginBottom: 16 }}>
-              <summary style={{ 
-                cursor: 'pointer', 
-                padding: '12px 16px', 
-                backgroundColor: 'var(--mac-background-secondary)', 
+              <summary style={{
+                cursor: 'pointer',
+                padding: '12px 16px',
+                backgroundColor: 'var(--mac-background-secondary)',
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 16,

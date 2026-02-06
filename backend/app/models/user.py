@@ -21,6 +21,11 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="Admin")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Требуется смена пароля при следующем входе
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # FCM Device Token for Push Notifications
+    device_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Метаданные
     created_at: Mapped[Optional[DateTime]] = mapped_column(
@@ -83,17 +88,23 @@ class User(Base):
 
     # Связь с пациентом
     patient: Mapped[Optional["Patient"]] = relationship(
-        "Patient", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "Patient", 
+        back_populates="user", 
+        uselist=False, 
+        cascade="all, delete-orphan",
+        foreign_keys="Patient.user_id"  # ✅ FIX: Explicit FK to resolve ambiguity with Patient.deleted_by
     )
 
     # Роли и группы (через единые M2M таблицы)
+    # passive_deletes=True - let DB handle cascade deletion
     roles: Mapped[List["Role"]] = relationship(
         "Role",
         secondary=user_roles_table,
         primaryjoin=lambda: User.id == user_roles_table.c.user_id,
         secondaryjoin=lambda: __import__('app').models.role_permission.Role.id
         == user_roles_table.c.role_id,
-        viewonly=False,
+        viewonly=True,  # Read-only to avoid conflicts with string role field
+        lazy="noload",  # Don't load by default to avoid query errors
     )
     groups: Mapped[List["UserGroup"]] = relationship(
         "UserGroup",
@@ -101,7 +112,8 @@ class User(Base):
         primaryjoin=lambda: User.id == user_groups_table.c.user_id,
         secondaryjoin=lambda: __import__('app').models.role_permission.UserGroup.id
         == user_groups_table.c.group_id,
-        viewonly=False,
+        viewonly=True,  # Read-only
+        lazy="noload",  # Don't load by default
     )
 
     # Переопределения разрешений
@@ -116,4 +128,12 @@ class User(Base):
     # Аудит
     audit_logs: Mapped[List["UserAuditLog"]] = relationship(
         "UserAuditLog", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # Персональная клиническая память врача
+    treatment_templates: Mapped[List["DoctorTreatmentTemplate"]] = relationship(
+        "DoctorTreatmentTemplate",
+        back_populates="doctor",
+        cascade="all, delete-orphan",
+        lazy="noload",  # Don't load by default
     )

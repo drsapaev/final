@@ -8,10 +8,12 @@
  */
 export function roleToRoute(role) {
   const roleLower = String(role || '').toLowerCase();
-  
+
   switch (roleLower) {
     case 'admin': return '/admin';
-    case 'registrar': return '/registrar-panel';
+    case 'registrar':
+    case 'receptionist': // DB uses 'Receptionist', UI uses 'registrar'
+      return '/registrar-panel';
     case 'lab': return '/lab-panel';
     case 'doctor': return '/doctor-panel';
     case 'cashier': return '/cashier-panel';
@@ -47,24 +49,24 @@ export function routeToRoles(route) {
     '/admin/reports': ['Admin'],
     '/admin/settings': ['Admin'],
     '/admin/security': ['Admin'],
-    '/registrar-panel': ['Admin', 'Registrar'],
+    '/registrar-panel': ['Admin', 'Registrar', 'Receptionist'],
     '/doctor-panel': ['Admin', 'Doctor'],
     '/cardiologist': ['Admin', 'Doctor', 'cardio'],
     '/dermatologist': ['Admin', 'Doctor', 'derma'],
     '/dentist': ['Admin', 'Doctor', 'dentist'],
     '/lab-panel': ['Admin', 'Lab'],
     '/cashier-panel': ['Admin', 'Cashier'],
-    '/patient-panel': ['Admin', 'Patient', 'Registrar', 'Doctor'],
+    '/patient-panel': ['Admin', 'Patient', 'Registrar', 'Receptionist', 'Doctor'],
     '/queue-board': [], // Публичный маршрут
     '/display-board': [], // Публичный маршрут
     '/settings': ['Admin'],
     '/audit': ['Admin'],
-    '/scheduler': ['Admin', 'Doctor', 'Registrar'],
-    '/appointments': ['Admin', 'Registrar'],
+    '/scheduler': ['Admin', 'Doctor', 'Registrar', 'Receptionist'],
+    '/appointments': ['Admin', 'Registrar', 'Receptionist'],
     '/analytics': ['Admin'],
-    '/search': ['Admin', 'Doctor', 'Registrar', 'Lab', 'Cashier'],
+    '/search': ['Admin', 'Doctor', 'Registrar', 'Receptionist', 'Lab', 'Cashier'],
   };
-  
+
   return routeMap[route] || [];
 }
 
@@ -76,12 +78,12 @@ export function routeToRoles(route) {
  */
 export function hasRouteAccess(profile, route) {
   if (!profile) return false;
-  
+
   const requiredRoles = routeToRoles(route);
   if (requiredRoles.length === 0) return true; // Публичный маршрут
-  
+
   const userRoles = [];
-  
+
   // Собираем роли пользователя
   if (profile.role) userRoles.push(String(profile.role).toLowerCase());
   if (profile.role_name) userRoles.push(String(profile.role_name).toLowerCase());
@@ -91,9 +93,9 @@ export function hasRouteAccess(profile, route) {
   if (profile.is_superuser || profile.is_admin || profile.admin) {
     userRoles.push('admin');
   }
-  
+
   // Проверяем совпадение ролей
-  return requiredRoles.some(requiredRole => 
+  return requiredRoles.some(requiredRole =>
     userRoles.includes(String(requiredRole).toLowerCase())
   );
 }
@@ -105,32 +107,33 @@ export function hasRouteAccess(profile, route) {
  */
 export function getRouteForProfile(profile) {
   if (!profile) return '/search';
-  
+
   // Проверяем множественные роли
   const rolesArr = Array.isArray(profile.roles) ? profile.roles.map(r => String(r).toLowerCase()) : [];
   const roleLower = String(profile.role || profile.role_name || '').toLowerCase();
 
-  // Специализированный маппинг для известных пользователей-врачей
+  // Специализированный маппинг для известных пользователей
   // Требование: при входе cardio@example.com показывать панель кардиолога
   const usernameLower = String(profile.username || '').toLowerCase();
   if (usernameLower === 'cardio@example.com') return '/cardiologist';
   if (usernameLower === 'derma@example.com') return '/dermatologist';
   if (usernameLower === 'dentist@example.com') return '/dentist';
-  
+  if (usernameLower === 'registrar@example.com') return '/registrar-panel';
+
   // Приоритет: admin > специализированные роли > общие роли
   if (rolesArr.includes('admin') || roleLower === 'admin') return '/admin';
-  
+
   if (roleLower) {
     const route = roleToRoute(roleLower);
     if (route && route !== '/search') return route;
   }
-  
+
   // Проверяем специализированные роли
   for (const r of rolesArr) {
     const route = roleToRoute(r);
     if (route && route !== '/search') return route;
   }
-  
+
   return '/search';
 }
 

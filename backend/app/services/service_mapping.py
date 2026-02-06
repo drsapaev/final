@@ -294,15 +294,19 @@ def normalize_service_code(code: str) -> str:
     Нормализует код услуги к единому формату
 
     Args:
-        code: Код услуги (например, "LAB-001", "lab_001", "LAB 001")
+        code: Код услуги (например, "K11", "LAB-001", "lab_001", "LAB 001")
 
     Returns:
-        Нормализованный код (нижний регистр, замена пробелов и тире на подчеркивания)
+        Нормализованный код:
+        - Для SSOT формата (K01, D02) - UPPERCASE (K11)
+        - Для других форматов - lowercase с подчеркиваниями (lab_001)
 
     Examples:
+        >>> normalize_service_code("K11")
+        'K11'
+        >>> normalize_service_code("k11")
+        'K11'
         >>> normalize_service_code("LAB-001")
-        'lab_001'
-        >>> normalize_service_code("LAB 001")
         'lab_001'
         >>> normalize_service_code("CONS_CARDIO")
         'cons_cardio'
@@ -310,8 +314,16 @@ def normalize_service_code(code: str) -> str:
     if not code:
         return ""
 
-    # Приводим к нижнему регистру
-    normalized = code.lower()
+    code_stripped = code.strip()
+    
+    # ⭐ SSOT формат: одна буква + 1-2 цифры (K01, D02, L14, etc.)
+    # Эти коды должны быть в UPPERCASE
+    import re
+    if re.match(r'^[A-Za-z]\d{1,2}$', code_stripped):
+        return code_stripped.upper()  # K11, k11 -> K11
+
+    # Для остальных форматов - нормализация к lowercase
+    normalized = code_stripped.lower()
 
     # Заменяем пробелы и тире на подчеркивания
     normalized = normalized.replace(" ", "_").replace("-", "_")

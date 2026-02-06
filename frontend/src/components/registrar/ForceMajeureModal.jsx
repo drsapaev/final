@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/macos';
 import logger from '../../utils/logger';
+import { tokenManager } from '../../utils/tokenManager';
 
 const ForceMajeureModal = ({
     isOpen,
@@ -49,7 +50,7 @@ const ForceMajeureModal = ({
     }, [isOpen, specialistId]);
 
     const getAuthToken = () => {
-        return localStorage.getItem('access_token') || localStorage.getItem('auth_token') || '';
+        return tokenManager.getAccessToken();
     };
 
     // Load pending entries (dry run)

@@ -1,0 +1,297 @@
+/**
+ * ICD10Autocomplete Styles
+ * 
+ * Autocomplete для кодов МКБ-10
+ * Клавиатурная навигация, недавние коды
+ */
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+.icd10-autocomplete {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ============================================
+   INPUT
+   ============================================ */
+.icd10-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.icd10-input {
+    width: 100%;
+    padding: 10px 36px 10px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--mac-text-primary, #1d1d1f);
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.icd10-input::placeholder {
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+.icd10-input:focus {
+    border-color: var(--mac-accent-blue, #007aff);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.icd10-input--open {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.icd10-input:disabled {
+    background: var(--mac-background-tertiary, #f5f5f7);
+    color: var(--mac-text-tertiary, #aeaeb2);
+    cursor: not-allowed;
+}
+
+.icd10-clear {
+    position: absolute;
+    right: 10px;
+    padding: 4px;
+    font-size: 12px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.icd10-clear:hover {
+    color: var(--mac-text-secondary, #636366);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.icd10-loading {
+    position: absolute;
+    right: 10px;
+    font-size: 14px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.icd10-fallback-notice {
+    padding: 4px 8px;
+    font-size: 10px;
+    color: #ff9500;
+    background: rgba(255, 149, 0, 0.1);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.icd10-dropdown__confidence {
+    padding: 2px 5px;
+    font-size: 10px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+/* ============================================
+   DROPDOWN
+   ============================================ */
+.icd10-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+    z-index: 100;
+    animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.icd10-dropdown__list {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.icd10-dropdown__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.icd10-dropdown__item:last-child {
+    border-bottom: none;
+}
+
+.icd10-dropdown__item:hover {
+    background: rgba(0, 122, 255, 0.05);
+}
+
+.icd10-dropdown__item--selected {
+    background: rgba(0, 122, 255, 0.1);
+}
+
+.icd10-dropdown__code {
+    min-width: 60px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: white;
+    background: linear-gradient(135deg, #5e5ce6 0%, #7c7aff 100%);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.icd10-dropdown__item--selected .icd10-dropdown__code {
+    background: linear-gradient(135deg, #007aff 0%, #5ac8fa 100%);
+}
+
+.icd10-dropdown__name {
+    flex: 1;
+    color: var(--mac-text-primary, #1d1d1f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.icd10-dropdown__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.icd10-dropdown__recent {
+    font-size: 12px;
+}
+
+.icd10-dropdown__specialty {
+    font-size: 8px;
+    color: #34c759;
+}
+
+.icd10-dropdown__footer {
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   SELECTED DIAGNOSIS DISPLAY
+   ============================================ */
+.icd10-selected {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(52, 199, 89, 0.08);
+    border: 1px solid rgba(52, 199, 89, 0.2);
+    border-radius: 8px;
+}
+
+.icd10-selected__code {
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: white;
+    background: #34c759;
+    border-radius: 4px;
+}
+
+.icd10-selected__name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--mac-text-secondary, #636366);
+}
+
+/* ============================================
+   NO RESULTS
+   ============================================ */
+.icd10-no-results {
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    text-align: center;
+    background: var(--mac-background-secondary, #f5f5f7);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    .icd10-input {
+        background: var(--mac-background, #1c1c1e);
+        border-color: rgba(255, 255, 255, 0.1);
+        color: var(--mac-text-primary, #f5f5f7);
+    }
+
+    .icd10-dropdown {
+        background: #2c2c2e;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .icd10-selected {
+        background: rgba(52, 199, 89, 0.15);
+        border-color: rgba(52, 199, 89, 0.3);
+    }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+
+    .icd10-dropdown,
+    .icd10-clear {
+        display: none !important;
+    }
+}

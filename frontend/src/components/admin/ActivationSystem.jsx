@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Key, 
-  Smartphone, 
-  Calendar, 
-  Shield, 
+import {
+  Key,
+  Smartphone,
+  Calendar,
+  Shield,
   Plus,
   Edit,
   Trash2,
-  Save, 
-  RefreshCw, 
-  AlertCircle, 
+  Save,
+  RefreshCw,
+  AlertCircle,
   CheckCircle,
   Copy,
   Download,
@@ -23,6 +23,7 @@ import {
 import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 const ActivationSystem = () => {
   const [loading, setLoading] = useState(true);
   const [activations, setActivations] = useState([]);
@@ -48,17 +49,17 @@ const ActivationSystem = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Загружаем активации, устройства и статистику
       const [activationsRes, devicesRes, statsRes] = await Promise.all([
         fetch('/api/v1/admin/activation/keys', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         }),
         fetch('/api/v1/admin/activation/devices', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         }),
         fetch('/api/v1/admin/activation/stats', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         })
       ]);
 
@@ -90,7 +91,7 @@ const ActivationSystem = () => {
       const response = await fetch('/api/v1/admin/activation/keys', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(keyData)
@@ -119,7 +120,7 @@ const ActivationSystem = () => {
       const response = await fetch(`/api/v1/admin/activation/keys/${activationId}/revoke`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -142,9 +143,9 @@ const ActivationSystem = () => {
 
   const filteredActivations = activations.filter(activation => {
     const matchesSearch = activation.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         activation.machine_hash?.toLowerCase().includes(searchTerm.toLowerCase());
+      activation.machine_hash?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || activation.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -152,11 +153,11 @@ const ActivationSystem = () => {
     return (
       <Card style={{ padding: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <RefreshCw style={{ 
-            width: '20px', 
-            height: '20px', 
-            marginRight: '8px', 
-            animation: 'spin 1s linear infinite' 
+          <RefreshCw style={{
+            width: '20px',
+            height: '20px',
+            marginRight: '8px',
+            animation: 'spin 1s linear infinite'
           }} />
           <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка системы активации...</span>
         </div>
@@ -169,24 +170,24 @@ const ActivationSystem = () => {
       {/* Заголовок */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
+          <h2 style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             margin: 0,
             marginBottom: '4px'
           }}>
             Система активации
           </h2>
-          <p style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
+          <p style={{
+            fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-secondary)',
             margin: 0
           }}>
             Управление лицензиями и активированными устройствами
           </p>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -201,19 +202,19 @@ const ActivationSystem = () => {
 
       {/* Сообщения */}
       {message.text && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          padding: '16px', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '16px',
           borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: message.type === 'success' 
-            ? 'var(--mac-success-bg)' 
+          backgroundColor: message.type === 'success'
+            ? 'var(--mac-success-bg)'
             : 'var(--mac-error-bg)',
-          color: message.type === 'success' 
-            ? 'var(--mac-success)' 
+          color: message.type === 'success'
+            ? 'var(--mac-success)'
             : 'var(--mac-error)',
-          border: `1px solid ${message.type === 'success' 
-            ? 'var(--mac-success-border)' 
+          border: `1px solid ${message.type === 'success'
+            ? 'var(--mac-success-border)'
             : 'var(--mac-error-border)'}`
         }}>
           {message.type === 'success' ? (
@@ -228,65 +229,65 @@ const ActivationSystem = () => {
       {/* Статистика */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-accent-blue)',
             marginBottom: '8px'
           }}>
             {stats.total_activations || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Всего активаций
           </div>
         </Card>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-success)',
             marginBottom: '8px'
           }}>
             {stats.active_activations || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Активных
           </div>
         </Card>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-warning)',
             marginBottom: '8px'
           }}>
             {stats.trial_activations || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Пробных
           </div>
         </Card>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-error)',
             marginBottom: '8px'
           }}>
             {stats.expired_activations || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Истекших
           </div>
@@ -297,12 +298,12 @@ const ActivationSystem = () => {
       <Card style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               <Search style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               Поиск
@@ -317,12 +318,12 @@ const ActivationSystem = () => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               <Filter style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               Статус
@@ -347,152 +348,152 @@ const ActivationSystem = () => {
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px' }}>
           <MacOSTable
-          columns={[
-            {
-              key: 'key',
-              title: 'Ключ активации',
-              render: (activation) => (
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <Key style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
-                  <div>
-                    <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      fontFamily: 'monospace',
-                      color: 'var(--mac-text-primary)' 
-                    }}>
-                      {activation.key?.slice(0, 8)}...{activation.key?.slice(-4)}
+            columns={[
+              {
+                key: 'key',
+                title: 'Ключ активации',
+                render: (activation) => (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Key style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
+                    <div>
+                      <div style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        fontFamily: 'monospace',
+                        color: 'var(--mac-text-primary)'
+                      }}>
+                        {activation.key?.slice(0, 8)}...{activation.key?.slice(-4)}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyToClipboard(activation.key)}
+                        style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: '4px' }}
+                      >
+                        <Copy style={{ width: '12px', height: '12px', marginRight: '4px' }} />
+                        Копировать
+                      </Button>
                     </div>
+                  </div>
+                )
+              },
+              {
+                key: 'device',
+                title: 'Устройство',
+                render: (activation) => (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Smartphone style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-text-tertiary)' }} />
+                    <div>
+                      <div style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)'
+                      }}>
+                        {activation.machine_hash?.slice(0, 12)}...
+                      </div>
+                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                        ID: {activation.id}
+                      </div>
+                    </div>
+                  </div>
+                )
+              },
+              {
+                key: 'status',
+                title: 'Статус',
+                render: (activation) => {
+                  const status = statusLabels[activation.status] || { label: activation.status, color: 'secondary' };
+                  return <Badge variant={status.color}>{status.label}</Badge>;
+                }
+              },
+              {
+                key: 'expiry',
+                title: 'Срок действия',
+                render: (activation) => {
+                  const isExpired = new Date(activation.expiry_date) < new Date();
+                  return (
+                    <div>
+                      <div style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        color: 'var(--mac-text-primary)'
+                      }}>
+                        {new Date(activation.expiry_date).toLocaleDateString('ru-RU')}
+                      </div>
+                      {isExpired && (
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
+                          Истек {Math.floor((new Date() - new Date(activation.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+              },
+              {
+                key: 'created',
+                title: 'Создан',
+                render: (activation) => (
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
+                    {new Date(activation.created_at).toLocaleDateString('ru-RU')}
+                  </div>
+                )
+              },
+              {
+                key: 'actions',
+                title: 'Действия',
+                render: (activation) => (
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <Button
                       size="sm"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(activation.key)}
-                      style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: '4px' }}
+                      variant="outline"
+                      onClick={() => {/* Продлить лицензию */ }}
+                      disabled={activation.status === 'revoked'}
                     >
-                      <Copy style={{ width: '12px', height: '12px', marginRight: '4px' }} />
-                      Копировать
+                      <Calendar style={{ width: '14px', height: '14px' }} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => revokeActivation(activation.id)}
+                      disabled={activation.status === 'revoked'}
+                    >
+                      <Shield style={{ width: '14px', height: '14px' }} />
                     </Button>
                   </div>
-                </div>
-              )
-            },
-            {
-              key: 'device',
-              title: 'Устройство',
-              render: (activation) => (
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <Smartphone style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-text-tertiary)' }} />
-                  <div>
-                    <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      color: 'var(--mac-text-primary)' 
-                    }}>
-                      {activation.machine_hash?.slice(0, 12)}...
-                    </div>
-                    <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
-                      ID: {activation.id}
-                    </div>
-                  </div>
-                </div>
-              )
-            },
-            {
-              key: 'status',
-              title: 'Статус',
-              render: (activation) => {
-                const status = statusLabels[activation.status] || { label: activation.status, color: 'secondary' };
-                return <Badge variant={status.color}>{status.label}</Badge>;
+                )
               }
-            },
-            {
-              key: 'expiry',
-              title: 'Срок действия',
-              render: (activation) => {
-                const isExpired = new Date(activation.expiry_date) < new Date();
-                return (
-                  <div>
-                    <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-primary)' 
-                    }}>
-                      {new Date(activation.expiry_date).toLocaleDateString('ru-RU')}
-                    </div>
-                    {isExpired && (
-                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
-                        Истек {Math.floor((new Date() - new Date(activation.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-            },
-            {
-              key: 'created',
-              title: 'Создан',
-              render: (activation) => (
-                <div style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  color: 'var(--mac-text-primary)' 
+            ]}
+            data={filteredActivations}
+            emptyState={
+              <div style={{
+                textAlign: 'center',
+                padding: '48px 24px',
+                color: 'var(--mac-text-secondary)'
+              }}>
+                <Key style={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)', margin: '0 auto 16px' }} />
+                <h3 style={{
+                  fontSize: 'var(--mac-font-size-lg)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 8px 0'
                 }}>
-                  {new Date(activation.created_at).toLocaleDateString('ru-RU')}
-                </div>
-              )
-            },
-            {
-              key: 'actions',
-              title: 'Действия',
-              render: (activation) => (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {/* Продлить лицензию */}}
-                    disabled={activation.status === 'revoked'}
-                  >
-                    <Calendar style={{ width: '14px', height: '14px' }} />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => revokeActivation(activation.id)}
-                    disabled={activation.status === 'revoked'}
-                  >
-                    <Shield style={{ width: '14px', height: '14px' }} />
-                  </Button>
-                </div>
-              )
+                  Активации не найдены
+                </h3>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  {searchTerm || statusFilter !== 'all'
+                    ? 'Попробуйте изменить критерии поиска'
+                    : 'Создайте первый ключ активации'
+                  }
+                </p>
+              </div>
             }
-          ]}
-          data={filteredActivations}
-          emptyState={
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '48px 24px',
-              color: 'var(--mac-text-secondary)'
-            }}>
-              <Key style={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)', margin: '0 auto 16px' }} />
-              <h3 style={{ 
-                fontSize: 'var(--mac-font-size-lg)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                margin: '0 0 8px 0' 
-              }}>
-                Активации не найдены
-              </h3>
-              <p style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)', 
-                margin: 0 
-              }}>
-                {searchTerm || statusFilter !== 'all'
-                  ? 'Попробуйте изменить критерии поиска'
-                  : 'Создайте первый ключ активации'
-                }
-              </p>
-            </div>
-          }
-        />
+          />
         </div>
       </Card>
 
@@ -505,28 +506,28 @@ const ActivationSystem = () => {
       )}
 
       {/* Информация */}
-      <Card style={{ 
-        padding: '24px', 
-        backgroundColor: 'var(--mac-info-bg)', 
-        border: '1px solid var(--mac-info-border)' 
+      <Card style={{
+        padding: '24px',
+        backgroundColor: 'var(--mac-info-bg)',
+        border: '1px solid var(--mac-info-border)'
       }}>
-        <h3 style={{ 
-          fontSize: 'var(--mac-font-size-lg)', 
-          fontWeight: 'var(--mac-font-weight-medium)', 
-          marginBottom: '8px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          color: 'var(--mac-info)' 
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          marginBottom: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          color: 'var(--mac-info)'
         }}>
           <Shield style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           Как работает система активации
         </h3>
-        <div style={{ 
-          fontSize: 'var(--mac-font-size-sm)', 
-          color: 'var(--mac-text-secondary)', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '8px' 
+        <div style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
         }}>
           <p style={{ margin: 0 }}>• Каждое устройство требует уникальный ключ активации</p>
           <p style={{ margin: 0 }}>• Ключи имеют срок действия и могут быть отозваны</p>
@@ -572,25 +573,25 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
 
   return (
     <Card style={{ padding: '24px' }}>
-      <h3 style={{ 
-        fontSize: 'var(--mac-font-size-lg)', 
-        fontWeight: 'var(--mac-font-weight-medium)', 
+      <h3 style={{
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-medium)',
         marginBottom: '16px',
         color: 'var(--mac-text-primary)',
         margin: 0
       }}>
         Создание ключа активации
       </h3>
-      
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Тип лицензии
             </label>
@@ -607,12 +608,12 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Срок действия (дни)
             </label>
@@ -627,12 +628,12 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Максимум устройств
             </label>
@@ -647,12 +648,12 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Описание
             </label>
@@ -668,12 +669,12 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
 
         {/* Функции */}
         <div>
-          <label style={{ 
-            display: 'block', 
-            fontSize: 'var(--mac-font-size-sm)', 
-            fontWeight: 'var(--mac-font-weight-medium)', 
-            color: 'var(--mac-text-primary)', 
-            marginBottom: '12px' 
+          <label style={{
+            display: 'block',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '12px'
           }}>
             Включенные функции:
           </label>

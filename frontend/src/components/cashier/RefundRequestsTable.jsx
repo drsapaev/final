@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/macos';
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 
 const RefundRequestsTable = ({ onRefresh }) => {
     const [requests, setRequests] = useState([]);
@@ -30,7 +31,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected' | 'completed'
 
     const getAuthToken = () => {
-        return localStorage.getItem('access_token') || localStorage.getItem('auth_token') || '';
+        return tokenManager.getAccessToken() || '';
     };
 
     // Load refund requests

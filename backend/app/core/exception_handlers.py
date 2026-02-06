@@ -5,6 +5,7 @@
 """
 
 import logging
+import uuid
 from typing import Union
 
 from fastapi import FastAPI, Request, status
@@ -21,6 +22,11 @@ from app.services.queue_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_request_id(request: Request) -> str:
+    """Получить request_id из state или сгенерировать новый"""
+    return getattr(request.state, 'request_id', str(uuid.uuid4())[:8])
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -234,8 +240,10 @@ def register_exception_handlers(app: FastAPI) -> None:
         """
         Обработка всех остальных необработанных исключений
         """
+        request_id = _get_request_id(request)
         logger.error(
-            "Unhandled exception: %s: %s (path: %s)",
+            "[%s] Unhandled exception: %s: %s (path: %s)",
+            request_id,
             type(exc).__name__,
             str(exc),
             request.url.path,
@@ -246,6 +254,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "internal_server_error",
                 "message": "Внутренняя ошибка сервера",
+                "request_id": request_id,
                 "detail": (
                     str(exc)
                     if logger.level <= logging.DEBUG

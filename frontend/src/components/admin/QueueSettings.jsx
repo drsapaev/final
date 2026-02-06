@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -15,7 +15,14 @@ import {
   Scissors,
   Stethoscope,
   QrCode,
-  Play
+  Play,
+  Sparkles,
+  Smile,
+  Activity,
+  Package,
+  Zap,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import {
   MacOSCard,
@@ -33,48 +40,61 @@ const QueueSettings = () => {
     timezone: 'Asia/Tashkent',
     queue_start_hour: 7,
     auto_close_time: '09:00',
-    start_numbers: {
-      cardiology: 1,
-      dermatology: 15,
-      stomatology: 3
-    },
-    max_per_day: {
-      cardiology: 15,
-      dermatology: 20,
-      stomatology: 12
-    }
+    start_numbers: {},
+    max_per_day: {},
+    dev_mode_enabled: false
   });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [testResult, setTestResult] = useState(null);
 
-  // Конфигурация специальностей
-  const specialties = [
-    {
-      key: 'cardiology',
-      name: 'Кардиология',
-      icon: Heart,
-      color: 'text-red-600',
-      description: 'Консультации и ЭхоКГ'
-    },
-    {
-      key: 'dermatology',
-      name: 'Дерматология',
-      icon: Stethoscope,
-      color: 'text-orange-600',
-      description: 'Дерматология и косметология'
-    },
-    {
-      key: 'stomatology',
-      name: 'Стоматология',
-      icon: Scissors,
-      color: 'text-blue-600',
-      description: 'Стоматологические услуги'
+  // ⭐ SSOT: Загружаем специальности из QueueProfiles API
+  const [specialties, setSpecialties] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+
+  // Icon mapping for profiles
+  const ICON_MAP = {
+    'Heart': Heart,
+    'Activity': Activity,
+    'Sparkles': Sparkles,
+    'Smile': Smile,
+    'TestTube': TestTube,
+    'Stethoscope': Stethoscope,
+    'Users': Users,
+    'Package': Package,
+    'Scissors': Scissors,
+    'Zap': Zap
+  };
+
+  // Загрузка профилей и докторов
+  const loadProfiles = useCallback(async () => {
+    try {
+      const [profilesRes, doctorsRes] = await Promise.all([
+        api.get('/queues/profiles?active_only=true'),
+        api.get('/admin/doctors').catch(() => ({ data: [] }))
+      ]);
+
+      const profiles = profilesRes.data.profiles || [];
+      setSpecialties(profiles.map(p => ({
+        key: p.key,
+        name: p.title_ru || p.title,
+        icon: ICON_MAP[p.icon] || Stethoscope,
+        color: p.color || 'var(--mac-text-primary)',
+        description: (p.queue_tags || []).join(', ')
+      })));
+
+      setDoctors(doctorsRes.data || []);
+
+      logger.info(`Loaded ${profiles.length} queue profiles and ${doctorsRes.data?.length || 0} doctors`);
+    } catch (error) {
+      logger.error('Error loading profiles:', error);
+      // Не устанавливаем fallback данные - показываем пустой список
     }
-  ];
+  }, []);
 
   useEffect(() => {
+    loadProfiles();
     loadSettings();
-  }, []);
+  }, [loadProfiles]);
 
   const loadSettings = async () => {
     try {
@@ -126,16 +146,18 @@ const QueueSettings = () => {
       setTesting(true);
       setTestResult(null);
 
-      // Здесь нужно получить ID врача по специальности
-      // Для демо используем фиксированные ID
-      const doctorIds = {
-        cardiology: 1,
-        dermatology: 2,
-        stomatology: 3
-      };
+      // ⭐ SSOT: Находим врача по специальности из загруженных данных
+      const doctor = doctors.find(d => d.specialty === specialty);
+      const doctorId = doctor?.id || doctor?.user_id;
+
+      if (!doctorId) {
+        setMessage({ type: 'error', text: `Врач для специальности "${specialty}" не найден` });
+        setTesting(false);
+        return;
+      }
 
       const response = await api.post('/admin/queue/test', {
-        doctor_id: doctorIds[specialty] || 1,
+        doctor_id: doctorId,
         date: new Date().toISOString().split('T')[0]
       });
 
@@ -281,12 +303,77 @@ const QueueSettings = () => {
           </MacOSCard>
         )}
 
+        {/* ⭐ Dev Mode Toggle */}
+        <MacOSCard style={{
+          padding: '16px 20px',
+          marginBottom: '24px',
+          backgroundColor: settings.dev_mode_enabled ? 'rgba(239, 68, 68, 0.1)' : 'var(--mac-bg-secondary)',
+          border: settings.dev_mode_enabled ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--mac-border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Zap style={{
+                width: '24px',
+                height: '24px',
+                color: settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-text-tertiary)'
+              }} />
+              <div>
+                <div style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Режим разработки (Dev Mode)
+                </div>
+                <div style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-text-secondary)'
+                }}>
+                  {settings.dev_mode_enabled
+                    ? '⚠️ Временные ограничения QR отключены!'
+                    : 'Отключает проверку времени для QR-регистрации'
+                  }
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => handleSettingChange('dev_mode_enabled', !settings.dev_mode_enabled)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: settings.dev_mode_enabled ? '#EF4444' : 'var(--mac-bg-tertiary)',
+                color: settings.dev_mode_enabled ? 'white' : 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}
+            >
+              {settings.dev_mode_enabled ? (
+                <>
+                  <ToggleRight style={{ width: '18px', height: '18px' }} />
+                  Включён
+                </>
+              ) : (
+                <>
+                  <ToggleLeft style={{ width: '18px', height: '18px' }} />
+                  Выключен
+                </>
+              )}
+            </button>
+          </div>
+        </MacOSCard>
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
           gap: '24px',
           marginBottom: '24px'
         }}>
+
           {/* Общие настройки */}
           <MacOSCard style={{ padding: '24px' }}>
             <h3 style={{

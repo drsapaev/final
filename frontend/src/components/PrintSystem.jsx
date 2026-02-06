@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Printer, Settings, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
-
+import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+
 const PrintSystem = () => {
   const [printerStatus, setPrinterStatus] = useState('disconnected');
   const [printQueue, setPrintQueue] = useState([]);
@@ -22,7 +23,7 @@ const PrintSystem = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify(printerSettings)
       });
@@ -45,7 +46,7 @@ const PrintSystem = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           ...ticketData,
@@ -69,7 +70,7 @@ const PrintSystem = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           ...receiptData,
@@ -99,7 +100,7 @@ const PrintSystem = () => {
 
     // Имитация завершения печати через 2 секунды
     setTimeout(() => {
-      setPrintQueue(prev => prev.map(item => 
+      setPrintQueue(prev => prev.map(item =>
         item.id === newItem.id ? { ...item, status: 'completed' } : item
       ));
     }, 2000);
@@ -156,7 +157,7 @@ const PrintSystem = () => {
               <p className="text-gray-500">ESC/POS принтер</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {getStatusIcon(printerStatus)}
             <span className="font-medium">{getStatusText(printerStatus)}</span>
@@ -222,8 +223,8 @@ const PrintSystem = () => {
             <Settings className="w-4 h-4 mr-2" />
             Тест печати
           </Button>
-          
-          <Button 
+
+          <Button
             variant="outline"
             onClick={() => printTicket({
               number: Math.floor(Math.random() * 100) + 1,
@@ -236,8 +237,8 @@ const PrintSystem = () => {
           >
             Тестовый талон
           </Button>
-          
-          <Button 
+
+          <Button
             variant="outline"
             onClick={() => printReceipt({
               number: 'R' + Math.floor(Math.random() * 1000),
@@ -281,7 +282,7 @@ const PrintSystem = () => {
                     <div className="text-sm text-gray-500">{item.description}</div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-gray-500">
                     {item.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
@@ -299,7 +300,7 @@ const PrintSystem = () => {
       {/* Шаблон талона */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Предпросмотр талона</h3>
-        
+
         <div className="bg-white border-2 border-dashed border-gray-300 p-4 rounded-lg max-w-sm mx-auto">
           <div className="text-center space-y-2 font-mono text-sm">
             <div className="font-bold">КЛИНИКА</div>

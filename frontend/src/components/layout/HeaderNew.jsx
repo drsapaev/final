@@ -6,6 +6,8 @@ import auth, { setProfile } from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 import { Button, Icon } from '../ui/macos';
+import GlobalSearchBar from '../search/GlobalSearchBar';
+import ChatButton from '../chat/ChatButton';
 
 import logger from '../../utils/logger';
 /**
@@ -29,7 +31,7 @@ export default function HeaderNew() {
   useEffect(() => auth.subscribe(setState), []);
 
   const { theme, toggleTheme, setTheme } = useTheme();
-  
+
   // Color schemes list (иконки соответствуют ColorSchemeSelector)
   const colorSchemes = [
     { id: 'light', name: 'Светлая', icon: 'sun' },
@@ -39,7 +41,7 @@ export default function HeaderNew() {
     { id: 'glass', name: 'Полупрозрачная стеклянная', icon: 'layers' }, // Layers из ColorSchemeSelector
     { id: 'gradient', name: 'Градиентная палитра', icon: 'sparkles' } // Sparkles из ColorSchemeSelector
   ];
-  
+
   // Close theme menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -47,7 +49,6 @@ export default function HeaderNew() {
       const inRef = themeMenuRef.current && (path.includes(themeMenuRef.current) || themeMenuRef.current.contains(event.target));
       const inMenu = !!(event.target && event.target.closest && event.target.closest('[data-theme-menu="true"]'));
       const inside = inRef || inMenu;
-      logger.log('🖱️ Click detected:', event.target, 'inside:', inside);
       if (!inside) {
         setShowThemeMenu(false);
       }
@@ -55,13 +56,13 @@ export default function HeaderNew() {
     document.addEventListener('click', handleClickOutside, true);
     return () => document.removeEventListener('click', handleClickOutside, true);
   }, []);
-  
+
   // Apply color scheme
   const applyColorScheme = (schemeId) => {
     const root = document.documentElement;
     document.body.classList.remove('light-theme', 'dark-theme');
     root.removeAttribute('data-theme');
-    
+
     if (schemeId === 'vibrant') {
       // Матовые приглушённые цвета
       root.style.setProperty('--mac-bg-primary', '#6b8db3'); /* Приглушённый синий */
@@ -120,10 +121,10 @@ export default function HeaderNew() {
       document.body.style.webkitBackdropFilter = '';
       root.setAttribute('data-color-scheme', 'gradient');
     }
-    
+
     setShowThemeMenu(false);
   };
-  
+
   const getCurrentScheme = () => {
     const savedScheme = localStorage.getItem('colorScheme') || localStorage.getItem('activeColorSchemeId');
     if (savedScheme && ['vibrant', 'glass', 'gradient'].includes(savedScheme)) {
@@ -131,11 +132,11 @@ export default function HeaderNew() {
     }
     return theme;
   };
-  
+
   const handleThemeClick = (schemeId) => {
     logger.log('🔥 Theme clicked:', schemeId);
     logger.log('Current theme state:', theme);
-    
+
     if (schemeId === 'vibrant' || schemeId === 'glass' || schemeId === 'gradient') {
       logger.log('Applying custom scheme:', schemeId);
       // Set flags BEFORE applying to prevent ThemeContext override
@@ -148,39 +149,39 @@ export default function HeaderNew() {
       window.dispatchEvent(new CustomEvent('colorSchemeChanged', { detail: schemeId }));
     } else {
       logger.log('Applying standard theme:', schemeId);
-      
+
       // Clear custom schemes FIRST
       logger.log('Clearing custom scheme flags');
       localStorage.removeItem('customColorScheme');
       localStorage.removeItem('activeColorSchemeId');
-      
+
       // Apply standard themes
       let targetTheme = schemeId;
-      
+
       if (schemeId === 'auto') {
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         targetTheme = prefersDark ? 'dark' : 'light';
         logger.log('Auto theme detected:', targetTheme);
       }
-      
+
       logger.log('Setting theme to:', targetTheme);
       localStorage.setItem('ui_theme', targetTheme);
       localStorage.setItem('theme', targetTheme);
       localStorage.setItem('colorScheme', schemeId);
-      
+
       // Force update DOM immediately BEFORE setTheme to prevent race condition
       logger.log('Updating DOM attributes');
       document.body.classList.remove('light-theme', 'dark-theme');
       document.body.classList.add(`${targetTheme}-theme`);
       document.documentElement.setAttribute('data-theme', targetTheme);
       document.documentElement.removeAttribute('data-color-scheme');
-      
+
       // Call setTheme AFTER DOM updates
       setTheme(targetTheme);
       // Broadcast selected scheme id (light/dark/auto)
       window.dispatchEvent(new CustomEvent('colorSchemeChanged', { detail: schemeId }));
     }
-    
+
     setShowThemeMenu(false);
     logger.log('Theme change completed');
   };
@@ -212,6 +213,8 @@ export default function HeaderNew() {
   const user = state.profile || state.user || null;
   const role = (user?.role || user?.role_name || 'Guest');
   const roleLower = String(role).toLowerCase();
+  // Normalize receptionist to registrar for UI consistency
+  const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
 
   const isRegistrarPanel = location.pathname === '/registrar-panel';
 
@@ -221,7 +224,7 @@ export default function HeaderNew() {
   const isGradientTheme = activeColorScheme === 'gradient';
   const isVibrantTheme = activeColorScheme === 'vibrant';
   const isCustomTheme = isGlassTheme || isGradientTheme || isVibrantTheme;
-  
+
   const headerStyle = {
     backgroundColor: isGlassTheme
       ? 'rgba(50, 55, 65, 0.85)'
@@ -261,12 +264,12 @@ export default function HeaderNew() {
   // Навигация по ролям (как в исходном хедере)
   const navItems = useMemo(() => {
     const items = [];
-    if (roleLower !== 'admin') {
-      if (roleLower === 'registrar') items.push({ to: '/cashier-panel', label: 'Кассир', icon: 'creditcard' });
-      if (roleLower === 'cashier') items.push({ to: '/cashier-panel', label: 'Касса', icon: 'creditcard' });
+    if (roleNormalized !== 'admin') {
+      if (roleNormalized === 'registrar') items.push({ to: '/cashier-panel', label: 'Кассир', icon: 'creditcard' });
+      if (roleNormalized === 'cashier') items.push({ to: '/cashier-panel', label: 'Касса', icon: 'creditcard' });
     }
     return items;
-  }, [roleLower]);
+  }, [roleNormalized]);
 
   const changeLang = (v) => {
     setLang(v);
@@ -322,7 +325,7 @@ export default function HeaderNew() {
         );
       })}
 
-      {roleLower === 'registrar' && isRegistrarPanel && (
+      {roleNormalized === 'registrar' && isRegistrarPanel && (
         <>
           <Button
             variant="outline"
@@ -401,106 +404,113 @@ export default function HeaderNew() {
         <CompactConnectionStatus className="mr-2" />
       </div>
 
+      {/* 2.5) Чат */}
+      {user && (
+        <div style={{ flex: '0 0 auto' }}>
+          <ChatButton />
+        </div>
+      )}
+
       {/* 3) Тема */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 0 auto' }} key={themeKey}>
         <div ref={themeMenuRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', height: '100%' }}>
-        <Button
-          ref={themeButtonRef}
-          variant="ghost"
-          size="small"
-          onClick={(e) => {
-            logger.log('Theme button clicked, current state:', showThemeMenu);
-            // Вычисляем позицию для фиксированного меню
-            try {
-              const btn = themeButtonRef.current;
-              if (btn) {
-                const rect = btn.getBoundingClientRect();
-                const MENU_WIDTH = 220;
-                const left = Math.min(
-                  Math.max(8, rect.left),
-                  Math.max(8, window.innerWidth - MENU_WIDTH - 8)
-                );
-                const top = Math.min(rect.bottom + 8, window.innerHeight - 8);
-                setMenuPos({ left, top });
-              }
-            } catch {}
-            setShowThemeMenu((v) => !v);
-          }}
-          title="Выбрать тему"
-          aria-label="Выбрать тему"
-          style={{
-            width: '36px',
-            height: '36px',
-            padding: 0,
-            borderRadius: 'var(--mac-radius-sm)',
-            border: '1px solid var(--mac-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flex: '0 0 auto'
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--mac-text-primary)' }}>
-            {renderSchemeIcon(getCurrentScheme())}
-          </span>
-        </Button>
-        
-        {/* Theme Menu Dropdown */}
-        {showThemeMenu ? (
-          ReactDOM.createPortal(
-            <div 
-              data-theme-menu="true"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              style={{
-                position: 'fixed',
-                left: `${menuPos.left}px`,
-                top: `${menuPos.top}px`,
-                backgroundColor: isCustomTheme ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-md)',
-                padding: '8px',
-                minWidth: '220px',
-                boxShadow: 'var(--mac-shadow-md, 0 8px 24px rgba(0,0,0,0.2))',
-                zIndex: 2147483647,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                pointerEvents: 'auto',
-                color: 'var(--mac-text-primary)'
-              }}
-            >
-              {colorSchemes.map((scheme) => (
-                <div
-                  key={scheme.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleThemeClick(scheme.id);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--mac-radius-sm)',
-                    background: 'transparent',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--mac-accent-blue)' }}>
-                    {renderSchemeIcon(scheme.id)}
-                  </span>
-                  <span style={{ color: 'var(--mac-text-primary)' }}>{scheme.name}</span>
-                </div>
-              ))}
-            </div>,
-            document.body
-          )
-        ) : null}
+          <Button
+            ref={themeButtonRef}
+            variant="ghost"
+            size="small"
+            onClick={(e) => {
+              logger.log('Theme button clicked, current state:', showThemeMenu);
+              // Вычисляем позицию для фиксированного меню
+              try {
+                const btn = themeButtonRef.current;
+                if (btn) {
+                  const rect = btn.getBoundingClientRect();
+                  const MENU_WIDTH = 220;
+                  const left = Math.min(
+                    Math.max(8, rect.left),
+                    Math.max(8, window.innerWidth - MENU_WIDTH - 8)
+                  );
+                  const top = Math.min(rect.bottom + 8, window.innerHeight - 8);
+                  setMenuPos({ left, top });
+                }
+              } catch { }
+              setShowThemeMenu((v) => !v);
+            }}
+            title="Выбрать тему"
+            aria-label="Выбрать тему"
+            style={{
+              width: '36px',
+              height: '36px',
+              padding: 0,
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: '0 0 auto'
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--mac-text-primary)' }}>
+              {renderSchemeIcon(getCurrentScheme())}
+            </span>
+          </Button>
+
+          {/* Theme Menu Dropdown */}
+          {showThemeMenu ? (
+            ReactDOM.createPortal(
+              <div
+                data-theme-menu="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                style={{
+                  position: 'fixed',
+                  left: `${menuPos.left}px`,
+                  top: `${menuPos.top}px`,
+                  backgroundColor: isCustomTheme ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  padding: '8px',
+                  minWidth: '220px',
+                  boxShadow: 'var(--mac-shadow-md, 0 8px 24px rgba(0,0,0,0.2))',
+                  zIndex: 2147483647,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  pointerEvents: 'auto',
+                  color: 'var(--mac-text-primary)'
+                }}
+              >
+                {colorSchemes.map((scheme) => (
+                  <div
+                    key={scheme.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleThemeClick(scheme.id);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      background: 'transparent',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--mac-accent-blue)' }}>
+                      {renderSchemeIcon(scheme.id)}
+                    </span>
+                    <span style={{ color: 'var(--mac-text-primary)' }}>{scheme.name}</span>
+                  </div>
+                ))}
+              </div>,
+              document.body
+            )
+          ) : null}
         </div>
       </div>
 
@@ -510,8 +520,8 @@ export default function HeaderNew() {
           <Button
             variant="outline"
             size="small"
-            onClick={() => navigate('/registrar-panel')}
-            title="Панель регистратора"
+            onClick={() => navigate('/profile')}
+            title="Профиль пользователя"
             className="hdr-hide-sm"
             style={{
               display: 'flex',
@@ -534,11 +544,11 @@ export default function HeaderNew() {
             onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
             title="Выйти"
             className="hdr-hide-sm"
-            style={{ 
+            style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              flex: '0 0 auto' 
+              flex: '0 0 auto'
             }}
           >
             <Icon name="person" size="small" style={{ color: 'white' }} />
@@ -551,11 +561,11 @@ export default function HeaderNew() {
           size="small"
           onClick={() => navigate('/login')}
           className="hdr-hide-sm"
-          style={{ 
+          style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            flex: '0 0 auto' 
+            flex: '0 0 auto'
           }}
         >
           <Icon name="person" size="small" style={{ color: 'white' }} />
@@ -568,7 +578,10 @@ export default function HeaderNew() {
   return (
     <div className="app-header" style={headerStyle}>
       <div className="hdr-left" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{brand}</div>
-      <div className="hdr-center" style={{ minWidth: 0 }}>{roleNav}</div>
+      <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <GlobalSearchBar />
+        {roleNav}
+      </div>
       <div className="hdr-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{controls}</div>
     </div>
   );

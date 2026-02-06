@@ -12,7 +12,7 @@ from sqlalchemy import and_, or_
 from app.models.lab import LabOrder, LabResult
 from app.models.patient import Patient
 from app.models.user import User
-from app.services.notification_service import NotificationService
+from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,6 @@ class LabNotificationService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.notification_service = NotificationService(db)
     
     async def check_and_notify_ready_results(self) -> Dict[str, Any]:
         """
@@ -118,7 +117,7 @@ class LabNotificationService:
         
         # Отправляем через доступные каналы
         if user and hasattr(user, 'telegram_id') and user.telegram_id:
-            await self.notification_service.send_telegram_message(
+            await notification_sender_service.send_telegram_message(
                 user_id=user.telegram_id,
                 message=message,
             )
@@ -126,7 +125,7 @@ class LabNotificationService:
         # SMS если есть телефон
         if patient.phone:
             short_message = f"Ваши анализы готовы! Заказ #{order.id}. Просмотр в личном кабинете."
-            # await self.notification_service.send_sms(patient.phone, short_message)
+            # await notification_sender_service.send_sms(patient.phone, short_message)
         
         logger.info(f"Notification sent for order {order.id} to patient {patient.id}")
     
@@ -227,7 +226,7 @@ class LabNotificationService:
         # Отправляем врачу
         doctor_user = self.db.query(User).filter(User.id == order.doctor_id).first()
         if doctor_user and hasattr(doctor_user, 'telegram_id') and doctor_user.telegram_id:
-            await self.notification_service.send_telegram_message(
+            await notification_sender_service.send_telegram_message(
                 user_id=doctor_user.telegram_id,
                 message=message,
             )
@@ -287,7 +286,7 @@ class LabNotificationService:
                     if patient.user_id:
                         user = self.db.query(User).filter(User.id == patient.user_id).first()
                         if user and hasattr(user, 'telegram_id') and user.telegram_id:
-                            await self.notification_service.send_telegram_message(
+                            await notification_sender_service.send_telegram_message(
                                 user_id=user.telegram_id,
                                 message=message,
                             )

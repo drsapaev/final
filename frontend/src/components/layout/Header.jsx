@@ -5,10 +5,10 @@ import { useTheme } from '../../contexts/ThemeContext.jsx';
 import '../../styles/cursor-effects.css';
 import '../../styles/animations.css';
 import '../ui/animations.css';
-import { 
-  Hospital, 
-  Sun, 
-  Moon, 
+import {
+  Hospital,
+  Sun,
+  Moon,
   LogOut,
   Home,
   User,
@@ -35,14 +35,16 @@ export default function Header() {
   const user = st.profile || st.user || null;
   const role = (user?.role || user?.role_name || 'Guest');
   const roleLower = String(role).toLowerCase();
+  // Normalize receptionist to registrar for UI consistency
+  const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
   const view = new URLSearchParams(location.search).get('view');
 
   // Используем централизованную систему дизайна вместо дублированных токенов
-  const { 
-    getColor, 
-    getSpacing, 
-    getFontSize, 
-    designTokens 
+  const {
+    getColor,
+    getSpacing,
+    getFontSize,
+    designTokens
   } = useTheme();
 
   // Адаптивные цвета для тем
@@ -52,11 +54,11 @@ export default function Header() {
 
   const navItems = [];
   // Для администратора навигационные пункты скрыты
-  if (roleLower !== 'admin') {
-    if (roleLower === 'registrar') navItems.push({ to: '/cashier-panel', label: 'Кассир', icon: <CreditCard size={16} /> });
-    if (roleLower === 'cashier')   navItems.push({ to: '/cashier-panel', label: 'Касса',  icon: <CreditCard size={16} /> });
+  if (roleNormalized !== 'admin') {
+    if (roleNormalized === 'registrar') navItems.push({ to: '/cashier-panel', label: 'Кассир', icon: <CreditCard size={16} /> });
+    if (roleNormalized === 'cashier') navItems.push({ to: '/cashier-panel', label: 'Касса', icon: <CreditCard size={16} /> });
   }
-  
+
   // Специализированные роли
   if (roleLower === 'cardio') navItems.push({ to: '/cardiologist', label: 'Кардиолог', icon: '❤️' });
   if (roleLower === 'derma') navItems.push({ to: '/dermatologist', label: 'Дерматолог', icon: '✨' });
@@ -68,8 +70,8 @@ export default function Header() {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: `${getSpacing('md')} ${getSpacing('xl')}`,
-    background: theme === 'light' 
-      ? 'rgba(255, 255, 255, 0.9)' 
+    background: theme === 'light'
+      ? 'rgba(255, 255, 255, 0.9)'
       : 'rgba(15, 23, 42, 0.9)',
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${borderColor}`,
@@ -79,7 +81,7 @@ export default function Header() {
     right: 0,
     width: '100%',
     zIndex: 1000,
-    boxShadow: theme === 'light' 
+    boxShadow: theme === 'light'
       ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
       : '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
     boxSizing: 'border-box'
@@ -194,7 +196,7 @@ export default function Header() {
   function getRoleLabel(r) {
     const x = String(r || '').toLowerCase();
     if (x === 'admin') return 'Админ';
-    if (x === 'registrar') return 'Регистратор';
+    if (x === 'registrar' || x === 'receptionist') return 'Регистратор';
     if (x === 'doctor') return 'Врач';
     if (x === 'lab') return 'Лаборатория';
     if (x === 'cashier') return 'Кассир';
@@ -229,7 +231,7 @@ export default function Header() {
   };
 
   return (
-    <header 
+    <header
       className="interactive-element app-header-2025"
       style={{
         position: 'sticky',
@@ -243,7 +245,7 @@ export default function Header() {
         transition: 'all 0.2s ease',
         backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.9)',
         borderColor: theme === 'light' ? getColor('gray', 200) : getColor('gray', 700),
-        boxShadow: theme === 'light' 
+        boxShadow: theme === 'light'
           ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           : '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
         fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
@@ -276,11 +278,11 @@ export default function Header() {
         padding: '12px 24px',
         maxWidth: '100%'
       }}>
-      {/* Логотип */}
-        <button 
+        {/* Логотип */}
+        <button
           className="interactive-element hover-lift focus-ring"
           onClick={() => navigate('/')}
-          style={{ 
+          style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
@@ -288,21 +290,21 @@ export default function Header() {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            color: textColor 
+            color: textColor
           }}
         >
-        <Hospital size={24} color={getColor('primary', 500)} />
+          <Hospital size={24} color={getColor('primary', 500)} />
           <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Clinic</span>
           <span style={{ fontSize: '12px', fontWeight: 'normal', opacity: 0.6 }}>v0.1.0</span>
         </button>
 
-      {/* Навигация */}
+        {/* Навигация */}
         <nav style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {navItems.map(item => {
-          const isActive = location.pathname === item.to;
-          return (
-            <button 
-              key={item.to} 
+          {navItems.map(item => {
+            const isActive = location.pathname === item.to;
+            return (
+              <button
+                key={item.to}
                 className="interactive-element hover-lift ripple-effect focus-ring"
                 style={{
                   height: '40px',
@@ -328,16 +330,16 @@ export default function Header() {
                     boxShadow: 'none'
                   })
                 }}
-              onClick={() => navigate(item.to)}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+                onClick={() => navigate(item.to)}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
 
           {/* Быстрые ссылки для регистратора внутри панели */}
-          {roleLower === 'registrar' && location.pathname === '/registrar-panel' && (
+          {roleNormalized === 'registrar' && location.pathname === '/registrar-panel' && (
             <>
               <button
                 className="interactive-element hover-lift ripple-effect focus-ring"
@@ -430,9 +432,9 @@ export default function Header() {
                     }}
                   />
                   <div style={{ position: 'relative' }}>
-                    <SearchIcon 
-                      size={16} 
-                      style={{ 
+                    <SearchIcon
+                      size={16}
+                      style={{
                         position: 'absolute',
                         left: '12px',
                         top: '50%',
@@ -469,22 +471,22 @@ export default function Header() {
                       }}
                     />
                   </div>
-      </div>
+                </div>
               )}
             </>
           )}
         </nav>
 
-      {/* Управление */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        {/* Управление */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '12px',
           whiteSpace: 'nowrap'
         }}>
-        {/* Переключатель темы */}
-        <button 
-          onClick={toggleTheme} 
+          {/* Переключатель темы */}
+          <button
+            onClick={toggleTheme}
             className="interactive-element hover-lift ripple-effect focus-ring"
             style={{
               width: '40px',
@@ -499,15 +501,15 @@ export default function Header() {
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
               cursor: 'pointer'
             }}
-          title="Переключить тему"
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+            title="Переключить тему"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
 
-        {/* Переключатель языка */}
-        <select 
-          value={lang} 
-          onChange={(e) => changeLang(e.target.value)} 
+          {/* Переключатель языка */}
+          <select
+            value={lang}
+            onChange={(e) => changeLang(e.target.value)}
             className="interactive-element focus-ring"
             style={{
               height: '40px',
@@ -522,15 +524,15 @@ export default function Header() {
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
               cursor: 'pointer'
             }}
-        >
-          <option value="ru">RU</option>
-          <option value="uz">UZ</option>
-          <option value="en">EN</option>
-        </select>
+          >
+            <option value="ru">RU</option>
+            <option value="uz">UZ</option>
+            <option value="en">EN</option>
+          </select>
 
-        {/* Информация о пользователе */}
-        {user ? (
-          <>
+          {/* Информация о пользователе */}
+          {user ? (
+            <>
               <button
                 onClick={() => navigate('/registrar-panel')}
                 className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
@@ -555,10 +557,10 @@ export default function Header() {
                 }}
                 title="Открыть панель регистратора"
               >
-              <User size={16} />
+                <User size={16} />
                 <span style={{ fontWeight: '700' }}>{displayName}</span>
-              {showRoleBadge && (
-                  <span 
+                {showRoleBadge && (
+                  <span
                     className="role-badge"
                     style={{
                       padding: '2px 8px',
@@ -574,9 +576,9 @@ export default function Header() {
                   </span>
                 )}
               </button>
-            <button
+              <button
                 id="logout-header-btn"
-              onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
+                onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
                 className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
                 style={{
                   height: '40px',
@@ -602,16 +604,16 @@ export default function Header() {
                   alignSelf: 'center',
                   overflow: 'visible'
                 }}
-            >
-              <LogOut size={16} />
-              <span>Выйти</span>
-            </button>
-          </>
-        ) : (
-          <button 
-            onClick={() => navigate('/login')} 
+              >
+                <LogOut size={16} />
+                <span>Выйти</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
               className="interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-            style={{
+              style={{
                 height: '40px',
                 padding: '8px 12px',
                 display: 'flex',
@@ -622,18 +624,18 @@ export default function Header() {
                 fontWeight: '500',
                 color: 'white',
                 transition: 'all 0.2s ease',
-              background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+                background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
                 boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
-              border: 'none',
+                border: 'none',
                 cursor: 'pointer'
-            }}
-          >
-            <User size={16} />
-            <span>Войти</span>
-          </button>
-        )}
+              }}
+            >
+              <User size={16} />
+              <span>Войти</span>
+            </button>
+          )}
+        </div>
       </div>
-    </div>
     </header>
   );
 }

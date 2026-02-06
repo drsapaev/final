@@ -98,7 +98,7 @@ class NotificationHistory(Base):
 
 
 class NotificationSettings(Base):
-    """Настройки уведомлений для пользователей"""
+    """Настройки уведомлений пользователя"""
 
     __tablename__ = "notification_settings"
 
@@ -110,34 +110,17 @@ class NotificationSettings(Base):
         String(20), nullable=False
     )  # patient, doctor, admin
 
-    # Настройки каналов
+    # Каналы
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sms_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    telegram_enabled: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    telegram_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Настройки типов уведомлений
-    appointment_reminders: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False
-    )
-    payment_notifications: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False
-    )
+    # Типы уведомлений
+    appointment_reminders: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    payment_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     queue_updates: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    system_alerts: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    # Расписание уведомлений
-    reminder_hours_before: Mapped[int] = mapped_column(
-        Integer, default=24, nullable=False
-    )  # За сколько часов напоминать
-
-    # Контакты для уведомлений
-    notification_email: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
-    notification_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    system_alerts: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Метаданные
     created_at: Mapped[datetime] = mapped_column(

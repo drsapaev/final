@@ -8,22 +8,24 @@ from app.api.deps import get_current_user, get_db, require_roles
 from app.crud import patient as patient_crud, visit as visit_crud
 from app.crud.notification import (
     crud_notification_history,
-    crud_notification_settings,
     crud_notification_template,
 )
+from app.crud.user_management import user_notification_settings as crud_user_notification_settings
 from app.models.user import User
 from app.schemas.notification import (
     BulkNotificationRequest,
     NotificationHistory,
-    NotificationSettings,
-    NotificationSettingsUpdate,
     NotificationStatsResponse,
     NotificationTemplate,
     NotificationTemplateCreate,
     NotificationTemplateUpdate,
     SendNotificationRequest,
 )
-from app.services.notifications import notification_service
+from app.schemas.user_management import (
+    UserNotificationSettingsResponse,
+    UserNotificationSettingsUpdate,
+)
+from app.services.notifications import notification_sender_service
 
 router = APIRouter()
 
@@ -46,7 +48,7 @@ async def send_appointment_reminder(
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
-        notification_service.send_appointment_reminder,
+        notification_sender_service.send_appointment_reminder,
         patient.email,
         patient.phone,
         appointment_date,
@@ -82,7 +84,7 @@ async def send_visit_confirmation(
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
-        notification_service.send_visit_confirmation,
+        notification_sender_service.send_visit_confirmation,
         patient.email,
         patient.phone,
         visit.date,
@@ -120,7 +122,7 @@ async def send_payment_notification(
 
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
-        notification_service.send_payment_notification,
+        notification_sender_service.send_payment_notification,
         patient.email,
         patient.phone,
         amount,
@@ -148,7 +150,7 @@ async def send_queue_update(
     """Отправка обновления очереди"""
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
-        notification_service.send_queue_update,
+        notification_sender_service.send_queue_update,
         department,
         current_number,
         estimated_wait,
@@ -173,7 +175,7 @@ async def send_system_alert(
     """Отправка системного оповещения (только для админов)"""
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
-        notification_service.send_system_alert, alert_type, message, details
+        notification_sender_service.send_system_alert, alert_type, message, details
     )
 
     return {
@@ -195,7 +197,7 @@ async def test_notifications(
 
     # Тестируем все типы уведомлений
     background_tasks.add_task(
-        notification_service.send_appointment_reminder,
+        notification_sender_service.send_appointment_reminder,
         test_email,
         test_phone,
         test_date,
@@ -204,7 +206,7 @@ async def test_notifications(
     )
 
     background_tasks.add_task(
-        notification_service.send_visit_confirmation,
+        notification_sender_service.send_visit_confirmation,
         test_email,
         test_phone,
         test_date,
@@ -214,7 +216,7 @@ async def test_notifications(
     )
 
     background_tasks.add_task(
-        notification_service.send_payment_notification,
+        notification_sender_service.send_payment_notification,
         test_email,
         test_phone,
         100.0,
@@ -224,11 +226,11 @@ async def test_notifications(
     )
 
     background_tasks.add_task(
-        notification_service.send_queue_update, "Тестовое отделение", 123, "15 минут"
+        notification_sender_service.send_queue_update, "Тестовое отделение", 123, "15 минут"
     )
 
     background_tasks.add_task(
-        notification_service.send_system_alert,
+        notification_sender_service.send_system_alert,
         "TEST",
         "Тестовое системное оповещение",
         {"test_key": "test_value"},
@@ -248,25 +250,25 @@ async def get_notification_status(
     return {
         "email": {
             "configured": bool(
-                notification_service.smtp_username
-                and notification_service.smtp_password
+                notification_sender_service.smtp_username
+                and notification_sender_service.smtp_password
             ),
-            "server": notification_service.smtp_server,
-            "port": notification_service.smtp_port,
+            "server": notification_sender_service.smtp_server,
+            "port": notification_sender_service.smtp_port,
         },
         "telegram": {
             "configured": bool(
-                notification_service.telegram_bot_token
-                and notification_service.telegram_chat_id
+                notification_sender_service.telegram_bot_token
+                and notification_sender_service.telegram_chat_id
             ),
-            "bot_token": "***" if notification_service.telegram_bot_token else None,
-            "chat_id": notification_service.telegram_chat_id,
+            "bot_token": "***" if notification_sender_service.telegram_bot_token else None,
+            "chat_id": notification_sender_service.telegram_chat_id,
         },
         "sms": {
             "configured": bool(
-                notification_service.sms_api_key and notification_service.sms_api_url
+                notification_sender_service.sms_api_key and notification_sender_service.sms_api_url
             ),
-            "api_url": notification_service.sms_api_url,
+            "api_url": notification_sender_service.sms_api_url,
         },
     }
 
@@ -366,10 +368,9 @@ async def get_notification_stats(
 
 
 # Настройки уведомлений
-@router.get("/settings/{user_id}", response_model=NotificationSettings)
+@router.get("/settings/{user_id}", response_model=UserNotificationSettingsResponse)
 async def get_user_notification_settings(
     user_id: int,
-    user_type: str = Query(..., description="Тип пользователя: patient, doctor, admin"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -379,18 +380,21 @@ async def get_user_notification_settings(
         not hasattr(current_user, "role") or current_user.role != "Admin"
     ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
-
-    settings = crud_notification_settings.get_or_create(
-        db, user_id=user_id, user_type=user_type
-    )
+    
+    # Используем UserNotificationSettings
+    settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
+    if not settings:
+        # Если настроек нет, можно попробовать создать дефолтные или вернуть 404
+        # Лучше 404, а создание должно быть при регистрации
+        raise HTTPException(status_code=404, detail="Настройки уведомлений не найдены")
+        
     return settings
 
 
-@router.put("/settings/{user_id}", response_model=NotificationSettings)
+@router.put("/settings/{user_id}", response_model=UserNotificationSettingsResponse)
 async def update_user_notification_settings(
     user_id: int,
-    settings_data: NotificationSettingsUpdate,
-    user_type: str = Query(..., description="Тип пользователя"),
+    settings_data: UserNotificationSettingsUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -401,11 +405,11 @@ async def update_user_notification_settings(
     ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
 
-    settings = crud_notification_settings.get_or_create(
-        db, user_id=user_id, user_type=user_type
-    )
+    settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
+    if not settings:
+        raise HTTPException(status_code=404, detail="Настройки уведомлений не найдены")
 
-    return crud_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
+    return crud_user_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
 
 
 # Отправка уведомлений с шаблонами
@@ -435,7 +439,7 @@ async def send_notification(
 
         # Отправляем в фоновом режиме
         background_tasks.add_task(
-            notification_service.send_templated_notification,
+            notification_sender_service.send_templated_notification,
             db=db,
             notification_type=request.notification_type,
             channel=channel,
@@ -478,7 +482,7 @@ async def send_bulk_notification(
 
     # Отправляем в фоновом режиме
     background_tasks.add_task(
-        notification_service.send_bulk_notification,
+        notification_sender_service.send_bulk_notification,
         db=db,
         notification_type=request.notification_type,
         channels=request.channels,

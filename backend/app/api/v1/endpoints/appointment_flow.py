@@ -425,6 +425,8 @@ def save_emr(
 ) -> Any:
     """
     Сохранить EMR (перевести из черновика)
+    
+    Также индексирует фразы для Doctor History Autocomplete.
     """
     emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
     if not emr:
@@ -434,6 +436,32 @@ def save_emr(
         raise HTTPException(status_code=400, detail="EMR уже сохранена")
 
     saved_emr = crud_emr.emr.save_emr(db, emr_id=emr.id)
+    
+    # 🔥 INDEX PHRASES for Doctor History Autocomplete
+    # Это НЕ генерация - это извлечение фраз для будущих подсказок
+    try:
+        from app.services.emr_phrase_indexer import get_emr_phrase_indexer
+        
+        indexer = get_emr_phrase_indexer(db)
+        specialty = getattr(current_user, 'specialty', None)
+        
+        indexed_count = indexer.index_single_emr(
+            emr_id=saved_emr.id,
+            doctor_id=current_user.id,
+            specialty=specialty
+        )
+        
+        logger.info(
+            "[save_emr] Indexed %d phrases for doctor %d from EMR %d",
+            indexed_count, current_user.id, saved_emr.id
+        )
+    except Exception as index_error:
+        # Не блокируем сохранение если индексация не удалась
+        logger.warning(
+            "[save_emr] Failed to index phrases: %s",
+            index_error
+        )
+    
     return saved_emr
 
 

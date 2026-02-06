@@ -130,6 +130,11 @@ const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
+const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
+const SingleSheetEMRDemo = lazy(() => import('./pages/SingleSheetEMRDemo.jsx'));
+const EMRv2Demo = lazy(() => import('./pages/EMRv2Demo.jsx'));
+const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
+const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
 
 // Стилизованные компоненты
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
@@ -1106,10 +1111,13 @@ function AppShell() {
           ...(theme === 'light' && {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' // Добавляем тень для светлой темы
           }),
-          ...(hideSidebar && { maxWidth: 'none', margin: 0, padding: 0 }),
+          ...(hideSidebar && { maxWidth: 'none', marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0, padding: 0 }),
           ...(isFullscreen && {
             maxWidth: 'none',
-            margin: 0,
+            marginTop: 0,
+            marginRight: 0,
+            marginBottom: 0,
+            marginLeft: 0,
             padding: 0,
             width: '100%',
             minWidth: '100%',
@@ -1142,10 +1150,12 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginFormStyled />} />
           <Route path="/old-login" element={<Login />} />
+          <Route path="/change-password-required" element={<ChangePasswordRequired />} />
           <Route path="/health" element={<Health />} />
           <Route path="/" element={<Landing />} />
           <Route path="/medilab-demo" element={<MediLabDemo />} />
           <Route path="/macos-demo" element={<MacOSDemoPage />} />
+          <Route path="/profile" element={<RequireAuth roles={[]}><UserProfile /></RequireAuth>} />
           {/* Test pages - Admin only (security fix) */}
           <Route path="/css-test" element={<RequireAuth roles={['Admin']}><CSSTestPage /></RequireAuth>} />
           <Route path="/buttons" element={<RequireAuth roles={['Admin']}><ButtonShowcase /></RequireAuth>} />
@@ -1186,32 +1196,37 @@ function AppContent() {
               <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar']}><RegistrarPanel /></RequireAuth>} />
+              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist']}><RegistrarPanel /></RequireAuth>} />
               <Route path="doctor-panel" element={<RequireAuth roles={['Admin', 'Doctor']}><DoctorPanel /></RequireAuth>} />
               <Route path="cardiologist" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio']}><CardiologistPanelUnified /></RequireAuth>} />
               <Route path="dermatologist" element={<RequireAuth roles={['Admin', 'Doctor', 'derma']}><DermatologistPanelUnified /></RequireAuth>} />
               <Route path="dentist" element={<RequireAuth roles={['Admin', 'Doctor', 'dentist']}><DentistPanelUnified /></RequireAuth>} />
               <Route path="lab-panel" element={<RequireAuth roles={['Admin', 'Lab']}><LabPanel /></RequireAuth>} />
-              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Patient', 'Registrar', 'Doctor']}><PatientPanel /></RequireAuth>} />
+              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Patient', 'Registrar', 'Receptionist', 'Doctor']}><PatientPanel /></RequireAuth>} />
               <Route path="queue-board" element={<DisplayBoardUnified />} />
               <Route path="display-board" element={<DisplayBoardUnified />} />
               <Route path="display-board/:role" element={<DisplayBoardUnified />} />
               <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
               <Route path="security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
               <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
-              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar']}><Scheduler /></RequireAuth>} />
-              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar']}><Appointments /></RequireAuth>} />
+              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist']}><Scheduler /></RequireAuth>} />
+              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist']}><Appointments /></RequireAuth>} />
               <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
               {/* Visit details - Medical staff only (security fix - contains PHI) */}
-              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
+              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
               {/* Search - Medical staff only (security fix) */}
-              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
+              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
+
+              {/* Patient Pickup View - For all medical staff to view patient info */}
+              <Route path="pickup/:patientId" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist', 'Cashier', 'Lab', 'Doctor', 'cardio', 'derma', 'dentist']}><PatientPickupView /></RequireAuth>} />
 
               {/* Интегрированные скрытые компоненты */}
               <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
               <Route path="advanced-emr" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><EMRInterface /></RequireAuth>} />
               {/* EMR Demo - Medical staff only (security fix - contains PHI) */}
               <Route path="emr-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRDemo /></RequireAuth>} />
+              <Route path="emr-single-sheet" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><SingleSheetEMRDemo /></RequireAuth>} />
+              <Route path="emr-v2-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRv2Demo /></RequireAuth>} />
               <Route path="file-management" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><FileManager /></RequireAuth>} />
               <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
               <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
@@ -1258,7 +1273,10 @@ const macOSWrapStyle = {
 const macOSMainStyle = {
   flex: 1,
   maxWidth: '100%', // Убираем фиксированную ширину, позволяем CSS Grid управлять размером
-  margin: '0', // Убираем центрирование, так как CSS Grid управляет позиционированием
+  marginTop: 0, // Убираем центрирование, так как CSS Grid управляет позиционированием
+  marginRight: 0,
+  marginBottom: 0,
+  marginLeft: 0,
   width: '100%',
   minWidth: 0, // Добавляем minWidth для правильной работы flex
   boxSizing: 'border-box',

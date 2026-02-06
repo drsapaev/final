@@ -93,21 +93,26 @@ class EskizSMSProvider(BaseSMSProvider):
         ):
             return self.auth_token
 
-        async with aiohttp.ClientSession() as session:
+        import httpx
+        async with httpx.AsyncClient() as client:
             auth_data = {"email": self.api_key, "password": self.api_secret}
 
-            async with session.post(
-                f"{self.base_url}/auth/login", json=auth_data, timeout=self.timeout
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
+            try:
+                response = await client.post(
+                    f"{self.base_url}/auth/login", json=auth_data, timeout=self.timeout
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
                     self.auth_token = data.get("data", {}).get("token")
                     # Токен действует 30 дней
                     self.token_expires = datetime.now() + timedelta(days=29)
                     return self.auth_token
                 else:
-                    error_text = await response.text()
+                    error_text = response.text
                     raise Exception(f"Eskiz auth failed: {error_text}")
+            except Exception as e:
+                raise Exception(f"Eskiz auth request failed: {str(e)}")
 
     async def send_sms(self, message: SMSMessage) -> SMSResponse:
         """Отправить SMS через Eskiz"""
@@ -129,28 +134,29 @@ class EskizSMSProvider(BaseSMSProvider):
                 "Content-Type": "application/json",
             }
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
                     f"{self.base_url}/message/sms/send",
                     json=sms_data,
                     headers=headers,
                     timeout=self.timeout,
-                ) as response:
-                    data = await response.json()
+                )
+                data = response.json()
 
-                    if response.status == 200 and data.get("status") == "success":
-                        return SMSResponse(
-                            success=True,
-                            message_id=str(data.get("data", {}).get("id")),
-                            provider="eskiz",
-                            status="sent",
-                        )
-                    else:
-                        return SMSResponse(
-                            success=False,
-                            error=data.get("message", "Unknown error"),
-                            provider="eskiz",
-                        )
+                if response.status_code == 200 and data.get("status") == "success":
+                    return SMSResponse(
+                        success=True,
+                        message_id=str(data.get("data", {}).get("id")),
+                        provider="eskiz",
+                        status="sent",
+                    )
+                else:
+                    return SMSResponse(
+                        success=False,
+                        error=data.get("message", "Unknown error"),
+                        provider="eskiz",
+                    )
 
         except Exception as e:
             logger.error(f"Eskiz SMS error: {str(e)}")
@@ -163,26 +169,28 @@ class EskizSMSProvider(BaseSMSProvider):
 
             headers = {"Authorization": f"Bearer {token}"}
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
                     f"{self.base_url}/user/get-limit",
                     headers=headers,
                     timeout=self.timeout,
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return {
-                            "success": True,
-                            "balance": data.get("data", {}).get("sms_count", 0),
-                            "currency": "SMS",
-                            "provider": "eskiz",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": "Failed to get balance",
-                            "provider": "eskiz",
-                        }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "balance": data.get("data", {}).get("sms_count", 0),
+                        "currency": "SMS",
+                        "provider": "eskiz",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Failed to get balance",
+                        "provider": "eskiz",
+                    }
 
         except Exception as e:
             return {"success": False, "error": str(e), "provider": "eskiz"}
@@ -194,25 +202,27 @@ class EskizSMSProvider(BaseSMSProvider):
 
             headers = {"Authorization": f"Bearer {token}"}
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
                     f"{self.base_url}/message/sms/status/{message_id}",
                     headers=headers,
                     timeout=self.timeout,
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return {
-                            "success": True,
-                            "status": data.get("data", {}).get("status"),
-                            "provider": "eskiz",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": "Failed to get status",
-                            "provider": "eskiz",
-                        }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "status": data.get("data", {}).get("status"),
+                        "provider": "eskiz",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Failed to get status",
+                        "provider": "eskiz",
+                    }
 
         except Exception as e:
             return {"success": False, "error": str(e), "provider": "eskiz"}
@@ -249,30 +259,31 @@ class PlayMobileSMSProvider(BaseSMSProvider):
                 "Content-Type": "application/json",
             }
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
                     f"{self.base_url}/v1/send-sms",
                     json=sms_data,
                     headers=headers,
                     timeout=self.timeout,
-                ) as response:
-                    data = await response.json()
+                )
+                data = response.json()
 
-                    if response.status == 200:
-                        results = data.get("results", [])
-                        if results and results[0].get("status") == "0":
-                            return SMSResponse(
-                                success=True,
-                                message_id=results[0].get("message-id"),
-                                provider="playmobile",
-                                status="sent",
-                            )
+                if response.status_code == 200:
+                    results = data.get("results", [])
+                    if results and results[0].get("status") == "0":
+                        return SMSResponse(
+                            success=True,
+                            message_id=results[0].get("message-id"),
+                            provider="playmobile",
+                            status="sent",
+                        )
 
-                    return SMSResponse(
-                        success=False,
-                        error=data.get("error", "Unknown error"),
-                        provider="playmobile",
-                    )
+                return SMSResponse(
+                    success=False,
+                    error=data.get("error", "Unknown error"),
+                    provider="playmobile",
+                )
 
         except Exception as e:
             logger.error(f"PlayMobile SMS error: {str(e)}")
@@ -286,24 +297,26 @@ class PlayMobileSMSProvider(BaseSMSProvider):
                 "Content-Type": "application/json",
             }
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
                     f"{self.base_url}/v1/balance", headers=headers, timeout=self.timeout
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return {
-                            "success": True,
-                            "balance": data.get("balance", 0),
-                            "currency": data.get("currency", "UZS"),
-                            "provider": "playmobile",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": "Failed to get balance",
-                            "provider": "playmobile",
-                        }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "balance": data.get("balance", 0),
+                        "currency": data.get("currency", "UZS"),
+                        "provider": "playmobile",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Failed to get balance",
+                        "provider": "playmobile",
+                    }
 
         except Exception as e:
             return {"success": False, "error": str(e), "provider": "playmobile"}
@@ -318,26 +331,28 @@ class PlayMobileSMSProvider(BaseSMSProvider):
 
             params = {"message-id": message_id}
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
                     f"{self.base_url}/v1/message-status",
                     headers=headers,
                     params=params,
                     timeout=self.timeout,
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return {
-                            "success": True,
-                            "status": data.get("status"),
-                            "provider": "playmobile",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": "Failed to get status",
-                            "provider": "playmobile",
-                        }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "status": data.get("status"),
+                        "provider": "playmobile",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Failed to get status",
+                        "provider": "playmobile",
+                    }
 
         except Exception as e:
             return {"success": False, "error": str(e), "provider": "playmobile"}

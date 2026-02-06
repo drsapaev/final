@@ -11,29 +11,29 @@
   --bg-secondary: #1e293b;
   --bg-tertiary: #334155;
   --bg-hover: #475569;
-  
+
   /* Улучшенные фоны для карточек и панелей */
   --bg-card-solid: #1e293b;
   --bg-card-elevated: #334155;
   --bg-panel-solid: #0f172a;
   --bg-panel-elevated: #1e293b;
-  
+
   /* Цвета текста */
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
   --text-inverse: #1e293b;
-  
+
   /* Цвета границ - УЛУЧШЕННЫЕ ДЛЯ ВИДИМОСТИ */
   --border-color: #334155;
   --border-light: #475569;
   --border-focus: #3b82f6;
-  
+
   /* Улучшенные границы для лучшей видимости */
   --border-strong: #475569;
   --border-card: #475569;
   --border-panel: #334155;
-  
+
   /* Акцентные цвета */
   --accent-color: #3b82f6;
   --accent-hover: #2563eb;
@@ -41,13 +41,13 @@
   --warning-color: #f59e0b;
   --error-color: #ef4444;
   --info-color: #06b6d4;
-  
+
   /* Тени */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
-  
+
   /* Специальные цвета для админ панели */
   --admin-sidebar-bg: #1e293b;
   --admin-header-bg: #0f172a;
@@ -63,11 +63,18 @@
   color: var(--text-primary) !important;
 }
 
-.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
   color: var(--text-primary) !important;
 }
 
-.dark p, .dark span, .dark div {
+.dark p,
+.dark span,
+.dark div {
   color: var(--text-primary);
 }
 
@@ -265,6 +272,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -280,6 +288,7 @@
     opacity: 0;
     transform: translateX(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -338,12 +347,10 @@
 
 /* Улучшения для загрузочных состояний */
 .dark .admin-skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--bg-tertiary) 25%,
-    var(--bg-hover) 50%,
-    var(--bg-tertiary) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--bg-tertiary) 25%,
+      var(--bg-hover) 50%,
+      var(--bg-tertiary) 75%);
   background-size: 200% 100%;
   animation: admin-skeleton-loading 1.5s infinite;
 }
@@ -352,6 +359,7 @@
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -418,11 +426,11 @@
   .dark .admin-mobile-text-sm {
     font-size: 0.875rem;
   }
-  
+
   .dark .admin-mobile-text-base {
     font-size: 1rem;
   }
-  
+
   .dark .admin-mobile-text-lg {
     font-size: 1.125rem;
   }
@@ -431,10 +439,11 @@
 /* Улучшения для печати */
 @media print {
   .dark {
-    color-adjust: exact;
+    print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  
+
   .dark .admin-no-print {
     display: none !important;
   }
+}

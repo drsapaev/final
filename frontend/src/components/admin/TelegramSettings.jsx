@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  MessageSquare, 
-  Bot, 
-  Key, 
-  Send, 
-  Users, 
+import {
+  MessageSquare,
+  Bot,
+  Key,
+  Send,
+  Users,
   Bell,
-  Save, 
-  RefreshCw, 
-  AlertCircle, 
+  Save,
+  RefreshCw,
+  AlertCircle,
   CheckCircle,
   TestTube,
   Eye,
@@ -21,6 +21,7 @@ import {
 import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 const TelegramSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,17 +51,17 @@ const TelegramSettings = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Загружаем настройки, информацию о боте и статистику
       const [settingsRes, webhookRes, statsRes] = await Promise.all([
         fetch('/api/v1/admin/telegram/settings', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         }),
         fetch('/api/v1/admin/telegram/webhook-info', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         }),
         fetch('/api/v1/admin/telegram/stats?days_back=7', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         })
       ]);
 
@@ -99,7 +100,7 @@ const TelegramSettings = () => {
       const response = await fetch('/api/v1/admin/telegram/settings', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(settings)
@@ -126,7 +127,7 @@ const TelegramSettings = () => {
       const response = await fetch('/api/v1/admin/telegram/test-bot', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -147,11 +148,11 @@ const TelegramSettings = () => {
   const setWebhook = async () => {
     try {
       const webhookUrl = `${window.location.origin}/api/v1/telegram/webhook`;
-      
+
       const response = await fetch('/api/v1/admin/telegram/set-webhook', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ webhook_url: webhookUrl })
@@ -181,7 +182,7 @@ const TelegramSettings = () => {
       const response = await fetch('/api/v1/admin/telegram/send-test-message', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -207,11 +208,11 @@ const TelegramSettings = () => {
     return (
       <Card style={{ padding: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <RefreshCw style={{ 
-            width: '20px', 
-            height: '20px', 
-            marginRight: '8px', 
-            animation: 'spin 1s linear infinite' 
+          <RefreshCw style={{
+            width: '20px',
+            height: '20px',
+            marginRight: '8px',
+            animation: 'spin 1s linear infinite'
           }} />
           <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка Telegram настроек...</span>
         </div>
@@ -224,24 +225,24 @@ const TelegramSettings = () => {
       {/* Заголовок */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
+          <h2 style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             margin: 0,
             marginBottom: '4px'
           }}>
             Настройки Telegram
           </h2>
-          <p style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
+          <p style={{
+            fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-secondary)',
             margin: 0
           }}>
             Управление Telegram ботом и уведомлениями
           </p>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -260,19 +261,19 @@ const TelegramSettings = () => {
 
       {/* Сообщения */}
       {message.text && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          padding: '16px', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '16px',
           borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: message.type === 'success' 
-            ? 'var(--mac-success-bg)' 
+          backgroundColor: message.type === 'success'
+            ? 'var(--mac-success-bg)'
             : 'var(--mac-error-bg)',
-          color: message.type === 'success' 
-            ? 'var(--mac-success)' 
+          color: message.type === 'success'
+            ? 'var(--mac-success)'
             : 'var(--mac-error)',
-          border: `1px solid ${message.type === 'success' 
-            ? 'var(--mac-success-border)' 
+          border: `1px solid ${message.type === 'success'
+            ? 'var(--mac-success-border)'
             : 'var(--mac-error-border)'}`
         }}>
           {message.type === 'success' ? (
@@ -287,65 +288,65 @@ const TelegramSettings = () => {
       {/* Статистика */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-accent-blue)',
             marginBottom: '8px'
           }}>
             {stats.total_users || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Всего пользователей
           </div>
         </Card>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-success)',
             marginBottom: '8px'
           }}>
             {stats.messages_sent || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Сообщений отправлено
           </div>
         </Card>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-warning)',
             marginBottom: '8px'
           }}>
             {stats.messages_delivered || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Доставлено
           </div>
         </Card>
         <Card style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-2xl)', 
-            fontWeight: 'var(--mac-font-weight-bold)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
             color: 'var(--mac-error)',
             marginBottom: '8px'
           }}>
             {stats.messages_failed || 0}
           </div>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
-            color: 'var(--mac-text-secondary)' 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
           }}>
             Ошибок
           </div>
@@ -355,11 +356,11 @@ const TelegramSettings = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
         {/* Основные настройки */}
         <Card style={{ padding: '24px' }}>
-          <h3 style={{ 
-            fontSize: 'var(--mac-font-size-lg)', 
-            fontWeight: 'var(--mac-font-weight-medium)', 
-            marginBottom: '16px', 
-            display: 'flex', 
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            marginBottom: '16px',
+            display: 'flex',
             alignItems: 'center',
             color: 'var(--mac-text-primary)',
             margin: 0
@@ -367,15 +368,15 @@ const TelegramSettings = () => {
             <Bot style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
             Настройки бота
           </h3>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 <Key style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
                 Токен бота
@@ -396,9 +397,9 @@ const TelegramSettings = () => {
                   {showToken ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
                 </Button>
               </div>
-              <p style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)', 
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)',
                 marginTop: '4px',
                 margin: 0
               }}>
@@ -408,25 +409,25 @@ const TelegramSettings = () => {
 
             {/* Информация о боте */}
             {botInfo && (
-              <div style={{ 
-                padding: '12px', 
-                backgroundColor: 'var(--mac-success-bg)', 
-                border: '1px solid var(--mac-success-border)', 
-                borderRadius: 'var(--mac-radius-md)' 
+              <div style={{
+                padding: '12px',
+                backgroundColor: 'var(--mac-success-bg)',
+                border: '1px solid var(--mac-success-border)',
+                borderRadius: 'var(--mac-radius-md)'
               }}>
-                <h4 style={{ 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-success)', 
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-success)',
                   marginBottom: '8px',
                   margin: 0
                 }}>
                   Информация о боте:
                 </h4>
-                <div style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '4px' 
+                <div style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
                 }}>
                   <div style={{ color: 'var(--mac-text-primary)' }}><strong>Username:</strong> @{botInfo.username}</div>
                   <div style={{ color: 'var(--mac-text-primary)' }}><strong>Имя:</strong> {botInfo.first_name}</div>
@@ -437,12 +438,12 @@ const TelegramSettings = () => {
             )}
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 ID чатов администраторов
               </label>
@@ -452,9 +453,9 @@ const TelegramSettings = () => {
                 placeholder="123456789, 987654321"
                 style={{ width: '100%', minHeight: '60px' }}
               />
-              <p style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)', 
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)',
                 marginTop: '4px',
                 margin: 0
               }}>
@@ -477,11 +478,11 @@ const TelegramSettings = () => {
 
         {/* Настройки уведомлений */}
         <Card style={{ padding: '24px' }}>
-          <h3 style={{ 
-            fontSize: 'var(--mac-font-size-lg)', 
-            fontWeight: 'var(--mac-font-weight-medium)', 
-            marginBottom: '16px', 
-            display: 'flex', 
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            marginBottom: '16px',
+            display: 'flex',
             alignItems: 'center',
             color: 'var(--mac-text-primary)',
             margin: 0
@@ -489,7 +490,7 @@ const TelegramSettings = () => {
             <Bell style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-success)' }} />
             Уведомления
           </h3>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <label style={{ display: 'flex', alignItems: 'center' }}>
@@ -530,12 +531,12 @@ const TelegramSettings = () => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 <Globe style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
                 Язык по умолчанию
@@ -554,33 +555,33 @@ const TelegramSettings = () => {
 
             {/* Информация о webhook */}
             {webhookInfo && (
-              <div style={{ 
-                padding: '12px', 
-                borderRadius: 'var(--mac-radius-md)', 
+              <div style={{
+                padding: '12px',
+                borderRadius: 'var(--mac-radius-md)',
                 border: '1px solid',
-                backgroundColor: webhookInfo.webhook_set 
-                  ? 'var(--mac-success-bg)' 
+                backgroundColor: webhookInfo.webhook_set
+                  ? 'var(--mac-success-bg)'
                   : 'var(--mac-warning-bg)',
-                borderColor: webhookInfo.webhook_set 
-                  ? 'var(--mac-success-border)' 
+                borderColor: webhookInfo.webhook_set
+                  ? 'var(--mac-success-border)'
                   : 'var(--mac-warning-border)'
               }}>
-                <h4 style={{ 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
-                  color: webhookInfo.webhook_set 
-                    ? 'var(--mac-success)' 
+                  color: webhookInfo.webhook_set
+                    ? 'var(--mac-success)'
                     : 'var(--mac-warning)',
                   margin: 0
                 }}>
                   Webhook: {webhookInfo.webhook_set ? 'Настроен' : 'Не настроен'}
                 </h4>
                 {webhookInfo.webhook_info && (
-                  <div style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '4px' 
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
                   }}>
                     <div style={{ color: 'var(--mac-text-primary)' }}><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
                     <div style={{ color: 'var(--mac-text-primary)' }}><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
@@ -594,11 +595,11 @@ const TelegramSettings = () => {
 
       {/* Тестирование */}
       <Card style={{ padding: '24px' }}>
-        <h3 style={{ 
-          fontSize: 'var(--mac-font-size-lg)', 
-          fontWeight: 'var(--mac-font-weight-medium)', 
-          marginBottom: '16px', 
-          display: 'flex', 
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          marginBottom: '16px',
+          display: 'flex',
           alignItems: 'center',
           color: 'var(--mac-text-primary)',
           margin: 0
@@ -606,15 +607,15 @@ const TelegramSettings = () => {
           <Send style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-purple)' }} />
           Тестирование отправки сообщений
         </h3>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Chat ID получателя
             </label>
@@ -625,9 +626,9 @@ const TelegramSettings = () => {
               placeholder="123456789"
               style={{ width: '100%' }}
             />
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-sm)', 
-              color: 'var(--mac-text-secondary)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)',
               marginTop: '4px',
               margin: 0
             }}>
@@ -636,12 +637,12 @@ const TelegramSettings = () => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Текст сообщения
             </label>
@@ -655,8 +656,8 @@ const TelegramSettings = () => {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-          <Button 
-            onClick={sendTestMessage} 
+          <Button
+            onClick={sendTestMessage}
             disabled={!settings.bot_token || !testChatId || !testMessage}
           >
             <Send style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -666,29 +667,29 @@ const TelegramSettings = () => {
       </Card>
 
       {/* Инструкция */}
-      <Card style={{ 
-        padding: '24px', 
-        backgroundColor: 'var(--mac-info-bg)', 
-        border: '1px solid var(--mac-info-border)' 
+      <Card style={{
+        padding: '24px',
+        backgroundColor: 'var(--mac-info-bg)',
+        border: '1px solid var(--mac-info-border)'
       }}>
-        <h3 style={{ 
-          fontSize: 'var(--mac-font-size-lg)', 
-          fontWeight: 'var(--mac-font-weight-medium)', 
-          marginBottom: '8px', 
-          display: 'flex', 
-          alignItems: 'center', 
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          marginBottom: '8px',
+          display: 'flex',
+          alignItems: 'center',
           color: 'var(--mac-info)',
           margin: 0
         }}>
           <MessageSquare style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           Настройка Telegram бота
         </h3>
-        <div style={{ 
-          fontSize: 'var(--mac-font-size-sm)', 
-          color: 'var(--mac-text-secondary)', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '8px' 
+        <div style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
         }}>
           <p style={{ margin: 0 }}>1. Создайте бота через @BotFather в Telegram</p>
           <p style={{ margin: 0 }}>2. Получите токен бота и вставьте его выше</p>

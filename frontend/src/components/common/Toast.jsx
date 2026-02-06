@@ -154,7 +154,7 @@ function ToastItem({ toast, onRemove, theme }) {
 
   const getIcon = (type) => {
     const iconStyle = {
-      fontSize: getFontSize('lg'),
+      fontSize: '16px',
       flexShrink: 0,
       marginTop: '2px'
     };
@@ -171,7 +171,7 @@ function ToastItem({ toast, onRemove, theme }) {
 
   const contentStyle = {
     flex: 1,
-    fontSize: getFontSize('md'),
+    fontSize: '14px',
     lineHeight: 1.4
   };
 
@@ -187,7 +187,7 @@ function ToastItem({ toast, onRemove, theme }) {
   const closeButtonStyle = {
     background: 'none',
     border: 'none',
-    fontSize: getFontSize('lg'),
+    fontSize: '16px',
     cursor: 'pointer',
     color: 'inherit',
     opacity: 0.7,
@@ -202,9 +202,9 @@ function ToastItem({ toast, onRemove, theme }) {
     left: 0,
     height: '3px',
     backgroundColor: toast.type === 'success' ? 'var(--color-success)' :
-                     toast.type === 'error' ? 'var(--color-danger)' :
-                     toast.type === 'warning' ? 'var(--color-warning)' :
-                     'var(--color-info)',
+      toast.type === 'error' ? 'var(--color-danger)' :
+        toast.type === 'warning' ? 'var(--color-warning)' :
+          'var(--color-info)',
     width: '100%',
     transform: 'scaleX(1)',
     transformOrigin: 'left',
@@ -241,17 +241,17 @@ export const toast = {
     const { addToast } = useToast();
     return addToast({ type: 'success', message, ...options });
   },
-  
+
   error: (message, options = {}) => {
     const { addToast } = useToast();
     return addToast({ type: 'error', message, ...options });
   },
-  
+
   warning: (message, options = {}) => {
     const { addToast } = useToast();
     return addToast({ type: 'warning', message, ...options });
   },
-  
+
   info: (message, options = {}) => {
     const { addToast } = useToast();
     return addToast({ type: 'info', message, ...options });

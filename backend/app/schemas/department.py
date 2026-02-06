@@ -7,7 +7,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 # ============================================================
 # DEPARTMENT SERVICE SCHEMAS
@@ -21,8 +21,7 @@ class DepartmentServiceCreate(BaseModel):
     display_order: int = 999
     price_override: Optional[Decimal] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentServiceUpdate(BaseModel):
@@ -32,8 +31,7 @@ class DepartmentServiceUpdate(BaseModel):
     display_order: Optional[int] = None
     price_override: Optional[Decimal] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentServiceResponse(BaseModel):
@@ -46,8 +44,7 @@ class DepartmentServiceResponse(BaseModel):
     display_order: int
     price_override: Optional[Decimal]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================
@@ -69,8 +66,7 @@ class DepartmentQueueSettingsUpdate(BaseModel):
         None, pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentQueueSettingsResponse(BaseModel):
@@ -87,8 +83,7 @@ class DepartmentQueueSettingsResponse(BaseModel):
     show_on_display: bool
     auto_close_time: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================
@@ -106,8 +101,7 @@ class DepartmentRegistrationSettingsUpdate(BaseModel):
     auto_assign_doctor: Optional[bool] = None
     allow_walkin: Optional[bool] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentRegistrationSettingsResponse(BaseModel):
@@ -122,8 +116,7 @@ class DepartmentRegistrationSettingsResponse(BaseModel):
     auto_assign_doctor: bool
     allow_walkin: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================
@@ -144,8 +137,7 @@ class DepartmentBase(BaseModel):
     active: bool = True
     description: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentCreate(DepartmentBase):
@@ -167,8 +159,7 @@ class DepartmentUpdate(BaseModel):
     active: Optional[bool] = None
     description: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentResponse(DepartmentBase):
@@ -176,8 +167,7 @@ class DepartmentResponse(DepartmentBase):
 
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentFullResponse(DepartmentResponse):
@@ -188,5 +178,4 @@ class DepartmentFullResponse(DepartmentResponse):
     has_queue_settings: bool = False
     has_registration_settings: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,0 +1,13 @@
+/**
+ * DiagnosisSection CSS
+ */
+
+.diagnosis-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.diagnosis-section__icd10 {
+    max-width: 300px;
+}

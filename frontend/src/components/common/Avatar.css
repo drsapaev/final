@@ -1,0 +1,35 @@
+.avatar-wrapper {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.avatar-circle {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    user-select: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-status {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 30%;
+    height: 30%;
+    border-radius: 50%;
+    border: 2px solid var(--mac-bg-primary, white);
+    box-sizing: content-box;
+}
+
+.avatar-status.online {
+    background-color: #34C759;
+}
+
+.avatar-status.offline {
+    background-color: #FF3B30;
+}

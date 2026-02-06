@@ -15,7 +15,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   const location = useLocation();
   const { isDark, getColor, toggleTheme } = useTheme();
   const [language, setLanguage] = useState('en');
-  
+
   // Локально дублируем активную схему на контейнер сайдбара, чтобы исключить зависимость от <html>
   useEffect(() => {
     const applyLocalScheme = () => {
@@ -29,7 +29,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         } else {
           el.removeAttribute('data-color-scheme');
         }
-      } catch (_) {}
+      } catch (_) { }
     };
     applyLocalScheme();
     const handler = () => applyLocalScheme();
@@ -46,21 +46,21 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       window.removeEventListener('pageshow', handler);
     };
   }, []);
-  
+
   // Функции переключения
   const handleThemeToggle = () => {
     if (toggleTheme) {
       toggleTheme();
     }
   };
-  
+
   const handleLanguageToggle = () => {
     setLanguage(prev => prev === 'en' ? 'ru' : 'en');
   };
-  
+
   const st = auth.getState();
   const profile = st.profile || st.user || {};
-  
+
   // Для демо-страницы используем роль admin по умолчанию
   const isDemoPage = location.pathname.startsWith('/medilab-demo');
   const role = isDemoPage ? 'admin' : String(profile?.role || profile?.role_name || '').toLowerCase();
@@ -73,6 +73,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       iconName: 'LayoutDashboard',
       path: '/dashboard',
       roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+    },
+    {
+      id: 'search',
+      label: 'Поиск',
+      iconName: 'Search',
+      path: '/search',
+      roles: ['admin', 'doctor', 'registrar', 'receptionist', 'cashier', 'lab', 'cardio', 'derma', 'dentist']
     },
     {
       id: 'patients',
@@ -149,11 +156,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     if (isDemoPage) {
       return items;
     }
-    
-    const filtered = items.filter(item => 
+
+    const filtered = items.filter(item =>
       item.roles.includes(role) || item.roles.includes('all')
     );
-    
+
     return filtered;
   };
 
@@ -165,13 +172,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     if (path === '/dashboard' || path === '/') {
       return location.pathname === '/' || location.pathname === '/dashboard' || location.pathname === '/medilab-demo' || location.pathname === '/medilab-demo/dashboard';
     }
-    
+
     // Для демо-страницы проверяем специальные маршруты
     if (location.pathname.startsWith('/medilab-demo')) {
       const demoPath = path.replace('/', '/medilab-demo');
       return location.pathname === demoPath;
     }
-    
+
     return location.pathname.startsWith(path);
   };
 
@@ -216,7 +223,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 
 
   return (
-    <aside 
+    <aside
       ref={asideRef}
       style={{
         width: isCollapsed ? '80px' : '280px',
@@ -236,78 +243,78 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         boxShadow: 'var(--shadow)'
       }}
     >
-       {/* Имя пользователя и кнопка сворачивания */}
-       <div 
-         style={{
-           padding: isCollapsed ? '12px 8px' : '20px 16px',
-           borderBottom: '1px solid var(--mac-separator)',
-           display: 'flex',
-           alignItems: 'center',
-           justifyContent: 'space-between'
-         }}
-       >
-         <div style={{ display: 'flex', alignItems: 'center' }}>
-           {!isCollapsed && (
-             <h1 
-               style={{
-                 fontSize: '24px',
-                 fontWeight: '700',
-                 color: isDark ? '#f8fafc' : '#1e293b',
-                 margin: 0
-               }}
-             >
-               {profile.name || 'Dr. User'}
-             </h1>
-           )}
-           {isCollapsed && (
-             <div 
-               style={{
-                 width: '28px',
-                 height: '28px',
-                 backgroundColor: '#3b82f6',
-                 borderRadius: '6px',
-                 display: 'flex',
-                 alignItems: 'center',
-                 justifyContent: 'center',
-                 color: 'white',
-                 fontSize: '14px',
-                 fontWeight: 'bold'
-               }}
-             >
-               {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
-             </div>
-           )}
-         </div>
-         
-         {/* Кнопка сворачивания */}
-         <button
-           className="sidebar-toggle-button"
-           onClick={onToggle}
-           style={{
-             color: isDark ? '#9ca3af' : '#6b7280',
-             padding: '6px',
-             display: 'flex',
-             alignItems: 'center',
-             justifyContent: 'center',
-             minWidth: '28px',
-             minHeight: '28px'
-           }}
-           onMouseEnter={(e) => {
-             e.target.style.color = isDark ? '#fbbf24' : '#1e40af';
-             e.target.style.filter = 'brightness(1.2)';
-           }}
-           onMouseLeave={(e) => {
-             e.target.style.color = isDark ? '#9ca3af' : '#6b7280';
-             e.target.style.filter = 'brightness(1)';
-           }}
-           title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
-         >
-           <Icon name={isCollapsed ? 'ChevronRight' : 'ChevronLeft'} size={16} />
-         </button>
-       </div>
+      {/* Имя пользователя и кнопка сворачивания */}
+      <div
+        style={{
+          padding: isCollapsed ? '12px 8px' : '20px 16px',
+          borderBottom: '1px solid var(--mac-separator)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {!isCollapsed && (
+            <h1
+              style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: isDark ? '#f8fafc' : '#1e293b',
+                margin: 0
+              }}
+            >
+              {profile.name || 'Dr. User'}
+            </h1>
+          )}
+          {isCollapsed && (
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                backgroundColor: '#3b82f6',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+          )}
+        </div>
+
+        {/* Кнопка сворачивания */}
+        <button
+          className="sidebar-toggle-button"
+          onClick={onToggle}
+          style={{
+            color: isDark ? '#9ca3af' : '#6b7280',
+            padding: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '28px',
+            minHeight: '28px'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.color = isDark ? '#fbbf24' : '#1e40af';
+            e.target.style.filter = 'brightness(1.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.color = isDark ? '#9ca3af' : '#6b7280';
+            e.target.style.filter = 'brightness(1)';
+          }}
+          title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
+        >
+          <Icon name={isCollapsed ? 'ChevronRight' : 'ChevronLeft'} size={16} />
+        </button>
+      </div>
 
       {/* Основная навигация */}
-      <nav 
+      <nav
         style={{
           flex: 1,
           padding: isCollapsed ? '8px 0' : '16px 12px',
@@ -320,12 +327,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       >
         {visibleMainItems.map((item) => {
           const active = isActive(item.path);
-          
+
           // Для демо-страницы используем специальные маршруты
-          const demoPath = location.pathname.startsWith('/medilab-demo') 
+          const demoPath = location.pathname.startsWith('/medilab-demo')
             ? item.path.replace('/', '/medilab-demo')
             : item.path;
-          
+
           const inlineStyle = isCollapsed ? {
             width: '40px',
             height: '40px',
@@ -336,7 +343,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             padding: '0',
             margin: '0 auto'
           } : {};
-          
+
           return (
             <NavLink
               key={item.id}
@@ -356,7 +363,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         })}
 
         {/* Разделитель */}
-        <div 
+        <div
           style={{
             height: '1px',
             backgroundColor: 'var(--mac-separator)',
@@ -367,7 +374,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         {/* Дополнительные элементы */}
         {visibleAdditionalItems.map((item) => {
           const active = isActive(item.path);
-          
+
           const inlineStyle = isCollapsed ? {
             width: '40px',
             height: '40px',
@@ -378,7 +385,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             padding: '0',
             margin: '0 auto'
           } : {};
-          
+
           return (
             <NavLink
               key={item.id}
@@ -399,7 +406,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       </nav>
 
       {/* Кнопки переключения темы и языка */}
-      <div 
+      <div
         style={{
           padding: isCollapsed ? '4px' : '12px 16px',
           borderTop: '1px solid var(--mac-separator)',
@@ -439,7 +446,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           <Icon name={isDark ? 'Sun' : 'Moon'} size={isCollapsed ? 16 : 16} />
           {!isCollapsed && (isDark ? 'Light' : 'Dark')}
         </button>
-        
+
         {/* Кнопка переключения языка */}
         <button
           className="sidebar-language-button"
@@ -472,47 +479,47 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         </button>
       </div>
 
-       {/* Кнопка Log out */}
-       <div 
-         style={{
-           padding: isCollapsed ? '8px' : '16px',
-           borderTop: '1px solid var(--mac-separator)',
-           display: 'flex',
-           justifyContent: isCollapsed ? 'center' : 'flex-start'
-         }}
-       >
-         <button
-           className="logout-button"
-           style={{
-             display: 'flex',
-             alignItems: 'center',
-             gap: isCollapsed ? '0' : '12px',
-             padding: isCollapsed ? '8px' : '12px 16px',
-             color: isDark ? '#f8fafc' : '#1e293b',
-             fontSize: '14px',
-             fontWeight: '500',
-             minWidth: isCollapsed ? '40px' : 'auto',
-             minHeight: isCollapsed ? '40px' : 'auto',
-             justifyContent: 'center'
-           }}
-           onMouseEnter={(e) => {
-             e.target.style.color = '#ef4444';
-             e.target.style.filter = 'brightness(1.2)';
-           }}
-           onMouseLeave={(e) => {
-             e.target.style.color = isDark ? '#f8fafc' : '#1e293b';
-             e.target.style.filter = 'brightness(1)';
-           }}
-           onClick={() => {
-             auth.logout();
-           }}
-           aria-label="Log out of account"
-           title={isCollapsed ? 'Log out' : ''}
-         >
-           <Icon name="LogOut" size={isCollapsed ? 16 : 16} />
-           {!isCollapsed && <span>Log out</span>}
-         </button>
-       </div>
+      {/* Кнопка Log out */}
+      <div
+        style={{
+          padding: isCollapsed ? '8px' : '16px',
+          borderTop: '1px solid var(--mac-separator)',
+          display: 'flex',
+          justifyContent: isCollapsed ? 'center' : 'flex-start'
+        }}
+      >
+        <button
+          className="logout-button"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isCollapsed ? '0' : '12px',
+            padding: isCollapsed ? '8px' : '12px 16px',
+            color: isDark ? '#f8fafc' : '#1e293b',
+            fontSize: '14px',
+            fontWeight: '500',
+            minWidth: isCollapsed ? '40px' : 'auto',
+            minHeight: isCollapsed ? '40px' : 'auto',
+            justifyContent: 'center'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.color = '#ef4444';
+            e.target.style.filter = 'brightness(1.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.color = isDark ? '#f8fafc' : '#1e293b';
+            e.target.style.filter = 'brightness(1)';
+          }}
+          onClick={() => {
+            auth.logout();
+          }}
+          aria-label="Log out of account"
+          title={isCollapsed ? 'Log out' : ''}
+        >
+          <Icon name="LogOut" size={isCollapsed ? 16 : 16} />
+          {!isCollapsed && <span>Log out</span>}
+        </button>
+      </div>
     </aside>
   );
 };

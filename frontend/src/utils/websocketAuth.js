@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import { tokenManager } from '../utils/tokenManager';
 
 /**
  * Утилиты для аутентифицированных WebSocket соединений
@@ -21,8 +22,8 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
     onError = null
   } = options;
 
-  const token = localStorage.getItem('access_token');
-  
+  const token = tokenManager.getAccessToken();
+
   // Если требуется аутентификация, но токена нет
   if (requireAuth && !token) {
     if (onAuthError) {
@@ -49,7 +50,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
 
   ws.onclose = (event) => {
     logger.log('❌ Аутентифицированное WebSocket отключено', event.code, event.reason);
-    
+
     // Обрабатываем ошибки аутентификации
     if (event.code === 1008) { // WS_1008_POLICY_VIOLATION
       logger.error('❌ Ошибка аутентификации WebSocket:', event.reason);
@@ -57,7 +58,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
         onAuthError(event.reason || 'Authentication failed');
       }
     }
-    
+
     if (onDisconnect) onDisconnect(event);
   };
 
@@ -65,14 +66,14 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
     try {
       const data = JSON.parse(event.data);
       logger.log('📨 Получено сообщение WebSocket:', data);
-      
+
       // Обрабатываем ошибки аутентификации в сообщениях
       if (data.type === 'error' && data.message && data.message.includes('аутентификация')) {
         if (onAuthError) {
           onAuthError(data.message);
         }
       }
-      
+
       if (onMessage) onMessage(data);
     } catch (error) {
       logger.warn('⚠️ Ошибка парсинга WebSocket сообщения:', error);
@@ -97,7 +98,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
 export function createQueueWebSocket(department, date, options = {}) {
   const baseUrl = 'ws://localhost:8000/api/v1/ws-auth/ws/queue/optional-auth';
   const params = { department, date };
-  
+
   return createAuthenticatedWebSocket(baseUrl, params, options);
 }
 
@@ -110,7 +111,7 @@ export function createQueueWebSocket(department, date, options = {}) {
 export function createDisplayBoardWebSocket(boardId, options = {}) {
   const baseUrl = `ws://localhost:8000/api/v1/display/ws/board/${encodeURIComponent(boardId)}`;
   const params = {};
-  
+
   return createAuthenticatedWebSocket(baseUrl, params, options);
 }
 
@@ -124,9 +125,9 @@ export function sendAuthenticatedMessage(ws, message) {
     const messageWithAuth = {
       ...message,
       timestamp: new Date().toISOString(),
-      token: localStorage.getItem('access_token') // Дополнительная проверка
+      token: tokenManager.getAccessToken() // Централизованный доступ к токену
     };
-    
+
     ws.send(JSON.stringify(messageWithAuth));
     logger.log('📤 Отправлено аутентифицированное сообщение:', messageWithAuth);
   } else {
@@ -177,18 +178,18 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
           logger.log('✅ Переподключающийся WebSocket подключен');
           reconnectAttempts = 0;
           lastPongTime = Date.now();
-          
+
           // ✅ SECURITY: Start heartbeat monitoring
           startHeartbeat();
-          
+
           if (wsOptions.onConnect) wsOptions.onConnect(event);
         },
         onDisconnect: (event) => {
           logger.log('❌ Переподключающийся WebSocket отключен');
           stopHeartbeat();
-          
+
           if (wsOptions.onDisconnect) wsOptions.onDisconnect(event);
-          
+
           // ✅ SECURITY: Exponential backoff reconnection
           if (!isManuallyDisconnected && reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
@@ -223,7 +224,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
           } catch (e) {
             // Not JSON, ignore
           }
-          
+
           if (wsOptions.onMessage) wsOptions.onMessage(event);
         }
       });
@@ -241,19 +242,19 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
   const startHeartbeat = () => {
     const HEARTBEAT_INTERVAL = 30000; // 30 seconds
     const HEARTBEAT_TIMEOUT = 120000;  // 2 minutes
-    
+
     heartbeatInterval = setInterval(() => {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         return;
       }
-      
+
       // Check if we've received a pong recently
       if (lastPongTime && (Date.now() - lastPongTime) > HEARTBEAT_TIMEOUT) {
         logger.warn('⚠️ Heartbeat timeout, reconnecting...');
         ws.close();
         return;
       }
-      
+
       // Send ping
       try {
         ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/native';
 import logger from '../../utils/logger';
-import { 
-  Shield, 
-  Smartphone, 
-  Mail, 
-  Key, 
-  Settings, 
-  Trash2, 
-  Download, 
-  RefreshCw, 
-  CheckCircle, 
+import tokenManager from '../../utils/tokenManager';
+import {
+  Shield,
+  Smartphone,
+  Mail,
+  Key,
+  Settings,
+  Trash2,
+  Download,
+  RefreshCw,
+  CheckCircle,
   AlertCircle,
   Eye,
   EyeOff,
@@ -52,7 +53,7 @@ const TwoFactorManager = () => {
     try {
       const response = await fetch('/api/v1/2fa/status', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -66,7 +67,7 @@ const TwoFactorManager = () => {
     try {
       const response = await fetch('/api/v1/2fa/devices', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -80,7 +81,7 @@ const TwoFactorManager = () => {
     try {
       const response = await fetch('/api/v1/2fa/security-logs', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -94,7 +95,7 @@ const TwoFactorManager = () => {
     try {
       const response = await fetch('/api/v1/2fa/recovery-methods', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
       const data = await response.json();
@@ -113,7 +114,7 @@ const TwoFactorManager = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           method: method,
@@ -123,7 +124,7 @@ const TwoFactorManager = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setStatus(data);
         setSuccess('2FA успешно настроен');
@@ -153,7 +154,7 @@ const TwoFactorManager = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           password: password,
@@ -162,7 +163,7 @@ const TwoFactorManager = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setStatus(data);
         setSuccess('2FA успешно отключен');
@@ -185,12 +186,12 @@ const TwoFactorManager = () => {
       const response = await fetch('/api/v1/2fa/regenerate-backup-codes', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setBackupCodes(data.backup_codes);
         setShowBackupCodes(true);
@@ -217,7 +218,7 @@ const TwoFactorManager = () => {
       const response = await fetch(`/api/v1/2fa/devices/${deviceId}/revoke`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -364,9 +365,8 @@ const TwoFactorManager = () => {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  method.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
+                <span className={`text-xs px-2 py-1 rounded-full ${method.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
                   {method.verified ? 'Подтвержден' : 'Не подтвержден'}
                 </span>
                 <Button variant="ghost" size="sm">
@@ -477,10 +477,9 @@ const TwoFactorManager = () => {
             <Card key={index} className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-full ${
-                    log.type === 'success' ? 'bg-green-100' :
-                    log.type === 'warning' ? 'bg-yellow-100' : 'bg-red-100'
-                  }`}>
+                  <div className={`p-2 rounded-full ${log.type === 'success' ? 'bg-green-100' :
+                      log.type === 'warning' ? 'bg-yellow-100' : 'bg-red-100'
+                    }`}>
                     {log.type === 'success' ? (
                       <CheckCircle className="w-4 h-4 text-green-600" />
                     ) : log.type === 'warning' ? (
@@ -626,11 +625,10 @@ const TwoFactorManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
+              className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               <tab.icon className="w-4 h-4" />
               <span>{tab.label}</span>

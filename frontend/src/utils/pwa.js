@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 
 /**
  * PWA утилиты для регистрации Service Worker и управления PWA функциями
@@ -11,13 +12,13 @@ export async function registerServiceWorker() {
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/'
       });
-      
+
       logger.log('Service Worker зарегистрирован:', registration);
-      
+
       // Обработка обновлений
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
-        
+
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
@@ -30,7 +31,7 @@ export async function registerServiceWorker() {
           }
         });
       });
-      
+
       return registration;
     } catch (error) {
       logger.error('Ошибка регистрации Service Worker:', error);
@@ -59,7 +60,7 @@ export function checkPWASupport() {
     cache: 'caches' in window,
     indexedDB: 'indexedDB' in window
   };
-  
+
   logger.log('PWA поддержка:', support);
   return support;
 }
@@ -68,7 +69,7 @@ export function checkPWASupport() {
 export async function requestNotificationPermission() {
   if ('Notification' in window) {
     const permission = await Notification.requestPermission();
-    
+
     if (permission === 'granted') {
       logger.log('Разрешение на уведомления получено');
       return true;
@@ -77,7 +78,7 @@ export async function requestNotificationPermission() {
       return false;
     }
   }
-  
+
   return false;
 }
 
@@ -87,19 +88,19 @@ export async function subscribeToPushNotifications() {
     logger.log('Push уведомления не поддерживаются');
     return null;
   }
-  
+
   try {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: process.env.REACT_APP_VAPID_PUBLIC_KEY
     });
-    
+
     logger.log('Подписка на push уведомления создана:', subscription);
-    
+
     // Отправляем подписку на сервер
     await sendSubscriptionToServer(subscription);
-    
+
     return subscription;
   } catch (error) {
     logger.error('Ошибка подписки на push уведомления:', error);
@@ -114,11 +115,11 @@ async function sendSubscriptionToServer(subscription) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        'Authorization': `Bearer ${tokenManager.getAccessToken()}`
       },
       body: JSON.stringify(subscription)
     });
-    
+
     if (response.ok) {
       logger.log('Подписка отправлена на сервер');
     } else {
@@ -134,7 +135,7 @@ export function installPWA() {
   // Проверяем, можно ли установить PWA
   if (window.deferredPrompt) {
     window.deferredPrompt.prompt();
-    
+
     window.deferredPrompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === 'accepted') {
         logger.log('PWA установлено');
@@ -149,7 +150,7 @@ export function installPWA() {
 // Проверка, установлено ли PWA
 export function isPWAInstalled() {
   return window.matchMedia('(display-mode: standalone)').matches ||
-         window.navigator.standalone === true;
+    window.navigator.standalone === true;
 }
 
 // Получение информации о подключении
@@ -162,7 +163,7 @@ export function getConnectionInfo() {
       saveData: navigator.connection.saveData
     };
   }
-  
+
   return null;
 }
 
@@ -173,7 +174,7 @@ export function setupConnectionHandlers() {
     // Можно показать уведомление или синхронизировать данные
     showConnectionNotification('online');
   });
-  
+
   window.addEventListener('offline', () => {
     logger.log('Подключение потеряно');
     showConnectionNotification('offline');
@@ -194,18 +195,18 @@ function showConnectionNotification(status) {
     font-weight: 500;
     z-index: 10000;
     transition: all 0.3s ease;
-    ${status === 'online' 
-      ? 'background: #10b981;' 
+    ${status === 'online'
+      ? 'background: #10b981;'
       : 'background: #ef4444;'
     }
   `;
-  
-  notification.textContent = status === 'online' 
-    ? '🟢 Подключение восстановлено' 
+
+  notification.textContent = status === 'online'
+    ? '🟢 Подключение восстановлено'
     : '🔴 Нет подключения к интернету';
-  
+
   document.body.appendChild(notification);
-  
+
   // Убираем уведомление через 3 секунды
   setTimeout(() => {
     notification.style.opacity = '0';
@@ -234,7 +235,7 @@ export async function getCachedData(key) {
     try {
       const cache = await caches.open('clinic-offline-data');
       const response = await cache.match(`/offline-data/${key}`);
-      
+
       if (response) {
         return await response.json();
       }
@@ -242,33 +243,33 @@ export async function getCachedData(key) {
       logger.error('Ошибка получения кэшированных данных:', error);
     }
   }
-  
+
   return null;
 }
 
 // Инициализация PWA
 export async function initializePWA() {
   logger.log('Инициализация PWA...');
-  
+
   // Проверяем поддержку
   const support = checkPWASupport();
-  
+
   if (!support.serviceWorker) {
     logger.log('PWA не поддерживается в этом браузере');
     return;
   }
-  
+
   // Регистрируем Service Worker
   await registerServiceWorker();
-  
+
   // Настраиваем обработчики подключения
   setupConnectionHandlers();
-  
+
   // Запрашиваем разрешение на уведомления
   if (support.notification) {
     await requestNotificationPermission();
   }
-  
+
   logger.log('PWA инициализирован');
 }
 

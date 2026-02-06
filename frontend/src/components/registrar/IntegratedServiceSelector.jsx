@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Heart, 
-  Stethoscope, 
-  Scissors, 
+import {
+  Heart,
+  Stethoscope,
+  Scissors,
   TestTube,
   Activity,
   User,
@@ -13,14 +13,14 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Card, Badge } from '../ui/native';
-
+import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
  */
-const IntegratedServiceSelector = ({ 
-  selectedServices = [], 
+const IntegratedServiceSelector = ({
+  selectedServices = [],
   onServicesChange,
   className = '',
   simple = false,
@@ -86,7 +86,7 @@ const IntegratedServiceSelector = ({
 
   const specialtyColors = {
     cardiology: 'text-red-600',
-    dermatology: 'text-orange-600', 
+    dermatology: 'text-orange-600',
     cosmetology: 'text-pink-600',
     dentistry: 'text-blue-600',
     laboratory: 'text-green-600',
@@ -122,7 +122,7 @@ const IntegratedServiceSelector = ({
       setLoading(false);
 
       // Проверяем наличие токена
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         logger.warn('Токен не найден, используем демо-данные');
         return;
@@ -130,9 +130,9 @@ const IntegratedServiceSelector = ({
 
       // Пытаемся загрузить с API, но не заменяем fallback данные если API пустой
       try {
-      const params = new URLSearchParams();
-      // Исключаем фильтрацию по specialty, чтобы не терять группы
-      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+        const params = new URLSearchParams();
+        // Исключаем фильтрацию по specialty, чтобы не терять группы
+        const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
         const response = await fetch(`${API_BASE}/api/v1/registrar/services?${params}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -143,12 +143,12 @@ const IntegratedServiceSelector = ({
         if (response.ok) {
           const data = await response.json();
           logger.log('IntegratedServiceSelector: API response:', data);
-          
+
           // Проверяем структуру ответа более детально
           if (data.services_by_group) {
             const groupKeys = Object.keys(data.services_by_group);
             logger.log('IntegratedServiceSelector: Groups in API response:', groupKeys);
-            
+
             // Проверяем, есть ли реальные услуги в группах
             let hasServices = false;
             for (const group of groupKeys) {
@@ -158,7 +158,7 @@ const IntegratedServiceSelector = ({
                 logger.log(`IntegratedServiceSelector: Group ${group} has ${groupServices.length} services`);
               }
             }
-            
+
             if (hasServices) {
               setServices(data.services_by_group);
               setCategories(data.categories || DEMO_CATEGORIES);
@@ -193,7 +193,7 @@ const IntegratedServiceSelector = ({
 
   const handleServiceToggle = (serviceId, serviceData) => {
     const isSelected = selectedServices.some(s => s.id === serviceId);
-    
+
     if (isSelected) {
       // Убираем услугу
       const newServices = selectedServices.filter(s => s.id !== serviceId);
@@ -220,7 +220,7 @@ const IntegratedServiceSelector = ({
     // Если services пустой, используем DEMO_SERVICES
     const sourceServices = Object.keys(services).length > 0 ? services : DEMO_SERVICES;
     const filteredServices = {};
-    
+
     Object.keys(sourceServices).forEach(group => {
       const groupServices = sourceServices[group] || [];
       // Убеждаемся, что groupServices - это массив
@@ -228,7 +228,7 @@ const IntegratedServiceSelector = ({
       // Не фильтруем услуги по специальности, показываем все доступные
       filteredServices[group] = servicesArray;
     });
-    
+
     return filteredServices;
   };
 
@@ -280,25 +280,24 @@ const IntegratedServiceSelector = ({
             {categories.map(category => {
               const Icon = specialtyIcons[category.specialty] || User;
               const colorClass = specialtyColors[category.specialty] || 'text-gray-600';
-              
+
               return (
                 <button
                   key={category.id}
-                  className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${
-                    selectedServices.some(s => s.specialty === category.specialty)
+                  className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${selectedServices.some(s => s.specialty === category.specialty)
                       ? 'bg-blue-100 border-blue-300 text-blue-700'
                       : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
+                    }`}
                   onClick={() => {
                     // Фильтрация по специальности
                     const specialtyServices = Object.values(services)
                       .flat()
                       .filter(service => service.specialty === category.specialty);
-                    
-                    const newServices = selectedServices.filter(s => 
+
+                    const newServices = selectedServices.filter(s =>
                       !specialtyServices.some(ss => ss.id === s.id)
                     );
-                    
+
                     onServicesChange(newServices);
                   }}
                 >
@@ -322,17 +321,16 @@ const IntegratedServiceSelector = ({
           {(() => {
             const ecgService = filteredServices.cardiology?.find(s => s.code === 'ecg');
             const isEcgSelected = selectedServices.some(s => s.code === 'ecg');
-            
+
             if (!ecgService) return null;
-            
+
             return (
               <button
                 onClick={() => handleServiceToggle(ecgService.id, ecgService)}
-                className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${
-                  isEcgSelected
+                className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${isEcgSelected
                     ? 'bg-red-100 border-red-300 text-red-700'
                     : 'bg-white border-red-200 text-red-700 hover:bg-red-50'
-                }`}
+                  }`}
               >
                 <Activity className="w-4 h-4 mr-2" />
                 <span className="text-sm font-medium">ЭКГ</span>
@@ -340,22 +338,21 @@ const IntegratedServiceSelector = ({
               </button>
             );
           })()}
-          
+
           {/* ЭхоКГ тумблер */}
           {(() => {
             const echoService = filteredServices.cardiology?.find(s => s.code === 'echo.cardiography');
             const isEchoSelected = selectedServices.some(s => s.code === 'echo.cardiography');
-            
+
             if (!echoService) return null;
-            
+
             return (
               <button
                 onClick={() => handleServiceToggle(echoService.id, echoService)}
-                className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${
-                  isEchoSelected
+                className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${isEchoSelected
                     ? 'bg-red-100 border-red-300 text-red-700'
                     : 'bg-white border-red-200 text-red-700 hover:bg-red-50'
-                }`}
+                  }`}
               >
                 <Heart className="w-4 h-4 mr-2" />
                 <span className="text-sm font-medium">ЭхоКГ</span>
@@ -379,7 +376,7 @@ const IntegratedServiceSelector = ({
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
                 {groupNames[group] || group}
               </h3>
-              
+
               <div className="space-y-3">
                 <select
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
@@ -401,7 +398,7 @@ const IntegratedServiceSelector = ({
                     </option>
                   ))}
                 </select>
-                
+
                 {/* Выбранные услуги из этой группы */}
                 {selectedServices.filter(s => s.group === group).map(service => (
                   <div key={service.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">

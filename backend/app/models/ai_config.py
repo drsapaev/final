@@ -18,14 +18,24 @@ if TYPE_CHECKING:
 
 
 class AIProvider(Base):
-    """Провайдеры AI (OpenAI, Gemini, DeepSeek и т.д.)"""
+    """
+    Провайдеры AI (OpenAI, Gemini, DeepSeek и т.д.)
+    
+    SECURITY: API ключи хранятся в зашифрованном виде (Fernet).
+    Для работы требуется ENCRYPTION_KEY в .env
+    """
 
     __tablename__ = "ai_providers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)  # openai, gemini, deepseek
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)  # OpenAI GPT-4
-    api_key: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # Зашифрованный ключ
+    
+    # API key is stored encrypted - use api_key property for access
+    _api_key_encrypted: Mapped[Optional[str]] = mapped_column(
+        "api_key", String(500), nullable=True
+    )  # Increased size for encrypted content
+    
     api_url: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # Базовый URL API
     model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # gpt-4, gemini-pro
     temperature: Mapped[float] = mapped_column(Float, default=0.2, nullable=False)
@@ -47,6 +57,84 @@ class AIProvider(Base):
     prompt_templates: Mapped[List["AIPromptTemplate"]] = relationship(
         "AIPromptTemplate", back_populates="provider"
     )
+    
+    @property
+    def api_key(self) -> Optional[str]:
+        """
+        Decrypt and return API key.
+        
+        Returns None if:
+        - No key stored
+        - ENCRYPTION_KEY not set
+        - Decryption fails (corrupted or wrong key)
+        """
+        if not self._api_key_encrypted:
+            return None
+        
+        # Import here to avoid circular imports
+        from app.core.config import settings
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        if not settings.ENCRYPTION_KEY:
+            # Fallback: if no encryption key, assume legacy plaintext
+            # This allows gradual migration
+            if not self._api_key_encrypted.startswith("gAAAAA"):
+                logger.warning(
+                    f"API key for provider '{self.name}' is not encrypted. "
+                    "Set ENCRYPTION_KEY and run migration script."
+                )
+                return self._api_key_encrypted
+            else:
+                logger.error(
+                    f"ENCRYPTION_KEY not set but API key for '{self.name}' appears encrypted"
+                )
+                return None
+        
+        try:
+            from cryptography.fernet import Fernet
+            cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+            return cipher.decrypt(self._api_key_encrypted.encode()).decode()
+        except Exception as e:
+            logger.error(f"Failed to decrypt API key for provider '{self.name}': {e}")
+            return None
+    
+    @api_key.setter
+    def api_key(self, value: Optional[str]):
+        """
+        Encrypt and store API key.
+        
+        If ENCRYPTION_KEY not set, stores plaintext with warning.
+        """
+        if not value:
+            self._api_key_encrypted = None
+            return
+        
+        from app.core.config import settings
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        if not settings.ENCRYPTION_KEY:
+            logger.warning(
+                f"ENCRYPTION_KEY not set. Storing API key for '{self.name}' in PLAINTEXT. "
+                "This is a security risk in production!"
+            )
+            self._api_key_encrypted = value
+            return
+        
+        try:
+            from cryptography.fernet import Fernet
+            cipher = Fernet(settings.ENCRYPTION_KEY.encode())
+            self._api_key_encrypted = cipher.encrypt(value.encode()).decode()
+        except Exception as e:
+            logger.error(f"Failed to encrypt API key for provider '{self.name}': {e}")
+            raise ValueError(f"API key encryption failed: {e}")
+    
+    def has_valid_api_key(self) -> bool:
+        """Check if provider has a valid (decryptable) API key"""
+        return self.api_key is not None and len(self.api_key) > 0
 
 
 class AIPromptTemplate(Base):

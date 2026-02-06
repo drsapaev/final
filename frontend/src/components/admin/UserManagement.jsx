@@ -2,67 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Input,
-  Badge,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Select,
-  Option,
-  Switch,
-  Checkbox,
-  Alert,
-  CircularProgress,
-} from '../ui/macos';
-import {
-  Grid,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  TableContainer,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTable,
+  MacOSBadge,
+  MacOSModal,
+  MacOSAlert,
   Avatar,
-  Chip,
-  IconButton,
-  Menu,
-  ListItemIcon,
-  ListItemText,
-  Divider,
-  FormControlLabel
-} from '@mui/material';
+  Box,
+  Typography
+} from '../ui/macos';
 import {
   Plus,
   Edit,
   Trash2,
   MoreVertical,
   Search,
-  Filter,
   RefreshCw,
   User,
-  Mail,
-  Phone,
-  Shield,
   CheckCircle,
-  XCircle,
-  AlertTriangle,
-  UserX,
-  UserCheck,
-  Settings,
-  UserPlus,
-  Ban
+  Ban,
+  Shield,
+  Mail
 } from 'lucide-react';
+import { Menu, MenuItem, ListItemIcon, ListItemText, Divider, IconButton } from '@mui/material'; // Legacy for Actions menu
+import UserModal from './UserModal';
+import { useRoles } from '../../hooks/useRoles';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -70,30 +37,36 @@ const UserManagement = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [showUserDialog, setShowUserDialog] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [userForm, setUserForm] = useState({
-    username: '',
-    email: '',
-    full_name: '',
-    role: 'Patient',
-    is_active: true,
-    phone: '',
-    password: ''
-  });
 
-  const roles = [
-    { value: 'Admin', label: 'Администратор', color: 'error' },
-    { value: 'Doctor', label: 'Врач', color: 'primary' },
-    { value: 'Nurse', label: 'Медсестра', color: 'info' },
-    { value: 'Receptionist', label: 'Регистратор', color: 'warning' },
-    { value: 'Lab', label: 'Лаборант', color: 'secondary' },
-    { value: 'Cashier', label: 'Кассир', color: 'success' },
-    { value: 'Patient', label: 'Пациент', color: 'default' }
+  // Load roles from API (Phase 4: DB-driven roles)
+  const { roleOptions: apiRoleOptions, loading: rolesLoading } = useRoles({ includeAll: true });
+
+  // Fallback roles if API fails
+  const roles = apiRoleOptions.filter(r => r.value !== '') || [
+    { value: 'Admin', label: 'Администратор' },
+    { value: 'Doctor', label: 'Врач' },
+    { value: 'Nurse', label: 'Медсестра' },
+    { value: 'Receptionist', label: 'Регистратор' },
+    { value: 'Cashier', label: 'Кассир' },
+    { value: 'Lab', label: 'Лаборант' },
+    { value: 'Patient', label: 'Пациент' }
+  ];
+
+  const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
+    { value: '', label: 'Все роли' },
+    ...roles
+  ];
+
+  const statusOptions = [
+    { value: '', label: 'Все статусы' },
+    { value: 'active', label: 'Активные' },
+    { value: 'inactive', label: 'Неактивные' }
   ];
 
   useEffect(() => {
@@ -103,7 +76,8 @@ const UserManagement = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/users/users');
+      // Request up to 100 users per page to show all users
+      const response = await api.get('/users/users', { params: { per_page: 100 } });
       setUsers(response.data.users || response.data || []);
       setError('');
     } catch (err) {
@@ -115,34 +89,24 @@ const UserManagement = () => {
     }
   };
 
-  const handleCreateUser = async () => {
+  const handleSaveUser = async (userData) => {
     try {
-      await api.post('/users/users', userForm);
-      setSuccess('Пользователь успешно создан');
+      if (selectedUser) {
+        await api.put(`/users/users/${selectedUser.id}`, userData);
+        setSuccess('Пользователь успешно обновлен');
+      } else {
+        await api.post('/users/users', userData);
+        setSuccess('Пользователь успешно создан');
+      }
       setError('');
       loadUsers();
-      setShowUserDialog(false);
-      resetForm();
-    } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка создания пользователя';
-      setError(errorMessage);
-      logger.error('Ошибка создания пользователя:', err);
-    }
-  };
-
-  const handleUpdateUser = async () => {
-    try {
-      await api.put(`/users/users/${selectedUser.id}`, userForm);
-      setSuccess('Пользователь успешно обновлен');
-      setError('');
-      loadUsers();
-      setShowUserDialog(false);
+      setShowUserModal(false);
       setSelectedUser(null);
-      resetForm();
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обновления пользователя';
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка сохранения пользователя';
       setError(errorMessage);
-      logger.error('Ошибка обновления пользователя:', err);
+      logger.error('Ошибка сохранения пользователя:', err);
+      throw err; // UserModal catch block will handle specific errors if needed
     }
   };
 
@@ -156,7 +120,33 @@ const UserManagement = () => {
       setSelectedUser(null);
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления пользователя';
-      setError(errorMessage);
+
+      // Check if it's an IntegrityError (related data exists)
+      if (errorMessage.includes('связанные данные') || errorMessage.includes('деактивировать')) {
+        // Offer to deactivate instead
+        const shouldDeactivate = window.confirm(
+          `${errorMessage}\n\nХотите деактивировать пользователя вместо удаления?`
+        );
+
+        if (shouldDeactivate) {
+          try {
+            await api.put(`/users/users/${selectedUser.id}`, { is_active: false });
+            setSuccess('Пользователь деактивирован');
+            setError('');
+            loadUsers();
+            setShowDeleteDialog(false);
+            setSelectedUser(null);
+            return;
+          } catch (deactivateErr) {
+            setError('Ошибка деактивации пользователя: ' + (deactivateErr.response?.data?.detail || deactivateErr.message));
+          }
+        } else {
+          setShowDeleteDialog(false);
+          setSelectedUser(null);
+        }
+      } else {
+        setError(errorMessage);
+      }
       logger.error('Ошибка удаления пользователя:', err);
     }
   };
@@ -174,52 +164,22 @@ const UserManagement = () => {
     }
   };
 
-  const resetForm = () => {
-    setUserForm({
-      username: '',
-      email: '',
-      full_name: '',
-      role: 'Patient',
-      is_active: true,
-      phone: '',
-      password: ''
-    });
-  };
-
   const openUserDialog = (user = null) => {
-    if (user) {
-      setSelectedUser(user);
-      setUserForm({
-        username: user.username || '',
-        email: user.email || '',
-        full_name: user.full_name || '',
-        role: user.role || 'Patient',
-        is_active: user.is_active !== false,
-        phone: user.phone || '',
-        password: ''
-      });
-    } else {
-      setSelectedUser(null);
-      resetForm();
-    }
-    setShowUserDialog(true);
+    setSelectedUser(user);
+    setShowUserModal(true);
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'active' && user.is_active) ||
-      (statusFilter === 'inactive' && !user.is_active);
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const getRoleColor = (role) => {
-    const roleData = roles.find(r => r.value === role);
-    return roleData?.color || 'default';
+  const getRoleBadgeVariant = (role) => {
+    const variants = {
+      'Admin': 'error',
+      'Doctor': 'primary',
+      'Nurse': 'info',
+      'Receptionist': 'warning',
+      'Lab': 'secondary',
+      'Cashier': 'success',
+      'Patient': 'default'
+    };
+    return variants[role] || 'default';
   };
 
   const getRoleLabel = (role) => {
@@ -227,314 +187,265 @@ const UserManagement = () => {
     return roleData?.label || role;
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === '' || user.role === roleFilter;
+    const matchesStatus = statusFilter === '' ||
+      (statusFilter === 'active' && user.is_active) ||
+      (statusFilter === 'inactive' && !user.is_active);
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  // Table Columns Configuration
+  const columns = [
+    {
+      key: 'user',
+      title: 'Пользователь',
+      render: (_, user) => (
+        <Box display="flex" alignItems="center" gap="12px">
+          {/* Placeholder Avatar - can be replaced with MacOSAvatar if available */}
+          <div style={{
+            width: '32px', height: '32px', borderRadius: '50%', background: '#007AFF',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
+          }}>
+            <User size={16} />
+          </div>
+          <Box>
+            <Typography style={{ fontWeight: 500, fontSize: '13px' }}>
+              {user.full_name || user.username}
+            </Typography>
+            <Typography style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+              {user.username}
+            </Typography>
+          </Box>
+        </Box>
+      )
+    },
+    {
+      key: 'role',
+      title: 'Роль',
+      render: (role) => (
+        <MacOSBadge variant={getRoleBadgeVariant(role)}>
+          {getRoleLabel(role)}
+        </MacOSBadge>
+      )
+    },
+    {
+      key: 'email',
+      title: 'Email',
+      render: (email) => <span style={{ fontSize: '13px' }}>{email || '-'}</span>
+    },
+    {
+      key: 'phone',
+      title: 'Телефон',
+      render: (phone) => <span style={{ fontSize: '13px' }}>{phone || '-'}</span>
+    },
+    {
+      key: 'status',
+      title: 'Статус',
+      render: (_, user) => (
+        <MacOSBadge variant={user.is_active ? 'success' : 'default'} outline>
+          {user.is_active ? 'Активен' : 'Неактивен'}
+        </MacOSBadge>
+      )
+    },
+    {
+      key: 'last_login',
+      title: 'Последний вход',
+      render: (last_login) => (
+        <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+          {last_login ? new Date(last_login).toLocaleDateString() : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      title: '',
+      render: (_, user) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <IconButton
+            onClick={(e) => {
+              setAnchorEl(e.currentTarget);
+              setSelectedUser(user);
+            }}
+            size="small"
+          >
+            <MoreVertical size={16} />
+          </IconButton>
+        </div>
+      )
+    }
+  ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Заголовок */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
+    <Box style={{ padding: '24px' }}>
+      {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" style={{ marginBottom: '24px' }}>
+        <Typography variant="h1" style={{ fontSize: '24px', fontWeight: 600 }}>
           Управление пользователями
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Plus />}
+        <MacOSButton
+          variant="primary"
           onClick={() => openUserDialog()}
+          startIcon={<Plus size={16} />}
         >
           Добавить пользователя
-        </Button>
+        </MacOSButton>
       </Box>
 
-      {/* Алерты */}
+      {/* Alerts */}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <MacOSAlert variant="error" title="Ошибка" onClose={() => setError('')} style={{ marginBottom: '16px' }}>
           {error}
-        </Alert>
+        </MacOSAlert>
       )}
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+        <MacOSAlert variant="success" title="Успешно" onClose={() => setSuccess('')} style={{ marginBottom: '16px' }}>
           {success}
-        </Alert>
+        </MacOSAlert>
       )}
 
-      {/* Фильтры и поиск */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Поиск пользователей"
+      {/* Filters */}
+      <MacOSCard style={{ marginBottom: '24px', padding: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+
+          {/* Search */}
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Поиск</label>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+              <MacOSInput
+                placeholder="Поиск пользователей..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  )
-                }}
+                style={{ paddingLeft: '32px', width: '100%' }}
               />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Роль</InputLabel>
-                <Select
-                  value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
-                  label="Роль"
-                >
-                  <MenuItem value="all">Все роли</MenuItem>
-                  {roles.map((role) => (
-                    <MenuItem key={role.value} value={role.value}>
-                      {role.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Статус</InputLabel>
-                <Select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  label="Статус"
-                >
-                  <MenuItem value="all">Все статусы</MenuItem>
-                  <MenuItem value="active">Активные</MenuItem>
-                  <MenuItem value="inactive">Неактивные</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<RefreshCw />}
-                onClick={loadUsers}
-              >
-                Обновить
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+            </div>
+          </div>
 
-      {/* Таблица пользователей */}
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Пользователь</TableCell>
-                <TableCell>Роль</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Телефон</TableCell>
-                <TableCell>Статус</TableCell>
-                <TableCell>Последний вход</TableCell>
-                <TableCell align="right">Действия</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id} hover>
-                  <TableCell>
-                    <Box display="flex" alignItems="center">
-                      <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                        <User />
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2">
-                          {user.full_name || user.username}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          @{user.username}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={getRoleLabel(user.role)}
-                      color={getRoleColor(user.role)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>{user.email || '-'}</TableCell>
-                  <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={user.is_active ? 'Активен' : 'Неактивен'}
-                      color={user.is_active ? 'success' : 'default'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {user.last_login ? new Date(user.last_login).toLocaleDateString() : '-'}
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      onClick={(e) => {
-                        setAnchorEl(e.currentTarget);
-                        setSelectedUser(user);
-                      }}
-                    >
-                      <MoreVertical />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
+          {/* Role Filter */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Роль</label>
+            <MacOSSelect
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              options={roleOptions}
+              placeholder="Все роли"
+            />
+          </div>
 
-      {/* Меню действий */}
+          {/* Status Filter */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Статус</label>
+            <MacOSSelect
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={statusOptions}
+              placeholder="Все статусы"
+            />
+          </div>
+
+          {/* Refresh Button */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, visibility: 'hidden' }}>Действие</label>
+            <MacOSButton
+              variant="secondary"
+              onClick={loadUsers}
+              style={{ width: '100%', justifyContent: 'center' }}
+              disabled={loading}
+            >
+              <RefreshCw size={16} style={{ marginRight: '8px' }} />
+              Обновить
+            </MacOSButton>
+          </div>
+        </div>
+      </MacOSCard>
+
+      {/* Table */}
+      <MacOSCard>
+        <MacOSTable
+          columns={columns}
+          data={filteredUsers}
+          loading={loading}
+          hoverable
+        />
+      </MacOSCard>
+
+      {/* Actions Menu (MUI Legacy for now) */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
+        PaperProps={{
+          style: {
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            border: '1px solid #e5e7eb'
+          }
+        }}
       >
         <MenuItem onClick={() => { openUserDialog(selectedUser); setAnchorEl(null); }}>
-          <ListItemIcon><Edit /></ListItemIcon>
-          <ListItemText>Редактировать</ListItemText>
+          <ListItemIcon><Edit size={16} /></ListItemIcon>
+          <ListItemText primary="Редактировать" primaryTypographyProps={{ fontSize: '13px' }} />
         </MenuItem>
         <MenuItem onClick={() => {
           handleToggleUserStatus(selectedUser.id, selectedUser.is_active);
           setAnchorEl(null);
         }}>
           <ListItemIcon>
-            {selectedUser?.is_active ? <Ban /> : <CheckCircle />}
+            {selectedUser?.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
           </ListItemIcon>
-          <ListItemText>
-            {selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
-          </ListItemText>
+          <ListItemText
+            primary={selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
+            primaryTypographyProps={{ fontSize: '13px' }}
+          />
         </MenuItem>
         <Divider />
         <MenuItem onClick={() => {
           setShowDeleteDialog(true);
           setAnchorEl(null);
         }}>
-          <ListItemIcon><Trash2 color="error" /></ListItemIcon>
-          <ListItemText>Удалить</ListItemText>
+          <ListItemIcon><Trash2 size={16} color="#ef4444" /></ListItemIcon>
+          <ListItemText primary="Удалить" primaryTypographyProps={{ fontSize: '13px', color: '#ef4444' }} />
         </MenuItem>
       </Menu>
 
-      {/* Диалог создания/редактирования пользователя */}
-      <Dialog open={showUserDialog} onClose={() => setShowUserDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedUser ? 'Редактировать пользователя' : 'Добавить пользователя'}
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Имя пользователя"
-                value={userForm.username}
-                onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Полное имя"
-                value={userForm.full_name}
-                onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Email"
-                type="email"
-                value={userForm.email}
-                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Телефон"
-                value={userForm.phone}
-                onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Роль</InputLabel>
-                <Select
-                  value={userForm.role}
-                  onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                  label="Роль"
-                >
-                  {roles.map((role) => (
-                    <MenuItem key={role.value} value={role.value}>
-                      {role.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Пароль"
-                type="password"
-                value={userForm.password}
-                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                required={!selectedUser}
-                helperText={selectedUser ? 'Оставьте пустым, чтобы не изменять' : 'Обязательно для нового пользователя'}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={userForm.is_active}
-                    onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
-                  />
-                }
-                label="Активный пользователь"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowUserDialog(false)}>Отмена</Button>
-          <Button
-            onClick={selectedUser ? handleUpdateUser : handleCreateUser}
-            variant="contained"
-          >
-            {selectedUser ? 'Обновить' : 'Создать'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* User Modal (New MacOS Styled) */}
+      <UserModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        user={selectedUser}
+        onSave={handleSaveUser}
+        loading={loading && showUserModal}
+      />
 
-      {/* Диалог подтверждения удаления */}
-      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
-        <DialogTitle>Подтверждение удаления</DialogTitle>
-        <DialogContent>
+      {/* Delete Confirmation Dialog (Using MacOSModal) */}
+      <MacOSModal
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        title="Подтверждение удаления"
+        size="sm"
+      >
+        <div style={{ padding: '0 0 24px 0' }}>
           <Typography>
-            Вы уверены, что хотите удалить пользователя "{selectedUser?.username}"?
+            Вы уверены, что хотите удалить пользователя <b>{selectedUser?.username}</b>?
+            <br />
             Это действие нельзя отменить.
           </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowDeleteDialog(false)}>Отмена</Button>
-          <Button onClick={handleDeleteUser} color="error" variant="contained">
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <MacOSButton variant="secondary" onClick={() => setShowDeleteDialog(false)}>
+            Отмена
+          </MacOSButton>
+          <MacOSButton variant="danger" onClick={handleDeleteUser}>
             Удалить
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </MacOSButton>
+        </div>
+      </MacOSModal>
+
     </Box>
   );
 };

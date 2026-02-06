@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, User, Mail, Lock, Shield, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button } from '../ui/native';
+import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
+import MacOSModal from '../ui/macos/MacOSModal';
+import MacOSInput from '../ui/macos/MacOSInput';
+import MacOSSelect from '../ui/macos/MacOSSelect';
+import MacOSButton from '../ui/macos/MacOSButton';
+import MacOSCheckbox from '../ui/macos/MacOSCheckbox';
+import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';
-const UserModal = ({ 
-  isOpen, 
-  onClose, 
-  user = null, 
-  onSave, 
-  loading = false 
+
+/**
+ * UserModal - macOS-styled modal for creating/editing users
+ * Phase 1 refactoring: migrated from native components to macOS design system
+ */
+const UserModal = ({
+  isOpen,
+  onClose,
+  user = null,
+  onSave,
+  loading = false
 }) => {
   const [formData, setFormData] = useState({
     username: '',
@@ -21,6 +31,20 @@ const UserModal = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load roles from API (Phase 4: DB-driven roles - completed)
+  const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
+
+  // Fallback roles if API fails
+  const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
+    { value: 'Admin', label: 'Администратор' },
+    { value: 'Doctor', label: 'Врач' },
+    { value: 'Nurse', label: 'Медсестра' },
+    { value: 'Receptionist', label: 'Регистратор' },
+    { value: 'Cashier', label: 'Кассир' },
+    { value: 'Lab', label: 'Лаборант' },
+    { value: 'Patient', label: 'Пациент' }
+  ];
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -83,7 +107,7 @@ const UserModal = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -116,257 +140,222 @@ const UserModal = ({
     }
   };
 
-  if (!isOpen) return null;
+  // Error message component
+  const ErrorMessage = ({ message }) => (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      marginTop: '4px',
+      fontSize: 'var(--mac-font-size-xs, 12px)',
+      color: 'var(--mac-error, #FF3B30)'
+    }}>
+      <AlertCircle style={{ width: '12px', height: '12px' }} />
+      {message}
+    </div>
+  );
+
+  // Form field wrapper with icon
+  const FormField = ({ label, required, icon: Icon, error, children }) => (
+    <div style={{ marginBottom: '16px' }}>
+      <label style={{
+        display: 'block',
+        marginBottom: '6px',
+        fontSize: 'var(--mac-font-size-sm, 13px)',
+        fontWeight: '500',
+        color: 'var(--mac-text-primary, #1d1d1f)'
+      }}>
+        {label} {required && <span style={{ color: 'var(--mac-error, #FF3B30)' }}>*</span>}
+      </label>
+      <div style={{ position: 'relative' }}>
+        {Icon && (
+          <Icon style={{
+            position: 'absolute',
+            left: '12px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '16px',
+            height: '16px',
+            color: 'var(--mac-text-tertiary, #86868b)',
+            zIndex: 1,
+            pointerEvents: 'none'
+          }} />
+        )}
+        {children}
+      </div>
+      {error && <ErrorMessage message={error} />}
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          {/* Заголовок */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {user ? 'Редактировать пользователя' : 'Добавить пользователя'}
-            </h2>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <MacOSModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={user ? 'Редактировать пользователя' : 'Добавить пользователя'}
+      size="md"
+      closable
+    >
+      <form onSubmit={handleSubmit}>
+        {/* Username */}
+        <FormField
+          label="Имя пользователя"
+          required
+          icon={User}
+          error={errors.username}
+        >
+          <MacOSInput
+            type="text"
+            value={formData.username}
+            onChange={(e) => handleChange('username', e.target.value)}
+            placeholder="Введите имя пользователя"
+            error={!!errors.username}
+            style={{ paddingLeft: '40px' }}
+          />
+        </FormField>
 
-          {/* Форма */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Имя пользователя */}
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                Имя пользователя *
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                      style={{ color: 'var(--text-tertiary)' }} />
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => handleChange('username', e.target.value)}
-                  className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.username ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: errors.username ? 'var(--danger-color)' : 'var(--border-color)'
-                  }}
-                  placeholder="Введите имя пользователя"
-                />
-              </div>
-              {errors.username && (
-                <p className="text-sm text-red-500 mt-1 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.username}
-                </p>
-              )}
-            </div>
+        {/* Full Name */}
+        <FormField label="Полное имя">
+          <MacOSInput
+            type="text"
+            value={formData.full_name}
+            onChange={(e) => handleChange('full_name', e.target.value)}
+            placeholder="Введите полное имя"
+          />
+        </FormField>
 
-            {/* Полное имя */}
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                Полное имя
-              </label>
-              <input
-                type="text"
-                value={formData.full_name}
-                onChange={(e) => handleChange('full_name', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ 
-                  background: 'var(--bg-primary)', 
-                  color: 'var(--text-primary)',
-                  borderColor: 'var(--border-color)'
-                }}
-                placeholder="Введите полное имя"
-              />
-            </div>
+        {/* Email */}
+        <FormField
+          label="Email"
+          required
+          icon={Mail}
+          error={errors.email}
+        >
+          <MacOSInput
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            placeholder="Введите email"
+            error={!!errors.email}
+            style={{ paddingLeft: '40px' }}
+          />
+        </FormField>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                Email *
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                      style={{ color: 'var(--text-tertiary)' }} />
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: errors.email ? 'var(--danger-color)' : 'var(--border-color)'
-                  }}
-                  placeholder="Введите email"
-                />
-              </div>
-              {errors.email && (
-                <p className="text-sm text-red-500 mt-1 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.email}
-                </p>
-              )}
-            </div>
+        {/* Role */}
+        <FormField label="Роль" icon={Shield}>
+          <MacOSSelect
+            value={formData.role}
+            onChange={(e) => handleChange('role', e.target.value)}
+            options={roleOptions}
+            style={{ paddingLeft: '40px' }}
+          />
+        </FormField>
 
-            {/* Роль */}
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                Роль
-              </label>
-              <div className="relative">
-                <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                        style={{ color: 'var(--text-tertiary)' }} />
-                <select
-                  value={formData.role}
-                  onChange={(e) => handleChange('role', e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border-color)'
-                  }}
-                >
-                  <option value="Patient">Пациент</option>
-                  <option value="Admin">Администратор</option>
-                  <option value="Doctor">Врач</option>
-                  <option value="Nurse">Медсестра</option>
-                  <option value="Receptionist">Регистратор</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Статус */}
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                Статус
-              </label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) => handleChange('is_active', e.target.checked)}
-                  className="w-4 h-4 rounded border focus:ring-2 focus:ring-blue-500"
-                />
-                <label htmlFor="is_active" className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                  Активный пользователь
-                </label>
-              </div>
-            </div>
-
-            {/* Пароль */}
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                {user ? 'Новый пароль (оставьте пустым, чтобы не изменять)' : 'Пароль *'}
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                      style={{ color: 'var(--text-tertiary)' }} />
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => handleChange('password', e.target.value)}
-                  className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: errors.password ? 'var(--danger-color)' : 'var(--border-color)'
-                  }}
-                  placeholder="Введите пароль"
-                />
-              </div>
-              {errors.password && (
-                <p className="text-sm text-red-500 mt-1 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.password}
-                </p>
-              )}
-            </div>
-
-            {/* Подтверждение пароля */}
-            {formData.password && (
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Подтверждение пароля *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                        style={{ color: 'var(--text-tertiary)' }} />
-                  <input
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                    className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: errors.confirmPassword ? 'var(--danger-color)' : 'var(--border-color)'
-                    }}
-                    placeholder="Подтвердите пароль"
-                  />
-                </div>
-                {errors.confirmPassword && (
-                  <p className="text-sm text-red-500 mt-1 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.confirmPassword}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Кнопки */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                disabled={isSubmitting || loading}
-                className="flex-1"
-                style={{ 
-                  background: 'var(--accent-color)',
-                  color: 'white'
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    Сохранение...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    {user ? 'Сохранить изменения' : 'Создать пользователя'}
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Отмена
-              </Button>
-            </div>
-          </form>
+        {/* Status */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: 'var(--mac-font-size-sm, 13px)',
+            fontWeight: '500',
+            color: 'var(--mac-text-primary, #1d1d1f)'
+          }}>
+            Статус
+          </label>
+          <MacOSCheckbox
+            checked={formData.is_active}
+            onChange={(checked) => handleChange('is_active', checked)}
+            label="Активный пользователь"
+          />
         </div>
-      </Card>
-    </div>
+
+        {/* Password */}
+        <FormField
+          label={user ? 'Новый пароль (оставьте пустым, чтобы не изменять)' : 'Пароль'}
+          required={!user}
+          icon={Lock}
+          error={errors.password}
+        >
+          <MacOSInput
+            type="password"
+            value={formData.password}
+            onChange={(e) => handleChange('password', e.target.value)}
+            placeholder="Введите пароль"
+            error={!!errors.password}
+            style={{ paddingLeft: '40px' }}
+          />
+        </FormField>
+
+        {/* Confirm Password */}
+        {formData.password && (
+          <FormField
+            label="Подтверждение пароля"
+            required
+            icon={Lock}
+            error={errors.confirmPassword}
+          >
+            <MacOSInput
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => handleChange('confirmPassword', e.target.value)}
+              placeholder="Подтвердите пароль"
+              error={!!errors.confirmPassword}
+              style={{ paddingLeft: '40px' }}
+            />
+          </FormField>
+        )}
+
+        {/* Action Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'flex-end',
+          marginTop: '24px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--mac-border, rgba(0, 0, 0, 0.1))'
+        }}>
+          <MacOSButton
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Отмена
+          </MacOSButton>
+          <MacOSButton
+            type="submit"
+            variant="primary"
+            disabled={isSubmitting || loading}
+          >
+            {isSubmitting ? (
+              <>
+                <div style={{
+                  width: '14px',
+                  height: '14px',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: 'white',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                  marginRight: '8px'
+                }} />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Save style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                {user ? 'Сохранить изменения' : 'Создать пользователя'}
+              </>
+            )}
+          </MacOSButton>
+        </div>
+      </form>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </MacOSModal>
   );
 };
 
 export default UserModal;
-

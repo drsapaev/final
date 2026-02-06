@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSInput, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
   MacOSSelect,
   MacOSTextarea,
   MacOSBadge,
   MacOSAlert,
   MacOSLoadingSkeleton
 } from '../ui/macos';
-import { 
-  Database, 
-  Play, 
-  Copy, 
+import {
+  Database,
+  Play,
+  Copy,
   Download,
   RefreshCw,
   Code,
@@ -25,6 +25,8 @@ import {
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
+
 const GraphQLExplorer = () => {
   const [activeTab, setActiveTab] = useState('explorer');
   const [query, setQuery] = useState('');
@@ -304,7 +306,7 @@ const GraphQLExplorer = () => {
           `
         })
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setSchema(data.data.__schema);
@@ -338,7 +340,7 @@ const GraphQLExplorer = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           query: query,
@@ -401,8 +403,8 @@ const GraphQLExplorer = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Отображение ошибок */}
       {error && (
-        <MacOSAlert 
-          type="error" 
+        <MacOSAlert
+          type="error"
           title="Ошибка"
           description={error}
           onClose={() => setError(null)}
@@ -411,7 +413,7 @@ const GraphQLExplorer = () => {
 
       {/* Примеры запросов */}
       <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{ 
+        <h3 style={{
           margin: '0 0 16px 0',
           color: 'var(--mac-text-primary)',
           display: 'flex',
@@ -423,7 +425,7 @@ const GraphQLExplorer = () => {
           <BookOpen size={20} />
           Примеры запросов
         </h3>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
           {Object.entries(queryExamples).map(([key, example]) => (
             <MacOSButton
@@ -444,13 +446,13 @@ const GraphQLExplorer = () => {
       {/* Редактор запроса */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '16px'
           }}>
-            <h3 style={{ 
+            <h3 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               display: 'flex',
@@ -463,12 +465,12 @@ const GraphQLExplorer = () => {
               GraphQL Запрос
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <MacOSButton 
+              <MacOSButton
                 onClick={copyQuery}
                 variant="outline"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '4px',
                   padding: '4px 8px',
                   fontSize: 'var(--mac-font-size-xs)'
@@ -477,13 +479,13 @@ const GraphQLExplorer = () => {
                 <Copy size={14} />
                 Копировать
               </MacOSButton>
-              <MacOSButton 
+              <MacOSButton
                 onClick={executeQuery}
                 disabled={loading}
                 variant="primary"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '4px',
                   padding: '4px 8px',
                   fontSize: 'var(--mac-font-size-xs)'
@@ -534,13 +536,13 @@ const GraphQLExplorer = () => {
         </MacOSCard>
 
         <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '16px'
           }}>
-            <h3 style={{ 
+            <h3 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               display: 'flex',
@@ -553,12 +555,12 @@ const GraphQLExplorer = () => {
               Результат
             </h3>
             {result && (
-              <MacOSButton 
+              <MacOSButton
                 onClick={downloadResult}
                 variant="outline"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '4px',
                   padding: '4px 8px',
                   fontSize: 'var(--mac-font-size-xs)'
@@ -582,23 +584,23 @@ const GraphQLExplorer = () => {
             lineHeight: '1.5'
           }}>
             {loading ? (
-              <MacOSLoadingSkeleton 
-                type="text" 
+              <MacOSLoadingSkeleton
+                type="text"
                 count={8}
                 style={{ height: '100%' }}
               />
             ) : result ? (
-              <pre style={{ 
-                margin: 0, 
+              <pre style={{
+                margin: 0,
                 whiteSpace: 'pre-wrap',
                 color: result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)'
               }}>
                 {formatJSON(result)}
               </pre>
             ) : (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
                 color: 'var(--mac-text-tertiary)'
@@ -615,7 +617,7 @@ const GraphQLExplorer = () => {
   const renderSchemaTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <MacOSCard style={{ padding: '24px' }}>
-        <h3 style={{ 
+        <h3 style={{
           margin: '0 0 16px 0',
           color: 'var(--mac-text-primary)',
           display: 'flex',
@@ -642,7 +644,7 @@ const GraphQLExplorer = () => {
                     backgroundColor: 'var(--mac-bg-secondary)'
                   }}
                 >
-                  <h4 style={{ 
+                  <h4 style={{
                     margin: '0 0 8px 0',
                     color: 'var(--mac-accent)',
                     fontSize: 'var(--mac-font-size-md)',
@@ -651,7 +653,7 @@ const GraphQLExplorer = () => {
                     {type.name}
                   </h4>
                   {type.description && (
-                    <p style={{ 
+                    <p style={{
                       margin: '0 0 8px 0',
                       color: 'var(--mac-text-secondary)',
                       fontSize: 'var(--mac-font-size-sm)'
@@ -681,7 +683,7 @@ const GraphQLExplorer = () => {
                       </div>
                     ))}
                     {type.fields?.length > 10 && (
-                      <div style={{ 
+                      <div style={{
                         padding: '4px',
                         textAlign: 'center',
                         color: 'var(--mac-text-tertiary)',
@@ -695,8 +697,8 @@ const GraphQLExplorer = () => {
               ))}
           </div>
         ) : (
-          <MacOSLoadingSkeleton 
-            type="card" 
+          <MacOSLoadingSkeleton
+            type="card"
             count={3}
             style={{ height: '200px' }}
           />
@@ -712,15 +714,15 @@ const GraphQLExplorer = () => {
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '16px',
         marginBottom: '24px'
       }}>
         <Zap size={24} color="var(--mac-accent)" />
-        <h2 style={{ 
-          margin: 0, 
+        <h2 style={{
+          margin: 0,
           color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-xl)',
           fontWeight: 'var(--mac-font-weight-bold)'
@@ -730,8 +732,8 @@ const GraphQLExplorer = () => {
       </div>
 
       {/* Вкладки */}
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         borderBottom: '1px solid var(--mac-border)',
         marginBottom: '24px'
       }}>

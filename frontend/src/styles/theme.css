@@ -1,52 +1,59 @@
 /* Универсальная система темизации для всего проекта */
 
+/* EMR V2 Design Tokens */
+@import './emr-tokens.css';
+
 /* Базовые CSS переменные (будут обновляться ThemeProvider) */
 :root {
   /* Основные цвета фона */
   --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;  
+  --bg-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
-  
+
   /* Цвета текста */
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-tertiary: #64748b;
-  
+
   /* Границы и интерактивные элементы */
   --border-color: #e2e8f0;
   --hover-bg: #f1f5f9;
   --accent-color: #3b82f6;
-  
+
   /* Статусные цвета */
   --success-color: #22c55e;
   --warning-color: #f59e0b;
   --danger-color: #ef4444;
   --info-color: #0ea5e9;
-  
+
   /* Тени */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  
+
   /* Улучшенные цвета для высокой контрастности */
   /* Текст на градиентах */
   --text-on-gradient: #ffffff;
   --text-shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.8);
   --text-shadow-medium: 0 1px 2px rgba(0, 0, 0, 0.6);
-  
+
   /* Улучшенные статусные цвета */
-  --status-success-contrast: #065f46; /* Темно-зеленый для лучшего контраста */
-  --status-warning-contrast: #92400e; /* Темно-оранжевый */
-  --status-danger-contrast: #991b1b;  /* Темно-красный */
-  --status-info-contrast: #0c4a6e;    /* Темно-синий */
-  
+  --status-success-contrast: #065f46;
+  /* Темно-зеленый для лучшего контраста */
+  --status-warning-contrast: #92400e;
+  /* Темно-оранжевый */
+  --status-danger-contrast: #991b1b;
+  /* Темно-красный */
+  --status-info-contrast: #0c4a6e;
+  /* Темно-синий */
+
   /* Фоны для статусов с высоким контрастом */
   --status-success-bg-contrast: rgba(34, 197, 94, 0.15);
   --status-warning-bg-contrast: rgba(245, 158, 11, 0.15);
   --status-danger-bg-contrast: rgba(239, 68, 68, 0.15);
   --status-info-bg-contrast: rgba(14, 165, 233, 0.15);
-  
+
   /* Overlay для градиентов */
   --gradient-overlay: rgba(0, 0, 0, 0.3);
   --gradient-overlay-strong: rgba(0, 0, 0, 0.5);
@@ -65,7 +72,12 @@
 }
 
 /* Глобальный шрифт для всего приложения */
-html, body, button, input, select, textarea {
+html,
+body,
+button,
+input,
+select,
+textarea {
   font-family: var(--ui-font);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -179,7 +191,9 @@ html, body, button, input, select, textarea {
   box-shadow: var(--shadow-md);
 }
 
-.clinic-header h1, .clinic-header h2, .clinic-header h3 {
+.clinic-header h1,
+.clinic-header h2,
+.clinic-header h3 {
   margin: 0;
   font-weight: 700;
 }
@@ -251,12 +265,12 @@ html, body, button, input, select, textarea {
     border-radius: 16px;
     margin: 8px;
   }
-  
+
   .clinic-button {
     padding: 10px 20px;
     font-size: 14px;
   }
-  
+
   .clinic-header {
     padding: 16px 20px;
   }
@@ -267,7 +281,7 @@ html, body, button, input, select, textarea {
   --text-on-gradient: #f8fafc;
   --text-shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.9);
   --text-shadow-medium: 0 1px 2px rgba(0, 0, 0, 0.7);
-  
+
   /* Улучшенные фоны для темной темы */
   --bg-card-dark: #1e293b;
   --bg-panel-dark: #334155;
@@ -321,6 +335,7 @@ html, body, button, input, select, textarea {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -332,6 +347,7 @@ html, body, button, input, select, textarea {
     opacity: 0;
     transform: translateY(100%);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -350,6 +366,7 @@ html, body, button, input, select, textarea {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -393,71 +410,169 @@ html, body, button, input, select, textarea {
 }
 
 /* Типографическая система */
-.clinic-text-xs { font-size: 12px; line-height: 1.4; }
-.clinic-text-sm { font-size: 14px; line-height: 1.5; }
-.clinic-text-base { font-size: 16px; line-height: 1.5; }
-.clinic-text-lg { font-size: 18px; line-height: 1.6; }
-.clinic-text-xl { font-size: 20px; line-height: 1.6; }
-.clinic-text-2xl { font-size: 24px; line-height: 1.4; }
-.clinic-text-3xl { font-size: 30px; line-height: 1.3; }
-.clinic-text-4xl { font-size: 36px; line-height: 1.2; }
+.clinic-text-xs {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.clinic-text-sm {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.clinic-text-base {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.clinic-text-lg {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.clinic-text-xl {
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.clinic-text-2xl {
+  font-size: 24px;
+  line-height: 1.4;
+}
+
+.clinic-text-3xl {
+  font-size: 30px;
+  line-height: 1.3;
+}
+
+.clinic-text-4xl {
+  font-size: 36px;
+  line-height: 1.2;
+}
 
 /* Веса шрифтов */
-.clinic-font-normal { font-weight: 400; }
-.clinic-font-medium { font-weight: 500; }
-.clinic-font-semibold { font-weight: 600; }
-.clinic-font-bold { font-weight: 700; }
+.clinic-font-normal {
+  font-weight: 400;
+}
+
+.clinic-font-medium {
+  font-weight: 500;
+}
+
+.clinic-font-semibold {
+  font-weight: 600;
+}
+
+.clinic-font-bold {
+  font-weight: 700;
+}
 
 /* Заголовки с правильной иерархией */
-.clinic-heading-1 { 
-  font-size: 36px; 
-  font-weight: 700; 
-  line-height: 1.2; 
+.clinic-heading-1 {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--text-primary);
   margin-bottom: 1rem;
 }
 
-.clinic-heading-2 { 
-  font-size: 30px; 
-  font-weight: 600; 
-  line-height: 1.3; 
+.clinic-heading-2 {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.3;
   color: var(--text-primary);
   margin-bottom: 0.75rem;
 }
 
-.clinic-heading-3 { 
-  font-size: 24px; 
-  font-weight: 600; 
-  line-height: 1.4; 
+.clinic-heading-3 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
 /* Утилитарные классы */
-.clinic-text-center { text-align: center; }
-.clinic-text-left { text-align: left; }
-.clinic-text-right { text-align: right; }
+.clinic-text-center {
+  text-align: center;
+}
 
-.clinic-flex { display: flex; }
-.clinic-flex-col { flex-direction: column; }
-.clinic-items-center { align-items: center; }
-.clinic-justify-center { justify-content: center; }
-.clinic-justify-between { justify-content: space-between; }
+.clinic-text-left {
+  text-align: left;
+}
 
-.clinic-gap-sm { gap: 8px; }
-.clinic-gap-md { gap: 16px; }
-.clinic-gap-lg { gap: 24px; }
+.clinic-text-right {
+  text-align: right;
+}
 
-.clinic-p-sm { padding: 8px; }
-.clinic-p-md { padding: 16px; }
-.clinic-p-lg { padding: 24px; }
+.clinic-flex {
+  display: flex;
+}
 
-.clinic-m-sm { margin: 8px; }
-.clinic-m-md { margin: 16px; }
-.clinic-m-lg { margin: 24px; }
+.clinic-flex-col {
+  flex-direction: column;
+}
 
-.clinic-w-full { width: 100%; }
-.clinic-h-full { height: 100%; }
+.clinic-items-center {
+  align-items: center;
+}
 
-.clinic-hidden { display: none; }
-.clinic-visible { display: block; }
+.clinic-justify-center {
+  justify-content: center;
+}
+
+.clinic-justify-between {
+  justify-content: space-between;
+}
+
+.clinic-gap-sm {
+  gap: 8px;
+}
+
+.clinic-gap-md {
+  gap: 16px;
+}
+
+.clinic-gap-lg {
+  gap: 24px;
+}
+
+.clinic-p-sm {
+  padding: 8px;
+}
+
+.clinic-p-md {
+  padding: 16px;
+}
+
+.clinic-p-lg {
+  padding: 24px;
+}
+
+.clinic-m-sm {
+  margin: 8px;
+}
+
+.clinic-m-md {
+  margin: 16px;
+}
+
+.clinic-m-lg {
+  margin: 24px;
+}
+
+.clinic-w-full {
+  width: 100%;
+}
+
+.clinic-h-full {
+  height: 100%;
+}
+
+.clinic-hidden {
+  display: none;
+}
+
+.clinic-visible {
+  display: block;
+}

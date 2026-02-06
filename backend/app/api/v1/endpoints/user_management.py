@@ -64,6 +64,163 @@ from app.services.user_management_service import (
 router = APIRouter()
 
 
+# ============================================
+# CURRENT USER SELF-SERVICE ENDPOINTS
+# IMPORTANT: These must be BEFORE /users/{user_id} routes!
+# ============================================
+
+@router.get("/me/preferences")
+async def get_current_user_preferences(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Получить настройки текущего пользователя.
+    Используется фронтендом для загрузки EMR preferences.
+    """
+    try:
+        preferences = user_preferences.get_by_user_id(db, current_user.id)
+        
+        if not preferences:
+            # Возвращаем дефолтные настройки если нет записи
+            return {
+                "theme": "system",
+                "language": "ru",
+                "compact_mode": False,
+                "emr_smart_field_mode": "ghost",
+                "emr_show_mode_switcher": True,
+                "emr_debounce_ms": 500,
+                "emr_recent_icd10": [],
+                "emr_recent_templates": [],
+                "emr_favorite_templates": {},
+                "emr_custom_templates": []
+            }
+        
+        # Возвращаем все поля из preferences + EMR-специфичные
+        result = {
+            "id": preferences.id,
+            "user_id": preferences.user_id,
+            "theme": preferences.theme or "system",
+            "language": preferences.language or "ru",
+            "timezone": preferences.timezone,
+            "compact_mode": preferences.compact_mode or False,
+            "sidebar_collapsed": preferences.sidebar_collapsed or False,
+        }
+        
+        # Добавляем EMR-специфичные поля из JSON или дефолты
+        emr_data = getattr(preferences, 'emr_settings', None) or {}
+        if isinstance(emr_data, str):
+            import json
+            try:
+                emr_data = json.loads(emr_data)
+            except Exception:
+                emr_data = {}
+        
+        result.update({
+            "emr_smart_field_mode": emr_data.get("emr_smart_field_mode", "ghost"),
+            "emr_show_mode_switcher": emr_data.get("emr_show_mode_switcher", True),
+            "emr_debounce_ms": emr_data.get("emr_debounce_ms", 500),
+            "emr_recent_icd10": emr_data.get("emr_recent_icd10", []),
+            "emr_recent_templates": emr_data.get("emr_recent_templates", []),
+            "emr_favorite_templates": emr_data.get("emr_favorite_templates", {}),
+            "emr_custom_templates": emr_data.get("emr_custom_templates", [])
+        })
+        
+        return result
+        
+    except Exception as e:
+        # Логируем, но возвращаем дефолты вместо 500
+        import logging
+        logging.warning(f"Failed to get preferences for user {current_user.id}: {e}")
+        return {
+            "theme": "system",
+            "language": "ru",
+            "compact_mode": False,
+            "emr_smart_field_mode": "ghost",
+            "emr_show_mode_switcher": True,
+            "emr_debounce_ms": 500,
+            "emr_recent_icd10": [],
+            "emr_recent_templates": [],
+            "emr_favorite_templates": {},
+            "emr_custom_templates": []
+        }
+
+
+@router.put("/me/preferences")
+async def update_current_user_preferences(
+    preferences_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Обновить настройки текущего пользователя.
+    Принимает произвольный JSON с настройками.
+    """
+    try:
+        preferences = user_preferences.get_by_user_id(db, current_user.id)
+        
+        if not preferences:
+            # Создаём новую запись preferences
+            from app.models.user_profile import UserPreferences
+            preferences = UserPreferences(
+                user_id=current_user.id,
+                theme=preferences_data.get("theme", "system"),
+                language=preferences_data.get("language", "ru"),
+                compact_mode=preferences_data.get("compact_mode", False),
+                sidebar_collapsed=preferences_data.get("sidebar_collapsed", False),
+            )
+            db.add(preferences)
+        else:
+            # Обновляем существующие поля
+            if "theme" in preferences_data:
+                preferences.theme = preferences_data["theme"]
+            if "language" in preferences_data:
+                preferences.language = preferences_data["language"]
+            if "compact_mode" in preferences_data:
+                preferences.compact_mode = preferences_data["compact_mode"]
+            if "sidebar_collapsed" in preferences_data:
+                preferences.sidebar_collapsed = preferences_data["sidebar_collapsed"]
+        
+        # Сохраняем EMR-специфичные настройки в JSON поле
+        emr_keys = [
+            "emr_smart_field_mode", "emr_show_mode_switcher", "emr_debounce_ms",
+            "emr_recent_icd10", "emr_recent_templates", "emr_favorite_templates",
+            "emr_custom_templates"
+        ]
+        
+        emr_data = {}
+        current_emr = getattr(preferences, 'emr_settings', None) or {}
+        if isinstance(current_emr, str):
+            import json
+            try:
+                current_emr = json.loads(current_emr)
+            except Exception:
+                current_emr = {}
+        
+        emr_data.update(current_emr)
+        for key in emr_keys:
+            if key in preferences_data:
+                emr_data[key] = preferences_data[key]
+        
+        if hasattr(preferences, 'emr_settings'):
+            import json
+            preferences.emr_settings = json.dumps(emr_data)
+        
+        db.commit()
+        db.refresh(preferences)
+        
+        return {"success": True, "message": "Preferences updated"}
+        
+    except Exception as e:
+        db.rollback()
+        import logging
+        logging.error(f"Failed to update preferences for user {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка обновления настроек: {str(e)}"
+        )
+
+
 @router.post("/users", response_model=UserResponse)
 async def create_user(
     user_data: UserCreateRequest,
@@ -103,10 +260,11 @@ async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: Optional[str] = Query(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+        # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
-    status: Optional[str] = Query(
-        None, pattern="^(active|inactive|suspended|pending|locked)$"
+    status_filter: Optional[str] = Query(
+        None, pattern="^(active|inactive|suspended|pending|locked)$", alias="status"
     ),
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None, min_length=1, max_length=100),
@@ -120,7 +278,7 @@ async def get_users(
             page=page,
             per_page=per_page,
             role=role,
-            status=status,
+            status=status_filter,
             is_active=is_active,
             query=search,
         )

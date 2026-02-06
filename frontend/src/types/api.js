@@ -6,7 +6,8 @@
  */
 export const USER_ROLES = {
   ADMIN: 'Admin',
-  REGISTRAR: 'Registrar', 
+  REGISTRAR: 'Registrar',
+  RECEPTIONIST: 'Receptionist',  // Alias for REGISTRAR - same role
   DOCTOR: 'Doctor',
   LAB: 'Lab',
   CASHIER: 'Cashier',
@@ -21,7 +22,7 @@ export const USER_ROLES = {
  */
 export const APPOINTMENT_STATUS = {
   SCHEDULED: 'scheduled',
-  CONFIRMED: 'confirmed', 
+  CONFIRMED: 'confirmed',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
@@ -293,21 +294,21 @@ export const PaginatedResponseDTO = {
  */
 export function validateDTO(data, dto) {
   const errors = [];
-  
+
   for (const [key, expectedType] of Object.entries(dto)) {
     if (!(key in data)) {
       errors.push(`Missing required field: ${key}`);
       continue;
     }
-    
+
     const value = data[key];
     const actualType = Array.isArray(value) ? 'array' : typeof value;
-    
+
     if (actualType !== expectedType) {
       errors.push(`Field ${key} expected ${expectedType}, got ${actualType}`);
     }
   }
-  
+
   return errors;
 }
 
@@ -316,12 +317,12 @@ export function validateDTO(data, dto) {
  */
 export function createDTO(data, dto) {
   const validated = {};
-  
+
   for (const [key, expectedType] of Object.entries(dto)) {
     if (key in data) {
       validated[key] = data[key];
     }
   }
-  
+
   return validated;
 }

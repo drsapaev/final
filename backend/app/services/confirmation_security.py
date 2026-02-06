@@ -81,6 +81,7 @@ class ConfirmationSecurityService:
             # 1. Проверяем существование и валидность токена
             visit = self._get_visit_by_token(token)
             if not visit:
+                print(f"DEBUG: Visit not found for token {token}")
                 self._log_security_event(
                     "invalid_token",
                     {
@@ -93,12 +94,15 @@ class ConfirmationSecurityService:
                 return SecurityCheckResult(
                     allowed=False, reason="Недействительный токен подтверждения"
                 )
+            
+            print(f"DEBUG: Visit found: ID={visit.id}, Status={visit.status}, Expires={visit.confirmation_expires_at}, Now={datetime.utcnow()}")
 
             # 2. Проверяем срок действия токена
             if (
                 visit.confirmation_expires_at
                 and visit.confirmation_expires_at < datetime.utcnow()
             ):
+                print("DEBUG: Token expired")
                 self._log_security_event(
                     "expired_token",
                     {
@@ -115,6 +119,7 @@ class ConfirmationSecurityService:
 
             # 3. Проверяем статус визита
             if visit.status not in ["pending_confirmation"]:
+                print(f"DEBUG: Invalid status {visit.status}")
                 return SecurityCheckResult(
                     allowed=False, reason=f"Визит уже имеет статус: {visit.status}"
                 )
