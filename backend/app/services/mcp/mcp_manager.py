@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 class MCPManager:
     """Менеджер для управления MCP сервисами и мониторинга"""
 
+    # Circuit breaker configuration
+    CIRCUIT_BREAKER_THRESHOLD = 3  # failures before tripping
+    CIRCUIT_BREAKER_COOLDOWN = 300  # 5 minutes in seconds
+
     def __init__(self):
         self.client: Optional[MedicalMCPClient] = None
         self.metrics: Dict[str, Any] = {
@@ -27,6 +31,10 @@ class MCPManager:
         }
         self.config = self._load_config()
         self._health_check_task: Optional[asyncio.Task] = None
+        
+        # Circuit breaker state
+        self._server_failures: Dict[str, int] = {}
+        self._server_disabled_until: Dict[str, datetime] = {}
 
     def _load_config(self) -> Dict[str, Any]:
         """Загрузка конфигурации MCP"""
@@ -35,11 +43,55 @@ class MCPManager:
             "health_check_interval": getattr(
                 settings, "MCP_HEALTH_CHECK_INTERVAL", 60
             ),  # секунды
-            "request_timeout": getattr(settings, "MCP_REQUEST_TIMEOUT", 30),  # секунды
+            "request_timeout": getattr(settings, "MCP_REQUEST_TIMEOUT", 180),  # секунды
             "max_batch_size": getattr(settings, "MCP_MAX_BATCH_SIZE", 10),
             "fallback_to_direct": getattr(settings, "MCP_FALLBACK_TO_DIRECT", True),
             "log_requests": getattr(settings, "MCP_LOG_REQUESTS", True),
         }
+
+    # === Circuit Breaker Methods ===
+
+    def _is_server_available(self, server: str) -> bool:
+        """Check if server is available (not circuit-broken)"""
+        if server in self._server_disabled_until:
+            if datetime.utcnow() < self._server_disabled_until[server]:
+                return False
+            # Cooldown passed, reset
+            del self._server_disabled_until[server]
+            self._server_failures[server] = 0
+            logger.info(f"CIRCUIT_BREAKER_RESET: server={server}")
+        return True
+
+    def _record_server_failure(self, server: str):
+        """Record a failure and potentially trip the circuit breaker"""
+        self._server_failures[server] = self._server_failures.get(server, 0) + 1
+        if self._server_failures[server] >= self.CIRCUIT_BREAKER_THRESHOLD:
+            self._server_disabled_until[server] = datetime.utcnow() + timedelta(
+                seconds=self.CIRCUIT_BREAKER_COOLDOWN
+            )
+            logger.warning(
+                f"CIRCUIT_BREAKER_TRIPPED: server={server}, "
+                f"failures={self._server_failures[server]}, "
+                f"disabled_for={self.CIRCUIT_BREAKER_COOLDOWN}s"
+            )
+
+    def _record_server_success(self, server: str):
+        """Record a success and reset failure count"""
+        if server in self._server_failures:
+            self._server_failures[server] = 0
+
+    def get_circuit_breaker_status(self) -> Dict[str, Any]:
+        """Get current circuit breaker status for monitoring"""
+        now = datetime.utcnow()
+        status = {}
+        for server, disabled_until in self._server_disabled_until.items():
+            remaining = (disabled_until - now).total_seconds()
+            status[server] = {
+                "disabled": remaining > 0,
+                "remaining_seconds": max(0, int(remaining)),
+                "failures": self._server_failures.get(server, 0),
+            }
+        return status
 
     async def initialize(self):
         """Инициализация MCP менеджера"""
@@ -142,6 +194,20 @@ class MCPManager:
                 "fallback": self.config["fallback_to_direct"],
             }
 
+        # Circuit breaker check
+        if not self._is_server_available(server):
+            remaining = (self._server_disabled_until[server] - datetime.utcnow()).total_seconds()
+            logger.warning(
+                f"CIRCUIT_BREAKER_BLOCKED: server={server}, remaining={remaining:.0f}s"
+            )
+            return {
+                "status": "error",
+                "error": "Server temporarily unavailable (circuit breaker)",
+                "layer": "circuit_breaker",
+                "server": server,
+                "retry_after": int(remaining),
+            }
+
         start_time = datetime.utcnow()
         timeout = timeout or self.config["request_timeout"]
 
@@ -149,6 +215,13 @@ class MCPManager:
             # Логируем запрос если включено
             if self.config["log_requests"]:
                 logger.debug(f"MCP request: {server}.{method}")
+
+            # ⚠️ ВАЖНО: Явно логируем таймаут ПЕРЕД wait_for
+            # Это гарантирует, что таймаут никогда не будет "немым"
+            logger.info(
+                f"MCP_WAIT_START: server={server}, method={method}, "
+                f"timeout={timeout}s, layer=mcp_manager"
+            )
 
             # Выполняем запрос с таймаутом
             result = await asyncio.wait_for(
@@ -159,8 +232,10 @@ class MCPManager:
             self.metrics["requests_total"] += 1
             if result.get("status") == "success":
                 self.metrics["requests_success"] += 1
+                self._record_server_success(server)  # Circuit breaker: reset on success
             else:
                 self.metrics["requests_failed"] += 1
+                self._record_server_failure(server)  # Circuit breaker: track failure
 
             # Обновляем статистику сервера
             if server not in self.metrics["server_stats"]:
@@ -184,19 +259,51 @@ class MCPManager:
                 current_avg * (total_requests - 1) + response_time
             ) / total_requests
 
+            # Добавляем debug_meta в dev режиме для прозрачности
+            if getattr(settings, "ENV", "dev").lower() == "dev":
+                result["debug_meta"] = {
+                    "layer": "mcp_manager",
+                    "server": server,
+                    "method": method,
+                    "elapsed_ms": int(response_time * 1000),
+                    "timeout_ms": int(timeout * 1000),
+                }
+
             return result
 
         except asyncio.TimeoutError:
-            logger.error(f"MCP request timeout: {server}.{method}")
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            # ⚠️ КРИТИЧНО: Явный лог с указанием слоя и параметров
+            logger.warning(
+                f"MCP_TIMEOUT: server={server}, method={method}, "
+                f"timeout={timeout}s, elapsed={elapsed:.2f}s, layer=mcp_manager"
+            )
             self.metrics["requests_failed"] += 1
+            self._record_server_failure(server)  # Circuit breaker: track timeout as failure
 
-            return {"status": "error", "error": "Request timeout", "timeout": timeout}
+            # Ответ с полной провенансностью ошибки
+            return {
+                "status": "error",
+                "error": "Request timeout",
+                "timeout": timeout,
+                "layer": "mcp_manager",  # Кто сгенерировал ошибку
+                "server": server,
+                "method": method,
+                "elapsed": round(elapsed, 2),
+            }
 
         except Exception as e:
             logger.error(f"MCP request error: {server}.{method} - {str(e)}")
             self.metrics["requests_failed"] += 1
+            self._record_server_failure(server)  # Circuit breaker: track exception as failure
 
-            return {"status": "error", "error": str(e)}
+            return {
+                "status": "error",
+                "error": str(e),
+                "layer": "mcp_manager",
+                "server": server,
+                "method": method,
+            }
 
     async def batch_execute(
         self, requests: List[Dict[str, Any]], parallel: bool = True

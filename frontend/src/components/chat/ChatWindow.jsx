@@ -2,18 +2,81 @@
  * Главное окно чата
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Send, MessageCircle, ChevronLeft, Plus, Search, Check, CheckCheck, Mic, Filter } from 'lucide-react';
+import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import auth from '../../stores/auth';
 import VoiceRecorder from './VoiceRecorder';
 import VoiceMessage from './VoiceMessage';
+import EmojiPicker from './EmojiPicker';
+import Avatar from '../common/Avatar';
+import MessageContextMenu from './MessageContextMenu';
+import ReactMarkdown from 'react-markdown';
+import LinkPreview from './LinkPreview';
+import FileUploader from './FileUploader';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useToast } from '../../components/common/Toast';
 import './Chat.css';
+
+const groupReactions = (reactions) => {
+    if (!reactions) return {};
+    const groups = {};
+    reactions.forEach(r => {
+        if (!groups[r.reaction]) groups[r.reaction] = [];
+        groups[r.reaction].push(r.user_id);
+    });
+    return groups;
+};
+
+// === HELPER FUNCTIONS ===
+
+// Форматирование времени сообщения
+const formatMessageTime = (dateStr) => {
+    if (!dateStr) return '';
+    let d = dateStr;
+    if (d.indexOf('Z') === -1 && d.indexOf('+') === -1) d += 'Z';
+    return new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+};
+
+// Форматирование разделителя даты
+const formatDateSeparator = (dateStr) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Сегодня';
+    if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
+    return date.toLocaleDateString('ru', { day: 'numeric', month: 'long' });
+};
+
+// Группировка сообщений по датам
+const groupMessagesByDate = (msgs) => {
+    if (!msgs || msgs.length === 0) return [];
+
+    const groups = [];
+    let currentDate = null;
+
+    // Сортируем от старых к новым для правильной группировки
+    const sorted = [...msgs].reverse();
+
+    sorted.forEach(msg => {
+        const msgDate = new Date(msg.created_at).toDateString();
+        if (msgDate !== currentDate) {
+            groups.push({ type: 'date-separator', date: msg.created_at, id: `sep-${msg.id}` });
+            currentDate = msgDate;
+        }
+        groups.push({ type: 'message', ...msg });
+    });
+
+    return groups;
+};
 
 const ChatWindow = ({ isOpen, onClose }) => {
     const [authState, setAuthState] = useState(auth.getState());
     const user = authState.profile;
+    const { addToast } = useToast();
     const {
         conversations,
         messages,
@@ -22,13 +85,21 @@ const ChatWindow = ({ isOpen, onClose }) => {
         isConnected,
         isLoading,
         typingUsers,
+        setIsChatOpen,
+        onlineUsers,
+        requestOnlineStatus,
         loadConversations,
         loadMessages,
+        loadMoreMessages,
+        hasMore,
         sendMessage,
         sendTyping,
         searchUsers,
         closeConversation,
-        setActiveConversation
+        setActiveConversation,
+        toggleReaction,
+        deleteMessage,
+        uploadFile
     } = useChat();
 
     const [inputValue, setInputValue] = useState('');
@@ -37,7 +108,18 @@ const ChatWindow = ({ isOpen, onClose }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+
+    // Drag and Resize State
+    const [position, setPosition] = useState({ x: window.innerWidth - 420, y: window.innerHeight - 640 });
+    const [size, setSize] = useState({ width: 380, height: 600 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 0, h: 0 });
+
     const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+    const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
+    const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
 
     // Search & Filter State
     const [convSearchQuery, setConvSearchQuery] = useState('');
@@ -49,11 +131,46 @@ const ChatWindow = ({ isOpen, onClose }) => {
     const [allUsers, setAllUsers] = useState([]);
 
     const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
+    const prevScrollHeightRef = useRef(null);
     const inputRef = useRef(null);
     const typingTimeoutRef = useRef(null);
 
-    // Позиция окна - правый верхний угол (macOS стиль)
-    const [position] = useState({ x: window.innerWidth - 400, y: 70 });
+    // Scroll to bottom button state
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+    // Максимальная длина сообщения
+    const MAX_MESSAGE_LENGTH = 4000;
+
+    // Filtered Messages
+    const filteredMessages = showMsgSearch && msgSearchQuery
+        ? messages.filter(m => m.content && m.content.toLowerCase().includes(msgSearchQuery.toLowerCase()))
+        : messages;
+
+    const groupedMessages = groupMessagesByDate(filteredMessages);
+
+    const rowVirtualizer = useVirtualizer({
+        count: groupedMessages.length,
+        getScrollElement: () => messagesContainerRef.current,
+        estimateSize: (index) => {
+            const item = groupedMessages[index];
+            if (item.type === 'date-separator') return 40;
+            if (item.message_type === 'image') return 220;
+            if (item.message_type === 'voice') return 90;
+            return 70;
+        },
+        overscan: 15,
+        scrollToAlignment: 'end'
+    });
+
+    // Scroll to bottom effect
+    useLayoutEffect(() => {
+        if (groupedMessages.length > 0 && !prevScrollHeightRef.current) {
+            rowVirtualizer.scrollToIndex(groupedMessages.length - 1);
+        }
+    }, [groupedMessages.length]);
+
+
 
     // Подписка на изменения auth
     useEffect(() => {
@@ -61,12 +178,47 @@ const ChatWindow = ({ isOpen, onClose }) => {
         return unsubscribe;
     }, []);
 
-    // Прокрутка к последнему сообщению
+    // Sync chat open state with context for notification sound logic
     useEffect(() => {
-        if (messages.length > 0) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        setIsChatOpen(isOpen);
+    }, [isOpen, setIsChatOpen]);
+
+    // Request online status for all conversation partners when chat opens
+    useEffect(() => {
+        if (isOpen && isConnected && conversations.length > 0) {
+            const userIds = conversations.map(c => c.user_id);
+            requestOnlineStatus(userIds);
+
+            // Refresh online status every 30 seconds while chat is open
+            const interval = setInterval(() => {
+                requestOnlineStatus(userIds);
+            }, 30000);
+
+            return () => clearInterval(interval);
         }
-    }, [messages]);
+    }, [isOpen, isConnected, conversations, requestOnlineStatus]);
+
+    // Скролл-позиция теперь обрабатывается через rowVirtualizer и эффект в начале компонента
+
+
+    const handleScroll = async (e) => {
+        const container = e.target;
+
+        // Показать/скрыть кнопку "scroll to bottom"
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+        setShowScrollToBottom(!isNearBottom);
+
+        // Load more при скролле вверх
+        if (container.scrollTop === 0 && hasMore && !isLoading) {
+            prevScrollHeightRef.current = container.scrollHeight;
+            await loadMoreMessages();
+        }
+    };
+
+    // Прокрутка вниз
+    const scrollToBottom = () => {
+        rowVirtualizer.scrollToIndex(groupedMessages.length - 1, { behavior: 'smooth' });
+    };
 
     // Фокус на input при открытии беседы
     useEffect(() => {
@@ -74,6 +226,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
             inputRef.current?.focus();
         }
     }, [activeConversation]);
+
 
     // Загрузка пользователей если нет бесед
     useEffect(() => {
@@ -125,7 +278,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
             sendTyping(activeConversation, false);
         } catch (error) {
             setInputValue(content);
-            alert('Ошибка отправки сообщения');
+            addToast({ type: 'error', message: 'Ошибка отправки сообщения' });
         } finally {
             setIsSending(false);
         }
@@ -171,7 +324,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
             loadConversations();
         } catch (error) {
             console.error('Voice send error:', error);
-            alert('Ошибка отправки голосового сообщения: ' + error.message);
+            addToast({ type: 'error', message: 'Ошибка отправки голосового сообщения: ' + error.message });
         } finally {
             setIsSending(false);
         }
@@ -179,8 +332,17 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
     // Обработка ввода
     const handleInputChange = (e) => {
-        setInputValue(e.target.value);
+        const value = e.target.value;
 
+        // Ограничение длины
+        if (value.length > MAX_MESSAGE_LENGTH) return;
+
+        setInputValue(value);
+
+        // Auto-resize textarea
+        const textarea = e.target;
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
         if (activeConversation) {
             sendTyping(activeConversation, true);
             clearTimeout(typingTimeoutRef.current);
@@ -189,6 +351,117 @@ const ChatWindow = ({ isOpen, onClose }) => {
             }, 2000);
         }
     };
+
+    const handleMessageContextMenu = (e, message) => {
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            message: message
+        });
+    };
+
+    const handleMenuAction = async (action, msg) => {
+        if (action === 'copy') {
+            try {
+                await navigator.clipboard.writeText(msg.content);
+                addToast({ type: 'success', message: 'Текст скопирован' });
+            } catch (err) {
+                console.error('Failed to copy text:', err);
+            }
+        } else if (action === 'delete') {
+            if (window.confirm('Удалить это сообщение у себя?')) {
+                try {
+                    await deleteMessage(msg.id);
+                    addToast({ type: 'success', message: 'Сообщение удалено' });
+                } catch (e) {
+                    addToast({ type: 'error', message: 'Не удалось удалить сообщение' });
+                }
+            }
+        } else if (action === 'reply') {
+            setInputValue(`@${msg.sender_name || 'Сотрудник'}, `);
+            inputRef.current?.focus();
+        } else if (action === 'forward') {
+            addToast({ type: 'info', message: 'Функция пересылки в разработке' });
+        }
+    };
+
+    const handleFileUpload = async (file) => {
+        if (!activeConversation) return;
+        setIsSending(true);
+        try {
+            await uploadFile(activeConversation, file);
+            addToast({ type: 'success', message: 'Файл отправлен' });
+        } catch (e) {
+            addToast({ type: 'error', message: 'Ошибка при загрузке файла' });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    useEffect(() => {
+        const handleCloseMenu = () => setContextMenu(null);
+        window.addEventListener('click', handleCloseMenu);
+        return () => window.removeEventListener('click', handleCloseMenu);
+    }, []);
+
+    // Drag Logic
+    const handleMouseDown = (e) => {
+        if (e.target.closest('.chat-header') && !e.target.closest('button')) {
+            setIsDragging(true);
+            setDragOffset({
+                x: e.clientX - position.x,
+                y: e.clientY - position.y
+            });
+        }
+    };
+
+    // Resize Logic
+    const handleResizeStart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsResizing(true);
+        setResizeStart({
+            x: e.clientX,
+            y: e.clientY,
+            w: size.width,
+            h: size.height
+        });
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (isDragging) {
+                setPosition({
+                    x: e.clientX - dragOffset.x,
+                    y: e.clientY - dragOffset.y
+                });
+            }
+            if (isResizing) {
+                const dw = e.clientX - resizeStart.x;
+                const dh = e.clientY - resizeStart.y;
+                setSize({
+                    width: Math.max(300, resizeStart.w + dw),
+                    height: Math.max(400, resizeStart.h + dh)
+                });
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            setIsResizing(false);
+        };
+
+        if (isDragging || isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging, isResizing, dragOffset, resizeStart]);
 
     // Enter для отправки
     const handleKeyPress = (e) => {
@@ -248,10 +521,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
         return matchesSearch && matchesFilter;
     });
 
-    // Filtered Messages
-    const filteredMessages = showMsgSearch && msgSearchQuery
-        ? messages.filter(m => m.content && m.content.toLowerCase().includes(msgSearchQuery.toLowerCase()))
-        : messages;
+
 
     if (!isOpen) return null;
 
@@ -261,15 +531,19 @@ const ChatWindow = ({ isOpen, onClose }) => {
     return ReactDOM.createPortal(
         <div className="chat-window-overlay" style={{ pointerEvents: 'none', background: 'transparent' }}>
             <div
-                className="chat-window"
+                className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''}`}
+                onMouseDown={handleMouseDown}
                 style={{
                     position: 'absolute',
-                    left: position.x,
-                    top: position.y,
+                    left: Math.max(0, Math.min(window.innerWidth - size.width, position.x)),
+                    top: Math.max(0, Math.min(window.innerHeight - size.height, position.y)),
+                    width: size.width,
+                    height: size.height,
                     transform: 'none',
                     margin: 0,
                     pointerEvents: 'auto',
-                    height: 550 // Высота окна фиксирована
+                    cursor: isDragging ? 'grabbing' : 'default',
+                    userSelect: (isDragging || isResizing) ? 'none' : 'auto'
                 }}
 
                 onClick={e => e.stopPropagation()}
@@ -290,7 +564,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
                             {showNewChat
                                 ? 'Новое сообщение'
                                 : activeUser
-                                    ? activeUser.user_name
+                                    ? (
+                                        <span className="chat-header-name">
+                                            {activeUser.user_name}
+                                            {onlineUsers[activeConversation] && (
+                                                <span className="user-online-dot" title="В сети" />
+                                            )}
+                                        </span>
+                                    )
                                     : 'Чаты'
                             }
                         </h3>
@@ -436,8 +717,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         className="conversation-item"
                                         onClick={() => loadMessages(conv.user_id)}
                                     >
-                                        <div className="conv-avatar">
-                                            {(conv.user_name?.[0] || '?').toUpperCase()}
+                                        <div className="conv-avatar-wrapper">
+                                            <div className="conv-avatar">
+                                                {(conv.user_name?.[0] || '?').toUpperCase()}
+                                            </div>
+                                            {onlineUsers[conv.user_id] && (
+                                                <span className="avatar-online-indicator" />
+                                            )}
                                         </div>
                                         <div className="conv-info">
                                             <div className="conv-top-row">
@@ -498,7 +784,11 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     {/* Messages */}
                     {activeConversation && !showNewChat && (
                         <>
-                            <div className="messages-container">
+                            <div
+                                className="messages-container"
+                                ref={messagesContainerRef}
+                                onScroll={handleScroll}
+                            >
                                 {showMsgSearch && (
                                     <div className="message-search-bar" style={{
                                         padding: '8px 12px',
@@ -525,7 +815,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                 )}
 
                                 {isLoading ? (
-                                    <div className="chat-loading" />
+                                    /* Skeleton Loading */
+                                    <div className="chat-skeleton">
+                                        {[1, 2, 3, 4, 5].map(i => (
+                                            <div key={i} className={`skeleton-message ${i % 2 ? 'sent' : 'received'}`}>
+                                                <div className="skeleton-bubble" />
+                                            </div>
+                                        ))}
+                                    </div>
                                 ) : messages.length === 0 ? (
                                     <div className="empty-state">
                                         <div className="conv-avatar" style={{ width: 64, height: 64, fontSize: 24, marginBottom: 16 }}>
@@ -536,76 +833,197 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         <p style={{ marginTop: 8, fontSize: 13, opacity: 0.6 }}>Напишите первое сообщение</p>
                                     </div>
                                 ) : (
-                                    <>
-                                        {[...filteredMessages].reverse().map(msg => (
-                                            <div
-                                                key={msg.id}
-                                                className={`message ${msg.sender_id === user?.id ? 'sent' : 'received'}`}
-                                            >
-                                                {msg.message_type === 'voice' ? (
-                                                    <>
-                                                        <VoiceMessage
-                                                            message={msg}
-                                                            fileUrl={msg.file_url}
-                                                        />
-                                                        <div className="message-meta">
-                                                            <span className="message-time">
-                                                                {(() => {
-                                                                    let dateStr = msg.created_at;
-                                                                    // Если нет Z и нет смещения, считаем UTC
-                                                                    if (dateStr && dateStr.indexOf('Z') === -1 && dateStr.indexOf('+') === -1) {
-                                                                        dateStr += 'Z';
-                                                                    }
-                                                                    return new Date(dateStr).toLocaleTimeString('ru', {
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit'
-                                                                    });
-                                                                })()}
-                                                            </span>
-                                                            {msg.sender_id === user?.id && (
-                                                                <span className="message-status">
-                                                                    {msg.is_read ? <CheckCheck size={14} /> : <Check size={14} />}
-                                                                </span>
-                                                            )}
+                                    <div
+                                        style={{
+                                            height: `${rowVirtualizer.getTotalSize()}px`,
+                                            width: '100%',
+                                            position: 'relative',
+                                        }}
+                                    >
+                                        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+                                            const item = groupedMessages[virtualItem.index];
+                                            return (
+                                                <div
+                                                    key={virtualItem.key}
+                                                    data-index={virtualItem.index}
+                                                    ref={rowVirtualizer.measureElement}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: '100%',
+                                                        transform: `translateY(${virtualItem.start}px)`,
+                                                        padding: '0 12px'
+                                                    }}
+                                                >
+                                                    {item.type === 'date-separator' ? (
+                                                        <div className="date-separator">
+                                                            <span>{formatDateSeparator(item.date)}</span>
                                                         </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="message-content">{msg.content}</div>
-                                                        <div className="message-meta">
-                                                            <span className="message-time">
-                                                                {(() => {
-                                                                    let dateStr = msg.created_at;
-                                                                    // Если нет Z и нет смещения, считаем UTC
-                                                                    if (dateStr && dateStr.indexOf('Z') === -1 && dateStr.indexOf('+') === -1) {
-                                                                        dateStr += 'Z';
-                                                                    }
-                                                                    return new Date(dateStr).toLocaleTimeString('ru', {
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit'
-                                                                    });
-                                                                })()}
-                                                            </span>
-                                                            {msg.sender_id === user?.id && (
-                                                                <span className="message-status">
-                                                                    {msg.is_read ? <CheckCheck size={14} /> : <Check size={14} />}
-                                                                </span>
+                                                    ) : (
+                                                        <div className={`message-row ${item.sender_id === user?.id ? 'sent' : 'received'}`}>
+                                                            {item.sender_id !== user?.id && activeUser && (
+                                                                <Avatar
+                                                                    user={{
+                                                                        name: activeUser.user_name,
+                                                                        role: activeUser.user_role
+                                                                    }}
+                                                                    size={28}
+                                                                    className="message-avatar"
+                                                                />
                                                             )}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))}
+                                                            <div
+                                                                className={`message ${item.sender_id === user?.id ? 'sent' : 'received'}`}
+                                                                onContextMenu={(e) => handleMessageContextMenu(e, item)}
+                                                            >
+                                                                {item.message_type === 'voice' ? (
+                                                                    <>
+                                                                        <VoiceMessage
+                                                                            message={item}
+                                                                            fileUrl={item.file_url}
+                                                                        />
+                                                                        <div className="message-meta">
+                                                                            <span className="message-time">{formatMessageTime(item.created_at)}</span>
+                                                                            {item.sender_id === user?.id && (
+                                                                                <span className="message-status">
+                                                                                    {item.is_read ? <CheckCheck size={14} /> : <Check size={14} />}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className="message-content">
+                                                                            {item.message_type === 'image' ? (
+                                                                                <div className="message-image">
+                                                                                    <img
+                                                                                        src={item.content}
+                                                                                        alt="Attached"
+                                                                                        onClick={() => window.open(item.content, '_blank')}
+                                                                                        style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }}
+                                                                                    />
+                                                                                </div>
+                                                                            ) : item.message_type === 'file' ? (
+                                                                                <div className="message-file">
+                                                                                    <a href={item.content} target="_blank" rel="noopener noreferrer" className="file-link">
+                                                                                        <Paperclip size={16} />
+                                                                                        <span>{item.content.split('name=')[1] || 'Файл'}</span>
+                                                                                    </a>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <ReactMarkdown
+                                                                                    components={{
+                                                                                        a: ({ node, ...props }) => (
+                                                                                            <a {...props} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} />
+                                                                                        )
+                                                                                    }}
+                                                                                >
+                                                                                    {item.content}
+                                                                                </ReactMarkdown>
+                                                                            )}
 
+                                                                            {item.message_type === 'text' && item.content && item.content.match(/https?:\/\/[^\s]+/) && (
+                                                                                <LinkPreview url={item.content.match(/https?:\/\/[^\s]+/)[0]} />
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="message-meta">
+                                                                            <span className="message-time">{formatMessageTime(item.created_at)}</span>
+                                                                            {item.sender_id === user?.id && (
+                                                                                <span className="message-status">
+                                                                                    {item.is_read ? <CheckCheck size={14} /> : <Check size={14} />}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </>
+                                                                )}
+
+                                                                {item.reactions && item.reactions.length > 0 && (
+                                                                    <div className="message-reactions">
+                                                                        {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]) => (
+                                                                            <span
+                                                                                key={emoji}
+                                                                                className={`reaction-bubble ${userIds.includes(user?.id) ? 'active' : ''}`}
+                                                                                onClick={(e) => { e.stopPropagation(); toggleReaction(item.id, emoji); }}
+                                                                            >
+                                                                                {emoji} {userIds.length > 1 && userIds.length}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+
+                                                                <button
+                                                                    className="add-reaction-btn"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setReactionMenuMessageId(reactionMenuMessageId === item.id ? null : item.id);
+                                                                    }}
+                                                                >
+                                                                    <Smile size={14} />
+                                                                </button>
+
+                                                                {reactionMenuMessageId === item.id && (
+                                                                    <div className="reaction-menu">
+                                                                        {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(emoji => (
+                                                                            <button
+                                                                                key={emoji}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    toggleReaction(item.id, emoji);
+                                                                                    setReactionMenuMessageId(null);
+                                                                                }}
+                                                                            >
+                                                                                {emoji}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* Typing Indicator inside scroll area */}
                                         {typingUsers[activeConversation] && (
-                                            <div className="typing-container">
-                                                <div className="typing-dot"></div>
-                                                <div className="typing-dot"></div>
-                                                <div className="typing-dot"></div>
+                                            <div
+                                                className="typing-indicator-modern"
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: -40,
+                                                    left: 12,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8
+                                                }}
+                                            >
+                                                <Avatar
+                                                    user={{
+                                                        name: activeUser?.user_name,
+                                                        role: activeUser?.user_role
+                                                    }}
+                                                    size={24}
+                                                />
+                                                <div className="typing-bubble">
+                                                    <div className="typing-dots">
+                                                        <span></span><span></span><span></span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
-                                        <div ref={messagesEndRef} />
-                                    </>
+                                        <div ref={messagesEndRef} style={{ height: 1 }} />
+                                    </div>
+                                )}
+
+                                {/* Scroll to Bottom Button */}
+                                {showScrollToBottom && (
+                                    <button
+                                        className="scroll-to-bottom-btn"
+                                        onClick={scrollToBottom}
+                                        title="К последним сообщениям"
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
                                 )}
                             </div>
 
@@ -617,20 +1035,40 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                     />
                                 ) : (
                                     <>
-                                        <textarea
-                                            ref={inputRef}
-                                            value={inputValue}
-                                            onChange={handleInputChange}
-                                            onKeyPress={handleKeyPress}
-                                            placeholder="Сообщение..."
-                                            rows={1}
+                                        <div className="input-wrapper">
+                                            <textarea
+                                                ref={inputRef}
+                                                value={inputValue}
+                                                onChange={handleInputChange}
+                                                onKeyPress={handleKeyPress}
+                                                placeholder="Сообщение... (Shift+Enter для новой строки)"
+                                                rows={1}
+                                                disabled={isSending}
+                                                onMouseDown={e => e.stopPropagation()}
+                                                aria-label="Введите сообщение"
+                                            />
+                                            {inputValue.length > 100 && (
+                                                <span className={`char-counter ${inputValue.length > MAX_MESSAGE_LENGTH * 0.9 ? 'warning' : ''}`}>
+                                                    {inputValue.length}/{MAX_MESSAGE_LENGTH}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <FileUploader
+                                            onUpload={handleFileUpload}
                                             disabled={isSending}
-                                            onMouseDown={e => e.stopPropagation()}
+                                        />
+                                        <EmojiPicker
+                                            onEmojiSelect={(emoji) => {
+                                                setInputValue(prev => prev + emoji);
+                                                inputRef.current?.focus();
+                                            }}
+                                            disabled={isSending}
                                         />
                                         <button
                                             onClick={() => setShowVoiceRecorder(true)}
                                             className="voice-btn"
                                             title="Голосовое сообщение"
+                                            aria-label="Записать голосовое сообщение"
                                             disabled={isSending}
                                         >
                                             <Mic size={18} />
@@ -640,6 +1078,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                             disabled={!inputValue.trim() || isSending}
                                             className="send-btn"
                                             title="Отправить"
+                                            aria-label="Отправить сообщение"
                                         >
                                             <Send size={16} />
                                         </button>
@@ -649,6 +1088,19 @@ const ChatWindow = ({ isOpen, onClose }) => {
                         </>
                     )}
                 </div>
+                {contextMenu && (
+                    <MessageContextMenu
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        message={contextMenu.message}
+                        isOwn={contextMenu.message.sender_id === user?.id}
+                        onBlur={() => setContextMenu(null)}
+                        onAction={handleMenuAction}
+                    />
+                )}
+
+                {/* Resize handle */}
+                <div className="chat-resize-handle" onMouseDown={handleResizeStart} />
             </div>
         </div>,
         document.body

@@ -1,8 +1,8 @@
 // AdminPanel.jsx - macOS UI/UX Compliant - Updated: 2025-01-26
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Badge, 
+import {
+  Badge,
   Progress,
   Icon,
   Sidebar,
@@ -28,40 +28,40 @@ import {
 } from '../components/ui/macos';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Clock, 
-  Brain, 
-  Globe, 
-  FileText, 
-  Server, 
-  Printer, 
-  Stethoscope, 
-  Package, 
-  Receipt, 
-  Percent, 
-  Database, 
-  Users, 
-  UserPlus, 
-  Calendar, 
-  AlertTriangle, 
-  Settings, 
-  Monitor, 
-  CreditCard, 
-  Building2, 
-  Shield, 
-  Heart, 
-  Pill, 
-  Mic, 
-  ClipboardCheck, 
-  Bot, 
-  Bell, 
-  Phone, 
-  Download, 
-  MessageSquare, 
-  Key, 
-  CheckCircle, 
+import {
+  BarChart3,
+  TrendingUp,
+  Clock,
+  Brain,
+  Globe,
+  FileText,
+  Server,
+  Printer,
+  Stethoscope,
+  Package,
+  Receipt,
+  Percent,
+  Database,
+  Users,
+  UserPlus,
+  Calendar,
+  AlertTriangle,
+  Settings,
+  Monitor,
+  CreditCard,
+  Building2,
+  Shield,
+  Heart,
+  Pill,
+  Mic,
+  ClipboardCheck,
+  Bot,
+  Bell,
+  Phone,
+  Download,
+  MessageSquare,
+  Key,
+  CheckCircle,
   Activity,
   Eye,
   Plus,
@@ -111,7 +111,8 @@ import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import ClinicSettings from '../components/admin/ClinicSettings';
 import QueueSettings from '../components/admin/QueueSettings';
 import ServiceCatalog from '../components/admin/ServiceCatalog';
-import DepartmentManagement from '../components/admin/DepartmentManagement';
+// ⭐ DEPRECATED: DepartmentManagement replaced by QueueProfilesManager (SSOT)
+// import DepartmentManagement from '../components/admin/DepartmentManagement';
 import AISettings from '../components/admin/AISettings';
 import DisplayBoardSettings from '../components/admin/DisplayBoardSettings';
 import ActivationSystem from '../components/admin/ActivationSystem';
@@ -149,8 +150,8 @@ import EquipmentManagement from '../components/admin/EquipmentManagement';
 import LicenseManagement from '../components/admin/LicenseManagement';
 import BackupManagement from '../components/admin/BackupManagement';
 import WaitTimeAnalytics from '../components/analytics/WaitTimeAnalytics';
-import AIAnalytics from '../components/analytics/AIAnalytics'; 
-import GraphQLExplorer from '../components/admin/GraphQLExplorer'; 
+import AIAnalytics from '../components/analytics/AIAnalytics';
+import GraphQLExplorer from '../components/admin/GraphQLExplorer';
 import WebhookManager from '../components/admin/WebhookManager';
 import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
@@ -159,19 +160,27 @@ import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager
 import DynamicPricingManager from '../components/admin/DynamicPricingManager';
 import BillingManager from '../components/admin/BillingManager';
 import DiscountBenefitsManager from '../components/admin/DiscountBenefitsManager';
+import QueueProfilesManager from '../components/admin/QueueProfilesManager';  // ⭐ SSOT: Dynamic queue tabs management
 import { useAdminHotkeys } from '../hooks/useHotkeys';
 import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 import '../styles/admin-styles.css';
 
 const AdminPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
+  // ✅ Получаем patientId из URL для автоматического поиска
+  const getPatientIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
   // Состояние для UX улучшений
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
-  
+
   // Обработчики горячих клавиш
   const hotkeyHandlers = {
     save: () => {
@@ -200,16 +209,16 @@ const AdminPanel = () => {
     closeModal: () => setShowHotkeysModal(false),
     help: () => setShowHotkeysModal(true)
   };
-  
+
   // Активируем горячие клавиши
   useAdminHotkeys(hotkeyHandlers);
-  
+
   // Используем новый хук для загрузки данных
-  const { 
-    data: statsData, 
-    loading: statsLoading, 
-    error: statsError, 
-    refresh: refreshStats 
+  const {
+    data: statsData,
+    loading: statsLoading,
+    error: statsError,
+    refresh: refreshStats
   } = useAdminData('/admin/stats', {
     refreshInterval: 0, // Автообновление отключено, можно включить при необходимости
     enabled: true, // Включена загрузка реальных данных
@@ -227,10 +236,10 @@ const AdminPanel = () => {
     appointmentsToday: 0,
     pendingApprovals: 0
   };
-  
+
   const stats = statsData || defaultStats;
   const isLoading = statsLoading;
-  
+
   // Хук для управления пользователями
   const {
     users,
@@ -248,10 +257,10 @@ const AdminPanel = () => {
     updateUser,
     deleteUser
   } = useUsers();
-  
+
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном пользователей
   const userModal = useModal();
-  
+
   // Хук для управления врачами
   const {
     doctors,
@@ -269,10 +278,10 @@ const AdminPanel = () => {
     updateDoctor,
     deleteDoctor
   } = useDoctors();
-  
+
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном врачей
   const doctorModal = useModal();
-  
+
   // Хук для управления пациентами
   const {
     patients,
@@ -291,10 +300,47 @@ const AdminPanel = () => {
     deletePatient,
     calculateAge
   } = usePatients();
-  
+
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном пациентов
   const patientModal = useModal();
-  
+
+  // ✅ Эффект для автоматической загрузки пациента из URL
+  useEffect(() => {
+    const loadPatientFromUrl = async () => {
+      const patientIdFromUrl = getPatientIdFromUrl();
+      if (!patientIdFromUrl) return;
+
+      try {
+        const token = tokenManager.getAccessToken();
+        if (!token) return;
+
+        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const patientData = await response.json();
+          const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
+
+          // Устанавливаем поисковый запрос для фильтрации пациентов
+          setPatientsSearchTerm(patientName);
+
+          // Навигируем на страницу пациентов, сохраняя patientId
+          if (location.pathname !== '/admin/patients') {
+            navigate(`/admin/patients?patientId=${patientIdFromUrl}`);
+          }
+
+          logger.info('[Admin] Загружен пациент из URL:', patientName);
+        }
+      } catch (error) {
+        logger.error('[Admin] Не удалось загрузить пациента:', error);
+      }
+    };
+
+    loadPatientFromUrl();
+  }, [location.search, getPatientIdFromUrl, navigate, setPatientsSearchTerm]);
+
   // Хук для управления записями
   const {
     appointments,
@@ -315,10 +361,10 @@ const AdminPanel = () => {
     getTodayAppointments,
     getTomorrowAppointments
   } = useAppointments();
-  
+
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном записей
   const appointmentModal = useModal();
-  
+
   // Хук для управления финансами
   const {
     transactions,
@@ -341,13 +387,13 @@ const AdminPanel = () => {
     getCategoryStats,
     getDailyStats
   } = useFinance();
-  
+
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном финансов
   const financeModal = useModal();
 
   // ✅ УЛУЧШЕНИЕ: Универсальный хук для async действий
   const asyncAction = useAsyncAction();
-  
+
   // Хук для управления отчетами
   const {
     reports,
@@ -371,8 +417,8 @@ const AdminPanel = () => {
     getStatusVariant,
     formatDateRange
   } = useReports();
-  
-  
+
+
   // Хук для управления настройками
   const {
     settings,
@@ -387,7 +433,7 @@ const AdminPanel = () => {
     getSettingsStats,
     validateSettings
   } = useSettings();
-  
+
   // Состояние для настроек
   const [settingsSubTab, setSettingsSubTab] = useState(() => {
     // Восстанавливаем вкладку из URL или localStorage
@@ -418,11 +464,11 @@ const AdminPanel = () => {
   useEffect(() => {
     localStorage.setItem('servicesTab', servicesTab);
   }, [servicesTab]);
-  
+
   // Состояние для логотипа
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
-  
+
   // Настройки по умолчанию
   const defaultSettings = {
     clinicName: '',
@@ -434,7 +480,7 @@ const AdminPanel = () => {
     currency: 'RUB',
     logoUrl: ''
   };
-  
+
   // Функции для работы с логотипом
   const handleLogoSelect = (event) => {
     const file = event.target.files[0];
@@ -452,7 +498,7 @@ const AdminPanel = () => {
       }
 
       setLogoFile(file);
-      
+
       // Создаем превью
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -466,7 +512,7 @@ const AdminPanel = () => {
     setLogoFile(null);
     setLogoPreview(null);
   };
-  
+
   // Хук для управления безопасностью
   const {
     securityData,
@@ -492,12 +538,12 @@ const AdminPanel = () => {
     getSecurityStats,
     getSecurityTrends
   } = useSecurity();
-  
+
   // Загрузка последних действий с бэкенда
-  const { 
-    data: recentActivitiesData, 
-    loading: recentActivitiesLoading, 
-    error: recentActivitiesError 
+  const {
+    data: recentActivitiesData,
+    loading: recentActivitiesLoading,
+    error: recentActivitiesError
   } = useAdminData('/admin/recent-activities?limit=10', {
     refreshInterval: 0,
     enabled: true,
@@ -507,10 +553,10 @@ const AdminPanel = () => {
   const recentActivities = recentActivitiesData?.activities || [];
 
   // Загрузка системных уведомлений с бэкенда
-  const { 
-    data: systemAlertsData, 
-    loading: systemAlertsLoading, 
-    error: systemAlertsError 
+  const {
+    data: systemAlertsData,
+    loading: systemAlertsLoading,
+    error: systemAlertsError
   } = useAdminData('/notifications/history/stats?days=7', {
     refreshInterval: 0,
     enabled: true,
@@ -523,7 +569,7 @@ const AdminPanel = () => {
     // Если date - строка, преобразуем в Date
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     if (isNaN(dateObj.getTime())) return 'Недавно';
-    
+
     const now = new Date();
     const diff = now - dateObj;
     const seconds = Math.floor(diff / 1000);
@@ -541,7 +587,7 @@ const AdminPanel = () => {
   // Преобразуем данные уведомлений в формат для отображения
   const systemAlerts = React.useMemo(() => {
     if (!systemAlertsData?.recent_activity) return [];
-    
+
     return systemAlertsData.recent_activity.slice(0, 5).map((alert, index) => ({
       id: alert.id || index + 1,
       type: alert.status === 'failed' ? 'error' : alert.status === 'pending' ? 'warning' : 'info',
@@ -552,19 +598,19 @@ const AdminPanel = () => {
   }, [systemAlertsData, formatTimeAgo]);
 
   // Загрузка данных для графика активности
-  const { 
-    data: activityChartData, 
-    loading: activityChartLoading, 
-    error: activityChartError 
+  const {
+    data: activityChartData,
+    loading: activityChartLoading,
+    error: activityChartError
   } = useAdminData('/admin/activity-chart?days=7', {
     refreshInterval: 0,
     enabled: true,
     initialData: { labels: [], data: [] }
   });
-  
-  const { 
+
+  const {
     designTokens,
-    isDark 
+    isDark
   } = useTheme();
 
   // Вспомогательные функции для работы с токенами
@@ -575,7 +621,7 @@ const AdminPanel = () => {
   const getFontSize = (size) => {
     return designTokens.typography.fontSize[size] || '16px';
   };
-  
+
   // Анимации (используются в компонентах)
   const [animationsStarted, setAnimationsStarted] = useState(false);
 
@@ -585,7 +631,7 @@ const AdminPanel = () => {
       const timer = setTimeout(() => {
         setAnimationsStarted(true);
       }, 100);
-      
+
       return () => clearTimeout(timer);
     }
   }, [animationsStarted]);
@@ -699,7 +745,7 @@ const AdminPanel = () => {
   const getReportTypeLabel = (type) => {
     const typeLabels = {
       'financial': 'Финансовый',
-      'medical': 'Медицинский', 
+      'medical': 'Медицинский',
       'operational': 'Операционный',
       'analytics': 'Аналитический',
       'security': 'Безопасность',
@@ -799,12 +845,14 @@ const AdminPanel = () => {
 
   const handleDeleteDoctor = async (doctor) => {
     const doctorName = doctor.user?.full_name || doctor.name || doctor.user?.username || 'этого врача';
-    if (window.confirm(`Вы уверены, что хотите удалить врача "${doctorName}"?`)) {
+    if (window.confirm(`Вы уверены, что хотите деактивировать врача "${doctorName}"?\n\nВрач будет отмечен как неактивный, но останется в базе данных.`)) {
       try {
         await deleteDoctor(doctor.id);
+        alert(`Врач "${doctorName}" успешно деактивирован`);
       } catch (error) {
-        logger.error('Ошибка удаления врача:', error);
-        alert('Ошибка при удалении врача');
+        logger.error('Ошибка деактивации врача:', error);
+        const errorMessage = error.message || 'Неизвестная ошибка';
+        alert(`Ошибка при деактивации врача: ${errorMessage}`);
       }
     }
   };
@@ -1130,7 +1178,7 @@ const AdminPanel = () => {
   ];
 
   // Получаем все табы для совместимости
-  const tabs = navigationSections.flatMap(section => 
+  const tabs = navigationSections.flatMap(section =>
     section.items.map(item => ({
       id: item.to === '/admin' ? 'dashboard' : item.to.split('/')[2],
       label: item.label,
@@ -1141,7 +1189,7 @@ const AdminPanel = () => {
   // Вычисляем текущую вкладку из URL параметров или пути
   const searchParams = new URLSearchParams(location.search);
   const sectionFromQuery = searchParams.get('section');
-  
+
   // Если секция указана в query параметре, используем её
   // Иначе пытаемся извлечь из пути URL
   let current = sectionFromQuery;
@@ -1159,10 +1207,10 @@ const AdminPanel = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Красивые KPI карточки */}
         {statsLoading ? (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '24px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '24px'
           }}>
             <MacOSLoadingSkeleton type="card" count={6} />
           </div>
@@ -1179,10 +1227,10 @@ const AdminPanel = () => {
             }
           />
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '24px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '24px'
           }}>
             <MacOSStatCard
               title="Всего пользователей"
@@ -1191,7 +1239,7 @@ const AdminPanel = () => {
               color="blue"
               loading={statsLoading}
             />
-        
+
             <MacOSStatCard
               title="Врачи"
               value={stats.totalDoctors || 0}
@@ -1199,7 +1247,7 @@ const AdminPanel = () => {
               color="green"
               loading={statsLoading}
             />
-        
+
             <MacOSStatCard
               title="Пациенты"
               value={stats.totalPatients || 0}
@@ -1207,7 +1255,7 @@ const AdminPanel = () => {
               color="purple"
               loading={statsLoading}
             />
-            
+
             <MacOSStatCard
               title="Доход"
               value={formatCurrency(stats.totalRevenue || 0)}
@@ -1215,7 +1263,7 @@ const AdminPanel = () => {
               color="green"
               loading={statsLoading}
             />
-            
+
             <MacOSStatCard
               title="Записи сегодня"
               value={stats.appointmentsToday || 0}
@@ -1223,7 +1271,7 @@ const AdminPanel = () => {
               color="orange"
               loading={statsLoading}
             />
-            
+
             <MacOSStatCard
               title="Ожидают подтверждения"
               value={stats.pendingApprovals || 0}
@@ -1235,16 +1283,16 @@ const AdminPanel = () => {
         )}
 
         {/* Графики и аналитика */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-          gap: '24px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '24px'
         }}>
-           <MacOSCard style={{ padding: '24px' }}>
+          <MacOSCard style={{ padding: '24px' }}>
             <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ 
-                fontSize: 'var(--mac-font-size-lg)', 
-                fontWeight: 'var(--mac-font-weight-semibold)', 
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)',
                 margin: 0
               }}>Активность системы</h3>
@@ -1254,24 +1302,24 @@ const AdminPanel = () => {
               </MacOSButton>
             </div>
             {activityChartLoading ? (
-              <div style={{ 
-                height: '256px', 
-                borderRadius: 'var(--mac-radius-md)', 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                height: '256px',
+                borderRadius: 'var(--mac-radius-md)',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                background: 'var(--mac-bg-secondary)' 
+                background: 'var(--mac-bg-secondary)'
               }}>
                 <MacOSLoadingSkeleton type="text" count={3} />
               </div>
             ) : activityChartError ? (
-              <div style={{ 
-                height: '256px', 
-                borderRadius: 'var(--mac-radius-md)', 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                height: '256px',
+                borderRadius: 'var(--mac-radius-md)',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                background: 'var(--mac-bg-secondary)' 
+                background: 'var(--mac-bg-secondary)'
               }}>
                 <MacOSEmptyState
                   icon={AlertTriangle}
@@ -1280,9 +1328,9 @@ const AdminPanel = () => {
                 />
               </div>
             ) : activityChartData?.data && activityChartData.data.length > 0 ? (
-              <div style={{ 
-                height: '256px', 
-                borderRadius: 'var(--mac-radius-md)', 
+              <div style={{
+                height: '256px',
+                borderRadius: 'var(--mac-radius-md)',
                 padding: '16px',
                 background: 'var(--mac-bg-secondary)',
                 display: 'flex',
@@ -1290,9 +1338,9 @@ const AdminPanel = () => {
                 justifyContent: 'space-between'
               }}>
                 {/* Простой график в виде столбцов */}
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'flex-end', 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
                   justifyContent: 'space-around',
                   height: '200px',
                   gap: '4px'
@@ -1301,10 +1349,10 @@ const AdminPanel = () => {
                     const maxValue = Math.max(...activityChartData.data.map(d => d.total || 0));
                     const height = maxValue > 0 ? (item.total / maxValue) * 180 : 0;
                     return (
-                      <div key={index} style={{ 
-                        flex: 1, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
+                      <div key={index} style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
                         alignItems: 'center',
                         gap: '4px'
                       }}>
@@ -1316,8 +1364,8 @@ const AdminPanel = () => {
                           minHeight: '4px',
                           transition: 'height 0.3s ease'
                         }} />
-                        <span style={{ 
-                          fontSize: '10px', 
+                        <span style={{
+                          fontSize: '10px',
                           color: 'var(--mac-text-tertiary)',
                           textAlign: 'center'
                         }}>
@@ -1327,9 +1375,9 @@ const AdminPanel = () => {
                     );
                   })}
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-around', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-around',
                   marginTop: '8px',
                   fontSize: '12px',
                   color: 'var(--mac-text-secondary)'
@@ -1340,20 +1388,20 @@ const AdminPanel = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ 
-                height: '256px', 
-                borderRadius: 'var(--mac-radius-md)', 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                height: '256px',
+                borderRadius: 'var(--mac-radius-md)',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                background: 'var(--mac-bg-secondary)' 
+                background: 'var(--mac-bg-secondary)'
               }}>
                 <div style={{ textAlign: 'center' }}>
-                  <Activity style={{ 
-                    width: '48px', 
-                    height: '48px', 
-                    margin: '0 auto 16px auto', 
-                    color: 'var(--mac-text-tertiary)' 
+                  <Activity style={{
+                    width: '48px',
+                    height: '48px',
+                    margin: '0 auto 16px auto',
+                    color: 'var(--mac-text-tertiary)'
                   }} />
                   <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных за выбранный период</p>
                 </div>
@@ -1361,13 +1409,13 @@ const AdminPanel = () => {
             )}
           </MacOSCard>
 
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: 0 }}
           >
             <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ 
-                fontSize: 'var(--mac-font-size-lg)', 
-                fontWeight: 'var(--mac-font-weight-semibold)', 
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)',
                 margin: 0
               }}>Последние действия</h3>
@@ -1395,24 +1443,24 @@ const AdminPanel = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {recentActivities.map((activity) => (
-                  <div key={activity.id} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px', 
-                    padding: '12px', 
+                  <div key={activity.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
                     borderRadius: 'var(--mac-radius-md)',
-                    background: 'var(--mac-bg-secondary)' 
+                    background: 'var(--mac-bg-secondary)'
                   }}>
                     {getStatusIcon(activity.status)}
                     <div style={{ flex: '1' }}>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
                         color: 'var(--mac-text-primary)',
                         margin: 0
                       }}>{activity.message}</p>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-secondary)',
                         margin: '4px 0 0 0'
                       }}>{activity.user} • {activity.time}</p>
@@ -1425,81 +1473,81 @@ const AdminPanel = () => {
         </div>
 
         {/* Системные уведомления */}
-        <MacOSCard 
+        <MacOSCard
           style={{ padding: 0, marginTop: '24px' }}
         >
           <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>Системные уведомления</h3>
             <MacOSBadge variant="warning">{systemAlerts.length}</MacOSBadge>
           </div>
-            {systemAlertsLoading ? (
-              <div style={{ padding: '16px' }}>
-                <MacOSLoadingSkeleton type="text" count={3} />
-              </div>
-            ) : systemAlertsError ? (
-              <div style={{ padding: '16px' }}>
-                <MacOSEmptyState
-                  icon={AlertTriangle}
-                  title="Ошибка загрузки"
-                  description="Не удалось загрузить системные уведомления"
-                />
-              </div>
-            ) : systemAlerts.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет системных уведомлений</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {systemAlerts.map((alert) => (
-                  <div key={alert.id} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px', 
-                    padding: '12px', 
-                    border: '1px solid var(--mac-border)', 
-                    borderRadius: 'var(--mac-radius-md)' 
-                  }}>
-                    <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
-                    <div style={{ flex: '1' }}>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
-                        color: 'var(--mac-text-primary)',
-                        margin: 0
-                      }}>{alert.message}</p>
-                      <p style={{ 
-                        fontSize: '12px', 
-                        color: 'var(--mac-text-secondary)',
-                        margin: '4px 0 0 0'
-                      }}>{alert.time}</p>
-                    </div>
-                    <MacOSBadge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
-                      {alert.priority}
-                    </MacOSBadge>
+          {systemAlertsLoading ? (
+            <div style={{ padding: '16px' }}>
+              <MacOSLoadingSkeleton type="text" count={3} />
+            </div>
+          ) : systemAlertsError ? (
+            <div style={{ padding: '16px' }}>
+              <MacOSEmptyState
+                icon={AlertTriangle}
+                title="Ошибка загрузки"
+                description="Не удалось загрузить системные уведомления"
+              />
+            </div>
+          ) : systemAlerts.length === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center' }}>
+              <p style={{ color: 'var(--mac-text-secondary)' }}>Нет системных уведомлений</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {systemAlerts.map((alert) => (
+                <div key={alert.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-md)'
+                }}>
+                  <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
+                  <div style={{ flex: '1' }}>
+                    <p style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: 'var(--mac-font-weight-medium)',
+                      color: 'var(--mac-text-primary)',
+                      margin: 0
+                    }}>{alert.message}</p>
+                    <p style={{
+                      fontSize: '12px',
+                      color: 'var(--mac-text-secondary)',
+                      margin: '4px 0 0 0'
+                    }}>{alert.time}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </MacOSCard>
-        </div>
+                  <MacOSBadge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
+                    {alert.priority}
+                  </MacOSBadge>
+                </div>
+              ))}
+            </div>
+          )}
+        </MacOSCard>
+      </div>
     </ErrorBoundary>
   );
 
   const renderUsers = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard 
+      <MacOSCard
         variant="default"
         style={{ padding: '24px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
+          <h2 style={{
+            fontSize: 'var(--mac-font-size-xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             margin: 0
           }}>Управление пользователями</h2>
@@ -1508,7 +1556,7 @@ const AdminPanel = () => {
             Добавить пользователя
           </MacOSButton>
         </div>
-        
+
         {/* Поиск и фильтры */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: '1' }}>
@@ -1539,16 +1587,15 @@ const AdminPanel = () => {
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
             options={[
+              // TODO(DB_ROLES): Fetch from /api/v1/roles in Phase 0.5
               { value: '', label: 'Все роли' },
               { value: 'Admin', label: 'Администратор' },
-              { value: 'Doctor', label: 'Врач' },
-              { value: 'Registrar', label: 'Регистратор' },
+              { value: 'Receptionist', label: 'Регистратор' },
               { value: 'Cashier', label: 'Кассир' },
+              { value: 'Doctor', label: 'Врач' },
               { value: 'Lab', label: 'Лаборатория' },
-              { value: 'Patient', label: 'Пациент' },
-              { value: 'cardio', label: 'Кардиолог' },
-              { value: 'derma', label: 'Дерматолог' },
-              { value: 'dentist', label: 'Стоматолог' }
+              { value: 'Nurse', label: 'Медсестра' },
+              { value: 'Patient', label: 'Пациент' }
             ]}
             style={{
               padding: '8px 12px',
@@ -1600,8 +1647,8 @@ const AdminPanel = () => {
             <EmptyState
               type="users"
               title="Пользователи не найдены"
-              description={searchTerm || filterRole || filterStatus 
-                ? 'Попробуйте изменить параметры поиска' 
+              description={searchTerm || filterRole || filterStatus
+                ? 'Попробуйте изменить параметры поиска'
                 : 'В системе пока нет пользователей'
               }
               action={
@@ -1612,56 +1659,56 @@ const AdminPanel = () => {
               }
             />
           ) : (
-            <table style={{ 
-              width: '100%', 
+            <table style={{
+              width: '100%',
               borderCollapse: 'collapse',
               border: '1px solid var(--mac-border)'
             }} role="table" aria-label="Таблица пользователей">
               <thead>
-                <tr style={{ 
-                  backgroundColor: 'var(--mac-bg-tertiary)', 
-                  borderBottom: '1px solid var(--mac-border)' 
+                <tr style={{
+                  backgroundColor: 'var(--mac-bg-tertiary)',
+                  borderBottom: '1px solid var(--mac-border)'
                 }}>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)',
                     borderRight: '1px solid var(--mac-border)',
                     borderBottom: '1px solid var(--mac-border)'
                   }}>Пользователь</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)',
                     borderRight: '1px solid var(--mac-border)',
                     borderBottom: '1px solid var(--mac-border)'
                   }}>Роль</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)',
                     borderRight: '1px solid var(--mac-border)',
                     borderBottom: '1px solid var(--mac-border)'
                   }}>Статус</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)',
                     borderRight: '1px solid var(--mac-border)',
                     borderBottom: '1px solid var(--mac-border)'
                   }}>Последний вход</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)',
                     borderBottom: '1px solid var(--mac-border)'
@@ -1670,14 +1717,14 @@ const AdminPanel = () => {
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} style={{ 
-                    borderBottom: '1px solid var(--mac-border)', 
+                  <tr key={user.id} style={{
+                    borderBottom: '1px solid var(--mac-border)',
                     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <td style={{ 
+                    <td style={{
                       padding: '12px 16px',
                       borderRight: '1px solid var(--mac-border)',
                       borderBottom: '1px solid var(--mac-border)'
@@ -1700,63 +1747,63 @@ const AdminPanel = () => {
                           </span>
                         </div>
                         <div>
-                          <p style={{ 
-                            fontWeight: 'var(--mac-font-weight-medium)', 
+                          <p style={{
+                            fontWeight: 'var(--mac-font-weight-medium)',
                             color: 'var(--mac-text-primary)',
                             fontSize: 'var(--mac-font-size-sm)',
                             margin: 0
                           }}>
                             {user.profile?.full_name || user.full_name || user.username}
                           </p>
-                          <p style={{ 
-                            fontSize: '12px', 
+                          <p style={{
+                            fontSize: '12px',
                             color: 'var(--mac-text-secondary)',
                             margin: '4px 0 0 0'
                           }}>{user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td style={{ 
+                    <td style={{
                       padding: '12px 16px',
                       borderRight: '1px solid var(--mac-border)',
                       borderBottom: '1px solid var(--mac-border)'
                     }}>
-                      <MacOSBadge 
+                      <MacOSBadge
                         variant={user.role === 'Admin' ? 'error' : user.role === 'Doctor' ? 'success' : 'info'}
                       >
                         {getRoleLabel(user.role)}
                       </MacOSBadge>
                     </td>
-                    <td style={{ 
+                    <td style={{
                       padding: '12px 16px',
                       borderRight: '1px solid var(--mac-border)',
                       borderBottom: '1px solid var(--mac-border)'
                     }}>
-                      <MacOSBadge 
+                      <MacOSBadge
                         variant={user.is_active ? 'success' : 'warning'}
                       >
                         {getUserStatusLabel(user.is_active)}
                       </MacOSBadge>
                     </td>
-                    <td style={{ 
-                      padding: '12px 16px', 
-                      fontSize: 'var(--mac-font-size-sm)', 
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-text-secondary)',
                       borderRight: '1px solid var(--mac-border)',
                       borderBottom: '1px solid var(--mac-border)'
                     }}>
                       {user.profile?.last_login ? new Date(user.profile.last_login).toLocaleString('ru-RU') : 'Никогда'}
                     </td>
-                    <td style={{ 
+                    <td style={{
                       padding: '12px 16px',
                       borderBottom: '1px solid var(--mac-border)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button 
+                        <button
                           onClick={() => handleEditUser(user)}
-                          style={{ 
-                            padding: '4px', 
-                            borderRadius: 'var(--mac-radius-sm)', 
+                          style={{
+                            padding: '4px',
+                            borderRadius: 'var(--mac-radius-sm)',
                             transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
                             color: 'var(--mac-text-secondary)',
                             backgroundColor: 'transparent',
@@ -1769,11 +1816,11 @@ const AdminPanel = () => {
                         >
                           <Edit style={{ width: '16px', height: '16px' }} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDeleteUser(user)}
-                          style={{ 
-                            padding: '4px', 
-                            borderRadius: 'var(--mac-radius-sm)', 
+                          style={{
+                            padding: '4px',
+                            borderRadius: 'var(--mac-radius-sm)',
                             transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
                             color: 'var(--mac-error)',
                             backgroundColor: 'transparent',
@@ -1810,7 +1857,7 @@ const AdminPanel = () => {
               >
                 Назад
               </MacOSButton>
-              
+
               {/* Номера страниц */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
@@ -1824,7 +1871,7 @@ const AdminPanel = () => {
                   } else {
                     pageNum = pagination.page - 2 + i;
                   }
-                  
+
                   return (
                     <button
                       key={pageNum}
@@ -1855,7 +1902,7 @@ const AdminPanel = () => {
                   );
                 })}
               </div>
-              
+
               <MacOSButton
                 variant="outline"
                 onClick={() => changePage(pagination.page + 1)}
@@ -1886,7 +1933,7 @@ const AdminPanel = () => {
       department: 'all',
       doctor: 'all'
     });
-    
+
     // Загружаем список врачей для фильтра
     const { data: doctorsList } = useAdminData('/doctors?limit=100&active_only=true', {
       enabled: true,
@@ -1901,9 +1948,9 @@ const AdminPanel = () => {
     };
 
     // Загрузка данных аналитики
-    const { 
-      data: analyticsData, 
-      loading: analyticsLoading, 
+    const {
+      data: analyticsData,
+      loading: analyticsLoading,
       error: analyticsError,
       refresh: refreshAnalytics
     } = useAdminData(`/admin/analytics/overview?period=${analyticsFilters.period}&department=${analyticsFilters.department === 'all' ? '' : analyticsFilters.department}&doctor_id=${analyticsFilters.doctor === 'all' ? '' : analyticsFilters.doctor}`, {
@@ -1922,9 +1969,9 @@ const AdminPanel = () => {
     });
 
     // Загрузка данных для графиков
-    const { 
-      data: chartsData, 
-      loading: chartsLoading, 
+    const {
+      data: chartsData,
+      loading: chartsLoading,
       error: chartsError,
       refresh: refreshCharts
     } = useAdminData(`/admin/analytics/charts?period=${analyticsFilters.period}&chart_type=appointments&department=${analyticsFilters.department === 'all' ? '' : analyticsFilters.department}&doctor_id=${analyticsFilters.doctor === 'all' ? '' : analyticsFilters.doctor}`, {
@@ -1950,483 +1997,483 @@ const AdminPanel = () => {
     };
 
     return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <MacOSCard 
-        variant="default"
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <MacOSCard
+          variant="default"
           style={{ padding: '24px' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>Аналитика и отчеты</h2>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <MacOSButton 
-              variant="outline"
-              onClick={() => {
-                // Экспорт реальных данных аналитики в CSV
-                if (!analyticsData) {
-                  alert('Нет данных для экспорта');
-                  return;
-                }
-                
-                const csvRows = [
-                  ['Период', 'Записи', 'Доходы', 'Пациенты', 'Средний чек'],
-                  [
-                    analyticsFilters.period,
-                    analyticsData.metrics?.totalAppointments || 0,
-                    analyticsData.metrics?.totalRevenue || 0,
-                    analyticsData.metrics?.totalPatients || 0,
-                    analyticsData.metrics?.averageCheck || 0
-                  ]
-                ];
-                
-                const csvData = csvRows.map(row => row.join(',')).join('\n');
-                const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `analytics-export-${analyticsFilters.period}-${new Date().toISOString().split('T')[0]}.csv`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-              }}
-              disabled={!analyticsData || analyticsLoading}
-            >
-              <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-              Экспорт
-            </MacOSButton>
-            <MacOSButton
-              onClick={() => {
-                // Открыть генератор отчетов
-                navigate('/admin/reports');
-              }}
-            >
-              <BarChart3 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-              Создать отчет
-            </MacOSButton>
-          </div>
-        </div>
-
-        {/* Фильтры */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px', 
-          marginBottom: '24px' 
-        }} role="group" aria-label="Фильтры аналитики">
-          <div>
-            <label htmlFor="period" style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              marginBottom: '4px', 
-              color: 'var(--mac-text-primary)' 
-            }}>Период</label>
-            <MacOSSelect
-              id="period"
-              aria-label="Период"
-              value={analyticsFilters.period}
-              onChange={(value) => handleFilterChange('period', value)}
-              options={[
-                { value: 'today', label: 'Сегодня' },
-                { value: 'week', label: 'Неделя' },
-                { value: 'month', label: 'Месяц' },
-                { value: 'quarter', label: 'Квартал' },
-                { value: 'year', label: 'Год' }
-              ]}
-            />
-          </div>
-          <div>
-            <label htmlFor="department" style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              marginBottom: '4px', 
-              color: 'var(--mac-text-primary)' 
-            }}>Отделение</label>
-            <MacOSSelect
-              id="department"
-              aria-label="Отделение"
-              value={analyticsFilters.department}
-              onChange={(value) => handleFilterChange('department', value)}
-              options={[
-                { value: 'all', label: 'Все отделения' },
-                { value: 'cardiology', label: 'Кардиология' },
-                { value: 'dermatology', label: 'Дерматология' },
-                { value: 'stomatology', label: 'Стоматология' },
-                { value: 'dentistry', label: 'Стоматология' },
-                { value: 'laboratory', label: 'Лаборатория' },
-                { value: 'cosmetology', label: 'Косметология' },
-                { value: 'procedures', label: 'Процедуры' },
-                { value: 'physiotherapy', label: 'Физиотерапия' },
-                { value: 'functional_diagnostics', label: 'Функциональная диагностика' },
-                { value: 'general', label: 'Общее' }
-              ]}
-            />
-          </div>
-          <div>
-            <label htmlFor="doctor" style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              marginBottom: '4px', 
-              color: 'var(--mac-text-primary)' 
-            }}>Врач</label>
-            <MacOSSelect
-              id="doctor"
-              aria-label="Врач"
-              value={analyticsFilters.doctor}
-              onChange={(value) => handleFilterChange('doctor', value)}
-              options={[
-                { value: 'all', label: 'Все врачи' },
-                ...(Array.isArray(doctorsList) ? doctorsList : []).map(doctor => ({
-                  value: doctor.user_id?.toString() || doctor.id?.toString() || '',
-                  label: doctor.user?.full_name || doctor.user?.username || `Врач #${doctor.id || doctor.user_id}`
-                })).filter(opt => opt.value && opt.label)
-              ]}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'end' }}>
-            <MacOSButton 
-              style={{ width: '100%' }} 
-              aria-label="Применить фильтры"
-              onClick={applyFilters}
-            >
-              <Filter style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-              Применить
-            </MacOSButton>
-          </div>
-        </div>
-
-        {/* Ключевые метрики */}
-        {analyticsLoading ? (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '16px', 
-            marginBottom: '24px' 
-          }}>
-            <MacOSLoadingSkeleton type="card" count={4} />
-          </div>
-        ) : analyticsError ? (
-          <MacOSEmptyState
-            icon={AlertTriangle}
-            title="Ошибка загрузки аналитики"
-            description="Не удалось загрузить данные. Проверьте подключение к серверу."
-            action={
-              <MacOSButton onClick={refreshAnalytics} variant="primary">
-                <RefreshCw size={16} />
-                Повторить попытку
-              </MacOSButton>
-            }
-          />
-        ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '16px', 
-            marginBottom: '24px' 
-          }}>
-            <MacOSStatCard
-              title="Всего записей"
-              value={analyticsData?.metrics?.totalAppointments?.toLocaleString() || '0'}
-              icon={Calendar}
-              color="var(--mac-accent-blue)"
-              loading={analyticsLoading}
-            />
-            
-            <MacOSStatCard
-              title="Доходы"
-              value={formatCurrency(analyticsData?.metrics?.totalRevenue || 0)}
-              icon={CreditCard}
-              color="var(--mac-success)"
-              loading={analyticsLoading}
-            />
-            
-            <MacOSStatCard
-              title="Пациенты"
-              value={analyticsData?.metrics?.totalPatients?.toLocaleString() || '0'}
-              icon={Users}
-              color="var(--mac-info)"
-              loading={analyticsLoading}
-            />
-            
-            <MacOSStatCard
-              title="Средний чек"
-              value={formatCurrency(analyticsData?.metrics?.averageCheck || 0)}
-              icon={TrendingUp}
-              color="var(--mac-warning)"
-              loading={analyticsLoading}
-            />
-          </div>
-        )}
-
-        {/* Графики */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-          gap: '24px' 
-        }}>
-          <MacOSCard 
-            style={{ padding: '24px' }}
-          >
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '16px',
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <h2 style={{
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
               margin: 0
-            }}>Динамика записей</h3>
-            {chartsLoading ? (
-              <MacOSLoadingSkeleton height="256px" />
-            ) : chartsError ? (
-              <MacOSEmptyState
-                icon={AlertTriangle}
-                title="Ошибка загрузки графика"
-                description="Не удалось загрузить данные графика"
+            }}>Аналитика и отчеты</h2>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <MacOSButton
+                variant="outline"
+                onClick={() => {
+                  // Экспорт реальных данных аналитики в CSV
+                  if (!analyticsData) {
+                    alert('Нет данных для экспорта');
+                    return;
+                  }
+
+                  const csvRows = [
+                    ['Период', 'Записи', 'Доходы', 'Пациенты', 'Средний чек'],
+                    [
+                      analyticsFilters.period,
+                      analyticsData.metrics?.totalAppointments || 0,
+                      analyticsData.metrics?.totalRevenue || 0,
+                      analyticsData.metrics?.totalPatients || 0,
+                      analyticsData.metrics?.averageCheck || 0
+                    ]
+                  ];
+
+                  const csvData = csvRows.map(row => row.join(',')).join('\n');
+                  const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `analytics-export-${analyticsFilters.period}-${new Date().toISOString().split('T')[0]}.csv`;
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                }}
+                disabled={!analyticsData || analyticsLoading}
+              >
+                <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                Экспорт
+              </MacOSButton>
+              <MacOSButton
+                onClick={() => {
+                  // Открыть генератор отчетов
+                  navigate('/admin/reports');
+                }}
+              >
+                <BarChart3 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                Создать отчет
+              </MacOSButton>
+            </div>
+          </div>
+
+          {/* Фильтры */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }} role="group" aria-label="Фильтры аналитики">
+            <div>
+              <label htmlFor="period" style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                marginBottom: '4px',
+                color: 'var(--mac-text-primary)'
+              }}>Период</label>
+              <MacOSSelect
+                id="period"
+                aria-label="Период"
+                value={analyticsFilters.period}
+                onChange={(value) => handleFilterChange('period', value)}
+                options={[
+                  { value: 'today', label: 'Сегодня' },
+                  { value: 'week', label: 'Неделя' },
+                  { value: 'month', label: 'Месяц' },
+                  { value: 'quarter', label: 'Квартал' },
+                  { value: 'year', label: 'Год' }
+                ]}
               />
-            ) : chartsData?.data && chartsData.data.length > 0 ? (
-              <div style={{ 
-                height: '256px', 
-                padding: '16px',
-                backgroundColor: 'var(--mac-bg-tertiary)', 
-                borderRadius: 'var(--mac-radius-md)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'flex-end', 
-                  justifyContent: 'space-around',
-                  height: '200px',
-                  gap: '4px'
+            </div>
+            <div>
+              <label htmlFor="department" style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                marginBottom: '4px',
+                color: 'var(--mac-text-primary)'
+              }}>Отделение</label>
+              <MacOSSelect
+                id="department"
+                aria-label="Отделение"
+                value={analyticsFilters.department}
+                onChange={(value) => handleFilterChange('department', value)}
+                options={[
+                  { value: 'all', label: 'Все отделения' },
+                  { value: 'cardiology', label: 'Кардиология' },
+                  { value: 'dermatology', label: 'Дерматология' },
+                  { value: 'stomatology', label: 'Стоматология' },
+                  { value: 'dentistry', label: 'Стоматология' },
+                  { value: 'laboratory', label: 'Лаборатория' },
+                  { value: 'cosmetology', label: 'Косметология' },
+                  { value: 'procedures', label: 'Процедуры' },
+                  { value: 'physiotherapy', label: 'Физиотерапия' },
+                  { value: 'functional_diagnostics', label: 'Функциональная диагностика' },
+                  { value: 'general', label: 'Общее' }
+                ]}
+              />
+            </div>
+            <div>
+              <label htmlFor="doctor" style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                marginBottom: '4px',
+                color: 'var(--mac-text-primary)'
+              }}>Врач</label>
+              <MacOSSelect
+                id="doctor"
+                aria-label="Врач"
+                value={analyticsFilters.doctor}
+                onChange={(value) => handleFilterChange('doctor', value)}
+                options={[
+                  { value: 'all', label: 'Все врачи' },
+                  ...(Array.isArray(doctorsList) ? doctorsList : []).map(doctor => ({
+                    value: doctor.user_id?.toString() || doctor.id?.toString() || '',
+                    label: doctor.user?.full_name || doctor.user?.username || `Врач #${doctor.id || doctor.user_id}`
+                  })).filter(opt => opt.value && opt.label)
+                ]}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'end' }}>
+              <MacOSButton
+                style={{ width: '100%' }}
+                aria-label="Применить фильтры"
+                onClick={applyFilters}
+              >
+                <Filter style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                Применить
+              </MacOSButton>
+            </div>
+          </div>
+
+          {/* Ключевые метрики */}
+          {analyticsLoading ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              <MacOSLoadingSkeleton type="card" count={4} />
+            </div>
+          ) : analyticsError ? (
+            <MacOSEmptyState
+              icon={AlertTriangle}
+              title="Ошибка загрузки аналитики"
+              description="Не удалось загрузить данные. Проверьте подключение к серверу."
+              action={
+                <MacOSButton onClick={refreshAnalytics} variant="primary">
+                  <RefreshCw size={16} />
+                  Повторить попытку
+                </MacOSButton>
+              }
+            />
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              <MacOSStatCard
+                title="Всего записей"
+                value={analyticsData?.metrics?.totalAppointments?.toLocaleString() || '0'}
+                icon={Calendar}
+                color="var(--mac-accent-blue)"
+                loading={analyticsLoading}
+              />
+
+              <MacOSStatCard
+                title="Доходы"
+                value={formatCurrency(analyticsData?.metrics?.totalRevenue || 0)}
+                icon={CreditCard}
+                color="var(--mac-success)"
+                loading={analyticsLoading}
+              />
+
+              <MacOSStatCard
+                title="Пациенты"
+                value={analyticsData?.metrics?.totalPatients?.toLocaleString() || '0'}
+                icon={Users}
+                color="var(--mac-info)"
+                loading={analyticsLoading}
+              />
+
+              <MacOSStatCard
+                title="Средний чек"
+                value={formatCurrency(analyticsData?.metrics?.averageCheck || 0)}
+                icon={TrendingUp}
+                color="var(--mac-warning)"
+                loading={analyticsLoading}
+              />
+            </div>
+          )}
+
+          {/* Графики */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '24px'
+          }}>
+            <MacOSCard
+              style={{ padding: '24px' }}
+            >
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '16px',
+                margin: 0
+              }}>Динамика записей</h3>
+              {chartsLoading ? (
+                <MacOSLoadingSkeleton height="256px" />
+              ) : chartsError ? (
+                <MacOSEmptyState
+                  icon={AlertTriangle}
+                  title="Ошибка загрузки графика"
+                  description="Не удалось загрузить данные графика"
+                />
+              ) : chartsData?.data && chartsData.data.length > 0 ? (
+                <div style={{
+                  height: '256px',
+                  padding: '16px',
+                  backgroundColor: 'var(--mac-bg-tertiary)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
                 }}>
-                  {chartsData.data.map((item, index) => {
-                    const maxValue = Math.max(...chartsData.data.map(d => d.appointments || 0));
-                    const height = maxValue > 0 ? (item.appointments / maxValue) * 180 : 0;
-                    return (
-                      <div key={index} style={{ 
-                        flex: 1, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <div style={{
-                          width: '100%',
-                          height: `${height}px`,
-                          background: 'linear-gradient(to top, var(--mac-primary), var(--mac-primary-light))',
-                          borderRadius: '4px 4px 0 0',
-                          minHeight: '4px',
-                          transition: 'height 0.3s ease'
-                        }} />
-                        <span style={{ 
-                          fontSize: '10px', 
-                          color: 'var(--mac-text-tertiary)',
-                          textAlign: 'center'
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'space-around',
+                    height: '200px',
+                    gap: '4px'
+                  }}>
+                    {chartsData.data.map((item, index) => {
+                      const maxValue = Math.max(...chartsData.data.map(d => d.appointments || 0));
+                      const height = maxValue > 0 ? (item.appointments / maxValue) * 180 : 0;
+                      return (
+                        <div key={index} style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}>
-                          {chartsData.labels[index]}
-                        </span>
+                          <div style={{
+                            width: '100%',
+                            height: `${height}px`,
+                            background: 'linear-gradient(to top, var(--mac-primary), var(--mac-primary-light))',
+                            borderRadius: '4px 4px 0 0',
+                            minHeight: '4px',
+                            transition: 'height 0.3s ease'
+                          }} />
+                          <span style={{
+                            fontSize: '10px',
+                            color: 'var(--mac-text-tertiary)',
+                            textAlign: 'center'
+                          }}>
+                            {chartsData.labels[index]}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                    <span>Всего записей: {chartsData.data.reduce((sum, d) => sum + (d.appointments || 0), 0)}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  height: '256px',
+                  backgroundColor: 'var(--mac-bg-tertiary)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных за выбранный период</p>
+                </div>
+              )}
+            </MacOSCard>
+
+            <MacOSCard
+              style={{ padding: '24px' }}
+            >
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '16px',
+                margin: 0
+              }}>Статусы записей</h3>
+              {analyticsLoading ? (
+                <MacOSLoadingSkeleton height="256px" />
+              ) : analyticsError ? (
+                <MacOSEmptyState
+                  icon={AlertTriangle}
+                  title="Ошибка загрузки"
+                  description="Не удалось загрузить данные"
+                />
+              ) : analyticsData?.appointmentsByStatus && analyticsData.appointmentsByStatus.length > 0 ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  padding: '16px'
+                }}>
+                  {analyticsData.appointmentsByStatus.map((item, index) => {
+                    const total = analyticsData.appointmentsByStatus.reduce((sum, s) => sum + s.count, 0);
+                    const percentage = total > 0 ? (item.count / total) * 100 : 0;
+                    return (
+                      <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: 'var(--mac-radius-full)',
+                              background: index === 0 ? 'var(--mac-success)' :
+                                index === 1 ? 'var(--mac-warning)' : 'var(--mac-danger)'
+                            }}
+                          ></div>
+                          <span style={{
+                            fontSize: 'var(--mac-font-size-sm)',
+                            fontWeight: 'var(--mac-font-weight-medium)',
+                            color: 'var(--mac-text-primary)'
+                          }}>
+                            {item.status}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{
+                            fontSize: 'var(--mac-font-size-sm)',
+                            fontWeight: 'var(--mac-font-weight-medium)',
+                            color: 'var(--mac-text-primary)'
+                          }}>
+                            {item.count}
+                          </span>
+                          <span style={{
+                            fontSize: 'var(--mac-font-size-xs)',
+                            marginLeft: '8px',
+                            color: 'var(--mac-text-secondary)'
+                          }}>
+                            ({percentage.toFixed(1)}%)
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  marginTop: '8px',
-                  fontSize: '12px',
-                  color: 'var(--mac-text-secondary)'
+              ) : (
+                <div style={{
+                  height: '256px',
+                  backgroundColor: 'var(--mac-bg-tertiary)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}>
-                  <span>Всего записей: {chartsData.data.reduce((sum, d) => sum + (d.appointments || 0), 0)}</span>
+                  <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных</p>
                 </div>
-              </div>
-            ) : (
-              <div style={{ 
-                height: '256px', 
-                backgroundColor: 'var(--mac-bg-tertiary)', 
-                borderRadius: 'var(--mac-radius-md)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных за выбранный период</p>
-              </div>
-            )}
-          </MacOSCard>
-          
-          <MacOSCard 
-            style={{ padding: '24px' }}
+              )}
+            </MacOSCard>
+          </div>
+
+          {/* Топ врачи */}
+          <MacOSCard
+            style={{ padding: '24px', marginTop: '24px' }}
           >
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
               marginBottom: '16px',
               margin: 0
-            }}>Статусы записей</h3>
+            }}>Топ врачи по количеству приемов</h3>
+
             {analyticsLoading ? (
-              <MacOSLoadingSkeleton height="256px" />
+              <MacOSLoadingSkeleton height="200px" />
             ) : analyticsError ? (
               <MacOSEmptyState
-                icon={AlertTriangle}
+                icon={Users}
                 title="Ошибка загрузки"
-                description="Не удалось загрузить данные"
+                description="Не удалось загрузить данные о врачах"
               />
-            ) : analyticsData?.appointmentsByStatus && analyticsData.appointmentsByStatus.length > 0 ? (
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '12px',
-                padding: '16px'
-              }}>
-                {analyticsData.appointmentsByStatus.map((item, index) => {
-                  const total = analyticsData.appointmentsByStatus.reduce((sum, s) => sum + s.count, 0);
-                  const percentage = total > 0 ? (item.count / total) * 100 : 0;
-                  return (
-                    <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div 
-                          style={{ 
-                            width: '12px', 
-                            height: '12px', 
-                            borderRadius: 'var(--mac-radius-full)',
-                            background: index === 0 ? 'var(--mac-success)' : 
-                                       index === 1 ? 'var(--mac-warning)' : 'var(--mac-danger)'
-                          }}
-                        ></div>
-                        <span style={{ 
-                          fontSize: 'var(--mac-font-size-sm)', 
-                          fontWeight: 'var(--mac-font-weight-medium)', 
-                          color: 'var(--mac-text-primary)' 
-                        }}>
-                          {item.status}
-                        </span>
+            ) : !analyticsData?.topDoctors || analyticsData.topDoctors.length === 0 ? (
+              <MacOSEmptyState
+                icon={Users}
+                title="Нет данных о врачах"
+                description="За выбранный период нет данных о врачах"
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {analyticsData.topDoctors.map((doctor, index) => (
+                  <div key={index} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px',
+                    backgroundColor: 'var(--mac-bg-tertiary)',
+                    borderRadius: 'var(--mac-radius-md)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: 'var(--mac-accent)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <span style={{
+                          color: 'white',
+                          fontSize: 'var(--mac-font-size-sm)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
+                        }}>{index + 1}</span>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ 
-                          fontSize: 'var(--mac-font-size-sm)', 
-                          fontWeight: 'var(--mac-font-weight-medium)', 
-                          color: 'var(--mac-text-primary)' 
-                        }}>
-                          {item.count}
-                        </span>
-                        <span style={{ 
-                          fontSize: 'var(--mac-font-size-xs)', 
-                          marginLeft: '8px', 
-                          color: 'var(--mac-text-secondary)' 
-                        }}>
-                          ({percentage.toFixed(1)}%)
-                        </span>
+                      <div>
+                        <p style={{
+                          fontWeight: 'var(--mac-font-weight-medium)',
+                          color: 'var(--mac-text-primary)',
+                          margin: 0
+                        }}>{doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно'}</p>
+                        <p style={{
+                          fontSize: 'var(--mac-font-size-sm)',
+                          color: 'var(--mac-text-secondary)',
+                          margin: 0
+                        }}>{doctor.specialty || doctor.department || 'Неизвестно'}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ 
-                height: '256px', 
-                backgroundColor: 'var(--mac-bg-tertiary)', 
-                borderRadius: 'var(--mac-radius-md)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных</p>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>{doctor.patients} записей</p>
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        color: 'var(--mac-text-secondary)',
+                        margin: 0
+                      }}>{doctor.revenue}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </MacOSCard>
-        </div>
-
-        {/* Топ врачи */}
-        <MacOSCard 
-          style={{ padding: '24px', marginTop: '24px' }}
-        >
-          <h3 style={{ 
-            fontSize: 'var(--mac-font-size-lg)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
-            color: 'var(--mac-text-primary)', 
-            marginBottom: '16px',
-            margin: 0
-          }}>Топ врачи по количеству приемов</h3>
-          
-          {analyticsLoading ? (
-            <MacOSLoadingSkeleton height="200px" />
-          ) : analyticsError ? (
-            <MacOSEmptyState
-              icon={Users}
-              title="Ошибка загрузки"
-              description="Не удалось загрузить данные о врачах"
-            />
-          ) : !analyticsData?.topDoctors || analyticsData.topDoctors.length === 0 ? (
-            <MacOSEmptyState
-              icon={Users}
-              title="Нет данных о врачах"
-              description="За выбранный период нет данных о врачах"
-            />
-          ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {analyticsData.topDoctors.map((doctor, index) => (
-              <div key={index} style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between', 
-                padding: '12px', 
-                backgroundColor: 'var(--mac-bg-tertiary)', 
-                borderRadius: 'var(--mac-radius-md)' 
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ 
-                    width: '32px', 
-                    height: '32px', 
-                    backgroundColor: 'var(--mac-accent)', 
-                    borderRadius: '50%', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
-                  }}>
-                    <span style={{ 
-                      color: 'white', 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                        fontWeight: 'var(--mac-font-weight-medium)' 
-                    }}>{index + 1}</span>
-                  </div>
-                  <div>
-                    <p style={{ 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      color: 'var(--mac-text-primary)',
-                      margin: 0
-                    }}>{doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно'}</p>
-                    <p style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)',
-                      margin: 0
-                    }}>{doctor.specialty || doctor.department || 'Неизвестно'}</p>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)',
-                    margin: 0
-                  }}>{doctor.patients} записей</p>
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    color: 'var(--mac-text-secondary)',
-                    margin: 0
-                  }}>{doctor.revenue}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          )}
         </MacOSCard>
-      </MacOSCard>
-    </div>
-  );
+      </div>
+    );
   };
 
   const renderContent = () => {
@@ -2445,7 +2492,7 @@ const AdminPanel = () => {
       case 'user-data-transfer':
       case 'user-export':
       case 'group-permissions':
-        return <UnifiedUserManagement renderUsersList={renderUsers} />;
+        return <UnifiedUserManagement />;
       case 'doctors':
         return renderDoctors();
       case 'patients':
@@ -2494,15 +2541,16 @@ const AdminPanel = () => {
         return <SystemManagement />;
       case 'cloud-printing':
         return <CloudPrintingManager />;
-        case 'medical-equipment':
-          return <MedicalEquipmentManager />;
-        case 'graphql-explorer':
-          return <GraphQLExplorer />;
-      case 'services':
+      case 'medical-equipment':
+        return <MedicalEquipmentManager />;
+      case 'graphql-explorer':
+        return <GraphQLExplorer />;
+      case 'services': {
         // Вкладки для секции Services
+        // ⭐ SSOT: DepartmentManagement удалён - QueueProfilesManager теперь единственный источник для вкладок регистратуры
         const serviceTabs = [
           { key: 'catalog', label: 'Справочник услуг', icon: Package },
-          { key: 'departments', label: 'Управление отделениями', icon: Building2 }
+          { key: 'queue-profiles', label: 'Вкладки регистратуры', icon: FolderTree }  // ⭐ SSOT: Dynamic queue tabs
         ];
 
         return (
@@ -2563,11 +2611,13 @@ const AdminPanel = () => {
 
             {/* Содержимое вкладок */}
             {servicesTab === 'catalog' && <ServiceCatalog />}
-            {servicesTab === 'departments' && <DepartmentManagement />}
+            {servicesTab === 'queue-profiles' && <QueueProfilesManager theme={isDark ? 'dark' : 'light'} />}
           </div>
         );
+      }
       case 'departments':
-        return <DepartmentManagement />;
+        // ⭐ DEPRECATED: Redirect to SSOT queue-profiles
+        return <QueueProfilesManager theme={isDark ? 'dark' : 'light'} />;
       case 'ai-settings':
         return <UnifiedSettings />;
       case 'display-settings':
@@ -2581,9 +2631,9 @@ const AdminPanel = () => {
         return (
           <MacOSCard style={{ padding: '48px' }}>
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{ 
-                fontSize: '24px', 
-                fontWeight: '600', 
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: '600',
                 marginBottom: '16px',
                 color: 'var(--mac-text-primary)',
                 margin: 0
@@ -2600,14 +2650,14 @@ const AdminPanel = () => {
   // Заглушки для остальных разделов
   const renderDoctors = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard 
+      <MacOSCard
         variant="default"
         style={{ padding: '24px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
+          <h2 style={{
+            fontSize: 'var(--mac-font-size-xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             margin: 0
           }}>Управление врачами</h2>
@@ -2616,7 +2666,7 @@ const AdminPanel = () => {
             Добавить врача
           </MacOSButton>
         </div>
-        
+
         {/* Поиск и фильтры */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: '1' }}>
@@ -2702,8 +2752,8 @@ const AdminPanel = () => {
             <EmptyState
               type="users"
               title="Врачи не найдены"
-              description={doctorsSearchTerm || filterSpecialization || filterDepartment || doctorsFilterStatus 
-                ? 'Попробуйте изменить параметры поиска' 
+              description={doctorsSearchTerm || filterSpecialization || filterDepartment || doctorsFilterStatus
+                ? 'Попробуйте изменить параметры поиска'
                 : 'В системе пока нет врачей'
               }
               action={
@@ -2716,56 +2766,56 @@ const AdminPanel = () => {
           ) : (
             <table style={{ width: '100%' }} role="table" aria-label="Таблица врачей">
               <thead>
-                <tr style={{ 
-                  backgroundColor: 'var(--mac-bg-tertiary)', 
-                  borderBottom: '1px solid var(--mac-border)' 
+                <tr style={{
+                  backgroundColor: 'var(--mac-bg-tertiary)',
+                  borderBottom: '1px solid var(--mac-border)'
                 }}>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Врач</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Специализация</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Отделение</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Опыт</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Статус</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Пациенты</th>
-                  <th scope="col" style={{ 
-                    textAlign: 'left', 
-                    padding: '12px 16px', 
-                    color: 'var(--mac-text-primary)', 
+                  <th scope="col" style={{
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    color: 'var(--mac-text-primary)',
                     fontWeight: 'var(--mac-font-weight-medium)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>Действия</th>
@@ -2773,12 +2823,12 @@ const AdminPanel = () => {
               </thead>
               <tbody>
                 {doctors.map((doctor) => (
-                  <tr key={doctor.id} style={{ 
-                    borderBottom: '1px solid var(--mac-border)', 
+                  <tr key={doctor.id} style={{
+                    borderBottom: '1px solid var(--mac-border)',
                     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -2802,20 +2852,20 @@ const AdminPanel = () => {
                           </span>
                         </div>
                         <div>
-                          <p style={{ 
-                            fontWeight: 'var(--mac-font-weight-medium)', 
+                          <p style={{
+                            fontWeight: 'var(--mac-font-weight-medium)',
                             color: 'var(--mac-text-primary)',
                             fontSize: 'var(--mac-font-size-sm)',
                             margin: 0
                           }}>{doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно'}</p>
-                          <p style={{ 
-                            fontSize: '12px', 
+                          <p style={{
+                            fontSize: '12px',
                             color: 'var(--mac-text-secondary)',
                             margin: '4px 0 0 0'
                           }}>{doctor.user?.email || doctor.email || 'Нет email'}</p>
                           {doctor.user?.phone && (
-                            <p style={{ 
-                              fontSize: '11px', 
+                            <p style={{
+                              fontSize: '11px',
                               color: 'var(--mac-text-tertiary)',
                               margin: '2px 0 0 0'
                             }}>{doctor.user.phone}</p>
@@ -2833,34 +2883,34 @@ const AdminPanel = () => {
                         {doctor.specialty ? getDepartmentLabel(doctor.specialty) : (doctor.department ? getDepartmentLabel(doctor.department) : 'Не указано')}
                       </MacOSBadge>
                     </td>
-                    <td style={{ 
-                      padding: '12px 16px', 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)' 
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
                     }}>
                       {doctor.experience ? `${doctor.experience} лет` : 'Не указано'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <MacOSBadge 
+                      <MacOSBadge
                         variant={doctor.active ? 'success' : 'warning'}
                       >
                         {doctor.active ? 'Активен' : 'Неактивен'}
                       </MacOSBadge>
                     </td>
-                    <td style={{ 
-                      padding: '12px 16px', 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)' 
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
                     }}>
                       {doctor.patientsCount || 0} пациентов
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button 
+                        <button
                           onClick={() => handleEditDoctor(doctor)}
-                          style={{ 
-                            padding: '4px', 
-                            borderRadius: 'var(--mac-radius-sm)', 
+                          style={{
+                            padding: '4px',
+                            borderRadius: 'var(--mac-radius-sm)',
                             transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
                             color: 'var(--mac-text-secondary)',
                             backgroundColor: 'transparent',
@@ -2873,11 +2923,11 @@ const AdminPanel = () => {
                         >
                           <Edit style={{ width: '16px', height: '16px' }} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDeleteDoctor(doctor)}
-                          style={{ 
-                            padding: '4px', 
-                            borderRadius: 'var(--mac-radius-sm)', 
+                          style={{
+                            padding: '4px',
+                            borderRadius: 'var(--mac-radius-sm)',
                             transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
                             color: 'var(--mac-error)',
                             backgroundColor: 'transparent',
@@ -2886,7 +2936,7 @@ const AdminPanel = () => {
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          title="Удалить"
+                          title="Деактивировать"
                         >
                           <Trash2 style={{ width: '16px', height: '16px' }} />
                         </button>
@@ -2913,14 +2963,14 @@ const AdminPanel = () => {
 
   const renderPatients = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard 
+      <MacOSCard
         variant="default"
         style={{ padding: '24px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h2 style={{ 
-            fontSize: 'var(--mac-font-size-xl)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
+          <h2 style={{
+            fontSize: 'var(--mac-font-size-xl)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
             margin: 0
           }}>Управление пациентами</h2>
@@ -2929,7 +2979,7 @@ const AdminPanel = () => {
             Добавить пациента
           </MacOSButton>
         </div>
-        
+
         {/* Поиск и фильтры */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: '1' }}>
@@ -3041,8 +3091,8 @@ const AdminPanel = () => {
             <MacOSEmptyState
               type="users"
               title="Пациенты не найдены"
-              description={patientsSearchTerm || filterGender || filterAgeRange || filterBloodType 
-                ? 'Попробуйте изменить параметры поиска' 
+              description={patientsSearchTerm || filterGender || filterAgeRange || filterBloodType
+                ? 'Попробуйте изменить параметры поиска'
                 : 'В системе пока нет пациентов'
               }
               action={
@@ -3067,106 +3117,106 @@ const AdminPanel = () => {
               data={patients.map((patient) => ({
                 id: patient.id,
                 patient: (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          backgroundColor: 'var(--mac-accent)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: 'var(--mac-font-size-sm)',
-                          fontWeight: '500'
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--mac-accent)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: '500'
+                    }}>
+                      <span>
+                        {patient.firstName[0]}{patient.lastName[0]}
+                      </span>
+                    </div>
+                    <div>
+                      <p style={{
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)',
+                        fontSize: 'var(--mac-font-size-sm)',
+                        margin: 0
+                      }}>
+                        {patient.lastName} {patient.firstName} {patient.middleName}
+                      </p>
+                      <p style={{
+                        fontSize: '12px',
+                        color: 'var(--mac-text-secondary)',
+                        margin: '4px 0 0 0'
+                      }}>
+                        {patient.email || 'Email не указан'}
+                      </p>
+                      {patient.address && (
+                        <p style={{
+                          fontSize: '11px',
+                          color: 'var(--mac-text-tertiary)',
+                          margin: '2px 0 0 0'
                         }}>
-                          <span>
-                            {patient.firstName[0]}{patient.lastName[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <p style={{ 
-                            fontWeight: 'var(--mac-font-weight-medium)', 
-                            color: 'var(--mac-text-primary)',
-                            fontSize: 'var(--mac-font-size-sm)',
-                            margin: 0
-                          }}>
-                            {patient.lastName} {patient.firstName} {patient.middleName}
-                          </p>
-                          <p style={{ 
-                            fontSize: '12px', 
-                            color: 'var(--mac-text-secondary)',
-                            margin: '4px 0 0 0'
-                          }}>
-                            {patient.email || 'Email не указан'}
-                          </p>
-                          {patient.address && (
-                            <p style={{ 
-                              fontSize: '11px', 
-                              color: 'var(--mac-text-tertiary)',
-                              margin: '2px 0 0 0'
-                            }}>
-                              {patient.address}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                          {patient.address}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 ),
                 age: (
-                  <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)' 
-                    }}>
-                      {calculateAge(patient.birthDate)} лет
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                    {calculateAge(patient.birthDate)} лет
                   </div>
                 ),
                 gender: (
                   <MacOSBadge variant={patient.gender === 'male' ? 'info' : 'success'}>
-                        {getGenderLabel(patient.gender)}
+                    {getGenderLabel(patient.gender)}
                   </MacOSBadge>
                 ),
                 phone: (
-                  <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)' 
-                    }}>
-                      {patient.phone}
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                    {patient.phone}
                   </div>
                 ),
                 bloodType: (
                   patient.bloodType ? (
                     <MacOSBadge variant="warning">
-                          {patient.bloodType}
+                      {patient.bloodType}
                     </MacOSBadge>
-                      ) : (
-                        <span style={{ 
-                          fontSize: 'var(--mac-font-size-sm)', 
-                          color: 'var(--mac-text-tertiary)' 
-                        }}>Не указано</span>
+                  ) : (
+                    <span style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-tertiary)'
+                    }}>Не указано</span>
                   )
                 ),
                 lastVisit: (
-                  <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)' 
-                    }}>
-                      {patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('ru-RU') : 'Нет визитов'}
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                    {patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('ru-RU') : 'Нет визитов'}
                   </div>
                 ),
                 visits: (
-                  <div style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-secondary)' 
-                    }}>
-                      {patient.visitsCount} визитов
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                    {patient.visitsCount} визитов
                   </div>
                 ),
                 actions: (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <MacOSButton
                       variant="outline"
-                          onClick={() => handleEditPatient(patient)}
-                          style={{ 
+                      onClick={() => handleEditPatient(patient)}
+                      style={{
                         padding: '6px',
                         minWidth: 'auto',
                         width: '32px',
@@ -3175,14 +3225,14 @@ const AdminPanel = () => {
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}
-                          title="Редактировать"
-                        >
-                          <Edit style={{ width: '16px', height: '16px' }} />
+                      title="Редактировать"
+                    >
+                      <Edit style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                     <MacOSButton
                       variant="outline"
-                          onClick={() => handleDeletePatient(patient)}
-                          style={{ 
+                      onClick={() => handleDeletePatient(patient)}
+                      style={{
                         padding: '6px',
                         minWidth: 'auto',
                         width: '32px',
@@ -3190,14 +3240,14 @@ const AdminPanel = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                            color: 'var(--mac-error)',
+                        color: 'var(--mac-error)',
                         borderColor: 'var(--mac-error)'
-                          }}
-                          title="Удалить"
-                        >
-                          <Trash2 style={{ width: '16px', height: '16px' }} />
+                      }}
+                      title="Удалить"
+                    >
+                      <Trash2 style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
-                      </div>
+                  </div>
                 )
               }))}
             />
@@ -3225,25 +3275,25 @@ const AdminPanel = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика записей */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
         }}>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Всего записей</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{appointments.length}</p>
@@ -3251,20 +3301,20 @@ const AdminPanel = () => {
               <Calendar style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>На сегодня</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{todayAppointments.length}</p>
@@ -3272,20 +3322,20 @@ const AdminPanel = () => {
               <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>На завтра</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{tomorrowAppointments.length}</p>
@@ -3293,20 +3343,20 @@ const AdminPanel = () => {
               <Calendar style={{ width: '32px', height: '32px', color: 'var(--mac-text-primary)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Ожидают</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{statusStats.pending}</p>
@@ -3316,14 +3366,14 @@ const AdminPanel = () => {
           </MacOSCard>
         </div>
 
-        <MacOSCard 
+        <MacOSCard
           variant="default"
           style={{ padding: '24px' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2 style={{ 
-              fontSize: '20px', 
-              fontWeight: '600', 
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>Управление записями</h2>
@@ -3332,17 +3382,17 @@ const AdminPanel = () => {
               Создать запись
             </MacOSButton>
           </div>
-          
+
           {/* Поиск и фильтры */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
             <div style={{ flex: '1', position: 'relative' }}>
-              <Search style={{ 
-                position: 'absolute', 
-                left: '12px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                width: '16px', 
-                height: '16px', 
+              <Search style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '16px',
+                height: '16px',
                 color: 'var(--mac-text-tertiary)',
                 zIndex: 1
               }} />
@@ -3413,8 +3463,8 @@ const AdminPanel = () => {
               <MacOSEmptyState
                 type="calendar"
                 title="Записи не найдены"
-                description={appointmentsSearchTerm || appointmentFilterStatus || appointmentFilterDate || appointmentFilterDoctor 
-                  ? 'Попробуйте изменить параметры поиска' 
+                description={appointmentsSearchTerm || appointmentFilterStatus || appointmentFilterDate || appointmentFilterDoctor
+                  ? 'Попробуйте изменить параметры поиска'
                   : 'В системе пока нет записей'
                 }
                 action={
@@ -3437,95 +3487,95 @@ const AdminPanel = () => {
                 data={appointments.map((appointment) => ({
                   id: appointment.id,
                   patient: (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ 
-                            width: '32px', 
-                            height: '32px', 
-                            borderRadius: '50%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            background: 'var(--mac-accent-blue)' 
-                          }}>
-                            <span style={{ 
-                              color: 'white', 
-                              fontSize: 'var(--mac-font-size-sm)', 
-                              fontWeight: 'var(--mac-font-weight-medium)' 
-                            }}>
-                              {appointment.patientName.split(' ').map(n => n[0]).join('').toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <p style={{ 
-                              fontWeight: 'var(--mac-font-weight-medium)', 
-                              color: 'var(--mac-text-primary)',
-                              margin: 0
-                            }}>{appointment.patientName}</p>
-                            {appointment.phone && (
-                              <p style={{ 
-                                fontSize: 'var(--mac-font-size-sm)', 
-                                color: 'var(--mac-text-secondary)',
-                                margin: '4px 0 0 0'
-                              }}>{appointment.phone}</p>
-                            )}
-                          </div>
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--mac-accent-blue)'
+                      }}>
+                        <span style={{
+                          color: 'white',
+                          fontSize: 'var(--mac-font-size-sm)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
+                        }}>
+                          {appointment.patientName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p style={{
+                          fontWeight: 'var(--mac-font-weight-medium)',
+                          color: 'var(--mac-text-primary)',
+                          margin: 0
+                        }}>{appointment.patientName}</p>
+                        {appointment.phone && (
+                          <p style={{
+                            fontSize: 'var(--mac-font-size-sm)',
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>{appointment.phone}</p>
+                        )}
+                      </div>
+                    </div>
                   ),
                   doctor: (
-                        <div>
-                          <p style={{ 
-                            fontWeight: 'var(--mac-font-weight-medium)', 
-                            color: 'var(--mac-text-primary)',
-                            margin: 0
-                          }}>{appointment.doctorName}</p>
-                          <p style={{ 
-                            fontSize: 'var(--mac-font-size-sm)', 
-                            color: 'var(--mac-text-secondary)',
-                            margin: '4px 0 0 0'
-                          }}>{appointment.doctorSpecialization}</p>
-                        </div>
+                    <div>
+                      <p style={{
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>{appointment.doctorName}</p>
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        color: 'var(--mac-text-secondary)',
+                        margin: '4px 0 0 0'
+                      }}>{appointment.doctorSpecialization}</p>
+                    </div>
                   ),
                   datetime: (
-                        <div>
-                          <p style={{ 
-                            fontWeight: 'var(--mac-font-weight-medium)', 
-                            color: 'var(--mac-text-primary)',
-                            margin: 0
-                          }}>
-                            {new Date(appointment.appointmentDate).toLocaleDateString('ru-RU')}
-                          </p>
-                          <p style={{ 
-                            fontSize: 'var(--mac-font-size-sm)', 
-                            color: 'var(--mac-text-secondary)',
-                            margin: '4px 0 0 0'
-                          }}>
-                            {appointment.appointmentTime} ({appointment.duration} мин)
-                          </p>
-                        </div>
+                    <div>
+                      <p style={{
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>
+                        {new Date(appointment.appointmentDate).toLocaleDateString('ru-RU')}
+                      </p>
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        color: 'var(--mac-text-secondary)',
+                        margin: '4px 0 0 0'
+                      }}>
+                        {appointment.appointmentTime} ({appointment.duration} мин)
+                      </p>
+                    </div>
                   ),
                   status: (
                     <MacOSBadge variant={getAppointmentStatusVariant(appointment.status)}>
-                          {getAppointmentStatusLabel(appointment.status)}
+                      {getAppointmentStatusLabel(appointment.status)}
                     </MacOSBadge>
                   ),
                   reason: (
-                        <p style={{ 
-                          fontSize: 'var(--mac-font-size-sm)', 
-                          color: 'var(--mac-text-secondary)',
-                          margin: 0
-                        }}>
-                          {appointment.reason.length > 50 
-                            ? `${appointment.reason.substring(0, 50)}...` 
-                            : appointment.reason
-                          }
-                        </p>
+                    <p style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)',
+                      margin: 0
+                    }}>
+                      {appointment.reason.length > 50
+                        ? `${appointment.reason.substring(0, 50)}...`
+                        : appointment.reason
+                      }
+                    </p>
                   ),
                   actions: (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <MacOSButton
                         variant="outline"
-                            onClick={() => handleEditAppointment(appointment)}
-                            style={{ 
+                        onClick={() => handleEditAppointment(appointment)}
+                        style={{
                           padding: '6px',
                           minWidth: 'auto',
                           width: '32px',
@@ -3534,14 +3584,14 @@ const AdminPanel = () => {
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
-                            title="Редактировать"
-                          >
-                            <Edit style={{ width: '16px', height: '16px' }} />
+                        title="Редактировать"
+                      >
+                        <Edit style={{ width: '16px', height: '16px' }} />
                       </MacOSButton>
                       <MacOSButton
                         variant="outline"
-                            onClick={() => handleDeleteAppointment(appointment)}
-                            style={{ 
+                        onClick={() => handleDeleteAppointment(appointment)}
+                        style={{
                           padding: '6px',
                           minWidth: 'auto',
                           width: '32px',
@@ -3552,11 +3602,11 @@ const AdminPanel = () => {
                           color: 'var(--mac-error)',
                           borderColor: 'var(--mac-error)'
                         }}
-                            title="Удалить"
-                          >
-                            <Trash2 style={{ width: '16px', height: '16px' }} />
+                        title="Удалить"
+                      >
+                        <Trash2 style={{ width: '16px', height: '16px' }} />
                       </MacOSButton>
-                        </div>
+                    </div>
                   )
                 }))}
               />
@@ -3587,25 +3637,25 @@ const AdminPanel = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Финансовая статистика */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
         }}>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Общий доход</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-success)',
                   margin: '4px 0 0 0'
                 }}>
@@ -3615,20 +3665,20 @@ const AdminPanel = () => {
               <DollarSign style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Общие расходы</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-error)',
                   margin: '4px 0 0 0'
                 }}>
@@ -3638,47 +3688,47 @@ const AdminPanel = () => {
               <CreditCard style={{ width: '32px', height: '32px', color: 'var(--mac-error)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Чистая прибыль</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)',
                   margin: '4px 0 0 0'
                 }}>
                   {formatCurrency(financialStats.netProfit)}
                 </p>
               </div>
-              <Calendar style={{ 
-                width: '32px', 
-                height: '32px', 
-                color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' 
+              <Calendar style={{
+                width: '32px',
+                height: '32px',
+                color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)'
               }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Всего транзакций</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>
@@ -3690,14 +3740,14 @@ const AdminPanel = () => {
           </MacOSCard>
         </div>
 
-        <MacOSCard 
+        <MacOSCard
           variant="default"
           style={{ padding: 0 }}
         >
           <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2 style={{ 
-              fontSize: '20px', 
-              fontWeight: '600', 
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>Финансовый учет</h2>
@@ -3706,7 +3756,7 @@ const AdminPanel = () => {
               Добавить транзакцию
             </MacOSButton>
           </div>
-          
+
           {/* Поиск и фильтры */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
             <div style={{ flex: '1' }}>
@@ -3837,8 +3887,8 @@ const AdminPanel = () => {
               <EmptyState
                 type="creditcard"
                 title="Транзакции не найдены"
-                description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus 
-                  ? 'Попробуйте изменить параметры поиска' 
+                description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus
+                  ? 'Попробуйте изменить параметры поиска'
                   : 'В системе пока нет транзакций'
                 }
                 action={
@@ -3892,8 +3942,8 @@ const AdminPanel = () => {
                       </td>
                       <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                         <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: 0 }}>
-                          {transaction.description.length > 50 
-                            ? `${transaction.description.substring(0, 50)}...` 
+                          {transaction.description.length > 50
+                            ? `${transaction.description.substring(0, 50)}...`
                             : transaction.description
                           }
                         </p>
@@ -3913,7 +3963,7 @@ const AdminPanel = () => {
                       </td>
                       <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-                          <button 
+                          <button
                             onClick={() => handleEditTransaction(transaction)}
                             style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-text-secondary)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)')}
@@ -3922,7 +3972,7 @@ const AdminPanel = () => {
                           >
                             <Edit style={{ width: '16px', height: '16px' }} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDeleteTransaction(transaction)}
                             style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-danger)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)')}
@@ -3963,25 +4013,25 @@ const AdminPanel = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика настроек */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
         }}>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Всего настроек</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{settingsStats.totalSettings}</p>
@@ -3989,20 +4039,20 @@ const AdminPanel = () => {
               <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Настроено</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-success)',
                   margin: '4px 0 0 0'
                 }}>{settingsStats.configuredSettings}</p>
@@ -4010,20 +4060,20 @@ const AdminPanel = () => {
               <CheckCircle style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Завершенность</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-info)',
                   margin: '4px 0 0 0'
                 }}>{settingsStats.configurationPercentage}%</p>
@@ -4031,30 +4081,30 @@ const AdminPanel = () => {
               <BarChart3 style={{ width: '32px', height: '32px', color: 'var(--mac-info)' }} />
             </div>
           </MacOSCard>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Безопасность</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: settingsStats.securityEnabled ? 'var(--mac-success)' : 'var(--mac-warning)',
                   margin: '4px 0 0 0'
                 }}>
                   {settingsStats.securityEnabled ? 'Вкл' : 'Выкл'}
                 </p>
               </div>
-              <Shield style={{ 
-                width: '32px', 
-                height: '32px', 
-                color: settingsStats.securityEnabled ? 'var(--mac-success)' : 'var(--mac-warning)' 
+              <Shield style={{
+                width: '32px',
+                height: '32px',
+                color: settingsStats.securityEnabled ? 'var(--mac-success)' : 'var(--mac-warning)'
               }} />
             </div>
           </MacOSCard>
@@ -4076,7 +4126,7 @@ const AdminPanel = () => {
               Цветовые схемы
             </MacOSButton>
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <MacOSButton variant="outline" onClick={handleExportSettings}>
               <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -4102,10 +4152,10 @@ const AdminPanel = () => {
 
         {/* Общие настройки */}
         {settingsSubTab === 'general' && (
-           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               marginBottom: '20px',
               color: 'var(--mac-text-primary)'
             }}>
@@ -4113,10 +4163,10 @@ const AdminPanel = () => {
             </h3>
             <div style={{ display: 'grid', gap: '16px' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -4129,10 +4179,10 @@ const AdminPanel = () => {
                 />
               </div>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -4146,10 +4196,10 @@ const AdminPanel = () => {
                 />
               </div>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -4162,10 +4212,10 @@ const AdminPanel = () => {
                 />
               </div>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -4179,10 +4229,10 @@ const AdminPanel = () => {
                 />
               </div>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -4200,8 +4250,8 @@ const AdminPanel = () => {
                   ]}
                   placeholder="Выберите часовой пояс"
                 />
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-xs)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
                   color: 'var(--mac-text-tertiary)',
                   marginTop: '4px',
                   marginBottom: 0
@@ -4210,27 +4260,27 @@ const AdminPanel = () => {
                 </p>
               </div>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   marginBottom: '8px',
                   color: 'var(--mac-text-primary)'
                 }}>
                   Логотип клиники
                 </label>
-                
+
                 {/* Текущий логотип */}
                 {(settings?.logoUrl || logoPreview) && (
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ 
-                      width: '128px', 
-                      height: '80px', 
-                      border: '2px dashed var(--mac-border)', 
+                    <div style={{
+                      width: '128px',
+                      height: '80px',
+                      border: '2px dashed var(--mac-border)',
                       borderRadius: 'var(--mac-radius-md)',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       backgroundColor: 'var(--mac-bg-secondary)',
                       overflow: 'hidden'
                     }}>
@@ -4241,9 +4291,9 @@ const AdminPanel = () => {
                       />
                     </div>
                     {logoPreview && (
-                      <MacOSButton 
-                        variant="outline" 
-                        size="sm" 
+                      <MacOSButton
+                        variant="outline"
+                        size="sm"
                         onClick={resetLogo}
                         style={{ marginTop: '8px' }}
                       >
@@ -4252,7 +4302,7 @@ const AdminPanel = () => {
                     )}
                   </div>
                 )}
-                
+
                 {/* Загрузка логотипа */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
@@ -4262,7 +4312,7 @@ const AdminPanel = () => {
                     style={{ display: 'none' }}
                     id="logo-upload"
                   />
-                  <MacOSButton 
+                  <MacOSButton
                     variant="outline"
                     onClick={() => document.getElementById('logo-upload').click()}
                   >
@@ -4270,8 +4320,8 @@ const AdminPanel = () => {
                     Выбрать файл
                   </MacOSButton>
                 </div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-xs)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
                   color: 'var(--mac-text-tertiary)',
                   marginTop: '4px',
                   marginBottom: 0
@@ -4281,20 +4331,20 @@ const AdminPanel = () => {
               </div>
             </div>
             <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-              <MacOSButton 
+              <MacOSButton
                 onClick={() => handleSaveSettings(settings)}
                 loading={settingsLoading}
               >
                 Сохранить настройки
               </MacOSButton>
-              <MacOSButton 
-                variant="outline" 
+              <MacOSButton
+                variant="outline"
                 onClick={() => setSettings(prev => ({ ...prev, ...defaultSettings }))}
               >
                 Сбросить к умолчанию
               </MacOSButton>
-              <MacOSButton 
-                variant="outline" 
+              <MacOSButton
+                variant="outline"
                 onClick={() => window.location.reload()}
               >
                 <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -4328,25 +4378,25 @@ const AdminPanel = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика безопасности */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
         }}>
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Всего угроз</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{securityStats.totalThreats}</p>
@@ -4356,9 +4406,9 @@ const AdminPanel = () => {
                   ) : (
                     <TrendingDown style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-success)' }} />
                   )}
-                  <span style={{ 
-                    fontSize: '12px', 
-                    color: securityTrends.threats.change > 0 ? 'var(--mac-error)' : 'var(--mac-success)' 
+                  <span style={{
+                    fontSize: '12px',
+                    color: securityTrends.threats.change > 0 ? 'var(--mac-error)' : 'var(--mac-success)'
                   }}>
                     {Math.abs(securityTrends.threats.change).toFixed(1)}%
                   </span>
@@ -4368,20 +4418,20 @@ const AdminPanel = () => {
             </div>
           </MacOSCard>
 
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Критические</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-error)',
                   margin: '4px 0 0 0'
                 }}>{securityStats.criticalThreats}</p>
@@ -4390,20 +4440,20 @@ const AdminPanel = () => {
             </div>
           </MacOSCard>
 
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Заблокированные IP</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>{securityStats.blockedIPs}</p>
@@ -4413,9 +4463,9 @@ const AdminPanel = () => {
                   ) : (
                     <TrendingDown style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-success)' }} />
                   )}
-                  <span style={{ 
-                    fontSize: '12px', 
-                    color: securityTrends.blockedIPs.change > 0 ? 'var(--mac-error)' : 'var(--mac-success)' 
+                  <span style={{
+                    fontSize: '12px',
+                    color: securityTrends.blockedIPs.change > 0 ? 'var(--mac-error)' : 'var(--mac-success)'
                   }}>
                     {Math.abs(securityTrends.blockedIPs.change).toFixed(1)}%
                   </span>
@@ -4425,20 +4475,20 @@ const AdminPanel = () => {
             </div>
           </MacOSCard>
 
-          <MacOSCard 
+          <MacOSCard
             style={{ padding: '24px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>Оценка безопасности</p>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-2xl)', 
-                  fontWeight: 'var(--mac-font-weight-bold)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-2xl)',
+                  fontWeight: 'var(--mac-font-weight-bold)',
                   color: securityStats.securityScore >= 80 ? 'var(--mac-success)' : 'var(--mac-warning)',
                   margin: '4px 0 0 0'
                 }}>
@@ -4450,9 +4500,9 @@ const AdminPanel = () => {
                   ) : (
                     <TrendingDown style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-error)' }} />
                   )}
-                  <span style={{ 
-                    fontSize: '12px', 
-                    color: securityTrends.securityScore.change > 0 ? 'var(--mac-success)' : 'var(--mac-error)' 
+                  <span style={{
+                    fontSize: '12px',
+                    color: securityTrends.securityScore.change > 0 ? 'var(--mac-success)' : 'var(--mac-error)'
                   }}>
                     {Math.abs(securityTrends.securityScore.change).toFixed(1)}%
                   </span>
@@ -4493,32 +4543,32 @@ const AdminPanel = () => {
 
   if (isLoading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        backgroundColor: 'var(--mac-bg-primary)', 
-        padding: '24px' 
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: 'var(--mac-bg-primary)',
+        padding: '24px'
       }}>
-        <div style={{ 
-          maxWidth: '1280px', 
-          margin: '0 auto', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '24px' 
+        <div style={{
+          maxWidth: '1280px',
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px'
         }}>
           <MacOSLoadingSkeleton style={{ height: '32px', width: '256px' }} />
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-            gap: '16px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '16px'
           }}>
             {[...Array(6)].map((_, i) => (
               <MacOSLoadingSkeleton key={i} style={{ height: '96px' }} />
             ))}
           </div>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-            gap: '24px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '24px'
           }}>
             <MacOSLoadingSkeleton style={{ height: '320px' }} />
             <MacOSLoadingSkeleton style={{ height: '320px' }} />
@@ -4553,33 +4603,33 @@ const AdminPanel = () => {
   return (
     <div style={pageStyle}>
       <div style={containerStyle}>
-        
+
         {/* Навигация теперь через глобальный сайдбар в App.jsx */}
 
         {/* Мобильная навигация */}
-        <MobileNavigation 
+        <MobileNavigation
           sections={navigationSections}
           currentSection={current}
           onNavigate={(path) => navigate(path)}
         />
 
         {/* Основной контент */}
-        <div style={{ 
-          opacity: animationsStarted ? 1 : 0, 
+        <div style={{
+          opacity: animationsStarted ? 1 : 0,
           transform: animationsStarted ? 'translateY(0)' : 'translateY(20px)',
           transition: 'opacity 0.3s ease, transform 0.4s ease'
         }}>
-          <div style={{ 
+          <div style={{
             padding: current === 'analytics' || current === 'clinic-management' || current === 'ai-imaging' || current === 'settings' || current === 'finance' || current === 'reports' || current === 'telegram-bot' || current === 'fcm-notifications' ? '0' : '12px'
-        }}>
-          {renderContent()}
+          }}>
+            {renderContent()}
           </div>
         </div>
-        
+
         {/* Модальное окно горячих клавиш */}
-        <HotkeysModal 
-          isOpen={showHotkeysModal} 
-          onClose={() => setShowHotkeysModal(false)} 
+        <HotkeysModal
+          isOpen={showHotkeysModal}
+          onClose={() => setShowHotkeysModal(false)}
         />
       </div>
     </div>

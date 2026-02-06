@@ -20,10 +20,10 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 import QueueIntegration from '../components/QueueIntegration';
 import { queueService } from '../services/queue';
 import EMRSystem from '../components/medical/EMRSystem';
-import { 
-  Calendar, 
-  Stethoscope, 
-  FileText, 
+import {
+  Calendar,
+  Stethoscope,
+  FileText,
   Eye,
   Search,
   Plus,
@@ -39,13 +39,10 @@ import {
   Save,
   Building
 } from 'lucide-react';
+import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
-
-const logger = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-};
+import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -60,23 +57,33 @@ const DentistPanelUnified = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [authState, setAuthState] = useState(auth.getState());
-  
+
   useEffect(() => {
     const unsubscribe = auth.subscribe(setAuthState);
     return unsubscribe;
   }, []);
-  
+
   const user = authState.profile;
-  
+
   // Синхронизация активной вкладки с URL
   const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
+    // Если есть patientId, переходим на вкладку пациента
+    if (params.get('patientId')) {
+      return 'examinations';
+    }
     return params.get('tab') || 'appointments';
   }, [location.search]);
-  
+
+  // Получаем patientId из URL для автоматической загрузки пациента
+  const getPatientIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
   // Состояние
   const [activeTab, setActiveTab] = useState(() => getActiveTabFromURL());
-  
+
   // Синхронизация URL с активной вкладкой
   useEffect(() => {
     const urlTab = getActiveTabFromURL();
@@ -84,7 +91,7 @@ const DentistPanelUnified = () => {
       setActiveTab(urlTab);
     }
   }, [activeTab, getActiveTabFromURL]);
-  
+
   // Функция для изменения активной вкладки с обновлением URL
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -97,7 +104,7 @@ const DentistPanelUnified = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [emr, setEmr] = useState(null);
-  
+
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -116,7 +123,7 @@ const DentistPanelUnified = () => {
   const [showTreatmentForm, setShowTreatmentForm] = useState(false);
   const [showProstheticForm, setShowProstheticForm] = useState(false);
   const [dentalChartData, setDentalChartData] = useState(null);
-  
+
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
@@ -167,10 +174,10 @@ const DentistPanelUnified = () => {
   // Refs
 
   // Используем централизованную систему темизации
-  const { 
-    isDark, 
-    getColor, 
-    getSpacing, 
+  const {
+    isDark,
+    getColor,
+    getSpacing,
     getFontSize
   } = useTheme();
 
@@ -178,7 +185,7 @@ const DentistPanelUnified = () => {
   // Загрузка услуг для правильного отображения в tooltips
   const loadServices = useCallback(async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) return;
       const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
@@ -199,7 +206,7 @@ const DentistPanelUnified = () => {
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
     const patientServices = new Set();
     const patientServiceCodes = new Set();
-    
+
     allAppointments.forEach(appointment => {
       if (appointment.patient_id === patientId) {
         if (appointment.services && Array.isArray(appointment.services)) {
@@ -210,7 +217,7 @@ const DentistPanelUnified = () => {
         }
       }
     });
-    
+
     return {
       services: Array.from(patientServices),
       service_codes: Array.from(patientServiceCodes)
@@ -221,13 +228,13 @@ const DentistPanelUnified = () => {
   const loadDentistryAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         logger.info('Нет токена аутентификации');
         setAppointmentsLoading(false);
         return;
       }
-      
+
       // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
       const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
         headers: {
@@ -235,10 +242,10 @@ const DentistPanelUnified = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        
+
         // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
         let allAppointments = [];
         if (data && data.queues && Array.isArray(data.queues)) {
@@ -349,7 +356,7 @@ const DentistPanelUnified = () => {
     if (activeTab === 'appointments') {
       loadDentistryAppointments();
     }
-    
+
     // Слушаем глобальные события обновления очереди
     const handleQueueUpdate = (event) => {
       logger.info('[Dentist] Получено событие обновления очереди:', event.detail);
@@ -358,7 +365,7 @@ const DentistPanelUnified = () => {
       }
     };
     window.addEventListener('queueUpdated', handleQueueUpdate);
-    
+
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
@@ -394,7 +401,7 @@ const DentistPanelUnified = () => {
         // Вызвать пациента
         try {
           const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
-          const token = localStorage.getItem('auth_token');
+          const token = tokenManager.getAccessToken();
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -452,7 +459,7 @@ const DentistPanelUnified = () => {
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
   const authHeader = useCallback(() => ({
-    Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`,
+    Authorization: `Bearer ${tokenManager.getAccessToken()}`,
   }), []);
 
   const loadPatients = useCallback(async () => {
@@ -511,6 +518,52 @@ const DentistPanelUnified = () => {
     loadServices();
   }, [loadData, loadServices]);
 
+  // ✅ Автоматическая загрузка пациента из URL параметра patientId
+  useEffect(() => {
+    const loadPatientFromUrl = async () => {
+      const patientIdFromUrl = getPatientIdFromUrl();
+      if (!patientIdFromUrl) return;
+
+      // Если пациент уже загружен с этим ID, пропускаем
+      if (selectedPatient?.patient_id === patientIdFromUrl) return;
+
+      try {
+        const token = tokenManager.getAccessToken();
+        if (!token) return;
+
+        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+
+        // Загружаем данные пациента
+        const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (patientResponse.ok) {
+          const patientData = await patientResponse.json();
+
+          // Создаем объект пациента для отображения
+          const patientObj = {
+            id: patientData.id,
+            patient_id: patientData.id,
+            patient_name: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
+            patient_fio: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
+            phone: patientData.phone || '',
+            source: 'search',
+            specialty: 'dental'
+          };
+
+          setSelectedPatient(patientObj);
+          setActiveTab('examinations');
+          logger.info('[Dentist] Загружен пациент из URL:', patientObj.patient_name);
+        }
+      } catch (error) {
+        logger.error('[Dentist] Не удалось загрузить пациента из URL:', error);
+      }
+    };
+
+    loadPatientFromUrl();
+  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Обработчики
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
@@ -521,18 +574,18 @@ const DentistPanelUnified = () => {
   // Сохранение EMR
   const saveEMR = async (emrData) => {
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       if (!selectedPatient?.id) {
         logger.warn('[Dentist] saveEMR: нет selectedPatient.id');
         return;
       }
-      
+
       const appointmentForEMR = {
         id: selectedPatient.id,
         patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
         patient_name: selectedPatient.patient_name || selectedPatient.name
       };
-      
+
       const response = await fetch(`/api/v1/appointments/${appointmentForEMR.id}/emr`, {
         method: 'POST',
         headers: {
@@ -560,22 +613,22 @@ const DentistPanelUnified = () => {
   // Завершение визита
   const handleCompleteVisit = async () => {
     if (!selectedPatient) return;
-    
+
     try {
       const visitPayload = {
         patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
         notes: 'Стоматологический прием завершен'
       };
-      
+
       await queueService.completeVisit(selectedPatient.id, visitPayload);
-      
+
       // Автоматически вызвать следующего пациента
       try {
         await queueService.callNextWaiting('dentist');
       } catch (err) {
         logger.warn('[Dentist] callNextWaiting failed:', err);
       }
-      
+
       setSelectedPatient(null);
       setEmr(null);
       handleTabChange('queue');
@@ -641,21 +694,21 @@ const DentistPanelUnified = () => {
     e.preventDefault();
     try {
       const res = await fetch('/api/v1/dental/examinations', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', ...authHeader() }, 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(examinationForm)
       });
       if (res.ok) {
         setShowExaminationForm(false);
-        setExaminationForm({ 
-          patient_id: '', examination_date: '', oral_hygiene: '', caries_status: '', 
-          periodontal_status: '', occlusion: '', missing_teeth: '', dental_plaque: '', 
-          gingival_bleeding: '', diagnosis: '', recommendations: '' 
+        setExaminationForm({
+          patient_id: '', examination_date: '', oral_hygiene: '', caries_status: '',
+          periodontal_status: '', occlusion: '', missing_teeth: '', dental_plaque: '',
+          gingival_bleeding: '', diagnosis: '', recommendations: ''
         });
         loadDentistryAppointments();
       }
-    } catch (e) { 
-      logger.error('Ошибка сохранения осмотра:', e); 
+    } catch (e) {
+      logger.error('Ошибка сохранения осмотра:', e);
     }
   };
 
@@ -663,21 +716,21 @@ const DentistPanelUnified = () => {
     e.preventDefault();
     try {
       const res = await fetch('/api/v1/dental/treatments', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', ...authHeader() }, 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(treatmentForm)
       });
       if (res.ok) {
         setShowTreatmentForm(false);
-        setTreatmentForm({ 
-          patient_id: '', treatment_date: '', treatment_type: '', teeth_involved: '', 
-          procedure_description: '', materials_used: '', anesthesia: '', complications: '', 
-          follow_up_date: '', cost: '' 
+        setTreatmentForm({
+          patient_id: '', treatment_date: '', treatment_type: '', teeth_involved: '',
+          procedure_description: '', materials_used: '', anesthesia: '', complications: '',
+          follow_up_date: '', cost: ''
         });
         loadTreatmentPlans();
       }
-    } catch (e) { 
-      logger.error('Ошибка сохранения лечения:', e); 
+    } catch (e) {
+      logger.error('Ошибка сохранения лечения:', e);
     }
   };
 
@@ -685,32 +738,32 @@ const DentistPanelUnified = () => {
     e.preventDefault();
     try {
       const res = await fetch('/api/v1/dental/prosthetics', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', ...authHeader() }, 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(prostheticForm)
       });
       if (res.ok) {
         setShowProstheticForm(false);
-        setProstheticForm({ 
-          patient_id: '', prosthetic_date: '', prosthetic_type: '', teeth_replaced: '', 
-          material: '', shade: '', fit_quality: '', patient_satisfaction: '', 
-          warranty_period: '', cost: '' 
+        setProstheticForm({
+          patient_id: '', prosthetic_date: '', prosthetic_type: '', teeth_replaced: '',
+          material: '', shade: '', fit_quality: '', patient_satisfaction: '',
+          warranty_period: '', cost: ''
         });
         loadProsthetics();
       }
-    } catch (e) { 
-      logger.error('Ошибка сохранения протеза:', e); 
+    } catch (e) {
+      logger.error('Ошибка сохранения протеза:', e);
     }
   };
 
   // Фильтрация пациентов
   const filteredPatients = patients.filter(patient => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.phone?.includes(searchQuery);
-    
+
     const matchesStatus = filterStatus === 'all' || patient.status === filterStatus;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -745,8 +798,8 @@ const DentistPanelUnified = () => {
   const renderDashboard = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Статистические карточки */}
-      <div style={{ 
-        display: 'grid', 
+      <div style={{
+        display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '24px'
       }}>
@@ -762,30 +815,30 @@ const DentistPanelUnified = () => {
           transition: 'all var(--mac-duration-normal) var(--mac-ease)',
           cursor: 'pointer'
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}>
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
           <div>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-secondary)',
-              marginBottom: '4px' 
+              marginBottom: '4px'
             }}>Всего пациентов</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-3xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
-              color: 'var(--mac-text-primary)' 
+            <p style={{
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-text-primary)'
             }}>{stats.totalPatients}</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-success)',
-              marginTop: '4px' 
+              marginTop: '4px'
             }}>+12% за месяц</p>
           </div>
           <div style={{
@@ -814,30 +867,30 @@ const DentistPanelUnified = () => {
           transition: 'all var(--mac-duration-normal) var(--mac-ease)',
           cursor: 'pointer'
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}>
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
           <div>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-secondary)',
-              marginBottom: '4px' 
+              marginBottom: '4px'
             }}>Записей сегодня</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-3xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
-              color: 'var(--mac-text-primary)' 
+            <p style={{
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-text-primary)'
             }}>{stats.todayAppointments}</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-accent-blue)',
-              marginTop: '4px' 
+              marginTop: '4px'
             }}>8 из 12 слотов</p>
           </div>
           <div style={{
@@ -866,30 +919,30 @@ const DentistPanelUnified = () => {
           transition: 'all var(--mac-duration-normal) var(--mac-ease)',
           cursor: 'pointer'
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}>
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
           <div>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-secondary)',
-              marginBottom: '4px' 
+              marginBottom: '4px'
             }}>Активные планы</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-3xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
-              color: 'var(--mac-text-primary)' 
+            <p style={{
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-text-primary)'
             }}>{stats.activeTreatmentPlans}</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-accent-purple)',
-              marginTop: '4px' 
+              marginTop: '4px'
             }}>+8% к прошлому месяцу</p>
           </div>
           <div style={{
@@ -918,30 +971,30 @@ const DentistPanelUnified = () => {
           transition: 'all var(--mac-duration-normal) var(--mac-ease)',
           cursor: 'pointer'
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}>
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
           <div>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-secondary)',
-              marginBottom: '4px' 
+              marginBottom: '4px'
             }}>Протезы</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-3xl)', 
-              fontWeight: 'var(--mac-font-weight-bold)', 
-              color: 'var(--mac-text-primary)' 
+            <p style={{
+              fontSize: 'var(--mac-font-size-3xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-text-primary)'
             }}>{stats.completedProsthetics}</p>
-            <p style={{ 
-              fontSize: 'var(--mac-font-size-xs)', 
+            <p style={{
+              fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-warning)',
-              marginTop: '4px' 
+              marginTop: '4px'
             }}>+15% к прошлому месяцу</p>
           </div>
           <div style={{
@@ -981,7 +1034,7 @@ const DentistPanelUnified = () => {
           <Button
             variant="text"
             size="sm"
-            onClick={() => {}}
+            onClick={() => { }}
             style={{
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -1100,7 +1153,7 @@ const DentistPanelUnified = () => {
           <Button
             variant="text"
             size="sm"
-            onClick={() => {}}
+            onClick={() => { }}
             style={{
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -1112,7 +1165,7 @@ const DentistPanelUnified = () => {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {appointmentsTableData.slice(0, 5).map(appointment => (
-            <div 
+            <div
               key={appointment.id}
               style={{
                 display: 'flex',
@@ -1265,8 +1318,8 @@ const DentistPanelUnified = () => {
         gap: '24px'
       }}>
         {filteredPatients.map(patient => (
-          <Card 
-            key={patient.id} 
+          <Card
+            key={patient.id}
             padding="lg"
             style={{
               transition: 'all var(--mac-duration-normal) var(--mac-ease)',
@@ -1405,8 +1458,8 @@ const DentistPanelUnified = () => {
 
   // Рендер записей
   const renderAppointments = () => (
-    <div style={{ 
-      width: '100%', 
+    <div style={{
+      width: '100%',
       maxWidth: 'none',
       display: 'flex',
       flexDirection: 'column',
@@ -1461,7 +1514,7 @@ const DentistPanelUnified = () => {
             </Button>
           </div>
         </div>
-        
+
         <EnhancedAppointmentsTable
           data={appointmentsTableData}
           loading={appointmentsLoading}
@@ -1472,7 +1525,7 @@ const DentistPanelUnified = () => {
           outerBorder={false}
           services={services}
           showCheckboxes={false}
-          onRowSelect={() => {}}
+          onRowSelect={() => { }}
           onRowClick={handleAppointmentRowClick}
           onActionClick={handleAppointmentActionClick}
         />
@@ -1497,7 +1550,7 @@ const DentistPanelUnified = () => {
         }}>
           Выберите пациента для проведения или просмотра объективного осмотра
         </p>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -1575,7 +1628,7 @@ const DentistPanelUnified = () => {
         }}>
           Выберите пациента для постановки диагнозов и назначений
         </p>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -1665,7 +1718,7 @@ const DentistPanelUnified = () => {
                 Вернуться в очередь
               </Button>
             </div>
-            
+
             {/* EMR System */}
             <EMRSystem
               appointment={{
@@ -1683,7 +1736,7 @@ const DentistPanelUnified = () => {
         </div>
       );
     }
-    
+
     // Иначе показываем список пациентов для выбора протокола
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1701,7 +1754,7 @@ const DentistPanelUnified = () => {
           }}>
             Выберите пациента из очереди или выберите из списка для создания протокола визита
           </p>
-          
+
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -1780,7 +1833,7 @@ const DentistPanelUnified = () => {
         }}>
           Выберите пациента для просмотра и управления фото и рентгеновскими снимками
         </p>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -1877,7 +1930,7 @@ const DentistPanelUnified = () => {
             Управление шаблонами
           </Button>
         </div>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -1943,7 +1996,7 @@ const DentistPanelUnified = () => {
               </Button>
             </div>
           </div>
-          
+
           <div
             style={{
               padding: '16px',
@@ -2004,7 +2057,7 @@ const DentistPanelUnified = () => {
               </Button>
             </div>
           </div>
-          
+
           <div
             style={{
               padding: '16px',
@@ -2106,7 +2159,7 @@ const DentistPanelUnified = () => {
             Открыть отчеты
           </Button>
         </div>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
@@ -2164,7 +2217,7 @@ const DentistPanelUnified = () => {
               Общая статистика по всем направлениям деятельности
             </p>
           </div>
-          
+
           <div
             style={{
               padding: '16px',
@@ -2217,7 +2270,7 @@ const DentistPanelUnified = () => {
               Анализ пациентской базы и их активности
             </p>
           </div>
-          
+
           <div
             style={{
               padding: '16px',
@@ -2270,7 +2323,7 @@ const DentistPanelUnified = () => {
               Статистика работы врачей и их специализаций
             </p>
           </div>
-          
+
           <div
             style={{
               padding: '16px',
@@ -2345,7 +2398,7 @@ const DentistPanelUnified = () => {
         }}>
           Выберите пациента для просмотра и редактирования схемы зубов
         </p>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -2423,7 +2476,7 @@ const DentistPanelUnified = () => {
         }}>
           Выберите пациента для создания или редактирования плана лечения
         </p>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
@@ -3405,7 +3458,7 @@ const DentistPanelUnified = () => {
           visitId={selectedPatient?.visitId || 'demo-visit-1'}
         />
       )}
-      
+
       {/* DentalPriceManager Modal */}
       {showPriceManager && selectedServiceForPrice && (
         <DentalPriceManager
@@ -3435,6 +3488,14 @@ const DentistPanelUnified = () => {
           specialtyFilter="dentistry"
         />
       )}
+
+      {/* AI Chat Widget */}
+      <AIChatWidget
+        contextType="general"
+        specialty="dentistry"
+        useWebSocket={false}
+        position="bottom-right"
+      />
     </div>
   );
 };

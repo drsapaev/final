@@ -12,8 +12,12 @@ import httpx
 from PIL import Image
 
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
+from ...core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Используем таймаут из конфигурации (без magic numbers!)
+_PROVIDER_TIMEOUT = float(getattr(settings, "AI_PROVIDER_TIMEOUT", 180))
 
 
 class DeepSeekProvider(BaseAIProvider):
@@ -26,6 +30,7 @@ class DeepSeekProvider(BaseAIProvider):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+        self.timeout = _PROVIDER_TIMEOUT
 
     def get_default_model(self) -> str:
         return "deepseek-chat"
@@ -48,7 +53,7 @@ class DeepSeekProvider(BaseAIProvider):
                         "max_tokens": request.max_tokens,
                         "temperature": request.temperature,
                     },
-                    timeout=60.0,
+                    timeout=self.timeout,  # Из конфигурации, не magic number!
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -138,58 +143,80 @@ class DeepSeekProvider(BaseAIProvider):
     async def suggest_icd10(
         self, symptoms: List[str], diagnosis: Optional[str] = None
     ) -> List[Dict[str, str]]:
-        """Подсказки кодов МКБ-10 с детальными клиническими рекомендациями"""
+        """Подсказки кодов МКБ-10 — возвращает структурированный JSON"""
 
-        prompt = f"""Вы - опытный врач-клиницист, помогающий с формулировкой диагнозов и выбором кодов МКБ-10.
+        symptoms_text = ', '.join(symptoms) if symptoms else 'не указаны'
+        
+        prompt = f"""Вы - опытный врач-клиницист. Предложите подходящие коды МКБ-10.
 
 КЛИНИЧЕСКАЯ СИТУАЦИЯ:
-Симптомы: {', '.join(symptoms)}
+Симптомы: {symptoms_text}
 """
         if diagnosis:
             prompt += f"Предполагаемый диагноз: {diagnosis}\n"
 
         prompt += """
 
-ЗАДАЧА: Предоставьте 3-4 варианта формулировки диагноза с кодами МКБ-10 для разных клинических ситуаций.
+ЗАДАЧА: Верните 3-5 наиболее подходящих кодов МКБ-10.
 
-ФОРМАТ ОТВЕТА (СТРОГО):
-
-**Вариант 1: Когда причина не установлена**
-> КОД МКБ-10 — Название
-Когда использовать: [краткое объяснение]
-Формулировка: Основной диагноз: [текст] (КОД).
-
-**Вариант 2: Когда предполагается психогенное происхождение**
-> КОД МКБ-10 — Название
-Когда использовать: [краткое объяснение]
-Формулировка: Основной диагноз: [текст] (КОД).
-
-**Вариант 3: При подтверждённой органической патологии**
-> КОД МКБ-10 — Название
-Когда использовать: [краткое объяснение]
-Формулировка: Основной диагноз: [текст] (КОД).
+ФОРМАТ ОТВЕТА: Только JSON массив, без markdown, без комментариев:
+[
+    {"code": "R50.9", "label": "Лихорадка неуточнённая", "confidence": 0.85},
+    {"code": "A09.9", "label": "Гастроэнтерит неуточненный", "confidence": 0.70}
+]
 
 ТРЕБОВАНИЯ:
 - Используйте АКТУАЛЬНЫЕ коды МКБ-10
-- КРАТКО (1-2 предложения) объясняйте когда применять
-- Давайте РЕАЛЬНЫЕ клинические примеры
-- Это информационный инструмент для врачей, требует проверки специалистом"""
+- confidence от 0.5 до 0.95
+- label на русском языке
+- Сортировка по убыванию confidence
+- ТОЛЬКО JSON, никакого другого текста!"""
 
-        request = AIRequest(prompt=prompt, temperature=0.3, max_tokens=1500)
+        request = AIRequest(prompt=prompt, temperature=0.2, max_tokens=800)
 
         response = await self.generate(request)
 
         if response.error:
+            logger.warning(f"DeepSeek ICD10 error: {response.error}")
             return []
 
-        # Возвращаем текстовый ответ вместо JSON
-        return [
-            {
-                "clinical_recommendations": response.content.strip(),
-                "symptoms": symptoms,
-                "diagnosis": diagnosis,
-            }
-        ]
+        try:
+            # Очищаем от возможного markdown
+            content = response.content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+            
+            # Парсим JSON
+            suggestions = json.loads(content)
+            
+            # Валидация структуры
+            if isinstance(suggestions, list):
+                validated = []
+                for s in suggestions:
+                    if isinstance(s, dict) and "code" in s and "label" in s:
+                        validated.append({
+                            "code": str(s.get("code", "")),
+                            "label": str(s.get("label", "")),
+                            "confidence": float(s.get("confidence", 0.8)),
+                        })
+                return validated
+            
+            logger.warning(f"DeepSeek ICD10: unexpected format: {type(suggestions)}")
+            return []
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"DeepSeek ICD10 JSON parse error: {e}")
+            # Fallback: попробуем извлечь коды regex
+            import re
+            codes = re.findall(r'[A-Z]\d{2}(?:\.\d)?', response.content)
+            if codes:
+                return [{"code": c, "label": "Код МКБ-10", "confidence": 0.5} for c in codes[:5]]
+            return []
 
     async def interpret_lab_results(
         self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None

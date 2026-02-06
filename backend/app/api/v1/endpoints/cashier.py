@@ -171,7 +171,12 @@ async def get_pending_payments(
         # Базовый запрос - получаем все визиты (не отменённые и не оплаченные)
         # Исключаем визиты со статусами: canceled, paid, completed, done, closed
         excluded_statuses = ["canceled", "cancelled", "paid", "completed", "done", "closed"]
-        query = db.query(Visit).filter(
+        
+        # ✅ ОПТИМИЗАЦИЯ: Используем joinedload для eager loading services
+        # Примечание: Visit.patient relationship не существует, поэтому используем batch loading
+        query = db.query(Visit).options(
+            joinedload(Visit.services)
+        ).filter(
             ~Visit.status.in_(excluded_statuses),
             # Также исключаем визиты с discount_mode='paid' (SSOT признак оплаты)
             or_(
@@ -189,7 +194,7 @@ async def get_pending_payments(
         # Поиск по пациенту (Join с Patient)
         if search:
             search_param = f"%{search}%"
-            query = query.join(Patient).filter(
+            query = query.join(Patient, Visit.patient_id == Patient.id, isouter=True).filter(
                 or_(
                     Patient.last_name.ilike(search_param),
                     Patient.first_name.ilike(search_param),
@@ -197,7 +202,7 @@ async def get_pending_payments(
                 )
             )
         
-        # Загружаем все визиты
+        # ✅ ОПТИМИЗАЦИЯ: Загружаем все визиты с eager loading для services
         all_visits = query.order_by(Visit.created_at.desc()).all()
         
         if not all_visits:
@@ -209,14 +214,14 @@ async def get_pending_payments(
                 "pages": 0
             }
         
-        # Batch Loading: Пациенты
+        # Batch Loading: Пациенты (Visit.patient relationship не существует)
         patient_ids = list(set([v.patient_id for v in all_visits if v.patient_id]))
         patients_map = {}
         if patient_ids:
             patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
             patients_map = {p.id: p for p in patients}
         
-        # Batch Loading: Платежи для всех визитов
+        # Batch Loading: Платежи для всех визитов (этот запрос всё ещё нужен)
         visit_ids = [v.id for v in all_visits]
         payments_map = defaultdict(list)  # visit_id -> list[Payment]
         if visit_ids:

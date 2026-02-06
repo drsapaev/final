@@ -306,6 +306,53 @@ Complete queue item.
 
 ---
 
+---
+
+## 🔔 Notifications
+
+### GET `/notifications/settings/me`
+Get current user's notification settings.
+
+**Response:**
+```json
+{
+  "user_id": 1,
+  "email_enabled": true,
+  "telegram_enabled": true,
+  "sms_enabled": false,
+  "push_enabled": true,
+  "notification_types": {
+    "appointment_reminder": ["email", "push"],
+    "queue_updates": ["telegram", "push"],
+    "marketing": ["email"]
+  }
+}
+```
+
+### PUT `/notifications/settings/me`
+Update notification settings.
+
+**Request:**
+```json
+{
+  "email_enabled": true,
+  "telegram_enabled": false,
+  "notification_types": {
+    "queue_updates": ["push"]
+  }
+}
+```
+
+### GET `/notifications/history`
+Get notification history for the current user.
+
+**Query params:**
+- `skip`: Offset
+- `limit`: Limit
+- `channel`: Filter by channel (email, telegram, etc.)
+
+---
+
 ## ⚙️ Settings
 
 ### GET `/settings/`

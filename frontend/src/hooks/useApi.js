@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, apiRequest } from '../api/client';
 import { toast } from 'react-toastify';
-
+import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 /**
  * Хук для выполнения API запросов с состоянием загрузки
@@ -16,9 +16,9 @@ export function useApiCall() {
   const [error, setError] = useState(null);
 
   const execute = useCallback(async (apiCall, options = {}) => {
-    const { 
-      showError = true, 
-      showSuccess = false, 
+    const {
+      showError = true,
+      showSuccess = false,
       successMessage = 'Операция выполнена успешно',
       errorMessage = 'Произошла ошибка'
     } = options;
@@ -28,20 +28,20 @@ export function useApiCall() {
 
     try {
       const result = await apiCall();
-      
+
       if (showSuccess) {
         toast.success(successMessage);
       }
-      
+
       return result;
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || errorMessage;
       setError(errorMsg);
-      
+
       if (showError) {
         toast.error(errorMsg);
       }
-      
+
       throw err;
     } finally {
       setLoading(false);
@@ -69,7 +69,7 @@ export function useApiData(endpoint, options = {}) {
 
   const loadData = useCallback(async (loadOptions = {}) => {
     const { silent: loadSilent = silent } = loadOptions;
-    
+
     if (!loadSilent) {
       setLoading(true);
     }
@@ -82,15 +82,15 @@ export function useApiData(endpoint, options = {}) {
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || 'Ошибка загрузки данных';
       setError(errorMsg);
-      
+
       if (fallbackData) {
         setData(fallbackData);
       }
-      
+
       if (!loadSilent) {
         logger.error(`API Error (${endpoint}):`, errorMsg);
       }
-      
+
       throw err;
     } finally {
       if (!loadSilent) {
@@ -116,7 +116,7 @@ export function useApiData(endpoint, options = {}) {
  */
 export function usePatients(department = null) {
   const endpoint = department ? `/patients?department=${department}&limit=100` : '/patients?limit=100';
-  
+
   return useApiData(endpoint, {
     fallbackData: [],
     dependencies: [department]
@@ -143,7 +143,7 @@ export function useAppointments(options = {}) {
  */
 export function useQueues(date = null) {
   const params = date ? { date } : {};
-  
+
   return useApiData('/queues', {
     params,
     fallbackData: [],
@@ -156,7 +156,7 @@ export function useQueues(date = null) {
  */
 export function useServices(specialty = null) {
   const params = specialty ? { specialty } : {};
-  
+
   return useApiData('/services', {
     params,
     fallbackData: [],
@@ -230,23 +230,23 @@ export function useWebSocket(url, options = {}) {
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
 
-  const { 
-    onMessage = null, 
-    onConnect = null, 
+  const {
+    onMessage = null,
+    onConnect = null,
     onDisconnect = null,
-    autoConnect = true 
+    autoConnect = true
   } = options;
 
   const connect = useCallback(() => {
     if (socket) return;
 
     // Добавляем токен аутентификации к URL
-    const token = localStorage.getItem('access_token');
+    const token = tokenManager.getAccessToken();
     const separator = url.includes('?') ? '&' : '?';
     const authenticatedUrl = token ? `${url}${separator}token=${encodeURIComponent(token)}` : url;
 
     const ws = new WebSocket(authenticatedUrl);
-    
+
     ws.onopen = () => {
       setConnected(true);
       if (onConnect) onConnect();
@@ -323,7 +323,7 @@ export function useCachedData(key, fetcher, options = {}) {
         // Загружаем свежие данные
         const freshData = await fetcher();
         setData(freshData);
-        
+
         // Сохраняем в кэш
         localStorage.setItem(`cache_${key}`, JSON.stringify({
           data: freshData,

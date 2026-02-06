@@ -26,7 +26,7 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
-from app.services.notification_service import NotificationService
+from app.services.notifications import notification_sender_service
 from app.services.service_mapping import get_service_code
 
 router = APIRouter()
@@ -1198,6 +1198,7 @@ async def schedule_next_visit(
             confirmation_token=confirmation_token,
             confirmation_channel=request.confirmation_channel,
             confirmation_expires_at=expires_at,
+            source="desk",  # ✅ SSOT: Врач назначает = desk
         )
         db.add(visit)
         db.flush()  # Получаем ID визита

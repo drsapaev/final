@@ -6,9 +6,9 @@ import { hasRouteAccess } from '../../constants/routes';
 /**
  * Компонент для проверки ролевого доступа
  */
-export function RoleGuard({ 
-  children, 
-  allowedRoles = [], 
+export function RoleGuard({
+  children,
+  allowedRoles = [],
   requiredPermissions = [],
   fallback = null,
   profile = null,
@@ -18,7 +18,7 @@ export function RoleGuard({
   const { getColor, getSpacing, getFontSize } = theme;
 
   // Получаем профиль из контекста или пропсов
-  const userProfile = profile || (typeof window !== 'undefined' ? 
+  const userProfile = profile || (typeof window !== 'undefined' ?
     JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
 
   if (!userProfile) {
@@ -33,7 +33,7 @@ export function RoleGuard({
   // Проверяем роли
   if (allowedRoles.length > 0) {
     const userRoles = getUserRoles(userProfile);
-    const hasRole = allowedRoles.some(role => 
+    const hasRole = allowedRoles.some(role =>
       userRoles.includes(role.toLowerCase())
     );
 
@@ -45,7 +45,7 @@ export function RoleGuard({
   // Проверяем разрешения
   if (requiredPermissions.length > 0) {
     const userPermissions = getUserPermissions(userProfile);
-    const hasPermission = requiredPermissions.every(permission => 
+    const hasPermission = requiredPermissions.every(permission =>
       userPermissions.includes(permission)
     );
 
@@ -74,7 +74,7 @@ export function withRoleGuard(WrappedComponent, guardProps = {}) {
  * Хук для проверки ролевого доступа
  */
 export function useRoleAccess(profile = null) {
-  const userProfile = profile || (typeof window !== 'undefined' ? 
+  const userProfile = profile || (typeof window !== 'undefined' ?
     JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
 
   const hasRole = (roles) => {
@@ -103,7 +103,7 @@ export function useRoleAccess(profile = null) {
   };
 
   const isRegistrar = () => {
-    return hasRole(['registrar', 'Registrar']);
+    return hasRole(['registrar', 'Registrar', 'receptionist', 'Receptionist']);
   };
 
   const isLab = () => {
@@ -130,10 +130,10 @@ export function useRoleAccess(profile = null) {
 /**
  * Компонент для условного рендеринга
  */
-export function ConditionalRender({ 
-  condition, 
-  children, 
-  fallback = null 
+export function ConditionalRender({
+  condition,
+  children,
+  fallback = null
 }) {
   return condition ? children : fallback;
 }
@@ -141,17 +141,17 @@ export function ConditionalRender({
 /**
  * Компонент для ролевого условного рендеринга
  */
-export function RoleConditionalRender({ 
-  roles = [], 
+export function RoleConditionalRender({
+  roles = [],
   permissions = [],
-  children, 
+  children,
   fallback = null,
   profile = null
 }) {
   const { hasRole, hasPermission } = useRoleAccess(profile);
-  
-  const hasAccess = (roles.length === 0 || hasRole(roles)) && 
-                   (permissions.length === 0 || hasPermission(permissions));
+
+  const hasAccess = (roles.length === 0 || hasRole(roles)) &&
+    (permissions.length === 0 || hasPermission(permissions));
 
   return hasAccess ? children : fallback;
 }
@@ -205,7 +205,7 @@ function AccessDenied({ message, theme }) {
  */
 function getUserRoles(profile) {
   const roles = [];
-  
+
   if (profile.role) roles.push(String(profile.role).toLowerCase());
   if (profile.role_name) roles.push(String(profile.role_name).toLowerCase());
   if (Array.isArray(profile.roles)) {
@@ -214,40 +214,40 @@ function getUserRoles(profile) {
   if (profile.is_superuser || profile.is_admin || profile.admin) {
     roles.push('admin');
   }
-  
+
   return [...new Set(roles)]; // Убираем дубликаты
 }
 
 function getUserPermissions(profile) {
   const permissions = [];
-  
+
   if (Array.isArray(profile.permissions)) {
     permissions.push(...profile.permissions);
   }
-  
+
   // Добавляем базовые разрешения на основе ролей
   const roles = getUserRoles(profile);
-  
+
   if (roles.includes('admin')) {
     permissions.push('*'); // Админ имеет все разрешения
   }
-  
+
   if (roles.includes('doctor')) {
     permissions.push('view_patients', 'edit_patients', 'view_appointments', 'edit_appointments');
   }
-  
-  if (roles.includes('registrar')) {
+
+  if (roles.includes('registrar') || roles.includes('receptionist')) {
     permissions.push('view_patients', 'edit_patients', 'view_appointments', 'edit_appointments', 'manage_queue');
   }
-  
+
   if (roles.includes('lab')) {
     permissions.push('view_patients', 'view_appointments', 'manage_lab_results');
   }
-  
+
   if (roles.includes('cashier')) {
     permissions.push('view_patients', 'view_appointments', 'manage_payments');
   }
-  
+
   return [...new Set(permissions)]; // Убираем дубликаты
 }
 
@@ -289,13 +289,13 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
       <div style={titleStyle}>Информация о пользователе</div>
       <div style={infoStyle}>Имя: {userProfile.username || 'Не указано'}</div>
       <div style={infoStyle}>Email: {userProfile.email || 'Не указано'}</div>
-      
+
       {showRoles && (
         <div style={infoStyle}>
           Роли: {roles.join(', ')}
         </div>
       )}
-      
+
       {showPermissions && (
         <div style={infoStyle}>
           Разрешения: {permissions.join(', ')}

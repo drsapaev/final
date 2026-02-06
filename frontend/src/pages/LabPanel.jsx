@@ -7,29 +7,36 @@ import LabResultsManager from '../components/laboratory/LabResultsManager';
 import LabReportGenerator from '../components/laboratory/LabReportGenerator';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import EditPatientModal from '../components/common/EditPatientModal';
+import AIChatWidget from '../components/ai/AIChatWidget';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
-
-const logger = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-};
+import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 
 const LabPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
-  
+
   // Синхронизация активной вкладки с URL
   const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
+    // Если есть patientId, переходим на вкладку результатов
+    if (params.get('patientId')) {
+      return 'results';
+    }
     return params.get('tab') || 'tests';
   }, [location.search]);
-  
+
+  // Получаем patientId из URL для автоматической загрузки пациента
+  const getPatientIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
   const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
-  
+
   // Синхронизация URL с активной вкладкой
   useEffect(() => {
     const urlTab = getActiveTabFromURL();
@@ -37,7 +44,7 @@ const LabPanel = () => {
       setActiveTab(urlTab);
     }
   }, [activeTab, getActiveTabFromURL]);
-  
+
   // Функция для изменения активной вкладки с обновлением URL
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -50,12 +57,12 @@ const LabPanel = () => {
   const [showTestForm, setShowTestForm] = useState(false);
   const [showResultForm, setShowResultForm] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  
+
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState({});
-  
+
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const patientModal = useModal();
   const visitModal = useModal();
@@ -75,14 +82,14 @@ const LabPanel = () => {
   const [resultForm, setResultForm] = useState({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' });
 
   const authHeader = useCallback(
-    () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` }),
+    () => ({ Authorization: `Bearer ${tokenManager.getAccessToken()}` }),
     []
   );
 
   // ✅ Загрузка услуг для правильного отображения в tooltips (объявлена до использования)
   const loadServices = useCallback(async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) return;
       const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
@@ -173,6 +180,8 @@ const LabPanel = () => {
     }
   }, [authHeader, setMessage]);
 
+  const [selectedPatientForResults, setSelectedPatientForResults] = useState(null);
+
   useEffect(() => {
     loadPatients();
     loadTests();
@@ -180,11 +189,47 @@ const LabPanel = () => {
     loadServices();
   }, [loadPatients, loadTests, loadResults, loadServices]);
 
+  // ✅ Автоматическая загрузка пациента из URL для результатов
+  useEffect(() => {
+    const loadPatientFromUrl = async () => {
+      const patientIdFromUrl = getPatientIdFromUrl();
+      if (!patientIdFromUrl) return;
+
+      try {
+        const token = tokenManager.getAccessToken();
+        if (!token) return;
+
+        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const patientData = await response.json();
+          const patientObj = {
+            id: patientData.id,
+            name: `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim(),
+            last_name: patientData.last_name,
+            first_name: patientData.first_name,
+            birthDate: patientData.birth_date,
+            phone: patientData.phone
+          };
+          setSelectedPatientForResults(patientObj);
+          logger.info('[Lab] Загружен пациент из URL для результатов:', patientObj.name);
+        }
+      } catch (error) {
+        logger.error('[Lab] Не удалось загрузить пациента из URL:', error);
+      }
+    };
+
+    loadPatientFromUrl();
+  }, [getPatientIdFromUrl]);
+
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
     const patientServices = new Set();
     const patientServiceCodes = new Set();
-    
+
     allAppointments.forEach(appointment => {
       if (appointment.patient_id === patientId) {
         if (appointment.services && Array.isArray(appointment.services)) {
@@ -195,7 +240,7 @@ const LabPanel = () => {
         }
       }
     });
-    
+
     return {
       services: Array.from(patientServices),
       service_codes: Array.from(patientServiceCodes)
@@ -207,14 +252,14 @@ const LabPanel = () => {
     setAppointmentsLoading(true);
     try {
       logger.info('[Lab] loadLabAppointments: start');
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         logger.warn('[Lab] loadLabAppointments: нет токена аутентификации');
         setMessage({ type: 'error', text: 'Требуется авторизация. Пожалуйста, войдите в систему.' });
         setAppointmentsLoading(false);
         return;
       }
-      
+
       // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
       const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
         headers: {
@@ -222,7 +267,7 @@ const LabPanel = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         logger.error('[Lab] loadLabAppointments: HTTP error', {
@@ -232,10 +277,10 @@ const LabPanel = () => {
         });
         throw new Error(`Ошибка загрузки записей: ${response.status} ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       logger.info('[Lab] loadLabAppointments: данные получены', { queuesCount: data?.queues?.length || 0 });
-      
+
       // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
       let allAppointments = [];
       if (data && data.queues && Array.isArray(data.queues)) {
@@ -349,7 +394,7 @@ const LabPanel = () => {
     if (activeTab === 'appointments') {
       loadLabAppointments();
     }
-    
+
     // Слушаем глобальные события обновления очереди
     const handleQueueUpdate = (event) => {
       logger.info('[Lab] Получено событие обновления очереди:', event.detail);
@@ -358,7 +403,7 @@ const LabPanel = () => {
       }
     };
     window.addEventListener('queueUpdated', handleQueueUpdate);
-    
+
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
@@ -369,17 +414,17 @@ const LabPanel = () => {
     if (patientId >= 1000) {
       return null;
     }
-    
-    const token = localStorage.getItem('auth_token');
+
+    const token = tokenManager.getAccessToken();
     if (!token) return null;
-    
+
     const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-    
+
     try {
       const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         return await response.json();
       }
@@ -392,7 +437,7 @@ const LabPanel = () => {
   // Функция для преобразования данных пациента из формата API в формат PatientModal
   const transformPatientData = useCallback((apiPatient) => {
     if (!apiPatient) return null;
-    
+
     return {
       id: apiPatient.id,
       firstName: apiPatient.first_name || '',
@@ -436,14 +481,14 @@ const LabPanel = () => {
       setEditPatientModal({ open: true, patient: partialPatient, loading: false });
       return;
     }
-    
+
     try {
       // Показываем индикатор загрузки
       setEditPatientModal({ open: true, patient: null, loading: true });
-      
+
       // Загружаем полные данные пациента
       const apiPatient = await fetchPatientData(row.patient_id);
-      
+
       if (!apiPatient) {
         // Если не удалось загрузить, используем данные из row (частичные)
         const partialPatient = createPartialPatientFromRow(row);
@@ -451,11 +496,11 @@ const LabPanel = () => {
         logger.warn('[Lab] Не удалось загрузить данные из API, используем частичные данные пациента из row');
         return;
       }
-      
+
       // Преобразуем данные в формат PatientModal
       const transformedPatient = transformPatientData(apiPatient);
       setEditPatientModal({ open: true, patient: transformedPatient, loading: false });
-      
+
     } catch (error) {
       logger.error('[Lab] Ошибка при загрузке данных пациента:', error);
       // В случае ошибки используем частичные данные
@@ -486,7 +531,7 @@ const LabPanel = () => {
         // Вызвать пациента
         try {
           const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
-          const token = localStorage.getItem('auth_token');
+          const token = tokenManager.getAccessToken();
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -542,15 +587,15 @@ const LabPanel = () => {
     try {
       logger.info('[Lab] handleTestSubmit: start', testForm);
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/lab/tests', { 
-        method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          ...authHeader() 
-        }, 
-        body: JSON.stringify(testForm) 
+      const res = await fetch('http://localhost:8000/api/v1/lab/tests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader()
+        },
+        body: JSON.stringify(testForm)
       });
-      
+
       if (res.ok) {
         const savedTest = await res.json();
         logger.info('[Lab] handleTestSubmit: успешно создан тест', savedTest);
@@ -581,15 +626,15 @@ const LabPanel = () => {
     try {
       logger.info('[Lab] handleResultSubmit: start', resultForm);
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/lab/results', { 
-        method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          ...authHeader() 
-        }, 
-        body: JSON.stringify(resultForm) 
+      const res = await fetch('http://localhost:8000/api/v1/lab/results', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader()
+        },
+        body: JSON.stringify(resultForm)
       });
-      
+
       if (res.ok) {
         const savedResult = await res.json();
         logger.info('[Lab] handleResultSubmit: успешно создан результат', savedResult);
@@ -693,7 +738,7 @@ const LabPanel = () => {
       {/* Сообщения об ошибках/успехе */}
       {message.text && (
         <div style={{ padding: '12px', marginBottom: '16px' }}>
-          <Alert 
+          <Alert
             severity={message.type === 'error' ? 'error' : message.type === 'success' ? 'success' : 'info'}
             onClose={() => setMessage({ type: '', text: '' })}
           >
@@ -703,10 +748,10 @@ const LabPanel = () => {
       )}
 
       {activeTab === 'tests' && (
-        <Card 
+        <Card
           variant="filled"
           padding="none"
-          style={{ 
+          style={{
             marginBottom: getSpacing(4)
           }}
         >
@@ -715,7 +760,7 @@ const LabPanel = () => {
             borderBottom: '1px solid var(--mac-border)',
             padding: getSpacing(4)
           }}>
-            <CardTitle style={{ 
+            <CardTitle style={{
               color: 'var(--mac-text-primary)',
               fontSize: '18px',
               fontWeight: '600',
@@ -723,8 +768,8 @@ const LabPanel = () => {
             }}>
               Лабораторные исследования
             </CardTitle>
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               onClick={() => setShowTestForm(true)}
               style={{ marginLeft: 'auto' }}
             >
@@ -738,9 +783,9 @@ const LabPanel = () => {
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing(4) }}>
               {tests.map((t) => (
-                <div 
-                  key={t.id} 
-                  style={{ 
+                <div
+                  key={t.id}
+                  style={{
                     backgroundColor: 'var(--mac-bg-primary)',
                     border: '1px solid var(--mac-border)',
                     borderRadius: 'var(--mac-radius-md)',
@@ -751,9 +796,9 @@ const LabPanel = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: getSpacing(2) }}>
-                        <h3 style={{ 
-                          margin: 0, 
-                          fontSize: '16px', 
+                        <h3 style={{
+                          margin: 0,
+                          fontSize: '16px',
                           fontWeight: '600',
                           color: 'var(--mac-text-primary)'
                         }}>
@@ -763,8 +808,8 @@ const LabPanel = () => {
                           {t.test_date}
                         </Badge>
                       </div>
-                      <div style={{ 
-                        fontSize: '14px', 
+                      <div style={{
+                        fontSize: '14px',
                         color: 'var(--mac-text-secondary)',
                         lineHeight: '1.4'
                       }}>
@@ -784,10 +829,10 @@ const LabPanel = () => {
       )}
 
       {activeTab === 'appointments' && (
-        <Card 
+        <Card
           variant="filled"
           padding="none"
-          style={{ 
+          style={{
             marginBottom: getSpacing(4)
           }}
         >
@@ -796,7 +841,7 @@ const LabPanel = () => {
             borderBottom: '1px solid var(--mac-border)',
             padding: getSpacing(4)
           }}>
-            <CardTitle style={{ 
+            <CardTitle style={{
               color: 'var(--mac-text-primary)',
               fontSize: '18px',
               fontWeight: '600',
@@ -840,7 +885,7 @@ const LabPanel = () => {
               services={services}
               showCheckboxes={false}
               view="doctor"
-              onRowSelect={() => {}}
+              onRowSelect={() => { }}
               onRowClick={handleAppointmentRowClick}
               onActionClick={handleAppointmentActionClick}
             />
@@ -850,7 +895,7 @@ const LabPanel = () => {
 
       {activeTab === 'results' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing(4) }}>
-          <Card 
+          <Card
             variant="filled"
             padding="none"
           >
@@ -859,7 +904,7 @@ const LabPanel = () => {
               borderBottom: '1px solid var(--mac-border)',
               padding: getSpacing(4)
             }}>
-              <CardTitle style={{ 
+              <CardTitle style={{
                 color: 'var(--mac-text-primary)',
                 fontSize: '18px',
                 fontWeight: '600',
@@ -874,7 +919,7 @@ const LabPanel = () => {
               backgroundColor: 'var(--mac-bg-secondary)'
             }}>
               <LabResultsManager
-                patientId={patientModal.selectedItem?.id || 'demo-patient-1'}
+                patientId={selectedPatientForResults?.id || patientModal.selectedItem?.id || 'demo-patient-1'}
                 visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
                 onUpdate={() => {
                   logger.info('Результаты обновлены');
@@ -883,9 +928,9 @@ const LabPanel = () => {
               />
             </CardContent>
           </Card>
-          
+
           {results.length > 0 && (
-            <Card 
+            <Card
               variant="filled"
               padding="none"
             >
@@ -894,7 +939,7 @@ const LabPanel = () => {
                 borderBottom: '1px solid var(--mac-border)',
                 padding: getSpacing(4)
               }}>
-                <CardTitle style={{ 
+                <CardTitle style={{
                   color: 'var(--mac-text-primary)',
                   fontSize: '18px',
                   fontWeight: '600',
@@ -910,7 +955,7 @@ const LabPanel = () => {
               }}>
                 <LabReportGenerator
                   results={results}
-                  patient={patientModal.selectedItem || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
+                  patient={selectedPatientForResults || patientModal.selectedItem || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
                   doctor={{ name: 'Доктор Иванов', specialty: 'Терапевт' }}
                   clinic={{ name: 'Медицинская клиника' }}
                   visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
@@ -923,10 +968,10 @@ const LabPanel = () => {
 
 
       {activeTab === 'patients' && (
-        <Card 
+        <Card
           variant="filled"
           padding="none"
-          style={{ 
+          style={{
             marginBottom: getSpacing(4)
           }}
         >
@@ -935,7 +980,7 @@ const LabPanel = () => {
             borderBottom: '1px solid var(--mac-border)',
             padding: getSpacing(4)
           }}>
-            <CardTitle style={{ 
+            <CardTitle style={{
               color: 'var(--mac-text-primary)',
               fontSize: '18px',
               fontWeight: '600',
@@ -958,9 +1003,9 @@ const LabPanel = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing(4) }}>
                 {patients.map((p) => (
-                  <div 
-                    key={p.id} 
-                    style={{ 
+                  <div
+                    key={p.id}
+                    style={{
                       backgroundColor: 'var(--mac-bg-primary)',
                       border: '1px solid var(--mac-border)',
                       borderRadius: 'var(--mac-radius-md)',
@@ -971,9 +1016,9 @@ const LabPanel = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: getSpacing(2) }}>
-                          <h3 style={{ 
-                            margin: 0, 
-                            fontSize: '16px', 
+                          <h3 style={{
+                            margin: 0,
+                            fontSize: '16px',
                             fontWeight: '600',
                             color: 'var(--mac-text-primary)'
                           }}>
@@ -983,30 +1028,30 @@ const LabPanel = () => {
                             Лаборатория
                           </Badge>
                         </div>
-                        <div style={{ 
-                          fontSize: '14px', 
+                        <div style={{
+                          fontSize: '14px',
                           color: 'var(--mac-text-secondary)',
                           lineHeight: '1.4'
                         }}>
                           <Icon name="phone" size={14} style={{ marginRight: getSpacing(1) }} />
-                          {p.phone} | 
+                          {p.phone} |
                           <Icon name="calendar" size={14} style={{ marginLeft: getSpacing(1), marginRight: getSpacing(1) }} />
-                          {p.birth_date} | 
+                          {p.birth_date} |
                           <Icon name="person.badge" size={14} style={{ marginLeft: getSpacing(1), marginRight: getSpacing(1) }} />
                           ID: {p.id}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: getSpacing(2) }}>
-                        <Button 
-                          variant="primary" 
+                        <Button
+                          variant="primary"
                           size="small"
                           onClick={() => { setShowTestForm(true); setTestForm({ ...testForm, patient_id: p.id }); }}
                         >
                           <Icon name="testtube.2" size={16} />
                           Назначить анализ
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="small"
                           onClick={() => { setShowResultForm(true); setResultForm({ ...resultForm, patient_id: p.id }); }}
                         >
@@ -1024,10 +1069,10 @@ const LabPanel = () => {
       )}
 
       {activeTab === 'reports' && (
-        <Card 
+        <Card
           variant="filled"
           padding="none"
-          style={{ 
+          style={{
             marginBottom: getSpacing(4)
           }}
         >
@@ -1036,7 +1081,7 @@ const LabPanel = () => {
             borderBottom: '1px solid var(--mac-border)',
             padding: getSpacing(4)
           }}>
-            <CardTitle style={{ 
+            <CardTitle style={{
               color: 'var(--mac-text-primary)',
               fontSize: '18px',
               fontWeight: '600',
@@ -1050,9 +1095,9 @@ const LabPanel = () => {
             padding: getSpacing(4),
             backgroundColor: 'var(--mac-bg-secondary)'
           }}>
-            <div style={{ 
-              textAlign: 'center', 
-              padding: getSpacing(8), 
+            <div style={{
+              textAlign: 'center',
+              padding: getSpacing(8),
               color: 'var(--mac-text-secondary)',
               display: 'flex',
               flexDirection: 'column',
@@ -1209,6 +1254,14 @@ const LabPanel = () => {
           theme={{ isDark, getColor, getSpacing, getFontSize }}
         />
       )}
+
+      {/* AI Chat Widget */}
+      <AIChatWidget
+        contextType="general"
+        specialty="laboratory"
+        useWebSocket={false}
+        position="bottom-right"
+      />
     </div>
   );
 };

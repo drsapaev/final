@@ -1,0 +1,993 @@
+/**
+ * SingleSheetEMR Styles
+ * 
+ * Принципы:
+ * - A4-логика (вертикальный лист)
+ * - macOS-стиль (воздух, нет рамок)
+ * - Сканирование глазами, не изучение формы
+ * - Минимум кликов
+ */
+
+/* ============================================
+   ROOT CONTAINER
+   ============================================ */
+.emr-demo-container {
+  background: var(--mac-bg-primary, var(--mac-background-secondary, #f5f5f7));
+  min-height: 100vh;
+}
+
+.emr-demo-container.light-theme {
+  background: #f5f5f7;
+}
+
+.emr-demo-container.dark-theme {
+  background: #1c1c1e;
+}
+
+.single-sheet-emr {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  /* Full width */
+  margin: 0;
+  background: var(--mac-background, #ffffff);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  border-radius: var(--mac-radius-md, 12px);
+  /* Match sidebar */
+  overflow: hidden;
+}
+
+/* ... existing styles ... */
+
+.emr-vitals__row {
+  display: flex;
+  align-items: flex-end;
+  /* Align bottoms of fields */
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.emr-vitals__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  /* For absolute unit positioning if needed */
+}
+
+/* Make Vitals labels consistent height to prevent misalignment */
+.emr-vitals__field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mac-text-secondary, #86868b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  height: 14px;
+  /* Fixed height for alignment */
+  line-height: 14px;
+}
+
+.emr-vitals__field input {
+  width: 80px;
+  /* Slightly wider */
+  height: 36px;
+  /* Fixed height */
+  padding: 0 10px;
+  font-size: 15px;
+  /* Readable size */
+  font-weight: 500;
+  text-align: center;
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: var(--mac-background, #ffffff);
+}
+
+/* Unit positioning - make it not affect layout flow matching other inputs */
+.emr-vitals__unit {
+  position: absolute;
+  right: 8px;
+  bottom: 9px;
+  /* Vertical align center of input */
+  font-size: 12px;
+  color: var(--mac-text-tertiary, #aeaeb2);
+  pointer-events: none;
+}
+
+/* Adjust input padding when unit is present */
+.emr-vitals__field:has(.emr-vitals__unit) input {
+  padding-right: 24px;
+}
+
+.emr-vitals__separator {
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--mac-text-tertiary, #aeaeb2);
+  margin-bottom: 6px;
+  /* Align visually with input center */
+}
+
+.emr-vitals__bmi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  /* Match input height */
+  padding: 0 14px;
+  background: var(--mac-accent-blue, #007aff);
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 0px;
+  /* Align correctly with inputs */
+}
+
+/* ============================================
+   HEADER - Always visible, sticky
+   ============================================ */
+.emr-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background: var(--mac-background, #ffffff);
+  border-bottom: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  backdrop-filter: blur(10px);
+}
+
+/* ============================================
+   VISIT STATUS BADGE - Всегда виден врачу
+   ============================================ */
+.emr-visit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.emr-header__patient {
+  flex: 1;
+}
+
+.emr-header__name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--mac-text-primary, #1d1d1f);
+  letter-spacing: -0.02em;
+}
+
+.emr-header__meta {
+  font-size: 14px;
+  color: var(--mac-text-secondary, #86868b);
+}
+
+.emr-header__allergies {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.emr-header__diagnoses {
+  max-width: 300px;
+  font-size: 13px;
+  color: var(--mac-text-secondary, #86868b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emr-header__ai-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #5e5ce6 0%, #bf5af2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.emr-header__ai-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(94, 92, 230, 0.3);
+}
+
+/* ============================================
+   MAIN CONTENT - Scrollable
+   ============================================ */
+.emr-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ============================================
+   SECTIONS
+   ============================================ */
+.emr-section {
+  border-radius: 12px;
+}
+
+.emr-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.emr-section__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mac-text-secondary, #86868b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.emr-section__badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: var(--mac-accent-blue, #007aff);
+  color: white;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.emr-section__content {
+  padding: 0 0 8px 0;
+}
+
+.emr-section__label {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mac-text-secondary, #86868b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Complaints section - always prominent */
+.emr-section--complaints {
+  background: var(--mac-background-secondary, #f5f5f7);
+  padding: 16px 20px;
+}
+
+/* ============================================
+   INLINE TEXT FIELDS
+   ============================================ */
+.emr-field {
+  position: relative;
+}
+
+.emr-field__input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--mac-text-primary, #1d1d1f);
+  background: var(--mac-background, #ffffff);
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  resize: none;
+}
+
+.emr-field__input:focus {
+  border-color: var(--mac-accent-blue, #007aff);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.emr-field__input--multiline {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.emr-field__input::placeholder {
+  color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+.emr-field__input:disabled {
+  background: var(--mac-background-tertiary, #e5e5e5);
+  cursor: not-allowed;
+}
+
+/* AI Suggestion inside field */
+.emr-field__suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: rgba(94, 92, 230, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #5e5ce6;
+}
+
+.emr-field__suggestion-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--mac-text-secondary, #86868b);
+}
+
+.emr-field__suggestion-accept {
+  padding: 6px 12px;
+  background: #5e5ce6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.emr-field__suggestion-accept:hover {
+  background: #4a48d1;
+}
+
+.emr-field__suggestion-hint {
+  font-size: 11px;
+  color: var(--mac-text-tertiary, #aeaeb2);
+  margin-left: 8px;
+}
+
+/* ============================================
+   VITALS WIDGET
+   ============================================ */
+/* Vitals styles moved to top */
+
+/* BP Warning - subtle, non-blocking */
+.emr-vitals__field--warning input {
+  border-color: #ff9500;
+  background: rgba(255, 149, 0, 0.08);
+}
+
+.emr-vitals__field--warning label {
+  color: #ff9500;
+}
+
+.emr-vitals__field--critical input {
+  border-color: #ff3b30;
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.emr-vitals__field--critical label {
+  color: #ff3b30;
+}
+
+.emr-vitals__warning {
+  padding: 6px 12px;
+  background: rgba(255, 149, 0, 0.15);
+  color: #ff9500;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.emr-vitals__warning--critical {
+  background: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+
+/* ============================================
+   DIAGNOSIS FIELD
+   ============================================ */
+.emr-diagnosis {
+  position: relative;
+}
+
+.emr-diagnosis__main {
+  display: flex;
+  gap: 12px;
+}
+
+.emr-diagnosis__input {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 15px;
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.emr-diagnosis__input:focus {
+  border-color: var(--mac-accent-blue, #007aff);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.emr-diagnosis__icd {
+  width: 120px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  outline: none;
+  background: var(--mac-background-secondary, #f5f5f7);
+}
+
+.emr-diagnosis__icd:focus {
+  border-color: var(--mac-accent-blue, #007aff);
+}
+
+.emr-diagnosis__suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 120px;
+  margin-top: 4px;
+  background: var(--mac-background, #ffffff);
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  z-index: 50;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.emr-diagnosis__suggestion {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--mac-border, rgba(0, 0, 0, 0.05));
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.emr-diagnosis__suggestion:hover {
+  background: var(--mac-background-secondary, #f5f5f7);
+}
+
+.emr-diagnosis__suggestion:last-child {
+  border-bottom: none;
+}
+
+.emr-diagnosis__suggestion-code {
+  font-weight: 600;
+  color: var(--mac-accent-blue, #007aff);
+  min-width: 70px;
+}
+
+.emr-diagnosis__suggestion-name {
+  color: var(--mac-text-primary, #1d1d1f);
+}
+
+/* ============================================
+   PLAN SECTION
+   ============================================ */
+.emr-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emr-plan__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emr-plan__row label {
+  min-width: 120px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mac-text-secondary, #86868b);
+}
+
+.emr-plan__row input {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 15px;
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.emr-plan__row input:focus {
+  border-color: var(--mac-accent-blue, #007aff);
+}
+
+/* ============================================
+   FOOTER - Actions
+   ============================================ */
+.emr-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--mac-background, #ffffff);
+  border-top: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+}
+
+.emr-footer__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emr-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.emr-status--draft {
+  background: rgba(255, 149, 0, 0.15);
+  color: #ff9500;
+}
+
+.emr-status--signed {
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
+}
+
+.emr-footer__saved {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+.emr-footer__unsaved {
+  font-size: 12px;
+  color: #ff9500;
+}
+
+.emr-footer__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.emr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s, background 0.15s;
+}
+
+.emr-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.emr-btn--secondary {
+  background: var(--mac-background-secondary, #f5f5f7);
+  color: var(--mac-text-primary, #1d1d1f);
+}
+
+.emr-btn--secondary:hover:not(:disabled) {
+  background: var(--mac-background-tertiary, #e5e5e5);
+}
+
+.emr-btn--primary {
+  background: var(--mac-accent-blue, #007aff);
+  color: white;
+}
+
+.emr-btn--primary:hover:not(:disabled) {
+  background: #0066d6;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .emr-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .emr-header__diagnoses {
+    display: none;
+  }
+
+  .emr-vitals__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .emr-vitals__field {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .emr-vitals__field input {
+    width: 100px;
+  }
+
+  .emr-diagnosis__main {
+    flex-direction: column;
+  }
+
+  .emr-diagnosis__icd {
+    width: 100%;
+  }
+
+  .emr-plan__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .emr-plan__row label {
+    min-width: auto;
+  }
+
+  .emr-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .emr-footer__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .emr-footer__actions .emr-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ============================================
+   DARK MODE - App Theme Integration
+   ============================================ */
+/* Dark theme via app toggle */
+.dark-theme .single-sheet-emr,
+.emr-demo-container.dark-theme .single-sheet-emr {
+  --mac-background: #1c1c1e;
+  --mac-background-secondary: #2c2c2e;
+  --mac-background-tertiary: #3a3a3c;
+  --mac-text-primary: #f5f5f7;
+  --mac-text-secondary: #a1a1a6;
+  --mac-text-tertiary: #8e8e93;
+  --mac-border: rgba(255, 255, 255, 0.12);
+}
+
+/* === HEADER FIXES (Dark) === */
+.dark-theme .emr-header__name,
+.emr-demo-container.dark-theme .emr-header__name {
+  color: #ffffff;
+}
+
+.dark-theme .emr-header__meta,
+.emr-demo-container.dark-theme .emr-header__meta {
+  color: #a1a1a6;
+}
+
+.dark-theme .emr-header__diagnoses,
+.emr-demo-container.dark-theme .emr-header__diagnoses {
+  color: #a1a1a6;
+}
+
+/* Visit Status Badge - ensure visible in dark */
+.dark-theme .emr-visit-status,
+.emr-demo-container.dark-theme .emr-visit-status {
+  background: rgba(52, 199, 89, 0.2);
+  color: #34c759;
+}
+
+/* Allergies block - maintain red visibility */
+.dark-theme .emr-header__allergies,
+.emr-demo-container.dark-theme .emr-header__allergies {
+  background: rgba(255, 69, 58, 0.2);
+  color: #ff6b6b;
+}
+
+/* AI Summary Button - MUST remain gradient/visible */
+.dark-theme .emr-header__ai-btn,
+.emr-demo-container.dark-theme .emr-header__ai-btn {
+  background: linear-gradient(135deg, #5e5ce6 0%, #bf5af2 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(94, 92, 230, 0.4);
+}
+
+/* === INPUT FIELDS (Dark) === */
+.dark-theme .emr-vitals__field input,
+.emr-demo-container.dark-theme .emr-vitals__field input {
+  background: var(--mac-background-tertiary, #3a3a3c);
+  color: var(--mac-text-primary, #f5f5f7);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark-theme .emr-diagnosis__icd,
+.emr-demo-container.dark-theme .emr-diagnosis__icd {
+  background: var(--mac-background-tertiary, #3a3a3c);
+  color: var(--mac-text-primary, #f5f5f7);
+}
+
+/* Textarea and inputs */
+.dark-theme .emr-field__input,
+.emr-demo-container.dark-theme .emr-field__input {
+  background: #2c2c2e;
+  color: #f5f5f7;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Placeholder contrast fix */
+.dark-theme .emr-field__input::placeholder,
+.emr-demo-container.dark-theme .emr-field__input::placeholder {
+  color: #8e8e93;
+  opacity: 1;
+}
+
+/* Section titles */
+.dark-theme .emr-section__title,
+.emr-demo-container.dark-theme .emr-section__title {
+  color: #f5f5f7;
+}
+
+.dark-theme .emr-section__subtitle,
+.emr-demo-container.dark-theme .emr-section__subtitle {
+  color: #a1a1a6;
+}
+
+/* === FOOTER ACTIONS (Dark) === */
+.dark-theme .emr-footer,
+.emr-demo-container.dark-theme .emr-footer {
+  background: #1c1c1e;
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Primary action button - make prominent */
+.dark-theme .emr-btn--primary,
+.emr-demo-container.dark-theme .emr-btn--primary {
+  background: linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);
+}
+
+/* Secondary buttons */
+.dark-theme .emr-btn--secondary,
+.emr-demo-container.dark-theme .emr-btn--secondary {
+  background: #3a3a3c;
+  color: #f5f5f7;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Ghost button visibility */
+.dark-theme .emr-btn--ghost,
+.emr-demo-container.dark-theme .emr-btn--ghost {
+  color: #a1a1a6;
+}
+
+.dark-theme .emr-btn--ghost:hover,
+.emr-demo-container.dark-theme .emr-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f5f7;
+}
+
+/* Fallback: System preference (prefers-color-scheme) */
+@media (prefers-color-scheme: dark) {
+  .single-sheet-emr:not(.light-theme-forced) {
+    --mac-background: #1c1c1e;
+    --mac-background-secondary: #2c2c2e;
+    --mac-background-tertiary: #3a3a3c;
+    --mac-text-primary: #f5f5f7;
+    --mac-text-secondary: #98989d;
+    --mac-text-tertiary: #636366;
+    --mac-border: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ============================================
+   CUSTOM COLOR SCHEMES SUPPORT
+   ============================================ */
+
+/* Vibrant Theme */
+[data-color-scheme="vibrant"] .single-sheet-emr {
+  --mac-background: rgba(107, 141, 179, 0.3);
+  --mac-background-secondary: rgba(127, 168, 153, 0.35);
+  --mac-background-tertiary: rgba(212, 160, 99, 0.3);
+  --mac-text-primary: #ffffff;
+  --mac-text-secondary: rgba(255, 255, 255, 0.85);
+  --mac-text-tertiary: rgba(255, 255, 255, 0.65);
+  --mac-border: rgba(255, 255, 255, 0.2);
+  background: rgba(107, 141, 179, 0.3) !important;
+  backdrop-filter: blur(16px);
+}
+
+[data-color-scheme="vibrant"] .emr-content {
+  background: linear-gradient(135deg, rgba(107, 141, 179, 0.25) 0%, rgba(127, 168, 153, 0.25) 50%, rgba(212, 160, 99, 0.2) 100%);
+}
+
+[data-color-scheme="vibrant"] .emr-header,
+[data-color-scheme="vibrant"] .emr-footer {
+  background: rgba(107, 141, 179, 0.5);
+  backdrop-filter: blur(12px);
+}
+
+[data-color-scheme="vibrant"] .emr-field__input,
+[data-color-scheme="vibrant"] .emr-vitals__field input,
+[data-color-scheme="vibrant"] .emr-diagnosis__input,
+[data-color-scheme="vibrant"] .emr-diagnosis__icd,
+[data-color-scheme="vibrant"] .emr-plan__row input {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-color-scheme="vibrant"] .emr-field__input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Glass Theme */
+[data-color-scheme="glass"] .single-sheet-emr {
+  --mac-background: rgba(50, 55, 65, 0.6);
+  --mac-background-secondary: rgba(60, 65, 75, 0.5);
+  --mac-background-tertiary: rgba(70, 75, 85, 0.45);
+  --mac-text-primary: #f0f1f5;
+  --mac-text-secondary: rgba(240, 240, 245, 0.85);
+  --mac-text-tertiary: rgba(240, 240, 245, 0.6);
+  --mac-border: rgba(255, 255, 255, 0.15);
+  background: rgba(50, 55, 65, 0.6) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+[data-color-scheme="glass"] .emr-header,
+[data-color-scheme="glass"] .emr-footer {
+  background: rgba(50, 55, 65, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+[data-color-scheme="glass"] .emr-content {
+  background: rgba(50, 55, 65, 0.4);
+  backdrop-filter: blur(16px);
+}
+
+[data-color-scheme="glass"] .emr-field__input,
+[data-color-scheme="glass"] .emr-vitals__field input,
+[data-color-scheme="glass"] .emr-diagnosis__input,
+[data-color-scheme="glass"] .emr-diagnosis__icd,
+[data-color-scheme="glass"] .emr-plan__row input {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f0f1f5;
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+[data-color-scheme="glass"] .emr-field__input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+[data-color-scheme="glass"] .emr-section--complaints {
+  background: rgba(60, 65, 75, 0.5);
+}
+
+/* Gradient Theme */
+[data-color-scheme="gradient"] .single-sheet-emr {
+  --mac-background: transparent;
+  --mac-background-secondary: rgba(102, 126, 234, 0.25);
+  --mac-background-tertiary: rgba(118, 75, 162, 0.3);
+  --mac-text-primary: #ffffff;
+  --mac-text-secondary: rgba(255, 255, 255, 0.9);
+  --mac-text-tertiary: rgba(255, 255, 255, 0.7);
+  --mac-border: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 50%, rgba(240, 147, 251, 0.3) 100%) !important;
+  backdrop-filter: blur(12px);
+}
+
+[data-color-scheme="gradient"] .emr-header,
+[data-color-scheme="gradient"] .emr-footer {
+  background: rgba(102, 126, 234, 0.4);
+  backdrop-filter: blur(12px);
+}
+
+[data-color-scheme="gradient"] .emr-content {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 50%, rgba(240, 147, 251, 0.2) 100%);
+}
+
+[data-color-scheme="gradient"] .emr-field__input,
+[data-color-scheme="gradient"] .emr-vitals__field input,
+[data-color-scheme="gradient"] .emr-diagnosis__input,
+[data-color-scheme="gradient"] .emr-diagnosis__icd,
+[data-color-scheme="gradient"] .emr-plan__row input {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+[data-color-scheme="gradient"] .emr-field__input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+[data-color-scheme="gradient"] .emr-section--complaints {
+  background: rgba(118, 75, 162, 0.35);
+}
+
+/* Vitals - Auto-calculated fields styling for all custom themes */
+[data-color-scheme] .emr-vitals {
+  backdrop-filter: blur(8px);
+}
+
+[data-color-scheme] .emr-vitals__bmi {
+  background: var(--mac-accent-blue, rgba(0, 122, 255, 0.8));
+}
+
+/* Header elements - Allergies and Diagnoses readability */
+[data-color-scheme] .emr-header__allergies {
+  background: rgba(255, 59, 48, 0.25);
+  color: #ff6b6b;
+}
+
+[data-color-scheme] .emr-header__diagnoses {
+  color: var(--mac-text-secondary);
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+
+  .emr-header__ai-btn,
+  .emr-footer__actions,
+  .emr-field__suggestion {
+    display: none !important;
+  }
+
+  .emr-header {
+    position: static;
+    border-bottom: 2px solid #000;
+  }
+
+  .emr-content {
+    overflow: visible;
+  }
+
+  .single-sheet-emr {
+    max-width: 100%;
+  }
+}

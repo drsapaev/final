@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/native';
-import { 
-  Shield, 
-  Smartphone, 
-  Mail, 
-  Phone, 
-  Key, 
-  QrCode, 
-  Download, 
-  Copy, 
-  CheckCircle, 
-  AlertCircle, 
-  ArrowRight, 
+import tokenManager from '../../utils/tokenManager';
+import {
+  Shield,
+  Smartphone,
+  Mail,
+  Phone,
+  Key,
+  QrCode,
+  Download,
+  Copy,
+  CheckCircle,
+  AlertCircle,
+  ArrowRight,
   ArrowLeft,
   RefreshCw,
   Eye,
@@ -82,7 +83,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           method: selectedMethod,
@@ -122,7 +123,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           method: selectedMethod,
@@ -170,11 +171,10 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }) => {
     <div className="flex items-center justify-center space-x-4 mb-8">
       {steps.map((step, index) => (
         <div key={step.id} className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            currentStep >= step.id
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep >= step.id
               ? 'bg-blue-600 text-white'
               : 'bg-gray-200 text-gray-600'
-          }`}>
+            }`}>
             {currentStep > step.id ? (
               <CheckCircle className="w-4 h-4" />
             ) : (
@@ -182,9 +182,8 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }) => {
             )}
           </div>
           {index < steps.length - 1 && (
-            <div className={`w-8 h-0.5 ${
-              currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'
-            }`} />
+            <div className={`w-8 h-0.5 ${currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'
+              }`} />
           )}
         </div>
       ))}
@@ -207,19 +206,16 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }) => {
             <button
               key={method.id}
               onClick={() => handleMethodSelect(method.id)}
-              className={`p-6 border-2 rounded-lg text-left transition-all ${
-                selectedMethod === method.id
+              className={`p-6 border-2 rounded-lg text-left transition-all ${selectedMethod === method.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-start space-x-3">
-                <div className={`p-2 rounded-lg ${
-                  selectedMethod === method.id ? 'bg-blue-100' : 'bg-gray-100'
-                }`}>
-                  <IconComponent className={`w-6 h-6 ${
-                    selectedMethod === method.id ? 'text-blue-600' : 'text-gray-600'
-                  }`} />
+                <div className={`p-2 rounded-lg ${selectedMethod === method.id ? 'bg-blue-100' : 'bg-gray-100'
+                  }`}>
+                  <IconComponent className={`w-6 h-6 ${selectedMethod === method.id ? 'text-blue-600' : 'text-gray-600'
+                    }`} />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
@@ -336,7 +332,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }) => {
       <div className="text-center">
         <h3 className="text-xl font-semibold mb-2">Подтверждение настройки</h3>
         <p className="text-gray-600">
-          {selectedMethod === 'totp' 
+          {selectedMethod === 'totp'
             ? 'Отсканируйте QR-код в приложении-аутентификаторе и введите код'
             : 'Введите код, который мы отправили вам'
           }

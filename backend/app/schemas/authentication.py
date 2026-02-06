@@ -33,6 +33,7 @@ class LoginResponse(BaseModel):
     requires_2fa: bool = False
     two_factor_method: Optional[str] = None
     pending_2fa_token: Optional[str] = None
+    must_change_password: bool = False  # Требуется смена пароля при следующем входе
 
 
 class RefreshTokenRequest(BaseModel):
@@ -326,7 +327,8 @@ class UserCreateRequest(BaseModel):
     email: EmailStr
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     password: str = Field(..., min_length=8, max_length=100)
-    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
     is_active: bool = True
     is_superuser: bool = False
 
@@ -351,8 +353,9 @@ class UserUpdateRequest(BaseModel):
 
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     email: Optional[EmailStr] = None
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: Optional[str] = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None

@@ -82,6 +82,38 @@ export const getAvailableUsers = async (search = '') => {
     return response.data;
 };
 
+/**
+ * Добавить/удалить реакцию на сообщение
+ * @param {number} messageId - ID сообщения
+ * @param {string} reaction - Emoji реакции
+ * @returns {Promise<Object>} Обновленное сообщение
+ */
+export const toggleReaction = async (messageId, reaction) => {
+    const response = await api.post(`/messages/${messageId}/reactions`, {
+        reaction
+    });
+    return response.data;
+};
+
+/**
+ * Загрузить файл для сообщения
+ * @param {number} recipientId - ID получателя
+ * @param {File} file - Файл
+ * @returns {Promise<Object>} Созданное сообщение
+ */
+export const uploadFile = async (recipientId, file) => {
+    const formData = new FormData();
+    formData.append('recipient_id', recipientId);
+    formData.append('file', file);
+
+    const response = await api.post('/messages/upload', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+    return response.data;
+};
+
 export default {
     sendMessage,
     getConversations,
@@ -89,5 +121,7 @@ export default {
     getUnreadCount,
     markAsRead,
     deleteMessage,
-    getAvailableUsers
+    getAvailableUsers,
+    toggleReaction,
+    uploadFile
 };

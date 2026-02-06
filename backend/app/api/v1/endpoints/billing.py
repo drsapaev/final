@@ -374,36 +374,42 @@ def record_payment(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/payments", response_model=List[PaymentResponse])
+@router.get("/payments")
 def get_payments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    invoice_id: Optional[int] = None,
-    patient_id: Optional[int] = None,
-    payment_method: Optional[PaymentMethod] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список платежей"""
-    from app.models.billing import Payment
+    from app.models.payment import Payment
 
     query = db.query(Payment)
 
-    if invoice_id:
-        query = query.filter(Payment.invoice_id == invoice_id)
-    if patient_id:
-        query = query.filter(Payment.patient_id == patient_id)
-    if payment_method:
-        query = query.filter(Payment.payment_method == payment_method)
     if date_from:
-        query = query.filter(Payment.payment_date >= date_from)
+        query = query.filter(Payment.created_at >= date_from)
     if date_to:
-        query = query.filter(Payment.payment_date <= date_to)
+        query = query.filter(Payment.created_at <= date_to)
 
     payments = query.order_by(Payment.created_at.desc()).offset(skip).limit(limit).all()
-    return payments
+    
+    # Return compatible response structure
+    return [
+        {
+            "id": p.id,
+            "visit_id": p.visit_id,
+            "amount": float(p.amount),
+            "method": p.method,
+            "status": p.status,
+            "receipt_no": p.receipt_no,
+            "note": p.note,
+            "created_at": p.created_at,
+            "paid_at": p.paid_at,
+        }
+        for p in payments
+    ]
 
 
 @router.post("/auto-generate/visit/{visit_id}")
@@ -538,7 +544,8 @@ def get_billing_analytics(
     """Получить аналитику по счетам"""
     from sqlalchemy import func
 
-    from app.models.billing import Invoice, Payment
+    from app.models.billing import Invoice
+    from app.models.payment import Payment
 
     # Базовые фильтры
     invoice_query = db.query(Invoice)

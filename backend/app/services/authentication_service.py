@@ -74,7 +74,7 @@ class AuthenticationService:
     def verify_token(
         self, token: str, token_type: str = "access"
     ) -> Optional[Dict[str, Any]]:
-        """Проверяет JWT токен"""
+        """Проверяет JWT токен (без проверки blacklist)"""
         try:
             payload = jwt.decode(
                 token, settings.SECRET_KEY, algorithms=[self.algorithm]
@@ -88,6 +88,30 @@ class AuthenticationService:
         except jwt.InvalidTokenError:
             logger.warning("Invalid token")
             return None
+    
+    def verify_token_with_blacklist(
+        self, db: Session, token: str, token_type: str = "access"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Проверяет JWT токен с проверкой черного списка.
+        
+        Используйте этот метод для критических операций.
+        """
+        payload = self.verify_token(token, token_type)
+        if not payload:
+            return None
+        
+        jti = payload.get("jti")
+        if not jti:
+            return payload  # Старые токены без jti пропускаем
+        
+        # Проверяем blacklist
+        from app.services.token_blacklist_service import token_blacklist_service
+        if token_blacklist_service.is_token_blacklisted(db, jti):
+            logger.warning(f"Token {jti} is blacklisted")
+            return None
+        
+        return payload
 
     def authenticate_user(
         self,
@@ -325,6 +349,7 @@ class AuthenticationService:
             },
             "requires_2fa": requires_2fa,
             "two_factor_method": two_factor_method,
+            "must_change_password": getattr(user, 'must_change_password', False),
         }
 
     def refresh_access_token(self, db: Session, refresh_token: str) -> Dict[str, Any]:
@@ -403,6 +428,10 @@ class AuthenticationService:
                 db.query(UserSession).filter(UserSession.user_id == user_id).update(
                     {"is_active": False}
                 )
+                
+                # ✅ NEW: Блокируем все access токены пользователя
+                from app.services.token_blacklist_service import token_blacklist_service
+                token_blacklist_service.blacklist_all_user_tokens(db, user_id, reason="logout_all")
 
                 self._log_user_activity(
                     db, user_id, "logout_all", "Выход со всех устройств"
@@ -559,8 +588,9 @@ class AuthenticationService:
             if not verify_password(current_password, user.hashed_password):
                 return {"success": False, "message": "Неверный текущий пароль"}
 
-            # Обновляем пароль
+            # Обновляем пароль и сбрасываем флаг must_change_password
             user.hashed_password = get_password_hash(new_password)
+            user.must_change_password = False
             db.commit()
 
             # Отзываем все refresh токены пользователя

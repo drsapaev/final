@@ -3,16 +3,13 @@
  * Provides get, post, put, delete methods with automatic auth
  */
 import logger from '../utils/logger';
+import { tokenManager } from '../utils/tokenManager';
 
 const BASE_URL = 'http://localhost:8000/api/v1';
 
 function getAuthToken() {
-    return (
-        localStorage.getItem('auth_token') ||
-        localStorage.getItem('access_token') ||
-        localStorage.getItem('token') ||
-        ''
-    );
+    // Использует централизованный tokenManager для единообразия
+    return tokenManager.getAccessToken() || '';
 }
 
 async function request(method, path, options = {}) {

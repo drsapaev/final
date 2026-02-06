@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  QrCode, 
-  Plus, 
-  Download, 
-  Trash2, 
-  Eye, 
-  Copy, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  QrCode,
+  Plus,
+  Download,
+  Trash2,
+  Eye,
+  Copy,
   Users,
   Calendar,
   Clock,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Building2
 } from 'lucide-react';
+import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 
 const QRTokenManager = () => {
   const [tokens, setTokens] = useState([]);
@@ -26,34 +29,69 @@ const QRTokenManager = () => {
   const [createForm, setCreateForm] = useState({
     specialist_id: '',
     department: '',
-    expires_hours: 24
+    expires_hours: 24,
+    is_clinic_wide: false  // ⭐ NEW: Общий QR клиники
   });
 
-  // Список специалистов и отделений (в реальном приложении загружается с сервера)
-  const specialists = [
-    { id: 1, name: 'Доктор Иванов И.И.', department: 'cardiology' },
-    { id: 2, name: 'Доктор Петров П.П.', department: 'dermatology' },
-    { id: 3, name: 'Доктор Сидоров С.С.', department: 'dentistry' },
-  ];
+  // ⭐ SSOT: Динамическая загрузка специалистов и отделений
+  const [specialists, setSpecialists] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  const departments = [
-    { value: 'cardiology', label: 'Кардиология' },
-    { value: 'dermatology', label: 'Дерматология' },
-    { value: 'dentistry', label: 'Стоматология' },
-    { value: 'laboratory', label: 'Лаборатория' },
-    { value: 'ecg', label: 'ЭКГ' },
-  ];
+  // Загрузка справочников из API
+  const loadReferenceData = useCallback(async () => {
+    try {
+      setLoadingData(true);
+
+      const [doctorsRes, profilesRes] = await Promise.all([
+        fetch('/api/v1/admin/doctors', {
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+        }).catch(() => ({ ok: false })),
+        fetch('/api/v1/queues/profiles?active_only=true', {
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+        }).catch(() => ({ ok: false }))
+      ]);
+
+      if (doctorsRes.ok) {
+        const doctorsData = await doctorsRes.json();
+        const docs = Array.isArray(doctorsData) ? doctorsData : (doctorsData.doctors || []);
+        setSpecialists(docs.map(d => ({
+          id: d.id || d.user_id,
+          name: d.user?.full_name || d.full_name || `Врач #${d.id}`,
+          department: d.specialty
+        })));
+      }
+
+      if (profilesRes.ok) {
+        const profilesData = await profilesRes.json();
+        const profiles = profilesData.profiles || [];
+        setDepartments(profiles.map(p => ({
+          value: p.key,
+          label: p.title_ru || p.title
+        })));
+      }
+
+      logger.info('Loaded QR reference data');
+    } catch (err) {
+      logger.error('Error loading reference data:', err);
+      // Не устанавливаем fallback данные (SSOT)
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
 
   useEffect(() => {
+    loadReferenceData();
     loadTokens();
-  }, []);
+  }, [loadReferenceData]);
+
 
   const loadTokens = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/v1/admin/qr-tokens/active', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -77,7 +115,7 @@ const QRTokenManager = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify(createForm)
       });
@@ -92,11 +130,11 @@ const QRTokenManager = () => {
       setShowCreateModal(false);
       setCreateForm({ specialist_id: '', department: '', expires_hours: 24 });
       setSuccess('QR токен успешно создан');
-      
+
       // Показываем QR код нового токена
       setSelectedToken(newToken);
       setShowQRModal(true);
-      
+
     } catch (err) {
       setError(err.message);
     }
@@ -111,7 +149,7 @@ const QRTokenManager = () => {
       const response = await fetch(`/api/v1/admin/qr-tokens/${token}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -219,23 +257,23 @@ const QRTokenManager = () => {
                       {getDepartmentName(token.department)}
                     </h3>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-600">Специалист</p>
                       <p className="font-medium">{getSpecialistName(token.specialist_id)}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-sm text-gray-600">Создан</p>
                       <p className="font-medium">{formatDate(token.created_at)}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-sm text-gray-600">Истекает</p>
                       <p className="font-medium">{formatDate(token.expires_at)}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-sm text-gray-600">Статистика</p>
                       <p className="font-medium">
@@ -262,7 +300,7 @@ const QRTokenManager = () => {
                   >
                     <Eye className="h-4 w-4" />
                   </button>
-                  
+
                   <button
                     onClick={() => copyToClipboard(token.qr_url)}
                     className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -270,7 +308,7 @@ const QRTokenManager = () => {
                   >
                     <Copy className="h-4 w-4" />
                   </button>
-                  
+
                   <button
                     onClick={() => downloadQR(token)}
                     className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
@@ -278,7 +316,7 @@ const QRTokenManager = () => {
                   >
                     <Download className="h-4 w-4" />
                   </button>
-                  
+
                   <button
                     onClick={() => deleteToken(token.token)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -298,45 +336,75 @@ const QRTokenManager = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Создать QR токен</h3>
-            
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Специалист
+              {/* ⭐ NEW: Clinic-wide QR option */}
+              <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createForm.is_clinic_wide}
+                    onChange={(e) => setCreateForm(prev => ({
+                      ...prev,
+                      is_clinic_wide: e.target.checked,
+                      specialist_id: e.target.checked ? '' : prev.specialist_id,
+                      department: e.target.checked ? '' : prev.department
+                    }))}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium text-gray-900">Общий QR клиники</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Пациент сможет выбрать специальность при регистрации
+                    </p>
+                  </div>
                 </label>
-                <select
-                  value={createForm.specialist_id}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, specialist_id: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Выберите специалиста</option>
-                  {specialists.map(specialist => (
-                    <option key={specialist.id} value={specialist.id}>
-                      {specialist.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Отделение
-                </label>
-                <select
-                  value={createForm.department}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, department: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Выберите отделение</option>
-                  {departments.map(dept => (
-                    <option key={dept.value} value={dept.value}>
-                      {dept.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Specialist selector - hidden when clinic-wide */}
+              {!createForm.is_clinic_wide && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Специалист
+                  </label>
+                  <select
+                    value={createForm.specialist_id}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, specialist_id: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Выберите специалиста</option>
+                    {specialists.map(specialist => (
+                      <option key={specialist.id} value={specialist.id}>
+                        {specialist.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Department selector - hidden when clinic-wide */}
+              {!createForm.is_clinic_wide && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Отделение
+                  </label>
+                  <select
+                    value={createForm.department}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, department: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Выберите отделение</option>
+                    {departments.map(dept => (
+                      <option key={dept.value} value={dept.value}>
+                        {dept.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -362,22 +430,23 @@ const QRTokenManager = () => {
               </button>
               <button
                 onClick={createToken}
-                disabled={!createForm.specialist_id || !createForm.department}
+                disabled={!createForm.is_clinic_wide && (!createForm.specialist_id || !createForm.department)}
                 className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Создать
+                {createForm.is_clinic_wide ? 'Создать общий QR' : 'Создать'}
               </button>
             </div>
           </div>
         </div>
       )}
 
+
       {/* Модальное окно QR кода */}
       {showQRModal && selectedToken && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">QR код для очереди</h3>
-            
+
             <div className="text-center mb-4">
               <img
                 src={selectedToken.qr_code_base64}
@@ -385,7 +454,7 @@ const QRTokenManager = () => {
                 className="mx-auto mb-4 border border-gray-200 rounded-lg"
                 style={{ maxWidth: '200px' }}
               />
-              
+
               <p className="text-sm text-gray-600 mb-2">
                 {getDepartmentName(selectedToken.department)}
               </p>

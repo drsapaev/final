@@ -2,15 +2,16 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
-import { 
-  ErrorBoundary, 
-  ToastProvider, 
-  useToast, 
-  Loading, 
-  ModalProvider, 
-  useModal, 
-  FormProvider, 
-  useForm, 
+import tokenManager from '../../utils/tokenManager';
+import {
+  ErrorBoundary,
+  ToastProvider,
+  useToast,
+  Loading,
+  ModalProvider,
+  useModal,
+  FormProvider,
+  useForm,
   Table,
   RoleGuard,
   useRoleAccess
@@ -99,7 +100,7 @@ function ComponentTestInner() {
         </div>
       ),
       footer: (
-        <button style={buttonStyle} onClick={() => {}}>
+        <button style={buttonStyle} onClick={() => { }}>
           Закрыть
         </button>
       )
@@ -123,12 +124,12 @@ function ComponentTestInner() {
   const handleFormValidation = () => {
     const isValid = validateForm({
       name: { required: 'Имя обязательно' },
-      email: { 
+      email: {
         required: 'Email обязателен',
         email: 'Некорректный email'
       }
     });
-    
+
     if (isValid) {
       addToast({
         type: 'success',
@@ -239,7 +240,7 @@ function ComponentTestInner() {
         <p>Профиль: {profile ? JSON.stringify(profile) : 'Не авторизован'}</p>
         <p>Роль admin: {hasRole(['admin']) ? 'Да' : 'Нет'}</p>
         <p>Админ: {isAdmin() ? 'Да' : 'Нет'}</p>
-        
+
         <RoleGuard allowedRoles={['admin']} fallback={<p>Доступ запрещен</p>}>
           <p>Этот контент виден только админам</p>
         </RoleGuard>
@@ -249,7 +250,7 @@ function ComponentTestInner() {
       <div style={sectionStyle}>
         <h2 style={titleStyle}>API интеграция</h2>
         <p>API клиент: {typeof window !== 'undefined' ? 'Доступен' : 'Недоступен'}</p>
-        <p>Токен: {localStorage.getItem('auth_token') ? 'Есть' : 'Нет'}</p>
+        <p>Токен: {tokenManager.getAccessToken() ? 'Есть' : 'Нет'}</p>
         <p>Профиль: {localStorage.getItem('auth_profile') ? 'Есть' : 'Нет'}</p>
       </div>
     </div>

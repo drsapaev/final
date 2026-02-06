@@ -1,0 +1,94 @@
+/**
+ * PhraseSuggestions CSS
+ */
+
+.phrase-suggestions {
+    background: #fafbff;
+    border: 1px solid #e0e8f5;
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 8px;
+}
+
+.phrase-suggestions__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #5c6bc0;
+}
+
+.phrase-suggestions__icon {
+    font-size: 1rem;
+}
+
+.phrase-suggestions__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.phrase-suggestions__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.phrase-suggestions__item:hover {
+    background: #f5f8ff;
+    border-color: #c5d5f5;
+}
+
+.phrase-suggestions__item--selected {
+    background: #e8f0fe;
+    border-color: #4285f4;
+}
+
+.phrase-suggestions__item input[type="checkbox"] {
+    margin-top: 2px;
+    accent-color: #4285f4;
+}
+
+.phrase-suggestions__text {
+    flex: 1;
+    font-size: 0.9rem;
+    color: #333;
+    line-height: 1.4;
+}
+
+.phrase-suggestions__insert {
+    width: 100%;
+    padding: 10px;
+    background: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+
+.phrase-suggestions__insert:hover:not(:disabled) {
+    background: #3367d6;
+}
+
+.phrase-suggestions__insert:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.phrase-suggestions__footer {
+    font-size: 0.7rem;
+    color: #888;
+    text-align: center;
+}

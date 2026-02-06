@@ -1,171 +1,115 @@
-# Clinic Queue Manager — Документация
+# 📚 Documentation Index
 
-## Обзор
-Модульная система для поликлиники (MVP):
-- Очередь на день (выдача талонов, табло, WS)
-- Визиты, услуги, платежи
-- Лабораторные заявки (результаты)
-- Онлайн-очередь / «открытие дня» (QR)
-- Настройки (произвольные пары `category/key/value`)
-- Аудит действий
+## 🚨 MANDATORY READING (Before ANY Changes)
 
-## Технологии
-- **Backend**: FastAPI, SQLAlchemy 2, Alembic, JWT (python-jose), ReportLab, qrcode, WebSocket (FastAPI)
-- **Frontend**: React + Vite (без роутера; страницы-экраны)
-- **Ops**: Dockerfile + docker-compose (dev), SQLite по умолчанию
+> **AI Agents and Developers MUST read these FIRST!**
+
+| Document | Purpose | Priority |
+|----------|---------|----------|
+| [AUTHENTICATION_LAWS_FOR_AI.md](./AUTHENTICATION_LAWS_FOR_AI.md) | Auth system rules | 🔴 CRITICAL |
+| [DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md](./DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md) | Autocomplete rules | 🔴 CRITICAL |
+| [ROLE_SYSTEM_PROTECTION.md](./ROLE_SYSTEM_PROTECTION.md) | Role protection | 🔴 CRITICAL |
+| [AUTHENTICATION_SYSTEM_FINAL_GUIDE.md](./AUTHENTICATION_SYSTEM_FINAL_GUIDE.md) | Auth full guide | 🟡 Important |
 
 ---
 
-## Запуск (Docker Compose, dev)
-```bash
-# из project-root/ops/
-docker compose up --build
+## 🏗️ Architecture & Systems
 
-##Сервисы:
+### Core Systems
+| Document | Description |
+|----------|-------------|
+| [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md) | Role-based access control |
+| [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Queue management system |
+| [ONLINE_QUEUE_SYSTEM_GUIDE.md](./ONLINE_QUEUE_SYSTEM_GUIDE.md) | Online queue guide |
+| [BATCH_UPDATE_ARCHITECTURE.md](./BATCH_UPDATE_ARCHITECTURE.md) | Batch operations |
 
-Backend: http://localhost:8000  (OpenAPI: http://localhost:8000/docs)
+### EMR & Autocomplete
+| Document | Description |
+|----------|-------------|
+| [EMR_SMART_AUTOCOMPLETE_UX.md](./EMR_SMART_AUTOCOMPLETE_UX.md) | Smart autocomplete UX |
+| [DOCTOR_AUTOCOMPLETE_README.md](./DOCTOR_AUTOCOMPLETE_README.md) | Doctor history autocomplete |
+| [COMPLAINTS_FIELD_SPEC.md](./COMPLAINTS_FIELD_SPEC.md) | Complaints field specification |
 
-Frontend (Vite dev): http://localhost:5173
-
-
-##Переменные окружения (минимум):
-
-DATABASE_URL=sqlite:////data/app.db — БД в volume backend_data
-
-AUTH_SECRET=change-me-in-prod — секрет для JWT
-
-CORS_ALLOW_ALL=1 — разрешить CORS всем источникам (для локалки)
-
-
-ESC/POS (опционально):
-
-PRINTER_TYPE=none|network|usb, PRINTER_NET_HOST, PRINTER_NET_PORT, PRINTER_USB_VID, PRINTER_USB_PID
-
-
-Volume:
-
-backend_data:/data — хранит SQLite-файл и артефакты
-
-
-##Команды:
-
-docker compose build
-docker compose up -d --build
-docker compose logs -f backend
-docker compose logs -f frontend
-
-##Админ по умолчанию:
-
-Скрипт backend/app/scripts/ensure_admin.py создаёт пользователя admin/admin (настраивается ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL, ADMIN_FULL_NAME).
-
-
+### AI Integration
+| Document | Description |
+|----------|-------------|
+| [AI_ARCHITECTURE_RULE.md](./AI_ARCHITECTURE_RULE.md) | AI architecture rules |
+| [AI_INTEGRATION_GUIDE.md](./AI_INTEGRATION_GUIDE.md) | AI integration |
+| [AI_MCP_FRONTEND_INTEGRATION_GUIDE.md](./AI_MCP_FRONTEND_INTEGRATION_GUIDE.md) | MCP frontend |
+| [MCP_INTEGRATION_GUIDE.md](./MCP_INTEGRATION_GUIDE.md) | MCP backend |
 
 ---
 
-##Локальный запуск без Docker (dev)
+## 🔌 API Reference
 
-# Backend
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r <(pip freeze)  # либо установить зависимости из pyproject
-alembic upgrade head
-uvicorn app.main:app --reload --port 8000
-
-# Frontend
-cd ../frontend
-npm i
-npm run dev
-# при необходимости VITE_API_BASE=http://localhost:8000/api/v1
-
+| Document | Description |
+|----------|-------------|
+| [API_REFERENCE.md](./API_REFERENCE.md) | General API reference |
+| [QUEUE_API_REFERENCE.md](./QUEUE_API_REFERENCE.md) | Queue API endpoints |
+| [QUEUE_BATCH_API_USAGE_GUIDE.md](./QUEUE_BATCH_API_USAGE_GUIDE.md) | Batch API guide |
+| [DOCTOR_AUTOCOMPLETE_API.md](./DOCTOR_AUTOCOMPLETE_API.md) | Autocomplete API |
 
 ---
 
-API (база: /api/v1)
+## 🚀 Deployment & Operations
 
-Части (основные):
-
-GET /health — состояние (DB/app/env)
-
-POST /auth/login (form) — токен; GET /auth/me
-
-GET/POST/PUT/DELETE /patients — CRUD пациентов
-
-GET/POST/PUT/DELETE /visits — визиты
-
-GET/POST /lab — заявки и результаты
-
-GET/POST /payments — платежи
-
-GET /services — каталог услуг
-GET /services/resolve — разрешение услуги (SSOT маппинг) — см. docs/services_mapping.md
-
-GET/PUT/DELETE /settings — произвольные настройки
-
-GET /queues/stats, POST /queues/next-ticket — дневная очередь
-
-POST /appointments/open, GET /appointments/stats — онлайн-очередь
-
-GET /appointments/qrcode — QR PNG
-
-GET /print/ticket.pdf, GET /print/invoice.pdf — печать PDF
-
-WS: ws://localhost:8000/ws/queue?department=Reg&date_str=YYYY-MM-DD
-
-
-##Примеры:
-
-# Health
-curl http://localhost:8000/api/v1/health
-
-# Логин (OAuth2 Password)
-curl -X POST -d "username=admin&password=admin&grant_type=&scope=&client_id=&client_secret=" \
-  http://localhost:8000/api/v1/auth/login
-
-# Мои данные
-curl -H "Authorization: Bearer <TOKEN>" http://localhost:8000/api/v1/auth/me
-
+| Document | Description |
+|----------|-------------|
+| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Full deployment guide |
+| [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md) | Backup & restore |
+| [PRODUCTION_SECURITY.md](./PRODUCTION_SECURITY.md) | Security in production |
+| [README_env.md](./README_env.md) | Environment variables |
 
 ---
 
-##Миграции
+## 📖 User Guides
 
-Конфигурация: backend/alembic.ini
-
-Скрипты: backend/alembic/versions/
-
-Применение:
-
-
-cd backend
-alembic upgrade head
-
+| Document | Audience |
+|----------|----------|
+| [ADMIN_QUICK_GUIDE.md](./ADMIN_QUICK_GUIDE.md) | Admins |
+| [QR_QUEUE_USER_MANUAL.md](./QR_QUEUE_USER_MANUAL.md) | Registrars |
+| [QR_EDITING_RULES.md](./QR_EDITING_RULES.md) | QR operations |
+| [TELEGRAM_PWA_GUIDE.md](./TELEGRAM_PWA_GUIDE.md) | Telegram users |
 
 ---
 
-##Печать
+## 🧪 Testing & QA
 
-PDF билеты/счета — app/services/print.py
-
-ESC/POS — app/services/escpos.py (переменные в settings)
-
-Лого (опц.): CLINIC_LOGO_PATH=/path/logo.png, футер PDF_FOOTER_ENABLED=1
-
-
+| Document | Description |
+|----------|-------------|
+| [AI_MCP_QA_CHECKLIST.md](./AI_MCP_QA_CHECKLIST.md) | AI/MCP QA checklist |
+| [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
 
 ---
 
-##Роли (минимально)
+## 📁 Archives
 
-Admin, Registrar, Doctor, Lab, Cashier, User
-
-
+Historical reports, completed fixes, and obsolete documentation are in [archives/](./archives/).
 
 ---
 
-##Известные ограничения (MVP)
+## 🎯 Quick Navigation
 
-Минимальные списки/фильтры на фронтенде
+### "I need to understand the system"
+1. Start with [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md)
+2. Then [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md)
+3. Then [AUTHENTICATION_SYSTEM_FINAL_GUIDE.md](./AUTHENTICATION_SYSTEM_FINAL_GUIDE.md)
 
-Без полноценного роутера/авторизации в UI (токен хранится локально)
+### "I'm an AI agent making changes"
+1. **READ FIRST:** [AUTHENTICATION_LAWS_FOR_AI.md](./AUTHENTICATION_LAWS_FOR_AI.md)
+2. **READ SECOND:** [DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md](./DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md)
+3. Then specific area docs
 
-В dev Docker конфиге фронт работает через Vite dev-сервер
+### "I need to deploy"
+1. [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+2. [DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md](./DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md)
+3. [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md)
+
+### "I need to integrate with API"
+1. [API_REFERENCE.md](./API_REFERENCE.md)
+2. [QUEUE_API_REFERENCE.md](./QUEUE_API_REFERENCE.md)
+3. [DOCTOR_AUTOCOMPLETE_API.md](./DOCTOR_AUTOCOMPLETE_API.md)
+
+---
+
+*Last Updated: 2026-01-06*

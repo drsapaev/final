@@ -164,6 +164,32 @@ class UserPreferences(Base):
     require_2fa: Mapped[bool] = mapped_column(Boolean, default=False)
     auto_logout: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # ============================================
+    # EMR PREFERENCES (Smart Autocomplete)
+    # ============================================
+    # Режим умного поля (ghost | mvp | hybrid | word)
+    emr_smart_field_mode: Mapped[str] = mapped_column(String(20), default="ghost")
+    # Показывать переключатель режимов
+    emr_show_mode_switcher: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Задержка debounce в мс
+    emr_debounce_ms: Mapped[int] = mapped_column(Integer, default=500)
+    # Недавно использованные коды МКБ-10 (массив кодов)
+    emr_recent_icd10: Mapped[Optional[List[str]]] = mapped_column(
+        JSON, default=lambda: []
+    )  # ["I10", "I25.9", "E11.9"]
+    # Недавно использованные шаблоны назначений
+    emr_recent_templates: Mapped[Optional[List[str]]] = mapped_column(
+        JSON, default=lambda: []
+    )  # ["med-1", "exam-2"]
+    # Избранные шаблоны по специальностям
+    emr_favorite_templates: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON, default=lambda: {}
+    )  # {"cardiology": ["med-1"], "general": ["med-g1"]}
+    # Кастомные шаблоны пользователя
+    emr_custom_templates: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
+        JSON, default=lambda: []
+    )  # [{"id": "custom-1", "name": "Мой шаблон", "template": "..."}]
+
     # Метаданные
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

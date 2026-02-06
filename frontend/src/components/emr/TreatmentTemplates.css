@@ -1,0 +1,292 @@
+/**
+ * TreatmentTemplates Styles
+ * 
+ * Быстрые шаблоны для секции Plan
+ */
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+.treatment-templates {
+    position: relative;
+    display: inline-block;
+}
+
+/* ============================================
+   TRIGGER BUTTON
+   ============================================ */
+.treatment-templates__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--mac-accent-blue, #007aff);
+    background: rgba(0, 122, 255, 0.08);
+    border: 1px solid rgba(0, 122, 255, 0.2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.treatment-templates__trigger:hover {
+    background: rgba(0, 122, 255, 0.15);
+    border-color: rgba(0, 122, 255, 0.3);
+}
+
+.treatment-templates__trigger:active {
+    transform: scale(0.98);
+}
+
+/* ============================================
+   PANEL
+   ============================================ */
+.treatment-templates__panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 200;
+    width: 360px;
+    max-height: 420px;
+    margin-top: 4px;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    animation: panelSlideIn 0.15s ease;
+}
+
+@keyframes panelSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================
+   SEARCH
+   ============================================ */
+.treatment-templates__search {
+    padding: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.treatment-templates__search input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--mac-text-primary, #1d1d1f);
+    background: var(--mac-background-secondary, #f5f5f7);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.treatment-templates__search input:focus {
+    border-color: var(--mac-accent-blue, #007aff);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.treatment-templates__search input::placeholder {
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+/* ============================================
+   RECENT
+   ============================================ */
+.treatment-templates__recent {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.treatment-templates__recent-label {
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    text-transform: uppercase;
+}
+
+.treatment-templates__item--recent {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--mac-text-secondary, #636366);
+    text-align: left;
+    background: rgba(255, 204, 0, 0.08);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.treatment-templates__item--recent:hover {
+    background: rgba(255, 204, 0, 0.15);
+}
+
+/* ============================================
+   CATEGORIES
+   ============================================ */
+.treatment-templates__categories {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+}
+
+.treatment-templates__category {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 70px;
+    padding: 8px 4px;
+    font-size: 10px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.treatment-templates__category:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.treatment-templates__category--active {
+    color: var(--mac-accent-blue, #007aff);
+    background: rgba(0, 122, 255, 0.1);
+}
+
+.treatment-templates__category-icon {
+    font-size: 20px;
+}
+
+.treatment-templates__category-label {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ============================================
+   LIST
+   ============================================ */
+.treatment-templates__list {
+    max-height: 200px;
+    padding: 8px;
+    overflow-y: auto;
+}
+
+.treatment-templates__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.treatment-templates__item:last-child {
+    margin-bottom: 0;
+}
+
+.treatment-templates__item:hover {
+    background: rgba(0, 122, 255, 0.05);
+    border-color: rgba(0, 122, 255, 0.1);
+}
+
+.treatment-templates__item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mac-text-primary, #1d1d1f);
+}
+
+.treatment-templates__item-template {
+    font-size: 12px;
+    color: var(--mac-text-secondary, #636366);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.treatment-templates__empty {
+    padding: 24px;
+    font-size: 13px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    text-align: center;
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.treatment-templates__footer {
+    padding: 8px 12px;
+    font-size: 10px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    text-align: center;
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   BACKDROP
+   ============================================ */
+.treatment-templates__backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 199;
+    background: transparent;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    .treatment-templates__panel {
+        background: #2c2c2e;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .treatment-templates__search input {
+        background: #1c1c1e;
+        color: #f5f5f7;
+    }
+
+    .treatment-templates__category:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .treatment-templates__item:hover {
+        background: rgba(0, 122, 255, 0.15);
+    }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+    .treatment-templates {
+        display: none !important;
+    }
+}

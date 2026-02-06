@@ -18,6 +18,7 @@ import {
     Filter,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import tokenManager from '../../utils/tokenManager';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -99,7 +100,7 @@ const DoctorCalendar = ({
         setError(null);
 
         try {
-            const token = localStorage.getItem('token');
+            const token = tokenManager.getAccessToken();
             const params = new URLSearchParams({
                 week_start: formatDate(weekStart),
             });

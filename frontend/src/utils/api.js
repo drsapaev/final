@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { tokenManager } from './tokenManager';
 
 // Используем общий базовый URL как в api/client.js
 const API_BASE = import.meta.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
@@ -15,8 +16,8 @@ const api = axios.create({
 // Интерцептор для добавления токена авторизации
 api.interceptors.request.use(
   (config) => {
-    // Поддерживаем оба ключа: 'auth_token' и 'access_token'
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
+    // Используем централизованный tokenManager
+    const token = tokenManager.getAccessToken();
     if (token) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
@@ -35,9 +36,8 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Токен истек или недействителен
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
+      // Токен истек или недействителен - очищаем через tokenManager
+      tokenManager.clearAll();
       window.location.href = '/login';
     }
     return Promise.reject(error);

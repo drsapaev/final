@@ -1,0 +1,629 @@
+/**
+ * EMRSmartField v3.0 Styles
+ * 
+ * - Mode switcher
+ * - Inline corrections
+ * - Enhanced visual indicators
+ * - Telemetry-ready
+ */
+
+/* ============================================
+   WRAPPER
+   ============================================ */
+.emr-smart-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ============================================
+   HEADER + MODE SWITCHER
+   ============================================ */
+.emr-smart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.emr-smart-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mac-text-secondary, #86868b);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.emr-smart-mode-switcher {
+    position: relative;
+}
+
+.emr-smart-mode-current {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5e5ce6;
+    background: rgba(94, 92, 230, 0.1);
+    border: 1px solid rgba(94, 92, 230, 0.2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.emr-smart-mode-current:hover {
+    background: rgba(94, 92, 230, 0.15);
+}
+
+.emr-smart-mode-arrow {
+    font-size: 10px;
+    margin-left: 2px;
+}
+
+.emr-smart-mode-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+    z-index: 200;
+    animation: fadeIn 0.1s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.emr-smart-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 14px;
+    font-size: 12px;
+    text-align: left;
+    color: var(--mac-text-primary, #1d1d1f);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.emr-smart-mode-option:hover {
+    background: rgba(0, 122, 255, 0.08);
+}
+
+.emr-smart-mode-option--active {
+    color: #007aff;
+    font-weight: 600;
+}
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+.emr-smart-container {
+    position: relative;
+}
+
+.emr-smart-input-wrapper {
+    position: relative;
+}
+
+/* ============================================
+   FIELD
+   ============================================ */
+.emr-smart-field {
+    width: 100%;
+    min-height: 80px;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--mac-text-primary, #1d1d1f);
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 10px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input.emr-smart-field {
+    min-height: auto;
+    resize: none;
+}
+
+.emr-smart-field::placeholder {
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+.emr-smart-field--focused,
+.emr-smart-field:focus {
+    border-color: var(--mac-accent-blue, #007aff);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.emr-smart-field--readonly {
+    background: var(--mac-background-tertiary, #f5f5f7);
+    color: var(--mac-text-secondary, #636366);
+}
+
+.emr-smart-field--error {
+    border-color: #ff3b30;
+}
+
+/* ============================================
+   GHOST TEXT - полупрозрачная подсказка
+   ============================================ */
+.emr-smart-ghost {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px;
+    font-size: 15px;
+    line-height: 1.5;
+    pointer-events: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: hidden;
+}
+
+.emr-smart-ghost__existing {
+    color: transparent;
+}
+
+.emr-smart-ghost__suggestion {
+    color: var(--mac-text-tertiary, #aeaeb2);
+    opacity: 0.5;
+    background: linear-gradient(90deg,
+            rgba(94, 92, 230, 0.08) 0%,
+            transparent 100%);
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+.emr-smart-ghost__hint {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+    border-radius: 4px;
+    vertical-align: middle;
+    animation: pulseHint 2s infinite;
+    box-shadow: 0 2px 4px rgba(0, 122, 255, 0.3);
+}
+
+@keyframes pulseHint {
+
+    0%,
+    100% {
+        opacity: 0.9;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.02);
+    }
+}
+
+/* ============================================
+   INLINE CORRECTION - исправление формулировки
+   ============================================ */
+.emr-smart-correction {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #ff9500;
+    background: rgba(255, 149, 0, 0.08);
+    border: 1px solid rgba(255, 149, 0, 0.2);
+    border-radius: 8px;
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.emr-smart-correction__icon {
+    font-size: 14px;
+}
+
+.emr-smart-correction__text {
+    flex: 1;
+}
+
+.emr-smart-correction__text strong {
+    color: #e08600;
+}
+
+.emr-smart-correction__hint {
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    background: #ff9500;
+    border-radius: 4px;
+}
+
+/* ============================================
+   ERROR
+   ============================================ */
+.emr-smart-error {
+    margin-top: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #ff3b30;
+    background: rgba(255, 59, 48, 0.08);
+    border-radius: 6px;
+}
+
+/* ============================================
+   DROPDOWN (MVP mode)
+   ============================================ */
+.emr-smart-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    z-index: 100;
+    animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.emr-smart-dropdown__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mac-text-secondary, #636366);
+    background: linear-gradient(180deg, rgba(94, 92, 230, 0.08) 0%, transparent 100%);
+    border-bottom: 1px solid var(--mac-border, #e5e5e5);
+}
+
+.emr-smart-dropdown__header button {
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.emr-smart-dropdown__list {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.emr-smart-dropdown__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 14px;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.emr-smart-dropdown__item:last-child {
+    border-bottom: none;
+}
+
+.emr-smart-dropdown__item:hover {
+    background: rgba(0, 122, 255, 0.05);
+}
+
+.emr-smart-dropdown__item--selected {
+    background: rgba(0, 122, 255, 0.1);
+    border-left: 3px solid #007aff;
+}
+
+.emr-smart-dropdown__number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #5e5ce6 0%, #7c7aff 100%);
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.emr-smart-dropdown__item--selected .emr-smart-dropdown__number {
+    background: linear-gradient(135deg, #007aff 0%, #5ac8fa 100%);
+}
+
+.emr-smart-dropdown__text {
+    flex: 1;
+    line-height: 1.4;
+    color: var(--mac-text-primary, #1d1d1f);
+}
+
+.emr-smart-dropdown__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.emr-smart-dropdown__recent {
+    font-size: 12px;
+}
+
+.emr-smart-dropdown__count {
+    font-size: 10px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+.emr-smart-dropdown__source {
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+.emr-smart-dropdown__footer {
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-top: 1px solid var(--mac-border, #e5e5e5);
+}
+
+/* ============================================
+   MINI LIST (Ghost/Hybrid mode alternatives)
+   ============================================ */
+.emr-smart-mini-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.emr-smart-mini-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--mac-text-secondary, #636366);
+    background: var(--mac-background-secondary, #f5f5f7);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.emr-smart-mini-item:hover {
+    background: rgba(0, 122, 255, 0.08);
+    border-color: rgba(0, 122, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.emr-smart-mini-item--selected {
+    background: rgba(0, 122, 255, 0.1);
+    border-color: #007aff;
+}
+
+.emr-smart-mini-number {
+    padding: 2px 5px;
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #5e5ce6 0%, #7c7aff 100%);
+    border-radius: 4px;
+}
+
+.emr-smart-mini-text {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.emr-smart-mini-recent {
+    font-size: 10px;
+}
+
+/* ============================================
+   WORD MODE HINT
+   ============================================ */
+.emr-smart-word-hint {
+    position: absolute;
+    top: 8px;
+    right: 40px;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #34c759;
+    background: rgba(52, 199, 89, 0.1);
+    border-radius: 4px;
+}
+
+/* ============================================
+   LOADING
+   ============================================ */
+.emr-smart-loading {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 14px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================
+   READ-ONLY
+   ============================================ */
+.emr-smart-readonly {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+/* ============================================
+   HISTORY INDICATOR (Automatic Activation)
+   ============================================ */
+.emr-smart-history-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: #34c759;
+    background: rgba(52, 199, 89, 0.1);
+    border-radius: 4px;
+    cursor: help;
+    transition: all 0.2s;
+}
+
+.emr-smart-history-indicator:hover {
+    background: rgba(52, 199, 89, 0.15);
+    transform: scale(1.05);
+}
+
+/* History controls (indicator + pause button) */
+.emr-smart-history-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.emr-smart-pause-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 4px;
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all 0.2s;
+}
+
+.emr-smart-pause-btn:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.emr-smart-pause-btn--active {
+    opacity: 1;
+    background: rgba(255, 149, 0, 0.15);
+    color: #ff9500;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    .emr-smart-field {
+        background: #2c2c2e;
+        border-color: rgba(255, 255, 255, 0.1);
+        color: var(--mac-text-primary, #f5f5f7);
+    }
+
+    .emr-smart-dropdown,
+    .emr-smart-mode-menu {
+        background: #2c2c2e;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .emr-smart-ghost__suggestion {
+        color: rgba(255, 255, 255, 0.35);
+    }
+
+    .emr-smart-mini-item {
+        background: #2c2c2e;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+
+    .emr-smart-dropdown,
+    .emr-smart-mini-list,
+    .emr-smart-ghost,
+    .emr-smart-loading,
+    .emr-smart-readonly,
+    .emr-smart-mode-switcher,
+    .emr-smart-correction,
+    .emr-smart-word-hint {
+        display: none !important;
+    }
+}

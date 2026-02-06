@@ -1,39 +1,36 @@
 import logger from '../utils/logger';
+import { tokenManager } from '../utils/tokenManager';
 
 // Единый сервис работы с очередью и приемом пациента
 
 function getAuthToken() {
-	return (
-		localStorage.getItem('auth_token') ||
-		localStorage.getItem('access_token') ||
-		localStorage.getItem('token') ||
-		''
-	);
+	// Использует централизованный tokenManager для единообразия
+	return tokenManager.getAccessToken() || '';
 }
 
 async function apiRequest(path, options = {}) {
 	const base = options.absolute ? '' : 'http://localhost:8000';
 	const token = getAuthToken();
-	
+
 	if (!token) {
 		logger.error('[queueService] No auth token found');
 		throw new Error('Требуется авторизация. Пожалуйста, войдите в систему.');
 	}
-	
+
 	const headers = {
 		'Content-Type': 'application/json',
 		...(options.headers || {}),
 		...(token ? { Authorization: `Bearer ${token}` } : {})
 	};
-	
+
 	logger.log(`[queueService] ${options.method || 'GET'} ${path}`, { hasToken: !!token, tokenLength: token.length });
-	
+
 	const res = await fetch(`${base}/api/v1${path}`, {
 		method: options.method || 'GET',
 		headers,
 		body: options.body ? JSON.stringify(options.body) : undefined,
 	});
-	
+
 	if (!res.ok) {
 		let detail = 'Ошибка запроса';
 		let errorData = null;
@@ -43,14 +40,14 @@ async function apiRequest(path, options = {}) {
 		} catch (_) {
 			detail = `HTTP ${res.status}: ${res.statusText}`;
 		}
-		
+
 		logger.error(`[queueService] Request failed: ${path}`, {
 			status: res.status,
 			statusText: res.statusText,
 			detail,
 			errorData
 		});
-		
+
 		throw new Error(detail);
 	}
 	try {

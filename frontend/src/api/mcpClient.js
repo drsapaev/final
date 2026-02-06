@@ -10,6 +10,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api
 // Создаем axios instance для MCP
 const mcpClient = axios.create({
   baseURL: `${API_BASE_URL}/mcp`,
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,14 +31,14 @@ mcpClient.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const detail = error.response?.data?.detail || error.response?.data?.message;
-    
+
     // Логирование ошибок
     logger.error(`[MCP Client] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
       status,
       detail,
       data: error.response?.data
     });
-    
+
     // Обработка различных статусов
     if (status === 401) {
       logger.warn('[MCP Client] 401 Unauthorized - редирект на /login');
@@ -56,7 +57,7 @@ mcpClient.interceptors.response.use(
     } else if (!error.response) {
       logger.error('[MCP Client] Network Error - нет ответа от сервера');
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -66,7 +67,7 @@ mcpClient.interceptors.response.use(
  */
 export const mcpAPI = {
   // === Управление MCP ===
-  
+
   /**
    * Получить статус MCP системы
    */
@@ -102,7 +103,7 @@ export const mcpAPI = {
   },
 
   // === Анализ жалоб ===
-  
+
   /**
    * Анализ жалоб пациента
    */
@@ -137,7 +138,7 @@ export const mcpAPI = {
   },
 
   // === МКБ-10 ===
-  
+
   /**
    * Подсказки кодов МКБ-10
    */
@@ -173,7 +174,7 @@ export const mcpAPI = {
   },
 
   // === Лабораторные анализы ===
-  
+
   /**
    * Интерпретация лабораторных результатов
    */
@@ -203,13 +204,13 @@ export const mcpAPI = {
     const params = {};
     if (testName) params.test_name = testName;
     if (patientGender) params.patient_gender = patientGender;
-    
+
     const response = await mcpClient.get('/lab/normal-ranges', { params });
     return response.data;
   },
 
   // === Медицинские изображения ===
-  
+
   /**
    * Анализ медицинского изображения
    */
@@ -217,11 +218,11 @@ export const mcpAPI = {
     const formData = new FormData();
     formData.append('image', imageFile);
     formData.append('image_type', imageType);
-    
+
     if (options.modality) formData.append('modality', options.modality);
     if (options.clinicalContext) formData.append('clinical_context', options.clinicalContext);
     if (options.provider) formData.append('provider', options.provider);
-    
+
     const response = await mcpClient.post('/imaging/analyze', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
@@ -234,11 +235,11 @@ export const mcpAPI = {
   async analyzeSkinLesion(imageFile, lesionInfo = null, patientHistory = null, provider = null) {
     const formData = new FormData();
     formData.append('image', imageFile);
-    
+
     if (lesionInfo) formData.append('lesion_info', JSON.stringify(lesionInfo));
     if (patientHistory) formData.append('patient_history', JSON.stringify(patientHistory));
     if (provider) formData.append('provider', provider);
-    
+
     const response = await mcpClient.post('/imaging/skin-lesion', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
@@ -255,7 +256,7 @@ export const mcpAPI = {
   },
 
   // === Пакетная обработка ===
-  
+
   /**
    * Пакетная обработка запросов
    */

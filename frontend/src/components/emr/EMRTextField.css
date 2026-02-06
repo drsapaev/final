@@ -1,0 +1,317 @@
+/**
+ * EMRTextField Styles
+ * 
+ * Universal styles for all EMR text fields with template suggestions
+ */
+
+/* ============================================
+   WRAPPER & LABEL
+   ============================================ */
+.emr-text-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.emr-text-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mac-text-secondary, #86868b);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+.emr-text-container {
+    position: relative;
+}
+
+/* ============================================
+   TEXTAREA/INPUT - Base
+   ============================================ */
+.emr-text-field {
+    width: 100%;
+    min-height: 80px;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--mac-text-primary, #1d1d1f);
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 10px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input.emr-text-field {
+    min-height: auto;
+    resize: none;
+}
+
+.emr-text-field::placeholder {
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+/* ============================================
+   TEXTAREA - Focused
+   ============================================ */
+.emr-text-field--focused,
+.emr-text-field:focus {
+    border-color: var(--mac-accent-blue, #007aff);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+/* ============================================
+   TEXTAREA - Read-only (Signed)
+   ============================================ */
+.emr-text-field--readonly {
+    background: var(--mac-background-tertiary, #f5f5f7);
+    color: var(--mac-text-secondary, #636366);
+    cursor: default;
+    resize: none;
+}
+
+.emr-text-field--readonly:focus {
+    border-color: var(--mac-border, #e5e5e5);
+    box-shadow: none;
+}
+
+/* ============================================
+   TEXTAREA - Error
+   ============================================ */
+.emr-text-field--error {
+    border-color: #ff3b30;
+    background: rgba(255, 59, 48, 0.03);
+}
+
+.emr-text-field--error:focus {
+    border-color: #ff3b30;
+    box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.15);
+}
+
+/* ============================================
+   ERROR MESSAGE
+   ============================================ */
+.emr-text-error {
+    margin-top: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #ff3b30;
+    background: rgba(255, 59, 48, 0.08);
+    border-radius: 6px;
+}
+
+/* ============================================
+   AI SUGGESTIONS - Multiple variants from templates
+   ============================================ */
+.emr-text-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    animation: slideDown 0.2s ease;
+    z-index: 100;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.emr-text-suggestions__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(94, 92, 230, 0.08);
+    border-bottom: 1px solid var(--mac-border, #e5e5e5);
+}
+
+.emr-text-suggestions__icon {
+    font-size: 14px;
+}
+
+.emr-text-suggestions__title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mac-text-secondary, #636366);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.emr-text-suggestions__close {
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.emr-text-suggestions__close:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.emr-text-suggestions__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.emr-text-suggestions__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--mac-border, rgba(0, 0, 0, 0.05));
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.emr-text-suggestions__item:last-child {
+    border-bottom: none;
+}
+
+.emr-text-suggestions__item:hover {
+    background: rgba(0, 122, 255, 0.05);
+}
+
+.emr-text-suggestions__item--selected {
+    background: rgba(0, 122, 255, 0.1);
+}
+
+.emr-text-suggestions__number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    background: #5e5ce6;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.emr-text-suggestions__item--selected .emr-text-suggestions__number {
+    background: #007aff;
+}
+
+.emr-text-suggestions__text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--mac-text-primary, #1d1d1f);
+}
+
+.emr-text-suggestions__source {
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    white-space: nowrap;
+}
+
+.emr-text-suggestions__footer {
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-top: 1px solid var(--mac-border, #e5e5e5);
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+/* ============================================
+   AI LOADING
+   ============================================ */
+.emr-text-loading {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   READ-ONLY BADGE
+   ============================================ */
+.emr-text-readonly {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 11px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    .emr-text-field {
+        background: #2c2c2e;
+        border-color: var(--mac-border, rgba(255, 255, 255, 0.1));
+        color: var(--mac-text-primary, #f5f5f7);
+    }
+
+    .emr-text-field--readonly {
+        background: var(--mac-background-tertiary, #2c2c2e);
+    }
+
+    .emr-text-suggestions {
+        background: var(--mac-background, #2c2c2e);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+@media print {
+
+    .emr-text-suggestions,
+    .emr-text-loading,
+    .emr-text-readonly {
+        display: none !important;
+    }
+
+    .emr-text-field {
+        border: 1px solid #000;
+        box-shadow: none;
+        min-height: auto;
+    }
+}

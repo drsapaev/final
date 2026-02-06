@@ -24,6 +24,7 @@ from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.feature_flags import is_feature_enabled
 from app.services.queue_service import queue_service
+from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
@@ -1531,7 +1532,7 @@ class VisitResponse(BaseModel):
 @router.get("/registrar/visits", response_model=List[VisitResponse])
 def get_visits(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Cashier", "Lab")),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = Query(None, description="Фильтр по ID пациента"),
@@ -1550,12 +1551,34 @@ def get_visits(
 
         result = []
 
-        # 1. ПОЛУЧАЕМ ЗАПИСИ ИЗ СТАРОЙ ТАБЛИЦЫ APPOINTMENTS СНАЧАЛА
+        # 1. ПОЛУЧАЕМ ЗАПИСИ ИЗ СТАРОЙ ТАБЛИЦЫ APPOINTMENTS
         try:
+            appointments_query = db.query(Appointment)
+            
+            # Фильтры для appointments
+            if patient_id:
+                appointments_query = appointments_query.filter(Appointment.patient_id == patient_id)
+            if doctor_id:
+                appointments_query = appointments_query.filter(Appointment.doctor_id == doctor_id)
+            if department:
+                appointments_query = appointments_query.filter(Appointment.department == department)
+            if date_from:
+                try:
+                    from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+                    appointments_query = appointments_query.filter(Appointment.appointment_date >= from_date)
+                except ValueError:
+                    pass
+            if date_to:
+                try:
+                    to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+                    appointments_query = appointments_query.filter(Appointment.appointment_date <= to_date)
+                except ValueError:
+                    pass
+            
             appointments = (
-                db.query(Appointment)
+                appointments_query
                 .order_by(Appointment.created_at.desc())
-                .limit(5)
+                .limit(limit)
                 .all()
             )
 
@@ -2288,6 +2311,179 @@ def mark_visit_as_paid(
         )
 
 
+# ===================== ЭНДПОИНТ ДЛЯ ОТМЕТКИ ЗАПИСЕЙ ОНЛАЙН-ОЧЕРЕДИ КАК ОПЛАЧЕННЫХ =====================
+
+
+@router.post("/registrar/queue/entry/{entry_id}/mark-paid")
+def mark_queue_entry_as_paid(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
+    ),
+):
+    """
+    Отметить запись OnlineQueueEntry как оплаченную.
+    
+    Находит связанный Visit через visit_id и оплачивает его.
+    Если visit_id отсутствует, пытается найти Visit по patient_id и дате.
+    """
+    try:
+        from app.models.online_queue import OnlineQueueEntry
+        from app.models.visit import Visit
+        from app.services.billing_service import BillingService
+
+        logger.info(
+            "mark_queue_entry_as_paid: User: %s, Role: %s, Entry ID: %d",
+            current_user.username,
+            current_user.role,
+            entry_id,
+        )
+
+        # Находим запись в очереди
+        entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        if not entry:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"Запись очереди с ID {entry_id} не найдена"
+            )
+
+        # Пытаемся найти связанный Visit
+        visit = None
+        
+        # 1. Через visit_id
+        if entry.visit_id:
+            visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
+            logger.info(f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id")
+        
+        # 2. Если visit_id нет, ищем по patient_id и дате
+        if not visit and entry.patient_id:
+            from datetime import date
+            today = date.today()
+            visit = (
+                db.query(Visit)
+                .filter(
+                    Visit.patient_id == entry.patient_id,
+                    Visit.visit_date == today,
+                )
+                .order_by(Visit.created_at.desc())
+                .first()
+            )
+            if visit:
+                logger.info(f"mark_queue_entry_as_paid: Найден Visit {visit.id} через patient_id и дату")
+
+        if not visit:
+            # Если Visit не найден, обновляем только статус записи в очереди
+            logger.warning(
+                f"mark_queue_entry_as_paid: Visit не найден для entry {entry_id}. "
+                f"Обновляем только статус очереди."
+            )
+            entry.status = "paid"
+            entry.discount_mode = "paid"
+            db.commit()
+            db.refresh(entry)
+            
+            return {
+                "id": entry.id,
+                "status": entry.status,
+                "message": "Запись в очереди отмечена как оплаченная (Visit не найден)",
+            }
+
+        # Проверяем, не создан ли уже платеж для этого визита
+        from app.models.payment import Payment
+
+        existing_payment = (
+            db.query(Payment)
+            .filter(Payment.visit_id == visit.id, Payment.status == "paid")
+            .first()
+        )
+
+        if not existing_payment:
+            # Создаем платеж через SSOT
+            billing_service = BillingService(db)
+            total_info = billing_service.calculate_total(
+                visit_id=visit.id, discount_mode=visit.discount_mode or "none"
+            )
+            payment_amount = float(total_info["total"])
+
+            from datetime import datetime, timezone
+            from sqlalchemy import text
+
+            currency = total_info.get("currency", "UZS")
+            note = f"Оплата визита {visit.id} через запись очереди {entry_id}"
+            paid_at = datetime.now(timezone.utc)
+
+            result = db.execute(
+                text(
+                    """
+                    INSERT INTO payments 
+                    (visit_id, amount, currency, method, status, note, paid_at, created_at)
+                    VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
+                """
+                ),
+                {
+                    "visit_id": visit.id,
+                    "amount": payment_amount,
+                    "currency": currency,
+                    "method": "cash",
+                    "status": "paid",
+                    "note": note,
+                    "paid_at": paid_at,
+                    "created_at": paid_at,
+                },
+            )
+            db.commit()
+
+            payment = (
+                db.query(Payment)
+                .filter(Payment.visit_id == visit.id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+
+            logger.info(
+                "mark_queue_entry_as_paid: Создан платеж ID=%d для визита %d (через entry %d), сумма=%s",
+                payment.id,
+                visit.id,
+                entry_id,
+                payment_amount,
+            )
+        else:
+            logger.info(
+                "mark_queue_entry_as_paid: Платеж уже существует для визита %d, ID=%d",
+                visit.id,
+                existing_payment.id,
+            )
+
+        # Обновляем статус визита
+        visit.status = "paid"
+        visit.discount_mode = "paid"
+        
+        # Обновляем статус записи в очереди
+        entry.status = "paid"
+        entry.discount_mode = "paid"
+        
+        db.commit()
+        db.refresh(visit)
+        db.refresh(entry)
+
+        return {
+            "id": entry.id,
+            "visit_id": visit.id,
+            "status": visit.status,
+            "message": "Запись отмечена как оплаченная",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("mark_queue_entry_as_paid: Error: %s", str(e), exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка обновления записи: {str(e)}",
+        )
+
 @router.post("/registrar/visits/{visit_id}/complete")
 def complete_visit(
     visit_id: int,
@@ -2546,6 +2742,11 @@ def _assign_queue_numbers_on_confirmation(
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
         queue_time = datetime.now(timezone)
 
+        # ⭐ session_id для группировки услуг пациента в одной очереди
+        session_id = get_or_create_session_id(
+            db, visit.patient_id, daily_queue.id, today
+        ) if visit.patient_id else f"confirmation_{visit.id}"
+
         queue_entry = OnlineQueueEntry(
             queue_id=daily_queue.id,
             patient_id=visit.patient_id,
@@ -2553,6 +2754,7 @@ def _assign_queue_numbers_on_confirmation(
             status="waiting",
             source="confirmation",  # Источник: подтверждение визита
             queue_time=queue_time,  # Устанавливаем время регистрации
+            session_id=session_id,  # ⭐ NEW: Session grouping
         )
         db.add(queue_entry)
 

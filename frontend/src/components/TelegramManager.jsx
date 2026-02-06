@@ -53,6 +53,7 @@ import {
   MenuItem,
   FormControlLabel
 } from '@mui/material';
+import tokenManager from '../utils/tokenManager';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
@@ -75,7 +76,7 @@ const TelegramManager = () => {
   const loadTelegramData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
 
       const [statusRes, templatesRes] = await Promise.all([
         fetch('/api/v1/telegram/bot-status', {
@@ -104,7 +105,7 @@ const TelegramManager = () => {
 
   const handleCreateTemplate = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch('/api/v1/telegram/templates', {
         method: 'POST',
         headers: {

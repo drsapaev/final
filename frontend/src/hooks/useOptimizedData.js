@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import tokenManager from '../utils/tokenManager';
 
 /**
  * Хук для оптимизированной загрузки данных с кэшированием и дебаунсингом
@@ -46,7 +47,7 @@ export const useOptimizedData = (url, options = {}) => {
     try {
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         signal: abortControllerRef.current.signal
@@ -57,7 +58,7 @@ export const useOptimizedData = (url, options = {}) => {
       }
 
       const result = await response.json();
-      
+
       // Сохраняем в кэш
       cacheRef.current.set(cacheKey, {
         data: result,

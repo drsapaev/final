@@ -13,7 +13,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 # -----------------------------------------------------------------------------
 # Логирование
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Temporarily DEBUG for auth investigation
 log = logging.getLogger("clinic.main")
 
 # -----------------------------------------------------------------------------
@@ -70,9 +70,11 @@ log.info("Exception handlers registered")
 # WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
 from app.ws.queue_ws import router as queue_ws_router, ws_queue  # noqa: E402
+from app.ws.chat_ws import chat_websocket_handler  # noqa: E402
 
 app.include_router(queue_ws_router)  # /ws/queue
 app.add_api_websocket_route("/ws/dev-queue", ws_queue)
+app.add_api_websocket_route("/ws/chat", chat_websocket_handler)  # User-to-user chat
 
 # -----------------------------------------------------------------------------
 # Audit Middleware (должен быть ДО CORS для установки request_id)
@@ -89,6 +91,17 @@ from app.middleware.security_middleware import SecurityMiddleware  # noqa: E402
 
 app.add_middleware(SecurityMiddleware)
 log.info("Security middleware registered")
+
+# -----------------------------------------------------------------------------
+# CSRF Protection Middleware (optional, enable via CSRF_ENABLED=1)
+# -----------------------------------------------------------------------------
+CSRF_ENABLED = os.getenv("CSRF_ENABLED", "0") == "1"
+if CSRF_ENABLED:
+    from app.middleware.csrf_middleware import CSRFMiddleware  # noqa: E402
+    app.add_middleware(CSRFMiddleware, enabled=True)
+    log.info("CSRF protection middleware registered")
+else:
+    log.info("CSRF protection disabled (set CSRF_ENABLED=1 to enable)")
 
 # -----------------------------------------------------------------------------
 # CORS

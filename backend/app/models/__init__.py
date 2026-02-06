@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from .activation import Activation
+from .ai_config import (
+    AIPromptTemplate,
+    AIProvider,
+    AIUsageLog,
+)
 from .appointment import Appointment
 from .audit import AuditLog
 from .authentication import (
@@ -9,6 +14,7 @@ from .authentication import (
     PasswordResetToken,
     RefreshToken,
     SecurityEvent,
+    TokenBlacklist,
     UserActivity,
     UserSession,
 )
@@ -41,6 +47,7 @@ from .department import (
 from .doctor_price_override import DoctorPriceOverride
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
+from .emr_v2 import EMRAuditLog, EMRRecord, EMRRevision, SYSTEM_USER_ID
 from .emr_version import EMRVersion
 from .file_system import (
     File,
@@ -57,13 +64,14 @@ from .file_system import (
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
 from .lab import LabOrder, LabResult
+from .message import Message
 from .notification import (
     NotificationHistory,
-    NotificationSettings,
     NotificationTemplate,
 )
 from .online import OnlineDay
 from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from .queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
 from .refund_deposit import (
     RefundRequest,
     RefundRequestStatus,
@@ -72,6 +80,7 @@ from .refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
 )
+from .family_relation import FamilyRelation, RelationType
 from .patient import Patient
 from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
@@ -132,6 +141,9 @@ from .user_profile import (
     UserPreferences,
     UserProfile,
 )
+from .doctor_phrase_history import DoctorPhraseHistory
+from .global_search_audit import GlobalSearchAudit
+from .ai_chat import AIChatSession, AIChatMessage, AIChatFeedback
 from .visit import Visit, VisitService
 
 # Package marker for app.models
@@ -156,6 +168,11 @@ __all__ = [
     "Prescription",
     "EMRTemplate",
     "EMRVersion",
+    # EMR v2 Models
+    "EMRRecord",
+    "EMRRevision",
+    "EMRAuditLog",
+    "SYSTEM_USER_ID",
     "TwoFactorAuth",
     "TwoFactorBackupCode",
     "TwoFactorRecovery",
@@ -168,6 +185,7 @@ __all__ = [
     "LoginAttempt",
     "UserActivity",
     "SecurityEvent",
+    "TokenBlacklist",
     "UserProfile",
     "UserPreferences",
     "UserNotificationSettings",
@@ -182,7 +200,6 @@ __all__ = [
     "AuditLog",
     "NotificationTemplate",
     "NotificationHistory",
-    "NotificationSettings",
     "Setting",
     "Activation",
     "OnlineDay",
@@ -207,6 +224,8 @@ __all__ = [
     "DailyQueue",
     "OnlineQueueEntry",
     "QueueToken",
+    "QueueProfile",
+    "INITIAL_QUEUE_PROFILES",
     "TelegramConfig",
     "TelegramTemplate",
     "TelegramUser",
@@ -225,4 +244,16 @@ __all__ = [
     "PatientDeposit",
     "DepositTransaction",
     "DepositTransactionType",
+    # Family Relations
+    "FamilyRelation",
+    "RelationType",
+    # Global Search Audit
+    "GlobalSearchAudit",
+    # AI Chat
+    "AIChatSession",
+    "AIChatMessage",
+    "AIChatFeedback",
+    "AIPromptTemplate",
+    "AIProvider",
+    "AIUsageLog",
 ]

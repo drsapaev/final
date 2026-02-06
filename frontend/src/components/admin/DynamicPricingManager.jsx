@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSBadge, 
-  MacOSInput, 
-  MacOSSelect, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSInput,
+  MacOSSelect,
   MacOSTextarea,
   MacOSLoadingSkeleton,
   MacOSEmptyState,
   MacOSAlert
 } from '../ui/macos';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Package, 
-  TrendingUp, 
-  Calendar, 
-  Clock, 
-  Percent, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Package,
+  TrendingUp,
+  Calendar,
+  Clock,
+  Percent,
   DollarSign,
   Users,
   BarChart3,
@@ -31,7 +31,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
+
+// API base URL with fallback for development
+const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+
 const DynamicPricingManager = () => {
   const [activeTab, setActiveTab] = useState('rules');
   const [pricingRules, setPricingRules] = useState([]);
@@ -83,47 +88,41 @@ const DynamicPricingManager = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
       // Загружаем услуги
-      const servicesResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/services`, {
-        headers
-      });
-      if (servicesResponse.ok) {
-        const servicesData = await servicesResponse.json();
-        setServices(servicesData);
+      try {
+        const response = await api.get('/services');
+        setServices(Array.isArray(response.data) ? response.data : []);
+      } catch (e) {
+        logger.error('Failed to load services:', e);
+        setServices([]);
       }
 
       if (activeTab === 'rules') {
         // Загружаем правила ценообразования
-        const rulesResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/pricing-rules`, {
-          headers
-        });
-        if (rulesResponse.ok) {
-          const rulesData = await rulesResponse.json();
-          setPricingRules(rulesData);
+        try {
+          const response = await api.get('/dynamic-pricing/pricing-rules');
+          setPricingRules(Array.isArray(response.data) ? response.data : []);
+        } catch (e) {
+          logger.error('Failed to load pricing rules:', e);
+          setPricingRules([]);
         }
       } else if (activeTab === 'packages') {
         // Загружаем пакеты услуг
-        const packagesResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/service-packages`, {
-          headers
-        });
-        if (packagesResponse.ok) {
-          const packagesData = await packagesResponse.json();
-          setServicePackages(packagesData);
+        try {
+          const response = await api.get('/dynamic-pricing/service-packages');
+          setServicePackages(Array.isArray(response.data) ? response.data : []);
+        } catch (e) {
+          logger.error('Failed to load packages:', e);
+          setServicePackages([]);
         }
       } else if (activeTab === 'analytics') {
         // Загружаем аналитику
-        const analyticsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/pricing-analytics`, {
-          headers
-        });
-        if (analyticsResponse.ok) {
-          const analyticsData = await analyticsResponse.json();
-          setAnalytics(analyticsData);
+        try {
+          const response = await api.get('/dynamic-pricing/pricing-analytics');
+          setAnalytics(response.data);
+        } catch (e) {
+          logger.error('Failed to load analytics:', e);
+          setAnalytics(null);
         }
       }
     } catch (error) {
@@ -136,102 +135,61 @@ const DynamicPricingManager = () => {
 
   const handleCreateRule = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/pricing-rules`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(ruleForm)
+      await api.post('/dynamic-pricing/pricing-rules', ruleForm);
+      toast.success('Правило создано успешно');
+      setShowCreateRule(false);
+      setRuleForm({
+        name: '',
+        description: '',
+        rule_type: 'TIME_BASED',
+        discount_type: 'PERCENTAGE',
+        discount_value: 0,
+        start_date: '',
+        end_date: '',
+        start_time: '',
+        end_time: '',
+        days_of_week: '',
+        min_quantity: 1,
+        max_quantity: '',
+        min_amount: '',
+        priority: 0,
+        max_uses: '',
+        service_ids: []
       });
-
-      if (response.ok) {
-        toast.success('Правило создано успешно');
-        setShowCreateRule(false);
-        setRuleForm({
-          name: '',
-          description: '',
-          rule_type: 'TIME_BASED',
-          discount_type: 'PERCENTAGE',
-          discount_value: 0,
-          start_date: '',
-          end_date: '',
-          start_time: '',
-          end_time: '',
-          days_of_week: '',
-          min_quantity: 1,
-          max_quantity: '',
-          min_amount: '',
-          priority: 0,
-          max_uses: '',
-          service_ids: []
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка создания правила');
-      }
+      loadData();
     } catch (error) {
       logger.error('Ошибка создания правила:', error);
-      toast.error('Ошибка создания правила');
+      toast.error(error.response?.data?.detail || 'Ошибка создания правила');
     }
   };
 
   const handleCreatePackage = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/service-packages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(packageForm)
+      await api.post('/dynamic-pricing/service-packages', packageForm);
+      toast.success('Пакет создан успешно');
+      setShowCreatePackage(false);
+      setPackageForm({
+        name: '',
+        description: '',
+        service_ids: [],
+        package_price: 0,
+        valid_from: '',
+        valid_to: '',
+        max_purchases: '',
+        per_patient_limit: ''
       });
-
-      if (response.ok) {
-        toast.success('Пакет создан успешно');
-        setShowCreatePackage(false);
-        setPackageForm({
-          name: '',
-          description: '',
-          service_ids: [],
-          package_price: 0,
-          valid_from: '',
-          valid_to: '',
-          max_purchases: '',
-          per_patient_limit: ''
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка создания пакета');
-      }
+      loadData();
     } catch (error) {
       logger.error('Ошибка создания пакета:', error);
-      toast.error('Ошибка создания пакета');
+      toast.error(error.response?.data?.detail || 'Ошибка создания пакета');
     }
   };
 
   const handleToggleRule = async (ruleId, isActive) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/pricing-rules/${ruleId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ is_active: !isActive })
-      });
-
-      if (response.ok) {
-        toast.success(isActive ? 'Правило деактивировано' : 'Правило активировано');
-        loadData();
-      } else {
-        toast.error('Ошибка изменения статуса правила');
-      }
+      await api.put(`/dynamic-pricing/pricing-rules/${ruleId}`, { is_active: !isActive });
+      toast.success(isActive ? 'Правило деактивировано' : 'Правило активировано');
+      loadData();
     } catch (error) {
       logger.error('Ошибка изменения статуса правила:', error);
       toast.error('Ошибка изменения статуса правила');
@@ -242,20 +200,9 @@ const DynamicPricingManager = () => {
     if (!confirm('Вы уверены, что хотите удалить это правило?')) return;
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/pricing-rules/${ruleId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Правило удалено');
-        loadData();
-      } else {
-        toast.error('Ошибка удаления правила');
-      }
+      await api.delete(`/dynamic-pricing/pricing-rules/${ruleId}`);
+      toast.success('Правило удалено');
+      loadData();
     } catch (error) {
       logger.error('Ошибка удаления правила:', error);
       toast.error('Ошибка удаления правила');
@@ -266,20 +213,9 @@ const DynamicPricingManager = () => {
     if (!confirm('Вы уверены, что хотите удалить этот пакет?')) return;
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/service-packages/${packageId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Пакет удален');
-        loadData();
-      } else {
-        toast.error('Ошибка удаления пакета');
-      }
+      await api.delete(`/dynamic-pricing/service-packages/${packageId}`);
+      toast.success('Пакет удален');
+      loadData();
     } catch (error) {
       logger.error('Ошибка удаления пакета:', error);
       toast.error('Ошибка удаления пакета');
@@ -288,20 +224,8 @@ const DynamicPricingManager = () => {
 
   const handleUpdateDynamicPrices = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/update-dynamic-prices`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(`Обновлено цен: ${result.updated_count} из ${result.total_services}`);
-      } else {
-        toast.error('Ошибка обновления цен');
-      }
+      const response = await api.post('/dynamic-pricing/update-dynamic-prices');
+      toast.success(`Обновлено цен: ${response.data.updated_count} из ${response.data.total_services}`);
     } catch (error) {
       logger.error('Ошибка обновления цен:', error);
       toast.error('Ошибка обновления цен');
@@ -311,13 +235,13 @@ const DynamicPricingManager = () => {
   const renderRulesTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок и кнопки */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <div>
-          <h3 style={{ 
+          <h3 style={{
             margin: '0 0 4px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-lg)',
@@ -325,7 +249,7 @@ const DynamicPricingManager = () => {
           }}>
             Правила ценообразования
           </h3>
-          <p style={{ 
+          <p style={{
             margin: 0,
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -334,24 +258,24 @@ const DynamicPricingManager = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <MacOSButton 
-            onClick={handleUpdateDynamicPrices} 
+          <MacOSButton
+            onClick={handleUpdateDynamicPrices}
             variant="outline"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px' 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
             <TrendingUp size={16} />
             Обновить цены
           </MacOSButton>
-          <MacOSButton 
+          <MacOSButton
             onClick={() => setShowCreateRule(true)}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px' 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
             <Plus size={16} />
@@ -377,19 +301,19 @@ const DynamicPricingManager = () => {
         ) : (
           pricingRules.map(rule => (
             <MacOSCard key={rule.id} style={{ padding: 0 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start' 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
               }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '8px',
                     marginBottom: '12px'
                   }}>
-                    <h4 style={{ 
+                    <h4 style={{
                       margin: 0,
                       color: 'var(--mac-text-primary)',
                       fontSize: 'var(--mac-font-size-md)',
@@ -409,18 +333,18 @@ const DynamicPricingManager = () => {
                       {rule.rule_type === 'DYNAMIC' && 'Динамическое'}
                     </MacOSBadge>
                   </div>
-                  
-                  <p style={{ 
+
+                  <p style={{
                     margin: '0 0 12px 0',
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>
                     {rule.description}
                   </p>
-                  
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '16px',
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)'
@@ -441,9 +365,9 @@ const DynamicPricingManager = () => {
                   </div>
 
                   {(rule.start_time || rule.end_time) && (
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: '4px',
                       fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-text-secondary)',
@@ -454,12 +378,12 @@ const DynamicPricingManager = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
                     variant="outline"
                     onClick={() => handleToggleRule(rule.id, rule.is_active)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -475,7 +399,7 @@ const DynamicPricingManager = () => {
                   <MacOSButton
                     variant="outline"
                     onClick={() => setEditingRule(rule)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -491,7 +415,7 @@ const DynamicPricingManager = () => {
                   <MacOSButton
                     variant="outline"
                     onClick={() => handleDeleteRule(rule.id)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -514,13 +438,13 @@ const DynamicPricingManager = () => {
       {/* Форма создания правила */}
       {showCreateRule && (
         <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '16px' 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
           }}>
-            <h4 style={{ 
+            <h4 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-lg)',
@@ -533,13 +457,13 @@ const DynamicPricingManager = () => {
             </MacOSButton>
           </div>
 
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(2, 1fr)', 
-            gap: '16px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '16px'
           }}>
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -556,7 +480,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -579,7 +503,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -600,7 +524,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -618,7 +542,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -635,7 +559,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -652,7 +576,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -670,7 +594,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -688,7 +612,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -705,7 +629,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -731,11 +655,11 @@ const DynamicPricingManager = () => {
             </div>
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
-            gap: '8px', 
-            marginTop: '16px' 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '8px',
+            marginTop: '16px'
           }}>
             <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
               Отмена
@@ -753,13 +677,13 @@ const DynamicPricingManager = () => {
   const renderPackagesTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок и кнопки */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <div>
-          <h3 style={{ 
+          <h3 style={{
             margin: '0 0 4px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-lg)',
@@ -767,7 +691,7 @@ const DynamicPricingManager = () => {
           }}>
             Пакеты услуг
           </h3>
-          <p style={{ 
+          <p style={{
             margin: 0,
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -775,12 +699,12 @@ const DynamicPricingManager = () => {
             Управление комплексными предложениями
           </p>
         </div>
-        <MacOSButton 
+        <MacOSButton
           onClick={() => setShowCreatePackage(true)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
           <Plus size={16} />
@@ -805,19 +729,19 @@ const DynamicPricingManager = () => {
         ) : (
           servicePackages.map(pkg => (
             <MacOSCard key={pkg.id} style={{ padding: 0 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start' 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
               }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '8px',
                     marginBottom: '12px'
                   }}>
-                    <h4 style={{ 
+                    <h4 style={{
                       margin: 0,
                       color: 'var(--mac-text-primary)',
                       fontSize: 'var(--mac-font-size-md)',
@@ -829,24 +753,24 @@ const DynamicPricingManager = () => {
                       {pkg.is_active ? 'Активен' : 'Неактивен'}
                     </MacOSBadge>
                   </div>
-                  
-                  <p style={{ 
+
+                  <p style={{
                     margin: '0 0 12px 0',
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>
                     {pkg.description}
                   </p>
-                  
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '16px',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>
-                    <span style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                    <span style={{
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: '4px',
                       color: 'var(--mac-success)',
                       fontWeight: 'var(--mac-font-weight-semibold)'
@@ -855,7 +779,7 @@ const DynamicPricingManager = () => {
                       {pkg.package_price} ₽
                     </span>
                     {pkg.original_price && (
-                      <span style={{ 
+                      <span style={{
                         color: 'var(--mac-text-tertiary)',
                         textDecoration: 'line-through'
                       }}>
@@ -874,26 +798,26 @@ const DynamicPricingManager = () => {
                   </div>
 
                   {(pkg.valid_from || pkg.valid_to) && (
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: '4px',
                       fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-text-secondary)',
                       marginTop: '8px'
                     }}>
                       <Calendar size={12} />
-                      {pkg.valid_from && new Date(pkg.valid_from).toLocaleDateString()} - 
+                      {pkg.valid_from && new Date(pkg.valid_from).toLocaleDateString()} -
                       {pkg.valid_to && new Date(pkg.valid_to).toLocaleDateString()}
                     </div>
                   )}
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
                     variant="outline"
                     onClick={() => setEditingPackage(pkg)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -909,7 +833,7 @@ const DynamicPricingManager = () => {
                   <MacOSButton
                     variant="outline"
                     onClick={() => handleDeletePackage(pkg.id)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -932,13 +856,13 @@ const DynamicPricingManager = () => {
       {/* Форма создания пакета */}
       {showCreatePackage && (
         <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '16px' 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
           }}>
-            <h4 style={{ 
+            <h4 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-lg)',
@@ -951,13 +875,13 @@ const DynamicPricingManager = () => {
             </MacOSButton>
           </div>
 
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(2, 1fr)', 
-            gap: '16px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '16px'
           }}>
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -974,7 +898,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -992,7 +916,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -1009,7 +933,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -1026,7 +950,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -1043,7 +967,7 @@ const DynamicPricingManager = () => {
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ 
+              <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 color: 'var(--mac-text-primary)',
@@ -1069,11 +993,11 @@ const DynamicPricingManager = () => {
             </div>
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
-            gap: '8px', 
-            marginTop: '16px' 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '8px',
+            marginTop: '16px'
           }}>
             <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
               Отмена
@@ -1091,7 +1015,7 @@ const DynamicPricingManager = () => {
   const renderAnalyticsTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div>
-        <h3 style={{ 
+        <h3 style={{
           margin: '0 0 4px 0',
           color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-lg)',
@@ -1099,7 +1023,7 @@ const DynamicPricingManager = () => {
         }}>
           Аналитика ценообразования
         </h3>
-        <p style={{ 
+        <p style={{
           margin: 0,
           color: 'var(--mac-text-secondary)',
           fontSize: 'var(--mac-font-size-sm)'
@@ -1111,14 +1035,14 @@ const DynamicPricingManager = () => {
       {analytics ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '8px',
               marginBottom: '12px'
             }}>
               <TrendingUp size={20} color="var(--mac-accent)" />
-              <h4 style={{ 
+              <h4 style={{
                 margin: 0,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-md)',
@@ -1127,7 +1051,7 @@ const DynamicPricingManager = () => {
                 Общая экономия
               </h4>
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-success)',
@@ -1135,25 +1059,25 @@ const DynamicPricingManager = () => {
             }}>
               {analytics.summary?.total_savings?.toLocaleString() || 0} ₽
             </div>
-            <p style={{ 
+            <p style={{
               margin: 0,
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-              За период {analytics.period?.start_date && new Date(analytics.period.start_date).toLocaleDateString()} - 
+              За период {analytics.period?.start_date && new Date(analytics.period.start_date).toLocaleDateString()} -
               {analytics.period?.end_date && new Date(analytics.period.end_date).toLocaleDateString()}
             </p>
           </MacOSCard>
 
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '8px',
               marginBottom: '12px'
             }}>
               <Settings size={20} color="var(--mac-purple)" />
-              <h4 style={{ 
+              <h4 style={{
                 margin: 0,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-md)',
@@ -1162,7 +1086,7 @@ const DynamicPricingManager = () => {
                 Активные правила
               </h4>
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-text-primary)',
@@ -1170,7 +1094,7 @@ const DynamicPricingManager = () => {
             }}>
               {analytics.summary?.active_rules_count || 0}
             </div>
-            <p style={{ 
+            <p style={{
               margin: 0,
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
@@ -1180,14 +1104,14 @@ const DynamicPricingManager = () => {
           </MacOSCard>
 
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '8px',
               marginBottom: '12px'
             }}>
               <Package size={20} color="var(--mac-orange)" />
-              <h4 style={{ 
+              <h4 style={{
                 margin: 0,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-md)',
@@ -1196,7 +1120,7 @@ const DynamicPricingManager = () => {
                 Активные пакеты
               </h4>
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-text-primary)',
@@ -1204,7 +1128,7 @@ const DynamicPricingManager = () => {
             }}>
               {analytics.summary?.active_packages_count || 0}
             </div>
-            <p style={{ 
+            <p style={{
               margin: 0,
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
@@ -1223,7 +1147,7 @@ const DynamicPricingManager = () => {
 
       {analytics?.rules_statistics && (
         <MacOSCard style={{ padding: '16px' }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -1233,15 +1157,15 @@ const DynamicPricingManager = () => {
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {analytics.rules_statistics.map((rule, index) => (
-              <div key={index} style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              <div key={index} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 padding: '8px',
                 backgroundColor: 'var(--mac-bg-secondary)',
                 borderRadius: 'var(--mac-radius-md)'
               }}>
-                <span style={{ 
+                <span style={{
                   fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -1263,7 +1187,7 @@ const DynamicPricingManager = () => {
 
       {analytics?.packages_statistics && (
         <MacOSCard style={{ padding: '16px' }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -1273,15 +1197,15 @@ const DynamicPricingManager = () => {
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {analytics.packages_statistics.map((pkg, index) => (
-              <div key={index} style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+              <div key={index} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 padding: '8px',
                 backgroundColor: 'var(--mac-bg-secondary)',
                 borderRadius: 'var(--mac-radius-md)'
               }}>
-                <span style={{ 
+                <span style={{
                   fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)'
                 }}>
@@ -1311,23 +1235,23 @@ const DynamicPricingManager = () => {
 
   return (
     <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '16px',
         marginBottom: '24px'
       }}>
         <Package size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{ 
-            margin: 0, 
+          <h2 style={{
+            margin: 0,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-xl)',
             fontWeight: 'var(--mac-font-weight-bold)'
           }}>
             Динамическое ценообразование
           </h2>
-          <p style={{ 
+          <p style={{
             margin: '4px 0 0 0',
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -1338,8 +1262,8 @@ const DynamicPricingManager = () => {
       </div>
 
       {/* Табы */}
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         borderBottom: '1px solid var(--mac-border)',
         marginBottom: '24px'
       }}>

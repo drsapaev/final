@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, BellOff, Settings, Check, X } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/native';
-
+import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+
 /**
  * Компонент для управления мобильными уведомлениями
  */
@@ -15,7 +16,7 @@ const MobileNotifications = () => {
   useEffect(() => {
     checkNotificationPermission();
     loadNotifications();
-    
+
     // Слушаем push уведомления
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
@@ -33,10 +34,10 @@ const MobileNotifications = () => {
       setLoading(true);
       const response = await fetch('/api/v1/mobile/notifications', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);
@@ -65,7 +66,7 @@ const MobileNotifications = () => {
     try {
       const permission = await Notification.requestPermission();
       setPermission(permission);
-      
+
       if (permission === 'granted') {
         // Подписываемся на push уведомления
         await subscribeToPushNotifications();
@@ -88,7 +89,7 @@ const MobileNotifications = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify(subscription)
       });
@@ -104,13 +105,13 @@ const MobileNotifications = () => {
       await fetch(`/api/v1/mobile/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
       // Обновляем локальное состояние
-      setNotifications(prev => 
-        prev.map(n => 
+      setNotifications(prev =>
+        prev.map(n =>
           n.id === notificationId ? { ...n, is_read: true } : n
         )
       );
@@ -125,11 +126,11 @@ const MobileNotifications = () => {
       await fetch('/api/v1/mobile/notifications/mark-all-read', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => ({ ...n, is_read: true }))
       );
       setUnreadCount(0);
@@ -199,7 +200,7 @@ const MobileNotifications = () => {
             </Badge>
           )}
         </div>
-        
+
         <div className="flex space-x-2">
           {permission === 'default' && (
             <Button
@@ -210,7 +211,7 @@ const MobileNotifications = () => {
               Включить
             </Button>
           )}
-          
+
           {unreadCount > 0 && (
             <Button
               onClick={markAllAsRead}
@@ -239,36 +240,33 @@ const MobileNotifications = () => {
           notifications.map((notification) => (
             <Card
               key={notification.id}
-              className={`p-3 cursor-pointer transition-colors ${
-                notification.is_read 
-                  ? 'bg-gray-50' 
-                  : 'bg-blue-50 border-blue-200'
-              }`}
+              className={`p-3 cursor-pointer transition-colors ${notification.is_read
+                ? 'bg-gray-50'
+                : 'bg-blue-50 border-blue-200'
+                }`}
               onClick={() => markAsRead(notification.id)}
             >
               <div className="flex items-start space-x-3">
                 <div className="text-lg">
                   {getNotificationIcon(notification.type)}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h4 className={`font-medium ${
-                      notification.is_read ? 'text-gray-700' : 'text-gray-900'
-                    }`}>
+                    <h4 className={`font-medium ${notification.is_read ? 'text-gray-700' : 'text-gray-900'
+                      }`}>
                       {notification.title}
                     </h4>
                     <span className="text-xs text-gray-500">
                       {formatDate(notification.created_at)}
                     </span>
                   </div>
-                  
-                  <p className={`text-sm mt-1 ${
-                    notification.is_read ? 'text-gray-600' : 'text-gray-700'
-                  }`}>
+
+                  <p className={`text-sm mt-1 ${notification.is_read ? 'text-gray-600' : 'text-gray-700'
+                    }`}>
                     {notification.message}
                   </p>
-                  
+
                   {!notification.is_read && (
                     <div className="mt-2">
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>

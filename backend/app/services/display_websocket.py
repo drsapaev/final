@@ -121,6 +121,8 @@ class DisplayWebSocketManager:
             call_message = {
                 "type": "patient_call",
                 "data": {
+                    "id": queue_entry.id,
+                    "queue_entry_id": queue_entry.id,
                     "queue_number": queue_entry.number,
                     "patient_name": self._format_patient_name(queue_entry.patient_name),
                     "doctor_name": doctor_name,
@@ -157,7 +159,7 @@ class DisplayWebSocketManager:
         except Exception as e:
             logger.error(f"Ошибка трансляции вызова пациента: {e}")
 
-    async def broadcast_queue_update(
+    async def broadcast_daily_queue_state(
         self, daily_queue: DailyQueue, board_ids: List[str] = None
     ) -> None:
         """Трансляция обновления очереди"""
@@ -415,47 +417,7 @@ class DisplayWebSocketManager:
             }
         return status
 
-    async def broadcast_patient_call(
-        self,
-        queue_entry,
-        doctor_name: str,
-        cabinet: Optional[str] = None,
-        board_ids: Optional[List[str]] = None,
-    ) -> None:
-        """Трансляция вызова пациента на табло"""
-        try:
-            message = {
-                "type": "patient_call",
-                "data": {
-                    "queue_entry_id": queue_entry.id,
-                    "number": queue_entry.number,
-                    "patient_name": queue_entry.patient_name,
-                    "doctor_name": doctor_name,
-                    "cabinet": cabinet,
-                    "called_at": (
-                        queue_entry.called_at.isoformat()
-                        if queue_entry.called_at
-                        else None
-                    ),
-                    "specialist_id": queue_entry.queue.specialist_id,
-                    "department": f"specialist_{queue_entry.queue.specialist_id}",
-                },
-                "timestamp": datetime.utcnow().isoformat(),
-            }
 
-            # Если указаны конкретные табло
-            if board_ids:
-                for board_id in board_ids:
-                    await self.broadcast_to_board(board_id, message)
-            else:
-                # Отправляем на все табло
-                for board_id in self.connections.keys():
-                    await self.broadcast_to_board(board_id, message)
-
-            logger.info(f"Трансляция вызова пациента №{queue_entry.number} на табло")
-
-        except Exception as e:
-            logger.error(f"Ошибка трансляции вызова пациента: {e}")
 
     async def broadcast_queue_update(self, queue_entry, event_type: str) -> None:
         """Трансляция обновления очереди"""

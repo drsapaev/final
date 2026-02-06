@@ -175,7 +175,7 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
     exp_dt = row.expiry_date or (datetime.utcnow() + timedelta(days=400))
     claims["exp"] = int(exp_dt.timestamp())
 
-    token = jwt.encode(claims, settings.AUTH_SECRET, algorithm=settings.AUTH_ALGORITHM)
+    token = jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return ActivateResult(
         ok=True,
         token=token,

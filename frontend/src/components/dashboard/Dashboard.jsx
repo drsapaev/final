@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   XCircle,
 } from 'lucide-react';
+import tokenManager from '../../utils/tokenManager';
 // import AdvancedCharts from './AdvancedCharts';
 
 const Dashboard = ({ user }) => {
@@ -46,8 +47,8 @@ const Dashboard = ({ user }) => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
-      
+      const token = tokenManager.getAccessToken();
+
       const [analyticsRes, notificationsRes, filesRes, telegramRes] = await Promise.all([
         fetch('/api/v1/analytics/dashboard', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -274,10 +275,10 @@ const Dashboard = ({ user }) => {
                     primary="Telegram бот"
                     secondary={dashboardData?.telegram?.bot_active ? "Активен" : "Неактивен"}
                   />
-                  <Chip 
-                    label={dashboardData?.telegram?.bot_active ? "Активен" : "Неактивен"} 
-                    color={dashboardData?.telegram?.bot_active ? "success" : "warning"} 
-                    size="small" 
+                  <Chip
+                    label={dashboardData?.telegram?.bot_active ? "Активен" : "Неактивен"}
+                    color={dashboardData?.telegram?.bot_active ? "success" : "warning"}
+                    size="small"
                   />
                 </ListItem>
                 <ListItem>

@@ -6,13 +6,15 @@ import { useTheme } from '../../contexts/ThemeContext';
 /**
  * Карточка пациента в стиле MediLab
  */
-const PatientCard = ({ 
-  patient, 
-  onView, 
-  onEdit, 
+const PatientCard = ({
+  patient,
+  onView,
+  onEdit,
   onDelete,
+  onArchive,  // Soft-delete handler
+  onRestore,  // Restore handler
   className = '',
-  ...props 
+  ...props
 }) => {
   const { isDark } = useTheme();
 
@@ -25,10 +27,12 @@ const PatientCard = ({
     gender,
     lastVisit,
     department,
-    status = 'active'
+    status = 'active',
+    is_deleted = false  // Soft-delete flag
   } = patient;
 
   const getStatusColor = (status) => {
+    if (is_deleted) return '#9ca3af';  // Gray for archived
     switch (status) {
       case 'active': return '#10b981';
       case 'inactive': return '#6b7280';
@@ -43,19 +47,39 @@ const PatientCard = ({
   };
 
   return (
-    <MedicalCard 
-      className={`patient-card ${className}`}
+    <MedicalCard
+      className={`patient-card ${className} ${is_deleted ? 'archived' : ''}`}
       hover={true}
       padding="medium"
+      style={is_deleted ? { opacity: 0.7 } : {}}
       {...props}
     >
       <div className="flex flex-col h-full">
+        {/* Archived Badge */}
+        {is_deleted && (
+          <div style={{
+            background: '#fee2e2',
+            color: '#dc2626',
+            padding: '4px 12px',
+            borderRadius: '12px',
+            fontSize: '12px',
+            fontWeight: '500',
+            marginBottom: '12px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            alignSelf: 'flex-start'
+          }}>
+            📦 Архивирован
+          </div>
+        )}
+
         {/* Аватар и основная информация */}
         <div className="flex items-center gap-4 mb-4">
-          <div 
+          <div
             className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold"
             style={{
-              backgroundColor: avatar ? 'transparent' : '#3b82f6',
+              backgroundColor: avatar ? 'transparent' : (is_deleted ? '#9ca3af' : '#3b82f6'),
               backgroundImage: avatar ? `url(${avatar})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
@@ -63,15 +87,15 @@ const PatientCard = ({
           >
             {!avatar && <Icon name="User" size={24} />}
           </div>
-          
+
           <div className="flex-1 min-w-0">
-            <h3 
+            <h3
               className="text-lg font-semibold truncate"
               style={{ color: isDark ? '#f8fafc' : '#1e293b' }}
             >
               {name}
             </h3>
-            <p 
+            <p
               className="text-sm text-gray-500 truncate"
               style={{ color: isDark ? '#94a3b8' : '#64748b' }}
             >
@@ -80,10 +104,10 @@ const PatientCard = ({
           </div>
 
           {/* Статус */}
-          <div 
+          <div
             className="w-3 h-3 rounded-full"
             style={{ backgroundColor: getStatusColor(status) }}
-            title={status}
+            title={is_deleted ? 'Архивирован' : status}
           />
         </div>
 
@@ -97,7 +121,7 @@ const PatientCard = ({
               </span>
             </div>
           )}
-          
+
           {lastVisit && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Last visit:</span>
@@ -106,7 +130,7 @@ const PatientCard = ({
               </span>
             </div>
           )}
-          
+
           {department && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Dept:</span>
@@ -127,24 +151,39 @@ const PatientCard = ({
             <Icon name="Eye" size={16} />
             View
           </button>
-          
-          <button
-            onClick={() => onEdit?.(patient)}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-            title="Edit patient"
-          >
-            <Icon name="Edit" size={16} />
-            Edit
-          </button>
-          
-          <button
-            onClick={() => onDelete?.(patient)}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-            title="Delete patient"
-          >
-            <Icon name="Trash2" size={16} />
-            Delete
-          </button>
+
+          {!is_deleted && (
+            <>
+              <button
+                onClick={() => onEdit?.(patient)}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                title="Edit patient"
+              >
+                <Icon name="Edit" size={16} />
+                Edit
+              </button>
+
+              <button
+                onClick={() => (onArchive || onDelete)?.(patient)}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                title="Архивировать пациента"
+              >
+                <Icon name="Archive" size={16} />
+                Архив
+              </button>
+            </>
+          )}
+
+          {is_deleted && onRestore && (
+            <button
+              onClick={() => onRestore?.(patient)}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+              title="Восстановить пациента"
+            >
+              <Icon name="RotateCcw" size={16} />
+              Восстановить
+            </button>
+          )}
         </div>
       </div>
     </MedicalCard>

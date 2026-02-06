@@ -20,8 +20,9 @@
 10. [SSL/TLS Setup](#ssltls-setup)
 11. [Docker Deployment](#docker-deployment)
 12. [Health Checks](#health-checks)
-13. [Rollback Procedures](#rollback-procedures)
-14. [Troubleshooting](#troubleshooting)
+13. [Optional Features](#optional-features)
+14. [Rollback Procedures](#rollback-procedures)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -646,6 +647,24 @@ Add to crontab:
 ```bash
 */5 * * * * /home/clinic/scripts/health-check.sh
 ```
+
+---
+
+---
+
+## Optional Features
+
+### Doctor History-Based Autocomplete
+
+If you are enabling the AI-free Doctor Autocomplete feature:
+
+1. **Follow the specific guide**: [DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md](./DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md)
+2. **Key Steps**:
+   - Run migrations: `alembic upgrade head`
+   - Run batch indexing: `python migrate_phrases.py`
+   - Verify readiness: `curl http://localhost:8000/api/v1/emr/readiness/{doctor_id}`
+
+See the [Feature README](./DOCTOR_AUTOCOMPLETE_README.md) for more details.
 
 ---
 

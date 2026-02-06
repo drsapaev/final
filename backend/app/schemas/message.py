@@ -18,6 +18,7 @@ class MessageCreate(BaseModel):
     """Создание нового текстового сообщения"""
     recipient_id: int = Field(..., description="ID получателя")
     content: str = Field(..., min_length=1, max_length=5000, description="Текст сообщения")
+    patient_id: Optional[int] = Field(None, description="ID пациента для связи с EMR")
     
     @field_validator('content')
     @classmethod
@@ -31,6 +32,26 @@ class MessageCreate(BaseModel):
 class VoiceMessageCreate(BaseModel):
     """Создание голосового сообщения"""
     recipient_id: int = Field(..., description="ID получателя")
+    patient_id: Optional[int] = Field(None, description="ID пациента для связи с EMR")
+
+
+class MessageReactionBase(BaseModel):
+    """Базовая схема реакции"""
+    reaction: str = Field(..., max_length=10, description="Emoji реакции")
+
+class MessageReactionCreate(MessageReactionBase):
+    """Создание реакции"""
+    pass
+
+class MessageReactionOut(MessageReactionBase):
+    """Вывод реакции"""
+    id: int
+    user_id: int
+    user_name: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 class MessageOut(BaseModel):
@@ -54,6 +75,12 @@ class MessageOut(BaseModel):
     sender_role: Optional[str] = None
     recipient_name: Optional[str] = None
     recipient_role: Optional[str] = None
+    
+    # EMR Integration
+    patient_id: Optional[int] = None
+    
+    # Реакции
+    reactions: List[MessageReactionOut] = []
     
     class Config:
         from_attributes = True

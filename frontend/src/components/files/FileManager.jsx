@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
-import { 
-  Upload, 
-  Download, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Share2, 
-  Search, 
-  Filter, 
-  Grid, 
-  List, 
-  Folder, 
-  File, 
-  Image, 
-  FileText, 
-  Video, 
-  Music, 
+import { tokenManager } from '../../utils/tokenManager';
+import {
+  Upload,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  Share2,
+  Search,
+  Filter,
+  Grid,
+  List,
+  Folder,
+  File,
+  Image,
+  FileText,
+  Video,
+  Music,
   Archive,
   MoreVertical,
   Plus,
@@ -61,7 +62,7 @@ const FileManager = () => {
   const [stats, setStats] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
-  
+
   const fileInputRef = useRef(null);
   const uploadFormRef = useRef(null);
 
@@ -82,9 +83,9 @@ const FileManager = () => {
       if (filters.dateTo) params.append('date_to', filters.dateTo);
       if (filters.sizeMin) params.append('size_min', filters.sizeMin);
       if (filters.sizeMax) params.append('size_max', filters.sizeMax);
-      
+
       const response = await fetch(`/api/v1/files?${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
       setFiles(data.files || []);
@@ -107,7 +108,7 @@ const FileManager = () => {
   const loadStats = async () => {
     try {
       const response = await fetch('/api/v1/files/stats', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
       setStats(data);
@@ -129,7 +130,7 @@ const FileManager = () => {
       formData.append('file', file);
       formData.append('file_type', getFileType(file));
       formData.append('permission', 'private');
-      
+
       if (currentFolder) {
         formData.append('folder_id', currentFolder);
       }
@@ -137,7 +138,7 @@ const FileManager = () => {
       try {
         const response = await fetch('/api/v1/files/upload', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` },
           body: formData
         });
 
@@ -159,14 +160,14 @@ const FileManager = () => {
   const getFileType = (file) => {
     const ext = file.name.split('.').pop().toLowerCase();
     const mimeType = file.type;
-    
+
     if (mimeType.startsWith('image/')) return 'image';
     if (mimeType.startsWith('video/')) return 'video';
     if (mimeType.startsWith('audio/')) return 'audio';
     if (['pdf', 'doc', 'docx', 'txt'].includes(ext)) return 'document';
     if (['zip', 'rar', '7z'].includes(ext)) return 'archive';
     if (['dcm', 'dicom'].includes(ext)) return 'xray';
-    
+
     return 'other';
   };
 
@@ -203,9 +204,9 @@ const FileManager = () => {
   const handleDownload = async (fileId, filename) => {
     try {
       const response = await fetch(`/api/v1/files/${fileId}/download`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -225,9 +226,9 @@ const FileManager = () => {
   const handlePreview = async (fileId) => {
     try {
       const response = await fetch(`/api/v1/files/${fileId}/preview`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -244,7 +245,7 @@ const FileManager = () => {
     try {
       const response = await fetch(`/api/v1/files/${fileId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
@@ -280,9 +281,8 @@ const FileManager = () => {
       {files.map(file => (
         <div
           key={file.id}
-          className={`bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
-            selectedFiles.includes(file.id) ? 'ring-2 ring-blue-500' : ''
-          }`}
+          className={`bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${selectedFiles.includes(file.id) ? 'ring-2 ring-blue-500' : ''
+            }`}
           onClick={() => {
             if (selectedFiles.includes(file.id)) {
               setSelectedFiles(prev => prev.filter(id => id !== file.id));
@@ -305,7 +305,7 @@ const FileManager = () => {
               {formatDate(file.created_at)}
             </p>
           </div>
-          
+
           <div className="mt-3 flex justify-center space-x-2">
             <button
               onClick={(e) => {
@@ -462,7 +462,7 @@ const FileManager = () => {
           <h2 className="text-2xl font-bold text-gray-900">Файловый менеджер</h2>
           <p className="text-gray-600">Управление файлами и документами</p>
         </div>
-        
+
         <div className="mt-4 sm:mt-0 flex space-x-3">
           <button
             onClick={() => setShowStatsModal(true)}
@@ -471,7 +471,7 @@ const FileManager = () => {
             <BarChart3 className="w-4 h-4 mr-2" />
             Статистика
           </button>
-          
+
           <button
             onClick={() => setShowUploadModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
@@ -497,7 +497,7 @@ const FileManager = () => {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <select
               value={filters.fileType}
@@ -512,7 +512,7 @@ const FileManager = () => {
               <option value="archive">Архивы</option>
               <option value="xray">Рентген</option>
             </select>
-            
+
             <select
               value={filters.permission}
               onChange={(e) => handleFilterChange('permission', e.target.value)}
@@ -524,7 +524,7 @@ const FileManager = () => {
               <option value="restricted">Ограниченные</option>
               <option value="confidential">Конфиденциальные</option>
             </select>
-            
+
             <button
               onClick={clearFilters}
               className="px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -552,7 +552,7 @@ const FileManager = () => {
               <List className="w-4 h-4" />
             </button>
           </div>
-          
+
           {selectedFiles.length > 0 && (
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">
@@ -567,7 +567,7 @@ const FileManager = () => {
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <button
             onClick={loadFiles}
@@ -613,7 +613,7 @@ const FileManager = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div
                 className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
@@ -623,7 +623,7 @@ const FileManager = () => {
                 <p className="text-gray-600">Нажмите для выбора файлов или перетащите их сюда</p>
                 <p className="text-sm text-gray-500 mt-1">Поддерживаются все типы файлов</p>
               </div>
-              
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -631,7 +631,7 @@ const FileManager = () => {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              
+
               {uploading && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
@@ -647,7 +647,7 @@ const FileManager = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowUploadModal(false)}
@@ -673,7 +673,7 @@ const FileManager = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -685,7 +685,7 @@ const FileManager = () => {
                     <File className="w-8 h-8 text-blue-600" />
                   </div>
                 </div>
-                
+
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -696,7 +696,7 @@ const FileManager = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">По типам файлов</h4>
@@ -709,7 +709,7 @@ const FileManager = () => {
                     ))}
                   </div>
                 </div>
-                
+
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Использование хранилища</h4>
                   <div className="space-y-2">
@@ -739,7 +739,7 @@ const FileManager = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => setShowStatsModal(false)}

@@ -126,6 +126,15 @@ export default function Login() {
         return { requires2FA: true };
       }
 
+      // Проверяем, требуется ли смена пароля
+      if (data?.must_change_password) {
+        const token = data?.access_token;
+        if (token) {
+          setToken(token);
+        }
+        return { mustChangePassword: true, currentPassword: p };
+      }
+
       const token = data?.access_token;
       if (!token) throw new Error('В ответе не найден access_token');
       setToken(token);
@@ -136,7 +145,7 @@ export default function Login() {
         logger.warn('Не удалось получить профиль:', profileError);
         setProfile(null);
       }
-      return { requires2FA: false };
+      return { requires2FA: false, mustChangePassword: false };
     } catch (error) {
       logger.error('Login error:', error);
       throw error;
@@ -189,6 +198,16 @@ export default function Login() {
       // Если требуется 2FA, не продолжаем навигацию
       if (result?.requires2FA) {
         setBusy(false);
+        return;
+      }
+
+      // Если требуется смена пароля, перенаправляем на страницу смены пароля
+      if (result?.mustChangePassword) {
+        setBusy(false);
+        navigate('/change-password-required', {
+          state: { currentPassword: result.currentPassword },
+          replace: true
+        });
         return;
       }
 

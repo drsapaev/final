@@ -33,7 +33,6 @@ function notify() {
     } catch (e) {
       // swallow subscriber errors so one bad subscriber doesn't break others
       // but log for debugging.
-       
       logger.error('auth subscriber error:', e);
     }
   }
@@ -53,6 +52,32 @@ export function subscribe(fn) {
     logger.error('auth subscriber initial call error:', e);
   }
   return () => subscribers.delete(fn);
+}
+
+/**
+ * Cross-tab synchronization.
+ * When another tab changes the token/profile, this tab will detect and update.
+ * This prevents the bug where user logs in as different user in another tab.
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === TOKEN_KEY || e.key === PROFILE_KEY) {
+      logger.log('[auth] Storage changed in another tab, syncing state...');
+      // Check if the user changed
+      const newState = getState();
+      const oldProfile = e.key === PROFILE_KEY && e.oldValue ? JSON.parse(e.oldValue) : null;
+      const newProfile = newState.profile;
+
+      // If user ID changed, this is a different user - force page reload
+      if (oldProfile?.id !== newProfile?.id) {
+        logger.warn('[auth] Different user detected in another tab! Reloading page.');
+        window.location.reload();
+      } else {
+        // Just notify subscribers about the change
+        notify();
+      }
+    }
+  });
 }
 
 export function getToken() {
@@ -136,7 +161,6 @@ export async function getProfile(force = false) {
     }
   } catch (err) {
     // don't throw — return local stored profile or null
-     
     logger.warn('getProfile: API call failed:', err);
   }
 

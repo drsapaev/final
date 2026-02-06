@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  CreditCard, 
-  Save, 
-  RefreshCw, 
-  Eye, 
+import {
+  Settings,
+  CreditCard,
+  Save,
+  RefreshCw,
+  Eye,
   EyeOff,
   CheckCircle,
   XCircle,
@@ -12,19 +12,20 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSInput, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
   MacOSSelect,
   MacOSCheckbox
 } from '../ui/macos';
+import tokenManager from '../../utils/tokenManager';
 
 const API_BASE = '/api/v1';
 
 const PaymentProviderSettings = () => {
   const { executeAction, loading } = useAsyncAction();
-  
+
   const [settings, setSettings] = useState({
     default_provider: 'click',
     enabled_providers: ['click', 'payme'],
@@ -45,25 +46,25 @@ const PaymentProviderSettings = () => {
       test_mode: true
     }
   });
-  
+
   const [showSecrets, setShowSecrets] = useState({
     click: false,
     payme: false
   });
-  
+
   const [testResults, setTestResults] = useState({});
-  
+
   // Загрузка настроек при монтировании
   useEffect(() => {
     loadSettings();
   }, []);
-  
+
   const loadSettings = async () => {
     await executeAction(
       async () => {
         const response = await fetch(`${API_BASE}/admin/payment-provider-settings`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
             'Content-Type': 'application/json'
           }
         });
@@ -78,24 +79,24 @@ const PaymentProviderSettings = () => {
       }
     );
   };
-  
+
   const saveSettings = async () => {
     await executeAction(
       async () => {
         const response = await fetch(`${API_BASE}/admin/payment-provider-settings`, {
           method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-            'Content-Type': 'application/json' 
+          headers: {
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(settings)
         });
-        
+
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.detail || 'Ошибка сохранения настроек');
         }
-        
+
         toast.success('Настройки сохранены успешно');
       },
       {
@@ -104,24 +105,24 @@ const PaymentProviderSettings = () => {
       }
     );
   };
-  
+
   const testProvider = async (providerName) => {
     await executeAction(
       async () => {
         const response = await fetch(`${API_BASE}/admin/test-payment-provider`, {
           method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-            'Content-Type': 'application/json' 
+          headers: {
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             provider: providerName,
             config: settings[providerName]
           })
         });
-        
+
         const result = await response.json();
-        
+
         setTestResults(prev => ({
           ...prev,
           [providerName]: {
@@ -130,7 +131,7 @@ const PaymentProviderSettings = () => {
             timestamp: new Date().toLocaleString()
           }
         }));
-        
+
         if (response.ok && result.success) {
           toast.success(`${providerName.toUpperCase()}: Тест прошёл успешно`);
         } else {
@@ -143,7 +144,7 @@ const PaymentProviderSettings = () => {
       }
     );
   };
-  
+
   const updateProviderSetting = (provider, field, value) => {
     setSettings(prev => ({
       ...prev,
@@ -153,18 +154,18 @@ const PaymentProviderSettings = () => {
       }
     }));
   };
-  
+
   const updateGeneralSetting = (field, value) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
     }));
   };
-  
+
   const toggleProviderEnabled = (provider) => {
     const newEnabled = !settings[provider].enabled;
     updateProviderSetting(provider, 'enabled', newEnabled);
-    
+
     // Обновляем список включённых провайдеров
     if (newEnabled) {
       if (!settings.enabled_providers.includes(provider)) {
@@ -172,7 +173,7 @@ const PaymentProviderSettings = () => {
       }
     } else {
       updateGeneralSetting('enabled_providers', settings.enabled_providers.filter(p => p !== provider));
-      
+
       // Если отключили провайдер по умолчанию, выбираем другой
       if (settings.default_provider === provider) {
         const remainingProviders = settings.enabled_providers.filter(p => p !== provider);
@@ -182,22 +183,22 @@ const PaymentProviderSettings = () => {
       }
     }
   };
-  
+
   const toggleShowSecret = (provider) => {
     setShowSecrets(prev => ({
       ...prev,
       [provider]: !prev[provider]
     }));
   };
-  
+
   const renderProviderConfig = (providerName, providerConfig) => {
     const testResult = testResults[providerName];
-    
+
     return (
       <MacOSCard key={providerName} style={{ padding: '20px', border: '1px solid var(--mac-border)' }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '16px',
           paddingBottom: '16px',
@@ -205,9 +206,9 @@ const PaymentProviderSettings = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <CreditCard style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>
@@ -218,22 +219,22 @@ const PaymentProviderSettings = () => {
                 checked={providerConfig.enabled}
                 onChange={() => toggleProviderEnabled(providerName)}
               />
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)' 
+              <span style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
               }}>
                 {providerConfig.enabled ? 'Включён' : 'Отключён'}
               </span>
             </div>
           </div>
-          
+
           <MacOSButton
             variant="outline"
             onClick={() => testProvider(providerName)}
             disabled={!providerConfig.enabled || loading}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '8px',
               padding: '6px 12px'
             }}
@@ -242,10 +243,10 @@ const PaymentProviderSettings = () => {
             Тест
           </MacOSButton>
         </div>
-        
+
         {testResult && (
-          <MacOSCard style={{ 
-            padding: '12px', 
+          <MacOSCard style={{
+            padding: '12px',
             marginBottom: '16px',
             backgroundColor: testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
             border: testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
@@ -256,15 +257,15 @@ const PaymentProviderSettings = () => {
               ) : (
                 <XCircle style={{ width: '16px', height: '16px', color: 'var(--mac-error)' }} />
               )}
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
+              <span style={{
+                fontSize: 'var(--mac-font-size-sm)',
                 color: testResult.success ? 'var(--mac-success)' : 'var(--mac-error)',
                 fontWeight: 'var(--mac-font-weight-medium)'
               }}>
                 {testResult.message}
               </span>
-              <small style={{ 
-                fontSize: 'var(--mac-font-size-xs)', 
+              <small style={{
+                fontSize: 'var(--mac-font-size-xs)',
                 color: 'var(--mac-text-tertiary)',
                 marginLeft: 'auto'
               }}>
@@ -273,7 +274,7 @@ const PaymentProviderSettings = () => {
             </div>
           </MacOSCard>
         )}
-        
+
         {providerConfig.enabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -281,23 +282,23 @@ const PaymentProviderSettings = () => {
                 checked={providerConfig.test_mode}
                 onChange={(checked) => updateProviderSetting(providerName, 'test_mode', checked)}
               />
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-primary)' 
+              <span style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
               }}>
                 Тестовый режим
               </span>
             </div>
-            
+
             {providerName === 'click' && (
               <>
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Service ID
                   </label>
@@ -309,14 +310,14 @@ const PaymentProviderSettings = () => {
                     style={{ width: '100%' }}
                   />
                 </div>
-                
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Merchant ID
                   </label>
@@ -328,14 +329,14 @@ const PaymentProviderSettings = () => {
                     style={{ width: '100%' }}
                   />
                 </div>
-                
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Secret Key
                   </label>
@@ -351,7 +352,7 @@ const PaymentProviderSettings = () => {
                       type="button"
                       variant="outline"
                       onClick={() => toggleShowSecret('click')}
-                      style={{ 
+                      style={{
                         position: 'absolute',
                         right: '8px',
                         top: '50%',
@@ -370,14 +371,14 @@ const PaymentProviderSettings = () => {
                     </MacOSButton>
                   </div>
                 </div>
-                
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Base URL
                   </label>
@@ -391,16 +392,16 @@ const PaymentProviderSettings = () => {
                 </div>
               </>
             )}
-            
+
             {providerName === 'payme' && (
               <>
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Merchant ID
                   </label>
@@ -412,14 +413,14 @@ const PaymentProviderSettings = () => {
                     style={{ width: '100%' }}
                   />
                 </div>
-                
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Secret Key
                   </label>
@@ -435,7 +436,7 @@ const PaymentProviderSettings = () => {
                       type="button"
                       variant="outline"
                       onClick={() => toggleShowSecret('payme')}
-                      style={{ 
+                      style={{
                         position: 'absolute',
                         right: '8px',
                         top: '50%',
@@ -454,14 +455,14 @@ const PaymentProviderSettings = () => {
                     </MacOSButton>
                   </div>
                 </div>
-                
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Base URL
                   </label>
@@ -473,14 +474,14 @@ const PaymentProviderSettings = () => {
                     style={{ width: '100%' }}
                   />
                 </div>
-                
+
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     API URL
                   </label>
@@ -499,18 +500,18 @@ const PaymentProviderSettings = () => {
       </MacOSCard>
     );
   };
-  
+
   return (
-    <div style={{ 
+    <div style={{
       padding: 0,
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
       <MacOSCard style={{ padding: '24px' }}>
         {/* Заголовок */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '24px',
           paddingBottom: '24px',
@@ -518,22 +519,22 @@ const PaymentProviderSettings = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
-            <h2 style={{ 
-              fontSize: 'var(--mac-font-size-2xl)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h2 style={{
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>
               Настройки платежных провайдеров
             </h2>
           </div>
-          
+
           <MacOSButton
             onClick={saveSettings}
             disabled={loading}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '8px',
               backgroundColor: 'var(--mac-accent-blue)',
               border: 'none',
@@ -544,27 +545,27 @@ const PaymentProviderSettings = () => {
             Сохранить
           </MacOSButton>
         </div>
-      
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Общие настройки */}
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '16px' 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '16px'
             }}>
               Общие настройки
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
-                  marginBottom: '8px' 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
                 }}>
                   Провайдер по умолчанию
                 </label>
@@ -578,32 +579,32 @@ const PaymentProviderSettings = () => {
                   style={{ width: '100%' }}
                 />
               </div>
-              
-              <MacOSCard style={{ 
-                padding: '16px', 
-                backgroundColor: 'var(--mac-warning-bg)', 
-                border: '1px solid var(--mac-warning-border)' 
+
+              <MacOSCard style={{
+                padding: '16px',
+                backgroundColor: 'var(--mac-warning-bg)',
+                border: '1px solid var(--mac-warning-border)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <AlertTriangle style={{ 
-                    width: '20px', 
-                    height: '20px', 
-                    color: 'var(--mac-warning)', 
+                  <AlertTriangle style={{
+                    width: '20px',
+                    height: '20px',
+                    color: 'var(--mac-warning)',
                     marginTop: '2px',
                     flexShrink: 0
                   }} />
                   <div>
-                    <p style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      color: 'var(--mac-warning)', 
-                      margin: '0 0 8px 0' 
+                    <p style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: 'var(--mac-font-weight-medium)',
+                      color: 'var(--mac-warning)',
+                      margin: '0 0 8px 0'
                     }}>
                       <strong>Важно:</strong>
                     </p>
-                    <ul style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-warning)', 
+                    <ul style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-warning)',
                       margin: 0,
                       paddingLeft: '16px'
                     }}>
@@ -617,18 +618,18 @@ const PaymentProviderSettings = () => {
               </MacOSCard>
             </div>
           </MacOSCard>
-        
+
           {/* Настройки провайдеров */}
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '16px' 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '16px'
             }}>
               Конфигурация провайдеров
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {Object.entries(settings).map(([key, value]) => {
                 if (key === 'click' || key === 'payme') {

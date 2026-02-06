@@ -6,6 +6,7 @@ const MacOSBadge = ({
   size = 'md',
   className = '',
   style = {},
+  outline, // Destructure to prevent passing boolean to DOM
   ...props
 }) => {
   // Размеры бейджей

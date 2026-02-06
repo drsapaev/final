@@ -7,6 +7,7 @@ import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import PhoneVerification from '../components/auth/PhoneVerification';
 
 import logger from '../utils/logger';
+import NotificationSystemStatus from '../components/settings/NotificationSystemStatus.jsx';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
@@ -29,8 +30,8 @@ function Row({ k, v, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{k}</div>
-      <input value={val} onChange={(e)=>setVal(e.target.value)} style={inp} />
-      <button onClick={()=>onSave(k, val)} style={btn}>Сохранить</button>
+      <input value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
+      <button onClick={() => onSave(k, val)} style={btn}>Сохранить</button>
     </div>
   );
 }
@@ -176,7 +177,7 @@ export default function Settings() {
       setCat(c);
       loadCat(c);
     }
-     
+
   }, [tab]);
 
   const licenseOk = !!status?.ok;
@@ -201,13 +202,23 @@ export default function Settings() {
           <h2 style={{ margin: 0 }}>Настройки</h2>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <TabButton active={tab==='license'} onClick={()=>setTab('license')}>Лицензия</TabButton>
-            <TabButton active={tab==='printer'} onClick={()=>setTab('printer')}>Принтер</TabButton>
-            <TabButton active={tab==='online_queue'} onClick={()=>setTab('online_queue')}>Онлайн-очередь</TabButton>
-            <TabButton active={tab==='display_board'} onClick={()=>setTab('display_board')}>Табло очереди</TabButton>
-            <TabButton active={tab==='payment_providers'} onClick={()=>setTab('payment_providers')}>Провайдеры оплаты</TabButton>
-            <TabButton active={tab==='security'} onClick={()=>setTab('security')}>Безопасность</TabButton>
+            <TabButton active={tab === 'license'} onClick={() => setTab('license')}>Лицензия</TabButton>
+            <TabButton active={tab === 'printer'} onClick={() => setTab('printer')}>Принтер</TabButton>
+            <TabButton active={tab === 'online_queue'} onClick={() => setTab('online_queue')}>Онлайн-очередь</TabButton>
+            <TabButton active={tab === 'display_board'} onClick={() => setTab('display_board')}>Табло очереди</TabButton>
+            <TabButton active={tab === 'payment_providers'} onClick={() => setTab('payment_providers')}>Провайдеры оплаты</TabButton>
+            <TabButton active={tab === 'notifications'} onClick={() => setTab('notifications')}>Уведомления (System)</TabButton>
+            <TabButton active={tab === 'security'} onClick={() => setTab('security')}>Безопасность</TabButton>
           </div>
+
+          {tab === 'notifications' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={card}>
+                <div style={{ fontWeight: 700, marginBottom: 12 }}>Статус системы уведомлений</div>
+                <NotificationSystemStatus />
+              </div>
+            </div>
+          )}
 
           {tab === 'license' && (
             <div style={{ display: 'grid', gap: 12 }}>
@@ -228,7 +239,7 @@ export default function Settings() {
                   <input
                     placeholder="Вставьте ключ активации"
                     value={key}
-                    onChange={(e)=>setKey(e.target.value)}
+                    onChange={(e) => setKey(e.target.value)}
                     style={{ ...inp, minWidth: 320 }}
                   />
                   <button onClick={doActivate} disabled={busyAct || !key.trim()} style={btnPrimary}>
@@ -271,83 +282,83 @@ export default function Settings() {
                   <div style={card}>
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: бренд и объявления</div>
                     <div style={{ display: 'grid', gap: 8 }}>
-                      <KVField label="Бренд (brand)" defKey="brand" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Логотип (logo URL)" defKey="logo" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Объявление RU (announcement_ru)" defKey="announcement_ru" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Объявление UZ (announcement_uz)" defKey="announcement_uz" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Объявление EN (announcement_en)" defKey="announcement_en" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Основной цвет (primary_color)" defKey="primary_color" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Цвет фона (bg_color)" defKey="bg_color" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Цвет текста (text_color)" defKey="text_color" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Контраст по умолчанию (contrast_default=true/false)" defKey="contrast_default" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Киоск по умолчанию (kiosk_default=true/false)" defKey="kiosk_default" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
-                      <KVField label="Звук по умолчанию (sound_default=true/false)" defKey="sound_default" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Бренд (brand)" defKey="brand" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Логотип (logo URL)" defKey="logo" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Объявление RU (announcement_ru)" defKey="announcement_ru" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Объявление UZ (announcement_uz)" defKey="announcement_uz" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Объявление EN (announcement_en)" defKey="announcement_en" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Основной цвет (primary_color)" defKey="primary_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Цвет фона (bg_color)" defKey="bg_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Цвет текста (text_color)" defKey="text_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Контраст по умолчанию (contrast_default=true/false)" defKey="contrast_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Киоск по умолчанию (kiosk_default=true/false)" defKey="kiosk_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label="Звук по умолчанию (sound_default=true/false)" defKey="sound_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                     </div>
                   </div>
 
                   <div style={card}>
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: мэппинг Роль → Отделение</div>
-                    <RoleMapEditor items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                    <RoleMapEditor items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                   </div>
                 </>
               )}
 
-          {tab === 'payment_providers' && (
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={card}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontWeight: 700 }}>Провайдеры оплаты</div>
-                  <button 
-                    onClick={() => setShowAddProvider(true)}
-                    style={{
-                      padding: '8px 16px',
-                      background: 'var(--accent-color)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 6,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    + Добавить провайдера
-                  </button>
-                </div>
+              {tab === 'payment_providers' && (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <div style={card}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontWeight: 700 }}>Провайдеры оплаты</div>
+                      <button
+                        onClick={() => setShowAddProvider(true)}
+                        style={{
+                          padding: '8px 16px',
+                          background: 'var(--accent-color)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 6,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        + Добавить провайдера
+                      </button>
+                    </div>
 
-                {loadingProviders ? (
-                  <div style={{ opacity: 0.7 }}>Загрузка...</div>
-                ) : (
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {providers.map((provider) => (
-                      <ProviderCard
-                        key={provider.id}
-                        provider={provider}
-                        onEdit={() => setEditingProvider(provider)}
-                        onDelete={() => deleteProvider(provider.id)}
-                      />
-                    ))}
-                    {providers.length === 0 && (
-                      <div style={{ opacity: 0.7 }}>Провайдеры не найдены</div>
+                    {loadingProviders ? (
+                      <div style={{ opacity: 0.7 }}>Загрузка...</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {providers.map((provider) => (
+                          <ProviderCard
+                            key={provider.id}
+                            provider={provider}
+                            onEdit={() => setEditingProvider(provider)}
+                            onDelete={() => deleteProvider(provider.id)}
+                          />
+                        ))}
+                        {providers.length === 0 && (
+                          <div style={{ opacity: 0.7 }}>Провайдеры не найдены</div>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
 
-          {showAddProvider && (
-            <ProviderModal
-              onClose={() => setShowAddProvider(false)}
-              onSave={createProvider}
-              title="Добавить провайдера"
-            />
-          )}
+              {showAddProvider && (
+                <ProviderModal
+                  onClose={() => setShowAddProvider(false)}
+                  onSave={createProvider}
+                  title="Добавить провайдера"
+                />
+              )}
 
-          {editingProvider && (
-            <ProviderModal
-              provider={editingProvider}
-              onClose={() => setEditingProvider(null)}
-              onSave={(data) => updateProvider(editingProvider.id, data)}
-              title="Редактировать провайдера"
-            />
+              {editingProvider && (
+                <ProviderModal
+                  provider={editingProvider}
+                  onClose={() => setEditingProvider(null)}
+                  onSave={(data) => updateProvider(editingProvider.id, data)}
+                  title="Редактировать провайдера"
+                />
               )}
             </div>
           )}
@@ -640,52 +651,52 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 }
 
 // Стили с использованием CSS переменных
-const card = { 
-  border: '1px solid var(--border-color)', 
-  borderRadius: 12, 
-  padding: 12, 
+const card = {
+  border: '1px solid var(--border-color)',
+  borderRadius: 12,
+  padding: 12,
   background: 'var(--bg-primary)',
   boxShadow: 'var(--shadow-sm)'
 };
 
-const row = { 
-  display: 'grid', 
-  gridTemplateColumns: '1fr 2fr auto', 
-  gap: 8, 
-  alignItems: 'center' 
+const row = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 2fr auto',
+  gap: 8,
+  alignItems: 'center'
 };
 
-const inp = { 
-  padding: '6px 10px', 
-  border: '1px solid var(--border-color)', 
-  borderRadius: 8, 
+const inp = {
+  padding: '6px 10px',
+  border: '1px solid var(--border-color)',
+  borderRadius: 8,
   background: 'var(--bg-primary)',
   color: 'var(--text-primary)'
 };
 
-const btn = { 
-  padding: '6px 10px', 
-  borderRadius: 8, 
-  border: '1px solid var(--border-color)', 
-  background: 'var(--bg-secondary)', 
+const btn = {
+  padding: '6px 10px',
+  borderRadius: 8,
+  border: '1px solid var(--border-color)',
+  background: 'var(--bg-secondary)',
   color: 'var(--text-primary)',
   cursor: 'pointer',
   transition: 'all 0.2s ease'
 };
 
-const btnPrimary = { 
-  ...btn, 
-  borderColor: 'var(--accent-color)', 
-  background: 'var(--accent-color)', 
-  color: 'white' 
+const btnPrimary = {
+  ...btn,
+  borderColor: 'var(--accent-color)',
+  background: 'var(--accent-color)',
+  color: 'white'
 };
 
-const errBox = { 
-  color: 'var(--danger-color)', 
-  background: 'rgba(239, 68, 68, 0.1)', 
-  border: '1px solid var(--danger-color)', 
-  borderRadius: 8, 
-  padding: 8 
+const errBox = {
+  color: 'var(--danger-color)',
+  background: 'rgba(239, 68, 68, 0.1)',
+  border: '1px solid var(--danger-color)',
+  borderRadius: 8,
+  padding: 8
 };
 
 function KVField({ label, defKey, items, onSave }) {
@@ -695,8 +706,8 @@ function KVField({ label, defKey, items, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{label}</div>
-      <input value={val} onChange={(e)=>setVal(e.target.value)} style={inp} />
-      <button onClick={()=>onSave(defKey, val)} style={btn}>Сохранить</button>
+      <input value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
+      <button onClick={() => onSave(defKey, val)} style={btn}>Сохранить</button>
     </div>
   );
 }
@@ -706,15 +717,15 @@ function RoleMapItem({ role, items, onSave }) {
   const found = (items || []).find((x) => x.key === role);
   const [val, setVal] = useState(found?.value || '');
   useEffect(() => setVal(found?.value || ''), [found?.value]);
-  
+
   return (
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{role}</div>
-      <input 
-        value={val} 
-        onChange={(e) => setVal(e.target.value)} 
-        style={inp} 
-        placeholder="Например: Cardio" 
+      <input
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        style={inp}
+        placeholder="Например: Cardio"
       />
       <button onClick={() => onSave(role, val)} style={btn}>
         Сохранить
@@ -724,15 +735,15 @@ function RoleMapItem({ role, items, onSave }) {
 }
 
 function RoleMapEditor({ items, onSave }) {
-  const roles = ['admin','registrar','doctor','cardio','derma','dentist','lab','procedures','cashier','patient'];
+  const roles = ['admin', 'registrar', 'doctor', 'cardio', 'derma', 'dentist', 'lab', 'procedures', 'cashier', 'patient'];
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {roles.map((r) => (
-        <RoleMapItem 
-          key={r} 
-          role={r} 
-          items={items} 
-          onSave={onSave} 
+        <RoleMapItem
+          key={r}
+          role={r}
+          items={items}
+          onSave={onSave}
         />
       ))}
     </div>

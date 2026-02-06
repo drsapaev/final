@@ -5,12 +5,13 @@
 import { useState } from 'react';
 
 import logger from '../utils/logger';
+import { tokenManager } from '../utils/tokenManager';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 /**
- * Получить токен авторизации
+ * Получить токен авторизации (через централизованный tokenManager)
  */
-const getAuthToken = () => localStorage.getItem('access_token');
+const getAuthToken = () => tokenManager.getAccessToken();
 
 /**
  * Создать заголовки для API запросов
@@ -27,11 +28,11 @@ export const getQueueStatus = async (queueId) => {
   const response = await fetch(`${API_BASE}/queue/status/${queueId}`, {
     headers: createHeaders()
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to get queue status: ${response.statusText}`);
   }
-  
+
   return response.json();
 };
 
@@ -46,11 +47,11 @@ export const getQueueStatusBySpecialist = async (specialistId, day = null) => {
       headers: createHeaders()
     }
   );
-  
+
   if (!response.ok) {
     throw new Error(`Failed to get queue status by specialist: ${response.statusText}`);
   }
-  
+
   return response.json();
 };
 
@@ -66,11 +67,11 @@ export const moveQueueEntry = async (entryId, newPosition) => {
       new_position: newPosition
     })
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to move queue entry: ${response.statusText}`);
   }
-  
+
   return response.json();
 };
 
@@ -86,11 +87,11 @@ export const reorderQueue = async (queueId, entryOrders) => {
       entry_orders: entryOrders
     })
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to reorder queue: ${response.statusText}`);
   }
-  
+
   return response.json();
 };
 
@@ -101,7 +102,7 @@ export const formatQueueData = (serverQueue) => {
   if (!serverQueue || !serverQueue.entries) {
     return [];
   }
-  
+
   return serverQueue.entries.map(entry => ({
     id: entry.id,
     number: entry.number,
@@ -126,10 +127,10 @@ export const useQueueManager = (specialistId) => {
 
   const loadQueue = async () => {
     if (!specialistId) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const queueData = await getQueueStatusBySpecialist(specialistId);
       setQueueId(queueData.queue_id);
@@ -159,7 +160,7 @@ export const useQueueManager = (specialistId) => {
     if (!queueId) {
       throw new Error('Queue ID not available');
     }
-    
+
     try {
       const result = await reorderQueue(queueId, entryOrders);
       if (result.success && result.queue_info) {

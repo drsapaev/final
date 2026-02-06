@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Printer, 
-  Settings, 
-  Eye, 
+import {
+  X,
+  Printer,
+  Settings,
+  Eye,
   Download,
   AlertCircle,
   CheckCircle,
   RefreshCw
 } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
-
+import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import { createMarkup } from '../../utils/sanitizer';
 /**
@@ -42,13 +42,13 @@ const PrintDialog = ({
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/v1/print/printers`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
       if (response.ok) {
         const data = await response.json();
         setPrinters(data.printers);
-        
+
         // Выбираем принтер по умолчанию
         const defaultPrinter = data.printers.find(p => p.is_default);
         if (defaultPrinter) {
@@ -68,12 +68,12 @@ const PrintDialog = ({
 
     try {
       setLoading(true);
-      
+
       // Получаем шаблон для предварительного просмотра
       const response = await fetch(`${API_BASE}/api/v1/print/templates/preview`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -118,7 +118,7 @@ const PrintDialog = ({
     };
 
     const config = statusConfig[status.status] || { variant: 'default', label: status.status };
-    
+
     return (
       <Badge variant={config.variant} size="sm">
         {config.label}
@@ -202,7 +202,7 @@ const PrintDialog = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Принтер:
               </label>
-              
+
               {loading && printers.length === 0 ? (
                 <div className="flex items-center text-gray-500">
                   <RefreshCw size={16} className="animate-spin mr-2" />
@@ -213,11 +213,10 @@ const PrintDialog = ({
                   {printers.map(printer => (
                     <div
                       key={printer.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedPrinter?.id === printer.id
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedPrinter?.id === printer.id
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
-                      }`}
+                        }`}
                       onClick={() => setSelectedPrinter(printer)}
                     >
                       <div className="flex items-center justify-between">
@@ -277,7 +276,7 @@ const PrintDialog = ({
           {/* Правая панель - предварительный просмотр */}
           <div className="lg:w-2/3 p-6">
             <h3 className="text-lg font-medium mb-4">Предварительный просмотр</h3>
-            
+
             <div className="border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 h-full min-h-[400px] overflow-auto">
               {preview ? (
                 <div className="p-4">
@@ -298,7 +297,7 @@ const PrintDialog = ({
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
                     <Eye size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>Нажмите "Предварительный просмотр"<br/>для отображения документа</p>
+                    <p>Нажмите "Предварительный просмотр"<br />для отображения документа</p>
                   </div>
                 </div>
               )}
@@ -313,7 +312,7 @@ const PrintDialog = ({
               <>Выбран: {selectedPrinter.display_name} ({selectedPrinter.printer_type})</>
             )}
           </div>
-          
+
           <div className="flex space-x-3">
             <Button variant="outline" onClick={onClose}>
               Отменить

@@ -36,36 +36,44 @@ const QueueJoin = () => {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(null);
 
-  // Загрузка списка доступных специалистов
+  // ⭐ SSOT: Загрузка списка доступных специалистов из QueueProfiles (Admin Panel controlled)
   useEffect(() => {
     const loadSpecialists = async () => {
       try {
-        // Используем относительный путь для проксирования через Vite
-        const response = await fetch('/api/v1/queue/available-specialists');
+        // ⭐ NEW: Используем публичный endpoint из QueueProfiles (SSOT)
+        // Управляется из Admin Panel -> Вкладки регистратуры -> "Показывать на QR-странице"
+        const response = await fetch('/api/v1/queues/profiles/public');
         if (response.ok) {
           const data = await response.json();
-          // ✅ Фильтруем специалистов: исключаем 'ecg' и 'general'
-          const filteredSpecialists = (data.specialists || []).filter(specialist => {
-            const specialty = (specialist.specialty || '').toLowerCase();
-            return specialty !== 'ecg' && specialty !== 'general';
-          });
-          setAvailableSpecialists(filteredSpecialists);
+          // API возвращает specialists уже отфильтрованные по show_on_qr_page
+          setAvailableSpecialists(data.specialists || []);
         } else {
-          // Fallback на статический список
-          setAvailableSpecialists([
-            { id: 1, specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-            { id: 2, specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
-            { id: 3, specialty_display: 'Стоматолог', icon: '🦷', color: '#007AFF' },
-            { id: 4, specialty_display: 'Лаборатория', icon: '🔬', color: '#34C759' }
-          ]);
+          // Fallback: try old endpoint
+          const fallbackResponse = await fetch('/api/v1/queue/available-specialists');
+          if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json();
+            const filteredSpecialists = (data.specialists || []).filter(specialist => {
+              const specialty = (specialist.specialty || '').toLowerCase();
+              return specialty !== 'ecg' && specialty !== 'general';
+            });
+            setAvailableSpecialists(filteredSpecialists);
+          } else {
+            // Fallback на статический список
+            setAvailableSpecialists([
+              { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
+              { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
+              { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: '#007AFF' },
+              { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: '#34C759' }
+            ]);
+          }
         }
       } catch {
         // Fallback на статический список
         setAvailableSpecialists([
-          { id: 1, specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-          { id: 2, specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
-          { id: 3, specialty_display: 'Стоматолог', icon: '🦷', color: '#007AFF' },
-          { id: 4, specialty_display: 'Лаборатория', icon: '🔬', color: '#34C759' }
+          { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
+          { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
+          { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: '#007AFF' },
+          { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: '#34C759' }
         ]);
       }
     };
@@ -258,7 +266,7 @@ const QueueJoin = () => {
       // ✅ ИСПРАВЛЕНО: Валидация узбекского номера (998 + 9 цифр = 12 цифр)
       const cleanPhone = trimmedPhone.replace(/\D/g, '');
       let normalizedPhone = cleanPhone;
-      
+
       if (normalizedPhone.startsWith('8')) {
         normalizedPhone = '998' + normalizedPhone.slice(1);
       }
@@ -269,7 +277,7 @@ const QueueJoin = () => {
           normalizedPhone = '998' + normalizedPhone;
         }
       }
-      
+
       // Узбекский номер должен быть 12 цифр (998 + 9 цифр)
       if (normalizedPhone.length < 12) {
         setError('Телефон рақами тўлиқ эмас (камда 12 та рақам: +998 XX XXX XX XX)');
@@ -419,13 +427,13 @@ const QueueJoin = () => {
   const formatUzbekPhone = (value) => {
     // Удаляем все нецифровые символы
     const numbers = value.replace(/\D/g, '');
-    
+
     // Если начинается с 8, заменяем на 998
     let cleanNumber = numbers;
     if (cleanNumber.startsWith('8')) {
       cleanNumber = '998' + cleanNumber.slice(1);
     }
-    
+
     // Если не начинается с 998, добавляем 998
     if (!cleanNumber.startsWith('998') && cleanNumber.length > 0) {
       // Если начинается с 9 (без кода страны), добавляем 998
@@ -435,10 +443,10 @@ const QueueJoin = () => {
         cleanNumber = '998' + cleanNumber;
       }
     }
-    
+
     // Ограничиваем до 12 цифр (998 + 9 цифр)
     cleanNumber = cleanNumber.slice(0, 12);
-    
+
     // Форматируем в маску +998 XX XXX XX XX
     if (cleanNumber.length === 0) return '';
     if (cleanNumber.length <= 3) return `+${cleanNumber}`;
@@ -452,7 +460,7 @@ const QueueJoin = () => {
   const handlePhoneChange = (e) => {
     const input = e.target.value;
     const formatted = formatUzbekPhone(input);
-    
+
     // Обновляем состояние с отформатированным значением для отображения
     setFormData(prev => ({
       ...prev,
@@ -1374,14 +1382,14 @@ const QueueJoin = () => {
                     onKeyDown={(e) => {
                       // Разрешаем: цифры, Backspace, Delete, стрелки, Tab, Enter
                       const allowedKeys = [
-                        'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 
+                        'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight',
                         'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End'
                       ];
-                      
+
                       if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
                         return;
                       }
-                      
+
                       // Разрешаем только цифры и + в начале
                       if (!/\d/.test(e.key) && !(e.key === '+' && e.target.selectionStart === 0)) {
                         e.preventDefault();

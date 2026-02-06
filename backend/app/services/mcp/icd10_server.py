@@ -227,57 +227,36 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 symptoms=symptoms, diagnosis=diagnosis, provider_type=provider_type
             )
 
-            # Проверяем, получили ли мы детальные клинические рекомендации
-            if (
-                suggestions
-                and len(suggestions) > 0
-                and "clinical_recommendations" in suggestions[0]
-            ):
-                # Новый формат: детальные клинические рекомендации
-                return {
-                    "status": "success",
-                    "clinical_recommendations": suggestions[0][
-                        "clinical_recommendations"
-                    ],
-                    "metadata": {
-                        "symptoms_count": len(symptoms),
-                        "has_diagnosis": diagnosis is not None,
-                        "specialty": specialty,
-                        "provider_used": provider or "default",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "format": "detailed_clinical",
-                    },
-                }
-            else:
-                # Старый формат: список кодов
-                # Добавляем релевантные коды из кеша
-                relevant_codes = self._find_relevant_cached_codes(
-                    symptoms, diagnosis, specialty
-                )
+            # Теперь provider возвращает структурированный JSON: [{code, label, confidence}]
+            # Добавляем релевантные коды из кеша
+            relevant_codes = self._find_relevant_cached_codes(
+                symptoms, diagnosis, specialty
+            )
 
-                # Объединяем результаты
-                all_suggestions = suggestions[:max_suggestions]
+            # Объединяем результаты AI + кеш
+            all_suggestions = list(suggestions[:max_suggestions]) if suggestions else []
 
-                # Добавляем кешированные коды если есть место
-                for code in relevant_codes:
-                    if len(all_suggestions) < max_suggestions:
-                        if not any(
-                            s.get("code") == code["code"] for s in all_suggestions
-                        ):
-                            all_suggestions.append(code)
+            # Добавляем кешированные коды если есть место
+            for code in relevant_codes:
+                if len(all_suggestions) < max_suggestions:
+                    if not any(
+                        s.get("code") == code["code"] for s in all_suggestions
+                    ):
+                        all_suggestions.append(code)
 
-                return {
-                    "status": "success",
-                    "suggestions": all_suggestions,
-                    "metadata": {
-                        "symptoms_count": len(symptoms),
-                        "has_diagnosis": diagnosis is not None,
-                        "specialty": specialty,
-                        "provider_used": provider or "default",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "format": "code_list",
-                    },
-                }
+            return {
+                "status": "success",
+                "suggestions": all_suggestions,
+                "metadata": {
+                    "symptoms_count": len(symptoms),
+                    "has_diagnosis": diagnosis is not None,
+                    "specialty": specialty,
+                    "provider_used": provider or "default",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "ai_count": len(suggestions) if suggestions else 0,
+                    "cache_count": len(relevant_codes),
+                },
+            }
 
         except Exception as e:
             logger.error(f"Error suggesting ICD-10 codes: {str(e)}")

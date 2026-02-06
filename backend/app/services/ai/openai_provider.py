@@ -11,8 +11,12 @@ import openai
 from openai import AsyncOpenAI
 
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
+from ...core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Используем таймаут из конфигурации (без magic numbers!)
+_PROVIDER_TIMEOUT = float(getattr(settings, "AI_PROVIDER_TIMEOUT", 180))
 
 
 class OpenAIProvider(BaseAIProvider):
@@ -20,7 +24,7 @@ class OpenAIProvider(BaseAIProvider):
 
     def __init__(self, api_key: str, model: Optional[str] = None):
         super().__init__(api_key, model)
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key, timeout=_PROVIDER_TIMEOUT)
 
     def get_default_model(self) -> str:
         return "gpt-4-turbo-preview"

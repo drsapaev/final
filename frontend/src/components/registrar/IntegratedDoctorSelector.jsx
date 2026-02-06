@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Heart, 
-  Stethoscope, 
-  Scissors, 
+import {
+  Heart,
+  Stethoscope,
+  Scissors,
   User,
   Calendar,
   Clock,
@@ -12,14 +12,14 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Card, Badge } from '../ui/native';
-
+import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
  * Интегрированный селектор врачей для регистратуры
  * Использует данные врачей и расписаний из админ панели
  */
-const IntegratedDoctorSelector = ({ 
-  selectedDoctorId = null, 
+const IntegratedDoctorSelector = ({
+  selectedDoctorId = null,
   onDoctorChange,
   specialty = null,
   showSchedule = true,
@@ -61,7 +61,7 @@ const IntegratedDoctorSelector = ({
       setError('');
 
       // Загружаем врачей и настройки очередей
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       const [doctorsRes, queueRes] = await Promise.all([
         fetch('/api/v1/registrar/doctors', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -106,7 +106,7 @@ const IntegratedDoctorSelector = ({
   const getQueueInfo = (doctor) => {
     const specialty = doctor.specialty;
     const specialtySettings = queueSettings.specialties?.[specialty];
-    
+
     if (!specialtySettings) return null;
 
     return {
@@ -164,11 +164,10 @@ const IntegratedDoctorSelector = ({
         return (
           <Card
             key={doctor.id}
-            className={`p-4 cursor-pointer transition-all ${
-              isSelected
+            className={`p-4 cursor-pointer transition-all ${isSelected
                 ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20'
                 : 'hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
+              }`}
             onClick={() => handleDoctorSelect(doctor)}
           >
             <div className="flex items-start justify-between">
@@ -176,7 +175,7 @@ const IntegratedDoctorSelector = ({
                 <div className="flex-shrink-0">
                   <SpecialtyIcon size={24} className={iconColor} />
                 </div>
-                
+
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
                     <h4 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -186,7 +185,7 @@ const IntegratedDoctorSelector = ({
                       <CheckCircle size={20} className="text-blue-600" />
                     )}
                   </div>
-                  
+
                   <div className="space-y-1">
                     <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                       <Badge variant="outline" className="mr-2">
@@ -199,13 +198,13 @@ const IntegratedDoctorSelector = ({
                         </>
                       )}
                     </div>
-                    
+
                     {doctor.price_default > 0 && (
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         Базовая цена: {doctor.price_default.toLocaleString()} UZS
                       </div>
                     )}
-                    
+
                     {/* Информация об очереди */}
                     {queueInfo && (
                       <div className="text-sm text-blue-600 dark:text-blue-400">
@@ -229,15 +228,14 @@ const IntegratedDoctorSelector = ({
                 <div className="grid grid-cols-7 gap-1">
                   {weekdayNames.map((dayName, dayIndex) => {
                     const daySchedule = workingDays.find(s => s.weekday === dayIndex);
-                    
+
                     return (
                       <div
                         key={dayIndex}
-                        className={`text-center p-1 rounded text-xs ${
-                          daySchedule
+                        className={`text-center p-1 rounded text-xs ${daySchedule
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                             : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
-                        }`}
+                          }`}
                       >
                         <div className="font-medium">{dayName}</div>
                         {daySchedule && (

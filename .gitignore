@@ -54,3 +54,6 @@ backend/.secret_key
 # Test logs
 pytest_*.txt
 *_log*.txt
+*.db
+*.sqlite
+clinic.db

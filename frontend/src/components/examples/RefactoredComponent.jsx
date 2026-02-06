@@ -17,6 +17,7 @@ import { usePatients, useApiCall, useFormSubmit } from '../hooks/useApi';
 import { validators, validateForm } from '../utils/errorHandler';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 // ❌ СТАРЫЙ ПОДХОД - НЕ ИСПОЛЬЗУЙТЕ
 function OldPatientComponent() {
   const [patients, setPatients] = useState([]);
@@ -25,7 +26,7 @@ function OldPatientComponent() {
 
   // Дублирование логики авторизации
   const authHeader = () => ({
-    Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`,
+    Authorization: `Bearer ${tokenManager.getAccessToken() || ''}`,
   });
 
   // Ручная обработка загрузки
@@ -35,7 +36,7 @@ function OldPatientComponent() {
       const response = await fetch('/api/v1/patients?department=Cardio&limit=100', {
         headers: authHeader(),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setPatients(Array.isArray(data) ? data : []);
@@ -85,11 +86,11 @@ function OldPatientComponent() {
 // ✅ НОВЫЙ ПОДХОД - ИСПОЛЬЗУЙТЕ
 function NewPatientComponent() {
   // Автоматическая загрузка пациентов с обработкой ошибок
-  const { 
-    data: patients, 
-    loading: patientsLoading, 
-    error: patientsError, 
-    refresh: refreshPatients 
+  const {
+    data: patients,
+    loading: patientsLoading,
+    error: patientsError,
+    refresh: refreshPatients
   } = usePatients('Cardio');
 
   // Хук для отправки форм с валидацией
@@ -152,7 +153,7 @@ function NewPatientComponent() {
   return (
     <div className="patient-component">
       <h2>Пациенты кардиологии</h2>
-      
+
       {/* Форма создания пациента */}
       <form onSubmit={handleSubmit} className="patient-form">
         <input
@@ -162,7 +163,7 @@ function NewPatientComponent() {
           onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
           disabled={submitting}
         />
-        
+
         <input
           type="tel"
           placeholder="Телефон"
@@ -170,7 +171,7 @@ function NewPatientComponent() {
           onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
           disabled={submitting}
         />
-        
+
         <input
           type="email"
           placeholder="Email"
@@ -178,14 +179,14 @@ function NewPatientComponent() {
           onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
           disabled={submitting}
         />
-        
+
         <input
           type="date"
           value={formData.birth_date}
           onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))}
           disabled={submitting}
         />
-        
+
         <button type="submit" disabled={submitting}>
           {submitting ? 'Создание...' : 'Создать пациента'}
         </button>
@@ -194,14 +195,14 @@ function NewPatientComponent() {
       {/* Список пациентов */}
       <div className="patients-list">
         {patientsLoading && <div>Загрузка пациентов...</div>}
-        
+
         {patientsError && (
           <div className="error">
             Ошибка загрузки: {patientsError}
             <button onClick={refreshPatients}>Повторить</button>
           </div>
         )}
-        
+
         {patients && patients.length > 0 ? (
           <ul>
             {patients.map(patient => (
@@ -239,15 +240,15 @@ function RealtimeQueueComponent() {
       <div className="connection-status">
         Статус: {connected ? '🟢 Подключен' : '🔴 Отключен'}
       </div>
-      
+
       {lastMessage && (
         <div className="last-message">
           <h3>Последнее обновление:</h3>
           <pre>{JSON.stringify(lastMessage, null, 2)}</pre>
         </div>
       )}
-      
-      <button 
+
+      <button
         onClick={() => sendMessage({ type: 'request_update' })}
         disabled={!connected}
       >

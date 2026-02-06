@@ -20,8 +20,125 @@ const api = axios.create({
   // Optionally timeout: timeout: 15000,
 });
 
+// ✅ SECURITY: Check if token is expiring soon (within 5 minutes)
+function isTokenExpiringSoon(token) {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1]));
+    if (!payload.exp) return false;
+    const expiresAt = payload.exp * 1000;
+    const fiveMinutes = 5 * 60 * 1000;
+    return Date.now() > (expiresAt - fiveMinutes);
+  } catch {
+    return false;
+  }
+}
+
+// ✅ SECURITY: Single-flight pattern for token refresh
+// Prevents race conditions when multiple requests detect token expiring
+let refreshPromise = null;
+let pendingRequestsQueue = [];
+
+/**
+ * Refresh token with single-flight pattern.
+ * All concurrent callers wait for the same promise, preventing multiple refresh calls.
+ * @returns {Promise<string|null>} New access token or null on failure
+ */
+async function refreshTokenIfNeeded() {
+  const token = tokenManager.getAccessToken();
+  const refreshToken = tokenManager.getRefreshToken();
+
+  // No tokens or not expiring - return immediately
+  if (!token || !refreshToken || !isTokenExpiringSoon(token)) {
+    return token;
+  }
+
+  // ✅ MUTEX: If refresh is already in progress, wait for it
+  if (refreshPromise !== null) {
+    logger.log('🔄 Refresh already in progress, waiting...');
+    return refreshPromise;
+  }
+
+  // ✅ Start single refresh operation
+  refreshPromise = (async () => {
+    try {
+      logger.log('🔄 Token expiring soon, refreshing...');
+      const response = await axios.post(`${API_BASE}/auth/refresh`, {
+        refresh_token: refreshToken
+      });
+
+      if (response.data && response.data.access_token) {
+        const newToken = response.data.access_token;
+        tokenManager.setAccessToken(newToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        logger.log('✅ Token refreshed successfully');
+
+        // Notify all pending requests
+        pendingRequestsQueue.forEach(resolve => resolve(newToken));
+        pendingRequestsQueue = [];
+
+        return newToken;
+      }
+      return null;
+    } catch (err) {
+      logger.warn('❌ Token refresh failed:', err);
+      // Notify pending requests of failure
+      pendingRequestsQueue.forEach(resolve => resolve(null));
+      pendingRequestsQueue = [];
+      return null;
+    } finally {
+      // ✅ Reset mutex after completion
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+// ✅ SECURITY: Get CSRF token from cookie
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+// ✅ SECURITY: Fetch CSRF token from server if not in cookie
+let csrfTokenPromise = null;
+async function ensureCSRFToken() {
+  // Check cookie first
+  const cookieToken = getCookie('csrf_token');
+  if (cookieToken) return cookieToken;
+
+  // Single-flight pattern for CSRF token fetch
+  if (csrfTokenPromise) return csrfTokenPromise;
+
+  csrfTokenPromise = (async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/auth/csrf-token`, {
+        withCredentials: true
+      });
+      return response.data?.csrf_token || getCookie('csrf_token');
+    } catch (err) {
+      logger.warn('Failed to get CSRF token:', err);
+      return null;
+    } finally {
+      csrfTokenPromise = null;
+    }
+  })();
+
+  return csrfTokenPromise;
+}
+
 // Ensure Authorization header is attached for every request from localStorage
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
+  // Try to refresh token if expiring soon (except for auth endpoints)
+  if (!config.url?.includes('/auth/')) {
+    await refreshTokenIfNeeded();
+  }
+
   const token = tokenManager.getAccessToken();
   logger.log('🔍 [api/client.js] Request interceptor:', {
     url: config.url,
@@ -33,8 +150,36 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers['Authorization'] = `Bearer ${token}`;
   }
+
+  // ✅ CSRF: Add X-CSRF-Token for state-changing requests
+  const method = config.method?.toLowerCase();
+  if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    const csrfToken = await ensureCSRFToken();
+    if (csrfToken) {
+      config.headers = config.headers || {};
+      config.headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+
   return config;
 });
+
+// ✅ SECURITY: Handle 401 responses - log but don't auto-clear tokens
+// (prevents race condition where 401 during login transition clears new token)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      logger.warn('🔒 Unauthorized response received', {
+        url: error.config?.url,
+        hadToken: !!error.config?.headers?.Authorization
+      });
+      // NOTE: Token clearing removed to prevent race condition during login.
+      // User will be redirected to login by RoleGuard or route protection instead.
+    }
+    return Promise.reject(error);
+  }
+);
 
 function getApiBase() {
   return API_BASE;
@@ -138,3 +283,5 @@ export {
   login,
   get,
 };
+
+export default apiClient;

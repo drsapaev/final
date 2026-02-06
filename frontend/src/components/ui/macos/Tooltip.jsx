@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -11,13 +12,18 @@ const Tooltip = ({
   position = 'top',
   delay = 700,
   disabled = false,
+  followCursor = false, // ✅ NEW: Тултип следует за курсором
   className = '',
   style = {},
   ...props
 }) => {
   const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
+  const [mouseCoords, setMouseCoords] = useState({ x: 0, y: 0 });
+  const [tooltipSize, setTooltipSize] = useState(null); // ✅ NEW: Размеры тултипа
+
   const triggerRef = useRef(null);
   const tooltipRef = useRef(null);
   const timeoutRef = useRef(null);
@@ -34,8 +40,13 @@ const Tooltip = ({
     'bottom-right': { x: 'right', y: 'top' }
   };
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (e) => {
     if (disabled) return;
+
+    // ✅ FIXED: Запоминаем начальную позицию курсора сразу
+    if (followCursor) {
+      setMouseCoords({ x: e.clientX, y: e.clientY });
+    }
 
     timeoutRef.current = setTimeout(() => {
       const rect = triggerRef.current?.getBoundingClientRect();
@@ -44,9 +55,16 @@ const Tooltip = ({
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2
         });
-        setIsVisible(true);
+        setShouldRender(true); // Сначала рендерим (невидимым) для замера
       }
     }, delay);
+  };
+
+  // ✅ FIXED: Обновляем позицию при любом движении мыши
+  const handleMouseMove = (e) => {
+    if (followCursor) {
+      setMouseCoords({ x: e.clientX, y: e.clientY });
+    }
   };
 
   const handleMouseLeave = () => {
@@ -54,6 +72,10 @@ const Tooltip = ({
       clearTimeout(timeoutRef.current);
     }
     setIsVisible(false);
+    // Даем время на анимацию исчезновения
+    setTimeout(() => {
+      if (!timeoutRef.current) setShouldRender(false);
+    }, 200);
   };
 
   useEffect(() => {
@@ -64,16 +86,29 @@ const Tooltip = ({
     };
   }, []);
 
+  // ✅ NEW: Измеряем размеры сразу после рендера через useLayoutEffect
+  useLayoutEffect(() => {
+    if (shouldRender && tooltipRef.current) {
+      const rect = tooltipRef.current.getBoundingClientRect();
+      setTooltipSize({ width: rect.width, height: rect.height });
+      // Теперь можно показывать
+      requestAnimationFrame(() => setIsVisible(true));
+    } else if (!shouldRender) {
+      setTooltipSize(null);
+      setIsVisible(false);
+    }
+  }, [shouldRender]);
+
   const tooltipPosition = positionMap[position] || positionMap.top;
 
   const tooltipStyles = {
     position: 'fixed',
     top: 0,
     left: 0,
-    zIndex: 1300,
+    zIndex: 9999, // Поверх всего (Portal)
     pointerEvents: 'none',
-    opacity: isVisible ? 1 : 0,
-    transform: isVisible ? 'scale(1)' : 'scale(0.95)',
+    opacity: isVisible && tooltipSize ? 1 : 0, // Показываем только когда измерено
+    transform: isVisible && tooltipSize ? 'scale(1)' : 'scale(0.95)',
     transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
     transformOrigin: `${tooltipPosition.x === 'center' ? 'center' : tooltipPosition.x === 'left' ? 'right' : 'left'} ${tooltipPosition.y === 'center' ? 'center' : tooltipPosition.y === 'top' ? 'bottom' : 'top'}`
   };
@@ -98,37 +133,64 @@ const Tooltip = ({
 
   // Position the tooltip
   const getPositionedStyles = () => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return {};
-
-    const tooltipRect = tooltipRef.current?.getBoundingClientRect();
-    if (!tooltipRect && isVisible) return {};
+    if (!tooltipSize) return {}; // Ждем измерения
 
     let top = 0;
     let left = 0;
 
-    switch (tooltipPosition.x) {
-      case 'left':
-        left = coords.x - (tooltipRect?.width || 100) - 8;
-        break;
-      case 'right':
-        left = coords.x + 8;
-        break;
-      default: // center
-        left = coords.x - (tooltipRect?.width || 100) / 2;
-        break;
-    }
+    // ✅ NEW: Если followCursor включен, позиционируем относительно курсора
+    if (followCursor) {
+      const tooltipWidth = tooltipSize.width;
+      const tooltipHeight = tooltipSize.height;
+      const offset = 16;
 
-    switch (tooltipPosition.y) {
-      case 'top':
-        top = coords.y - (tooltipRect?.height || 30) - 8;
-        break;
-      case 'bottom':
-        top = coords.y + 8;
-        break;
-      default: // center
-        top = coords.y - (tooltipRect?.height || 30) / 2;
-        break;
+      // Проверяем, хватает ли места справа и снизу
+      const spaceRight = window.innerWidth - mouseCoords.x;
+      const spaceBottom = window.innerHeight - mouseCoords.y;
+
+      // Позиционируем по горизонтали
+      if (spaceRight > tooltipWidth + offset) {
+        left = mouseCoords.x + offset;
+      } else {
+        left = mouseCoords.x - tooltipWidth - offset;
+      }
+
+      // Позиционируем по вертикали
+      if (spaceBottom > tooltipHeight + offset) {
+        top = mouseCoords.y + offset;
+      } else {
+        top = mouseCoords.y - tooltipHeight - offset;
+      }
+    } else {
+      // Стандартное позиционирование (без followCursor)
+      // Здесь используем сохраненные coords (центр триггера)
+
+      const tooltipWidth = tooltipSize.width;
+      const tooltipHeight = tooltipSize.height;
+
+      switch (tooltipPosition.x) {
+        case 'left':
+          left = coords.x - tooltipWidth - 8;
+          break;
+        case 'right':
+          left = coords.x + 8;
+          break;
+        default: // center
+          left = coords.x - tooltipWidth / 2;
+          break;
+      }
+
+      switch (tooltipPosition.y) {
+        case 'top':
+          top = coords.y - tooltipHeight - 8;
+          break;
+        case 'bottom':
+          top = coords.y + 8;
+          break;
+        default: // center
+          top = coords.y - tooltipHeight / 2;
+          break;
+      }
     }
 
     // Ensure tooltip stays within viewport
@@ -139,13 +201,17 @@ const Tooltip = ({
       bottom: window.innerHeight - 8
     };
 
+    // Проверка границ
     if (left < viewport.left) left = viewport.left;
-    if (left + (tooltipRect?.width || 100) > viewport.right) {
-      left = viewport.right - (tooltipRect?.width || 100);
+    const currentWidth = tooltipSize.width;
+    if (left + currentWidth > viewport.right) {
+      left = viewport.right - currentWidth;
     }
+
     if (top < viewport.top) top = viewport.top;
-    if (top + (tooltipRect?.height || 30) > viewport.bottom) {
-      top = viewport.bottom - (tooltipRect?.height || 30);
+    const currentHeight = tooltipSize.height;
+    if (top + currentHeight > viewport.bottom) {
+      top = viewport.bottom - currentHeight;
     }
 
     return { top: `${top}px`, left: `${left}px` };
@@ -159,6 +225,7 @@ const Tooltip = ({
         ref={triggerRef}
         className={`mac-tooltip-trigger ${className}`}
         onMouseEnter={handleMouseEnter}
+        onMouseMove={followCursor ? handleMouseMove : undefined}
         onMouseLeave={handleMouseLeave}
         style={{ display: 'inline-block', ...style }}
         {...props}
@@ -166,7 +233,7 @@ const Tooltip = ({
         {children}
       </div>
 
-      {isVisible && (
+      {shouldRender && createPortal(
         <div
           ref={tooltipRef}
           className="mac-tooltip"
@@ -180,52 +247,53 @@ const Tooltip = ({
             {content}
           </div>
 
-          {/* Tooltip arrow */}
-          <div
-            className="mac-tooltip-arrow"
-            style={{
-              position: 'absolute',
-              width: '8px',
-              height: '8px',
-              backgroundColor: 'var(--mac-bg-tertiary)',
-              border: '1px solid var(--mac-border)',
-              transform: 'rotate(45deg)',
-              zIndex: -1,
-              ...(tooltipPosition.x === 'left' && tooltipPosition.y === 'center' && {
-                right: '-5px',
-                top: '50%',
-                transform: 'translateY(-50%) rotate(45deg)'
-              }),
-              ...(tooltipPosition.x === 'right' && tooltipPosition.y === 'center' && {
-                left: '-5px',
-                top: '50%',
-                transform: 'translateY(-50%) rotate(45deg)'
-              }),
-              ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'top' && {
-                bottom: '-5px',
-                left: '50%',
-                transform: 'translateX(-50%) rotate(45deg)'
-              }),
-              ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'bottom' && {
-                top: '-5px',
-                left: '50%',
-                transform: 'translateX(-50%) rotate(45deg)'
-              })
-            }}
-          />
+          {/* Стрелочку показываем только если НЕ followCursor */}
+          {!followCursor && (
+            <div
+              className="mac-tooltip-arrow"
+              style={{
+                position: 'absolute',
+                width: '8px',
+                height: '8px',
+                backgroundColor: 'var(--mac-bg-tertiary)',
+                border: '1px solid var(--mac-border)',
+                transform: 'rotate(45deg)',
+                zIndex: -1,
+                ...(tooltipPosition.x === 'left' && tooltipPosition.y === 'center' && {
+                  right: '-5px',
+                  top: '50%',
+                  marginTop: '-5px'
+                }),
+                ...(tooltipPosition.x === 'right' && tooltipPosition.y === 'center' && {
+                  left: '-5px',
+                  top: '50%',
+                  marginTop: '-5px'
+                }),
+                ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'top' && {
+                  bottom: '-5px',
+                  left: '50%',
+                  marginLeft: '-5px'
+                }),
+                ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'bottom' && {
+                  top: '-5px',
+                  left: '50%',
+                  marginLeft: '-5px'
+                })
+              }}
+            />
+          )}
 
           <style>{`
             /* Dark mode adjustments */
             @media (prefers-color-scheme: dark) {
               .mac-tooltip-content {
-                background-color: rgba(255, 255, 255, 0.05) !important;
+                background-color: rgba(30, 30, 30, 0.9) !important;
                 border-color: rgba(255, 255, 255, 0.1) !important;
                 color: #f5f5f7 !important;
               }
-
               .mac-tooltip-arrow {
-                background-color: rgba(255, 255, 255, 0.05) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                 background-color: rgba(30, 30, 30, 0.9) !important;
+                 border-color: rgba(255, 255, 255, 0.1) !important;
               }
             }
 
@@ -243,7 +311,8 @@ const Tooltip = ({
               }
             }
           `}</style>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -252,4 +321,3 @@ const Tooltip = ({
 Tooltip.displayName = 'macOS Tooltip';
 
 export default Tooltip;
-

@@ -1,0 +1,223 @@
+/**
+ * AISuggestionPopover CSS
+ */
+
+.ai-popover {
+    position: absolute;
+    z-index: 10000;
+    /* High z-index to appear above all EMR sections */
+    min-width: 320px;
+    max-width: 450px;
+    background: #fff;
+    border: 1px solid #c5d5f5;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(66, 133, 244, 0.2);
+    overflow: hidden;
+}
+
+/* Portal mode - fixed positioning handled by JS */
+.ai-popover--portal {
+    position: fixed;
+}
+
+/* Position variants */
+.ai-popover--bottom {
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+}
+
+.ai-popover--top {
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 4px;
+}
+
+.ai-popover--right {
+    top: 0;
+    left: 100%;
+    margin-left: 8px;
+}
+
+/* Header */
+.ai-popover__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #4285f4 0%, #5e97f6 100%);
+    color: white;
+    font-size: 0.8rem;
+}
+
+.ai-popover__icon {
+    font-size: 1rem;
+}
+
+.ai-popover__label {
+    font-weight: 600;
+}
+
+.ai-popover__count {
+    margin-left: auto;
+    opacity: 0.8;
+    font-size: 0.75rem;
+}
+
+.ai-popover__close {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.ai-popover__close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* List */
+.ai-popover__list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.ai-popover__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.ai-popover__item:last-child {
+    border-bottom: none;
+}
+
+.ai-popover__item:hover {
+    background: #f8f9ff;
+}
+
+.ai-popover__item--selected {
+    background: #e8f0fe;
+}
+
+.ai-popover__item-content {
+    flex: 1;
+}
+
+.ai-popover__item-text {
+    display: block;
+    font-size: 0.9rem;
+    color: #333;
+    line-height: 1.4;
+}
+
+.ai-popover__item-explanation {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+.ai-popover__item-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Confidence */
+.ai-popover__confidence {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+.ai-popover__confidence--high {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.ai-popover__confidence--medium {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.ai-popover__confidence--low {
+    background: #fce4ec;
+    color: #c2185b;
+}
+
+/* Source Badges */
+.ai-popover__source {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+
+.ai-popover__source--history {
+    background: #fff3db;
+    color: #b38300;
+    border-color: #f7e2b0;
+}
+
+.ai-popover__source--ai {
+    background: #e1f5fe;
+    color: #0277bd;
+    border-color: #b3e5fc;
+}
+
+/* Buttons */
+.ai-popover__apply,
+.ai-popover__dismiss {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.ai-popover__apply {
+    background: #4caf50;
+    color: white;
+}
+
+.ai-popover__apply:hover:not(:disabled) {
+    background: #43a047;
+}
+
+.ai-popover__apply:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ai-popover__dismiss {
+    background: #f5f5f5;
+    color: #888;
+}
+
+.ai-popover__dismiss:hover {
+    background: #e0e0e0;
+}
+
+/* Footer */
+.ai-popover__footer {
+    padding: 6px 12px;
+    background: #f5f5f5;
+    border-top: 1px solid #eee;
+    font-size: 0.7rem;
+    color: #888;
+    text-align: center;
+}

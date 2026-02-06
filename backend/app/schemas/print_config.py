@@ -5,7 +5,7 @@ Pydantic схемы для системы печати
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 # ===================== ПРИНТЕРЫ =====================
 
@@ -54,8 +54,7 @@ class PrinterConfigOut(PrinterConfigBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== ШАБЛОНЫ =====================
@@ -98,8 +97,7 @@ class PrintTemplateOut(PrintTemplateBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== ЗАДАНИЯ ПЕЧАТИ =====================
@@ -131,8 +129,7 @@ class PrintJobOut(PrintJobBase):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== API СХЕМЫ =====================

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
 
 const usePatients = () => {
@@ -17,25 +18,25 @@ const usePatients = () => {
   const loadPatients = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         throw new Error('Токен авторизации не найден');
       }
-      
+
       const response = await fetch(`${API_BASE}/api/v1/patients/?limit=1000`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Ошибка загрузки пациентов' }));
         throw new Error(errorData.detail || `Ошибка ${response.status}`);
       }
-      
+
       const data = await response.json();
       // Преобразуем данные из формата API в формат компонента
       const transformedPatients = data.map(patient => ({
@@ -60,7 +61,7 @@ const usePatients = () => {
         lastVisit: null, // Нужно получать отдельно
         visitsCount: 0 // Нужно получать отдельно
       }));
-      
+
       setPatients(transformedPatients);
     } catch (err) {
       setError(err);
@@ -74,13 +75,13 @@ const usePatients = () => {
   const createPatient = useCallback(async (patientData) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         throw new Error('Токен авторизации не найден');
       }
-      
+
       // Преобразуем данные из формата компонента в формат API
       // Backend принимает полное ФИО или отдельные поля - используем отдельные поля
       const apiData = {
@@ -94,7 +95,7 @@ const usePatients = () => {
         doc_number: patientData.passport || patientData.doc_number || null,
         address: patientData.address || null
       };
-      
+
       const response = await fetch(`${API_BASE}/api/v1/patients/`, {
         method: 'POST',
         headers: {
@@ -103,14 +104,14 @@ const usePatients = () => {
         },
         body: JSON.stringify(apiData)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Ошибка создания пациента' }));
         throw new Error(errorData.detail || `Ошибка ${response.status}`);
       }
-      
+
       const newPatient = await response.json();
-      
+
       // Преобразуем обратно в формат компонента
       const transformedPatient = {
         id: newPatient.id,
@@ -127,7 +128,7 @@ const usePatients = () => {
         lastVisit: null,
         visitsCount: 0
       };
-      
+
       setPatients(prev => [transformedPatient, ...prev]);
       return transformedPatient;
     } catch (err) {
@@ -142,13 +143,13 @@ const usePatients = () => {
   const updatePatient = useCallback(async (id, patientData) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         throw new Error('Токен авторизации не найден');
       }
-      
+
       // Преобразуем данные из формата компонента в формат API
       const apiData = {};
       if (patientData.lastName !== undefined) apiData.last_name = patientData.lastName;
@@ -160,7 +161,7 @@ const usePatients = () => {
       if (patientData.email !== undefined) apiData.email = patientData.email;
       if (patientData.passport !== undefined) apiData.doc_number = patientData.passport;
       if (patientData.address !== undefined) apiData.address = patientData.address;
-      
+
       const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {
         method: 'PUT',
         headers: {
@@ -169,14 +170,14 @@ const usePatients = () => {
         },
         body: JSON.stringify(apiData)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Ошибка обновления пациента' }));
         throw new Error(errorData.detail || `Ошибка ${response.status}`);
       }
-      
+
       const updatedPatient = await response.json();
-      
+
       // Преобразуем обратно в формат компонента
       const transformedPatient = {
         id: updatedPatient.id,
@@ -190,13 +191,13 @@ const usePatients = () => {
         address: updatedPatient.address || '',
         passport: updatedPatient.doc_number || ''
       };
-      
-      setPatients(prev => prev.map(patient => 
-        patient.id === id 
+
+      setPatients(prev => prev.map(patient =>
+        patient.id === id
           ? { ...patient, ...transformedPatient }
           : patient
       ));
-      
+
       return transformedPatient;
     } catch (err) {
       setError(err);
@@ -210,13 +211,13 @@ const usePatients = () => {
   const deletePatient = useCallback(async (id) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (!token) {
         throw new Error('Токен авторизации не найден');
       }
-      
+
       const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {
         method: 'DELETE',
         headers: {
@@ -224,12 +225,12 @@ const usePatients = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Ошибка удаления пациента' }));
         throw new Error(errorData.detail || `Ошибка ${response.status}`);
       }
-      
+
       setPatients(prev => prev.filter(patient => patient.id !== id));
     } catch (err) {
       setError(err);
@@ -245,26 +246,26 @@ const usePatients = () => {
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
   // Фильтрация пациентов
   const filteredPatients = patients.filter(patient => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       patient.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.middleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.phone.includes(searchTerm) ||
       patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.passport.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesGender = !filterGender || patient.gender === filterGender;
-    
+
     const patientAge = calculateAge(patient.birthDate);
     const matchesAgeRange = !filterAgeRange || (() => {
       switch (filterAgeRange) {
@@ -276,11 +277,87 @@ const usePatients = () => {
         default: return true;
       }
     })();
-    
+
     const matchesBloodType = !filterBloodType || patient.bloodType === filterBloodType;
-    
+
     return matchesSearch && matchesGender && matchesAgeRange && matchesBloodType;
   });
+
+  // Архивирование пациента (soft-delete) - использует реальный API
+  const archivePatient = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const token = tokenManager.getAccessToken();
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
+
+      const response = await fetch(`${API_BASE}/api/v1/patients/${id}/soft`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Ошибка архивирования пациента' }));
+        throw new Error(errorData.detail || `Ошибка ${response.status}`);
+      }
+
+      // Обновляем пациента в списке как удаленного
+      setPatients(prev => prev.map(patient =>
+        patient.id === id
+          ? { ...patient, is_deleted: true }
+          : patient
+      ));
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Восстановление пациента - использует реальный API
+  const restorePatient = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const token = tokenManager.getAccessToken();
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
+
+      const response = await fetch(`${API_BASE}/api/v1/patients/${id}/restore`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Ошибка восстановления пациента' }));
+        throw new Error(errorData.detail || `Ошибка ${response.status}`);
+      }
+
+      // Обновляем пациента в списке как активного
+      setPatients(prev => prev.map(patient =>
+        patient.id === id
+          ? { ...patient, is_deleted: false }
+          : patient
+      ));
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Загрузка при монтировании
   useEffect(() => {
@@ -303,6 +380,8 @@ const usePatients = () => {
     createPatient,
     updatePatient,
     deletePatient,
+    archivePatient,  // Soft-delete
+    restorePatient,  // Restore
     refresh: loadPatients,
     calculateAge
   };

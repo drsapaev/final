@@ -536,13 +536,15 @@ class ClinicTelegramBot:
         try:
             # Здесь должен быть вызов API подтверждения
             # Пока возвращаем заглушку
-            import requests
+            import httpx
 
-            response = requests.post(
-                f"{settings.API_BASE_URL}/telegram/visits/confirm",
-                json={"token": token, "channel": "telegram"},
-                headers={"Content-Type": "application/json"},
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{settings.API_BASE_URL}/telegram/visits/confirm",
+                    json={"token": token, "channel": "telegram"},
+                    headers={"Content-Type": "application/json"},
+                    timeout=10,
+                )
 
             if response.status_code == 200:
                 return response.json()

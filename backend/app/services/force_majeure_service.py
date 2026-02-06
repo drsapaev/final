@@ -29,7 +29,7 @@ from app.models.refund_deposit import (
     DepositTransactionType
 )
 from app.services.fcm_service import get_fcm_service
-from app.services.notification_service import NotificationService
+from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,6 @@ class ForceMajeureService:
     def __init__(self, db: Session):
         self.db = db
         self.fcm_service = get_fcm_service()
-        self.notification_service = NotificationService(db)
     
     def get_pending_entries(
         self, 

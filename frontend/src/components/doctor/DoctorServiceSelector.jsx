@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Package, 
-  Heart, 
+import {
+  Package,
+  Heart,
   Activity,
   Stethoscope,
   TestTube,
@@ -18,11 +18,12 @@ import {
 import { MacOSCard, MacOSButton, MacOSBadge, MacOSLoadingSkeleton } from '../ui/macos';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 /**
  * Селектор услуг для панели врача
  * Использует справочник из админ панели согласно passport.md стр. 1254
  */
-const DoctorServiceSelector = ({ 
+const DoctorServiceSelector = ({
   specialty = 'cardiology',
   selectedServices = [],
   onServicesChange,
@@ -31,13 +32,13 @@ const DoctorServiceSelector = ({
 }) => {
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
+
   // В демо-режиме не рендерим компонент
   if (isDemoMode) {
     logger.log('DoctorServiceSelector: Skipping render in demo mode');
     return null;
   }
-  
+
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState({});
   const [error, setError] = useState('');
@@ -56,7 +57,7 @@ const DoctorServiceSelector = ({
   // Названия категорий
   const categoryNames = {
     'consultation.cardiology': 'Консультация кардиолога',
-    'consultation.dermatology': 'Консультация дерматолога', 
+    'consultation.dermatology': 'Консультация дерматолога',
     'consultation.stomatology': 'Консультация стоматолога',
     'diagnostics.ecg': 'ЭКГ',
     'diagnostics.echo': 'ЭхоКГ',
@@ -71,18 +72,18 @@ const DoctorServiceSelector = ({
   const loadServices = async () => {
     // Проверяем демо-режим только по пути
     const isDemoMode = window.location.pathname.includes('/medilab-demo');
-    
+
     if (isDemoMode) {
       logger.log('DoctorServiceSelector: Skipping loadServices in demo mode');
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       setError('');
 
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      const token = tokenManager.getAccessToken();
       const response = await fetch(`/api/v1/doctor/${specialty}/services`, {
         headers: { 'Authorization': `Bearer ${token || ''}` }
       });
@@ -104,7 +105,7 @@ const DoctorServiceSelector = ({
 
   const handleServiceToggle = (service) => {
     const existingIndex = selectedServices.findIndex(s => s.id === service.id);
-    
+
     if (existingIndex >= 0) {
       // Убираем услугу
       const newServices = selectedServices.filter((_, index) => index !== existingIndex);
@@ -121,7 +122,7 @@ const DoctorServiceSelector = ({
         quantity: 1,
         total: service.price
       };
-      
+
       onServicesChange([...selectedServices, newService]);
     }
   };
@@ -137,13 +138,13 @@ const DoctorServiceSelector = ({
       }
       return service;
     });
-    
+
     onServicesChange(newServices);
   };
 
   const handlePriceChange = (serviceId, newPrice) => {
     if (!canEditPrices) return;
-    
+
     const newServices = selectedServices.map(service => {
       if (service.id === serviceId) {
         return {
@@ -154,7 +155,7 @@ const DoctorServiceSelector = ({
       }
       return service;
     });
-    
+
     onServicesChange(newServices);
   };
 
@@ -289,7 +290,7 @@ const DoctorServiceSelector = ({
                     </div>
                   </div>
                 </div>
-                
+
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -323,7 +324,7 @@ const DoctorServiceSelector = ({
                       <Plus size={14} />
                     </MacOSButton>
                   </div>
-                  
+
                   {/* Цена */}
                   {canEditPrices ? (
                     <input
@@ -359,12 +360,12 @@ const DoctorServiceSelector = ({
                       color: 'var(--mac-text-primary)'
                     }}>{service.price.toLocaleString()}</span>
                   )}
-                  
+
                   <span style={{
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-tertiary)'
                   }}>{service.currency}</span>
-                  
+
                   {/* Убрать услугу */}
                   <MacOSButton
                     size="sm"
@@ -385,7 +386,7 @@ const DoctorServiceSelector = ({
         {Object.entries(services).map(([categoryCode, categoryData]) => {
           const CategoryIcon = categoryIcons[categoryCode] || Package;
           const categoryName = categoryNames[categoryCode] || categoryData.category.name_ru;
-          
+
           return (
             <MacOSCard key={categoryCode} style={{ padding: '16px' }}>
               <h3 style={{
@@ -399,11 +400,11 @@ const DoctorServiceSelector = ({
                 <CategoryIcon size={20} style={{ marginRight: '8px', color: 'var(--mac-info)' }} />
                 {categoryName}
               </h3>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {categoryData.services.map(service => {
                   const isSelected = isServiceSelected(service.id);
-                  
+
                   return (
                     <div
                       key={service.id}
@@ -457,7 +458,7 @@ const DoctorServiceSelector = ({
                           )}
                         </div>
                       </div>
-                      
+
                       <div style={{ textAlign: 'right' }}>
                         <div style={{
                           fontWeight: 'var(--mac-font-weight-bold)',

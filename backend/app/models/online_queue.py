@@ -160,6 +160,13 @@ class OnlineQueueEntry(Base):
         Integer, default=0, nullable=False
     )  # 0 = обычный, 1 = следующий (восстановленный), 2 = VIP
 
+    # ⭐ Session ID для группировки услуг пациента в одной очереди
+    # FORMAT: opaque string, НЕ интерпретируется frontend
+    # RULE: Same patient + same queue + same day = same session_id
+    session_id: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, index=True
+    )
+
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )

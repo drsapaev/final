@@ -20,6 +20,7 @@ import OfflineIndicator from '../components/mobile/OfflineIndicator';
 import QueuePositionCard from '../components/mobile/QueuePositionCard';
 
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 
 /**
  * Мобильная панель пациента для PWA
@@ -43,7 +44,7 @@ const MobilePatientDashboard = () => {
       // Загружаем данные пациента
       const response = await fetch('/api/v1/mobile/auth/profile', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -55,7 +56,7 @@ const MobilePatientDashboard = () => {
       // Загружаем записи
       const appointmentsResponse = await fetch('/api/v1/mobile/appointments', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
       });
 
@@ -166,8 +167,8 @@ const MobilePatientDashboard = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${activeTab === tab.id
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-600 hover:bg-gray-50'
                 }`}
             >
               <tab.icon className="w-5 h-5 mb-1" />

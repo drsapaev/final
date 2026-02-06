@@ -81,6 +81,7 @@ from app.api.v1.endpoints import (  # online_queue,  # Временно откл
     file_upload_json,
     file_upload_simple,
     health as health_ep,
+    lab,
     lab_specialized,
     mobile_api,
     mobile_api_extended,
@@ -137,6 +138,9 @@ from app.api.v1.endpoints.security_management import (
 
 # Импортируем эндпоинты подтверждения визитов
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
+
+# Импортируем эндпоинты универсальных секционных шаблонов
+from app.api.v1.endpoints.section_templates import router as section_templates_router
 
 api_router = APIRouter()
 
@@ -201,6 +205,11 @@ api_router.include_router(
     prefix="/registrar/notifications",
     tags=["registrar-notifications"],
 )
+# Эндпоинты универсальных секционных шаблонов врача (Мой опыт)
+api_router.include_router(
+    section_templates_router,
+    tags=["section-templates"],
+)
 # Эндпоинты информации о врачах и отделениях
 api_router.include_router(
     doctor_info.router, prefix="/doctor-info", tags=["doctor-info"]
@@ -236,6 +245,19 @@ api_router.include_router(
 api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
 api_router.include_router(ai_integration.router, prefix="/ai", tags=["ai-integration"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])  # Новые AI endpoints
+
+# AI Gateway - унифицированный API с RBAC (рекомендуется для новых интеграций)
+from app.api.v1.endpoints import ai_gateway
+api_router.include_router(ai_gateway.router, prefix="/ai/v2", tags=["ai-gateway"])
+
+# AI Chat - REST API и WebSocket для чата с AI
+from app.api.v1.endpoints import ai_chat
+api_router.include_router(ai_chat.router, prefix="/ai/chat", tags=["ai-chat"])
+
+# AI Cost Analytics - Мониторинг расходов на AI
+from app.api.v1.endpoints import ai_cost_analytics
+api_router.include_router(ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"])
+
 
 # MCP (Model Context Protocol) endpoints
 try:
@@ -278,6 +300,11 @@ api_router.include_router(
     mobile_api_extended.router, prefix="/mobile", tags=["mobile-extended"]
 )
 api_router.include_router(emr_templates.router, prefix="/emr", tags=["emr-templates"])
+# Doctor Treatment Templates - персональная клиническая память
+from app.api.v1.endpoints import doctor_templates
+api_router.include_router(
+    doctor_templates.router, prefix="/emr", tags=["doctor-templates"]
+)
 api_router.include_router(emr_ai.router, prefix="/emr/ai", tags=["emr-ai"])
 api_router.include_router(
     emr_ai_enhanced.router, prefix="/emr/ai-enhanced", tags=["emr-ai-enhanced"]
@@ -360,6 +387,7 @@ api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-leg
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
+api_router.include_router(lab.router, tags=["lab"])
 api_router.include_router(lab_specialized.router, tags=["lab_specialized"])
 api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
@@ -373,6 +401,10 @@ api_router.include_router(
 )
 api_router.include_router(
     notifications.router, prefix="/notifications", tags=["notifications"]
+)
+from app.api.v1.endpoints import notification_websocket
+api_router.include_router(
+    notification_websocket.router, tags=["notification-websocket"]
 )
 api_router.include_router(docs.router, prefix="/docs", tags=["documentation"])
 api_router.include_router(
@@ -389,6 +421,11 @@ api_router.include_router(
 api_router.include_router(
     user_management.router, prefix="/users", tags=["user-management"]
 )
+
+# Роли и разрешения
+from app.api.v1.endpoints import roles
+
+api_router.include_router(roles.router, prefix="/roles", tags=["roles"])
 
 # Legacy API удалён - используйте /api/v1/queue/* endpoints
 
@@ -452,3 +489,44 @@ from app.api.v1.endpoints import registrar_batch
 api_router.include_router(
     registrar_batch.router, prefix="/registrar", tags=["registrar-batch"]
 )
+
+# EMR Phrase Suggest - автоподсказки из истории врача
+from app.api.v1.endpoints import phrase_suggest
+
+api_router.include_router(
+    phrase_suggest.router, prefix="/emr", tags=["emr-phrase-suggest"]
+)
+
+# EMR v2 - Production EMR with versioning and audit
+from app.api.v1.endpoints import emr_v2
+
+api_router.include_router(
+    emr_v2.router, prefix="/v2", tags=["emr-v2"]
+)
+
+# Global Search - агрегированный поиск по всем доменам
+from app.api.v1.endpoints import global_search
+
+api_router.include_router(
+    global_search.router, tags=["global-search"]
+)
+
+# Telemetry - Product metrics (NO PHI, events only)
+from app.api.v1.endpoints import telemetry
+
+api_router.include_router(
+    telemetry.router, tags=["telemetry"]
+)
+
+# User-to-user messaging system
+from app.api.v1.endpoints import messages
+api_router.include_router(
+    messages.router, prefix="/messages", tags=["messages"]
+)
+
+# Utils (Link preview, etc.)
+from app.api.v1.endpoints import utils
+api_router.include_router(
+    utils.router, prefix="/utils", tags=["utils"]
+)
+

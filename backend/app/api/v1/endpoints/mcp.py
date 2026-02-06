@@ -71,6 +71,26 @@ async def get_mcp_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/circuit-breaker")
+async def get_circuit_breaker_status(
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Получить статус circuit breaker для всех серверов"""
+    try:
+        mcp_manager = await get_mcp_manager()
+        return {
+            "status": "ok",
+            "servers": mcp_manager.get_circuit_breaker_status(),
+            "config": {
+                "threshold": mcp_manager.CIRCUIT_BREAKER_THRESHOLD,
+                "cooldown_seconds": mcp_manager.CIRCUIT_BREAKER_COOLDOWN,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting circuit breaker status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/reset-metrics")
 async def reset_mcp_metrics(
     current_user: User = Depends(get_current_user),

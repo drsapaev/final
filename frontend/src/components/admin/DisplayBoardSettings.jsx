@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Monitor, 
-  Palette, 
-  Image, 
-  Video, 
-  Volume2, 
+import {
+  Monitor,
+  Palette,
+  Image,
+  Video,
+  Volume2,
   VolumeX,
   Eye,
   EyeOff,
   Users,
   MessageCircle,
   Settings,
-  Save, 
-  RefreshCw, 
-  AlertCircle, 
+  Save,
+  RefreshCw,
+  AlertCircle,
   CheckCircle,
   TestTube,
   Upload,
@@ -26,6 +26,7 @@ import {
 import { Card, Button, Badge } from '../ui/macos';
 
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,17 +60,17 @@ const DisplayBoardSettings = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Загружаем табло, темы и статистику
       const [boardsRes, themesRes, statsRes] = await Promise.all([
         fetch('/api/v1/admin/display/boards', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         }),
         fetch('/api/v1/admin/display/themes', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         }),
         fetch('/api/v1/admin/display/stats', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
         })
       ]);
 
@@ -113,7 +114,7 @@ const DisplayBoardSettings = () => {
       const response = await fetch(`/api/v1/admin/display/boards/${selectedBoard.id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(selectedBoard)
@@ -154,7 +155,7 @@ const DisplayBoardSettings = () => {
       const response = await fetch(`/api/v1/admin/display/boards/${selectedBoard.id}/test`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(testData)
@@ -162,13 +163,13 @@ const DisplayBoardSettings = () => {
 
       if (response.ok) {
         const result = await response.json();
-        setTestResults(prev => ({ 
-          ...prev, 
-          [testType]: { 
-            success: true, 
+        setTestResults(prev => ({
+          ...prev,
+          [testType]: {
+            success: true,
             message: result.message,
             data: result.test_data
-          } 
+          }
         }));
         setMessage({ type: 'success', text: `Тест "${testType}" выполнен успешно` });
       } else {
@@ -176,12 +177,12 @@ const DisplayBoardSettings = () => {
       }
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
-      setTestResults(prev => ({ 
-        ...prev, 
-        [testType]: { 
-          success: false, 
-          error: error.message 
-        } 
+      setTestResults(prev => ({
+        ...prev,
+        [testType]: {
+          success: false,
+          error: error.message
+        }
       }));
       setMessage({ type: 'error', text: 'Ошибка тестирования табло' });
     }
@@ -224,7 +225,7 @@ const DisplayBoardSettings = () => {
             Настройка информационных экранов и вызовов пациентов
           </p>
         </div>
-        
+
         <div className="flex gap-3">
           <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw size={16} className="mr-2" />
@@ -243,11 +244,10 @@ const DisplayBoardSettings = () => {
 
       {/* Сообщения */}
       {message.text && (
-        <div className={`flex items-center p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
+        <div className={`flex items-center p-4 rounded-lg ${message.type === 'success'
+          ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+          : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+          }`}>
           {message.type === 'success' ? (
             <CheckCircle size={20} className="mr-2" />
           ) : (
@@ -284,7 +284,7 @@ const DisplayBoardSettings = () => {
             <Monitor size={20} className="mr-2 text-blue-600" />
             {selectedBoard.display_name}
           </h3>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -406,7 +406,7 @@ const DisplayBoardSettings = () => {
             <Volume2 size={20} className="mr-2 text-green-600" />
             Звуковые настройки
           </h3>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -488,7 +488,7 @@ const DisplayBoardSettings = () => {
           <TestTube size={20} className="mr-2 text-purple-600" />
           Тестирование табло
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="text-center">
             <Button
@@ -561,7 +561,7 @@ const DisplayBoardSettings = () => {
               Добавить
             </Button>
           </div>
-          
+
           <div className="space-y-3">
             {banners.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -573,8 +573,8 @@ const DisplayBoardSettings = () => {
                 <div key={banner.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg dark:border-gray-700">
                   <div className="flex items-center">
                     {banner.image_url && (
-                      <img 
-                        src={banner.image_url} 
+                      <img
+                        src={banner.image_url}
                         alt={banner.title}
                         className="w-12 h-8 object-cover rounded mr-3"
                       />
@@ -610,7 +610,7 @@ const DisplayBoardSettings = () => {
               Добавить
             </Button>
           </div>
-          
+
           <div className="space-y-3">
             <div className="text-center py-8 text-gray-500">
               <MessageCircle size={32} className="mx-auto mb-2 opacity-50" />

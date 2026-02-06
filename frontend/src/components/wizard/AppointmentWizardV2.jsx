@@ -28,6 +28,7 @@ import { formatDateDisplay } from '../../utils/dateUtils';
 import { createQueueEntriesBatch, getDoctorUserId, updateOnlineQueueEntry } from '../../api/queue';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import tokenManager from '../../utils/tokenManager';
 // ⭐ SSOT: Unified service extraction
 import { normalizeServicesFromInitialData } from '../../utils/serviceCodeResolver';
 import './AppointmentWizardV2.css';
@@ -85,7 +86,7 @@ const AppointmentWizardV2 = ({
 }) => {
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
-  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(1);
@@ -287,7 +288,7 @@ const AppointmentWizardV2 = ({
     try {
       const response = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(phone)}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         }
       });
@@ -427,7 +428,7 @@ const AppointmentWizardV2 = ({
     try {
       const response = await fetch(`${API_BASE}/patients/?q=${encodeURIComponent(query)}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         }
       });
@@ -572,7 +573,7 @@ const AppointmentWizardV2 = ({
     try {
       const response = await fetch(`${API_BASE}/registrar/services`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         }
       });
@@ -829,7 +830,7 @@ const AppointmentWizardV2 = ({
     try {
       const response = await fetch(`${API_BASE}/registrar/doctors`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         }
       });
@@ -964,8 +965,10 @@ const AppointmentWizardV2 = ({
       if (!wizardData.patient.fio.trim()) {
         newErrors.fio = 'Введите ФИО пациента';
       }
-      if (!wizardData.patient.phone.trim()) {
-        newErrors.phone = 'Введите телефон пациента';
+      // ✅ Телефон теперь необязателен (дети, пожилые без телефона)
+      // Проверяем формат только если телефон указан
+      if (wizardData.patient.phone.trim() && !/^\+?[\d\s\-()]+$/.test(wizardData.patient.phone.trim())) {
+        newErrors.phone = 'Неверный формат телефона';
       }
       if (!wizardData.patient.gender) { // ✅ Валидация пола
         newErrors.gender = 'Выберите пол';
@@ -1054,7 +1057,7 @@ const AppointmentWizardV2 = ({
     if (!validateStep(currentStep)) return;
 
     // Проверяем токен авторизации
-    const token = localStorage.getItem('auth_token');
+    const token = tokenManager.getAccessToken();
     if (!token) {
       toast.error('Требуется авторизация. Пожалуйста, войдите в систему заново.');
       return;
@@ -1137,7 +1140,7 @@ const AppointmentWizardV2 = ({
         // Попытка 1: Поиск по форматированному номеру
         let searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
             'Content-Type': 'application/json'
           }
         });
@@ -1155,7 +1158,7 @@ const AppointmentWizardV2 = ({
           logger.log('🔄 Trying search with cleaned phone:', cleanPhone);
           searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(cleanPhone)}`, {
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+              'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
               'Content-Type': 'application/json'
             }
           });
@@ -1193,7 +1196,7 @@ const AppointmentWizardV2 = ({
               await fetch(`${API_BASE}/patients/${foundPatient.id}`, {
                 method: 'PUT',
                 headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                  'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(updateData)
@@ -1208,7 +1211,7 @@ const AppointmentWizardV2 = ({
           // создаем НОВОГО пациента с данными из формы, чтобы не блокировать завершение мастера.
           logger.warn(`⚠️ Пациент с телефоном ${wizardData.patient.phone} не найден. Создаем нового пациента (editMode + QR).`);
 
-          const token = localStorage.getItem('auth_token');
+          const token = tokenManager.getAccessToken();
 
           const patientData = {
             full_name: wizardData.patient.fio.trim(),
@@ -1258,7 +1261,7 @@ const AppointmentWizardV2 = ({
           throw new Error('ФИО пациента обязательно для заполнения');
         }
 
-        const token = localStorage.getItem('auth_token');
+        const token = tokenManager.getAccessToken();
         logger.log('🔑 Токен для создания пациента:', token ? `${token.substring(0, 20)}...` : 'НЕТ ТОКЕНА');
         logger.log('📊 Длина токена:', token ? token.length : 0);
 
@@ -1321,7 +1324,7 @@ const AppointmentWizardV2 = ({
             // Обычно API ищет по частичному совпадению или точному
             const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
               headers: {
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
                 'Content-Type': 'application/json'
               }
             });
@@ -1401,7 +1404,8 @@ const AppointmentWizardV2 = ({
 
         // ⭐ SSOT: Для чистых QR-записей (online_queue) обновляем существующую запись вместо создания новой
         const isOnlineQueueEntry = initialData.record_type === 'online_queue' && effectiveSource === 'online';
-        const queueEntryId = initialData.queue_numbers?.[0]?.id || initialData.id;
+        // ✅ SSOT FIX: queue_entry_id приходит из backend для QR-визитов, иначе из queue_numbers
+        const queueEntryId = initialData.queue_entry_id || initialData.queue_numbers?.[0]?.id || initialData.id;
 
         if (isOnlineQueueEntry && queueEntryId) {
           logger.log(`⭐ SSOT: QR-запись ID=${queueEntryId}, обновляем через full-update endpoint...`);
@@ -1923,7 +1927,7 @@ const AppointmentWizardV2 = ({
           const patientResponse = await fetch(`${API_BASE}/patients/${patientId}`, {
             method: 'PUT',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+              'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify(patientUpdateData)
@@ -1992,7 +1996,7 @@ const AppointmentWizardV2 = ({
       const cartResponse = await fetch(`${API_BASE}/registrar/cart`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(cartData)
@@ -2790,7 +2794,7 @@ const PatientStepV2 = ({
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
-            Телефон *
+            Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'normal' }}>(необязательно)</span>
           </label>
           <MacOSInput
             ref={phoneRef}
@@ -2803,6 +2807,15 @@ const PatientStepV2 = ({
             iconPosition="left"
             size="md"
           />
+          {!data.phone && !errors.phone && (
+            <span style={{
+              fontSize: 'var(--mac-font-size-xs)',
+              color: 'var(--mac-text-tertiary)',
+              fontStyle: 'italic'
+            }}>
+              Для детей и пожилых можно не указывать
+            </span>
+          )}
           {errors.phone && (
             <span style={{
               fontSize: 'var(--mac-font-size-xs)',

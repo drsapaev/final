@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
-
+import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
  * Индикатор офлайн/онлайн статуса для мобильных устройств
@@ -20,12 +20,12 @@ const OfflineIndicator = () => {
     const handleOnline = () => {
       setIsOnline(true);
       setShowIndicator(true);
-      
+
       // Автоматически скрываем через 3 секунды
       setTimeout(() => {
         setShowIndicator(false);
       }, 3000);
-      
+
       // Синхронизируем данные
       syncData();
     };
@@ -67,24 +67,24 @@ const OfflineIndicator = () => {
 
   const syncData = async () => {
     setSyncStatus('syncing');
-    
+
     try {
       // Синхронизируем данные с сервером
       const promises = [
         fetch('/api/v1/mobile/appointments', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`
           }
         }),
         fetch('/api/v1/mobile/notifications', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`
           }
         })
       ];
 
       const responses = await Promise.allSettled(promises);
-      
+
       // Обновляем кэш
       responses.forEach((response, index) => {
         if (response.status === 'fulfilled' && response.value.ok) {
@@ -96,17 +96,17 @@ const OfflineIndicator = () => {
       });
 
       setSyncStatus('success');
-      
+
       // Скрываем индикатор через 2 секунды
       setTimeout(() => {
         setShowIndicator(false);
         setSyncStatus('idle');
       }, 2000);
-      
+
     } catch (error) {
       logger.error('Ошибка синхронизации:', error);
       setSyncStatus('error');
-      
+
       setTimeout(() => {
         setSyncStatus('idle');
       }, 3000);
@@ -128,11 +128,10 @@ const OfflineIndicator = () => {
 
   return (
     <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-sm">
-      <Card className={`transition-all duration-300 ${
-        isOnline 
-          ? 'bg-green-50 border-green-200' 
+      <Card className={`transition-all duration-300 ${isOnline
+          ? 'bg-green-50 border-green-200'
           : 'bg-orange-50 border-orange-200'
-      }`}>
+        }`}>
         <div className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -141,26 +140,25 @@ const OfflineIndicator = () => {
               ) : (
                 <WifiOff className="w-4 h-4 text-orange-600" />
               )}
-              
-              <span className={`font-medium text-sm ${
-                isOnline ? 'text-green-800' : 'text-orange-800'
-              }`}>
+
+              <span className={`font-medium text-sm ${isOnline ? 'text-green-800' : 'text-orange-800'
+                }`}>
                 {isOnline ? 'Подключение восстановлено' : 'Офлайн режим'}
               </span>
-              
+
               {syncStatus === 'syncing' && (
                 <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
               )}
-              
+
               {syncStatus === 'success' && (
                 <CheckCircle className="w-3 h-3 text-green-600" />
               )}
-              
+
               {syncStatus === 'error' && (
                 <AlertCircle className="w-3 h-3 text-red-600" />
               )}
             </div>
-            
+
             {!isOnline && (
               <Button
                 onClick={retryConnection}
@@ -172,7 +170,7 @@ const OfflineIndicator = () => {
               </Button>
             )}
           </div>
-          
+
           {!isOnline && (
             <div className="mt-2 text-xs text-orange-700">
               <p className="mb-1">Доступные данные в офлайн режиме:</p>
@@ -189,13 +187,13 @@ const OfflineIndicator = () => {
               </div>
             </div>
           )}
-          
+
           {isOnline && syncStatus === 'success' && (
             <p className="mt-1 text-xs text-green-700">
               Данные синхронизированы
             </p>
           )}
-          
+
           {syncStatus === 'error' && (
             <p className="mt-1 text-xs text-red-700">
               Ошибка синхронизации

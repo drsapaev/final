@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 
 /**
  * Утилиты для тестирования мастера регистрации
@@ -8,7 +9,7 @@ import logger from '../utils/logger';
 class WizardTester {
   constructor() {
     this.API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-    this.token = localStorage.getItem('auth_token');
+    this.token = tokenManager.getAccessToken();
   }
 
   // Получить заголовки для API запросов
@@ -22,12 +23,12 @@ class WizardTester {
   // Тест 1: Проверка настроек мастера
   async testWizardSettings() {
     logger.log('🧪 Тестирование настроек мастера...');
-    
+
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/wizard-settings`, {
         headers: this.getHeaders()
       });
-      
+
       const data = await response.json();
       logger.log('✅ Настройки мастера:', data);
       return data;
@@ -40,7 +41,7 @@ class WizardTester {
   // Тест 2: Проверка создания корзины
   async testCartCreation(testData = null) {
     logger.log('🧪 Тестирование создания корзины...');
-    
+
     const defaultTestData = {
       patient: {
         full_name: 'Тестовый Пациент',
@@ -73,7 +74,7 @@ class WizardTester {
       });
 
       const result = await response.json();
-      
+
       if (response.ok) {
         logger.log('✅ Корзина создана успешно:', result);
         return result;
@@ -90,12 +91,12 @@ class WizardTester {
   // Тест 3: Проверка льготных настроек
   async testBenefitSettings() {
     logger.log('🧪 Тестирование настроек льгот...');
-    
+
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/benefit-settings`, {
         headers: this.getHeaders()
       });
-      
+
       const data = await response.json();
       logger.log('✅ Настройки льгот:', data);
       return data;
@@ -108,12 +109,12 @@ class WizardTester {
   // Тест 4: Проверка заявок All Free
   async testAllFreeRequests() {
     logger.log('🧪 Тестирование заявок All Free...');
-    
+
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/all-free-requests`, {
         headers: this.getHeaders()
       });
-      
+
       const data = await response.json();
       logger.log('✅ Заявки All Free:', data);
       return data;
@@ -126,12 +127,12 @@ class WizardTester {
   // Тест 5: Проверка изменений цен
   async testPriceOverrides() {
     logger.log('🧪 Тестирование изменений цен...');
-    
+
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/registrar/price-overrides`, {
         headers: this.getHeaders()
       });
-      
+
       const data = await response.json();
       logger.log('✅ Изменения цен:', data);
       return data;
@@ -144,7 +145,7 @@ class WizardTester {
   // Тест 6: Проверка автосохранения
   testAutosave() {
     logger.log('🧪 Тестирование автосохранения...');
-    
+
     const testData = {
       step: 2,
       patient: { full_name: 'Тест Автосохранения' },
@@ -158,7 +159,7 @@ class WizardTester {
 
     // Проверяем восстановление
     const restored = JSON.parse(localStorage.getItem('wizard_draft'));
-    
+
     if (JSON.stringify(restored) === JSON.stringify(testData)) {
       logger.log('✅ Автосохранение работает корректно');
       return true;
@@ -171,7 +172,7 @@ class WizardTester {
   // Тест 7: Проверка валидации данных
   validateWizardData(data) {
     logger.log('🧪 Валидация данных мастера...');
-    
+
     const errors = [];
 
     // Проверка пациента
@@ -215,36 +216,36 @@ class WizardTester {
   // Запуск всех тестов
   async runAllTests() {
     logger.log('🚀 Запуск всех тестов мастера регистрации...');
-    logger.log('=' .repeat(50));
+    logger.log('='.repeat(50));
 
     const results = {};
 
     // Тест настроек
     results.wizardSettings = await this.testWizardSettings();
-    
+
     // Тест льготных настроек
     results.benefitSettings = await this.testBenefitSettings();
-    
+
     // Тест заявок All Free
     results.allFreeRequests = await this.testAllFreeRequests();
-    
+
     // Тест изменений цен
     results.priceOverrides = await this.testPriceOverrides();
-    
+
     // Тест автосохранения
     results.autosave = this.testAutosave();
 
     // Тест создания корзины (только если есть тестовые данные)
     logger.log('ℹ️ Тест создания корзины пропущен (требует реальные service_id)');
 
-    logger.log('=' .repeat(50));
+    logger.log('='.repeat(50));
     logger.log('📊 Результаты тестирования:', results);
-    
+
     const passedTests = Object.values(results).filter(result => result !== null && result !== false).length;
     const totalTests = Object.keys(results).length;
-    
+
     logger.log(`✅ Пройдено тестов: ${passedTests}/${totalTests}`);
-    
+
     return results;
   }
 
@@ -272,7 +273,7 @@ class WizardTester {
           total_amount: 50000
         }
       },
-      
+
       repeat: {
         patient: {
           full_name: 'Петров Петр Петрович',
@@ -293,7 +294,7 @@ class WizardTester {
           total_amount: 0 // Бесплатно для повторного
         }
       },
-      
+
       benefit: {
         patient: {
           full_name: 'Сидоров Сидор Сидорович',
@@ -314,7 +315,7 @@ class WizardTester {
           total_amount: 0 // Бесплатно для льготного
         }
       },
-      
+
       cart: {
         patient: {
           full_name: 'Многоуслугов Много Услугович',
@@ -360,7 +361,7 @@ class WizardTester {
 if (typeof window !== 'undefined') {
   window.WizardTester = WizardTester;
   window.wizardTester = new WizardTester();
-  
+
   logger.log('🧪 WizardTester загружен!');
   logger.log('Используйте: wizardTester.runAllTests() для запуска всех тестов');
   logger.log('Или: wizardTester.testCartCreation(wizardTester.generateTestData("cart")) для тестирования корзины');
