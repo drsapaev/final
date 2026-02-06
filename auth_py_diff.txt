@@ -1,0 +1,128 @@
+commit 7cbc097cd19823cffd6d1649f78ded7433e25608
+Author: google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>
+Date:   Sun Dec 14 16:44:06 2025 +0000
+
+    Audit: Fix DEV fallback auth, improve logging, and add linting deps
+    
+    - Secure `backend/app/main.py` by gating DEV fallback auth with ENV + ENABLE_DEV_AUTH.
+    - Replace insecure `print()` with `logger` in `backend/app/api/v1/endpoints/auth.py`.
+    - Remove/disable active `console.log` statements in `frontend/src/contexts/ChatContext.jsx`.
+    - Fix frontend linting by adding `@eslint/js` dependency.
+    - Add `AUDIT_REPORT.md` summarizing findings and fixes.
+
+diff --git a/backend/app/api/v1/endpoints/auth.py b/backend/app/api/v1/endpoints/auth.py
+index a87aa46..de76698 100644
+--- a/backend/app/api/v1/endpoints/auth.py
++++ b/backend/app/api/v1/endpoints/auth.py
+@@ -9,6 +9,7 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
+ from __future__ import annotations
+ 
+ import inspect
++import logging
+ from typing import Any, Dict
+ 
+ from fastapi import APIRouter, Depends, HTTPException, status
+@@ -30,6 +31,8 @@ from app.db.session import get_db
+ # ORM user model
+ from app.models.user import User
+ 
++logger = logging.getLogger(__name__)
++
+ router = APIRouter()
+ 
+ 
+@@ -49,8 +52,7 @@ async def login(
+ 
+     Works with both async and sync SQLAlchemy sessions returned by get_db().
+     """
+-    # DEBUG: Add logging
+-    print(f"DEBUG: Login attempt for username: {form_data.username}")
++    logger.info(f"Login attempt for username: {form_data.username}")
+ 
+     # build select statement
+     stmt = select(User).where(User.username == form_data.username)
+@@ -75,19 +77,19 @@ async def login(
+         except Exception:
+             user = None
+ 
+-    # DEBUG: Log user info
+     if user:
+-        print(f"DEBUG: User found: {user.username}, active: {user.is_active}")
+-        print(f"DEBUG: Hashed password: {user.hashed_password[:50]}...")
++        # Don't log full hashes or validation results unless in debug mode
++        logger.debug(f"User found: {user.username}, active: {user.is_active}")
+         password_valid = verify_password(form_data.password, user.hashed_password)
+-        print(f"DEBUG: Password valid: {password_valid}")
++        if not password_valid:
++            logger.warning(f"Invalid password for user {form_data.username}")
+     else:
+-        print(f"DEBUG: User not found for username: {form_data.username}")
++        logger.warning(f"User not found for username: {form_data.username}")
+ 
+     if not user or not verify_password(
+         form_data.password, getattr(user, "hashed_password", "")
+     ):
+-        print(f"DEBUG: Authentication failed for {form_data.username}")
++        logger.warning(f"Authentication failed for {form_data.username}")
+         raise HTTPException(
+             status_code=status.HTTP_401_UNAUTHORIZED,
+             detail="Incorrect username or password",
+@@ -142,7 +144,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
+       {"access_token": "<jwt>", "token_type": "bearer", "user": {...}}
+     """
+     try:
+-        print(f"DEBUG: JSON login called with username={request_data.username}")
++        logger.info(f"JSON login called with username={request_data.username}")
+ 
+         # ╨Ю╨┐╤А╨╡╨┤╨╡╨╗╤П╨╡╨╝ ╤В╨╕╨┐ ╤Б╨╡╤Б╤Б╨╕╨╕ ╨С╨Ф
+         is_async = inspect.iscoroutinefunction(
+@@ -171,16 +173,16 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
+             )
+ 
+         if not user:
+-            print(f"DEBUG: User not found")
++            logger.warning(f"User not found: {request_data.username}")
+             raise HTTPException(
+                 status_code=status.HTTP_401_UNAUTHORIZED,
+                 detail="╨Э╨╡╨▓╨╡╤А╨╜╤Л╨╡ ╤Г╤З╨╡╤В╨╜╤Л╨╡ ╨┤╨░╨╜╨╜╤Л╨╡",
+             )
+ 
+-        print(f"DEBUG: User found: {user.username}")
++        logger.debug(f"User found: {user.username}")
+ 
+         if not user.is_active:
+-            print(f"DEBUG: User is inactive")
++            logger.warning(f"User is inactive: {user.username}")
+             raise HTTPException(
+                 status_code=status.HTTP_401_UNAUTHORIZED,
+                 detail="╨Я╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М ╨┤╨╡╨░╨║╤В╨╕╨▓╨╕╤А╨╛╨▓╨░╨╜",
+@@ -188,10 +190,9 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
+ 
+         # ╨Я╤А╨╛╨▓╨╡╤А╤П╨╡╨╝ ╨┐╨░╤А╨╛╨╗╤М
+         password_valid = verify_password(request_data.password, user.hashed_password)
+-        print(f"DEBUG: Password valid: {password_valid}")
+ 
+         if not password_valid:
+-            print(f"DEBUG: Invalid password")
++            logger.warning(f"Invalid password for user: {user.username}")
+             raise HTTPException(
+                 status_code=status.HTTP_401_UNAUTHORIZED,
+                 detail="╨Э╨╡╨▓╨╡╤А╨╜╤Л╨╡ ╤Г╤З╨╡╤В╨╜╤Л╨╡ ╨┤╨░╨╜╨╜╤Л╨╡",
+@@ -200,7 +201,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
+         # ╨б╨╛╨╖╨┤╨░╨╡╨╝ ╤В╨╛╨║╨╡╨╜
+         access_token = create_access_token(data={"sub": str(user.id)})
+ 
+-        print(f"DEBUG: Token created successfully")
++        logger.info(f"Token created successfully for user: {user.username}")
+ 
+         return JSONLoginResponse(
+             access_token=access_token,
+@@ -219,7 +220,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
+     except HTTPException:
+         raise
+     except Exception as e:
+-        print(f"DEBUG: Exception in JSON login: {e}")
++        logger.error(f"Exception in JSON login: {e}")
+         raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail=f"╨Ю╤И╨╕╨▒╨║╨░ ╨▓╤Е╨╛╨┤╨░: {str(e)}",
