@@ -1,0 +1,44 @@
+INFO:app.core.config:Loaded persistent SECRET_KEY from .secret_key file (dev mode)
+DEBUG:escpos.capabilities:Using capabilities from file: C:\Program Files\Python311\Lib\site-packages\escpos\capabilities.json
+DEBUG:escpos.capabilities:Capabilities pickle file not found: C:\Users\KOMPYU~1\AppData\Local\Temp\tmpqxsujb35\3.11.1.capabilities.pickle
+DEBUG:escpos.capabilities:Loading and pickling capabilities
+DEBUG:escpos.capabilities:Finished loading capabilities took 0.20s
+[app.db.session] Using DATABASE_URL = sqlite:///./clinic.db
+[app.db.session] Foreign key enforcement enabled for SQLite via event listener
+DEBUG:passlib.utils.compat:loaded lazy attr 'SafeConfigParser': <class 'configparser.ConfigParser'>
+DEBUG:passlib.utils.compat:loaded lazy attr 'NativeStringIO': <class '_io.StringIO'>
+DEBUG:passlib.utils.compat:loaded lazy attr 'BytesIO': <class '_io.BytesIO'>
+DEBUG:passlib.registry:registered 'argon2' handler: <class 'passlib.handlers.argon2.argon2'>
+DEBUG:passlib.registry:registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+INFO:clinic.main:Exception handlers registered
+ws.queue: INFO: WS logger initialized with console handler
+INFO:ws.queue:WS logger initialized with console handler
+ws.queue: INFO: WSManager: ёючфрэ эют√щ ¤ъчхьяы Ё
+INFO:ws.queue:WSManager: ёючфрэ эют√щ ¤ъчхьяы Ё
+ws.queue: INFO: WSManager: ёючфрэ уыюсры№э√щ ¤ъчхьяы Ё 2491581260624
+INFO:ws.queue:WSManager: ёючфрэ уыюсры№э√щ ¤ъчхьяы Ё 2491581260624
+DEBUG:app.api.deps:deps.py: settings loaded, SECRET_KEY starts with: 3F17m
+INFO:clinic.main:Audit middleware registered
+INFO:clinic.main:Security middleware registered
+INFO:clinic.main:CSRF protection disabled (set CSRF_ENABLED=1 to enable)
+INFO:app.services.ai.ai_manager:Initialized Enhanced Mock provider (realistic medical responses)
+INFO:app.services.ai.ai_manager:\u2705 Initialized deepseek provider
+INFO:app.services.ai.ai_manager:\U0001f3af Set deepseek as DEFAULT provider
+INFO:app.services.ai.ai_manager:\u2705 Initialized gemini provider
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\final\backend\app\main.py", line 132, in <module>
+    from app.api.v1.api import api_router as v1_router  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\api\v1\api.py", line 33, in <module>
+    from app.api.v1.endpoints import registrar_notifications  # ╙тхфюьыхэш  ЁхушёЄЁрЄєЁ√
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\api\v1\endpoints\registrar_notifications.py", line 22, in <module>
+    from app.services.registrar_notification_service import (
+  File "C:\final\backend\app\services\registrar_notification_service.py", line 23, in <module>
+    from app.services.email_sms_enhanced import EmailSMSEnhancedService
+  File "C:\final\backend\app\services\email_sms_enhanced.py", line 22, in <module>
+    from app.crud import notification as crud_notification
+  File "C:\final\backend\app\crud\notification.py", line 8, in <module>
+    from app.models.notification import (
+ImportError: cannot import name 'NotificationSettings' from 'app.models.notification' (C:\final\backend\app\models\notification.py)

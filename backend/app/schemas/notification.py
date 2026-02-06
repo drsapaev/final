@@ -73,6 +73,43 @@ class NotificationHistory(NotificationHistoryBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Настройки уведомлений пользователя
+class NotificationSettingsBase(BaseModel):
+    user_id: int = Field(..., description="ID пользователя")
+    user_type: str = Field(..., max_length=20, description="Тип пользователя")
+    email_enabled: bool = Field(True, description="Email уведомления")
+    sms_enabled: bool = Field(True, description="SMS уведомления")
+    telegram_enabled: bool = Field(False, description="Telegram уведомления")
+    push_enabled: bool = Field(True, description="Push уведомления")
+    appointment_reminders: bool = Field(True, description="Напоминания о записях")
+    payment_notifications: bool = Field(True, description="Уведомления об оплате")
+    queue_updates: bool = Field(True, description="Обновления очереди")
+    system_alerts: bool = Field(True, description="Системные оповещения")
+
+
+class NotificationSettingsCreate(NotificationSettingsBase):
+    pass
+
+
+class NotificationSettingsUpdate(BaseModel):
+    email_enabled: Optional[bool] = None
+    sms_enabled: Optional[bool] = None
+    telegram_enabled: Optional[bool] = None
+    push_enabled: Optional[bool] = None
+    appointment_reminders: Optional[bool] = None
+    payment_notifications: Optional[bool] = None
+    queue_updates: Optional[bool] = None
+    system_alerts: Optional[bool] = None
+
+
+class NotificationSettings(NotificationSettingsBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Запросы для отправки уведомлений
 class SendNotificationRequest(BaseModel):
     recipient_type: str = Field(
