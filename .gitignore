@@ -57,3 +57,28 @@ pytest_*.txt
 *.db
 *.sqlite
 clinic.db
+
+# Security
+*.pem
+*.key
+*.crt
+secrets/
+*.dump
+*.sql
+
+# Tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Additional security
+*.pem
+*.key
+*.crt
+secrets/
+*.dump
+*.sql
+
+# Local dev artifacts
+.mypy_cache/
+.ruff_cache/

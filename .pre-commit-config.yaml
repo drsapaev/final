@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=300']
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-yaml
+      - id: check-json
+      - id: no-commit-to-branch
+        args: ['--branch', 'main']
+
+  - repo: local
+    hooks:
+      - id: no-db-files
+        name: Block database & dumps
+        entry: bash -c 'git diff --cached --name-only | grep -E "\.(db|sqlite|dump|sql)$" && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
