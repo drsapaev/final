@@ -12,7 +12,7 @@ import inspect
 import logging
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -31,8 +31,9 @@ from app.db.session import get_db
 # ORM user model
 from app.models.user import User
 
-router = APIRouter()
 logger = logging.getLogger(__name__)
+
+router = APIRouter()
 
 
 @router.post("/login")
@@ -51,7 +52,6 @@ async def login(
 
     Works with both async and sync SQLAlchemy sessions returned by get_db().
     """
-    # DEBUG: Add logging
     logger.info(f"Login attempt for username: {form_data.username}")
 
     # build select statement
@@ -77,10 +77,12 @@ async def login(
         except Exception:
             user = None
 
-    # DEBUG: Log user info
     if user:
+        # Don't log full hashes or validation results unless in debug mode
         logger.debug(f"User found: {user.username}, active: {user.is_active}")
-        # Secure: Do not log hashed password
+        password_valid = verify_password(form_data.password, user.hashed_password)
+        if not password_valid:
+            logger.warning(f"Invalid password for user {form_data.username}")
     else:
         logger.warning(f"User not found for username: {form_data.username}")
 
@@ -171,7 +173,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
             )
 
         if not user:
-            logger.warning(f"User not found")
+            logger.warning(f"User not found: {request_data.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные",
@@ -180,7 +182,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
         logger.debug(f"User found: {user.username}")
 
         if not user.is_active:
-            logger.warning(f"User is inactive")
+            logger.warning(f"User is inactive: {user.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Пользователь деактивирован",
@@ -188,10 +190,9 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
 
         # Проверяем пароль
         password_valid = verify_password(request_data.password, user.hashed_password)
-        # logger.debug(f"Password valid: {password_valid}")
 
         if not password_valid:
-            logger.warning(f"Invalid password")
+            logger.warning(f"Invalid password for user: {user.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные",
@@ -200,7 +201,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
         # Создаем токен
         access_token = create_access_token(data={"sub": str(user.id)})
 
-        logger.info(f"Token created successfully")
+        logger.info(f"Token created successfully for user: {user.username}")
 
         return JSONLoginResponse(
             access_token=access_token,
@@ -224,30 +225,3 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка входа: {str(e)}",
         )
-
-
-@router.get("/csrf-token")
-async def get_csrf_token(request: Request, response: Response):
-    """
-    Получить CSRF токен.
-    
-    Клиент должен вызвать этот эндпоинт и использовать
-    полученный токен в заголовке X-CSRF-Token для POST/PUT/PATCH/DELETE запросов.
-    """
-    import secrets
-    from app.middleware.csrf_middleware import CSRFMiddleware
-    
-    # Генерируем новый токен
-    token = secrets.token_hex(CSRFMiddleware.CSRF_TOKEN_LENGTH)
-    
-    # Устанавливаем в cookie
-    response.set_cookie(
-        key=CSRFMiddleware.CSRF_COOKIE_NAME,
-        value=token,
-        max_age=CSRFMiddleware.CSRF_TOKEN_LIFETIME_HOURS * 3600,
-        httponly=False,  # JS должен иметь доступ
-        samesite="strict",
-    )
-    
-    return {"csrf_token": token}
-

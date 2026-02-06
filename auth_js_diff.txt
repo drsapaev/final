@@ -1,0 +1,34 @@
+commit 7cbc097cd19823cffd6d1649f78ded7433e25608
+Author: google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>
+Date:   Sun Dec 14 16:44:06 2025 +0000
+
+    Audit: Fix DEV fallback auth, improve logging, and add linting deps
+    
+    - Secure `backend/app/main.py` by gating DEV fallback auth with ENV + ENABLE_DEV_AUTH.
+    - Replace insecure `print()` with `logger` in `backend/app/api/v1/endpoints/auth.py`.
+    - Remove/disable active `console.log` statements in `frontend/src/contexts/ChatContext.jsx`.
+    - Fix frontend linting by adding `@eslint/js` dependency.
+    - Add `AUDIT_REPORT.md` summarizing findings and fixes.
+
+diff --git a/frontend/src/stores/auth.js b/frontend/src/stores/auth.js
+index 3db2e4b..c21228a 100644
+--- a/frontend/src/stores/auth.js
++++ b/frontend/src/stores/auth.js
+@@ -33,7 +33,7 @@ function notify() {
+     } catch (e) {
+       // swallow subscriber errors so one bad subscriber doesn't break others
+       // but log for debugging.
+-      // eslint-disable-next-line no-console
++
+       logger.error('auth subscriber error:', e);
+     }
+   }
+@@ -136,7 +136,7 @@ export async function getProfile(force = false) {
+     }
+   } catch (err) {
+     // don't throw тАФ return local stored profile or null
+-    // eslint-disable-next-line no-console
++
+     logger.warn('getProfile: API call failed:', err);
+   }
+ 
