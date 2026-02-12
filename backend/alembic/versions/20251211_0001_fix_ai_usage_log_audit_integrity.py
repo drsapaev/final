@@ -1,7 +1,7 @@
 """fix ai usage log audit integrity
 
 Revision ID: 20251211_0001
-Revises: voice_messages_002_simplified
+Revises: voice_messages_002
 Create Date: 2025-12-11 00:00:00.000000
 
 CRITICAL FIX: AIUsageLog audit trail integrity
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20251211_0001'
-down_revision = 'voice_messages_002_simplified'
+down_revision = 'voice_messages_002'
 branch_labels = None
 depends_on = None
 
