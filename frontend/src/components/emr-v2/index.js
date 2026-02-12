@@ -83,11 +83,3 @@ export { TreatmentTemplatesPanel, TreatmentTemplatesButton } from './templates';
 // ============================================
 export { DoctorTemplatesPanel, DoctorTemplatesButton } from './DoctorTemplatesPanel';
 
-// ============================================
-// SPECIALTY SECTIONS (specialty-specific)
-// ============================================
-export {
-    CardiologySection,
-    DermatologySection,
-    DentistrySection,
-} from './sections/specialty';
