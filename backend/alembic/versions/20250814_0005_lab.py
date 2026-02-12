@@ -65,7 +65,7 @@ def upgrade() -> None:
         sa.Column("unit", sa.String(length=32), nullable=True),
         sa.Column("ref_range", sa.String(length=64), nullable=True),
         sa.Column(
-            "abnormal", sa.Boolean(), nullable=False, server_default=sa.text("0")
+            "abnormal", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
         sa.Column(
             "created_at",

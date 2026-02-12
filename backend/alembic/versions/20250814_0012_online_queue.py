@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.Column("department", sa.String(length=64), nullable=False),
         sa.Column("date_str", sa.String(length=16), nullable=False),
         sa.Column("start_number", sa.Integer(), nullable=True),
-        sa.Column("is_open", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_open", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
     op.create_index("ix_online_days_dep", "online_days", ["department"])
     op.create_index("ix_online_days_date", "online_days", ["date_str"])

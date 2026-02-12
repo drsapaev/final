@@ -42,7 +42,7 @@ const CardHeader = forwardRef(({
 }, ref) => {
   const headerStyles = {
     padding: '24px 24px 0 24px',
-    borderBottom: `1px solid ${colors.border.medium}`,
+    borderBottom: `1px solid ${colors.semantic.border.medium}`,
     marginBottom: '16px',
     ...style
   };
@@ -94,7 +94,7 @@ const CardFooter = forwardRef(({
 }, ref) => {
   const footerStyles = {
     padding: '16px 24px 24px 24px',
-    borderTop: `1px solid ${colors.border.medium}`,
+    borderTop: `1px solid ${colors.semantic.border.medium}`,
     marginTop: '16px',
     ...style
   };

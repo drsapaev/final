@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column("end_time", sa.String(length=5), nullable=False),
         sa.Column("room", sa.String(length=64), nullable=True),
         sa.Column("capacity_per_hour", sa.Integer(), nullable=True),
-        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
     op.create_index("ix_sched_dep", "schedule_templates", ["department"])
     op.create_index("ix_sched_doc", "schedule_templates", ["doctor_id"])

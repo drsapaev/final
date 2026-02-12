@@ -3,31 +3,35 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { SnackbarProvider } from 'notistack';
-import AIAssistant from '../AIAssistant';
-import { mcpAPI } from '../../../api/mcpClient';
+import { describe, it, beforeEach, expect, vi } from 'vitest';
 
-// Mock MCP API
-jest.mock('../../../api/mcpClient', () => ({
+vi.mock('notistack', () => ({
+  SnackbarProvider: ({ children }) => <div>{children}</div>,
+  useSnackbar: () => ({ enqueueSnackbar: vi.fn() })
+}));
+
+vi.mock('../../../contexts/ThemeContext', () => ({
+  useTheme: () => ({ theme: 'light' })
+}));
+
+vi.mock('../../../api/mcpClient', () => ({
   mcpAPI: {
-    analyzeComplaint: jest.fn(),
-    suggestICD10: jest.fn(),
-    interpretLabResults: jest.fn(),
-    analyzeSkinLesion: jest.fn(),
-    analyzeImage: jest.fn()
+    analyzeComplaint: vi.fn(),
+    suggestICD10: vi.fn(),
+    interpretLabResults: vi.fn(),
+    analyzeSkinLesion: vi.fn(),
+    analyzeImage: vi.fn()
   }
 }));
 
-const MockWrapper = ({ children }) => (
-  <SnackbarProvider maxSnack={3}>
-    {children}
-  </SnackbarProvider>
-);
+import AIAssistant from '../AIAssistant';
+import { mcpAPI } from '../../../api/mcpClient';
+
+const MockWrapper = ({ children }) => <div>{children}</div>;
 
 describe('AIAssistant Component', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Complaint Analysis', () => {
@@ -84,7 +88,7 @@ describe('AIAssistant Component', () => {
         </MockWrapper>
       );
 
-      const refreshButton = screen.getByRole('button', { name: /повторить анализ/i });
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
@@ -130,7 +134,7 @@ describe('AIAssistant Component', () => {
         </MockWrapper>
       );
 
-      const refreshButton = screen.getByRole('button', { name: /повторить анализ/i });
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
@@ -172,7 +176,7 @@ describe('AIAssistant Component', () => {
         </MockWrapper>
       );
 
-      const refreshButton = screen.getByRole('button', { name: /повторить анализ/i });
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
@@ -199,7 +203,18 @@ describe('AIAssistant Component', () => {
       expect(screen.getByText('OPENAI')).toBeInTheDocument();
     });
 
-    it('should change provider on chip click', () => {
+    it('should change provider on chip click', async () => {
+      const mockResult = {
+        status: 'success',
+        data: {
+          preliminary_diagnosis: ['Test'],
+          examinations: [],
+          lab_tests: [],
+          urgency: 'планово'
+        }
+      };
+      mcpAPI.analyzeComplaint.mockResolvedValue(mockResult);
+
       render(
         <MockWrapper>
           <AIAssistant
@@ -214,8 +229,17 @@ describe('AIAssistant Component', () => {
       const geminiChip = screen.getByText('GEMINI');
       fireEvent.click(geminiChip);
 
-      // Provider chip should be highlighted after click
-      expect(geminiChip.closest('.MuiChip-root')).toHaveClass('MuiChip-filled');
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(mcpAPI.analyzeComplaint).toHaveBeenCalledWith({
+          complaint: 'Test',
+          patientAge: undefined,
+          patientGender: undefined,
+          provider: 'gemini'
+        });
+      });
     });
   });
 
@@ -233,7 +257,7 @@ describe('AIAssistant Component', () => {
         </MockWrapper>
       );
 
-      const refreshButton = screen.getByRole('button', { name: /повторить анализ/i });
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
@@ -254,7 +278,7 @@ describe('AIAssistant Component', () => {
         </MockWrapper>
       );
 
-      const refreshButton = screen.getByRole('button', { name: /повторить анализ/i });
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
@@ -290,7 +314,7 @@ describe('AIAssistant Component', () => {
         </MockWrapper>
       );
 
-      const refreshButton = screen.getByRole('button', { name: /повторить анализ/i });
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {

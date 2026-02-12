@@ -28,7 +28,7 @@ def upgrade() -> None:
     op.add_column(
         "users",
         sa.Column(
-            "email_verified", sa.Boolean(), nullable=False, server_default=sa.text("0")
+            "email_verified", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
     )
 
@@ -52,7 +52,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("revoked", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("revoked", sa.Boolean(), nullable=False, server_default=sa.false()),
     )
     op.create_index(
         "ux_user_sessions_token", "user_sessions", ["refresh_token"], unique=True

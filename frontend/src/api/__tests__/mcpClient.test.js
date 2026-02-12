@@ -1,15 +1,30 @@
 /**
  * Unit tests for MCP Client
  */
-import { mcpAPI } from '../mcpClient';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 
-// Mock axios
-jest.mock('axios');
+vi.mock('axios', () => {
+  const defaultClient = {
+    get: vi.fn(),
+    post: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() }
+    }
+  };
+
+  return {
+    default: {
+      create: vi.fn(() => defaultClient)
+    }
+  };
+});
 
 describe('MCP Client API', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.resetModules();
+    vi.clearAllMocks();
   });
 
   describe('analyzeComplaint', () => {
@@ -26,13 +41,15 @@ describe('MCP Client API', () => {
         }
       };
 
-      axios.create.mockReturnValue({
-        post: jest.fn().mockResolvedValue(mockResponse),
+      const mockClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
-          request: { use: jest.fn() },
-          response: { use: jest.fn() }
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
         }
-      });
+      };
+      axios.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient');
 
       const result = await mcpAPI.analyzeComplaint({
         complaint: 'Головная боль',
@@ -46,13 +63,15 @@ describe('MCP Client API', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      axios.create.mockReturnValue({
-        post: jest.fn().mockRejectedValue(new Error('Network error')),
+      const mockClient = {
+        post: vi.fn().mockRejectedValue(new Error('Network error')),
         interceptors: {
-          request: { use: jest.fn() },
-          response: { use: jest.fn() }
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
         }
-      });
+      };
+      axios.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient');
 
       await expect(
         mcpAPI.analyzeComplaint({
@@ -78,13 +97,15 @@ describe('MCP Client API', () => {
         }
       };
 
-      axios.create.mockReturnValue({
-        post: jest.fn().mockResolvedValue(mockResponse),
+      const mockClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
-          request: { use: jest.fn() },
-          response: { use: jest.fn() }
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
         }
-      });
+      };
+      axios.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient');
 
       const result = await mcpAPI.suggestICD10({
         symptoms: ['головная боль'],
@@ -111,13 +132,15 @@ describe('MCP Client API', () => {
         }
       };
 
-      axios.create.mockReturnValue({
-        post: jest.fn().mockResolvedValue(mockResponse),
+      const mockClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
-          request: { use: jest.fn() },
-          response: { use: jest.fn() }
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
         }
-      });
+      };
+      axios.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient');
 
       const result = await mcpAPI.interpretLabResults({
         results: [
@@ -146,13 +169,15 @@ describe('MCP Client API', () => {
         }
       };
 
-      axios.create.mockReturnValue({
-        post: jest.fn().mockResolvedValue(mockResponse),
+      const mockClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
-          request: { use: jest.fn() },
-          response: { use: jest.fn() }
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
         }
-      });
+      };
+      axios.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient');
 
       const result = await mcpAPI.analyzeSkinLesion(
         mockFile,
@@ -175,13 +200,15 @@ describe('MCP Client API', () => {
         }
       };
 
-      axios.create.mockReturnValue({
-        get: jest.fn().mockResolvedValue(mockResponse),
+      const mockClient = {
+        get: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
-          request: { use: jest.fn() },
-          response: { use: jest.fn() }
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
         }
-      });
+      };
+      axios.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient');
 
       const result = await mcpAPI.getStatus();
 

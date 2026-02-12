@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("department", sa.String(length=64), nullable=True),
         sa.Column("unit", sa.String(length=32), nullable=True),  # шт., анализ, усл.
         sa.Column("price", sa.Numeric(12, 2), nullable=False, server_default="0"),
-        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
