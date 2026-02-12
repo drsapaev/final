@@ -116,7 +116,7 @@ jobs:
         for dir in app tests; do
           if [ -d "$dir" ]; then
             echo "  Проверяем $dir/..."
-            ruff check "$dir" --output-format=text > quality-reports/ruff_${dir}.txt 2>&1
+            ruff check "$dir" --output-format=concise > quality-reports/ruff_${dir}.txt 2>&1
             RUFF_EXIT=$?
             if [ $RUFF_EXIT -ne 0 ]; then
               ERROR_COUNT=$(grep -c "^" quality-reports/ruff_${dir}.txt || echo "0")
@@ -449,6 +449,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
+      PYTHONIOENCODING: 'utf-8'
+      PYTHONUTF8: '1'
     
     steps:
     - uses: actions/checkout@v4
@@ -635,6 +637,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
+      PYTHONIOENCODING: 'utf-8'
+      PYTHONUTF8: '1'
     
     steps:
     - uses: actions/checkout@v4
@@ -902,7 +906,7 @@ jobs:
         
         # Запускаем интеграционные тесты для запущенного сервера
         echo "🧪 Запускаем интеграционные тесты..."
-        python tests/integration/test_server_integration.py || {
+        pytest -q tests/integration/test_server_integration.py -rA || {
           echo "⚠️ Некоторые интеграционные тесты не прошли"
           echo "📊 Логи сервера (последние 100 строк):"
           tail -100 server.log || true
@@ -942,6 +946,8 @@ jobs:
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
       TARGET_RPS: '30'
+      PYTHONIOENCODING: 'utf-8'
+      PYTHONUTF8: '1'
 
     steps:
     - uses: actions/checkout@v4
@@ -983,38 +989,75 @@ jobs:
 
     - name: 🚀 Start API for load test
       run: |
+        set +e
+        mkdir -p artifacts/load
         cd backend
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > load_server.log 2>&1 &
         echo $! > load_server.pid
+        API_READY=0
         for i in {1..30}; do
           if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
             echo "✅ API ready for load test"
-            exit 0
+            API_READY=1
+            break
           fi
           sleep 2
         done
-        echo "❌ API did not start"
-        tail -100 load_server.log || true
-        exit 1
+        echo "LOAD_API_READY=$API_READY" >> $GITHUB_ENV
+        if [ "$API_READY" -ne 1 ]; then
+          echo "::warning::API did not start for load test. k6 step will be marked as failed with fallback artifacts."
+          tail -100 load_server.log || true
+        fi
+        exit 0
 
     - name: ⚡ Run k6 baseline scenario
       run: |
+        set +e
         mkdir -p artifacts/load
-        docker run --rm --network=host \
-          -e BASE_URL=http://127.0.0.1:8000 \
-          -e TARGET_RPS=${TARGET_RPS} \
-          -v ${{ github.workspace }}/ops/load:/scripts \
-          -v ${{ github.workspace }}/artifacts/load:/artifacts \
-          grafana/k6:latest \
-          run /scripts/clinic_core.js \
-          --summary-export=/artifacts/k6-summary.json
+        if [ "${LOAD_API_READY:-0}" -ne 1 ]; then
+          echo "::warning::Skipping k6 execution because API was not ready."
+          K6_EXIT=1
+        else
+          docker run --rm --network=host \
+            -e BASE_URL=http://127.0.0.1:8000 \
+            -e TARGET_RPS=${TARGET_RPS} \
+            -v ${{ github.workspace }}/ops/load:/scripts \
+            -v ${{ github.workspace }}/artifacts/load:/artifacts \
+            grafana/k6:latest \
+            run /scripts/clinic_core.js \
+            --summary-export=/artifacts/k6-summary.json
+          K6_EXIT=$?
+        fi
+        echo "K6_EXIT_CODE=$K6_EXIT" >> $GITHUB_ENV
+        if [ ! -f artifacts/load/k6-summary.json ]; then
+          echo "::warning::k6 summary was not generated; writing fallback summary."
+          cat > artifacts/load/k6-summary.json <<'JSON'
+        {"error":"k6 summary was not generated","metrics":{}}
+        JSON
+          echo "K6_SUMMARY_MISSING=1" >> $GITHUB_ENV
+        else
+          echo "K6_SUMMARY_MISSING=0" >> $GITHUB_ENV
+        fi
+        exit 0
 
     - name: 🚦 Check load regression
       run: |
+        set +e
         python ops/scripts/check_load_regression.py \
           --summary artifacts/load/k6-summary.json \
           --baseline ops/load/baseline_targets.json \
           --report artifacts/load/load-regression-report.md
+        REG_EXIT=$?
+        echo "LOAD_REGRESSION_EXIT_CODE=$REG_EXIT" >> $GITHUB_ENV
+        if [ $REG_EXIT -ne 0 ] && [ ! -f artifacts/load/load-regression-report.md ]; then
+          cat > artifacts/load/load-regression-report.md <<'MD'
+        # Load Test Regression Report
+
+        - Status: FAIL
+        - Reason: Regression check did not produce a report.
+        MD
+        fi
+        exit 0
 
     - name: 📤 Upload load artifacts
       if: always()
@@ -1031,6 +1074,28 @@ jobs:
       run: |
         if [ -f backend/load_server.pid ]; then
           kill $(cat backend/load_server.pid) 2>/dev/null || true
+        fi
+
+    - name: 🚨 Enforce load gate
+      run: |
+        K6_EXIT=${K6_EXIT_CODE:-1}
+        REG_EXIT=${LOAD_REGRESSION_EXIT_CODE:-1}
+        SUMMARY_MISSING=${K6_SUMMARY_MISSING:-1}
+
+        if [ ! -f artifacts/load/load-regression-report.md ]; then
+          cat > artifacts/load/load-regression-report.md <<'MD'
+        # Load Test Regression Report
+
+        - Status: FAIL
+        - Reason: load-regression-report.md missing after checks.
+        MD
+          REG_EXIT=1
+        fi
+
+        echo "k6_exit=$K6_EXIT, regression_exit=$REG_EXIT, summary_missing=$SUMMARY_MISSING"
+        if [ "$K6_EXIT" -ne 0 ] || [ "$REG_EXIT" -ne 0 ] || [ "$SUMMARY_MISSING" -ne 0 ]; then
+          echo "::error::Load gate failed."
+          exit 1
         fi
 
   # --- DAST (Nightly) ---
