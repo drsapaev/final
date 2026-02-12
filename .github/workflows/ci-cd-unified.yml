@@ -12,7 +12,7 @@ on:
 env:
   PYTHON_VERSION: '3.11.10'
   NODE_VERSION: '20'
-  DATABASE_URL: 'sqlite:///./clinic.db'
+  DATABASE_URL: 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
   CORS_DISABLE: '1'
   WS_DEV_ALLOW: '1'
 
@@ -71,11 +71,12 @@ jobs:
         done
         
         if [ $BLACK_ERRORS -gt 0 ]; then
-          echo "❌ Найдено $BLACK_ERRORS директорий, требующих форматирования"
-          echo "Запустите: black app/ tests/"
-          exit 1
+          echo "⚠️ Найдено $BLACK_ERRORS директорий, требующих форматирования"
+          echo "ℹ️ Не блокируем pipeline на этапе миграции legacy-форматирования"
+          echo "Рекомендация: black app/ tests/"
+        else
+          echo "✅ Black форматирование OK"
         fi
-        echo "✅ Black форматирование OK"
         
         echo "📦 Проверяем isort сортировку импортов..."
         ISORT_ERRORS=0
@@ -91,11 +92,12 @@ jobs:
         done
         
         if [ $ISORT_ERRORS -gt 0 ]; then
-          echo "❌ Найдено $ISORT_ERRORS директорий, требующих сортировки импортов"
-          echo "Запустите: isort app/ tests/"
-          exit 1
+          echo "⚠️ Найдено $ISORT_ERRORS директорий, требующих сортировки импортов"
+          echo "ℹ️ Не блокируем pipeline на этапе миграции legacy-импортов"
+          echo "Рекомендация: isort app/ tests/"
+        else
+          echo "✅ Isort сортировка OK"
         fi
-        echo "✅ Isort сортировка OK"
     
     - name: 🔍 Линтинг и статический анализ
       run: |
@@ -104,7 +106,7 @@ jobs:
         mkdir -p quality-reports
         
         echo "🔍 Собираем ВСЕ ошибки линтинга для полного отчета..."
-        echo "Этот шаг НЕ блокирует pipeline - мы собираем все ошибки для исправления"
+        echo "Этот шаг блокирует pipeline при наличии ошибок"
         
         # Ruff - собираем все ошибки
         echo "🔍 Ruff - быстрый линтер (только app/ и tests/)..."
@@ -181,7 +183,9 @@ jobs:
         echo "MyPy: $MYPY_ERRORS ошибок типов"
         echo "Pylint: $PYLINT_ERRORS ошибок"
         TOTAL=$((RUFF_TOTAL + FLAKE8_ERRORS + MYPY_ERRORS + PYLINT_ERRORS))
+        BLOCKING_TOTAL=$((RUFF_TOTAL + FLAKE8_ERRORS))
         echo "ВСЕГО: $TOTAL ошибок"
+        echo "БЛОКИРУЮЩИХ: $BLOCKING_TOTAL (Ruff + Flake8)"
         echo "================================"
         
         # Создаем единый файл со всеми ошибками
@@ -196,6 +200,7 @@ jobs:
           echo "- MyPy: $MYPY_ERRORS ошибок типов"
           echo "- Pylint: $PYLINT_ERRORS ошибок"
           echo "- **ВСЕГО: $TOTAL ошибок**"
+          echo "- **БЛОКИРУЮЩИХ: $BLOCKING_TOTAL (Ruff + Flake8)**"
           echo ""
           
           if [ $RUFF_ERRORS -gt 0 ]; then
@@ -241,9 +246,9 @@ jobs:
         echo "📦 Все отчеты сохранены в quality-reports/"
         
         # Показываем краткую сводку
-        if [ $TOTAL -gt 0 ]; then
+        if [ $BLOCKING_TOTAL -gt 0 ]; then
           echo ""
-          echo "⚠️ ВНИМАНИЕ: Найдено $TOTAL ошибок!"
+          echo "⚠️ ВНИМАНИЕ: Найдено $TOTAL ошибок (блокирующих: $BLOCKING_TOTAL)!"
           echo "📄 Полный отчет: quality-reports/ALL_ERRORS_REPORT.md"
           echo "💡 Рекомендация: Исправьте все ошибки перед следующим коммитом"
           echo ""
@@ -251,11 +256,14 @@ jobs:
           echo "  cd backend"
           echo "  python scripts/collect_linting_errors.py"
           echo ""
-          # НЕ блокируем pipeline - только предупреждаем
-          # Раскомментируйте следующую строку после исправления всех ошибок:
-          # exit 1
+          echo "❌ Блокируем pipeline из-за Ruff/Flake8 ошибок"
+          exit 1
         else
-          echo "✅ Все проверки пройдены успешно!"
+          if [ $TOTAL -gt 0 ]; then
+            echo "✅ Блокирующие проверки пройдены. MyPy/Pylint ошибки сохранены в отчете (не блокируют)."
+          else
+            echo "✅ Все проверки пройдены успешно!"
+          fi
         fi
     
     - name: 📄 Создание документа с ошибками
@@ -401,12 +409,12 @@ jobs:
     - name: 🔍 Линтинг frontend
       run: |
         cd frontend
-        npm run lint || echo "⚠️ Frontend линтинг нашел проблемы"
+        npm run lint
     
     - name: 🧪 Тесты frontend
       run: |
         cd frontend
-        npm test -- --coverage --watchAll=false || echo "⚠️ Frontend тесты не прошли"
+        npm run test:run -- --coverage
     
     - name: 🏗️ Сборка frontend
       run: |
@@ -419,6 +427,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: code-quality
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
     
     steps:
     - uses: actions/checkout@v4
@@ -439,13 +465,28 @@ jobs:
     - name: 🗄️ Подготовка базы данных
       run: |
         cd backend
-        # Создаем тестовую базу данных
-        python -c "
-        from app.db.base import Base
-        from app.db.session import engine
-        Base.metadata.create_all(bind=engine)
-        print('✅ Тестовая база данных создана')
-        "
+        echo "⏳ Ожидаем готовность Postgres..."
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        url = os.environ["DATABASE_URL"]
+        engine = create_engine(url)
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
+        alembic current
     
     - name: 🧪 Запуск тестов
       run: |
@@ -453,7 +494,7 @@ jobs:
         echo "🔍 Проверяем конфигурацию pytest:"
         cat pytest.ini
         echo "🧪 Запускаем тесты с покрытием:"
-        pytest tests/ --dead-fixtures || echo "⚠️ Backend тесты не прошли"
+        pytest tests/ --dead-fixtures
         echo "📁 Проверяем созданные файлы:"
         ls -la htmlcov/ || echo "Папка htmlcov не найдена"
         if [ ! -d "htmlcov" ]; then
@@ -461,6 +502,17 @@ jobs:
           mkdir -p htmlcov
           echo "Placeholder coverage report - tests completed successfully" > htmlcov/index.html
         fi
+
+    - name: 🧪 Critical E2E Smoke
+      run: |
+        cd backend
+        echo "🔬 Запускаем критичные E2E сценарии (queue/payment/rbac/emr/print)..."
+        pytest -q \
+          tests/integration/test_queue_time_websocket_e2e.py \
+          tests/integration/test_payment_init_e2e.py \
+          tests/integration/test_rbac_matrix.py \
+          tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_fill_emr \
+          tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
     
     - name: 📊 Загрузка отчета покрытия
       uses: actions/upload-artifact@v4
@@ -475,6 +527,7 @@ jobs:
     name: 🔒 Security сканирование
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [code-quality, frontend-tests, backend-tests]
     
     steps:
     - uses: actions/checkout@v4
@@ -496,11 +549,11 @@ jobs:
       run: |
         cd backend
         # Safety для проверки уязвимостей в зависимостях
-        safety check --json || true
+        safety check --json
         # Bandit для анализа безопасности кода
-        bandit -r app -f json || true
+        bandit -r app -f json
         # Semgrep для статического анализа безопасности
-        semgrep --config=auto app/ || true
+        semgrep --config=auto app/
 
   # --- Docker сборка ---
   docker:
@@ -559,6 +612,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [backend-tests, frontend-tests]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
     
     steps:
     - uses: actions/checkout@v4
@@ -581,33 +653,36 @@ jobs:
         pip list | grep -E "(fastapi|uvicorn|requests|httpx)" || true
     
     - name: 🗄️ Подготовка тестовой базы
-      env:
-        DATABASE_URL: "sqlite:///./test_clinic.db"
-        CORS_DISABLE: "1"
-        WS_DEV_ALLOW: "1"
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
-        python -c "
+        echo "⏳ Ожидаем готовность Postgres..."
+        python - <<'PY'
         import os
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
-        os.environ['CORS_DISABLE'] = '1'
-        os.environ['WS_DEV_ALLOW'] = '1'
-        from app.db.base import Base
-        from app.db.session import engine
-        Base.metadata.create_all(bind=engine)
-        print('✅ Тестовая база данных создана')
-        "
+        import time
+        from sqlalchemy import create_engine, text
+
+        url = os.environ["DATABASE_URL"]
+        engine = create_engine(url)
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
+        alembic current
     
     - name: 🚀 Запуск сервера
-      env:
-        DATABASE_URL: "sqlite:///./test_clinic.db"
-        CORS_DISABLE: "1"
-        WS_DEV_ALLOW: "1"
       run: |
         set -e
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
+        export DATABASE_URL="${DATABASE_URL}"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
@@ -618,7 +693,7 @@ jobs:
         python -c "
         import os
         import sys
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Python version:', sys.version[:5])
@@ -635,7 +710,7 @@ jobs:
         echo "  - Testing app.ws.queue_ws..."
         python -c "
         import os
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
         from app.ws.queue_ws import router, ws_queue
@@ -645,7 +720,7 @@ jobs:
         echo "  - Testing app.api.deps..."
         python -c "
         import os
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
         from app.api.deps import create_access_token
@@ -657,7 +732,7 @@ jobs:
         import os
         import sys
         import traceback
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Testing api.v1.api import...')
@@ -675,7 +750,7 @@ jobs:
           python -c "
           import os
           import sys
-          os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+          os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
           os.environ['CORS_DISABLE'] = '1'
           os.environ['WS_DEV_ALLOW'] = '1'
           modules_to_test = [
@@ -706,7 +781,7 @@ jobs:
         import os
         import sys
         import traceback
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Testing app.main import...')
@@ -728,7 +803,7 @@ jobs:
         import os
         import sys
         import traceback
-        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Testing app from app.main import...')
@@ -837,11 +912,276 @@ jobs:
           kill $(cat backend/server.pid) 2>/dev/null || true
         fi
 
+  # --- Load Tests (Nightly/Manual) ---
+  load-tests-nightly:
+    name: ⚡ Load Tests (k6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [security, integration]
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
+      TARGET_RPS: '30'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: 📦 Install backend dependencies
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 🗄️ Prepare database
+      run: |
+        cd backend
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(os.environ["DATABASE_URL"])
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
+
+    - name: 🚀 Start API for load test
+      run: |
+        cd backend
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > load_server.log 2>&1 &
+        echo $! > load_server.pid
+        for i in {1..30}; do
+          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            echo "✅ API ready for load test"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "❌ API did not start"
+        tail -100 load_server.log || true
+        exit 1
+
+    - name: ⚡ Run k6 baseline scenario
+      run: |
+        mkdir -p artifacts/load
+        docker run --rm --network=host \
+          -e BASE_URL=http://127.0.0.1:8000 \
+          -e TARGET_RPS=${TARGET_RPS} \
+          -v ${{ github.workspace }}/ops/load:/scripts \
+          -v ${{ github.workspace }}/artifacts/load:/artifacts \
+          grafana/k6:latest \
+          run /scripts/clinic_core.js \
+          --summary-export=/artifacts/k6-summary.json
+
+    - name: 🚦 Check load regression
+      run: |
+        python ops/scripts/check_load_regression.py \
+          --summary artifacts/load/k6-summary.json \
+          --baseline ops/load/baseline_targets.json \
+          --report artifacts/load/load-regression-report.md
+
+    - name: 📤 Upload load artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: load-test-report
+        path: |
+          artifacts/load/k6-summary.json
+          artifacts/load/load-regression-report.md
+        if-no-files-found: warn
+
+    - name: 🛑 Stop API
+      if: always()
+      run: |
+        if [ -f backend/load_server.pid ]; then
+          kill $(cat backend/load_server.pid) 2>/dev/null || true
+        fi
+
+  # --- DAST (Nightly) ---
+  dast-zap-nightly:
+    name: 🛡️ DAST ZAP (Nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: 📦 Install backend dependencies
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 🗄️ Prepare database
+      run: |
+        cd backend
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(os.environ["DATABASE_URL"])
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
+
+    - name: 🚀 Start API for DAST
+      run: |
+        cd backend
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > zap_server.log 2>&1 &
+        echo $! > zap_server.pid
+        for i in {1..30}; do
+          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            echo "✅ API is ready for ZAP scan"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "❌ API did not start"
+        tail -100 zap_server.log || true
+        exit 1
+
+    - name: 🔎 Run ZAP baseline scan
+      run: |
+        mkdir -p zap-report
+        docker run --rm --network=host \
+          -v ${{ github.workspace }}/zap-report:/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t http://127.0.0.1:8000 \
+          -J /zap/wrk/zap-report.json \
+          -r /zap/wrk/zap-report.html \
+          -w /zap/wrk/zap-warnings.md \
+          -m 5
+
+    - name: 🚦 Enforce DAST policy
+      run: |
+        python - <<'PY'
+        import json
+        from pathlib import Path
+
+        report = json.loads(Path("zap-report/zap-report.json").read_text(encoding="utf-8"))
+        high = 0
+        medium = 0
+
+        for site in report.get("site", []):
+          for alert in site.get("alerts", []):
+            risk = str(alert.get("riskcode", "0"))
+            if risk == "3":
+              high += 1
+            elif risk == "2":
+              medium += 1
+
+        print(f"ZAP alerts: high={high}, medium={medium}")
+        if high > 0 or medium > 0:
+          raise SystemExit(1)
+        PY
+
+    - name: 📤 Upload ZAP artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: zap-nightly-report
+        path: zap-report/
+        if-no-files-found: warn
+
+    - name: 🛑 Stop API
+      if: always()
+      run: |
+        if [ -f backend/zap_server.pid ]; then
+          kill $(cat backend/zap_server.pid) 2>/dev/null || true
+        fi
+
   # --- Документация ---
   docs:
     name: 📚 Генерация документации
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
     
     steps:
     - uses: actions/checkout@v4
@@ -862,6 +1202,29 @@ jobs:
     - name: 📚 Генерация API документации
       run: |
         cd backend
+        echo "⏳ Ожидаем готовность Postgres..."
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        url = os.environ["DATABASE_URL"]
+        engine = create_engine(url)
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
+        alembic current
+
         # Проверяем существование основных файлов
         if [ ! -f "app/main.py" ]; then
           echo "❌ Файл app/main.py не найден"
@@ -879,7 +1242,7 @@ jobs:
             sys.path.insert(0, '.')
             
             # Устанавливаем переменные окружения ПЕРЕД импортом
-            os.environ['DATABASE_URL'] = 'sqlite:///./clinic.db'
+            os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
             os.environ['CORS_DISABLE'] = '1'
             os.environ['WS_DEV_ALLOW'] = '1'
             
@@ -968,6 +1331,8 @@ jobs:
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
     
     steps:
     - uses: actions/checkout@v4
@@ -997,3 +1362,4 @@ jobs:
         else
           echo "❌ Развертывание не выполнено"
         fi
+
