@@ -28,6 +28,9 @@ depends_on = None
 
 def upgrade() -> None:
     conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    table_names = set(inspector.get_table_names())
+    has_appointments = "appointments" in table_names
 
     # ============================================================
     # 1. СОЗДАНИЕ НОВЫХ ТАБЛИЦ
@@ -123,22 +126,23 @@ def upgrade() -> None:
         WHERE services.department IS NOT NULL
     """))
 
-    # 2.3 Appointment: добавить department_id
-    with op.batch_alter_table('appointments') as batch_op:
-        batch_op.add_column(sa.Column('department_id', sa.Integer(), nullable=True))
-        batch_op.create_index('ix_appointments_department_id', ['department_id'])
-        batch_op.create_foreign_key('fk_appointments_department_id',
-            'departments', ['department_id'], ['id'], ondelete='SET NULL')
+    # 2.3 Appointment: добавить department_id (если таблица присутствует)
+    if has_appointments:
+        with op.batch_alter_table('appointments') as batch_op:
+            batch_op.add_column(sa.Column('department_id', sa.Integer(), nullable=True))
+            batch_op.create_index('ix_appointments_department_id', ['department_id'])
+            batch_op.create_foreign_key('fk_appointments_department_id',
+                'departments', ['department_id'], ['id'], ondelete='SET NULL')
 
-    # DATA MIGRATION: конвертируем String → ID для appointments
-    conn.execute(text("""
-        UPDATE appointments
-        SET department_id = (
-            SELECT d.id FROM departments d
-            WHERE d.key = appointments.department
-        )
-        WHERE appointments.department IS NOT NULL
-    """))
+        # DATA MIGRATION: конвертируем String → ID для appointments
+        conn.execute(text("""
+            UPDATE appointments
+            SET department_id = (
+                SELECT d.id FROM departments d
+                WHERE d.key = appointments.department
+            )
+            WHERE appointments.department IS NOT NULL
+        """))
 
     # 2.4 Visit: добавить department_id
     with op.batch_alter_table('visits') as batch_op:
@@ -197,6 +201,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Откат миграции"""
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    table_names = set(inspector.get_table_names())
 
     # Удаляем department_id из schedule_templates
     with op.batch_alter_table('schedule_templates') as batch_op:
@@ -210,11 +217,12 @@ def downgrade() -> None:
         batch_op.drop_index('ix_visits_department_id')
         batch_op.drop_column('department_id')
 
-    # Удаляем department_id из appointments
-    with op.batch_alter_table('appointments') as batch_op:
-        batch_op.drop_constraint('fk_appointments_department_id', type_='foreignkey')
-        batch_op.drop_index('ix_appointments_department_id')
-        batch_op.drop_column('department_id')
+    # Удаляем department_id из appointments (если таблица существует)
+    if 'appointments' in table_names:
+        with op.batch_alter_table('appointments') as batch_op:
+            batch_op.drop_constraint('fk_appointments_department_id', type_='foreignkey')
+            batch_op.drop_index('ix_appointments_department_id')
+            batch_op.drop_column('department_id')
 
     # Удаляем department_id из services
     with op.batch_alter_table('services') as batch_op:

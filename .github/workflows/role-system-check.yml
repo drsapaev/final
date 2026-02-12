@@ -20,6 +20,7 @@ jobs:
       CORS_DISABLE: "1"
       WS_DEV_ALLOW: "1"
       DISABLE_2FA_REQUIREMENT: "1"
+      SECRET_KEY: "test-secret-key-for-ci-cd-minimum-32-characters-long"
     steps:
     - uses: actions/checkout@v4
 
@@ -38,6 +39,14 @@ jobs:
         cd backend
         python - << 'PY'
         import sys
+        import os
+        
+        # Устанавливаем переменные окружения ПЕРЕД импортом модулей
+        os.environ['DATABASE_URL'] = 'sqlite:///./clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
+        os.environ['SECRET_KEY'] = 'test-secret-key-for-ci-cd-minimum-32-characters-long'
+        
         sys.path.insert(0, '.')
 
         from app.db.base import Base
