@@ -5,7 +5,6 @@ API endpoints для управления AI в админ панели
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -24,6 +23,7 @@ from app.schemas.ai_config import (
     AITestResult,
     AIUsageLogOut,
 )
+from app.services.admin_ai_service import AdminAIService
 
 router = APIRouter()
 
@@ -318,20 +318,12 @@ def get_ai_usage_logs(
 ):
     """Получить логи использования AI"""
     try:
-        query = db.query(crud_ai.AIUsageLog)
-
-        if provider_id:
-            query = query.filter(crud_ai.AIUsageLog.provider_id == provider_id)
-        if task_type:
-            query = query.filter(crud_ai.AIUsageLog.task_type == task_type)
-        if success_only is not None:
-            query = query.filter(crud_ai.AIUsageLog.success == success_only)
-
-        logs = (
-            query.order_by(desc(crud_ai.AIUsageLog.created_at))
-            .offset(skip)
-            .limit(limit)
-            .all()
+        logs = AdminAIService(db).get_usage_logs(
+            skip=skip,
+            limit=limit,
+            provider_id=provider_id,
+            task_type=task_type,
+            success_only=success_only,
         )
         return logs
     except Exception as e:

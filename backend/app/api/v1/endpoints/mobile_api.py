@@ -35,6 +35,7 @@ from app.schemas.mobile import (
     MobileVisitDetailOut,
     PatientProfileOut,
 )
+from app.services.mobile_api_service import MobileApiService
 from app.services.notifications import notification_sender_service
 
 router = APIRouter()
@@ -108,8 +109,10 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
 
         # Обновляем токен устройства
         if credentials.device_token:
-            user.device_token = credentials.device_token
-            db.commit()
+            MobileApiService(db).update_user_device_token(
+                user=user,
+                device_token=credentials.device_token,
+            )
 
         return MobileLoginResponse(
             access_token=access_token,
@@ -468,9 +471,9 @@ async def mark_notification_read(
         # MobileNotificationService used 'read' field.
         
         if hasattr(notification, 'read'):
-             notification.read = True
-             db.commit()
-             success = True
+             success = MobileApiService(db).mark_notification_as_read(
+                 notification=notification
+             )
         else:
              # If no read field, maybe status='read'?
              # crud_notification.update_status(db, notification_id, status='read')

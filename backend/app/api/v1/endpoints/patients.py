@@ -8,10 +8,12 @@ from app.crud.patient import patient as patient_crud
 from app.core.audit import log_critical_change
 from app.models.user import User
 from app.schemas import patient as patient_schemas
+from app.services.patient_portal_service import (
+    PatientPortalDomainError,
+    PatientPortalService,
+)
 from app.services.patient_service import PatientService
 
-from app.models.appointment import Appointment
-from app.models.lab import LabOrder
 from app.schemas import appointment as appointment_schemas
 from app.schemas import lab as lab_schemas
 
@@ -45,20 +47,14 @@ def get_my_appointment_details(
     if not current_user.patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
-    # Ищем запись, которая принадлежит этому пациенту
-    appointment = (
-        db.query(Appointment)
-        .filter(
-            Appointment.id == appointment_id,
-            Appointment.patient_id == current_user.patient.id
+    service = PatientPortalService(db)
+    try:
+        return service.get_my_appointment_details(
+            appointment_id=appointment_id,
+            patient_id=current_user.patient.id,
         )
-        .first()
-    )
-    
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
-
-    return appointment
+    except PatientPortalDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("/results", response_model=List[lab_schemas.LabOrderOut])
@@ -72,14 +68,7 @@ def get_my_results(
     if not current_user.patient:
         return []
 
-    # Получаем результаты (LabOrder) для пациента
-    results = (
-        db.query(LabOrder)
-        .filter(LabOrder.patient_id == current_user.patient.id)
-        .all()
-    )
-    
-    return results
+    return PatientPortalService(db).get_my_results(patient_id=current_user.patient.id)
 
 
 @router.get("/", response_model=List[patient_schemas.Patient])

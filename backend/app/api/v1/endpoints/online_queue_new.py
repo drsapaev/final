@@ -27,7 +27,10 @@ from app.services.queue_service import (
     QueueNotFoundError,
     QueueValidationError,
 )
-from app.models.online_queue import OnlineQueueEntry  # Added import
+from app.services.online_queue_new_service import (
+    OnlineQueueNewDomainError,
+    OnlineQueueNewService,
+)
 
 router = APIRouter()
 
@@ -293,10 +296,9 @@ def cancel_queue_entry(
     """
     Отмена записи в онлайн-очереди
     """
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Запись очереди не найдена")
-    
-    entry.status = "canceled"
-    db.commit()
+    service = OnlineQueueNewService(db)
+    try:
+        service.cancel_entry(entry_id=entry_id)
+    except OnlineQueueNewDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return {"message": "Запись отменена", "status": "canceled"}

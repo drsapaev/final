@@ -43,6 +43,10 @@ from app.services.emr_v2_service import (
     EMRSignedError,
     emr_v2_service,
 )
+from app.services.emr_doctor_history_service import (
+    EMRDoctorHistoryDomainError,
+    EMRDoctorHistoryService,
+)
 from app.services.section_templates_service import DoctorSectionTemplatesService
 
 logger = logging.getLogger(__name__)
@@ -457,57 +461,21 @@ async def get_doctor_history(
     if current_user.id != doctor_id and not current_user.has_role("Admin"):
         raise HTTPException(status_code=403, detail="Access denied")
     
-    # Map field names to EMR columns
-    field_map = {
-        "complaints": "complaints",
-        "anamnesis_morbi": "anamnesis_morbi",
-        "anamnesis_vitae": "anamnesis_vitae",
-        "examination": "examination",
-        "diagnosis": "diagnosis",
-        "treatment": "treatment",
-        "recommendations": "recommendations",
-    }
-    
-    db_field = field_map.get(field_name)
-    if not db_field:
-        raise HTTPException(status_code=400, detail=f"Invalid field name: {field_name}")
-    
+    history_service = EMRDoctorHistoryService(db)
     try:
-        # Query EMR records created by this doctor
-        from app.models.emr_v2 import EMRRecord
-        from sqlalchemy import desc
-        
-        query = db.query(EMRRecord).filter(
-            EMRRecord.created_by == doctor_id,
-            getattr(EMRRecord, db_field).isnot(None),
-            getattr(EMRRecord, db_field) != "",
+        entries = history_service.get_history_entries(
+            doctor_id=doctor_id,
+            field_name=field_name,
+            search_text=search_text,
+            limit=limit,
         )
-        
-        # If search text provided, filter by similarity (simple LIKE)
-        if search_text and len(search_text) >= 3:
-            query = query.filter(
-                getattr(EMRRecord, db_field).ilike(f"%{search_text[:50]}%")
-            )
-        
-        # Order by recency, limit
-        records = query.order_by(desc(EMRRecord.updated_at)).limit(limit).all()
-        
-        entries = []
-        for record in records:
-            content = getattr(record, db_field, "")
-            if content:
-                entries.append(DoctorHistoryEntry(
-                    content=content[:500],  # Limit content size
-                    diagnosis=record.diagnosis[:200] if record.diagnosis else None,
-                    created_at=record.created_at.isoformat() if record.created_at else "",
-                ))
-        
         return DoctorHistoryResponse(
-            entries=entries,
+            entries=[DoctorHistoryEntry(**entry) for entry in entries],
             total=len(entries),
             field_name=field_name,
         )
-        
-    except Exception as e:
-        logger.error(f"[EMR v2] Doctor history error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch history")
+    except EMRDoctorHistoryDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        logger.error("[EMR v2] Doctor history error: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to fetch history") from exc

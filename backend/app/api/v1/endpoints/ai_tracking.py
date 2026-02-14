@@ -2,7 +2,7 @@
 API endpoints для трекинга AI моделей
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,6 +14,7 @@ from app.schemas.ai_tracking import (
     AIProviderStats,
     AIResponseWithTracking,
 )
+from app.services.ai_tracking_api_service import AITrackingApiService
 from app.services.ai_tracking_service import get_ai_tracking_service
 
 router = APIRouter()
@@ -130,41 +131,8 @@ async def get_recent_ai_requests(
     - Время выполнения
     - Результат
     """
-    from app.models.ai_config import AIProvider, AIUsageLog
-
     try:
-        # Получаем последние записи
-        logs = (
-            db.query(AIUsageLog, AIProvider)
-            .join(AIProvider, AIUsageLog.provider_id == AIProvider.id)
-            .order_by(AIUsageLog.created_at.desc())
-            .limit(limit)
-            .all()
-        )
-
-        requests = []
-        for log, provider in logs:
-            request_info = {
-                "id": log.id,
-                "task_type": log.task_type,
-                "specialty": log.specialty,
-                "provider_name": provider.name,
-                "model_name": provider.model,
-                "display_name": provider.display_name,
-                "success": log.success,
-                "response_time_ms": log.response_time_ms,
-                "tokens_used": log.tokens_used,
-                "cached_response": log.cached_response,
-                "error_message": log.error_message,
-                "created_at": log.created_at,
-            }
-            requests.append(request_info)
-
-        return {
-            "requests": requests,
-            "total": len(requests),
-            "timestamp": datetime.utcnow(),
-        }
+        return AITrackingApiService(db).get_recent_requests(limit=limit)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Ошибка получения запросов: {str(e)}"
@@ -286,68 +254,8 @@ async def get_ai_usage_trends(
     - Популярные модели
     - Тренды по специализациям
     """
-    from sqlalchemy import desc, func
-
-    from app.models.ai_config import AIProvider, AIUsageLog
-
     try:
-        # Получаем данные по дням
-        cutoff_date = datetime.utcnow() - timedelta(days=days_back)
-
-        daily_usage = (
-            db.query(
-                func.date(AIUsageLog.created_at).label('date'),
-                AIProvider.name.label('provider_name'),
-                AIProvider.model.label('model_name'),
-                func.count(AIUsageLog.id).label('requests_count'),
-                func.avg(AIUsageLog.response_time_ms).label('avg_response_time'),
-                func.sum(AIUsageLog.tokens_used).label('total_tokens'),
-            )
-            .join(AIProvider, AIUsageLog.provider_id == AIProvider.id)
-            .filter(AIUsageLog.created_at >= cutoff_date)
-            .group_by(
-                func.date(AIUsageLog.created_at),
-                AIProvider.id,
-                AIProvider.name,
-                AIProvider.model,
-            )
-            .order_by(func.date(AIUsageLog.created_at).desc())
-            .all()
-        )
-
-        # Группируем по дням
-        trends = {}
-        for row in daily_usage:
-            date_str = row.date.strftime('%Y-%m-%d')
-            if date_str not in trends:
-                trends[date_str] = {
-                    'date': date_str,
-                    'total_requests': 0,
-                    'total_tokens': 0,
-                    'models': [],
-                }
-
-            trends[date_str]['total_requests'] += row.requests_count
-            trends[date_str]['total_tokens'] += row.total_tokens or 0
-            trends[date_str]['models'].append(
-                {
-                    'provider': row.provider_name,
-                    'model': row.model_name,
-                    'requests': row.requests_count,
-                    'avg_response_time': round(row.avg_response_time or 0, 2),
-                    'tokens': row.total_tokens or 0,
-                }
-            )
-
-        # Сортируем по дате
-        sorted_trends = sorted(trends.values(), key=lambda x: x['date'], reverse=True)
-
-        return {
-            "trends": sorted_trends,
-            "period_days": days_back,
-            "total_days": len(sorted_trends),
-            "timestamp": datetime.utcnow(),
-        }
+        return AITrackingApiService(db).get_usage_trends(days_back=days_back)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Ошибка получения трендов: {str(e)}"
