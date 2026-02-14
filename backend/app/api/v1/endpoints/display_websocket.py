@@ -19,13 +19,16 @@ from fastapi import (
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.core.config import settings
 from app.crud import display_config as crud_display, user as crud_user
 from app.db.session import SessionLocal
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.services.display_websocket import DisplayWebSocketManager, get_display_manager
+from app.services.display_websocket_api_service import (
+    DisplayWebSocketApiDomainError,
+    DisplayWebSocketApiService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,58 +134,19 @@ async def call_patient_to_board(
                 detail="Не указан ID записи в очереди",
             )
 
-        # Получаем запись в очереди
-        queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        return await DisplayWebSocketApiService(db).call_patient(
+            entry_id=entry_id,
+            board_ids=board_ids,
         )
-
-        if not queue_entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись в очереди не найдена",
-            )
-
-        # Обновляем статус
-        queue_entry.status = "called"
-        queue_entry.called_at = datetime.utcnow()
-        db.commit()
-
-        # Получаем данные врача
-        doctor = queue_entry.queue.specialist
-        doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
-        cabinet = doctor.cabinet if doctor else None
-
-        # Транслируем на табло
-        manager = get_display_manager()
-        await manager.broadcast_patient_call(
-            queue_entry=queue_entry,
-            doctor_name=doctor_name,
-            cabinet=cabinet,
-            board_ids=board_ids if board_ids else None,
-        )
-
-        return {
-            "success": True,
-            "message": f"Пациент #{queue_entry.number} вызван на табло",
-            "call_data": {
-                "number": queue_entry.number,
-                "patient_name": queue_entry.patient_name,
-                "doctor": doctor_name,
-                "cabinet": cabinet,
-                "called_at": queue_entry.called_at.isoformat(),
-            },
-            "boards_notified": (
-                len(board_ids) if board_ids else len(manager.connections)
-            ),
-        }
-
+    except DisplayWebSocketApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка вызова пациента на табло: {str(e)}",
-        )
+        ) from e
 
 
 # ===================== WEBSOCKET ДЛЯ ОТДЕЛЕНИЙ =====================
@@ -250,60 +214,12 @@ async def websocket_queue_department(
 
 async def _send_department_queue_state(websocket: WebSocket, department: str):
     """Отправляет текущее состояние очереди отделения"""
+    db = SessionLocal()
     try:
-        from datetime import date
-
-        from app.db.session import SessionLocal
-
-        db = SessionLocal()
-
-        # Получаем очереди отделения на сегодня
-        today = date.today()
-
-        # Получаем записи очереди
-        queue_entries = (
-            db.query(OnlineQueueEntry)
-            .join(DailyQueue)
-            .filter(DailyQueue.day == today, DailyQueue.active == True)
-            .all()
+        payload = DisplayWebSocketApiService(db).get_department_queue_state_payload(
+            department=department
         )
-
-        # Фильтруем по отделению (упрощенная логика)
-        filtered_entries = []
-        for entry in queue_entries:
-            # Здесь можно добавить более сложную логику фильтрации по отделению
-            filtered_entries.append(
-                {
-                    "id": entry.id,
-                    "number": entry.number,
-                    "patient_name": entry.patient_name,
-                    "status": entry.status,
-                    "source": entry.source,
-                    "created_at": (
-                        entry.created_at.isoformat() if entry.created_at else None
-                    ),
-                }
-            )
-
-        # Отправляем состояние
-        await websocket.send_text(
-            json.dumps(
-                {
-                    "type": "queue_state",
-                    "department": department,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "entries": filtered_entries,
-                    "total_waiting": len(
-                        [e for e in filtered_entries if e["status"] == "waiting"]
-                    ),
-                    "current_number": max(
-                        [e["number"] for e in filtered_entries], default=0
-                    ),
-                }
-            )
-        )
-
-        db.close()
+        await websocket.send_text(json.dumps(payload))
 
     except Exception as e:
         logger.error(f"Error sending department queue state: {e}")
@@ -312,6 +228,8 @@ async def _send_department_queue_state(websocket: WebSocket, department: str):
                 {"type": "error", "message": "Ошибка получения состояния очереди"}
             )
         )
+    finally:
+        db.close()
 
 
 @router.post("/announcement")
@@ -436,77 +354,16 @@ async def quick_call_next_patient(
     Быстрый вызов следующего пациента
     """
     try:
-        from datetime import date
-
-        from app.models.clinic import Doctor
-
-        # Находим врача по специальности
-        doctor = (
-            db.query(Doctor)
-            .filter(Doctor.specialty == specialty, Doctor.active == True)
-            .first()
+        return await DisplayWebSocketApiService(db).quick_call_next(
+            specialty=specialty,
+            board_id=board_id,
         )
-
-        if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Врач специальности {specialty} не найден",
-            )
-
-        # Находим дневную очередь
-        from app.models.online_queue import DailyQueue
-
-        today = date.today()
-        # ⭐ ВАЖНО: DailyQueue.specialist_id - это user_id, а не doctor_id
-        doctor_user_id = doctor.user_id if doctor.user_id else None
-        daily_queue = None
-        if doctor_user_id:
-            daily_queue = (
-                db.query(DailyQueue)
-                .filter(
-                    DailyQueue.day == today,
-                    DailyQueue.specialist_id
-                    == doctor_user_id,  # ⭐ user_id, а не doctor.id
-                )
-                .first()
-            )
-
-        if not daily_queue:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Очередь на сегодня не найдена",
-            )
-
-        # Находим следующего пациента в статусе "waiting"
-        next_entry = (
-            db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == daily_queue.id,
-                OnlineQueueEntry.status == "waiting",
-            )
-            .order_by(OnlineQueueEntry.number)
-            .first()
-        )
-
-        if not next_entry:
-            return {
-                "success": False,
-                "message": "Нет пациентов в очереди",
-                "queue_empty": True,
-            }
-
-        # Вызываем пациента
-        call_request = {
-            "entry_id": next_entry.id,
-            "board_ids": [board_id] if board_id else [],
-        }
-
-        return await call_patient_to_board(call_request, db, current_user)
-
+    except DisplayWebSocketApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка быстрого вызова: {str(e)}",
-        )
+        ) from e

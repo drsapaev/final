@@ -15,10 +15,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user
-from app.core.rbac import AIPermission, require_ai_permission, has_permission
+from app.api.deps import get_db
+from app.core.config import settings
+from app.core.rbac import AIPermission, has_permission, require_ai_permission
 from app.models.user import User
-from app.models.ai_chat import AIChatSession, AIChatMessage
+from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
 from app.services.ai.chat_service import get_chat_service
 
 logger = logging.getLogger(__name__)
@@ -160,24 +161,14 @@ async def get_session(
     """
     Получить информацию о сессии.
     """
-    session = db.query(AIChatSession).filter(
-        AIChatSession.id == session_id,
-        AIChatSession.user_id == current_user.id
-    ).first()
-    
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    return ChatSessionResponse(
-        id=session.id,
-        title=session.title,
-        context_type=session.context_type,
-        specialty=session.specialty,
-        is_active=session.is_active,
-        message_count=len(session.messages),
-        created_at=session.created_at.isoformat(),
-        updated_at=session.updated_at.isoformat()
-    )
+    try:
+        payload = AIChatApiService(db).get_session_payload(
+            session_id=session_id,
+            user_id=current_user.id,
+        )
+        return ChatSessionResponse(**payload)
+    except AIChatApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.delete("/sessions/{session_id}")
@@ -210,33 +201,16 @@ async def get_messages(
     """
     Получить историю сообщений сессии.
     """
-    # Проверяем доступ
-    session = db.query(AIChatSession).filter(
-        AIChatSession.id == session_id,
-        AIChatSession.user_id == current_user.id
-    ).first()
-    
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    service = get_chat_service(db)
-    messages = await service.get_history(session_id, limit=limit, before_id=before_id)
-    
-    return [
-        ChatMessageResponse(
-            id=m.id,
-            role=m.role,
-            content=m.content,
-            provider=m.provider,
-            model=m.model,
-            tokens_used=m.tokens_used,
-            latency_ms=m.latency_ms,
-            is_error=m.is_error,
-            was_cached=m.was_cached,
-            created_at=m.created_at.isoformat()
+    try:
+        payload = await AIChatApiService(db).get_messages_payload(
+            session_id=session_id,
+            user_id=current_user.id,
+            limit=limit,
+            before_id=before_id,
         )
-        for m in messages
-    ]
+        return [ChatMessageResponse(**item) for item in payload]
+    except AIChatApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post("/sessions/{session_id}/messages", response_model=ChatMessageResponse)
@@ -291,34 +265,16 @@ async def add_feedback(
     
     Используется для улучшения качества AI.
     """
-    # Проверяем что сообщение принадлежит пользователю
-    message = db.query(AIChatMessage).join(AIChatSession).filter(
-        AIChatMessage.id == message_id,
-        AIChatSession.user_id == current_user.id
-    ).first()
-    
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-    
-    service = get_chat_service(db)
-    
     try:
-        feedback = await service.add_feedback(
+        return await AIChatApiService(db).add_feedback_payload(
             message_id=message_id,
             user_id=current_user.id,
             feedback_type=request.feedback_type,
             comment=request.comment,
-            correction=request.correction
+            correction=request.correction,
         )
-        
-        return {
-            "message": "Feedback recorded",
-            "feedback_id": feedback.id,
-            "feedback_type": feedback.feedback_type
-        }
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except AIChatApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 # =============================================================================
@@ -329,21 +285,11 @@ async def authenticate_websocket(token: str, db: Session) -> Optional[User]:
     """
     Аутентификация WebSocket по JWT token.
     """
-    from jose import JWTError, jwt
-    from app.core.config import settings
-    
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: int = payload.get("sub")
-        
-        if user_id is None:
-            return None
-        
-        user = db.query(User).filter(User.id == user_id).first()
-        return user
-        
-    except JWTError:
-        return None
+    return AIChatApiService(db).authenticate_websocket_user(
+        token=token,
+        secret_key=settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
 
 
 @router.websocket("/ws")
