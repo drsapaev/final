@@ -9,10 +9,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.payments import get_payment_manager
 from app.db.transactions import transaction as transaction_ctx
 from app.models.payment import Payment
 from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+from app.services.payment_provider_manager_factory import get_payment_manager
 
 logger = logging.getLogger(__name__)
 

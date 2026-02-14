@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.core.config import settings
 from app.db.session import get_db
 from app.services.payment_cancel_service import (
     PaymentCancelDomainError,
@@ -30,7 +29,7 @@ from app.services.payment_test_init_service import (
     PaymentTestInitDomainError,
     PaymentTestInitService,
 )
-from app.services.payment_providers.manager import PaymentProviderManager
+from app.services.payment_provider_manager_factory import get_payment_manager
 
 router = APIRouter()
 
@@ -61,57 +60,6 @@ class PaymentInvoiceResponse(BaseModel):
 
 class PendingInvoicesResponse(BaseModel):
     invoices: List[PaymentInvoiceResponse]
-
-
-# Инициализация менеджера провайдеров
-payment_manager = None
-
-
-def get_payment_manager() -> PaymentProviderManager:
-    """Получение менеджера провайдеров платежей"""
-    global payment_manager
-
-    if payment_manager is None:
-        # Конфигурация провайдеров из настроек
-        config = {
-            "click": {
-                "enabled": getattr(
-                    settings, "CLICK_ENABLED", True
-                ),  # Включено для тестирования
-                "service_id": getattr(settings, "CLICK_SERVICE_ID", "test_service"),
-                "merchant_id": getattr(settings, "CLICK_MERCHANT_ID", "test_merchant"),
-                "secret_key": getattr(settings, "CLICK_SECRET_KEY", "test_secret"),
-                "base_url": getattr(
-                    settings, "CLICK_BASE_URL", "https://api.click.uz/v2"
-                ),
-            },
-            "payme": {
-                "enabled": getattr(
-                    settings, "PAYME_ENABLED", True
-                ),  # Включено для тестирования
-                "merchant_id": getattr(settings, "PAYME_MERCHANT_ID", "test_merchant"),
-                "secret_key": getattr(settings, "PAYME_SECRET_KEY", "test_secret"),
-                "base_url": getattr(
-                    settings, "PAYME_BASE_URL", "https://checkout.paycom.uz"
-                ),
-                "api_url": getattr(settings, "PAYME_API_URL", "https://api.paycom.uz"),
-            },
-            "kaspi": {
-                "enabled": getattr(
-                    settings, "KASPI_ENABLED", True
-                ),  # Включено для тестирования
-                "merchant_id": getattr(settings, "KASPI_MERCHANT_ID", "test_merchant"),
-                "secret_key": getattr(settings, "KASPI_SECRET_KEY", "test_secret"),
-                "base_url": getattr(settings, "KASPI_BASE_URL", "https://kaspi.kz/pay"),
-                "api_url": getattr(
-                    settings, "KASPI_API_URL", "https://api.kaspi.kz/pay/v1"
-                ),
-            },
-        }
-
-        payment_manager = PaymentProviderManager(config)
-
-    return payment_manager
 
 
 # Pydantic модели
