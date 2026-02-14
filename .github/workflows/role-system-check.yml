@@ -22,7 +22,7 @@ jobs:
       DISABLE_2FA_REQUIREMENT: "1"
       SECRET_KEY: "test-secret-key-for-ci-cd-minimum-32-characters-long"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python
       uses: actions/setup-python@v5
