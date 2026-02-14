@@ -82,3 +82,50 @@ class TestPaymentReadService:
         assert result["total"] == 2
         returned_ids = {item["payment_id"] for item in result["payments"]}
         assert returned_ids == {payment_1.id, payment_2.id}
+
+    def test_generate_receipt_not_found(self, db_session):
+        service = PaymentReadService(db_session)
+
+        with pytest.raises(PaymentReadDomainError) as exc_info:
+            service.generate_receipt(payment_id=999999, format_type="pdf")
+
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Платеж не найден"
+
+    def test_generate_receipt_success(self, db_session, test_visit):
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=8_000.0,
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.commit()
+        db_session.refresh(payment)
+
+        service = PaymentReadService(db_session)
+        result = service.generate_receipt(payment_id=payment.id, format_type="pdf")
+
+        assert result["success"] is True
+        assert result["receipt_data"]["payment_id"] == payment.id
+        assert result["format"] == "pdf"
+
+    def test_build_receipt_content_allows_missing_provider(self, db_session, test_visit):
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=8_000.0,
+            currency="UZS",
+            method="cash",
+            status="paid",
+            provider=None,
+        )
+        db_session.add(payment)
+        db_session.commit()
+        db_session.refresh(payment)
+
+        service = PaymentReadService(db_session)
+        content = service.build_receipt_content(payment_id=payment.id)
+
+        assert f"Номер платежа: {payment.id}" in content
+        assert "Провайдер: —" in content

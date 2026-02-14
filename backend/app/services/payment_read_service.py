@@ -84,3 +84,46 @@ class PaymentReadService:
                 }
             )
         return {"payments": payment_responses, "total": len(payment_responses)}
+
+    def generate_receipt(self, *, payment_id: int, format_type: str) -> dict[str, Any]:
+        payment = self.repository.get_payment(payment_id)
+        if not payment:
+            raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
+
+        receipt_data = {
+            "payment_id": payment.id,
+            "amount": float(payment.amount),
+            "currency": payment.currency,
+            "status": payment.status,
+            "provider": payment.provider,
+            "created_at": payment.created_at.isoformat() if payment.created_at else None,
+            "description": "Оплата медицинских услуг",
+        }
+        return {
+            "success": True,
+            "receipt_data": receipt_data,
+            "receipt_url": f"/api/v1/payments/{payment_id}/receipt/download",
+            "format": format_type,
+        }
+
+    def build_receipt_content(self, *, payment_id: int) -> str:
+        payment = self.repository.get_payment(payment_id)
+        if not payment:
+            raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
+
+        provider = payment.provider.title() if payment.provider else "—"
+        created_at = payment.created_at.strftime("%d.%m.%Y %H:%M") if payment.created_at else "—"
+        return f"""
+КВИТАНЦИЯ ОБ ОПЛАТЕ
+===================
+
+Номер платежа: {payment.id}
+Дата: {created_at}
+Сумма: {payment.amount} {payment.currency}
+Провайдер: {provider}
+Статус: {payment.status.title()}
+
+Описание: Оплата медицинских услуг
+
+Спасибо за использование наших услуг!
+        """.strip()

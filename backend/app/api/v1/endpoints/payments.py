@@ -432,36 +432,11 @@ def generate_receipt(
     current_user=Depends(deps.get_current_user),
 ):
     """Генерация квитанции об оплате"""
-
+    service = PaymentReadService(db)
     try:
-        # Получаем платеж
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
-        if not payment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
-            )
-
-        # Генерируем простую квитанцию
-        receipt_data = {
-            "payment_id": payment.id,
-            "amount": float(payment.amount),
-            "currency": payment.currency,
-            "status": payment.status,
-            "provider": payment.provider,
-            "created_at": payment.created_at.isoformat(),
-            "description": "Оплата медицинских услуг",
-        }
-
-        # Для демо возвращаем данные квитанции
-        return {
-            "success": True,
-            "receipt_data": receipt_data,
-            "receipt_url": f"/api/v1/payments/{payment_id}/receipt/download",
-            "format": format_type,
-        }
-
-    except HTTPException:
-        raise
+        return service.generate_receipt(payment_id=payment_id, format_type=format_type)
+    except PaymentReadDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -476,33 +451,11 @@ def download_receipt(
     current_user=Depends(deps.get_current_user),
 ):
     """Скачивание квитанции"""
-
+    service = PaymentReadService(db)
     try:
         from fastapi.responses import PlainTextResponse
 
-        # Получаем платеж
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
-        if not payment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
-            )
-
-        # Генерируем текстовую квитанцию
-        receipt_content = f"""
-КВИТАНЦИЯ ОБ ОПЛАТЕ
-===================
-
-Номер платежа: {payment.id}
-Дата: {payment.created_at.strftime('%d.%m.%Y %H:%M')}
-Сумма: {payment.amount} {payment.currency}
-Провайдер: {payment.provider.title()}
-Статус: {payment.status.title()}
-
-Описание: Оплата медицинских услуг
-
-Спасибо за использование наших услуг!
-        """.strip()
-
+        receipt_content = service.build_receipt_content(payment_id=payment_id)
         return PlainTextResponse(
             content=receipt_content,
             headers={
@@ -510,8 +463,8 @@ def download_receipt(
             },
         )
 
-    except HTTPException:
-        raise
+    except PaymentReadDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
