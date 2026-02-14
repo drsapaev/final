@@ -1,11 +1,9 @@
 # app/services/visit_payment_integration.py
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud.appointment import appointment as crud_appointment
-from app.crud.payment_webhook import update_webhook
 from app.models.enums import AppointmentStatus
 from app.repositories.visit_payment_integration_repository import (
     VisitPaymentIntegrationRepository,
@@ -20,10 +18,10 @@ class VisitPaymentIntegrationService:
     def create_visit_from_payment(
         db: Session,
         webhook: PaymentWebhookOut,
-        patient_id: Optional[int] = None,
-        doctor_id: Optional[int] = None,
-        notes: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[int]]:
+        patient_id: int | None = None,
+        doctor_id: int | None = None,
+        notes: str | None = None,
+    ) -> tuple[bool, str, int | None]:
         """
         Создание визита на основе успешного платежа
 
@@ -63,10 +61,9 @@ class VisitPaymentIntegrationService:
             db.commit()
 
             # Обновляем статус вебхука
-            update_webhook(
-                db,
-                webhook.id,
-                {"status": "visit_created", "processed_at": datetime.utcnow()},
+            repository.update_webhook_status(
+                webhook_id=webhook.id,
+                status="visit_created",
             )
 
             return True, f"Визит {visit_id} создан успешно", visit_id
@@ -80,9 +77,9 @@ class VisitPaymentIntegrationService:
         db: Session,
         visit_id: int,
         payment_status: str,
-        webhook: Optional[PaymentWebhookOut] = None,
-        additional_data: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, str]:
+        webhook: PaymentWebhookOut | None = None,
+        additional_data: dict[str, Any] | None = None,
+    ) -> tuple[bool, str]:
         """
         Обновление статуса платежа для существующего визита
 
@@ -143,7 +140,7 @@ class VisitPaymentIntegrationService:
     @staticmethod
     def get_visit_payment_info(
         db: Session, visit_id: int
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    ) -> tuple[bool, str, dict[str, Any] | None]:
         """
         Получение информации о платеже для визита
 
@@ -181,7 +178,7 @@ class VisitPaymentIntegrationService:
     @staticmethod
     def process_payment_for_existing_visit(
         db: Session, visit_id: int, webhook: PaymentWebhookOut
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Обработка платежа для существующего визита
 
@@ -215,10 +212,10 @@ class VisitPaymentIntegrationService:
                 print(f"✅ Статус записи обновлён на 'paid' для визита {visit_id}")
 
             # Обновляем статус вебхука
-            update_webhook(
-                db,
-                webhook.id,
-                {"status": "visit_updated", "processed_at": datetime.utcnow()},
+            repository = VisitPaymentIntegrationRepository(db)
+            repository.update_webhook_status(
+                webhook_id=webhook.id,
+                status="visit_updated",
             )
 
             return True, f"Платёж для визита {visit_id} обработан успешно"
@@ -229,7 +226,7 @@ class VisitPaymentIntegrationService:
     @staticmethod
     def get_visits_by_payment_status(
         db: Session, payment_status: str, limit: int = 100, offset: int = 0
-    ) -> Tuple[bool, str, list]:
+    ) -> tuple[bool, str, list]:
         """
         Получение визитов по статусу платежа
 
@@ -286,14 +283,11 @@ class VisitPaymentIntegrationService:
             appointment = repository.find_appointment_by_visit_id(visit_id)
 
             if appointment:
-                # Обновляем статус через CRUD
-                updated_appointment = crud_appointment.update_status(
-                    db,
+                return repository.update_appointment_status(
                     appointment_id=appointment.id,
                     new_status=new_status.value,
                     validate_transition=True,
                 )
-                return updated_appointment is not None
 
             return False
 
@@ -305,12 +299,12 @@ class VisitPaymentIntegrationService:
     def create_appointment_from_payment(
         db: Session,
         webhook: PaymentWebhookOut,
-        patient_id: Optional[int] = None,
-        doctor_id: Optional[int] = None,
-        department: Optional[str] = None,
-        appointment_date: Optional[str] = None,
-        appointment_time: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[int]]:
+        patient_id: int | None = None,
+        doctor_id: int | None = None,
+        department: str | None = None,
+        appointment_date: str | None = None,
+        appointment_time: str | None = None,
+    ) -> tuple[bool, str, int | None]:
         """
         Создание записи (appointment) на основе успешного платежа
 
@@ -345,14 +339,13 @@ class VisitPaymentIntegrationService:
                 payment_transaction_id=webhook.transaction_id,
             )
 
-            # Создаём запись через CRUD
-            appointment = crud_appointment.create(db, obj_in=appointment_data)
+            repository = VisitPaymentIntegrationRepository(db)
+            appointment = repository.create_appointment(appointment_data)
 
             # Обновляем статус вебхука
-            update_webhook(
-                db,
-                webhook.id,
-                {"status": "appointment_created", "processed_at": datetime.utcnow()},
+            repository.update_webhook_status(
+                webhook_id=webhook.id,
+                status="appointment_created",
             )
 
             return True, f"Запись {appointment.id} создана успешно", appointment.id
@@ -364,7 +357,7 @@ class VisitPaymentIntegrationService:
     @staticmethod
     def process_payment_for_appointment(
         db: Session, appointment_id: int, webhook: PaymentWebhookOut
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Обработка платежа для существующей записи (appointment)
 
@@ -377,15 +370,15 @@ class VisitPaymentIntegrationService:
             (success, message)
         """
         try:
+            repository = VisitPaymentIntegrationRepository(db)
             # Обновляем статус записи на "paid"
-            updated_appointment = crud_appointment.update_status(
-                db,
+            appointment_status_updated = repository.update_appointment_status(
                 appointment_id=appointment_id,
                 new_status=AppointmentStatus.PAID.value,
                 validate_transition=True,
             )
 
-            if not updated_appointment:
+            if not appointment_status_updated:
                 return (
                     False,
                     f"Запись {appointment_id} не найдена или не может быть обновлена",
@@ -401,15 +394,15 @@ class VisitPaymentIntegrationService:
                 "payment_processed_at": datetime.utcnow(),
             }
 
-            crud_appointment.update(
-                db, db_obj=updated_appointment, obj_in=appointment_update_data
+            repository.update_appointment_fields(
+                appointment_id=appointment_id,
+                values=appointment_update_data,
             )
 
             # Обновляем статус вебхука
-            update_webhook(
-                db,
-                webhook.id,
-                {"status": "appointment_updated", "processed_at": datetime.utcnow()},
+            repository.update_webhook_status(
+                webhook_id=webhook.id,
+                status="appointment_updated",
             )
 
             return True, f"Платёж для записи {appointment_id} обработан успешно"

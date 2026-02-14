@@ -84,18 +84,41 @@ class TestVisitPaymentIntegrationService:
 
     def test_update_related_appointment_status_success(self, db_session):
         repo = SimpleNamespace(
-            find_appointment_by_visit_id=lambda _visit_id: SimpleNamespace(id=123)
+            find_appointment_by_visit_id=lambda _visit_id: SimpleNamespace(id=123),
+            update_appointment_status=lambda **kwargs: kwargs["appointment_id"] == 123,
         )
         with patch(
             "app.services.visit_payment_integration.VisitPaymentIntegrationRepository",
             return_value=repo,
-        ), patch(
-            "app.services.visit_payment_integration.crud_appointment.update_status",
-            return_value=object(),
-        ) as update_status_mock:
+        ):
             result = VisitPaymentIntegrationService.update_related_appointment_status(
                 db_session, visit_id=99, new_status=AppointmentStatus.PAID
             )
 
         assert result is True
-        update_status_mock.assert_called_once()
+
+    def test_process_payment_for_appointment_updates_repository(self, db_session):
+        webhook = SimpleNamespace(
+            id=55,
+            amount=12345,
+            currency="UZS",
+            provider="click",
+            transaction_id="trx-55",
+        )
+        repo = SimpleNamespace(
+            update_appointment_status=lambda **_: True,
+            update_appointment_fields=lambda **_: True,
+            update_webhook_status=lambda **_: None,
+        )
+        with patch(
+            "app.services.visit_payment_integration.VisitPaymentIntegrationRepository",
+            return_value=repo,
+        ):
+            success, message = VisitPaymentIntegrationService.process_payment_for_appointment(
+                db_session,
+                appointment_id=42,
+                webhook=webhook,
+            )
+
+        assert success is True
+        assert "Платёж для записи 42 обработан успешно" in message

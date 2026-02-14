@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
+
 from sqlalchemy import MetaData, Table, select, update
 from sqlalchemy.orm import Session
+
+from app.crud.appointment import appointment as crud_appointment
+from app.crud.payment_webhook import update_webhook
 
 
 class VisitPaymentIntegrationRepository:
@@ -65,3 +71,40 @@ class VisitPaymentIntegrationRepository:
         table = self.appointments_table()
         query = select(table).where(table.c.visit_id == visit_id)
         return self.db.execute(query).first()
+
+    def update_webhook_status(self, *, webhook_id: int, status: str) -> None:
+        update_webhook(
+            self.db,
+            webhook_id,
+            {"status": status, "processed_at": datetime.utcnow()},
+        )
+
+    def update_appointment_status(
+        self,
+        *,
+        appointment_id: int,
+        new_status: str,
+        validate_transition: bool = True,
+    ) -> bool:
+        updated = crud_appointment.update_status(
+            self.db,
+            appointment_id=appointment_id,
+            new_status=new_status,
+            validate_transition=validate_transition,
+        )
+        return updated is not None
+
+    def update_appointment_fields(
+        self,
+        *,
+        appointment_id: int,
+        values: dict[str, Any],
+    ) -> bool:
+        appointment = crud_appointment.get(self.db, appointment_id)
+        if not appointment:
+            return False
+        crud_appointment.update(self.db, db_obj=appointment, obj_in=values)
+        return True
+
+    def create_appointment(self, appointment_in):  # type: ignore[no-untyped-def]
+        return crud_appointment.create(self.db, obj_in=appointment_in)
