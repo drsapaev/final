@@ -23,6 +23,10 @@ from app.models.payment_webhook import (
 )
 from app.models.visit import Visit
 from app.services.billing_service import BillingService
+from app.services.payment_cancel_service import (
+    PaymentCancelDomainError,
+    PaymentCancelService,
+)
 from app.services.payment_create_service import (
     PaymentCreateDomainError,
     PaymentCreateService,
@@ -388,58 +392,11 @@ def cancel_payment(
     current_user=Depends(deps.require_roles("Admin", "Cashier")),
 ) -> Dict[str, Any]:
     """Отмена платежа"""
-
-    # Получаем платеж
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
-        )
-
-    # Проверяем возможность отмены
-    if payment.status not in ["pending", "processing"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Платеж со статусом {payment.status} нельзя отменить",
-        )
-
-    # Если онлайн-платеж, пытаемся отменить у провайдера
-    if payment.provider and payment.provider_payment_id:
-        manager = get_payment_manager()
-        result = manager.cancel_payment(payment.provider, payment.provider_payment_id)
-
-        # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
-        billing_service = BillingService(db)
-
-        if result.success:
-            billing_service.update_payment_status(
-                payment_id=payment.id,
-                new_status=PaymentStatus.CANCELLED.value,
-                meta={**(payment.provider_data or {}), **result.provider_data},
-            )
-        else:
-            # Даже если провайдер не смог отменить, отмечаем как отмененный в нашей системе
-            billing_service.update_payment_status(
-                payment_id=payment.id,
-                new_status=PaymentStatus.CANCELLED.value,
-                meta={
-                    **(payment.provider_data or {}),
-                    "cancel_error": result.error_message,
-                },
-            )
-    else:
-        # ✅ SSOT: Обычный платеж - используем update_payment_status()
-        billing_service = BillingService(db)
-        billing_service.update_payment_status(
-            payment_id=payment.id, new_status=PaymentStatus.CANCELLED.value
-        )
-
-    return {
-        "success": True,
-        "payment_id": payment.id,
-        "status": payment.status,
-        "message": "Платеж отменен",
-    }
+    service = PaymentCancelService(db, get_payment_manager())
+    try:
+        return service.cancel_payment(payment_id=payment_id)
+    except PaymentCancelDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.post("/test-init", response_model=PaymentInitResponse)
