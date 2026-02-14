@@ -2,176 +2,85 @@ name: Role System Integrity Check
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'frontend/src/App.jsx'
-      - 'frontend/src/pages/Login.jsx'
-      - 'frontend/src/pages/UserSelect.jsx'
-      - 'backend/app/api/v1/endpoints/*.py'
-      - 'backend/app/core/role_validation.py'
+      - "frontend/src/App.jsx"
+      - "frontend/src/pages/Login.jsx"
+      - "frontend/src/pages/UserSelect.jsx"
+      - "backend/app/api/v1/endpoints/*.py"
+      - "backend/app/core/role_validation.py"
+      - "backend/tests/integration/test_rbac_matrix.py"
 
 jobs:
   role-system-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: "sqlite:///./clinic.db"
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
       CORS_DISABLE: "1"
       WS_DEV_ALLOW: "1"
       DISABLE_2FA_REQUIREMENT: "1"
       SECRET_KEY: "test-secret-key-for-ci-cd-minimum-32-characters-long"
+      PYTHONIOENCODING: "utf-8"
+      PYTHONUTF8: "1"
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11.1'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.10"
+          cache: "pip"
 
-    - name: Install dependencies
-      run: |
-        cd backend
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
 
-    - name: Setup test database
-      run: |
-        cd backend
-        python - << 'PY'
-        import sys
-        import os
-        
-        # Устанавливаем переменные окружения ПЕРЕД импортом модулей
-        os.environ['DATABASE_URL'] = 'sqlite:///./clinic.db'
-        os.environ['CORS_DISABLE'] = '1'
-        os.environ['WS_DEV_ALLOW'] = '1'
-        os.environ['SECRET_KEY'] = 'test-secret-key-for-ci-cd-minimum-32-characters-long'
-        
-        sys.path.insert(0, '.')
+      - name: Prepare database
+        run: |
+          cd backend
+          python - <<'PY'
+          import os
+          import time
+          from sqlalchemy import create_engine, text
 
-        from app.db.base import Base
-        from app.db.session import engine, SessionLocal
-        from app.models.user import User
-        from app.core.security import get_password_hash
-        from sqlalchemy import text
+          engine = create_engine(os.environ["DATABASE_URL"])
+          for i in range(30):
+              try:
+                  with engine.connect() as conn:
+                      conn.execute(text("SELECT 1"))
+                  print("✅ Postgres ready")
+                  break
+              except Exception as e:
+                  if i == 29:
+                      raise
+                  print(f"Attempt {i + 1}/30: {e}")
+                  time.sleep(2)
+          PY
+          alembic upgrade head
+          alembic current
 
-        # Create tables
-        Base.metadata.create_all(bind=engine)
-
-        # Users to create/update
-        users_data = [
-            ("admin", "Administrator", "Admin", "admin123"),
-            ("registrar", "Registrar", "Registrar", "registrar123"),
-            ("doctor", "Doctor", "Doctor", "doctor123"),
-            ("cashier", "Cashier", "Cashier", "cashier123"),
-            ("lab", "Lab Technician", "Lab", "lab123"),
-            ("cardio", "Cardiologist", "cardio", "cardio123"),
-            ("derma", "Dermatologist", "derma", "derma123"),
-            ("dentist", "Dentist", "dentist", "dentist123"),
-        ]
-
-        db = SessionLocal()
-        try:
-            for username, full_name, role, password in users_data:
-                # Check if user exists
-                existing = db.query(User).filter(User.username == username).first()
-                if existing:
-                    # Update password and role
-                    existing.hashed_password = get_password_hash(password)
-                    existing.role = role
-                    existing.is_active = True
-                    print(f"✅ Updated user: {username}")
-                else:
-                    # Create new user
-                    user = User(
-                        username=username,
-                        full_name=full_name,
-                        role=role,
-                        hashed_password=get_password_hash(password),
-                        is_active=True
-                    )
-                    db.add(user)
-                    print(f"✅ Created user: {username}")
-
-            db.commit()
-            print("✅ Test database ready with all users")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            db.rollback()
-            raise
-        finally:
-            db.close()
-        PY
-
-    - name: Start backend server
-      run: |
-        cd backend
-        echo "Запуск backend сервера..."
-        # Запускаем сервер в фоне с перенаправлением вывода
-        nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
-        SERVER_PID=$!
-        echo "Сервер запущен с PID: $SERVER_PID"
-
-        # Ждем больше времени для запуска
-        echo "Ожидание запуска сервера..."
-        sleep 15
-
-        # Проверяем, что процесс еще работает
-        if ! kill -0 $SERVER_PID 2>/dev/null; then
-          echo "❌ Сервер не запустился"
-          echo "Логи сервера:"
-          cat server.log
-          exit 1
-        fi
-
-        echo "Проверка доступности сервера..."
-        # Пробуем несколько раз с задержкой
-        for i in {1..5}; do
-          echo "Попытка $i/5..."
-          if curl -f http://127.0.0.1:8000/api/v1/health; then
-            echo "✅ Сервер успешно запущен и отвечает"
-            break
-          else
-            echo "Попытка $i неудачна, ждем 3 секунды..."
-            sleep 3
-          fi
-        done
-
-        # Финальная проверка
-        if ! curl -f http://127.0.0.1:8000/api/v1/health; then
-          echo "❌ Сервер не отвечает после всех попыток"
-          echo "Логи сервера:"
-          cat server.log
-          exit 1
-        fi
-
-    - name: Run role system tests
-      run: |
-        cd backend
-        echo "Running role system tests..."
-        echo "Verifying server is still running..."
-        curl -f http://127.0.0.1:8000/api/v1/health || echo "Warning: Health check failed"
-        python test_role_routing.py
-
-    - name: Check system integrity
-      run: |
-        cd backend
-        echo "Checking system integrity..."
-        python check_system_integrity.py
-
-    - name: Stop backend server
-      if: always()
-      run: |
-        echo "Останавливаем сервер..."
-        # Останавливаем по PID если он сохранен
-        if [ -n "$SERVER_PID" ]; then
-          kill $SERVER_PID 2>/dev/null || true
-        fi
-        # Дополнительная очистка процессов uvicorn
-        pkill -f "uvicorn.*8000" 2>/dev/null || true
-        echo "OK: Сервер остановлен"
-
-    - name: Validate role consistency
-      run: |
-        cd backend
-        python -c "from app.core.role_validation import validate_critical_user_roles; print('Role validation:', validate_critical_user_roles())"
+      - name: Run RBAC integrity test
+        run: |
+          cd backend
+          pytest -q tests/integration/test_rbac_matrix.py -rA
