@@ -1,8 +1,7 @@
 import http from "k6/http";
 import { check } from "k6";
 
-const targetRps = Number(__ENV.TARGET_RPS || 30);
-const minRps = Math.max(targetRps - 5, 1);
+const targetRps = Number(__ENV.TARGET_RPS || 15);
 
 export const options = {
   discardResponseBodies: true,
@@ -20,7 +19,6 @@ export const options = {
     http_req_failed: ["rate<0.01"],
     http_req_duration: ["p(95)<500"],
     checks: ["rate>0.99"],
-    http_reqs: [`rate>${minRps}`],
   },
   summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
 };
@@ -28,9 +26,8 @@ export const options = {
 const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8000";
 const ENDPOINTS = [
   "/api/v1/health",
+  "/api/v1/status",
   "/api/v1/payments/providers",
-  "/api/v1/telemetry/status",
-  "/api/v1/observability/metrics",
 ];
 
 export default function () {

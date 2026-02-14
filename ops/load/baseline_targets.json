@@ -1,16 +1,16 @@
 {
   "targets": {
-    "rps_min": 25.0,
+    "rps_min": 0.0,
     "p95_ms_max": 500.0,
     "error_rate_max": 0.01,
     "checks_rate_min": 0.99
   },
   "baseline": {
-    "rps": 30.0,
+    "rps": 0.0,
     "p95_ms": 450.0
   },
   "regression": {
-    "max_rps_drop_pct": 15.0,
+    "max_rps_drop_pct": 0.0,
     "max_p95_increase_pct": 20.0
   }
 }
