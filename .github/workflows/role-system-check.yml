@@ -54,7 +54,7 @@ jobs:
           cd backend
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx
+          pip install pytest pytest-cov pytest-asyncio httpx
 
       - name: Run RBAC integrity test
         run: |
