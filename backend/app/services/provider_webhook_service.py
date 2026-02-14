@@ -10,8 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db.transactions import transaction as transaction_ctx
-from app.models.payment import Payment
-from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 from app.services.payment_provider_manager_factory import get_payment_manager
 
 logger = logging.getLogger(__name__)
@@ -20,8 +19,13 @@ logger = logging.getLogger(__name__)
 class ProviderWebhookService:
     """Handles provider webhook processing formerly implemented in controller."""
 
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        repository: ProviderWebhookRepository | None = None,
+    ):
         self.db = db
+        self.repository = repository or ProviderWebhookRepository(db)
 
     def process_click_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Click платежной системы."""
@@ -47,13 +51,9 @@ class ProviderWebhookService:
             transaction_id = webhook_data.get("merchant_trans_id", "unknown")
             click_trans_id = webhook_data.get("click_trans_id")
 
-            existing_transaction = (
-                self.db.query(PaymentTransaction)
-                .filter(
-                    PaymentTransaction.transaction_id == click_trans_id,
-                    PaymentTransaction.provider == "click",
-                )
-                .first()
+            existing_transaction = self.repository.get_existing_transaction(
+                transaction_id=click_trans_id,
+                provider="click",
             )
 
             if existing_transaction:
@@ -69,22 +69,17 @@ class ProviderWebhookService:
                     "error_note": "Already processed",
                 }
 
-            with transaction_ctx(self.db) as txn:
+            with transaction_ctx(self.db):
                 webhook_id = f"click_{uuid.uuid4().hex[:8]}"
-                webhook = PaymentWebhook(
+                webhook = self.repository.create_webhook(
                     provider="click",
                     webhook_id=webhook_id,
                     transaction_id=transaction_id,
-                    status="pending",
                     amount=webhook_data.get("amount", 0),
                     currency="UZS",
                     raw_data=webhook_data,
                     signature=signature,
                 )
-
-                txn.add(webhook)
-                txn.flush()
-                txn.refresh(webhook)
 
                 result = manager.process_webhook("click", webhook_data)
 
@@ -98,10 +93,8 @@ class ProviderWebhookService:
                             result.payment_id
                         )
                         if payment_id_from_order:
-                            payment = (
-                                txn.query(Payment)
-                                .filter(Payment.id == payment_id_from_order)
-                                .first()
+                            payment = self.repository.get_payment_by_id(
+                                payment_id_from_order
                             )
 
                     if payment:
@@ -119,7 +112,7 @@ class ProviderWebhookService:
                         webhook.payment_id = payment.id
                         webhook.visit_id = payment.visit_id
 
-                        payment_transaction = PaymentTransaction(
+                        self.repository.create_transaction(
                             transaction_id=webhook_data.get("click_trans_id", webhook_id),
                             provider="click",
                             amount=webhook_data.get("amount", 0),
@@ -130,8 +123,6 @@ class ProviderWebhookService:
                             visit_id=payment.visit_id,
                             provider_data=result.provider_data,
                         )
-
-                        txn.add(payment_transaction)
 
                     error = 0 if result.status == "completed" else -1
                     return {
@@ -201,13 +192,9 @@ class ProviderWebhookService:
 
             existing_transaction = None
             if payme_transaction_id:
-                existing_transaction = (
-                    self.db.query(PaymentTransaction)
-                    .filter(
-                        PaymentTransaction.transaction_id == payme_transaction_id,
-                        PaymentTransaction.provider == "payme",
-                    )
-                    .first()
+                existing_transaction = self.repository.get_existing_transaction(
+                    transaction_id=payme_transaction_id,
+                    provider="payme",
                 )
 
             if existing_transaction:
@@ -246,21 +233,16 @@ class ProviderWebhookService:
                     }
                 return {"result": {}, "id": request_id}
 
-            with transaction_ctx(self.db) as txn:
+            with transaction_ctx(self.db):
                 webhook_id = f"payme_{uuid.uuid4().hex[:8]}"
-                webhook = PaymentWebhook(
+                webhook = self.repository.create_webhook(
                     provider="payme",
                     webhook_id=webhook_id,
                     transaction_id=order_id,
-                    status="pending",
                     amount=params.get("amount", 0),
                     currency="UZS",
                     raw_data=webhook_data,
                 )
-
-                txn.add(webhook)
-                txn.flush()
-                txn.refresh(webhook)
 
                 result = manager.process_webhook("payme", webhook_data)
 
@@ -274,10 +256,8 @@ class ProviderWebhookService:
                             result.payment_id
                         )
                         if payment_id_from_order:
-                            payment = (
-                                txn.query(Payment)
-                                .filter(Payment.id == payment_id_from_order)
-                                .first()
+                            payment = self.repository.get_payment_by_id(
+                                payment_id_from_order
                             )
 
                     if payment:
@@ -295,7 +275,7 @@ class ProviderWebhookService:
                         webhook.payment_id = payment.id
                         webhook.visit_id = payment.visit_id
 
-                        transaction = PaymentTransaction(
+                        self.repository.create_transaction(
                             transaction_id=params.get("id", webhook_id),
                             provider="payme",
                             amount=params.get("amount", 0),
@@ -306,8 +286,6 @@ class ProviderWebhookService:
                             visit_id=payment.visit_id,
                             provider_data=result.provider_data,
                         )
-
-                        txn.add(transaction)
 
                     if method == "CheckPerformTransaction":
                         return {"result": {"allow": True}, "id": request_id}
@@ -365,20 +343,17 @@ class ProviderWebhookService:
             logger.info("Kaspi webhook received: %s", webhook_data)
 
             webhook_id = f"kaspi_{uuid.uuid4().hex[:8]}"
-            webhook = PaymentWebhook(
+            webhook = self.repository.create_webhook(
                 provider="kaspi",
                 webhook_id=webhook_id,
                 transaction_id=webhook_data.get("transaction_id", "unknown"),
-                status="pending",
                 amount=webhook_data.get("amount", 0),
                 currency=webhook_data.get("currency", "KZT"),
                 raw_data=webhook_data,
                 signature=webhook_data.get("signature"),
             )
 
-            self.db.add(webhook)
             self.db.commit()
-            self.db.refresh(webhook)
 
             manager = get_payment_manager()
             result = manager.process_webhook("kaspi", webhook_data)
@@ -389,10 +364,8 @@ class ProviderWebhookService:
 
                 payment = None
                 if result.payment_id:
-                    payment = (
-                        self.db.query(Payment)
-                        .filter(Payment.provider_payment_id == result.payment_id)
-                        .first()
+                    payment = self.repository.get_payment_by_provider_payment_id(
+                        result.payment_id
                     )
 
                 if payment:
@@ -410,7 +383,7 @@ class ProviderWebhookService:
                     webhook.payment_id = payment.id
                     webhook.visit_id = payment.visit_id
 
-                    transaction = PaymentTransaction(
+                    self.repository.create_transaction(
                         transaction_id=webhook_data.get("transaction_id", webhook_id),
                         provider="kaspi",
                         amount=webhook_data.get("amount", 0),
@@ -421,8 +394,6 @@ class ProviderWebhookService:
                         visit_id=payment.visit_id,
                         provider_data=result.provider_data,
                     )
-
-                    self.db.add(transaction)
 
                 self.db.commit()
                 return {"status": "success", "message": "Webhook processed successfully"}
