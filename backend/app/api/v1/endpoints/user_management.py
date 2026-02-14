@@ -60,6 +60,7 @@ from app.services.user_management_service import (
     get_user_management_service,
     UserManagementService,
 )
+from app.services.user_management_api_service import UserManagementApiService
 
 router = APIRouter()
 
@@ -157,62 +158,12 @@ async def update_current_user_preferences(
     Принимает произвольный JSON с настройками.
     """
     try:
-        preferences = user_preferences.get_by_user_id(db, current_user.id)
-        
-        if not preferences:
-            # Создаём новую запись preferences
-            from app.models.user_profile import UserPreferences
-            preferences = UserPreferences(
-                user_id=current_user.id,
-                theme=preferences_data.get("theme", "system"),
-                language=preferences_data.get("language", "ru"),
-                compact_mode=preferences_data.get("compact_mode", False),
-                sidebar_collapsed=preferences_data.get("sidebar_collapsed", False),
-            )
-            db.add(preferences)
-        else:
-            # Обновляем существующие поля
-            if "theme" in preferences_data:
-                preferences.theme = preferences_data["theme"]
-            if "language" in preferences_data:
-                preferences.language = preferences_data["language"]
-            if "compact_mode" in preferences_data:
-                preferences.compact_mode = preferences_data["compact_mode"]
-            if "sidebar_collapsed" in preferences_data:
-                preferences.sidebar_collapsed = preferences_data["sidebar_collapsed"]
-        
-        # Сохраняем EMR-специфичные настройки в JSON поле
-        emr_keys = [
-            "emr_smart_field_mode", "emr_show_mode_switcher", "emr_debounce_ms",
-            "emr_recent_icd10", "emr_recent_templates", "emr_favorite_templates",
-            "emr_custom_templates"
-        ]
-        
-        emr_data = {}
-        current_emr = getattr(preferences, 'emr_settings', None) or {}
-        if isinstance(current_emr, str):
-            import json
-            try:
-                current_emr = json.loads(current_emr)
-            except Exception:
-                current_emr = {}
-        
-        emr_data.update(current_emr)
-        for key in emr_keys:
-            if key in preferences_data:
-                emr_data[key] = preferences_data[key]
-        
-        if hasattr(preferences, 'emr_settings'):
-            import json
-            preferences.emr_settings = json.dumps(emr_data)
-        
-        db.commit()
-        db.refresh(preferences)
-        
-        return {"success": True, "message": "Preferences updated"}
+        return UserManagementApiService(db).update_current_user_preferences(
+            current_user_id=current_user.id,
+            preferences_data=preferences_data,
+        )
         
     except Exception as e:
-        db.rollback()
         import logging
         logging.error(f"Failed to update preferences for user {current_user.id}: {e}")
         raise HTTPException(
@@ -488,12 +439,10 @@ async def update_user_profile(
 
         # Обновляем профиль
         update_data = profile_data.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            if hasattr(profile, field):
-                setattr(profile, field, value)
-
-        db.commit()
-        db.refresh(profile)
+        profile = UserManagementApiService(db).apply_profile_update(
+            profile=profile,
+            update_data=update_data,
+        )
 
         return UserProfileResponse(
             id=profile.id,
@@ -539,7 +488,6 @@ async def update_user_profile(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления профиля: {str(e)}",
@@ -924,36 +872,9 @@ async def export_users(
     """Экспорт пользователей"""
     try:
         service = get_user_management_service()
-
-        # Получаем пользователей для экспорта
-        users_query = db.query(User)
-
-        # Применяем фильтры если есть
-        if export_data.filters:
-            if export_data.filters.username:
-                users_query = users_query.filter(
-                    User.username.contains(export_data.filters.username)
-                )
-            if export_data.filters.email:
-                users_query = users_query.filter(
-                    User.email.contains(export_data.filters.email)
-                )
-            if export_data.filters.role:
-                users_query = users_query.filter(User.role == export_data.filters.role)
-            if export_data.filters.is_active is not None:
-                users_query = users_query.filter(
-                    User.is_active == export_data.filters.is_active
-                )
-            if export_data.filters.created_from:
-                users_query = users_query.filter(
-                    User.created_at >= export_data.filters.created_from
-                )
-            if export_data.filters.created_to:
-                users_query = users_query.filter(
-                    User.created_at <= export_data.filters.created_to
-                )
-
-        users = users_query.all()
+        users = UserManagementApiService(db).get_export_users(
+            export_filters=export_data.filters
+        )
 
         if not users:
             return UserExportResponse(

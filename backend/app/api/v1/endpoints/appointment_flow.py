@@ -3,20 +3,18 @@ API endpoints для жесткого потока: запись → плате�
 """
 
 import logging
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
-from app.models.appointment import Appointment as AppointmentModel
 from app.models.enums import AppointmentStatus
 from app.models.user import User
-from app.core.audit import log_critical_change, extract_model_changes
+from app.core.audit import extract_model_changes
 from app.schemas.appointment import Appointment
 from app.schemas.emr import (
     EMR,
@@ -25,6 +23,10 @@ from app.schemas.emr import (
     Prescription,
     PrescriptionCreate,
     PrescriptionUpdate,
+)
+from app.services.appointment_flow_api_service import (
+    AppointmentFlowApiDomainError,
+    AppointmentFlowApiService,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,6 +148,7 @@ def create_or_update_emr(
         )
     
     appointment = crud_appointment.get(db, id=appointment_id)
+    appointment_flow_api_service = AppointmentFlowApiService(db)
 
     # Если Appointment не найден, проверяем, может это Visit ID
     if not appointment:
@@ -153,66 +156,17 @@ def create_or_update_emr(
             "[create_or_update_emr] Appointment %d не найден, проверяем Visit...",
             appointment_id,
         )
-        from app.models.visit import Visit
-
-        visit = db.query(Visit).filter(Visit.id == appointment_id).first()
-        if visit:
-            logger.info(
-                "[create_or_update_emr] Найден Visit %d, проверяем существующий Appointment...",
-                appointment_id,
+        try:
+            appointment, visit = appointment_flow_api_service.resolve_appointment_from_visit(
+                appointment_id=appointment_id,
+                emr_data=emr_data,
             )
-            # Проверяем, нет ли уже Appointment для этого Visit (по patient_id, дате, doctor_id)
-            existing_appointment = (
-                db.query(AppointmentModel)
-                .filter(
-                    and_(
-                        AppointmentModel.patient_id == visit.patient_id,
-                        AppointmentModel.appointment_date
-                        == (visit.visit_date or date.today()),
-                        AppointmentModel.doctor_id == visit.doctor_id,
-                    )
-                )
-                .first()
-            )
-
-            if existing_appointment:
-                logger.info(
-                    "[create_or_update_emr] Найден существующий Appointment %d для Visit %d, используем его",
-                    existing_appointment.id,
-                    visit.id,
-                )
-                appointment = existing_appointment
-                # Обновляем appointment_id в emr_data для корректной привязки
-                emr_data.appointment_id = existing_appointment.id
-            else:
-                logger.info(
-                    "[create_or_update_emr] Создаем новый Appointment из Visit %d...",
-                    visit.id,
-                )
-                # Создаем Appointment из Visit для работы с EMR
-                appointment = AppointmentModel(
-                    patient_id=visit.patient_id,
-                    appointment_date=visit.visit_date or date.today(),
-                    appointment_time=visit.visit_time or "09:00",
-                    status=(
-                        AppointmentStatus.IN_VISIT
-                        if visit.status in ["in_progress", "confirmed"]
-                        else AppointmentStatus.PAID
-                    ),
-                    doctor_id=visit.doctor_id,
-                    department=visit.department,
-                    notes=visit.notes,
-                    created_at=visit.created_at,
-                )
-                db.add(appointment)
-                db.commit()
-                db.refresh(appointment)
             logger.info(
                 "[create_or_update_emr] Создан Appointment %d из Visit %d",
                 appointment.id,
                 visit.id,
             )
-        else:
+        except AppointmentFlowApiDomainError:
             logger.warning(
                 "[create_or_update_emr] Запись %d не найдена ни в Appointment, ни в Visit",
                 appointment_id,
@@ -248,9 +202,9 @@ def create_or_update_emr(
         # Если статус не подходит, но это called/calling/paid/waiting/queued, обновляем статус на in_visit
         # Это позволяет начать сохранение EMR для вызванных или оплаченных пациентов
         if status_str in ['called', 'calling', 'paid', 'waiting', 'queued']:
-            appointment.status = AppointmentStatus.IN_VISIT
-            db.commit()
-            db.refresh(appointment)
+            appointment_flow_api_service.promote_appointment_to_in_visit(
+                appointment=appointment
+            )
             logger.info(
                 "[create_or_update_emr] Статус appointment %d обновлен с '%s' на 'in_visit'",
                 appointment_id,
@@ -315,22 +269,13 @@ def create_or_update_emr(
             updated_emr = crud_emr.emr.update(
                 db, db_obj=existing_emr, obj_in=emr_update
             )
-            
-            # ✅ AUDIT LOG: Логируем обновление EMR
-            db.refresh(updated_emr)
-            _, new_data = extract_model_changes(None, updated_emr)
-            log_critical_change(
-                db=db,
-                user_id=current_user.id,
-                action="UPDATE",
-                table_name="emr",
-                row_id=updated_emr.id,
-                old_data=old_data,
-                new_data=new_data,
+            appointment_flow_api_service.finalize_emr_update_audit(
                 request=request,
-                description=f"Обновлен EMR ID={updated_emr.id} для записи {appointment_id}",
+                user_id=current_user.id,
+                appointment_id=appointment_id,
+                updated_emr=updated_emr,
+                old_data=old_data,
             )
-            db.commit()
             
             logger.info("[create_or_update_emr] EMR обновлен успешно")
             return updated_emr
@@ -353,22 +298,12 @@ def create_or_update_emr(
             try:
                 new_emr = crud_emr.emr.create(db, obj_in=emr_data)
                 logger.info("[create_or_update_emr] EMR создан, id=%d", new_emr.id)
-                
-                # ✅ AUDIT LOG: Логируем создание EMR
-                db.refresh(new_emr)
-                _, new_data = extract_model_changes(None, new_emr)
-                log_critical_change(
-                    db=db,
-                    user_id=current_user.id,
-                    action="CREATE",
-                    table_name="emr",
-                    row_id=new_emr.id,
-                    old_data=None,
-                    new_data=new_data,
+                appointment_flow_api_service.finalize_emr_create_audit(
                     request=request,
-                    description=f"Создан EMR ID={new_emr.id} для записи {appointment_id}",
+                    user_id=current_user.id,
+                    appointment_id=appointment_id,
+                    new_emr=new_emr,
                 )
-                db.commit()
             except Exception as create_error:
                 logger.error(
                     "[create_or_update_emr] Ошибка при создании EMR: %s: %s",

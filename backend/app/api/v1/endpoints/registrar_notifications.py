@@ -3,7 +3,7 @@ API endpoints для управления уведомлениями регис�
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -11,14 +11,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
-from app.models.doctor_price_override import DoctorPriceOverride
-from app.models.online_queue import OnlineQueueEntry
-from app.models.patient import Patient
-from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit
+from app.services.registrar_notifications_api_service import (
+    RegistrarNotificationsApiDomainError,
+    RegistrarNotificationsApiService,
+)
 from app.services.registrar_notification_service import (
     get_registrar_notification_service,
 )
@@ -157,47 +154,12 @@ async def notify_new_appointment(
     """Отправить уведомление о новой записи"""
     try:
         service = get_registrar_notification_service(db)
-
-        # Получаем запись
-        if request_data.appointment_type == "visit":
-            appointment = (
-                db.query(Visit).filter(Visit.id == request_data.appointment_id).first()
-            )
-        else:
-            appointment = (
-                db.query(Appointment)
-                .filter(Appointment.id == request_data.appointment_id)
-                .first()
-            )
-
-        if not appointment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
-            )
-
-        # Получаем пациента
-        patient = db.query(Patient).filter(Patient.id == appointment.patient_id).first()
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
-            )
-
-        # Получаем услуги (если есть)
-        services = []
-        if request_data.appointment_type == "visit":
-            from app.models.visit import VisitService
-
-            visit_services = (
-                db.query(VisitService)
-                .filter(VisitService.visit_id == appointment.id)
-                .all()
-            )
-            for vs in visit_services:
-                service = (
-                    db.query(Service).filter(Service.code == vs.service_code).first()
-                )
-                if service:
-                    services.append(service)
+        appointment, patient, services = RegistrarNotificationsApiService(
+            db
+        ).get_appointment_context(
+            appointment_id=request_data.appointment_id,
+            appointment_type=request_data.appointment_type,
+        )
 
         # Отправляем уведомление
         result = await service.notify_new_appointment(
@@ -214,6 +176,8 @@ async def notify_new_appointment(
             results=result.get("results", []),
         )
 
+    except RegistrarNotificationsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
@@ -233,45 +197,15 @@ async def notify_price_change(
     """Отправить уведомление об изменении цены"""
     try:
         service = get_registrar_notification_service(db)
-
-        # Получаем изменение цены
-        price_override = (
-            db.query(DoctorPriceOverride)
-            .filter(DoctorPriceOverride.id == request_data.price_override_id)
-            .first()
+        (
+            price_override,
+            doctor,
+            service_obj,
+            visit,
+            patient,
+        ) = RegistrarNotificationsApiService(db).get_price_change_context(
+            price_override_id=request_data.price_override_id
         )
-
-        if not price_override:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Изменение цены не найдено",
-            )
-
-        # Получаем врача
-        doctor = db.query(Doctor).filter(Doctor.id == price_override.doctor_id).first()
-        if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Врач не найден"
-            )
-
-        # Получаем услугу
-        service_obj = (
-            db.query(Service).filter(Service.id == price_override.service_id).first()
-        )
-        if not service_obj:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Услуга не найдена"
-            )
-
-        # Получаем визит и пациента (если есть)
-        visit = None
-        patient = None
-        if price_override.visit_id:
-            visit = db.query(Visit).filter(Visit.id == price_override.visit_id).first()
-            if visit:
-                patient = (
-                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                )
 
         # Отправляем уведомление
         result = await service.notify_price_change(
@@ -289,6 +223,8 @@ async def notify_price_change(
             results=result.get("results", []),
         )
 
+    except RegistrarNotificationsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
@@ -308,19 +244,9 @@ async def notify_queue_status(
     """Отправить уведомление о статусе очереди"""
     try:
         service = get_registrar_notification_service(db)
-
-        # Получаем запись в очереди
-        queue_entry = (
-            db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.id == request_data.queue_entry_id)
-            .first()
+        queue_entry = RegistrarNotificationsApiService(db).get_queue_entry(
+            queue_entry_id=request_data.queue_entry_id
         )
-
-        if not queue_entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись в очереди не найдена",
-            )
 
         # Отправляем уведомление
         result = await service.notify_queue_status(
@@ -336,6 +262,8 @@ async def notify_queue_status(
             results=result.get("results", []),
         )
 
+    except RegistrarNotificationsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:

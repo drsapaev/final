@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
-from app.core.audit import log_critical_change, extract_model_changes
+from app.core.audit import extract_model_changes
 from app.schemas.file_system import (
     FileExportRequest,
     FileExportResponse,
@@ -47,6 +47,7 @@ from app.schemas.file_system import (
     FileUploadRequest,
     FileUploadResponse,
 )
+from app.services.file_system_api_service import FileSystemApiService
 from app.services.file_system_service import get_file_system_service
 from app.utils.file_validator import validate_upload_file
 
@@ -108,22 +109,11 @@ async def upload_file(
 
         # Загружаем файл
         uploaded_file = service.upload_file(db, file, file_data, current_user.id)
-        
-        # ✅ AUDIT LOG: Логируем загрузку файла
-        db.refresh(uploaded_file)
-        _, new_data = extract_model_changes(None, uploaded_file)
-        log_critical_change(
-            db=db,
-            user_id=current_user.id,
-            action="CREATE",
-            table_name="files",
-            row_id=uploaded_file.id,
-            old_data=None,
-            new_data=new_data,
+        FileSystemApiService(db).finalize_file_create_audit(
             request=request,
-            description=f"Загружен файл: {uploaded_file.filename} (ID={uploaded_file.id})",
+            user_id=current_user.id,
+            uploaded_file=uploaded_file,
         )
-        db.commit()
 
         return FileOut.from_orm(uploaded_file)
 
@@ -329,22 +319,15 @@ async def get_files(
             owner_id=owner_id,
         )
 
-        # Подсчитываем общее количество
-        total_query = db.query(file.model).filter(file.model.owner_id == owner_id)
-        if file_type:
-            total_query = total_query.filter(file.model.file_type == file_type)
-        if patient_id:
-            total_query = total_query.filter(file.model.patient_id == patient_id)
-        if appointment_id:
-            total_query = total_query.filter(
-                file.model.appointment_id == appointment_id
-            )
-        if emr_id:
-            total_query = total_query.filter(file.model.emr_id == emr_id)
-        if folder_id:
-            total_query = total_query.filter(file.model.folder_id == folder_id)
-
-        total = total_query.count()
+        total = FileSystemApiService(db).count_files(
+            file_model=file.model,
+            owner_id=owner_id,
+            file_type=file_type,
+            patient_id=patient_id,
+            appointment_id=appointment_id,
+            emr_id=emr_id,
+            folder_id=folder_id,
+        )
         pages = (total + size - 1) // size
 
         return FileList(
@@ -416,22 +399,14 @@ async def update_file(
         
         # Обновляем файл
         updated_file = file.update(db, db_obj=db_file, obj_in=update_data)
-        
-        # ✅ AUDIT LOG: Логируем обновление файла
-        db.refresh(updated_file)
-        _, new_data = extract_model_changes(None, updated_file)
-        log_critical_change(
-            db=db,
-            user_id=current_user.id,
-            action="UPDATE",
-            table_name="files",
-            row_id=file_id,
-            old_data=old_data,
-            new_data=new_data,
+        FileSystemApiService(db).finalize_file_update_audit(
             request=request,
+            user_id=current_user.id,
+            file_id=file_id,
+            old_data=old_data,
+            updated_file=updated_file,
             description=f"Обновлен файл ID={file_id}: {updated_file.filename}",
         )
-        db.commit()
 
         return FileOut.from_orm(updated_file)
 
@@ -466,22 +441,17 @@ async def replace_file_content(
         updated_file = service.replace_file_content(
             db, file_id, file, current_user.id, change_description
         )
-        
-        # ✅ AUDIT LOG: Логируем замену содержимого
-        db.refresh(updated_file)
-        _, new_data = extract_model_changes(None, updated_file)
-        log_critical_change(
-            db=db,
-            user_id=current_user.id,
-            action="UPDATE",
-            table_name="files",
-            row_id=file_id,
-            old_data=None,  # Старая версия сохранена в FileVersion
-            new_data=new_data,
+        FileSystemApiService(db).finalize_file_update_audit(
             request=request,
-            description=f"Заменено содержимое файла ID={file_id}: {updated_file.filename} (хеш: {updated_file.file_hash[:8]}...)",
+            user_id=current_user.id,
+            file_id=file_id,
+            old_data=None,  # Старая версия сохранена в FileVersion
+            updated_file=updated_file,
+            description=(
+                f"Заменено содержимое файла ID={file_id}: {updated_file.filename} "
+                f"(хеш: {updated_file.file_hash[:8]}...)"
+            ),
         )
-        db.commit()
         
         return FileOut.from_orm(updated_file)
         
@@ -526,20 +496,14 @@ async def delete_file(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Файл не найден или нет прав для удаления",
             )
-        
-        # ✅ AUDIT LOG: Логируем удаление файла ПОСЛЕ успешного удаления
-        log_critical_change(
-            db=db,
-            user_id=current_user.id,
-            action="DELETE",
-            table_name="files",
-            row_id=file_id,
-            old_data=old_data,
-            new_data=None,
+
+        FileSystemApiService(db).finalize_file_delete_audit(
             request=request,
-            description=f"Удален файл ID={file_id}: {filename}",
+            user_id=current_user.id,
+            file_id=file_id,
+            old_data=old_data,
+            filename=filename,
         )
-        db.commit()
 
         return {"success": True, "message": "Файл удален"}
 

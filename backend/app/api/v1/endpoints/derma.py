@@ -7,11 +7,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.models.clinic import Doctor
-from app.models.doctor_price_override import DoctorPriceOverride
-from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit
+from app.services.derma_api_service import DermaApiDomainError, DermaApiService
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 
@@ -124,52 +121,11 @@ async def create_price_override(
     Дерматолог изменяет цену процедуры с указанием причины
     """
     try:
-        # Проверяем существование визита
-        visit = db.query(Visit).filter(Visit.id == override_data.visit_id).first()
-        if not visit:
-            raise HTTPException(status_code=404, detail="Визит не найден")
-
-        # Проверяем существование услуги
-        service = (
-            db.query(Service).filter(Service.id == override_data.service_id).first()
+        service = DermaApiService(db)
+        price_override = service.create_price_override(
+            override_data=override_data,
+            user_id=user.id,
         )
-        if not service:
-            raise HTTPException(status_code=404, detail="Услуга не найдена")
-
-        # Проверяем, что услуга разрешает изменение цены врачом
-        if not service.allow_doctor_price_override:
-            raise HTTPException(
-                status_code=400,
-                detail="Данная услуга не разрешает изменение цены врачом",
-            )
-
-        # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
-        if not doctor:
-            raise HTTPException(status_code=404, detail="Врач не найден")
-
-        # Проверяем, что врач - дерматолог
-        if doctor.specialty not in ["dermatology", "cosmetology"]:
-            raise HTTPException(
-                status_code=403,
-                detail="Только дерматолог-косметолог может изменять цены процедур",
-            )
-
-        # Создаём запись об изменении цены
-        price_override = DoctorPriceOverride(
-            visit_id=override_data.visit_id,
-            doctor_id=doctor.id,
-            service_id=override_data.service_id,
-            original_price=service.price or Decimal("0"),
-            new_price=override_data.new_price,
-            reason=override_data.reason,
-            details=override_data.details,
-            status="pending",
-        )
-
-        db.add(price_override)
-        db.commit()
-        db.refresh(price_override)
 
         return PriceOverrideResponse(
             id=price_override.id,
@@ -183,10 +139,11 @@ async def create_price_override(
             created_at=price_override.created_at,
         )
 
+    except DermaApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         raise HTTPException(
             status_code=500, detail=f"Ошибка создания изменения цены: {str(e)}"
         )
@@ -206,23 +163,11 @@ async def get_price_overrides(
     Получить список изменений цен дерматолога
     """
     try:
-        # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
-        if not doctor:
-            raise HTTPException(status_code=404, detail="Врач не найден")
-
-        query = db.query(DoctorPriceOverride).filter(
-            DoctorPriceOverride.doctor_id == doctor.id
-        )
-
-        if visit_id:
-            query = query.filter(DoctorPriceOverride.visit_id == visit_id)
-
-        if status:
-            query = query.filter(DoctorPriceOverride.status == status)
-
-        overrides = (
-            query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
+        overrides = DermaApiService(db).get_price_overrides(
+            user_id=user.id,
+            visit_id=visit_id,
+            status=status,
+            limit=limit,
         )
 
         return [
@@ -240,6 +185,8 @@ async def get_price_overrides(
             for override in overrides
         ]
 
+    except DermaApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:

@@ -12,6 +12,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.models.discount_benefits import BenefitType, DiscountType
 from app.models.user import User
+from app.services.discount_benefits_api_service import (
+    DiscountBenefitsApiDomainError,
+    DiscountBenefitsApiService,
+)
 from app.services.discount_benefits_service import DiscountBenefitsService
 
 router = APIRouter()
@@ -178,13 +182,10 @@ async def get_discounts(
     current_user: User = Depends(get_current_user),
 ):
     """Получить список скидок"""
-    service = DiscountBenefitsService(db)
-
-    if active_only:
-        discounts = service.get_active_discounts(service_ids)
-    else:
-        # Получить все скидки (нужно добавить метод в сервис)
-        discounts = db.query(service.db.query(service.Discount)).all()
+    discounts = DiscountBenefitsApiService(db).get_discounts(
+        active_only=active_only,
+        service_ids=service_ids,
+    )
 
     return {
         "success": True,
@@ -217,19 +218,14 @@ async def update_discount(
     current_user: User = Depends(get_current_user),
 ):
     """Обновить скидку"""
-    from app.models.discount_benefits import Discount
-
-    discount = db.query(Discount).filter(Discount.id == discount_id).first()
-    if not discount:
-        raise HTTPException(status_code=404, detail="Скидка не найдена")
-
-    # Обновить поля
-    update_data = discount_data.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(discount, field, value)
-
-    discount.updated_at = datetime.now()
-    db.commit()
+    service = DiscountBenefitsApiService(db)
+    try:
+        service.update_discount(
+            discount_id=discount_id,
+            update_data=discount_data.dict(exclude_unset=True),
+        )
+    except DiscountBenefitsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return {"success": True, "message": "Скидка обновлена успешно"}
 
@@ -241,16 +237,11 @@ async def delete_discount(
     current_user: User = Depends(get_current_user),
 ):
     """Удалить скидку"""
-    from app.models.discount_benefits import Discount
-
-    discount = db.query(Discount).filter(Discount.id == discount_id).first()
-    if not discount:
-        raise HTTPException(status_code=404, detail="Скидка не найдена")
-
-    # Деактивировать вместо удаления
-    discount.is_active = False
-    discount.updated_at = datetime.now()
-    db.commit()
+    service = DiscountBenefitsApiService(db)
+    try:
+        service.delete_discount(discount_id=discount_id)
+    except DiscountBenefitsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return {"success": True, "message": "Скидка деактивирована успешно"}
 
@@ -318,13 +309,7 @@ async def get_benefits(
     current_user: User = Depends(get_current_user),
 ):
     """Получить список льгот"""
-    from app.models.discount_benefits import Benefit
-
-    query = db.query(Benefit)
-    if active_only:
-        query = query.filter(Benefit.is_active == True)
-
-    benefits = query.all()
+    benefits = DiscountBenefitsApiService(db).list_benefits(active_only=active_only)
 
     return {
         "success": True,
@@ -494,13 +479,9 @@ async def get_loyalty_programs(
     current_user: User = Depends(get_current_user),
 ):
     """Получить программы лояльности"""
-    from app.models.discount_benefits import LoyaltyProgram
-
-    query = db.query(LoyaltyProgram)
-    if active_only:
-        query = query.filter(LoyaltyProgram.is_active == True)
-
-    programs = query.all()
+    programs = DiscountBenefitsApiService(db).list_loyalty_programs(
+        active_only=active_only
+    )
 
     return {
         "success": True,
