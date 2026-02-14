@@ -60,5 +60,4 @@ jobs:
         run: |
           cd backend
           test -f tests/integration/test_rbac_matrix.py
-          python -m pytest --version
           python -m pytest -c /dev/null -q tests/integration/test_rbac_matrix.py -rA
