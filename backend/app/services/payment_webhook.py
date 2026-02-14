@@ -2,23 +2,14 @@
 import hashlib
 import hmac
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud.payment_webhook import (
-    count_transactions,
-    count_webhooks,
-    create_transaction,
-    create_webhook,
-    get_failed_webhooks,
-    get_pending_webhooks,
-    get_provider_by_code,
-    get_transactions_by_status,
-    get_webhook_by_webhook_id,
-    update_webhook,
-)
 from app.models.payment_webhook import PaymentWebhook
+from app.repositories.payment_webhook_processing_repository import (
+    PaymentWebhookProcessingRepository,
+)
 from app.schemas.payment_webhook import (
     ClickWebhookData,
     PaymentTransactionCreate,
@@ -33,7 +24,7 @@ class PaymentWebhookService:
 
     @staticmethod
     def verify_payme_signature(
-        data: Dict[str, Any], signature: str, secret_key: str
+        data: dict[str, Any], signature: str, secret_key: str
     ) -> bool:
         """Верификация подписи Payme"""
         try:
@@ -59,7 +50,7 @@ class PaymentWebhookService:
             return False
 
     @staticmethod
-    def verify_click_signature(data: Dict[str, Any], secret_key: str) -> bool:
+    def verify_click_signature(data: dict[str, Any], secret_key: str) -> bool:
         """Верификация подписи Click"""
         try:
             # Создаём строку для подписи
@@ -74,15 +65,16 @@ class PaymentWebhookService:
 
     @staticmethod
     def process_payme_webhook(
-        db: Session, data: Dict[str, Any], signature: str
-    ) -> Tuple[bool, str, Optional[PaymentWebhook]]:
+        db: Session, data: dict[str, Any], signature: str
+    ) -> tuple[bool, str, PaymentWebhook | None]:
         """Обработка вебхука от Payme"""
         try:
+            repository = PaymentWebhookProcessingRepository(db)
             # Парсим данные
             webhook_data = PaymeWebhookData(**data)
 
             # Получаем провайдера
-            provider = get_provider_by_code(db, code="payme")
+            provider = repository.get_provider_by_code("payme")
             if not provider:
                 return False, "Provider not found", None
 
@@ -93,7 +85,7 @@ class PaymentWebhookService:
                 return False, "Invalid signature", None
 
             # Проверяем, не обработан ли уже этот вебхук
-            existing_webhook = get_webhook_by_webhook_id(db, webhook_id=webhook_data.id)
+            existing_webhook = repository.get_webhook_by_webhook_id(webhook_data.id)
             if existing_webhook:
                 return False, "Webhook already processed", existing_webhook
 
@@ -113,7 +105,7 @@ class PaymentWebhookService:
                 status="pending",  # Устанавливаем начальный статус
             )
 
-            webhook = create_webhook(db, webhook_create)
+            webhook = repository.create_webhook(webhook_create)
 
             # Создаём транзакцию
             transaction_create = PaymentTransactionCreate(
@@ -125,14 +117,14 @@ class PaymentWebhookService:
                 webhook_id=webhook.id,
             )
 
-            create_transaction(db, transaction_create)
+            repository.create_transaction(transaction_create)
 
             # Обновляем статус вебхука
             webhook_update = {"status": status, "processed_at": datetime.utcnow()}
             if status == "failed":
                 webhook_update["error_message"] = f"Payme state: {webhook_data.state}"
 
-            update_webhook(db, webhook.id, webhook_update)
+            repository.update_webhook(webhook.id, webhook_update)
 
             # Интеграция с записями и визитами - если платёж успешен
             if status == "processed":
@@ -210,15 +202,16 @@ class PaymentWebhookService:
 
     @staticmethod
     def process_click_webhook(
-        db: Session, data: Dict[str, Any]
-    ) -> Tuple[bool, str, Optional[PaymentWebhook]]:
+        db: Session, data: dict[str, Any]
+    ) -> tuple[bool, str, PaymentWebhook | None]:
         """Обработка вебхука от Click"""
         try:
+            repository = PaymentWebhookProcessingRepository(db)
             # Парсим данные
             webhook_data = ClickWebhookData(**data)
 
             # Получаем провайдера
-            provider = get_provider_by_code(db, code="click")
+            provider = repository.get_provider_by_code("click")
             if not provider:
                 return False, "Provider not found", None
 
@@ -229,8 +222,8 @@ class PaymentWebhookService:
                 return False, "Invalid signature", None
 
             # Проверяем, не обработан ли уже этот вебхук
-            existing_webhook = get_webhook_by_webhook_id(
-                db, webhook_id=webhook_data.click_trans_id
+            existing_webhook = repository.get_webhook_by_webhook_id(
+                webhook_data.click_trans_id
             )
             if existing_webhook:
                 return False, "Webhook already processed", existing_webhook
@@ -249,7 +242,7 @@ class PaymentWebhookService:
                 status="pending",  # Устанавливаем начальный статус
             )
 
-            webhook = create_webhook(db, webhook_create)
+            webhook = repository.create_webhook(webhook_create)
 
             # Создаём транзакцию
             transaction_create = PaymentTransactionCreate(
@@ -261,14 +254,14 @@ class PaymentWebhookService:
                 webhook_id=webhook.id,
             )
 
-            create_transaction(db, transaction_create)
+            repository.create_transaction(transaction_create)
 
             # Обновляем статус вебхука
             webhook_update = {"status": status, "processed_at": datetime.utcnow()}
             if status == "failed":
                 webhook_update["error_message"] = f"Click error: {webhook_data.error}"
 
-            update_webhook(db, webhook.id, webhook_update)
+            repository.update_webhook(webhook.id, webhook_update)
 
             # Интеграция с записями и визитами - если платёж успешен
             if status == "success":
@@ -342,20 +335,22 @@ class PaymentWebhookService:
 
     @staticmethod
     def get_webhook_summary(
-        db: Session, provider: Optional[str] = None
-    ) -> Dict[str, Any]:
+        db: Session, provider: str | None = None
+    ) -> dict[str, Any]:
         """Получение сводки по вебхукам"""
         try:
-            # Используем глобальные импорты
-            total_webhooks = count_webhooks(db)
-            pending_webhooks = len(get_pending_webhooks(db))
-            failed_webhooks = len(get_failed_webhooks(db))
+            repository = PaymentWebhookProcessingRepository(db)
+            total_webhooks = repository.count_webhooks()
+            pending_webhooks = len(repository.get_pending_webhooks())
+            failed_webhooks = len(repository.get_failed_webhooks())
 
-            total_transactions = count_transactions(db)
+            total_transactions = repository.count_transactions()
             successful_transactions = len(
-                get_transactions_by_status(db, status="success")
+                repository.get_transactions_by_status(status="success")
             )
-            failed_transactions = len(get_transactions_by_status(db, status="failed"))
+            failed_transactions = len(
+                repository.get_transactions_by_status(status="failed")
+            )
 
             return {
                 "webhooks": {
