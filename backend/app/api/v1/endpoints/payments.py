@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.config import settings
 from app.db.session import get_db
-from app.core.audit import log_critical_change, extract_model_changes
 from app.models.enums import (
     PaymentStatus,  # ✅ SSOT: Используем enum из app.models.enums
 )
@@ -25,6 +24,7 @@ from app.models.payment_webhook import (
 )
 from app.models.visit import Visit
 from app.services.billing_service import BillingService
+from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_providers.base import PaymentResult
 from app.services.payment_providers.manager import PaymentProviderManager
 
@@ -205,146 +205,23 @@ def init_payment(
 ) -> PaymentInitResponse:
     """Инициализация платежа"""
 
+    service = PaymentInitService(db, get_payment_manager())
+
     try:
-        # Проверяем существование визита
-        visit = db.query(Visit).filter(Visit.id == payment_request.visit_id).first()
-        if not visit:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
-            )
-
-        # Получаем менеджер провайдеров
-        manager = get_payment_manager()
-
-        # Проверяем поддержку провайдера и валюты
-        supported_providers = manager.get_providers_for_currency(
-            payment_request.currency
-        )
-        if payment_request.provider not in supported_providers:
-            return PaymentInitResponse(
-                success=False,
-                error_message=f"Провайдер {payment_request.provider} не поддерживает валюту {payment_request.currency}",
-            )
-
-        # Создаем запись платежа в БД через SSOT
-        billing_service = BillingService(db)
-        payment = billing_service.create_payment(
+        result = service.init_payment(
+            request=request,
+            current_user_id=current_user.id,
             visit_id=payment_request.visit_id,
+            provider=payment_request.provider,
             amount=float(payment_request.amount),
             currency=payment_request.currency,
-            method="online",
-            status=PaymentStatus.PENDING.value,
-            provider=payment_request.provider,
-            commit=False,  # Не коммитим сразу, обновим после получения данных от провайдера
+            description=payment_request.description,
+            return_url=payment_request.return_url,
+            cancel_url=payment_request.cancel_url,
         )
-        
-        # ✅ AUDIT LOG: Логируем инициализацию платежа (BEFORE provider call for atomicity)
-        db.flush()  # Получаем ID платежа
-        _, new_data = extract_model_changes(None, payment)
-        log_critical_change(
-            db=db,
-            user_id=current_user.id,
-            action="CREATE",
-            table_name="payments",
-            row_id=payment.id,
-            old_data=None,
-            new_data=new_data,
-            request=request,
-            description=f"Инициализирован платеж ID={payment.id}, провайдер={payment_request.provider}",
-        )
-        # ✅ FIX: Не коммитим здесь - сделаем один commit после всех операций с провайдером
-
-        # Генерируем order_id
-        # ✅ SSOT: Используем get_local_timestamp() вместо datetime.now()
-        from app.services.queue_service import queue_service
-
-        now = queue_service.get_local_timestamp(db)
-        order_id = f"clinic_{payment.id}_{int(now.timestamp())}"
-
-        # Формируем URLs
-        base_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-        return_url = (
-            payment_request.return_url
-            or f"{base_url}/payment/success?payment_id={payment.id}"
-        )
-        cancel_url = (
-            payment_request.cancel_url
-            or f"{base_url}/payment/cancel?payment_id={payment.id}"
-        )
-
-        # Создаем платеж у провайдера
-        result = manager.create_payment(
-            provider_name=payment_request.provider,
-            amount=payment_request.amount,
-            currency=payment_request.currency,
-            order_id=order_id,
-            description=payment_request.description or f"Оплата визита #{visit.id}",
-            return_url=return_url,
-            cancel_url=cancel_url,
-        )
-
-        if result.success:
-            # Обновляем платеж данными от провайдера
-            payment.provider_payment_id = result.payment_id
-            payment.payment_url = result.payment_url
-            payment.provider_data = result.provider_data
-
-            # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
-            # ✅ FIX: commit=False для атомарности - закоммитим все вместе в конце
-            billing_service = BillingService(db)
-            billing_service.update_payment_status(
-                payment_id=payment.id,
-                new_status=result.status or "pending",
-                meta=result.provider_data,
-                commit=False,  # Не коммитим здесь
-            )
-
-            # ✅ FIX: Один commit для всех операций (payment creation + audit + status update)
-            db.commit()
-            db.refresh(payment)
-
-            return PaymentInitResponse(
-                success=True,
-                payment_id=payment.id,
-                provider_payment_id=result.payment_id,
-                payment_url=result.payment_url,
-                status=result.status,
-            )
-        else:
-            # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
-            # ✅ FIX: commit=False для атомарности - закоммитим все вместе в конце
-            billing_service = BillingService(db)
-            billing_service.update_payment_status(
-                payment_id=payment.id,
-                new_status="failed",
-                meta={"error": result.error_message},
-                commit=False,  # Не коммитим здесь
-            )
-
-            # ✅ FIX: Один commit для всех операций (payment creation + audit + status update)
-            db.commit()
-            db.refresh(payment)
-
-            return PaymentInitResponse(
-                success=False, payment_id=payment.id, error_message=result.error_message
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        # ✅ КРИТИЧНО: если платеж уже создан — всегда возвращаем его ID,
-        # даже если произошла ошибка при обращении к провайдеру.
-        if "payment" in locals() and payment is not None and getattr(payment, "id", None):
-            return PaymentInitResponse(
-                success=False,
-                payment_id=payment.id,
-                error_message=f"Ошибка инициализации платежа: {str(e)}",
-            )
-
-        # Если ошибка произошла ДО создания платежа
-        return PaymentInitResponse(
-            success=False, error_message=f"Ошибка инициализации платежа: {str(e)}"
-        )
+        return PaymentInitResponse(**result)
+    except PaymentInitDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 class PaymentCreateRequest(BaseModel):

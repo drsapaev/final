@@ -14,7 +14,7 @@ from app.services.billing_service import BillingService
 from app.services.queue_service import queue_service
 
 
-@dataclass(frozen=True)
+@dataclass
 class PaymentInitDomainError(Exception):
     status_code: int
     detail: str
