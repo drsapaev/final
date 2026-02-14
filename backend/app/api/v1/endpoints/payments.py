@@ -31,8 +31,16 @@ from app.services.payment_create_service import (
     PaymentCreateDomainError,
     PaymentCreateService,
 )
+from app.services.payment_invoice_service import (
+    PaymentInvoiceDomainError,
+    PaymentInvoiceService,
+)
 from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_read_service import PaymentReadDomainError, PaymentReadService
+from app.services.payment_test_init_service import (
+    PaymentTestInitDomainError,
+    PaymentTestInitService,
+)
 from app.services.payment_providers.base import PaymentResult
 from app.services.payment_providers.manager import PaymentProviderManager
 
@@ -350,78 +358,20 @@ def test_init_payment(
     payment_request: PaymentInitRequest, db: Session = Depends(get_db)
 ) -> PaymentInitResponse:
     """Тестовая инициализация платежа БЕЗ аутентификации"""
-
+    service = PaymentTestInitService(db, get_payment_manager())
     try:
-        # Получаем менеджер провайдеров
-        payment_manager = get_payment_manager()
-
-        # Создаем запись платежа в БД через SSOT
-        billing_service = BillingService(db)
-        payment = billing_service.create_payment(
+        result = service.init_test_payment(
             visit_id=payment_request.visit_id,
+            provider=payment_request.provider,
             amount=float(payment_request.amount),
             currency=payment_request.currency,
-            method="online",
-            status=PaymentStatus.PENDING.value,
-            provider=payment_request.provider,
-            commit=False,  # Не коммитим сразу, обновим после получения данных от провайдера
+            description=payment_request.description,
+            return_url=payment_request.return_url,
+            cancel_url=payment_request.cancel_url,
         )
-
-        # Инициализируем платеж через провайдера
-        result = payment_manager.create_payment(
-            provider_name=payment_request.provider,
-            amount=payment_request.amount,
-            currency=payment_request.currency,
-            order_id=str(payment.id),
-            description=payment_request.description or f"Тестовый платеж #{payment.id}",
-            return_url=payment_request.return_url
-            or "http://localhost:5173/payment/success",
-            cancel_url=payment_request.cancel_url
-            or "http://localhost:5173/payment/cancel",
-        )
-
-        if result.success:
-            # Обновляем данные платежа
-            payment.provider_payment_id = result.payment_id
-            payment.payment_url = result.payment_url
-            # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
-            billing_service = BillingService(db)
-            billing_service.update_payment_status(
-                payment_id=payment.id,
-                new_status=PaymentStatus.PROCESSING.value,  # initialized -> processing (более корректный статус)
-            )
-
-            return PaymentInitResponse(
-                success=True,
-                payment_id=payment.id,
-                provider=payment_request.provider,
-                amount=payment_request.amount,
-                currency=payment_request.currency,
-                payment_url=result.payment_url,
-                provider_payment_id=result.payment_id,
-                status="initialized",
-                message="Тестовый платеж успешно инициализирован",
-            )
-        else:
-            # ✅ SSOT: Ошибка инициализации - используем update_payment_status()
-            billing_service = BillingService(db)
-            billing_service.update_payment_status(
-                payment_id=payment.id,
-                new_status="failed",
-                meta={"error": result.error_message},
-            )
-
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ошибка инициализации платежа: {result.error_message}",
-            )
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка инициализации платежа: {str(e)}",
-        )
+        return PaymentInitResponse(**result)
+    except PaymentTestInitDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.get("/{payment_id}/receipt")
@@ -482,36 +432,21 @@ async def create_payment_invoice(
     current_user: Any = Depends(deps.get_current_user),
 ):
     """Создание счета для оплаты из модуля оплаты"""
+    service = PaymentInvoiceService(db)
     try:
-        from app.models.payment_invoice import PaymentInvoice
-
-        # Создаем новый счет
-        invoice = PaymentInvoice(
+        return PaymentInvoiceResponse(
+            **service.create_invoice(
             amount=request.amount,
             currency=request.currency,
             provider=request.provider,
-            status=PaymentStatus.PENDING.value,
             description=request.description,
-            payment_method=request.provider,
-            created_by_id=current_user.id,
+            patient_info=request.patient_info,
+            created_by_id=getattr(current_user, "id", None),
         )
-
-        db.add(invoice)
-        db.commit()
-        db.refresh(invoice)
-
-        return PaymentInvoiceResponse(
-            invoice_id=invoice.id,
-            amount=invoice.amount,
-            currency=invoice.currency,
-            provider=invoice.provider,
-            status=invoice.status,
-            description=invoice.description,
-            created_at=invoice.created_at,
         )
-
+    except PaymentInvoiceDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except Exception as e:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания счета: {str(e)}",
@@ -523,31 +458,12 @@ async def get_pending_invoices(
     db: Session = Depends(get_db), current_user: Any = Depends(deps.get_current_user)
 ):
     """Получение списка неоплаченных счетов"""
+    service = PaymentInvoiceService(db)
     try:
-        from app.models.payment_invoice import PaymentInvoice
-
-        # Получаем неоплаченные счета
-        invoices = (
-            db.query(PaymentInvoice)
-            .filter(PaymentInvoice.status.in_(["pending", "processing"]))
-            .order_by(PaymentInvoice.created_at.desc())
-            .limit(50)
-            .all()
-        )
-
-        return [
-            PaymentInvoiceResponse(
-                invoice_id=invoice.id,
-                amount=invoice.amount,
-                currency=invoice.currency,
-                provider=invoice.provider,
-                status=invoice.status,
-                description=invoice.description,
-                created_at=invoice.created_at,
-            )
-            for invoice in invoices
-        ]
-
+        invoices = service.list_pending_invoices(limit=50)
+        return [PaymentInvoiceResponse(**invoice) for invoice in invoices]
+    except PaymentInvoiceDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
