@@ -2,29 +2,19 @@
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-from sqlalchemy import MetaData, select, Table, update
 from sqlalchemy.orm import Session
 
 from app.crud.appointment import appointment as crud_appointment
 from app.crud.payment_webhook import update_webhook
 from app.models.enums import AppointmentStatus
+from app.repositories.visit_payment_integration_repository import (
+    VisitPaymentIntegrationRepository,
+)
 from app.schemas.payment_webhook import PaymentWebhookOut
 
 
 class VisitPaymentIntegrationService:
     """Сервис для интеграции визитов с платежами"""
-
-    @staticmethod
-    def _visits_table(db: Session) -> Table:
-        """Получение таблицы визитов"""
-        md = MetaData()
-        return Table("visits", md, autoload_with=db.get_bind())
-
-    @staticmethod
-    def _visit_services_table(db: Session) -> Table:
-        """Получение таблицы услуг визита"""
-        md = MetaData()
-        return Table("visit_services", md, autoload_with=db.get_bind())
 
     @staticmethod
     def create_visit_from_payment(
@@ -48,7 +38,7 @@ class VisitPaymentIntegrationService:
             (success, message, visit_id)
         """
         try:
-            visits_table = VisitPaymentIntegrationService._visits_table(db)
+            repository = VisitPaymentIntegrationRepository(db)
 
             # Создаём визит с информацией о платеже
             visit_data = {
@@ -69,10 +59,8 @@ class VisitPaymentIntegrationService:
             }
 
             # Выполняем вставку
-            result = db.execute(visits_table.insert().values(**visit_data))
+            visit_id = repository.insert_visit(visit_data)
             db.commit()
-
-            visit_id = result.inserted_primary_key[0]
 
             # Обновляем статус вебхука
             update_webhook(
@@ -109,11 +97,10 @@ class VisitPaymentIntegrationService:
             (success, message)
         """
         try:
-            visits_table = VisitPaymentIntegrationService._visits_table(db)
+            repository = VisitPaymentIntegrationRepository(db)
 
             # Проверяем существование визита
-            visit_query = select(visits_table).where(visits_table.c.id == visit_id)
-            visit = db.execute(visit_query).first()
+            visit = repository.get_visit(visit_id)
 
             if not visit:
                 return False, f"Визит {visit_id} не найден"
@@ -141,11 +128,7 @@ class VisitPaymentIntegrationService:
                 update_data.update(additional_data)
 
             # Обновляем визит
-            db.execute(
-                update(visits_table)
-                .where(visits_table.c.id == visit_id)
-                .values(**update_data)
-            )
+            repository.update_visit(visit_id, update_data)
             db.commit()
 
             return (
@@ -172,20 +155,10 @@ class VisitPaymentIntegrationService:
             (success, message, payment_info)
         """
         try:
-            visits_table = VisitPaymentIntegrationService._visits_table(db)
+            repository = VisitPaymentIntegrationRepository(db)
 
             # Получаем информацию о визите и платеже
-            query = select(
-                visits_table.c.id,
-                visits_table.c.payment_status,
-                visits_table.c.payment_amount,
-                visits_table.c.payment_currency,
-                visits_table.c.payment_provider,
-                visits_table.c.payment_transaction_id,
-                visits_table.c.payment_processed_at,
-            ).where(visits_table.c.id == visit_id)
-
-            result = db.execute(query).first()
+            result = repository.get_visit_payment_projection(visit_id)
 
             if not result:
                 return False, f"Визит {visit_id} не найден", None
@@ -270,18 +243,12 @@ class VisitPaymentIntegrationService:
             (success, message, visits)
         """
         try:
-            visits_table = VisitPaymentIntegrationService._visits_table(db)
+            repository = VisitPaymentIntegrationRepository(db)
 
             # Получаем визиты с указанным статусом платежа
-            query = (
-                select(visits_table)
-                .where(visits_table.c.payment_status == payment_status)
-                .order_by(visits_table.c.id.desc())
-                .limit(limit)
-                .offset(offset)
+            results = repository.list_visits_by_payment_status(
+                payment_status, limit=limit, offset=offset
             )
-
-            results = db.execute(query).fetchall()
 
             visits = []
             for row in results:
@@ -313,15 +280,10 @@ class VisitPaymentIntegrationService:
             True если запись найдена и обновлена, False иначе
         """
         try:
+            repository = VisitPaymentIntegrationRepository(db)
             # Ищем запись по visit_id (предполагаем, что visit_id может быть в appointment)
             # Это зависит от структуры данных - возможно нужно добавить поле visit_id в appointments
-            appointments_table = VisitPaymentIntegrationService._appointments_table(db)
-
-            # Пытаемся найти запись по visit_id
-            query = select(appointments_table).where(
-                appointments_table.c.visit_id == visit_id
-            )
-            appointment = db.execute(query).first()
+            appointment = repository.find_appointment_by_visit_id(visit_id)
 
             if appointment:
                 # Обновляем статус через CRUD
@@ -338,12 +300,6 @@ class VisitPaymentIntegrationService:
         except Exception as e:
             print(f"⚠️ Ошибка обновления статуса записи: {e}")
             return False
-
-    @staticmethod
-    def _appointments_table(db: Session) -> Table:
-        """Получение таблицы записей"""
-        md = MetaData()
-        return Table("appointments", md, autoload_with=db.get_bind())
 
     @staticmethod
     def create_appointment_from_payment(
