@@ -3,7 +3,6 @@ API endpoints для платежной системы
 """
 
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -24,6 +23,10 @@ from app.models.payment_webhook import (
 )
 from app.models.visit import Visit
 from app.services.billing_service import BillingService
+from app.services.payment_create_service import (
+    PaymentCreateDomainError,
+    PaymentCreateService,
+)
 from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_providers.base import PaymentResult
 from app.services.payment_providers.manager import PaymentProviderManager
@@ -244,145 +247,17 @@ def create_payment(
 ) -> Dict[str, Any]:
     """Создание платежа (для кассы)"""
     try:
-        billing_service = BillingService(db)
-
-        # Определяем visit_id
-        visit_id = payment_request.visit_id
-        if not visit_id and payment_request.appointment_id:
-            # Если передан appointment_id, ищем связанный visit
-            from app.models.appointment import Appointment
-
-            appointment = (
-                db.query(Appointment)
-                .filter(Appointment.id == payment_request.appointment_id)
-                .first()
-            )
-            if appointment:
-                # Ищем visit по patient_id и дате
-                from datetime import date
-
-                visit = (
-                    db.query(Visit)
-                    .filter(
-                        Visit.patient_id == appointment.patient_id,
-                        Visit.visit_date
-                        == (appointment.appointment_date or date.today()),
-                    )
-                    .first()
-                )
-                if visit:
-                    visit_id = visit.id
-
-        if not visit_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не указан visit_id или appointment_id",
-            )
-
-        # Создаем платеж через SSOT
-        payment = billing_service.create_payment(
-            visit_id=visit_id,
+        service = PaymentCreateService(db)
+        return service.create_payment(
+            visit_id=payment_request.visit_id,
+            appointment_id=payment_request.appointment_id,
             amount=float(payment_request.amount),
             currency=payment_request.currency,
             method=payment_request.method,
-            status=PaymentStatus.PAID.value,
             note=payment_request.note,
         )
-        
-        # =====================================================
-        # ВАЖНО: Обновляем статус визита после оплаты
-        # =====================================================
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if visit:
-            # Проверяем, полностью ли оплачен визит
-            from decimal import Decimal
-            from app.models.visit import VisitService
-            
-            # Считаем общую сумму услуг визита
-            total_cost = Decimal("0")
-            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
-            for vs in visit_services:
-                price = Decimal(str(vs.price)) if vs.price else Decimal("0")
-                qty = vs.qty if vs.qty else 1
-                total_cost += price * qty
-            
-            # Считаем уже оплаченную сумму
-            from app.models.payment import Payment
-            paid_payments = db.query(Payment).filter(
-                Payment.visit_id == visit_id,
-                Payment.status.in_(["paid", "completed"])
-            ).all()
-            total_paid = sum(p.amount for p in paid_payments)
-            
-            # Если оплачено >= стоимости услуг, обновляем статус визита
-            if total_paid >= total_cost:
-                visit.status = "paid"
-                visit.discount_mode = "paid"
-                db.commit()
-
-        # Формируем ответ в том же формате, что и get_payments_list
-        from app.models.patient import Patient
-        from app.models.service import Service
-        from app.models.visit import VisitService
-
-        patient_name = None
-        service_name = None
-        appointment_time = None
-
-        visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-        if visit:
-            if visit.visit_time:
-                appointment_time = visit.visit_time.strftime('%H:%M')
-            elif visit.created_at:
-                appointment_time = visit.created_at.strftime('%H:%M')
-
-            if visit.patient_id:
-                patient = (
-                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                )
-                if patient:
-                    patient_name = (
-                        patient.short_name()
-                        or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
-                    )
-
-            first_service = (
-                db.query(VisitService).filter(VisitService.visit_id == visit.id).first()
-            )
-            if first_service:
-                service = (
-                    db.query(Service)
-                    .filter(Service.id == first_service.service_id)
-                    .first()
-                )
-                if service:
-                    service_name = service.name
-
-        method = 'Наличные'
-        if payment.provider:
-            method = payment.provider.capitalize()
-        elif payment.method:
-            method = payment.method.capitalize()
-
-        return {
-            'id': payment.id,
-            'payment_id': payment.id,
-            'time': appointment_time
-            or (payment.created_at.strftime('%H:%M') if payment.created_at else '—'),
-            'patient': patient_name or 'Неизвестно',
-            'service': service_name or 'Услуга',
-            'amount': float(payment.amount),
-            'method': method,
-            'status': payment.status,
-            'currency': payment.currency,
-            'created_at': (
-                payment.created_at.isoformat() if payment.created_at else None
-            ),
-            'paid_at': payment.paid_at.isoformat() if payment.paid_at else None,
-        }
-
-    except HTTPException:
-        raise
+    except PaymentCreateDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
