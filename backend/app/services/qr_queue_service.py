@@ -123,7 +123,7 @@ class QRQueueService:
         visit_type: str = "paid",
         discount_mode: str = "none",
         notes: Optional[str] = None,
-    ) -> "Visit":
+    ) -> Any:
         """
         ⭐ FIX 2: Создаёт Visit для QR-регистрации.
         

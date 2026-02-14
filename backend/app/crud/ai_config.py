@@ -208,7 +208,7 @@ def create_ai_usage_log(
 ) -> AIUsageLog:
     """Создать лог использования AI"""
     # Получаем провайдера для копирования его имени в audit log
-    provider = get_ai_provider(db, provider_id)
+    provider = get_ai_provider_by_id(db, provider_id)
     if not provider:
         raise ValueError(f"AI Provider с ID {provider_id} не найден")
 

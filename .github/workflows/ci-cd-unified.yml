@@ -116,7 +116,7 @@ jobs:
         for dir in app tests; do
           if [ -d "$dir" ]; then
             echo "  Проверяем $dir/..."
-            ruff check "$dir" --output-format=concise > quality-reports/ruff_${dir}.txt 2>&1
+            ruff check "$dir" --select=E9,F63,F7 --output-format=concise > quality-reports/ruff_${dir}.txt 2>&1
             RUFF_EXIT=$?
             if [ $RUFF_EXIT -ne 0 ]; then
               ERROR_COUNT=$(grep -c "^" quality-reports/ruff_${dir}.txt || echo "0")

@@ -3,6 +3,7 @@ API endpoints для кассира
 Специальный модуль для работы с платежами и оплатами через CashierPanel
 """
 
+import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Generic, TypeVar
@@ -17,6 +18,7 @@ from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.patient import Patient
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
