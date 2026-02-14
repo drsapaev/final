@@ -500,7 +500,7 @@ jobs:
         echo "🔍 Проверяем конфигурацию pytest:"
         cat pytest.ini
         echo "🧪 Запускаем тесты с покрытием:"
-        pytest tests/ --dead-fixtures
+        pytest tests/
         echo "📁 Проверяем созданные файлы:"
         ls -la htmlcov/ || echo "Папка htmlcov не найдена"
         if [ ! -d "htmlcov" ]; then
@@ -958,6 +958,9 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
 
+    - name: 📈 Setup k6
+      uses: grafana/setup-k6-action@v1
+
     - name: 📦 Install backend dependencies
       run: |
         cd backend
@@ -1018,14 +1021,11 @@ jobs:
           echo "::warning::Skipping k6 execution because API was not ready."
           K6_EXIT=1
         else
-          docker run --rm --network=host \
-            -e BASE_URL=http://127.0.0.1:8000 \
-            -e TARGET_RPS=${TARGET_RPS} \
-            -v ${{ github.workspace }}/ops/load:/scripts \
-            -v ${{ github.workspace }}/artifacts/load:/artifacts \
-            grafana/k6:latest \
-            run /scripts/clinic_core.js \
-            --summary-export=/artifacts/k6-summary.json
+          export BASE_URL=http://127.0.0.1:8000
+          export TARGET_RPS=${TARGET_RPS}
+          k6 run ops/load/clinic_core.js \
+            --summary-export=artifacts/load/k6-summary.json \
+            > artifacts/load/k6-run.log 2>&1
           K6_EXIT=$?
         fi
         echo "K6_EXIT_CODE=$K6_EXIT" >> $GITHUB_ENV
@@ -1067,6 +1067,7 @@ jobs:
         path: |
           artifacts/load/k6-summary.json
           artifacts/load/load-regression-report.md
+          artifacts/load/k6-run.log
         if-no-files-found: warn
 
     - name: 🛑 Stop API
