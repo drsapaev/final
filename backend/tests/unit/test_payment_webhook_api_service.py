@@ -50,14 +50,38 @@ class TestPaymentWebhookApiService:
     def test_list_transactions_applies_filters(self, db_session):
         service = PaymentWebhookApiService(db_session)
         tx1 = SimpleNamespace(provider="click", status="success", visit_id=1)
-        tx2 = SimpleNamespace(provider="payme", status="success", visit_id=1)
-        tx3 = SimpleNamespace(provider="click", status="failed", visit_id=2)
-        with patch.object(service.repository, "list_transactions", return_value=[tx1, tx2, tx3]):
+        with patch.object(service.repository, "list_transactions", return_value=[tx1]) as mocked:
             result = service.list_transactions(
                 skip=0, limit=100, provider="click", status="success", visit_id=1
             )
 
+        mocked.assert_called_once_with(
+            skip=0,
+            limit=100,
+            provider="click",
+            status="success",
+            visit_id=1,
+        )
         assert result == [tx1]
+
+    def test_list_webhooks_delegates_filters_to_repository(self, db_session):
+        service = PaymentWebhookApiService(db_session)
+        webhook = SimpleNamespace(provider="payme", status="pending")
+        with patch.object(service.repository, "list_webhooks", return_value=[webhook]) as mocked:
+            result = service.list_webhooks(
+                skip=10,
+                limit=20,
+                provider="payme",
+                status="pending",
+            )
+
+        mocked.assert_called_once_with(
+            skip=10,
+            limit=20,
+            provider="payme",
+            status="pending",
+        )
+        assert result == [webhook]
 
     def test_get_transaction_not_found(self, db_session):
         service = PaymentWebhookApiService(db_session)

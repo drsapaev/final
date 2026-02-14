@@ -84,12 +84,12 @@ class PaymentWebhookApiService:
         provider: str | None,
         status: str | None,
     ):
-        webhooks = self.repository.list_webhooks(skip=skip, limit=limit)
-        if provider:
-            webhooks = [w for w in webhooks if w.provider == provider]
-        if status:
-            webhooks = [w for w in webhooks if w.status == status]
-        return webhooks
+        return self.repository.list_webhooks(
+            skip=skip,
+            limit=limit,
+            provider=provider,
+            status=status,
+        )
 
     def list_transactions(
         self,
@@ -100,14 +100,13 @@ class PaymentWebhookApiService:
         status: str | None,
         visit_id: int | None,
     ):
-        transactions = self.repository.list_transactions(skip=skip, limit=limit)
-        if provider:
-            transactions = [t for t in transactions if t.provider == provider]
-        if status:
-            transactions = [t for t in transactions if t.status == status]
-        if visit_id is not None:
-            transactions = [t for t in transactions if t.visit_id == visit_id]
-        return transactions
+        return self.repository.list_transactions(
+            skip=skip,
+            limit=limit,
+            provider=provider,
+            status=status,
+            visit_id=visit_id,
+        )
 
     def get_webhook_summary(self, *, provider: str | None):
         return self.repository.get_webhook_summary(provider)

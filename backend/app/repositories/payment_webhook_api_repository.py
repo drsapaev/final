@@ -8,14 +8,13 @@ from app.crud.payment_webhook import (
     create_provider,
     delete_provider,
     get_all_providers,
-    get_all_transactions,
-    get_all_webhooks,
     get_provider_by_code,
     get_provider_by_id,
     get_transaction_by_id,
     get_webhook_by_id,
     update_provider,
 )
+from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 from app.schemas.payment_webhook import PaymentProviderCreate, PaymentProviderUpdate
 from app.services.payment_webhook import payment_webhook_service
 
@@ -33,7 +32,30 @@ class PaymentWebhookApiRepository:
         return payment_webhook_service.process_click_webhook(self.db, data)
 
     def get_webhook_summary(self, provider: str | None):
-        return payment_webhook_service.get_webhook_summary(self.db, provider)
+        webhook_query = self.db.query(PaymentWebhook)
+        transaction_query = self.db.query(PaymentTransaction)
+        if provider:
+            webhook_query = webhook_query.filter(PaymentWebhook.provider == provider)
+            transaction_query = transaction_query.filter(
+                PaymentTransaction.provider == provider
+            )
+
+        return {
+            "webhooks": {
+                "total": webhook_query.count(),
+                "pending": webhook_query.filter(PaymentWebhook.status == "pending").count(),
+                "failed": webhook_query.filter(PaymentWebhook.status == "failed").count(),
+            },
+            "transactions": {
+                "total": transaction_query.count(),
+                "successful": transaction_query.filter(
+                    PaymentTransaction.status == "success"
+                ).count(),
+                "failed": transaction_query.filter(
+                    PaymentTransaction.status == "failed"
+                ).count(),
+            },
+        }
 
     def list_providers(self):
         return get_all_providers(self.db)
@@ -53,11 +75,38 @@ class PaymentWebhookApiRepository:
     def delete_provider(self, provider_id: int) -> bool:
         return delete_provider(self.db, provider_id)
 
-    def list_webhooks(self, skip: int, limit: int):
-        return get_all_webhooks(self.db, skip=skip, limit=limit)
+    def list_webhooks(
+        self,
+        *,
+        skip: int,
+        limit: int,
+        provider: str | None = None,
+        status: str | None = None,
+    ):
+        query = self.db.query(PaymentWebhook)
+        if provider:
+            query = query.filter(PaymentWebhook.provider == provider)
+        if status:
+            query = query.filter(PaymentWebhook.status == status)
+        return query.order_by(PaymentWebhook.id.desc()).offset(skip).limit(limit).all()
 
-    def list_transactions(self, skip: int, limit: int):
-        return get_all_transactions(self.db, skip=skip, limit=limit)
+    def list_transactions(
+        self,
+        *,
+        skip: int,
+        limit: int,
+        provider: str | None = None,
+        status: str | None = None,
+        visit_id: int | None = None,
+    ):
+        query = self.db.query(PaymentTransaction)
+        if provider:
+            query = query.filter(PaymentTransaction.provider == provider)
+        if status:
+            query = query.filter(PaymentTransaction.status == status)
+        if visit_id is not None:
+            query = query.filter(PaymentTransaction.visit_id == visit_id)
+        return query.order_by(PaymentTransaction.id.desc()).offset(skip).limit(limit).all()
 
     def get_transaction(self, transaction_id: int):
         return get_transaction_by_id(self.db, transaction_id)
