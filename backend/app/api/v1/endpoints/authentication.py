@@ -14,8 +14,11 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.services.authentication_service import (
-    AuthenticationService,
     get_authentication_service,
+)
+from app.services.authentication_api_service import (
+    AuthenticationApiDomainError,
+    AuthenticationApiService,
 )
 
 logger = logging.getLogger(__name__)
@@ -383,28 +386,25 @@ async def update_user_profile(
     current_user: User = Depends(get_current_user),
 ):
     """Обновить профиль пользователя"""
+    api_service = AuthenticationApiService(db)
     try:
-        # Обновляем данные пользователя
-        update_data = request_data.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            if hasattr(current_user, field):
-                setattr(current_user, field, value)
-
-        db.commit()
-        db.refresh(current_user)
-
-        # Получаем обновленный профиль
         service = get_authentication_service()
-        profile = service.get_user_profile(db, current_user.id)
+        profile = api_service.update_user_profile(
+            current_user=current_user,
+            update_data=request_data.dict(exclude_unset=True),
+            profile_loader=lambda user_id: service.get_user_profile(db, user_id),
+        )
 
         return UserProfileResponse(**profile)
 
+    except AuthenticationApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
+        api_service.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления профиля: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/sessions", response_model=SessionListResponse)
@@ -683,21 +683,11 @@ async def revoke_session(
     """Отозвать сессию"""
     try:
         auth_service = get_authentication_service()
-
-        # Проверяем, что сессия принадлежит текущему пользователю
-        from app.models.authentication import UserSession
-
-        session = db.query(UserSession).filter(UserSession.id == session_id).first()
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
-            )
-
-        if session.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этой сессии",
-            )
+        AuthenticationApiService(db).ensure_session_access(
+            session_id=session_id,
+            current_user_id=current_user.id,
+            allow_admin_access=False,
+        )
 
         success = auth_service.revoke_session(db, session_id, reason)
 
@@ -713,6 +703,8 @@ async def revoke_session(
             "reason": reason,
         }
 
+    except AuthenticationApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
@@ -804,24 +796,11 @@ async def get_session_info(
     """Получить информацию о сессии"""
     try:
         auth_service = get_authentication_service()
-
-        # Проверяем, что сессия принадлежит текущему пользователю или пользователь - администратор
-        from app.models.authentication import UserSession
-
-        session = db.query(UserSession).filter(UserSession.id == session_id).first()
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
-            )
-
-        if session.user_id != current_user.id and current_user.role not in [
-            "Admin",
-            "SuperAdmin",
-        ]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этой сессии",
-            )
+        AuthenticationApiService(db).ensure_session_access(
+            session_id=session_id,
+            current_user_id=current_user.id,
+            allow_admin_access=current_user.role in ["Admin", "SuperAdmin"],
+        )
 
         session_info = auth_service.get_session_info(db, session_id)
 
@@ -837,6 +816,8 @@ async def get_session_info(
             "session": session_info,
         }
 
+    except AuthenticationApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:

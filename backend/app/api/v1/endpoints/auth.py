@@ -8,21 +8,15 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
 """
 from __future__ import annotations
 
-import inspect
 import logging
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from sqlalchemy import select
 
 # helpers from deps
-from app.api.deps import create_access_token, get_current_user
-
-# password verification helper (assumed present in project)
-from app.core.security import verify_password
+from app.api.deps import get_current_user
 
 # Import your project's DB session factory / dependency
 # get_db should be a dependency that yields either an AsyncSession or sync Session
@@ -30,6 +24,7 @@ from app.db.session import get_db
 
 # ORM user model
 from app.models.user import User
+from app.services.auth_api_service import AuthApiDomainError, AuthApiService
 
 logger = logging.getLogger(__name__)
 
@@ -53,52 +48,17 @@ async def login(
     Works with both async and sync SQLAlchemy sessions returned by get_db().
     """
     logger.info(f"Login attempt for username: {form_data.username}")
-
-    # build select statement
-    stmt = select(User).where(User.username == form_data.username)
-
-    # Detect whether db.execute is a coroutine function (AsyncSession) or sync Session
-    execute_callable = getattr(db, "execute", None)
-    if inspect.iscoroutinefunction(execute_callable):
-        # AsyncSession: await directly
-        result = await db.execute(stmt)
-    else:
-        # Sync Session: run in threadpool to avoid blocking event loop
-        result = await run_in_threadpool(db.execute, stmt)
-
-    # Try to extract user from result in a robust way
-    user = None
     try:
-        user = result.scalar_one_or_none()
-    except Exception:
-        try:
-            # fallback for Result API
-            user = result.scalars().first()
-        except Exception:
-            user = None
-
-    if user:
-        # Don't log full hashes or validation results unless in debug mode
-        logger.debug(f"User found: {user.username}, active: {user.is_active}")
-        password_valid = verify_password(form_data.password, user.hashed_password)
-        if not password_valid:
-            logger.warning(f"Invalid password for user {form_data.username}")
-    else:
-        logger.warning(f"User not found for username: {form_data.username}")
-
-    if not user or not verify_password(
-        form_data.password, getattr(user, "hashed_password", "")
-    ):
-        logger.warning(f"Authentication failed for {form_data.username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        return await AuthApiService(db).login_oauth_payload(
+            username=form_data.username,
+            password=form_data.password,
         )
-
-    # Create JWT access token (create_access_token implemented in deps)
-    access_token = create_access_token({"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    except AuthApiDomainError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
 
 
 @router.get("/me", response_model=None)
@@ -145,78 +105,18 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
     """
     try:
         logger.info(f"JSON login called with username={request_data.username}")
-
-        # Определяем тип сессии БД
-        is_async = inspect.iscoroutinefunction(
-            db.__class__.__aenter__
-            if hasattr(db.__class__, '__aenter__')
-            else lambda: None
+        payload = await AuthApiService(db).json_login_payload(
+            username=request_data.username,
+            password=request_data.password,
+            remember_me=request_data.remember_me,
         )
-
-        if is_async:
-            # Async session
-            stmt = select(User).where(
-                (User.username == request_data.username)
-                | (User.email == request_data.username)
-            )
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
-        else:
-            # Sync session
-            user = await run_in_threadpool(
-                lambda: db.query(User)
-                .filter(
-                    (User.username == request_data.username)
-                    | (User.email == request_data.username)
-                )
-                .first()
-            )
-
-        if not user:
-            logger.warning(f"User not found: {request_data.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверные учетные данные",
-            )
-
-        logger.debug(f"User found: {user.username}")
-
-        if not user.is_active:
-            logger.warning(f"User is inactive: {user.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Пользователь деактивирован",
-            )
-
-        # Проверяем пароль
-        password_valid = verify_password(request_data.password, user.hashed_password)
-
-        if not password_valid:
-            logger.warning(f"Invalid password for user: {user.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверные учетные данные",
-            )
-
-        # Создаем токен
-        access_token = create_access_token(data={"sub": str(user.id)})
-
-        logger.info(f"Token created successfully for user: {user.username}")
-
         return JSONLoginResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user={
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "full_name": user.full_name,
-                "role": user.role,
-                "is_active": user.is_active,
-                "is_superuser": user.is_superuser,
-            },
+            access_token=payload["access_token"],
+            token_type=payload["token_type"],
+            user=payload["user"],
         )
-
+    except AuthApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:

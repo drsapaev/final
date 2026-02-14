@@ -2,7 +2,6 @@
 API endpoints для двухфакторной аутентификации (2FA)
 """
 
-import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -18,7 +17,6 @@ from app.crud.two_factor_auth import (
     two_factor_session,
 )
 from app.db.session import get_db
-from app.models.authentication import RefreshToken, UserSession
 from app.models.user import User
 from app.schemas.authentication import LoginResponse
 from app.schemas.two_factor_auth import (
@@ -37,6 +35,7 @@ from app.schemas.two_factor_auth import (
 )
 from app.services.authentication_service import get_authentication_service
 from app.services.two_factor_service import get_two_factor_service, TwoFactorService
+from app.services.two_factor_auth_api_service import TwoFactorAuthApiService
 
 router = APIRouter()
 
@@ -177,17 +176,9 @@ async def verify_two_factor(
         
         # Если access_token не сработал, пробуем pending_2fa_token
         if not user and request_data.pending_2fa_token:
-            pending_session = (
-                db.query(UserSession)
-                .filter(
-                    UserSession.refresh_token == request_data.pending_2fa_token,
-                    UserSession.revoked == False,
-                    UserSession.expires_at > datetime.utcnow(),
-                )
-                .first()
+            user = TwoFactorAuthApiService(db).get_user_from_pending_token(
+                request_data.pending_2fa_token
             )
-            if pending_session:
-                user = db.query(User).filter(User.id == pending_session.user_id).first()
         
         if not user:
             raise HTTPException(
@@ -223,52 +214,14 @@ async def verify_two_factor(
             pending = request_data.pending_2fa_token
             tokens_payload = None
             if pending:
-                # Найдём сессию с таким временным токеном
-                pending_session = (
-                    db.query(UserSession)
-                    .filter(
-                        UserSession.user_id == user.id,
-                        UserSession.refresh_token == pending,
-                        UserSession.revoked == False,
-                        UserSession.expires_at > datetime.utcnow(),
-                    )
-                    .first()
+                auth = get_authentication_service()
+                tokens_payload = TwoFactorAuthApiService(
+                    db
+                ).exchange_pending_token_for_tokens(
+                    user=user,
+                    pending_token=pending,
+                    auth_service=auth,
                 )
-                if pending_session:
-                    auth = get_authentication_service()
-                    # Выпускаем финальные токены
-                    jti = str(uuid.uuid4())
-                    access_token = auth.create_access_token(
-                        {
-                            "sub": str(user.id),
-                            "username": user.username,
-                            "role": user.role,
-                            "is_active": user.is_active,
-                            "is_superuser": user.is_superuser,
-                        }
-                    )
-                    refresh_token = auth.create_refresh_token(user.id, jti)
-                    # Сохраняем refresh
-                    db.add(
-                        RefreshToken(
-                            user_id=user.id,
-                            token=refresh_token,
-                            jti=jti,
-                            expires_at=datetime.utcnow()
-                            + timedelta(days=auth.refresh_token_expire_days),
-                        )
-                    )
-                    # Отмечаем pending сессию как подтвержденную (можно оставить как trusted-маркер)
-                    pending_session.user_agent = (
-                        pending_session.user_agent or ""
-                    ) + "|2fa-verified"
-                    db.commit()
-                    tokens_payload = {
-                        "access_token": access_token,
-                        "refresh_token": refresh_token,
-                        "token_type": "bearer",
-                        "expires_in": auth.access_token_expire_minutes * 60,
-                    }
 
             # Возвращаем успех 2FA (фронт, при наличии tokens_payload, может завершить логин)
             return TwoFactorVerifyResponse(
