@@ -619,7 +619,7 @@ jobs:
         echo "✅ Все Dockerfile'ы найдены"
     
     - name: 🏗️ Сборка Backend Docker
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./ops/backend.Dockerfile
@@ -631,7 +631,7 @@ jobs:
           BUILDKIT_INLINE_CACHE=1
     
     - name: 🏗️ Сборка Frontend Docker
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./ops/frontend.Dockerfile
