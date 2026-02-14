@@ -522,7 +522,7 @@ jobs:
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
     
     - name: 📊 Загрузка отчета покрытия
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       if: always()
       with:
         name: coverage-report
@@ -1400,7 +1400,7 @@ jobs:
         fi
     
     - name: 📤 Загрузка документации
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: api-docs
         path: backend/openapi.json

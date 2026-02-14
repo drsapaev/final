@@ -45,7 +45,7 @@ jobs:
         bandit -r . -f json -o bandit-report.json || true
         
     - name: 📤 Загрузка отчётов безопасности
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: security-reports
         path: |
