@@ -12,17 +12,6 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.enums import (
-    PaymentStatus,  # ✅ SSOT: Используем enum из app.models.enums
-)
-from app.models.payment import Payment
-from app.models.payment_webhook import (
-    PaymentProvider,
-    PaymentTransaction,
-    PaymentWebhook,
-)
-from app.models.visit import Visit
-from app.services.billing_service import BillingService
 from app.services.payment_cancel_service import (
     PaymentCancelDomainError,
     PaymentCancelService,
@@ -41,7 +30,6 @@ from app.services.payment_test_init_service import (
     PaymentTestInitDomainError,
     PaymentTestInitService,
 )
-from app.services.payment_providers.base import PaymentResult
 from app.services.payment_providers.manager import PaymentProviderManager
 
 router = APIRouter()
@@ -193,23 +181,11 @@ class ProvidersResponse(BaseModel):
 @router.get("/providers", response_model=ProvidersResponse)
 def get_available_providers(db: Session = Depends(get_db)) -> ProvidersResponse:
     """Получение списка доступных провайдеров платежей"""
-
-    manager = get_payment_manager()
-    provider_info = manager.get_provider_info()
-
-    providers = []
-    for code, info in provider_info.items():
-        providers.append(
-            ProviderInfo(
-                name=info["name"],
-                code=code,
-                supported_currencies=info["supported_currencies"],
-                is_active=True,
-                features=info["features"],
-            )
-        )
-
-    return ProvidersResponse(providers=providers)
+    service = PaymentReadService(db, get_payment_manager())
+    try:
+        return ProvidersResponse(**service.get_available_providers())
+    except PaymentReadDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.post("/init", response_model=PaymentInitResponse)
@@ -289,29 +265,16 @@ def list_payments(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение списка платежей с фильтрацией (использует SSOT)"""
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    billing_service = BillingService(db)
-
-    # Получаем платежи через SSOT
-    payment_responses = billing_service.get_payments_list(
-        visit_id=visit_id,
-        date_from=date_from,
-        date_to=date_to,
-        limit=limit,
-        offset=offset,
+    service = PaymentReadService(db)
+    return PaymentListResponse(
+        **service.list_payments(
+            visit_id=visit_id,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+            offset=offset,
+        )
     )
-
-    # ✅ ЛОГИРОВАНИЕ: Для отладки - проверяем, что возвращаются реальные данные из БД
-    logger.info(
-        f"📊 Возвращено платежей: {len(payment_responses)}, фильтры: visit_id={visit_id}, date_from={date_from}, date_to={date_to}"
-    )
-    if payment_responses:
-        logger.info(f"📊 Первый платеж (пример): {payment_responses[0]}")
-
-    return PaymentListResponse(payments=payment_responses, total=len(payment_responses))
 
 
 @router.get("/{payment_id}", response_model=PaymentStatusResponse)

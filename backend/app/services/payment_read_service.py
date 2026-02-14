@@ -63,6 +63,44 @@ class PaymentReadService:
             "provider_data": payment.provider_data,
         }
 
+    def get_available_providers(self) -> dict[str, Any]:
+        if self.payment_manager is None:
+            raise PaymentReadDomainError(
+                status_code=500, detail="Менеджер платежных провайдеров не настроен"
+            )
+
+        provider_info = self.payment_manager.get_provider_info()
+        providers = []
+        for code, info in provider_info.items():
+            providers.append(
+                {
+                    "name": info["name"],
+                    "code": code,
+                    "supported_currencies": info["supported_currencies"],
+                    "is_active": True,
+                    "features": info["features"],
+                }
+            )
+        return {"providers": providers}
+
+    def list_payments(
+        self,
+        *,
+        visit_id: int | None,
+        date_from: str | None,
+        date_to: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict[str, Any]:
+        payment_responses = self.billing_service.get_payments_list(
+            visit_id=visit_id,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+            offset=offset,
+        )
+        return {"payments": payment_responses, "total": len(payment_responses)}
+
     def get_visit_payments(self, *, visit_id: int) -> dict[str, Any]:
         payments = self.repository.list_payments_by_visit(visit_id)
         payment_responses = []
