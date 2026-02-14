@@ -32,6 +32,7 @@ from app.services.payment_create_service import (
     PaymentCreateService,
 )
 from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
+from app.services.payment_read_service import PaymentReadDomainError, PaymentReadService
 from app.services.payment_providers.base import PaymentResult
 from app.services.payment_providers.manager import PaymentProviderManager
 
@@ -312,46 +313,11 @@ def get_payment_status(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ) -> PaymentStatusResponse:
     """Получение статуса платежа"""
-
-    # Получаем платеж из БД
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
-        )
-
-    # Если платеж онлайн и не завершен, проверяем статус у провайдера
-    if (
-        payment.provider
-        and payment.provider_payment_id
-        and payment.status
-        in [PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value]
-    ):
-
-        manager = get_payment_manager()
-        result = manager.check_payment_status(
-            payment.provider, payment.provider_payment_id
-        )
-
-        if result.success and result.status != payment.status:
-            # ✅ SSOT: Обновляем статус через update_payment_status()
-            billing_service = BillingService(db)
-            meta = {**(payment.provider_data or {}), **result.provider_data}
-            billing_service.update_payment_status(
-                payment_id=payment.id, new_status=result.status, meta=meta
-            )
-
-    return PaymentStatusResponse(
-        payment_id=payment.id,
-        status=payment.status,
-        amount=payment.amount,
-        currency=payment.currency,
-        provider=payment.provider,
-        provider_payment_id=payment.provider_payment_id,
-        created_at=payment.created_at,
-        paid_at=payment.paid_at,
-        provider_data=payment.provider_data,
-    )
+    service = PaymentReadService(db, get_payment_manager())
+    try:
+        return PaymentStatusResponse(**service.get_payment_status(payment_id=payment_id))
+    except PaymentReadDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.get("/visit/{visit_id}", response_model=PaymentListResponse)
@@ -361,28 +327,8 @@ def get_visit_payments(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение всех платежей по визиту"""
-
-    payments = db.query(Payment).filter(Payment.visit_id == visit_id).all()
-
-    payment_responses = []
-    for payment in payments:
-        payment_data = {
-            'payment_id': payment.id,
-            'id': payment.id,
-            'status': payment.status,
-            'amount': float(payment.amount),
-            'currency': payment.currency,
-            'provider': payment.provider,
-            'provider_payment_id': payment.provider_payment_id,
-            'created_at': (
-                payment.created_at.isoformat() if payment.created_at else None
-            ),
-            'paid_at': payment.paid_at.isoformat() if payment.paid_at else None,
-            'provider_data': payment.provider_data,
-        }
-        payment_responses.append(payment_data)
-
-    return PaymentListResponse(payments=payment_responses, total=len(payment_responses))
+    service = PaymentReadService(db)
+    return PaymentListResponse(**service.get_visit_payments(visit_id=visit_id))
 
 
 @router.post("/{payment_id}/cancel")
