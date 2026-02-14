@@ -5,17 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud.payment_webhook import (
-    create_provider as crud_create_provider,
-    delete_provider,
-    get_all_providers,
-    get_all_transactions,
-    get_all_webhooks,
-    get_provider_by_id,
-    get_transaction_by_id,
-    get_webhook_by_id,
-    update_provider as crud_update_provider,
-)
 from app.schemas.payment_webhook import (
     PaymentProviderCreate,
     PaymentProviderOut,
@@ -23,7 +12,10 @@ from app.schemas.payment_webhook import (
     PaymentTransactionOut,
     PaymentWebhookOut,
 )
-from app.services.payment_webhook import payment_webhook_service
+from app.services.payment_webhook_api_service import (
+    PaymentWebhookApiDomainError,
+    PaymentWebhookApiService,
+)
 
 router = APIRouter(prefix="/webhooks", tags=["payment_webhooks"])
 
@@ -34,6 +26,7 @@ router = APIRouter(prefix="/webhooks", tags=["payment_webhooks"])
 @router.post("/payment/payme", name="payme_webhook")
 async def payme_webhook(request: Request, db: Session = Depends(get_db)):
     """Вебхук от Payme для обработки платежей"""
+    service = PaymentWebhookApiService(db)
     try:
         # Получаем данные из запроса
         data = await request.json()
@@ -46,24 +39,7 @@ async def payme_webhook(request: Request, db: Session = Depends(get_db)):
                 detail="Missing X-Payme-Signature header",
             )
 
-        # Обрабатываем вебхук
-        success, message, webhook = payment_webhook_service.process_payme_webhook(
-            db, data, signature
-        )
-
-        if success:
-            return {
-                "ok": True,
-                "message": message,
-                "webhook_id": webhook.id if webhook else None,
-            }
-        else:
-            # Возвращаем 200 OK даже при ошибке, чтобы Payme не повторял запрос
-            return {
-                "ok": False,
-                "message": message,
-                "webhook_id": webhook.id if webhook else None,
-            }
+        return service.process_payme_webhook(data=data, signature=signature)
 
     except Exception as e:
         # Логируем ошибку, но возвращаем 200 OK
@@ -74,29 +50,12 @@ async def payme_webhook(request: Request, db: Session = Depends(get_db)):
 @router.post("/payment/click", name="click_webhook")
 async def click_webhook(request: Request, db: Session = Depends(get_db)):
     """Вебхук от Click для обработки платежей"""
+    service = PaymentWebhookApiService(db)
     try:
         # Получаем данные из формы
         form_data = await request.form()
         data = dict(form_data)
-
-        # Обрабатываем вебхук
-        success, message, webhook = payment_webhook_service.process_click_webhook(
-            db, data
-        )
-
-        if success:
-            return {
-                "ok": True,
-                "message": message,
-                "webhook_id": webhook.id if webhook else None,
-            }
-        else:
-            # Возвращаем 200 OK даже при ошибке
-            return {
-                "ok": False,
-                "message": message,
-                "webhook_id": webhook.id if webhook else None,
-            }
+        return service.process_click_webhook(data=data)
 
     except Exception as e:
         # Логируем ошибку, но возвращаем 200 OK
@@ -114,7 +73,7 @@ def list_providers(
     db: Session = Depends(get_db), current_user=Depends(require_roles("Admin"))
 ):
     """Список провайдеров платежей"""
-    return get_all_providers(db)
+    return PaymentWebhookApiService(db).list_providers()
 
 
 @router.post(
@@ -126,17 +85,11 @@ def create_provider(
     current_user=Depends(require_roles("Admin")),
 ):
     """Создание нового провайдера платежей"""
-    # Проверяем, что код провайдера уникален
-    from app.crud.payment_webhook import get_provider_by_code
-
-    existing = get_provider_by_code(db, code=provider_in.code)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Provider with code '{provider_in.code}' already exists",
-        )
-
-    return crud_create_provider(db, provider_in)
+    service = PaymentWebhookApiService(db)
+    try:
+        return service.create_provider(provider_in)
+    except PaymentWebhookApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.get(
@@ -150,12 +103,11 @@ def get_provider(
     current_user=Depends(require_roles("Admin")),
 ):
     """Получение провайдера по ID"""
-    provider = get_provider_by_id(db, provider_id)
-    if not provider:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found"
-        )
-    return provider
+    service = PaymentWebhookApiService(db)
+    try:
+        return service.get_provider(provider_id)
+    except PaymentWebhookApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.put(
@@ -170,13 +122,11 @@ def update_provider(
     current_user=Depends(require_roles("Admin")),
 ):
     """Обновление провайдера платежей"""
-    provider = get_provider_by_id(db, provider_id)
-    if not provider:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found"
-        )
-
-    return crud_update_provider(db, provider_id, provider_in)
+    service = PaymentWebhookApiService(db)
+    try:
+        return service.update_provider(provider_id, provider_in)
+    except PaymentWebhookApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.delete("/payment/providers/{provider_id}", name="delete_provider")
@@ -186,20 +136,11 @@ def delete_provider_endpoint(
     current_user=Depends(require_roles("Admin")),
 ):
     """Удаление провайдера платежей"""
-    provider = get_provider_by_id(db, provider_id)
-    if not provider:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found"
-        )
-
-    success = delete_provider(db, provider_id)
-    if success:
-        return {"ok": True, "message": "Provider deleted successfully"}
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete provider",
-        )
+    service = PaymentWebhookApiService(db)
+    try:
+        return service.delete_provider(provider_id)
+    except PaymentWebhookApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 # --- Admin endpoints (требуют аутентификации) ---
@@ -215,15 +156,13 @@ def list_webhooks(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Список вебхуков оплат"""
-    webhooks = get_all_webhooks(db, skip=skip, limit=limit)
-
-    # Применяем фильтры
-    if provider:
-        webhooks = [w for w in webhooks if w.provider == provider]
-    if status:
-        webhooks = [w for w in webhooks if w.status == status]
-
-    return webhooks
+    service = PaymentWebhookApiService(db)
+    return service.list_webhooks(
+        skip=skip,
+        limit=limit,
+        provider=provider,
+        status=status,
+    )
 
 
 @router.get(
@@ -241,24 +180,15 @@ def list_transactions(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Список транзакций оплат"""
+    service = PaymentWebhookApiService(db)
     try:
-        print(f"🔍 Получаем транзакции: skip={skip}, limit={limit}")
-        transactions = get_all_transactions(db, skip=skip, limit=limit)
-        print(f"📊 Получено транзакций: {len(transactions)}")
-
-        # Применяем фильтры
-        if provider:
-            transactions = [t for t in transactions if t.provider == provider]
-            print(f"🔍 После фильтра по провайдеру: {len(transactions)}")
-        if status:
-            transactions = [t for t in transactions if t.status == status]
-            print(f"🔍 После фильтра по статусу: {len(transactions)}")
-        if visit_id:
-            transactions = [t for t in transactions if t.visit_id == visit_id]
-            print(f"🔍 После фильтра по визиту: {len(transactions)}")
-
-        print(f"✅ Возвращаем {len(transactions)} транзакций")
-        return transactions
+        return service.list_transactions(
+            skip=skip,
+            limit=limit,
+            provider=provider,
+            status=status,
+            visit_id=visit_id,
+        )
     except Exception as e:
         print(f"❌ Ошибка в list_transactions: {e}")
         raise HTTPException(
@@ -274,11 +204,9 @@ def get_webhook_summary(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Сводка по вебхукам и транзакциям"""
+    service = PaymentWebhookApiService(db)
     try:
-        print(f"📊 Получаем сводку вебхуков для провайдера: {provider}")
-        summary = payment_webhook_service.get_webhook_summary(db, provider)
-        print(f"✅ Сводка получена: {summary}")
-        return summary
+        return service.get_webhook_summary(provider=provider)
     except Exception as e:
         print(f"❌ Ошибка в get_webhook_summary: {e}")
         raise HTTPException(
@@ -298,12 +226,11 @@ def get_transaction(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Получение транзакции по ID"""
-    transaction = get_transaction_by_id(db, transaction_id)
-    if not transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
-        )
-    return transaction
+    service = PaymentWebhookApiService(db)
+    try:
+        return service.get_transaction(transaction_id)
+    except PaymentWebhookApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.get(
@@ -315,9 +242,8 @@ def get_webhook(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Получение вебхука по ID"""
-    webhook = get_webhook_by_id(db, webhook_id)
-    if not webhook:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
-        )
-    return webhook
+    service = PaymentWebhookApiService(db)
+    try:
+        return service.get_webhook(webhook_id)
+    except PaymentWebhookApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
