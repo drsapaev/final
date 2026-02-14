@@ -254,8 +254,10 @@ _DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-pro
 @lru_cache(1)
 def get_settings() -> Settings:
     """Get application settings with validation"""
+    # Resolve environment mode once and reuse it in all validation branches.
+    env = os.getenv("ENV", os.getenv("APP_ENV", "dev")).lower()
+
     # ✅ ИСПРАВЛЕНО: Сначала проверяем env var, затем создаем Settings с аргументами
-    import os
     secret_key = os.getenv("SECRET_KEY")
     
     # Если SECRET_KEY в env - используем его
@@ -268,8 +270,6 @@ def get_settings() -> Settings:
     # Validate SECRET_KEY on load
     if not s.SECRET_KEY or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
         # In production, this should fail - but for dev we allow it with warning
-        import os
-        env = os.getenv("ENV", "dev").lower()
         if env in ("prod", "production"):
             raise ValueError(
                 "SECRET_KEY must be set via environment variable in production. "
