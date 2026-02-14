@@ -59,4 +59,6 @@ jobs:
       - name: Run RBAC integrity test
         run: |
           cd backend
-          pytest -q tests/integration/test_rbac_matrix.py -rA
+          test -f tests/integration/test_rbac_matrix.py
+          python -m pytest --version
+          python -m pytest -q tests/integration/test_rbac_matrix.py -rA -o addopts=''
