@@ -8,98 +8,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.models.clinic import Doctor
-from app.models.doctor_price_override import DoctorPriceOverride
-from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit
-from app.services.notifications import notification_sender_service
+from app.services.dental_api_service import DentalApiDomainError, DentalApiService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dental", tags=["dental"])
-
-
-# ===================== ФУНКЦИИ УВЕДОМЛЕНИЙ =====================
-
-
-async def send_price_override_notification(
-    db: Session,
-    price_override: DoctorPriceOverride,
-    doctor: Doctor,
-    service: Service,
-    visit: Visit,
-):
-    """Отправить уведомление в регистратуру об изменении цены"""
-    try:
-
-        # Получаем всех пользователей с ролью Registrar
-        registrars = db.query(User).filter(User.role == "Registrar").all()
-
-        if not registrars:
-            logger.warning(
-                "Не найдены пользователи с ролью Registrar для отправки уведомлений"
-            )
-            return
-
-        # Формируем сообщение
-        doctor_name = doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-        patient_info = (
-            f"Пациент #{visit.patient_id}" if visit else "Неизвестный пациент"
-        )
-
-        message = f"""
-🦷 ИЗМЕНЕНИЕ ЦЕНЫ СТОМАТОЛОГОМ
-
-👨‍⚕️ Врач: {doctor_name}
-👤 {patient_info}
-🔧 Услуга: {service.name} ({service.code})
-💰 Цена: {price_override.original_price} → {price_override.new_price} UZS
-📝 Причина: {price_override.reason}
-{f"📋 Детали: {price_override.details}" if price_override.details else ""}
-
-⏰ Время: {price_override.created_at.strftime('%d.%m.%Y %H:%M')}
-🔄 Статус: Ожидает одобрения
-
-Для одобрения/отклонения перейдите в панель регистратора.
-        """.strip()
-
-        # Отправляем уведомления всем регистраторам
-        for registrar in registrars:
-            try:
-                # Отправляем через Telegram, если есть telegram_id
-                if hasattr(registrar, 'telegram_id') and registrar.telegram_id:
-                    await notification_sender_service.send_telegram_message(
-                        user_id=registrar.telegram_id,
-                        message=message,
-                        parse_mode="HTML",
-                    )
-
-                # Также можем отправить через другие каналы (email, SMS)
-                # if registrar.email:
-                #     await notification_service.send_email(
-                #         to_email=registrar.email,
-                #         subject="Изменение цены стоматологом",
-                #         body=message
-                #     )
-
-                logger.info(
-                    f"Уведомление о изменении цены отправлено регистратору {registrar.username}"
-                )
-
-            except Exception as e:
-                logger.error(
-                    f"Ошибка отправки уведомления регистратору {registrar.username}: {e}"
-                )
-
-        # Сохраняем информацию об отправленном уведомлении
-        price_override.notification_sent = True
-        price_override.notification_sent_at = datetime.utcnow()
-        db.commit()
-
-    except Exception as e:
-        logger.error(f"Ошибка отправки уведомлений об изменении цены: {e}")
-        raise
 
 
 class DentalPriceOverrideRequest(BaseModel):
@@ -108,7 +22,7 @@ class DentalPriceOverrideRequest(BaseModel):
     new_price: Decimal
     reason: str
     details: Optional[str] = None
-    treatment_completed: bool = True  # Для стоматолога - указание цены после лечения
+    treatment_completed: bool = True
 
 
 class DentalPriceOverrideResponse(BaseModel):
@@ -135,7 +49,6 @@ async def get_dental_examinations(
     Получить список стоматологических осмотров
     """
     try:
-        # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
         raise HTTPException(
@@ -153,7 +66,6 @@ async def create_dental_examination(
     Создать новый стоматологический осмотр
     """
     try:
-        # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Стоматологический осмотр создан", "id": 1}
     except Exception as e:
         raise HTTPException(
@@ -172,7 +84,6 @@ async def get_treatment_plans(
     Получить список планов лечения
     """
     try:
-        # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
         raise HTTPException(
@@ -190,7 +101,6 @@ async def create_treatment_plan(
     Создать новый план лечения
     """
     try:
-        # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "План лечения создан", "id": 1}
     except Exception as e:
         raise HTTPException(
@@ -209,7 +119,6 @@ async def get_prosthetics(
     Получить список протезов
     """
     try:
-        # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
         raise HTTPException(
@@ -227,7 +136,6 @@ async def create_prosthetic(
     Создать новый протез
     """
     try:
-        # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Протез создан", "id": 1}
     except Exception as e:
         raise HTTPException(
@@ -267,67 +175,12 @@ async def create_dental_price_override(
     """
     Стоматолог указывает цену после проведенного лечения
     """
+    service = DentalApiService(db)
     try:
-        # Проверяем существование визита
-        visit = db.query(Visit).filter(Visit.id == override_data.visit_id).first()
-        if not visit:
-            raise HTTPException(status_code=404, detail="Визит не найден")
-
-        # Проверяем существование услуги
-        service = (
-            db.query(Service).filter(Service.id == override_data.service_id).first()
+        price_override = await service.create_dental_price_override(
+            override_data=override_data,
+            user=user,
         )
-        if not service:
-            raise HTTPException(status_code=404, detail="Услуга не найдена")
-
-        # Проверяем, что услуга разрешает изменение цены врачом
-        if not service.allow_doctor_price_override:
-            raise HTTPException(
-                status_code=400,
-                detail="Данная услуга не разрешает изменение цены врачом",
-            )
-
-        # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
-        if not doctor:
-            raise HTTPException(status_code=404, detail="Врач не найден")
-
-        # Проверяем, что врач - стоматолог
-        if doctor.specialty not in ["stomatology", "dental"]:
-            raise HTTPException(
-                status_code=403,
-                detail="Только стоматолог может указывать цену после лечения",
-            )
-
-        # Создаём запись об изменении цены
-        price_override = DoctorPriceOverride(
-            visit_id=override_data.visit_id,
-            doctor_id=doctor.id,
-            service_id=override_data.service_id,
-            original_price=service.price or Decimal("0"),
-            new_price=override_data.new_price,
-            reason=override_data.reason,
-            details=override_data.details,
-            status="pending",  # Требует одобрения регистратуры
-        )
-
-        db.add(price_override)
-        db.commit()
-        db.refresh(price_override)
-
-        # Отправляем уведомление в регистратуру
-        try:
-            await send_price_override_notification(
-                db=db,
-                price_override=price_override,
-                doctor=doctor,
-                service=service,
-                visit=visit,
-            )
-        except Exception as e:
-            # Не прерываем выполнение, если уведомление не отправилось
-            logger.warning(f"Не удалось отправить уведомление о изменении цены: {e}")
-
         return DentalPriceOverrideResponse(
             id=price_override.id,
             visit_id=price_override.visit_id,
@@ -340,11 +193,10 @@ async def create_dental_price_override(
             treatment_completed=override_data.treatment_completed,
             created_at=price_override.created_at,
         )
-
-    except HTTPException:
-        raise
+    except DentalApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
+        service.rollback()
         raise HTTPException(
             status_code=500, detail=f"Ошибка создания изменения цены: {str(e)}"
         )
@@ -364,25 +216,12 @@ async def get_dental_price_overrides(
     Получить список изменений цен стоматолога
     """
     try:
-        # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
-        if not doctor:
-            raise HTTPException(status_code=404, detail="Врач не найден")
-
-        query = db.query(DoctorPriceOverride).filter(
-            DoctorPriceOverride.doctor_id == doctor.id
+        overrides = DentalApiService(db).get_dental_price_overrides(
+            user_id=user.id,
+            visit_id=visit_id,
+            status=status,
+            limit=limit,
         )
-
-        if visit_id:
-            query = query.filter(DoctorPriceOverride.visit_id == visit_id)
-
-        if status:
-            query = query.filter(DoctorPriceOverride.status == status)
-
-        overrides = (
-            query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
-        )
-
         return [
             DentalPriceOverrideResponse(
                 id=override.id,
@@ -393,25 +232,21 @@ async def get_dental_price_overrides(
                 reason=override.reason,
                 details=override.details,
                 status=override.status,
-                treatment_completed=True,  # Для стоматолога всегда True
+                treatment_completed=True,
                 created_at=override.created_at,
             )
             for override in overrides
         ]
-
-    except HTTPException:
-        raise
+    except DentalApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Ошибка получения изменений цен: {str(e)}"
         )
 
 
-# ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН (РЕГИСТРАТУРА) =====================
-
-
 class PriceOverrideApprovalRequest(BaseModel):
-    action: str  # "approve" или "reject"
+    action: str
     rejection_reason: Optional[str] = None
 
 
@@ -428,89 +263,17 @@ async def approve_price_override(
     Одобрить или отклонить изменение цены стоматологом
     Доступно только для регистраторов и администраторов
     """
+    service = DentalApiService(db)
     try:
-        # Находим запись об изменении цены
-        price_override = (
-            db.query(DoctorPriceOverride)
-            .filter(DoctorPriceOverride.id == override_id)
-            .first()
+        return await service.approve_price_override(
+            override_id=override_id,
+            approval_data=approval_data,
+            user=user,
         )
-
-        if not price_override:
-            raise HTTPException(status_code=404, detail="Изменение цены не найдено")
-
-        # Проверяем, что изменение еще не обработано
-        if price_override.status != "pending":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Изменение цены уже обработано (статус: {price_override.status})",
-            )
-
-        # Валидируем действие
-        if approval_data.action not in ["approve", "reject"]:
-            raise HTTPException(
-                status_code=400, detail="Действие должно быть 'approve' или 'reject'"
-            )
-
-        # Если отклоняем, требуем причину
-        if approval_data.action == "reject" and not approval_data.rejection_reason:
-            raise HTTPException(
-                status_code=400, detail="При отклонении необходимо указать причину"
-            )
-
-        # Обновляем статус
-        price_override.status = (
-            "approved" if approval_data.action == "approve" else "rejected"
-        )
-        price_override.approved_by = user.id
-        price_override.approved_at = datetime.utcnow()
-
-        if approval_data.action == "reject":
-            price_override.rejection_reason = approval_data.rejection_reason
-
-        # Если одобряем, обновляем цену услуги в визите
-        if approval_data.action == "approve":
-            # Находим услугу в визите и обновляем цену
-            from app.models.visit import VisitService
-
-            visit_service = (
-                db.query(VisitService)
-                .filter(
-                    VisitService.visit_id == price_override.visit_id,
-                    VisitService.service_id == price_override.service_id,
-                )
-                .first()
-            )
-
-            if visit_service:
-                visit_service.price = price_override.new_price
-                visit_service.custom_price = price_override.new_price
-
-        db.commit()
-
-        # Отправляем уведомление врачу о результате
-        try:
-            await send_price_override_result_notification(
-                db=db, price_override=price_override, approved_by=user
-            )
-        except Exception as e:
-            logger.warning(f"Не удалось отправить уведомление врачу о результате: {e}")
-
-        action_text = "одобрено" if approval_data.action == "approve" else "отклонено"
-
-        return {
-            "success": True,
-            "message": f"Изменение цены {action_text}",
-            "override_id": override_id,
-            "status": price_override.status,
-            "approved_by": user.username,
-            "approved_at": price_override.approved_at.isoformat(),
-        }
-
-    except HTTPException:
-        raise
+    except DentalApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
+        service.rollback()
         raise HTTPException(
             status_code=500, detail=f"Ошибка обработки изменения цены: {str(e)}"
         )
@@ -529,114 +292,9 @@ async def get_pending_price_overrides(
     Доступно только для регистраторов и администраторов
     """
     try:
-        overrides = (
-            db.query(DoctorPriceOverride)
-            .filter(DoctorPriceOverride.status == "pending")
-            .order_by(DoctorPriceOverride.created_at.desc())
-            .limit(limit)
-            .all()
-        )
-
-        result = []
-        for override in overrides:
-            # Получаем дополнительную информацию
-            doctor = db.query(Doctor).filter(Doctor.id == override.doctor_id).first()
-            service = (
-                db.query(Service).filter(Service.id == override.service_id).first()
-            )
-            visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
-
-            result.append(
-                {
-                    "id": override.id,
-                    "visit_id": override.visit_id,
-                    "patient_id": visit.patient_id if visit else None,
-                    "doctor": {
-                        "id": doctor.id if doctor else None,
-                        "name": (
-                            doctor.user.full_name
-                            if doctor and doctor.user
-                            else f"Врач #{override.doctor_id}"
-                        ),
-                        "specialty": doctor.specialty if doctor else None,
-                    },
-                    "service": {
-                        "id": service.id if service else None,
-                        "name": (
-                            service.name
-                            if service
-                            else f"Услуга #{override.service_id}"
-                        ),
-                        "code": service.code if service else None,
-                    },
-                    "original_price": float(override.original_price),
-                    "new_price": float(override.new_price),
-                    "price_difference": float(
-                        override.new_price - override.original_price
-                    ),
-                    "reason": override.reason,
-                    "details": override.details,
-                    "created_at": override.created_at.isoformat(),
-                    "notification_sent": override.notification_sent,
-                    "notification_sent_at": (
-                        override.notification_sent_at.isoformat()
-                        if override.notification_sent_at
-                        else None
-                    ),
-                }
-            )
-
-        return {"success": True, "overrides": result, "total_count": len(result)}
-
+        return DentalApiService(db).get_pending_price_overrides(limit=limit)
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка получения ожидающих изменений цен: {str(e)}",
         )
-
-
-async def send_price_override_result_notification(
-    db: Session, price_override: DoctorPriceOverride, approved_by: User
-):
-    """Отправить уведомление врачу о результате рассмотрения изменения цены"""
-    try:
-
-        # Получаем врача
-        doctor = db.query(Doctor).filter(Doctor.id == price_override.doctor_id).first()
-        if not doctor or not doctor.user:
-            return
-
-        # Получаем услугу
-        service = (
-            db.query(Service).filter(Service.id == price_override.service_id).first()
-        )
-
-        # Формируем сообщение
-        status_emoji = "✅" if price_override.status == "approved" else "❌"
-        status_text = "ОДОБРЕНО" if price_override.status == "approved" else "ОТКЛОНЕНО"
-
-        message = f"""
-{status_emoji} ИЗМЕНЕНИЕ ЦЕНЫ {status_text}
-
-🔧 Услуга: {service.name if service else f"Услуга #{price_override.service_id}"}
-💰 Цена: {price_override.original_price} → {price_override.new_price} UZS
-📝 Ваша причина: {price_override.reason}
-
-👤 Рассмотрел: {approved_by.full_name or approved_by.username}
-⏰ Время: {price_override.approved_at.strftime('%d.%m.%Y %H:%M')}
-{f"❌ Причина отклонения: {price_override.rejection_reason}" if price_override.rejection_reason else ""}
-        """.strip()
-
-        # Отправляем уведомление врачу
-        if hasattr(doctor.user, 'telegram_id') and doctor.user.telegram_id:
-            await notification_sender_service.send_telegram_message(
-                user_id=doctor.user.telegram_id, message=message, parse_mode="HTML"
-            )
-
-        logger.info(
-            f"Уведомление о результате изменения цены отправлено врачу {doctor.user.username}"
-        )
-
-    except Exception as e:
-        logger.error(f"Ошибка отправки уведомления врачу о результате: {e}")
-        raise

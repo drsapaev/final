@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.dynamic_pricing import DiscountType, PricingRuleType
 from app.models.user import User
-from app.services.dynamic_pricing_service import DynamicPricingService
+from app.services.dynamic_pricing_api_service import (
+    DynamicPricingApiDomainError,
+    DynamicPricingApiService,
+)
 
 router = APIRouter()
 
@@ -29,12 +32,12 @@ class PricingRuleCreate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     start_time: Optional[str] = Field(
-        None, pattern=r'^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+        None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
     end_time: Optional[str] = Field(
-        None, pattern=r'^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+        None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
-    days_of_week: Optional[str] = Field(None, pattern=r'^[1-7](,[1-7])*$')
+    days_of_week: Optional[str] = Field(None, pattern=r"^[1-7](,[1-7])*$")
     min_quantity: int = Field(1, ge=1)
     max_quantity: Optional[int] = Field(None, ge=1)
     min_amount: Optional[float] = Field(None, ge=0)
@@ -51,12 +54,12 @@ class PricingRuleUpdate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     start_time: Optional[str] = Field(
-        None, pattern=r'^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+        None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
     end_time: Optional[str] = Field(
-        None, pattern=r'^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+        None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
-    days_of_week: Optional[str] = Field(None, pattern=r'^[1-7](,[1-7])*$')
+    days_of_week: Optional[str] = Field(None, pattern=r"^[1-7](,[1-7])*$")
     min_quantity: Optional[int] = Field(None, ge=1)
     max_quantity: Optional[int] = Field(None, ge=1)
     min_amount: Optional[float] = Field(None, ge=0)
@@ -144,6 +147,12 @@ class ServicePackageResponse(BaseModel):
         from_attributes = True
 
 
+def _model_to_dict(model: BaseModel) -> dict[str, Any]:
+    if hasattr(model, "model_dump"):
+        return model.model_dump(exclude_unset=True)
+    return model.dict(exclude_unset=True)
+
+
 # === API endpoints ===
 
 
@@ -154,38 +163,14 @@ def create_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Создать правило ценообразования"""
-    service = DynamicPricingService(db)
-
+    service = DynamicPricingApiService(db)
     try:
-        rule = service.create_pricing_rule(
-            name=rule_data.name,
-            description=rule_data.description,
-            rule_type=rule_data.rule_type,
-            discount_type=rule_data.discount_type,
-            discount_value=rule_data.discount_value,
-            start_date=rule_data.start_date,
-            end_date=rule_data.end_date,
-            start_time=rule_data.start_time,
-            end_time=rule_data.end_time,
-            days_of_week=rule_data.days_of_week,
-            min_quantity=rule_data.min_quantity,
-            max_quantity=rule_data.max_quantity,
-            min_amount=rule_data.min_amount,
-            priority=rule_data.priority,
-            max_uses=rule_data.max_uses,
-            created_by=current_user.id,
+        return service.create_pricing_rule(
+            payload=_model_to_dict(rule_data),
+            current_user_id=current_user.id,
         )
-
-        # Добавляем услуги к правилу
-        from app.models.dynamic_pricing import PricingRuleService
-
-        for service_id in rule_data.service_ids:
-            rule_service = PricingRuleService(rule_id=rule.id, service_id=service_id)
-            db.add(rule_service)
-        db.commit()
-
-        return rule
     except Exception as e:
+        service.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -199,17 +184,12 @@ def get_pricing_rules(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список правил ценообразования"""
-    from app.models.dynamic_pricing import PricingRule
-
-    query = db.query(PricingRule)
-
-    if rule_type:
-        query = query.filter(PricingRule.rule_type == rule_type)
-    if is_active is not None:
-        query = query.filter(PricingRule.is_active == is_active)
-
-    rules = query.offset(skip).limit(limit).all()
-    return rules
+    return DynamicPricingApiService(db).list_pricing_rules(
+        skip=skip,
+        limit=limit,
+        rule_type=rule_type,
+        is_active=is_active,
+    )
 
 
 @router.get("/pricing-rules/{rule_id}", response_model=PricingRuleResponse)
@@ -219,13 +199,10 @@ def get_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить правило ценообразования по ID"""
-    from app.models.dynamic_pricing import PricingRule
-
-    rule = db.query(PricingRule).filter(PricingRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Правило не найдено")
-
-    return rule
+    try:
+        return DynamicPricingApiService(db).get_pricing_rule(rule_id=rule_id)
+    except DynamicPricingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.put("/pricing-rules/{rule_id}", response_model=PricingRuleResponse)
@@ -236,19 +213,17 @@ def update_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Обновить правило ценообразования"""
-    from app.models.dynamic_pricing import PricingRule
-
-    rule = db.query(PricingRule).filter(PricingRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Правило не найдено")
-
-    # Обновляем поля
-    for field, value in rule_data.dict(exclude_unset=True).items():
-        setattr(rule, field, value)
-
-    db.commit()
-    db.refresh(rule)
-    return rule
+    service = DynamicPricingApiService(db)
+    try:
+        return service.update_pricing_rule(
+            rule_id=rule_id,
+            payload=_model_to_dict(rule_data),
+        )
+    except DynamicPricingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as e:
+        service.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/pricing-rules/{rule_id}")
@@ -258,15 +233,14 @@ def delete_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Удалить правило ценообразования"""
-    from app.models.dynamic_pricing import PricingRule
-
-    rule = db.query(PricingRule).filter(PricingRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Правило не найдено")
-
-    db.delete(rule)
-    db.commit()
-    return {"message": "Правило удалено"}
+    service = DynamicPricingApiService(db)
+    try:
+        return service.delete_pricing_rule(rule_id=rule_id)
+    except DynamicPricingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as e:
+        service.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/calculate-price")
@@ -276,15 +250,13 @@ def calculate_price(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Рассчитать цену с учетом правил ценообразования"""
-    service = DynamicPricingService(db)
-
+    service = DynamicPricingApiService(db)
     try:
-        result = service.apply_pricing_rules(
+        return service.calculate_price(
             services=request.services,
             patient_id=request.patient_id,
             appointment_time=request.appointment_time,
         )
-        return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -296,22 +268,14 @@ def create_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Создать пакет услуг"""
-    service = DynamicPricingService(db)
-
+    service = DynamicPricingApiService(db)
     try:
-        package = service.create_service_package(
-            name=package_data.name,
-            description=package_data.description,
-            service_ids=package_data.service_ids,
-            package_price=package_data.package_price,
-            valid_from=package_data.valid_from,
-            valid_to=package_data.valid_to,
-            max_purchases=package_data.max_purchases,
-            per_patient_limit=package_data.per_patient_limit,
-            created_by=current_user.id,
+        return service.create_service_package(
+            payload=_model_to_dict(package_data),
+            current_user_id=current_user.id,
         )
-        return package
     except Exception as e:
+        service.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -325,21 +289,12 @@ def get_service_packages(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список пакетов услуг"""
-    service = DynamicPricingService(db)
-
-    if patient_id:
-        packages = service.get_available_packages(patient_id=patient_id)
-    else:
-        from app.models.dynamic_pricing import ServicePackage
-
-        query = db.query(ServicePackage)
-
-        if is_active is not None:
-            query = query.filter(ServicePackage.is_active == is_active)
-
-        packages = query.offset(skip).limit(limit).all()
-
-    return packages
+    return DynamicPricingApiService(db).list_service_packages(
+        skip=skip,
+        limit=limit,
+        is_active=is_active,
+        patient_id=patient_id,
+    )
 
 
 @router.get("/service-packages/{package_id}", response_model=ServicePackageResponse)
@@ -349,13 +304,10 @@ def get_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить пакет услуг по ID"""
-    from app.models.dynamic_pricing import ServicePackage
-
-    package = db.query(ServicePackage).filter(ServicePackage.id == package_id).first()
-    if not package:
-        raise HTTPException(status_code=404, detail="Пакет не найден")
-
-    return package
+    try:
+        return DynamicPricingApiService(db).get_service_package(package_id=package_id)
+    except DynamicPricingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.put("/service-packages/{package_id}", response_model=ServicePackageResponse)
@@ -366,31 +318,17 @@ def update_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Обновить пакет услуг"""
-    from app.models.dynamic_pricing import ServicePackage
-
-    package = db.query(ServicePackage).filter(ServicePackage.id == package_id).first()
-    if not package:
-        raise HTTPException(status_code=404, detail="Пакет не найден")
-
-    # Обновляем поля
-    update_data = package_data.dict(exclude_unset=True)
-
-    # Пересчитываем экономию если изменилась цена
-    if 'package_price' in update_data and package.original_price:
-        new_price = update_data['package_price']
-        package.savings_amount = package.original_price - new_price
-        package.savings_percentage = (
-            (package.savings_amount / package.original_price * 100)
-            if package.original_price > 0
-            else 0
+    service = DynamicPricingApiService(db)
+    try:
+        return service.update_service_package(
+            package_id=package_id,
+            payload=_model_to_dict(package_data),
         )
-
-    for field, value in update_data.items():
-        setattr(package, field, value)
-
-    db.commit()
-    db.refresh(package)
-    return package
+    except DynamicPricingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as e:
+        service.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/service-packages/{package_id}")
@@ -400,15 +338,14 @@ def delete_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Удалить пакет услуг"""
-    from app.models.dynamic_pricing import ServicePackage
-
-    package = db.query(ServicePackage).filter(ServicePackage.id == package_id).first()
-    if not package:
-        raise HTTPException(status_code=404, detail="Пакет не найден")
-
-    db.delete(package)
-    db.commit()
-    return {"message": "Пакет удален"}
+    service = DynamicPricingApiService(db)
+    try:
+        return service.delete_service_package(package_id=package_id)
+    except DynamicPricingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as e:
+        service.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/purchase-package")
@@ -418,8 +355,7 @@ def purchase_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Купить пакет услуг"""
-    service = DynamicPricingService(db)
-
+    service = DynamicPricingApiService(db)
     try:
         purchase = service.purchase_package(
             package_id=request.package_id,
@@ -449,11 +385,9 @@ def update_dynamic_prices(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Обновить динамические цены"""
-    service = DynamicPricingService(db)
-
+    service = DynamicPricingApiService(db)
     try:
-        result = service.update_dynamic_prices()
-        return result
+        return service.update_dynamic_prices()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -466,13 +400,9 @@ def get_pricing_analytics(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить аналитику по ценообразованию"""
-    service = DynamicPricingService(db)
-
+    service = DynamicPricingApiService(db)
     try:
-        analytics = service.get_pricing_analytics(
-            start_date=start_date, end_date=end_date
-        )
-        return analytics
+        return service.get_pricing_analytics(start_date=start_date, end_date=end_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -486,30 +416,8 @@ def get_price_history(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить историю изменения цен для услуги"""
-    from app.models.dynamic_pricing import PriceHistory
-
-    history = (
-        db.query(PriceHistory)
-        .filter(PriceHistory.service_id == service_id)
-        .order_by(PriceHistory.changed_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+    return DynamicPricingApiService(db).get_price_history(
+        service_id=service_id,
+        skip=skip,
+        limit=limit,
     )
-
-    return [
-        {
-            "id": h.id,
-            "service_id": h.service_id,
-            "old_price": h.old_price,
-            "new_price": h.new_price,
-            "price_type": h.price_type,
-            "change_reason": h.change_reason,
-            "change_type": h.change_type,
-            "changed_at": h.changed_at,
-            "changed_by": h.changed_by,
-            "effective_from": h.effective_from,
-            "effective_to": h.effective_to,
-        }
-        for h in history
-    ]

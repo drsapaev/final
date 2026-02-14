@@ -4,20 +4,17 @@ API endpoints для пациентов - управление своими за
 Включает отмену и перенос записей с ограничением 24 часа.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.models.appointment import Appointment
 from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit
-from app.models.lab import LabOrder
-from app.models.clinic import Doctor, Schedule
+from app.services.patient_appointments_api_service import PatientAppointmentsApiService
 
 logger = logging.getLogger(__name__)
 
@@ -78,25 +75,6 @@ class AvailableSlotResponse(BaseModel):
 # Helper functions
 # ============================================================================
 
-def get_patient_for_user(db: Session, user: User) -> Optional[Patient]:
-    """Получить пациента, связанного с пользователем"""
-    # Пациент может быть связан по user_id или по телефону
-    if hasattr(user, 'patient_id') and user.patient_id:
-        return db.query(Patient).filter(Patient.id == user.patient_id).first()
-    
-    # Попробуем найти по телефону или email
-    if user.phone:
-        patient = db.query(Patient).filter(Patient.phone == user.phone).first()
-        if patient:
-            return patient
-    
-    if user.email:
-        patient = db.query(Patient).filter(Patient.email == user.email).first()
-        if patient:
-            return patient
-    
-    return None
-
 
 def can_modify_appointment(appointment: Appointment, min_hours: int = 24) -> tuple[bool, float]:
     """
@@ -126,7 +104,7 @@ def can_modify_appointment(appointment: Appointment, min_hours: int = 24) -> tup
 
 
 def get_department_display_name(department: Optional[str]) -> str:
-    """Получить читаемое название отделения"""
+    """Получить читаемое название отделения."""
     names = {
         'cardiology': 'Кардиология',
         'dermatology': 'Дерматология',
@@ -138,21 +116,14 @@ def get_department_display_name(department: Optional[str]) -> str:
     return names.get(department.lower(), department) if department else 'Не указано'
 
 
-def get_doctor_name(db: Session, doctor_id: Optional[int]) -> Optional[str]:
-    """Получить имя врача по doctor_id (ссылается на doctors.id, не users.id)"""
-    if not doctor_id:
+def extract_department_value(appointment: Appointment) -> Optional[str]:
+    """Достать строковое представление отделения из записи."""
+    department = getattr(appointment, "department", None)
+    if isinstance(department, str):
+        return department
+    if department is None:
         return None
-    
-    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
-    if not doctor:
-        return None
-    
-    if doctor.user_id:
-        user = db.query(User).filter(User.id == doctor.user_id).first()
-        if user:
-            return user.full_name or user.username
-    
-    return f"Врач #{doctor_id}"
+    return getattr(department, "key", None) or getattr(department, "name_ru", None)
 
 
 # ============================================================================
@@ -169,36 +140,27 @@ async def get_my_appointments(
     """
     Получить список записей текущего пациента.
     """
-    patient = get_patient_for_user(db, current_user)
+    service = PatientAppointmentsApiService(db)
+    patient = service.get_patient_for_user(current_user)
     
     if not patient:
         # Если пациент не найден, вернём пустой список (не ошибку)
         logger.warning(f"No patient found for user {current_user.id}")
         return []
     
-    # Базовый запрос
-    query = db.query(Appointment).filter(Appointment.patient_id == patient.id)
-    
-    # Фильтр по статусу
-    if status_filter:
-        query = query.filter(Appointment.status == status_filter)
-    
-    # Фильтр прошедших записей
-    if not include_past:
-        today = datetime.now().date()
-        query = query.filter(Appointment.appointment_date >= today)
-    
-    # Сортировка по дате
-    query = query.order_by(Appointment.appointment_date.asc(), Appointment.appointment_time.asc())
-    
-    appointments = query.all()
+    appointments = service.list_appointments(
+        patient_id=patient.id,
+        status_filter=status_filter,
+        include_past=include_past,
+    )
     
     result = []
     for apt in appointments:
         can_mod, hours_until = can_modify_appointment(apt)
         
         # Получаем имя врача
-        doctor_name = get_doctor_name(db, apt.doctor_id)
+        doctor_name = service.get_doctor_name(apt.doctor_id)
+        department = extract_department_value(apt)
         
         result.append(PatientAppointmentResponse(
             id=apt.id,
@@ -206,8 +168,8 @@ async def get_my_appointments(
             appointment_time=apt.appointment_time,
             doctor_name=doctor_name,
             doctor_id=apt.doctor_id,
-            department=apt.department,
-            department_name=get_department_display_name(apt.department),
+            department=department,
+            department_name=get_department_display_name(department),
             cabinet=getattr(apt, 'cabinet', None),
             status=apt.status,
             services=apt.services or [],
@@ -228,15 +190,16 @@ async def get_my_appointment(
     """
     Получить детали конкретной записи.
     """
-    patient = get_patient_for_user(db, current_user)
+    service = PatientAppointmentsApiService(db)
+    patient = service.get_patient_for_user(current_user)
     
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
     
-    appointment = db.query(Appointment).filter(
-        Appointment.id == appointment_id,
-        Appointment.patient_id == patient.id
-    ).first()
+    appointment = service.get_appointment_for_patient(
+        appointment_id=appointment_id,
+        patient_id=patient.id,
+    )
     
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -244,7 +207,8 @@ async def get_my_appointment(
     can_mod, hours_until = can_modify_appointment(appointment)
     
     # Получаем имя врача
-    doctor_name = get_doctor_name(db, appointment.doctor_id)
+    doctor_name = service.get_doctor_name(appointment.doctor_id)
+    department = extract_department_value(appointment)
     
     return PatientAppointmentResponse(
         id=appointment.id,
@@ -252,8 +216,8 @@ async def get_my_appointment(
         appointment_time=appointment.appointment_time,
         doctor_name=doctor_name,
         doctor_id=appointment.doctor_id,
-        department=appointment.department,
-        department_name=get_department_display_name(appointment.department),
+        department=department,
+        department_name=get_department_display_name(department),
         cabinet=getattr(appointment, 'cabinet', None),
         status=appointment.status,
         services=appointment.services or [],
@@ -273,15 +237,16 @@ async def cancel_my_appointment(
     Отменить запись на приём.
     Требуется минимум 24 часа до приёма.
     """
-    patient = get_patient_for_user(db, current_user)
+    service = PatientAppointmentsApiService(db)
+    patient = service.get_patient_for_user(current_user)
     
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
     
-    appointment = db.query(Appointment).filter(
-        Appointment.id == appointment_id,
-        Appointment.patient_id == patient.id
-    ).first()
+    appointment = service.get_appointment_for_patient(
+        appointment_id=appointment_id,
+        patient_id=patient.id,
+    )
     
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -301,10 +266,7 @@ async def cancel_my_appointment(
         )
     
     # Отменяем запись
-    appointment.status = 'cancelled'
-    appointment.updated_at = datetime.now()
-    
-    db.commit()
+    service.cancel_appointment(appointment)
     
     logger.info(f"Patient {patient.id} cancelled appointment {appointment_id}")
     
@@ -328,15 +290,16 @@ async def reschedule_my_appointment(
     Перенести запись на другую дату/время.
     Требуется минимум 24 часа до текущей записи.
     """
-    patient = get_patient_for_user(db, current_user)
+    service = PatientAppointmentsApiService(db)
+    patient = service.get_patient_for_user(current_user)
     
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
     
-    appointment = db.query(Appointment).filter(
-        Appointment.id == appointment_id,
-        Appointment.patient_id == patient.id
-    ).first()
+    appointment = service.get_appointment_for_patient(
+        appointment_id=appointment_id,
+        patient_id=patient.id,
+    )
     
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -374,11 +337,11 @@ async def reschedule_my_appointment(
     old_date = appointment.appointment_date
     old_time = appointment.appointment_time
     
-    appointment.appointment_date = new_date
-    appointment.appointment_time = request.new_time
-    appointment.updated_at = datetime.now()
-    
-    db.commit()
+    service.reschedule_appointment(
+        appointment=appointment,
+        new_date=new_date,
+        new_time=request.new_time,
+    )
     
     logger.info(
         f"Patient {patient.id} rescheduled appointment {appointment_id} "
@@ -407,15 +370,16 @@ async def get_available_slots(
     """
     Получить доступные слоты для переноса записи.
     """
-    patient = get_patient_for_user(db, current_user)
+    service = PatientAppointmentsApiService(db)
+    patient = service.get_patient_for_user(current_user)
     
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
     
-    appointment = db.query(Appointment).filter(
-        Appointment.id == appointment_id,
-        Appointment.patient_id == patient.id
-    ).first()
+    appointment = service.get_appointment_for_patient(
+        appointment_id=appointment_id,
+        patient_id=patient.id,
+    )
     
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -426,101 +390,19 @@ async def get_available_slots(
     except ValueError:
         raise HTTPException(status_code=400, detail="Неверный формат даты date_from")
     
-    end_date = start_date + timedelta(days=7)  # По умолчанию неделя
+    end_date = service.default_end_date(start_date=start_date)
     if date_to:
         try:
             end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
         except ValueError:
             raise HTTPException(status_code=400, detail="Неверный формат даты date_to")
-    
-    # Получаем врача и его расписание
-    doctor = None
-    doctor_name = "Врач"
-    schedules = []
-    
-    if appointment.doctor_id:
-        doctor = db.query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
-        if doctor:
-            # Получаем имя через связанного пользователя
-            if doctor.user_id:
-                user = db.query(User).filter(User.id == doctor.user_id).first()
-                if user:
-                    doctor_name = f"{user.full_name or user.username}"
-            
-            # Получаем расписание врача
-            schedules = db.query(Schedule).filter(
-                Schedule.doctor_id == doctor.id,
-                Schedule.active == True
-            ).all()
-    
-    # Получаем все существующие записи врача в диапазоне дат
-    existing_appointments = []
-    if appointment.doctor_id:
-        existing_appointments = db.query(Appointment).filter(
-            Appointment.doctor_id == appointment.doctor_id,
-            Appointment.appointment_date >= start_date,
-            Appointment.appointment_date <= end_date,
-            Appointment.status.notin_(['cancelled'])
-        ).all()
-    
-    # Создаём set занятых слотов
-    booked_slots = set()
-    for apt in existing_appointments:
-        slot_key = f"{apt.appointment_date}_{apt.appointment_time}"
-        booked_slots.add(slot_key)
-    
-    slots = []
-    current_date = start_date
-    
-    while current_date <= end_date:
-        weekday = current_date.weekday()  # 0=Monday
-        
-        # Ищем расписание на этот день недели
-        day_schedule = None
-        for sched in schedules:
-            if sched.weekday == weekday and sched.active:
-                day_schedule = sched
-                break
-        
-        if day_schedule and day_schedule.start_time and day_schedule.end_time:
-            # Генерируем слоты на основе реального расписания
-            start_hour = day_schedule.start_time.hour if hasattr(day_schedule.start_time, 'hour') else 9
-            end_hour = day_schedule.end_time.hour if hasattr(day_schedule.end_time, 'hour') else 18
-            
-            for hour in range(start_hour, end_hour):
-                time_str = f"{hour:02d}:00"
-                slot_key = f"{current_date}_{time_str}"
-                
-                # Пропускаем занятые слоты
-                if slot_key in booked_slots:
-                    continue
-                
-                slots.append(AvailableSlotResponse(
-                    date=str(current_date),
-                    time=time_str,
-                    doctor_id=appointment.doctor_id or 0,
-                    doctor_name=doctor_name
-                ))
-        elif not schedules:
-            # Если расписания нет, используем дефолтные часы (Пн-Сб 9-17)
-            if weekday < 6:
-                for hour in [9, 10, 11, 14, 15, 16]:
-                    time_str = f"{hour:02d}:00"
-                    slot_key = f"{current_date}_{time_str}"
-                    
-                    if slot_key in booked_slots:
-                        continue
-                    
-                    slots.append(AvailableSlotResponse(
-                        date=str(current_date),
-                        time=time_str,
-                        doctor_id=appointment.doctor_id or 0,
-                        doctor_name=doctor_name
-                    ))
-        
-        current_date += timedelta(days=1)
-    
-    return slots[:20]  # Ограничиваем количество
+
+    slots = service.list_available_slots(
+        appointment=appointment,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return [AvailableSlotResponse(**slot) for slot in slots[:20]]
 
 
 @router.get("/results", response_model=List[PatientResultResponse])
@@ -532,16 +414,17 @@ async def get_my_results(
     """
     Получить результаты анализов пациента.
     """
-    patient = get_patient_for_user(db, current_user)
+    service = PatientAppointmentsApiService(db)
+    patient = service.get_patient_for_user(current_user)
     
     if not patient:
         return []
     
     # Получаем лабораторные результаты
-    lab_results = db.query(LabOrder).filter(
-        LabOrder.patient_id == patient.id,
-        LabOrder.status == 'done'
-    ).order_by(LabOrder.created_at.desc()).limit(limit).all()
+    lab_results = service.list_done_lab_results(
+        patient_id=patient.id,
+        limit=limit,
+    )
     
     results = []
     for lab in lab_results:
