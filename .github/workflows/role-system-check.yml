@@ -56,30 +56,6 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio httpx
 
-      - name: Prepare database
-        run: |
-          cd backend
-          python - <<'PY'
-          import os
-          import time
-          from sqlalchemy import create_engine, text
-
-          engine = create_engine(os.environ["DATABASE_URL"])
-          for i in range(30):
-              try:
-                  with engine.connect() as conn:
-                      conn.execute(text("SELECT 1"))
-                  print("✅ Postgres ready")
-                  break
-              except Exception as e:
-                  if i == 29:
-                      raise
-                  print(f"Attempt {i + 1}/30: {e}")
-                  time.sleep(2)
-          PY
-          alembic upgrade head
-          alembic current
-
       - name: Run RBAC integrity test
         run: |
           cd backend
