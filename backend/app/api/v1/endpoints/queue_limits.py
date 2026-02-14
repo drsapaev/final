@@ -7,14 +7,11 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud.clinic import get_queue_settings, update_queue_settings
-from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
+from app.services.queue_limits_api_service import QueueLimitsApiService
 
 router = APIRouter()
 
@@ -90,74 +87,14 @@ def get_queue_limits(
     Получить настройки лимитов очередей
     """
     try:
-        # Получаем текущие настройки
-        queue_settings = get_queue_settings(db)
-        max_per_day_settings = queue_settings.get("max_per_day", {})
-        start_numbers_settings = queue_settings.get("start_numbers", {})
-
-        # Получаем все специальности из базы врачей
-        doctors_query = db.query(Doctor).filter(Doctor.active == True)
-        if specialty:
-            doctors_query = doctors_query.filter(Doctor.specialty == specialty)
-
-        doctors = doctors_query.all()
-
-        # Группируем по специальностям
-        specialties = {}
-        for doctor in doctors:
-            if doctor.specialty not in specialties:
-                specialties[doctor.specialty] = {"doctors": [], "current_usage": 0}
-            specialties[doctor.specialty]["doctors"].append(doctor)
-
-        # Подсчитываем текущее использование для каждой специальности
-        today = date.today()
-        for spec_name, spec_data in specialties.items():
-            total_usage = 0
-            for doctor in spec_data["doctors"]:
-                daily_queue = (
-                    db.query(DailyQueue)
-                    .filter(
-                        and_(
-                            DailyQueue.day == today,
-                            DailyQueue.specialist_id
-                            == doctor.user_id,  # ⭐ user_id, а не doctor.id
-                        )
-                    )
-                    .first()
-                )
-
-                if daily_queue:
-                    entries_count = (
-                        db.query(OnlineQueueEntry)
-                        .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-                        .count()
-                    )
-                    total_usage += entries_count
-
-            spec_data["current_usage"] = total_usage
-
-        # Формируем ответ
-        result = []
-        for spec_name, spec_data in specialties.items():
-            result.append(
-                QueueLimitResponse(
-                    specialty=spec_name,
-                    max_per_day=max_per_day_settings.get(spec_name, 15),
-                    start_number=start_numbers_settings.get(spec_name, 1),
-                    enabled=True,  # Пока все включены
-                    current_usage=spec_data["current_usage"],
-                    doctors_count=len(spec_data["doctors"]),
-                    last_updated=datetime.utcnow(),
-                )
-            )
-
-        return result
+        result = QueueLimitsApiService(db).get_queue_limits(specialty=specialty)
+        return [QueueLimitResponse(**item) for item in result]
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения лимитов: {str(e)}",
-        )
+        ) from e
 
 
 # ===================== ОБНОВЛЕНИЕ ЛИМИТОВ =====================
@@ -173,43 +110,16 @@ def update_queue_limits(
     Обновить настройки лимитов очередей
     """
     try:
-        # Получаем текущие настройки
-        queue_settings = get_queue_settings(db)
-        max_per_day = queue_settings.get("max_per_day", {})
-        start_numbers = queue_settings.get("start_numbers", {})
-
-        # Обновляем настройки
-        updated_specialties = []
-        for limit_update in limits:
-            if limit_update.max_per_day is not None:
-                max_per_day[limit_update.specialty] = limit_update.max_per_day
-
-            if limit_update.start_number is not None:
-                start_numbers[limit_update.specialty] = limit_update.start_number
-
-            updated_specialties.append(limit_update.specialty)
-
-        # Сохраняем обновленные настройки
-        new_settings = {
-            **queue_settings,
-            "max_per_day": max_per_day,
-            "start_numbers": start_numbers,
-        }
-
-        update_queue_settings(db, new_settings, current_user.id)
-
-        return {
-            "success": True,
-            "message": f"Лимиты обновлены для специальностей: {', '.join(updated_specialties)}",
-            "updated_specialties": updated_specialties,
-            "updated_at": datetime.utcnow(),
-        }
+        return QueueLimitsApiService(db).update_queue_limits(
+            limits=limits,
+            current_user_id=current_user.id,
+        )
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления лимитов: {str(e)}",
-        )
+        ) from e
 
 
 # ===================== СТАТУС ОЧЕРЕДЕЙ С ЛИМИТАМИ =====================
@@ -229,73 +139,17 @@ def get_queue_status_with_limits(
         if day is None:
             day = date.today()
 
-        # Получаем настройки лимитов
-        queue_settings = get_queue_settings(db)
-        max_per_day_settings = queue_settings.get("max_per_day", {})
-
-        # Получаем врачей
-        doctors_query = db.query(Doctor).filter(Doctor.active == True)
-        if specialty:
-            doctors_query = doctors_query.filter(Doctor.specialty == specialty)
-
-        doctors = doctors_query.all()
-
-        result = []
-        for doctor in doctors:
-            # Получаем очередь на день
-            daily_queue = (
-                db.query(DailyQueue)
-                .filter(
-                    and_(
-                        DailyQueue.day == day,
-                        DailyQueue.specialist_id
-                        == doctor.user_id,  # ⭐ user_id, а не doctor.id
-                    )
-                )
-                .first()
-            )
-
-            current_entries = 0
-            queue_opened = False
-
-            if daily_queue:
-                current_entries = (
-                    db.query(OnlineQueueEntry)
-                    .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-                    .count()
-                )
-                queue_opened = daily_queue.opened_at is not None
-
-            # Получаем лимит для специальности
-            max_entries = max_per_day_settings.get(doctor.specialty, 15)
-
-            # Проверяем доступность онлайн записи
-            online_available = not queue_opened and current_entries < max_entries
-
-            result.append(
-                QueueStatusResponse(
-                    doctor_id=doctor.id,
-                    doctor_name=(
-                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-                    ),
-                    specialty=doctor.specialty,
-                    cabinet=doctor.cabinet,
-                    day=day,
-                    current_entries=current_entries,
-                    max_entries=max_entries,
-                    limit_reached=current_entries >= max_entries,
-                    queue_opened=queue_opened,
-                    online_available=online_available,
-                )
-            )
-
-        return result
+        result = QueueLimitsApiService(db).get_queue_status_with_limits(
+            day=day,
+            specialty=specialty,
+        )
+        return [QueueStatusResponse(**item) for item in result]
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения статуса очередей: {str(e)}",
-        )
+        ) from e
 
 
 # ===================== ИНДИВИДУАЛЬНЫЕ ЛИМИТЫ ДЛЯ ВРАЧЕЙ =====================
@@ -311,55 +165,22 @@ def set_doctor_queue_limit(
     Установить индивидуальный лимит для врача на конкретный день
     """
     try:
-        # Проверяем существование врача
-        doctor = db.query(Doctor).filter(Doctor.id == limit_data.doctor_id).first()
-        if not doctor:
+        return QueueLimitsApiService(db).set_doctor_queue_limit(limit_data=limit_data)
+    except ValueError as exc:
+        if str(exc) == "DOCTOR_NOT_FOUND":
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Врач не найден"
-            )
-
-        # Получаем или создаем очередь на день
-        daily_queue = (
-            db.query(DailyQueue)
-            .filter(
-                and_(
-                    DailyQueue.day == limit_data.day,
-                    DailyQueue.specialist_id == limit_data.doctor_id,
-                )
-            )
-            .first()
-        )
-
-        if not daily_queue:
-            daily_queue = DailyQueue(
-                day=limit_data.day,
-                specialist_id=limit_data.doctor_id,
-                active=True,
-                max_online_entries=limit_data.max_online_entries,
-            )
-            db.add(daily_queue)
-        else:
-            daily_queue.max_online_entries = limit_data.max_online_entries
-
-        db.commit()
-
-        return {
-            "success": True,
-            "message": f"Лимит установлен для врача {doctor.user.full_name if doctor.user else f'#{doctor.id}'} на {limit_data.day}",
-            "doctor_id": limit_data.doctor_id,
-            "day": limit_data.day,
-            "max_online_entries": limit_data.max_online_entries,
-            "updated_at": datetime.utcnow(),
-        }
-
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Врач не найден",
+            ) from exc
+        raise
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        QueueLimitsApiService(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка установки лимита: {str(e)}",
-        )
+        ) from e
 
 
 # ===================== СБРОС ЛИМИТОВ =====================
@@ -377,34 +198,13 @@ def reset_queue_limits(
     Сбросить лимиты очередей к значениям по умолчанию
     """
     try:
-        queue_settings = get_queue_settings(db)
-
-        if specialty:
-            # Сбрасываем для конкретной специальности
-            max_per_day = queue_settings.get("max_per_day", {})
-            start_numbers = queue_settings.get("start_numbers", {})
-
-            max_per_day[specialty] = 15  # Значение по умолчанию
-            start_numbers[specialty] = 1  # Значение по умолчанию
-
-            new_settings = {
-                **queue_settings,
-                "max_per_day": max_per_day,
-                "start_numbers": start_numbers,
-            }
-
-            message = f"Лимиты сброшены для специальности: {specialty}"
-        else:
-            # Сбрасываем все лимиты
-            new_settings = {**queue_settings, "max_per_day": {}, "start_numbers": {}}
-            message = "Все лимиты сброшены к значениям по умолчанию"
-
-        update_queue_settings(db, new_settings, current_user.id)
-
-        return {"success": True, "message": message, "reset_at": datetime.utcnow()}
+        return QueueLimitsApiService(db).reset_queue_limits(
+            specialty=specialty,
+            current_user_id=current_user.id,
+        )
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка сброса лимитов: {str(e)}",
-        )
+        ) from e

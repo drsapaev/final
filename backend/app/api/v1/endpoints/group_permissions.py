@@ -10,14 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
-from app.models.role_permission import (
-    Permission,
-    Role,
-    UserGroup,
-    UserPermissionOverride,
-)
+from app.api.deps import get_db, require_roles
 from app.models.user import User
+from app.services.group_permissions_api_service import (
+    GroupPermissionsApiDomainError,
+    GroupPermissionsApiService,
+)
 from app.services.group_permissions_service import get_group_permissions_service
 
 logger = logging.getLogger(__name__)
@@ -110,31 +108,13 @@ def get_user_permissions(
     Включает разрешения из ролей, групп и индивидуальные переопределения
     """
     try:
-        service = get_group_permissions_service()
-
-        # Получаем пользователя
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден"
-            )
-
-        # Получаем разрешения
-        permissions = service.get_user_permissions(db, user_id, use_cache)
-
-        # Получаем роли и группы
-        roles = [role.name for role in user.roles if role.is_active]
-        groups = [group.name for group in user.groups if group.is_active]
-
-        return UserPermissionsResponse(
+        payload = GroupPermissionsApiService(db).get_user_permissions_payload(
             user_id=user_id,
-            username=user.username,
-            permissions=list(permissions),
-            permissions_count=len(permissions),
-            roles=roles,
-            groups=groups,
+            use_cache=use_cache,
         )
-
+        return UserPermissionsResponse(**payload)
+    except GroupPermissionsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
@@ -142,7 +122,7 @@ def get_user_permissions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения разрешений: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/users/{user_id}/permissions/check")
@@ -192,39 +172,18 @@ def get_groups(
     Получить список групп пользователей
     """
     try:
-        query = db.query(UserGroup)
-
-        if active_only:
-            query = query.filter(UserGroup.is_active == True)
-
-        if group_type:
-            query = query.filter(UserGroup.group_type == group_type)
-
-        groups = query.limit(limit).all()
-
-        result = []
-        for group in groups:
-            result.append(
-                GroupResponse(
-                    id=group.id,
-                    name=group.name,
-                    display_name=group.display_name,
-                    description=group.description,
-                    group_type=group.group_type,
-                    is_active=group.is_active,
-                    users_count=len([u for u in group.users if u.is_active]),
-                    roles_count=len([r for r in group.roles if r.is_active]),
-                )
-            )
-
-        return result
-
+        payload = GroupPermissionsApiService(db).list_groups_payload(
+            active_only=active_only,
+            group_type=group_type,
+            limit=limit,
+        )
+        return [GroupResponse(**item) for item in payload]
     except Exception as e:
         logger.error(f"Ошибка получения списка групп: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения групп: {str(e)}",
-        )
+        ) from e
 
 
 @router.get(
@@ -406,39 +365,18 @@ def get_roles(
     Получить список ролей
     """
     try:
-        query = db.query(Role)
-
-        if active_only:
-            query = query.filter(Role.is_active == True)
-
-        if not include_system:
-            query = query.filter(Role.is_system == False)
-
-        roles = query.limit(limit).all()
-
-        result = []
-        for role in roles:
-            result.append(
-                RoleResponse(
-                    id=role.id,
-                    name=role.name,
-                    display_name=role.display_name,
-                    description=role.description,
-                    level=role.level,
-                    is_active=role.is_active,
-                    is_system=role.is_system,
-                    permissions_count=len([p for p in role.permissions if p.is_active]),
-                )
-            )
-
-        return result
-
+        payload = GroupPermissionsApiService(db).list_roles_payload(
+            active_only=active_only,
+            include_system=include_system,
+            limit=limit,
+        )
+        return [RoleResponse(**item) for item in payload]
     except Exception as e:
         logger.error(f"Ошибка получения списка ролей: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения ролей: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/permissions", response_model=List[PermissionResponse])
@@ -453,37 +391,18 @@ def get_permissions(
     Получить список разрешений
     """
     try:
-        query = db.query(Permission)
-
-        if active_only:
-            query = query.filter(Permission.is_active == True)
-
-        if category:
-            query = query.filter(Permission.category == category)
-
-        permissions = query.limit(limit).all()
-
-        result = []
-        for permission in permissions:
-            result.append(
-                PermissionResponse(
-                    id=permission.id,
-                    name=permission.name,
-                    codename=permission.codename,
-                    description=permission.description,
-                    category=permission.category,
-                    is_active=permission.is_active,
-                )
-            )
-
-        return result
-
+        payload = GroupPermissionsApiService(db).list_permissions_payload(
+            active_only=active_only,
+            category=category,
+            limit=limit,
+        )
+        return [PermissionResponse(**item) for item in payload]
     except Exception as e:
         logger.error(f"Ошибка получения списка разрешений: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения разрешений: {str(e)}",
-        )
+        ) from e
 
 
 # ===================== ПЕРЕОПРЕДЕЛЕНИЯ РАЗРЕШЕНИЙ =====================
@@ -498,78 +417,23 @@ def create_permission_override(
     """
     Создать индивидуальное переопределение разрешения для пользователя
     """
+    api_service = GroupPermissionsApiService(db)
     try:
-        # Проверяем существование пользователя и разрешения
-        user = db.query(User).filter(User.id == request.user_id).first()
-        permission = (
-            db.query(Permission).filter(Permission.id == request.permission_id).first()
-        )
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден"
-            )
-
-        if not permission:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Разрешение не найдено"
-            )
-
-        # Проверяем, нет ли уже такого переопределения
-        existing = (
-            db.query(UserPermissionOverride)
-            .filter(
-                UserPermissionOverride.user_id == request.user_id,
-                UserPermissionOverride.permission_id == request.permission_id,
-                UserPermissionOverride.is_active == True,
-            )
-            .first()
-        )
-
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Переопределение для этого разрешения уже существует",
-            )
-
-        # Создаем переопределение
-        expires_at = None
-        if request.expires_hours:
-            from datetime import timedelta
-
-            expires_at = datetime.utcnow() + timedelta(hours=request.expires_hours)
-
-        override = UserPermissionOverride(
+        return api_service.create_permission_override(
             user_id=request.user_id,
             permission_id=request.permission_id,
             override_type=request.override_type,
             reason=request.reason,
-            expires_at=expires_at,
-            granted_by=current_user.id,
+            expires_hours=request.expires_hours,
+            granted_by_user_id=current_user.id,
+            granted_by_username=current_user.username,
         )
-
-        db.add(override)
-        db.commit()
-        db.refresh(override)
-
-        # Очищаем кэш пользователя
-        service = get_group_permissions_service()
-        service._clear_user_cache(request.user_id)
-
-        return {
-            "success": True,
-            "message": f"Переопределение разрешения '{permission.name}' создано для пользователя '{user.username}'",
-            "override_id": override.id,
-            "override_type": request.override_type,
-            "expires_at": expires_at.isoformat() if expires_at else None,
-            "created_by": current_user.username,
-            "created_at": override.created_at.isoformat(),
-        }
-
+    except GroupPermissionsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        api_service.rollback()
         logger.error(f"Ошибка создания переопределения разрешения: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
