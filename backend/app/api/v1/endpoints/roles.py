@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.models.role_permission import Role
 from app.models.user import User
 from app.schemas.role import (
     RoleCreate,
@@ -18,6 +17,7 @@ from app.schemas.role import (
     RoleResponse,
     RoleUpdate,
 )
+from app.services.roles_api_service import RolesApiDomainError, RolesApiService
 
 logger = logging.getLogger(__name__)
 
@@ -37,16 +37,10 @@ async def get_roles(
     Returns a list of all roles, optionally filtered by active/system status.
     """
     try:
-        query = db.query(Role)
-        
-        if is_active is not None:
-            query = query.filter(Role.is_active == is_active)
-        
-        if is_system is not None:
-            query = query.filter(Role.is_system == is_system)
-        
-        # Order by level (higher level = more privileges)
-        roles = query.order_by(Role.level.desc()).all()
+        roles = RolesApiService(db).list_roles(
+            is_active=is_active,
+            is_system=is_system,
+        )
         
         return RoleListResponse(
             roles=[RoleResponse.model_validate(role) for role in roles],
@@ -73,7 +67,7 @@ async def get_role_options(
     Used for role selection in forms and filters.
     """
     try:
-        roles = db.query(Role).filter(Role.is_active == True).order_by(Role.level.desc()).all()
+        roles = RolesApiService(db).list_active_roles()
         
         options = []
         
@@ -104,13 +98,11 @@ async def get_role(
     current_user: User = Depends(get_current_user),
 ):
     """Get a specific role by ID."""
-    role = db.query(Role).filter(Role.id == role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Роль не найдена"
-        )
-    return RoleResponse.model_validate(role)
+    try:
+        role = RolesApiService(db).get_role_or_error(role_id)
+        return RoleResponse.model_validate(role)
+    except RolesApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post("/", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
@@ -130,23 +122,13 @@ async def create_role(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы могут создавать роли"
         )
-    
-    # Check if role name already exists
-    existing = db.query(Role).filter(Role.name == role_data.name).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Роль с именем '{role_data.name}' уже существует"
-        )
-    
+
     try:
-        role = Role(**role_data.model_dump())
-        db.add(role)
-        db.commit()
-        db.refresh(role)
+        role = RolesApiService(db).create_role(role_data.model_dump())
         return RoleResponse.model_validate(role)
+    except RolesApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
         logger.error(f"Error creating role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -173,35 +155,16 @@ async def update_role(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы могут изменять роли"
         )
-    
-    role = db.query(Role).filter(Role.id == role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Роль не найдена"
-        )
-    
-    # System roles can only have display_name and description changed
-    if role.is_system:
-        allowed_fields = {"display_name", "description"}
-        update_data = role_data.model_dump(exclude_unset=True)
-        for field in update_data:
-            if field not in allowed_fields:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Нельзя изменить поле '{field}' для системной роли"
-                )
-    
+
     try:
-        update_data = role_data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(role, field, value)
-        
-        db.commit()
-        db.refresh(role)
+        role = RolesApiService(db).update_role(
+            role_id=role_id,
+            update_data=role_data.model_dump(exclude_unset=True),
+        )
         return RoleResponse.model_validate(role)
+    except RolesApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
         logger.error(f"Error updating role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -227,25 +190,12 @@ async def delete_role(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы могут удалять роли"
         )
-    
-    role = db.query(Role).filter(Role.id == role_id).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Роль не найдена"
-        )
-    
-    if role.is_system:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Нельзя удалить системную роль"
-        )
-    
+
     try:
-        db.delete(role)
-        db.commit()
+        RolesApiService(db).delete_role(role_id=role_id)
+    except RolesApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
         logger.error(f"Error deleting role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

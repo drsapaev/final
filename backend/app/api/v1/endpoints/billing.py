@@ -3,7 +3,7 @@ API endpoints для автоматического выставления сч�
 """
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.billing import InvoiceStatus, InvoiceType, PaymentMethod, RecurrenceType
 from app.models.user import User
+from app.services.billing_api_service import BillingApiDomainError, BillingApiService
 from app.services.billing_service import BillingService
 
 router = APIRouter()
@@ -173,6 +174,7 @@ def create_invoice(
 ):
     """Создать счет"""
     service = BillingService(db)
+    billing_api_service = BillingApiService(db)
 
     try:
         # Преобразуем данные позиций
@@ -202,15 +204,12 @@ def create_invoice(
 
         # Настраиваем периодичность если нужно
         if invoice_data.is_recurring:
-            invoice.is_recurring = True
-            invoice.recurrence_type = invoice_data.recurrence_type
-            invoice.recurrence_interval = invoice_data.recurrence_interval
-            invoice.next_invoice_date = service._calculate_next_recurrence_date(
-                invoice.issue_date,
-                invoice_data.recurrence_type,
-                invoice_data.recurrence_interval,
+            billing_api_service.configure_recurring_invoice(
+                invoice=invoice,
+                recurrence_type=invoice_data.recurrence_type,
+                recurrence_interval=invoice_data.recurrence_interval,
+                next_date_calculator=service._calculate_next_recurrence_date,
             )
-            db.commit()
 
         # Создаем напоминания
         if invoice_data.send_reminders:
@@ -234,23 +233,15 @@ def get_invoices(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список счетов"""
-    from app.models.billing import Invoice
-
-    query = db.query(Invoice)
-
-    if patient_id:
-        query = query.filter(Invoice.patient_id == patient_id)
-    if status:
-        query = query.filter(Invoice.status == status)
-    if invoice_type:
-        query = query.filter(Invoice.invoice_type == invoice_type)
-    if date_from:
-        query = query.filter(Invoice.issue_date >= date_from)
-    if date_to:
-        query = query.filter(Invoice.issue_date <= date_to)
-
-    invoices = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
-    return invoices
+    return BillingApiService(db).list_invoices(
+        skip=skip,
+        limit=limit,
+        patient_id=patient_id,
+        status=status,
+        invoice_type=invoice_type,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
@@ -260,13 +251,10 @@ def get_invoice(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить счет по ID"""
-    from app.models.billing import Invoice
-
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Счет не найден")
-
-    return invoice
+    try:
+        return BillingApiService(db).get_invoice_or_error(invoice_id=invoice_id)
+    except BillingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.put("/invoices/{invoice_id}", response_model=InvoiceResponse)
@@ -277,19 +265,13 @@ def update_invoice(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Обновить счет"""
-    from app.models.billing import Invoice
-
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Счет не найден")
-
-    # Обновляем поля
-    for field, value in invoice_data.dict(exclude_unset=True).items():
-        setattr(invoice, field, value)
-
-    db.commit()
-    db.refresh(invoice)
-    return invoice
+    try:
+        return BillingApiService(db).update_invoice(
+            invoice_id=invoice_id,
+            update_data=invoice_data.dict(exclude_unset=True),
+        )
+    except BillingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.delete("/invoices/{invoice_id}")
@@ -299,18 +281,10 @@ def delete_invoice(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Удалить счет"""
-    from app.models.billing import Invoice
-
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Счет не найден")
-
-    # Можно удалять только черновики
-    if invoice.status != InvoiceStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Можно удалять только черновики")
-
-    db.delete(invoice)
-    db.commit()
+    try:
+        BillingApiService(db).delete_invoice(invoice_id=invoice_id)
+    except BillingApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return {"message": "Счет удален"}
 
 
@@ -384,32 +358,13 @@ def get_payments(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список платежей"""
-    from app.models.payment import Payment
-
-    query = db.query(Payment)
-
-    if date_from:
-        query = query.filter(Payment.created_at >= date_from)
-    if date_to:
-        query = query.filter(Payment.created_at <= date_to)
-
-    payments = query.order_by(Payment.created_at.desc()).offset(skip).limit(limit).all()
-    
-    # Return compatible response structure
-    return [
-        {
-            "id": p.id,
-            "visit_id": p.visit_id,
-            "amount": float(p.amount),
-            "method": p.method,
-            "status": p.status,
-            "receipt_no": p.receipt_no,
-            "note": p.note,
-            "created_at": p.created_at,
-            "paid_at": p.paid_at,
-        }
-        for p in payments
-    ]
+    payments = BillingApiService(db).list_payments(
+        skip=skip,
+        limit=limit,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return BillingApiService(db).serialize_payments(payments)
 
 
 @router.post("/auto-generate/visit/{visit_id}")
@@ -523,14 +478,11 @@ def update_billing_settings(
     """Обновить настройки биллинга"""
     service = BillingService(db)
     settings = service.get_billing_settings()
-
-    # Обновляем поля
-    for field, value in settings_data.dict(exclude_unset=True).items():
-        setattr(settings, field, value)
-
-    settings.updated_by = current_user.id
-
-    db.commit()
+    BillingApiService(db).update_billing_settings(
+        settings=settings,
+        update_data=settings_data.dict(exclude_unset=True),
+        updated_by=current_user.id,
+    )
     return {"message": "Настройки обновлены"}
 
 
@@ -542,72 +494,7 @@ def get_billing_analytics(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить аналитику по счетам"""
-    from sqlalchemy import func
-
-    from app.models.billing import Invoice
-    from app.models.payment import Payment
-
-    # Базовые фильтры
-    invoice_query = db.query(Invoice)
-    payment_query = db.query(Payment)
-
-    if date_from:
-        invoice_query = invoice_query.filter(Invoice.issue_date >= date_from)
-        payment_query = payment_query.filter(Payment.payment_date >= date_from)
-    if date_to:
-        invoice_query = invoice_query.filter(Invoice.issue_date <= date_to)
-        payment_query = payment_query.filter(Payment.payment_date <= date_to)
-
-    # Статистика по счетам
-    total_invoices = invoice_query.count()
-    total_amount = (
-        invoice_query.with_entities(func.sum(Invoice.total_amount)).scalar() or 0
+    return BillingApiService(db).get_billing_analytics(
+        date_from=date_from,
+        date_to=date_to,
     )
-    paid_amount = (
-        invoice_query.filter(Invoice.status == InvoiceStatus.PAID)
-        .with_entities(func.sum(Invoice.total_amount))
-        .scalar()
-        or 0
-    )
-    overdue_amount = (
-        invoice_query.filter(Invoice.status == InvoiceStatus.OVERDUE)
-        .with_entities(func.sum(Invoice.balance))
-        .scalar()
-        or 0
-    )
-
-    # Статистика по платежам
-    total_payments = payment_query.count()
-    payments_amount = (
-        payment_query.with_entities(func.sum(Payment.amount)).scalar() or 0
-    )
-
-    # Статистика по статусам
-    status_stats = (
-        db.query(
-            Invoice.status,
-            func.count(Invoice.id).label('count'),
-            func.sum(Invoice.total_amount).label('amount'),
-        )
-        .group_by(Invoice.status)
-        .all()
-    )
-
-    return {
-        "period": {"date_from": date_from, "date_to": date_to},
-        "summary": {
-            "total_invoices": total_invoices,
-            "total_amount": total_amount,
-            "paid_amount": paid_amount,
-            "overdue_amount": overdue_amount,
-            "total_payments": total_payments,
-            "payments_amount": payments_amount,
-            "collection_rate": (
-                (paid_amount / total_amount * 100) if total_amount > 0 else 0
-            ),
-        },
-        "status_breakdown": [
-            {"status": stat.status, "count": stat.count, "amount": stat.amount or 0}
-            for stat in status_stats
-        ],
-    }

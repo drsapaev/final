@@ -20,9 +20,8 @@ from sqlalchemy.orm import Session
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
+from app.services.queue_api_service import QueueApiService
 from app.services.queue_service import (
     get_queue_service,
     QueueConflictError,
@@ -99,15 +98,13 @@ def generate_qr_token(
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
+        queue_api_service = QueueApiService(db)
+
         # Проверка прав доступа
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-        specialist = (
-            db.query(User)
-            .filter(User.id == specialist_id, User.role == "Doctor")
-            .first()
-        )
+        specialist = queue_api_service.get_doctor_user(specialist_id)
 
         if not specialist:
             raise HTTPException(status_code=404, detail="Специалист не найден")
@@ -269,10 +266,9 @@ def get_queue_statistics(
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
 
     # Получаем очередь
-    daily_queue = (
-        db.query(DailyQueue)
-        .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
-        .first()
+    daily_queue = QueueApiService(db).get_daily_queue(
+        day=day,
+        specialist_id=specialist_id,
     )
 
     if not daily_queue:
@@ -328,30 +324,23 @@ def open_queue(
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
+        queue_api_service = QueueApiService(db)
+
         # Проверка прав доступа
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         # Получение или создание очереди
-        daily_queue = (
-            db.query(DailyQueue)
-            .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
-            .first()
+        daily_queue = queue_api_service.get_or_create_daily_queue(
+            day=day,
+            specialist_id=specialist_id,
         )
-
-        if not daily_queue:
-            # Создаем очередь если её нет
-            daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
-            db.add(daily_queue)
-            db.commit()
-            db.refresh(daily_queue)
 
         if daily_queue.opened_at:
             raise HTTPException(status_code=400, detail="Прием уже открыт")
 
         # Открытие приема
-        daily_queue.opened_at = datetime.now()
-        db.commit()
+        queue_api_service.open_daily_queue(daily_queue)
 
         return {
             "success": True,
@@ -383,29 +372,24 @@ def get_today_queue(
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
 
     # Проверка существования специалиста
-    specialist = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    queue_api_service = QueueApiService(db)
+    specialist = queue_api_service.get_doctor(specialist_id)
     if not specialist:
         raise HTTPException(status_code=404, detail="Специалист не найден")
 
     today = date.today()
 
     # Получение очереди
-    daily_queue = (
-        db.query(DailyQueue)
-        .filter(DailyQueue.day == today, DailyQueue.specialist_id == specialist_id)
-        .first()
+    daily_queue = queue_api_service.get_daily_queue(
+        day=today,
+        specialist_id=specialist_id,
     )
 
     if not daily_queue:
         raise HTTPException(status_code=404, detail="Очередь на сегодня не найдена")
 
     # Получение записей
-    entries = (
-        db.query(OnlineQueueEntry)
-        .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-        .order_by(OnlineQueueEntry.number)
-        .all()
-    )
+    entries = queue_api_service.list_queue_entries(queue_id=daily_queue.id)
 
     waiting_count = sum(1 for entry in entries if entry.status == "waiting")
 
@@ -459,7 +443,8 @@ def call_patient(
     if current_user.role not in ["Admin", "Registrar", "Doctor"]:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    queue_api_service = QueueApiService(db)
+    entry = queue_api_service.get_queue_entry(entry_id)
 
     if not entry:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -468,10 +453,7 @@ def call_patient(
         raise HTTPException(status_code=400, detail="Пациент уже вызван или обслужен")
 
     # Обновление статуса
-    entry.status = "called"
-    entry.called_at = datetime.now()
-
-    db.commit()
+    queue_api_service.mark_entry_called(entry)
 
     # Отправка WebSocket события для табло
     try:
