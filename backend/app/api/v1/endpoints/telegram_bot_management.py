@@ -9,10 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
-from app.crud import user as crud_user
+from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
+from app.services.telegram_bot_management_api_service import (
+    TelegramBotManagementApiService,
+)
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()
@@ -52,43 +54,14 @@ async def get_telegram_bot_stats(
 ):
     """Получить статистику Telegram бота"""
     try:
-        # Подсчитываем пользователей с Telegram
-        total_users = db.query(User).filter(User.telegram_chat_id.isnot(None)).count()
-
-        # Активные пользователи (с активным Telegram)
-        active_users = (
-            db.query(User)
-            .filter(User.telegram_chat_id.isnot(None), User.is_active == True)
-            .count()
-        )
-
-        # Администраторы с Telegram
-        admin_users = (
-            db.query(User)
-            .filter(
-                User.telegram_chat_id.isnot(None),
-                User.role.in_(["Admin", "SuperAdmin"]),
-            )
-            .count()
-        )
-
-        # TODO: Добавить статистику сообщений и команд из базы данных
-        messages_sent_today = 0
-        commands_processed_today = 0
-
-        return TelegramBotStatsResponse(
-            total_users=total_users,
-            active_users=active_users,
-            admin_users=admin_users,
-            messages_sent_today=messages_sent_today,
-            commands_processed_today=commands_processed_today,
-        )
+        payload = TelegramBotManagementApiService(db).get_stats_payload()
+        return TelegramBotStatsResponse(**payload)
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting bot stats: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/send-notification")
@@ -100,6 +73,7 @@ async def send_telegram_notification(
     """Отправить уведомление через Telegram бота"""
     try:
         bot = get_enhanced_telegram_bot()
+        api_service = TelegramBotManagementApiService(db)
 
         if not bot.active:
             raise HTTPException(
@@ -112,23 +86,11 @@ async def send_telegram_notification(
         if request.send_to_all_admins:
             # Отправляем всем администраторам
             await bot.send_admin_notification(request.message, db)
-            success_count = (
-                db.query(User)
-                .filter(
-                    User.role.in_(["Admin", "SuperAdmin"]),
-                    User.telegram_chat_id.isnot(None),
-                )
-                .count()
-            )
+            success_count = api_service.count_admin_recipients()
 
         elif request.send_to_all_users:
             # Отправляем всем пользователям
-            all_user_ids = [
-                user.id
-                for user in db.query(User)
-                .filter(User.telegram_chat_id.isnot(None), User.is_active == True)
-                .all()
-            ]
+            all_user_ids = api_service.list_active_user_recipients()
             success_count = await bot.send_bulk_notification(
                 request.message, all_user_ids, db
             )
@@ -157,7 +119,7 @@ async def send_telegram_notification(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error sending notification: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/send-admin-alert")
@@ -198,29 +160,13 @@ async def get_users_with_telegram(
 ):
     """Получить список пользователей с настроенным Telegram"""
     try:
-        users = db.query(User).filter(User.telegram_chat_id.isnot(None)).all()
-
-        result = []
-        for user in users:
-            result.append(
-                {
-                    "id": user.id,
-                    "username": user.username,
-                    "full_name": user.full_name,
-                    "role": user.role,
-                    "telegram_chat_id": user.telegram_chat_id,
-                    "is_active": user.is_active,
-                    "created_at": user.created_at,
-                }
-            )
-
-        return {"users": result, "total_count": len(result)}
+        return TelegramBotManagementApiService(db).get_users_with_telegram_payload()
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting users: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/test-bot")
@@ -264,7 +210,7 @@ async def test_telegram_bot(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error testing bot: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/broadcast-system-message")
@@ -277,6 +223,7 @@ async def broadcast_system_message(
     """Системное сообщение для всех пользователей (только для SuperAdmin)"""
     try:
         bot = get_enhanced_telegram_bot()
+        api_service = TelegramBotManagementApiService(db)
 
         if not bot.active:
             raise HTTPException(
@@ -297,12 +244,7 @@ async def broadcast_system_message(
 👤 Отправитель: {current_user.full_name}"""
 
         # Отправляем всем активным пользователям
-        all_user_ids = [
-            user.id
-            for user in db.query(User)
-            .filter(User.telegram_chat_id.isnot(None), User.is_active == True)
-            .all()
-        ]
+        all_user_ids = api_service.list_active_user_recipients()
 
         success_count = await bot.send_bulk_notification(
             system_message, all_user_ids, db
@@ -321,7 +263,7 @@ async def broadcast_system_message(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error broadcasting system message: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/bot-commands")
@@ -375,4 +317,4 @@ async def get_bot_commands(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting bot commands: {str(e)}",
-        )
+        ) from e
