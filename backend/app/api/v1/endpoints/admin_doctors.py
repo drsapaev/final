@@ -20,6 +20,7 @@ from app.schemas.clinic import (
     ScheduleUpdate,
     WeeklyScheduleUpdate,
 )
+from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
 
 router = APIRouter()
 
@@ -392,64 +393,7 @@ def get_specialties(
 ):
     """Получить список специальностей"""
     try:
-        # Получаем уникальные специальности из врачей
-        from sqlalchemy import distinct
-
-        from app.models.clinic import Doctor
-
-        specialties_query = (
-            db.query(distinct(Doctor.specialty)).filter(Doctor.active == True).all()
-        )
-        specialties = [s[0] for s in specialties_query if s[0]]
-
-        # Добавляем информацию о каждой специальности
-        specialty_info = {
-            'cardiology': {
-                'name_ru': 'Кардиология',
-                'name_uz': 'Kardiologiya',
-                'name_en': 'Cardiology',
-                'description': 'Консультации кардиолога, ЭКГ, ЭхоКГ',
-                'color': '#dc3545',
-            },
-            'dermatology': {
-                'name_ru': 'Дерматология',
-                'name_uz': 'Dermatologiya',
-                'name_en': 'Dermatology',
-                'description': 'Дерматология и косметология',
-                'color': '#fd7e14',
-            },
-            'stomatology': {
-                'name_ru': 'Стоматология',
-                'name_uz': 'Stomatologiya',
-                'name_en': 'Stomatology',
-                'description': 'Стоматологические услуги',
-                'color': '#007bff',
-            },
-        }
-
-        result = []
-        for specialty in specialties:
-            info = specialty_info.get(
-                specialty,
-                {
-                    'name_ru': specialty,
-                    'name_uz': specialty,
-                    'name_en': specialty,
-                    'description': '',
-                    'color': '#6c757d',
-                },
-            )
-
-            # Подсчитываем количество врачей
-            doctor_count = (
-                db.query(Doctor)
-                .filter(Doctor.specialty == specialty, Doctor.active == True)
-                .count()
-            )
-
-            result.append({'code': specialty, 'doctor_count': doctor_count, **info})
-
-        return result
+        return AdminDoctorsStatsService(db).get_specialties()
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -463,30 +407,7 @@ def get_doctors_stats(
 ):
     """Получить статистику по врачам"""
     try:
-        from app.models.clinic import Doctor
-
-        total_doctors = db.query(Doctor).filter(Doctor.active == True).count()
-
-        # Статистика по специальностям
-        specialty_stats = {}
-        specialties = (
-            db.query(Doctor.specialty).filter(Doctor.active == True).distinct().all()
-        )
-
-        for (specialty,) in specialties:
-            if specialty:
-                count = (
-                    db.query(Doctor)
-                    .filter(Doctor.specialty == specialty, Doctor.active == True)
-                    .count()
-                )
-                specialty_stats[specialty] = count
-
-        return {
-            'total_doctors': total_doctors,
-            'by_specialty': specialty_stats,
-            'active_doctors': total_doctors,  # Все врачи активные в этом запросе
-        }
+        return AdminDoctorsStatsService(db).get_doctors_stats()
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

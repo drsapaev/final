@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.services.doctor_phrase_service import DoctorPhraseService, get_doctor_phrase_service
+from app.services.phrase_suggest_api_service import PhraseSuggestApiService
 
 router = APIRouter()
 
@@ -144,29 +145,7 @@ async def get_phrase_stats(
     """
     Получить статистику фраз врача.
     """
-    from app.models.doctor_phrase_history import DoctorPhraseHistory
-    from sqlalchemy import func
-    
-    stats = db.query(
-        DoctorPhraseHistory.field,
-        func.count(DoctorPhraseHistory.id).label('count'),
-        func.sum(DoctorPhraseHistory.usage_count).label('total_usage')
-    ).filter(
-        DoctorPhraseHistory.doctor_id == doctor_id
-    ).group_by(
-        DoctorPhraseHistory.field
-    ).all()
-    
-    return {
-        "doctorId": doctor_id,
-        "phrasesByField": {
-            stat.field: {
-                "uniquePhrases": stat.count,
-                "totalUsage": stat.total_usage or 0
-            }
-            for stat in stats
-        }
-    }
+    return PhraseSuggestApiService(db).get_phrase_stats(doctor_id=doctor_id)
 
 
 # ============================================
@@ -233,26 +212,12 @@ async def record_telemetry(
     
     Используется для расчёта acceptance_rate.
     """
-    from app.models.doctor_phrase_history import DoctorPhraseHistory
-    
     try:
-        if request.phraseId:
-            phrase = db.query(DoctorPhraseHistory).filter(
-                DoctorPhraseHistory.id == request.phraseId
-            ).first()
-            
-            if phrase:
-                if request.event == "shown":
-                    phrase.suggestions_shown += 1
-                elif request.event == "accepted":
-                    phrase.suggestions_accepted += 1
-                
-                db.commit()
-        
-        return TelemetryResponse(
-            success=True,
-            message=f"Recorded {request.event} event"
+        result = PhraseSuggestApiService(db).record_telemetry(
+            phrase_id=request.phraseId,
+            event=request.event,
         )
+        return TelemetryResponse(**result)
     except Exception as e:
         return TelemetryResponse(
             success=False,
@@ -284,47 +249,8 @@ async def get_telemetry_stats(
     
     Показывает acceptance rate и топ принятых фраз.
     """
-    from app.models.doctor_phrase_history import DoctorPhraseHistory
-    from sqlalchemy import func
-    
-    # Агрегированная статистика
-    stats = db.query(
-        func.sum(DoctorPhraseHistory.suggestions_shown).label('total_shown'),
-        func.sum(DoctorPhraseHistory.suggestions_accepted).label('total_accepted')
-    ).filter(
-        DoctorPhraseHistory.doctor_id == doctor_id
-    ).first()
-    
-    total_shown = stats.total_shown or 0 if stats else 0
-    total_accepted = stats.total_accepted or 0 if stats else 0
-    acceptance_rate = (total_accepted / total_shown * 100) if total_shown > 0 else 0
-    
-    # Топ принятых фраз
-    top_phrases = db.query(
-        DoctorPhraseHistory.phrase,
-        DoctorPhraseHistory.field,
-        DoctorPhraseHistory.suggestions_accepted
-    ).filter(
-        DoctorPhraseHistory.doctor_id == doctor_id,
-        DoctorPhraseHistory.suggestions_accepted > 0
-    ).order_by(
-        DoctorPhraseHistory.suggestions_accepted.desc()
-    ).limit(10).all()
-    
     return TelemetryStatsResponse(
-        doctorId=doctor_id,
-        totalShown=total_shown,
-        totalAccepted=total_accepted,
-        acceptanceRate=round(acceptance_rate, 1),
-        avgTimeToAcceptMs=None,  # TODO: track separately
-        topAcceptedPhrases=[
-            {
-                "phrase": p.phrase[:50] + "..." if len(p.phrase) > 50 else p.phrase,
-                "field": p.field,
-                "timesAccepted": p.suggestions_accepted
-            }
-            for p in top_phrases
-        ]
+        **PhraseSuggestApiService(db).get_telemetry_stats(doctor_id=doctor_id)
     )
 
 

@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.feature_flags import FeatureFlag, FeatureFlagHistory
 from app.models.user import User
+from app.services.feature_flags_api_service import (
+    FeatureFlagsApiDomainError,
+    FeatureFlagsApiService,
+)
 from app.services.feature_flags import FeatureFlagService, get_feature_flag_service
 
 router = APIRouter()
@@ -152,13 +156,10 @@ def get_feature_flag(
     Получает конкретный фича-флаг по ключу
     Доступно только администраторам
     """
-    flag = db.query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
-
-    if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Фича-флаг '{flag_key}' не найден",
-        )
+    try:
+        flag = FeatureFlagsApiService(db).get_flag_or_error(flag_key)
+    except FeatureFlagsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return FeatureFlagResponse(
         id=flag.id,
@@ -186,15 +187,7 @@ def create_feature_flag(
     Создает новый фича-флаг
     Доступно только администраторам
     """
-    # Проверяем что флаг с таким ключом не существует
-    existing = db.query(FeatureFlag).filter(FeatureFlag.key == request.key).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Фича-флаг с ключом '{request.key}' уже существует",
-        )
-
-    service = get_feature_flag_service(db)
+    service = FeatureFlagsApiService(db)
 
     try:
         flag = service.create_flag(
@@ -207,27 +200,28 @@ def create_feature_flag(
             environment=request.environment,
             user_id=current_user.username,
         )
-
-        return FeatureFlagResponse(
-            id=flag.id,
-            key=flag.key,
-            name=flag.name,
-            description=flag.description,
-            enabled=flag.enabled,
-            config=flag.config or {},
-            category=flag.category,
-            environment=flag.environment,
-            created_at=flag.created_at.isoformat() if flag.created_at else "",
-            updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
-            created_by=flag.created_by,
-            updated_by=flag.updated_by,
-        )
-
+    except FeatureFlagsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания фича-флага: {str(e)}",
-        )
+        ) from e
+
+    return FeatureFlagResponse(
+        id=flag.id,
+        key=flag.key,
+        name=flag.name,
+        description=flag.description,
+        enabled=flag.enabled,
+        config=flag.config or {},
+        category=flag.category,
+        environment=flag.environment,
+        created_at=flag.created_at.isoformat() if flag.created_at else "",
+        updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
+        created_by=flag.created_by,
+        updated_by=flag.updated_by,
+    )
 
 
 @router.put("/admin/feature-flags/{flag_key}", response_model=FeatureFlagResponse)
@@ -242,72 +236,45 @@ def update_feature_flag(
     Обновляет фича-флаг
     Доступно только администраторам
     """
-    flag = db.query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
-
-    if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Фича-флаг '{flag_key}' не найден",
-        )
-
-    service = get_feature_flag_service(db)
+    service = FeatureFlagsApiService(db)
 
     try:
-        # Обновляем поля
-        if request.name is not None:
-            flag.name = request.name
-        if request.description is not None:
-            flag.description = request.description
-        if request.category is not None:
-            flag.category = request.category
-        if request.environment is not None:
-            flag.environment = request.environment
-
-        # Обновляем состояние если указано
-        if request.enabled is not None:
-            service.set_flag(
-                flag_key=flag_key,
-                enabled=request.enabled,
-                user_id=current_user.username,
-                reason=request.reason,
-                ip_address=http_request.client.host if http_request.client else None,
-                user_agent=http_request.headers.get("User-Agent"),
-            )
-
-        # Обновляем конфигурацию если указана
-        if request.config is not None:
-            service.update_flag_config(
-                flag_key=flag_key,
-                config=request.config,
-                user_id=current_user.username,
-                reason=request.reason,
-            )
-
-        flag.updated_by = current_user.username
-        db.commit()
-        db.refresh(flag)
-
-        return FeatureFlagResponse(
-            id=flag.id,
-            key=flag.key,
-            name=flag.name,
-            description=flag.description,
-            enabled=flag.enabled,
-            config=flag.config or {},
-            category=flag.category,
-            environment=flag.environment,
-            created_at=flag.created_at.isoformat() if flag.created_at else "",
-            updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
-            created_by=flag.created_by,
-            updated_by=flag.updated_by,
+        flag = service.update_flag(
+            flag_key=flag_key,
+            name=request.name,
+            description=request.description,
+            category=request.category,
+            environment=request.environment,
+            enabled=request.enabled,
+            config=request.config,
+            reason=request.reason,
+            user_id=current_user.username,
+            ip_address=http_request.client.host if http_request.client else None,
+            user_agent=http_request.headers.get("User-Agent"),
         )
-
+    except FeatureFlagsApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        db.rollback()
+        service.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления фича-флага: {str(e)}",
-        )
+        ) from e
+
+    return FeatureFlagResponse(
+        id=flag.id,
+        key=flag.key,
+        name=flag.name,
+        description=flag.description,
+        enabled=flag.enabled,
+        config=flag.config or {},
+        category=flag.category,
+        environment=flag.environment,
+        created_at=flag.created_at.isoformat() if flag.created_at else "",
+        updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
+        created_by=flag.created_by,
+        updated_by=flag.updated_by,
+    )
 
 
 @router.post(

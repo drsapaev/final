@@ -1,16 +1,13 @@
 # app/api/v1/endpoints/activation.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.activation import activate_key, issue_key, validate_server_activation
-from app.models.activation import Activation  # type: ignore[attr-defined]
 from app.models.activation import ActivationStatus
 from app.schemas.activation import (
     ActivationActivateIn,
@@ -19,10 +16,10 @@ from app.schemas.activation import (
     ActivationIssueIn,
     ActivationIssueOut,
     ActivationListOut,
-    ActivationListRow,
     ActivationRevokeIn,
     ActivationStatusOut,
 )
+from app.services.activation_admin_service import ActivationAdminService
 
 router = APIRouter(prefix="/activation", tags=["activation"])
 
@@ -100,34 +97,14 @@ async def activation_list(
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin")),
 ):
-    q = select(Activation).order_by(Activation.created_at.desc())
-    if status:
-        q = q.where(Activation.status == status)
-    if key_like:
-        q = q.where(Activation.key.ilike(f"%{key_like}%"))
-    if machine_hash:
-        q = q.where(Activation.machine_hash == machine_hash)
-
-    total = db.execute(select(func.count()).select_from(q.subquery())).scalar() or 0
-    rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
-
-    items = [
-        ActivationListRow(
-            key=r.key,
-            machine_hash=r.machine_hash,
-            expiry_date=r.expiry_date.strftime("%Y-%m-%d") if r.expiry_date else None,
-            status=r.status,  # type: ignore[arg-type]
-            created_at=(r.created_at or datetime.utcnow()).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-            updated_at=(r.updated_at or r.created_at or datetime.utcnow()).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-            meta=r.meta,
-        )
-        for r in rows
-    ]
-    return ActivationListOut(items=items, total=int(total))
+    items, total = ActivationAdminService(db).list_activations(
+        status=status,
+        key_like=key_like,
+        machine_hash=machine_hash,
+        limit=limit,
+        offset=offset,
+    )
+    return ActivationListOut(items=items, total=total)
 
 
 @router.post("/revoke", summary="Отозвать ключ (Admin)")
@@ -136,17 +113,8 @@ async def activation_revoke(
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin")),
 ):
-    r: Optional[Activation] = (
-        db.execute(select(Activation).where(Activation.key == body.key))
-        .scalars()
-        .first()
-    )
-    if not r:
+    if not ActivationAdminService(db).revoke(key=body.key):
         return {"ok": False, "reason": "KEY_NOT_FOUND"}
-    r.status = ActivationStatus.REVOKED
-    r.updated_at = datetime.utcnow()
-    db.flush()
-    db.commit()
     return {"ok": True}
 
 
@@ -156,26 +124,11 @@ async def activation_extend(
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin")),
 ):
-    r: Optional[Activation] = (
-        db.execute(select(Activation).where(Activation.key == body.key))
-        .scalars()
-        .first()
-    )
-    if not r:
+    row = ActivationAdminService(db).extend(key=body.key, days=int(body.days))
+    if not row:
         return {"ok": False, "reason": "KEY_NOT_FOUND"}
-    base = r.expiry_date or datetime.utcnow()
-    r.expiry_date = base + timedelta(days=int(body.days))
-    if r.status in (
-        ActivationStatus.EXPIRED,
-        ActivationStatus.ISSUED,
-        ActivationStatus.TRIAL,
-    ):
-        r.status = ActivationStatus.ACTIVE
-    r.updated_at = datetime.utcnow()
-    db.flush()
-    db.commit()
     return {
         "ok": True,
-        "expiry_date": r.expiry_date.strftime("%Y-%m-%d"),
-        "status": r.status,
+        "expiry_date": row.expiry_date.strftime("%Y-%m-%d"),
+        "status": row.status,
     }

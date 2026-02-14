@@ -17,10 +17,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
+from app.services.queue_position_api_service import (
+    QueuePositionApiDomainError,
+    QueuePositionApiService,
+)
 from app.services.queue_position_notifications import (
-    QueuePositionNotificationService,
     get_queue_position_service
 )
 
@@ -80,16 +82,11 @@ async def get_queue_position(
     Публичный эндпоинт для отображения позиции на дисплее
     или в мобильном приложении.
     """
-    entry = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == entry_id
-    ).first()
-    
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
-        )
-    
+    try:
+        entry = QueuePositionApiService(db).get_position_entry(entry_id=entry_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
     
@@ -107,33 +104,14 @@ async def get_queue_position_by_number(
     
     Используется для поиска позиции по талону.
     """
-    # Находим очередь на сегодня
-    from datetime import date as date_type
-    today = date_type.today()
-    
-    queue = db.query(DailyQueue).filter(
-        DailyQueue.specialist_id == specialist_id,
-        DailyQueue.day == today
-    ).first()
-    
-    if not queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Очередь не найдена"
+    try:
+        entry = QueuePositionApiService(db).get_position_entry_by_number(
+            queue_number=queue_number,
+            specialist_id=specialist_id,
         )
-    
-    entry = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.queue_id == queue.id,
-        OnlineQueueEntry.number == queue_number,
-        OnlineQueueEntry.status != "cancelled"
-    ).first()
-    
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Номер {queue_number} не найден в очереди"
-        )
-    
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     service = get_queue_position_service(db)
     position_info = service.get_queue_position_info(entry)
     
@@ -154,16 +132,11 @@ async def send_position_notification(
     
     Доступно: Admin, Registrar, Doctor
     """
-    entry = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == request.entry_id
-    ).first()
-    
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
-        )
-    
+    try:
+        entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     service = get_queue_position_service(db)
     people_ahead = service._count_people_ahead(entry)
     
@@ -189,16 +162,11 @@ async def send_call_notification(
     
     Доступно: Admin, Registrar, Doctor
     """
-    entry = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == request.entry_id
-    ).first()
-    
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
-        )
-    
+    try:
+        entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     result = await get_queue_position_service(db).notify_patient_called(
         entry=entry,
         cabinet_number=request.cabinet_number
@@ -222,16 +190,11 @@ async def send_queue_update_notifications(
     
     Доступно: Admin, Registrar
     """
-    queue = db.query(DailyQueue).filter(
-        DailyQueue.id == queue_id
-    ).first()
-    
-    if not queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Очередь не найдена"
-        )
-    
+    try:
+        QueuePositionApiService(db).get_queue_or_error(queue_id=queue_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     service = get_queue_position_service(db)
     result = await service.notify_queue_changes_batch(
         queue_id=queue_id,
@@ -254,17 +217,11 @@ async def send_diagnostics_return_notification(
     
     Доступно: Admin, Doctor
     """
-    entry = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == entry_id,
-        OnlineQueueEntry.status == "diagnostics"
-    ).first()
-    
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в статусе 'diagnostics' не найдена"
-        )
-    
+    try:
+        entry = QueuePositionApiService(db).get_diagnostics_entry_or_error(entry_id=entry_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     # Получаем имя специалиста
     specialist_name = "врач"
     if entry.queue and entry.queue.specialist:
@@ -292,17 +249,11 @@ async def send_waiting_reminder(
     
     Доступно: Admin, Registrar
     """
-    entry = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == entry_id,
-        OnlineQueueEntry.status == "waiting"
-    ).first()
-    
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в статусе 'waiting' не найдена"
-        )
-    
+    try:
+        entry = QueuePositionApiService(db).get_waiting_entry_or_error(entry_id=entry_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     result = await get_queue_position_service(db).send_waiting_reminder(entry=entry)
     
     return NotificationResult(**result)
@@ -321,24 +272,11 @@ async def get_queue_positions_stats(
     
     Возвращает список всех записей с их позициями.
     """
-    queue = db.query(DailyQueue).filter(
-        DailyQueue.id == queue_id
-    ).first()
-    
-    if not queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Очередь не найдена"
-        )
-    
-    entries = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.queue_id == queue_id,
-        OnlineQueueEntry.status.in_(["waiting", "called", "in_service", "diagnostics"])
-    ).order_by(
-        OnlineQueueEntry.priority.desc(),
-        OnlineQueueEntry.queue_time
-    ).all()
-    
+    try:
+        queue, entries = QueuePositionApiService(db).get_queue_entries_stats(queue_id=queue_id)
+    except QueuePositionApiDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     service = get_queue_position_service(db)
     
     result = []
