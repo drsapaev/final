@@ -8,15 +8,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.crud.appointment import appointment as appointment_crud
-from app.models import appointment as appointment_models
-from app.models.patient import Patient
-from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-from app.models.service import Service
 from app.models.setting import Setting
-from app.models.visit import Visit, VisitService
 from app.repositories.appointments_api_repository import AppointmentsApiRepository
 from app.schemas import appointment as appointment_schemas
-from app.services.service_mapping import get_service_code
 
 
 class AppointmentsApiService:
@@ -40,8 +34,7 @@ class AppointmentsApiService:
         date_from: str | None,
         date_to: str | None,
     ) -> list[dict[str, Any]]:
-        appointments = appointment_crud.get_appointments(
-            self.repository.db,
+        appointments = self.repository.list_appointments(
             skip=skip,
             limit=limit,
             patient_id=patient_id,
@@ -55,31 +48,20 @@ class AppointmentsApiService:
         for apt in appointments:
             patient_name = None
             if apt.patient_id:
-                patient = self.repository.db.query(Patient).filter(Patient.id == apt.patient_id).first()
+                patient = self.repository.get_patient_by_id(apt.patient_id)
                 patient_name = patient.short_name() if patient else f"Пациент #{apt.patient_id}"
 
             services_with_names = []
             if apt.services and isinstance(apt.services, list):
                 for service_item in apt.services:
                     if isinstance(service_item, str):
-                        service = (
-                            self.repository.db.query(Service)
-                            .filter((Service.code == service_item) | (Service.service_code == service_item))
-                            .first()
-                        )
+                        service = self.repository.get_service_by_code(service_item)
                         services_with_names.append(service.name if service else service_item)
                     elif isinstance(service_item, dict):
                         if "name" in service_item:
                             services_with_names.append(service_item["name"])
                         elif "code" in service_item:
-                            service = (
-                                self.repository.db.query(Service)
-                                .filter(
-                                    (Service.code == service_item["code"])
-                                    | (Service.service_code == service_item["code"])
-                                )
-                                .first()
-                            )
+                            service = self.repository.get_service_by_code(service_item["code"])
                             services_with_names.append(
                                 service.name if service else service_item.get("code", "Услуга")
                             )
@@ -121,27 +103,22 @@ class AppointmentsApiService:
 
         result = []
 
-        appointments_query = self.repository.list_pending_appointments()
+        from_date = None
+        to_date = None
 
         if date_from:
             try:
                 from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-                appointments_query = appointments_query.filter(
-                    appointment_models.Appointment.appointment_date >= from_date
-                )
             except ValueError:
                 pass
 
         if date_to:
             try:
                 to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-                appointments_query = appointments_query.filter(
-                    appointment_models.Appointment.appointment_date <= to_date
-                )
             except ValueError:
                 pass
 
-        appointments = appointments_query.order_by(appointment_models.Appointment.created_at.desc()).all()
+        appointments = self.repository.list_pending_appointments(date_from=from_date, date_to=to_date)
 
         for apt in appointments:
             if apt.payment_amount and apt.status == "paid":
@@ -151,7 +128,7 @@ class AppointmentsApiService:
             patient_last_name = None
             patient_first_name = None
             if apt.patient_id:
-                patient = self.repository.db.query(Patient).filter(Patient.id == apt.patient_id).first()
+                patient = self.repository.get_patient_by_id(apt.patient_id)
                 if patient:
                     patient_name = patient.short_name()
                     patient_last_name = patient.last_name
@@ -164,13 +141,13 @@ class AppointmentsApiService:
             if apt.services and isinstance(apt.services, list):
                 for service_item in apt.services:
                     if isinstance(service_item, str):
-                        service = (
-                            self.repository.db.query(Service)
-                            .filter((Service.code == service_item) | (Service.service_code == service_item))
-                            .first()
-                        )
+                        service = self.repository.get_service_by_code(service_item)
                         if service:
-                            service_code = get_service_code(service.id, self.repository.db) or service.code or service_item
+                            service_code = (
+                                self.repository.get_mapped_service_code(service.id)
+                                or service.code
+                                or service_item
+                            )
                             services_codes.append(service_code)
                             services_names.append(service.name)
                         else:
@@ -186,16 +163,13 @@ class AppointmentsApiService:
                             services_codes.append(code)
                             services_names.append(service_item["name"])
                         elif "code" in service_item:
-                            service = (
-                                self.repository.db.query(Service)
-                                .filter(
-                                    (Service.code == service_item["code"])
-                                    | (Service.service_code == service_item["code"])
-                                )
-                                .first()
-                            )
+                            service = self.repository.get_service_by_code(service_item["code"])
                             if service:
-                                service_code = get_service_code(service.id, self.repository.db) or service.code or service_item["code"]
+                                service_code = (
+                                    self.repository.get_mapped_service_code(service.id)
+                                    or service.code
+                                    or service_item["code"]
+                                )
                                 services_codes.append(service_code)
                                 services_names.append(service.name)
                             else:
@@ -229,21 +203,10 @@ class AppointmentsApiService:
                 }
             )
 
-        visits_query = self.repository.db.query(Visit).filter(Visit.discount_mode != "all_free")
-        if date_from:
-            try:
-                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-                visits_query = visits_query.filter(Visit.visit_date >= from_date)
-            except ValueError:
-                pass
-        if date_to:
-            try:
-                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-                visits_query = visits_query.filter(Visit.visit_date <= to_date)
-            except ValueError:
-                pass
-
-        visits = visits_query.order_by(Visit.created_at.desc()).all()
+        visits = self.repository.list_visits_for_pending_payments(
+            date_from=from_date,
+            date_to=to_date,
+        )
         visits_by_patient = defaultdict(
             lambda: {
                 "visits": [],
@@ -261,16 +224,7 @@ class AppointmentsApiService:
         )
 
         for visit in visits:
-            paid_invoices = (
-                self.repository.db.query(PaymentInvoiceVisit)
-                .join(PaymentInvoice)
-                .filter(
-                    PaymentInvoiceVisit.visit_id == visit.id,
-                    PaymentInvoice.status == "paid",
-                )
-                .first()
-            )
-            if paid_invoices:
+            if self.repository.has_paid_invoice_for_visit(visit.id):
                 continue
 
             visit_date = visit.visit_date or (visit.created_at.date() if visit.created_at else None)
@@ -281,7 +235,7 @@ class AppointmentsApiService:
                 patient_last_name = None
                 patient_first_name = None
                 if visit.patient_id:
-                    patient = self.repository.db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                    patient = self.repository.get_patient_by_id(visit.patient_id)
                     if patient:
                         patient_name = patient.short_name()
                         patient_last_name = patient.last_name
@@ -317,28 +271,20 @@ class AppointmentsApiService:
             total_amount = 0
 
             for visit in group_data["visits"]:
-                visit_services = (
-                    self.repository.db.query(VisitService)
-                    .filter(VisitService.visit_id == visit.id)
-                    .all()
-                )
+                visit_services = self.repository.list_visit_services(visit.id)
                 for vs in visit_services:
                     service_code = vs.code
                     if not service_code:
-                        service = (
-                            self.repository.db.query(Service)
-                            .filter(Service.id == vs.service_id)
-                            .first()
-                        )
+                        service = self.repository.get_service_by_id(vs.service_id)
                         if service:
-                            service_code = get_service_code(vs.service_id, self.repository.db) or service.code or f"S{vs.service_id}"
+                            service_code = (
+                                self.repository.get_mapped_service_code(vs.service_id)
+                                or service.code
+                                or f"S{vs.service_id}"
+                            )
                     service_name = vs.name
                     if not service_name:
-                        service = (
-                            self.repository.db.query(Service)
-                            .filter(Service.id == vs.service_id)
-                            .first()
-                        )
+                        service = self.repository.get_service_by_id(vs.service_id)
                         service_name = service.name if service else f"Услуга #{vs.service_id}"
 
                     if service_code not in all_services_codes:
