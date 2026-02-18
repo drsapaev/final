@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import MetaData, Table, select, text
 from sqlalchemy.orm import Session
 
-from app.core.audit import extract_model_changes, log_critical_change
+from app.core.audit import extract_model_changes
 from app.models.visit import Visit
 from app.repositories.visits_api_repository import VisitsApiRepository
 from app.services.service_mapping import normalize_service_code
@@ -71,23 +71,15 @@ class VisitsApiService:
         use_crud = os.getenv("USE_CRUD_VISITS", "false").lower() == "true"
 
         if use_crud:
-            from app.crud.visit import create_visit as crud_create_visit
-
-            visit = crud_create_visit(
-                db=self.repository.db,
+            visit = self.repository.create_visit_via_crud(
                 patient_id=payload.patient_id,
                 doctor_id=payload.doctor_id,
                 visit_date=payload.planned_date,
                 notes=payload.notes,
-                status="open",
-                auto_status=False,
-                notify=False,
-                log=True,
             )
 
             _, new_data = extract_model_changes(None, visit)
-            log_critical_change(
-                db=self.repository.db,
+            self.repository.log_critical_change(
                 user_id=getattr(current_user, "id", None) or 0,
                 action="CREATE",
                 table_name="visits",
@@ -139,8 +131,7 @@ class VisitsApiService:
             else:
                 new_data[key] = value
 
-        log_critical_change(
-            db=self.repository.db,
+        self.repository.log_critical_change(
             user_id=getattr(current_user, "id", None) or 0,
             action="CREATE",
             table_name="visits",

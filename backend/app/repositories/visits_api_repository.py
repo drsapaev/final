@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.core.audit import log_critical_change
+from app.crud.visit import create_visit as crud_create_visit
 from app.models.visit import Visit
 
 
@@ -29,3 +31,47 @@ class VisitsApiRepository:
 
     def get_bind(self):
         return self.db.get_bind()
+
+    def create_visit_via_crud(
+        self,
+        *,
+        patient_id: int | None,
+        doctor_id: int | None,
+        visit_date,
+        notes: str | None,
+    ):
+        return crud_create_visit(
+            db=self.db,
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            visit_date=visit_date,
+            notes=notes,
+            status="open",
+            auto_status=False,
+            notify=False,
+            log=True,
+        )
+
+    def log_critical_change(
+        self,
+        *,
+        user_id: int,
+        action: str,
+        table_name: str,
+        row_id: int,
+        old_data,
+        new_data,
+        request,
+        description: str,
+    ) -> None:
+        log_critical_change(
+            db=self.db,
+            user_id=user_id,
+            action=action,
+            table_name=table_name,
+            row_id=row_id,
+            old_data=old_data,
+            new_data=new_data,
+            request=request,
+            description=description,
+        )
