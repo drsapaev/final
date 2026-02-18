@@ -13,7 +13,6 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
-from app.crud.message import message as message_crud
 from app.models.file_system import File as FileModel
 from app.models.file_system import FileType
 from app.models.message import Message
@@ -116,8 +115,7 @@ class MessagesApiService:
             current_user=current_user,
         )
 
-        new_message = message_crud.create(
-            self.repository.db,
+        new_message = self.repository.create_message(
             sender_id=current_user.id,
             obj_in=message_data,
         )
@@ -152,8 +150,8 @@ class MessagesApiService:
         return enriched_message
 
     def get_conversations(self, *, user_id: int) -> dict[str, Any]:
-        conversations = message_crud.get_conversations_list(self.repository.db, user_id=user_id)
-        total_unread = message_crud.get_unread_count(self.repository.db, user_id=user_id)
+        conversations = self.repository.get_conversations_list(user_id=user_id)
+        total_unread = self.repository.get_unread_count(user_id=user_id)
         return {
             "conversations": [ConversationOut(**item) for item in conversations],
             "total_unread": total_unread,
@@ -171,23 +169,19 @@ class MessagesApiService:
         if not other_user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        messages, total = message_crud.get_conversation(
-            self.repository.db,
+        messages, total = self.repository.get_conversation(
             user1_id=current_user.id,
             user2_id=user_id,
             skip=skip,
             limit=limit,
         )
 
-        unread_ids_query = self.repository.query_message_ids().filter(
-            Message.sender_id == user_id,
-            Message.recipient_id == current_user.id,
-            Message.is_read.is_(False),
+        unread_ids = self.repository.get_unread_message_ids(
+            sender_id=user_id,
+            recipient_id=current_user.id,
         )
-        unread_ids = [item[0] for item in unread_ids_query.all()]
 
-        message_crud.mark_conversation_as_read(
-            self.repository.db,
+        self.repository.mark_conversation_as_read(
             user_id=current_user.id,
             other_user_id=user_id,
         )
@@ -214,13 +208,13 @@ class MessagesApiService:
         }
 
     def get_unread_count(self, *, user_id: int) -> int:
-        return message_crud.get_unread_count(self.repository.db, user_id=user_id)
+        return self.repository.get_unread_count(user_id=user_id)
 
     def mark_message_read(self, *, message_id: int, user_id: int):
-        return message_crud.mark_as_read(self.repository.db, message_id=message_id, user_id=user_id)
+        return self.repository.mark_message_as_read(message_id=message_id, user_id=user_id)
 
     async def delete_message(self, *, message_id: int, user_id: int) -> dict[str, Any]:
-        success = message_crud.delete_for_user(self.repository.db, message_id=message_id, user_id=user_id)
+        success = self.repository.delete_message_for_user(message_id=message_id, user_id=user_id)
         if not success:
             raise HTTPException(status_code=404, detail="Сообщение не найдено или нет доступа")
 
@@ -254,14 +248,13 @@ class MessagesApiService:
         reaction: str,
         current_user: User,
     ) -> MessageOut:
-        message = message_crud.get(self.repository.db, id=message_id)
+        message = self.repository.get_message_by_id(message_id=message_id)
         if not message:
             raise HTTPException(status_code=404, detail="Сообщение не найдено")
         if message.sender_id != current_user.id and message.recipient_id != current_user.id:
             raise HTTPException(status_code=403, detail="Вы не участник этой беседы")
 
-        added = message_crud.toggle_reaction(
-            self.repository.db,
+        added = self.repository.toggle_reaction(
             user_id=current_user.id,
             message_id=message_id,
             reaction=reaction,
@@ -405,7 +398,7 @@ class MessagesApiService:
         if message.message_type != "voice" or not message.file_id:
             raise HTTPException(status_code=400, detail="Это не голосовое сообщение")
 
-        file_record = self.repository.db.query(FileModel).filter(FileModel.id == message.file_id).first()
+        file_record = self.repository.get_file_by_id(message.file_id)
         if not file_record:
             raise HTTPException(status_code=404, detail="Аудио файл не найден")
         if not os.path.exists(file_record.file_path):
@@ -444,8 +437,7 @@ class MessagesApiService:
         with open(file_path, "wb") as file_obj:
             file_obj.write(content)
 
-        message_obj = message_crud.create(
-            self.repository.db,
+        message_obj = self.repository.create_message(
             obj_in=MessageCreate(
                 recipient_id=recipient_id,
                 content=filename,
