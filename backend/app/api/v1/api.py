@@ -142,7 +142,6 @@ from app.api.v1.endpoints.migration_management import (
 )
 from app.api.v1.endpoints.morning_assignment import router as morning_assignment_router
 from app.api.v1.endpoints.payment_webhooks import router as payment_webhooks_router
-from app.api.v1.endpoints.payments import router as payments_new_router
 from app.api.v1.endpoints.queue import router as queue_router
 from app.api.v1.endpoints.section_templates import router as section_templates_router
 from app.api.v1.endpoints.security_management import (
@@ -173,9 +172,6 @@ api_router.include_router(
     departments.router, prefix="/departments", tags=["departments"]
 )
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
-api_router.include_router(
-    payments_new_router, prefix="/payments", tags=["payments-new"]
-)
 api_router.include_router(
     payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"]
 )

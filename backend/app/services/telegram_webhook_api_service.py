@@ -101,7 +101,7 @@ async def send_message_to_user(
 
 
 @router.get("/bot-info")
-async def get_bot_info(db: Session = Depends(get_db)):
+async def get_webhook_bot_info(db: Session = Depends(get_db)):
     """
     Получить информацию о боте
     """
