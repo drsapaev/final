@@ -27,10 +27,15 @@ from app.db.session import SessionLocal
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.services.display_websocket import get_display_manager
+from app.repositories.display_websocket_api_repository import DisplayWebsocketApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> DisplayWebsocketApiRepository:
+    return DisplayWebsocketApiRepository(db)
 
 # ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
 
@@ -134,7 +139,7 @@ async def call_patient_to_board(
 
         # Получаем запись в очереди
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
 
         if not queue_entry:
@@ -146,7 +151,7 @@ async def call_patient_to_board(
         # Обновляем статус
         queue_entry.status = "called"
         queue_entry.called_at = datetime.utcnow()
-        db.commit()
+        _repo(db).commit()
 
         # Получаем данные врача
         doctor = queue_entry.queue.specialist
@@ -263,7 +268,7 @@ async def _send_department_queue_state(websocket: WebSocket, department: str):
 
         # Получаем записи очереди
         queue_entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .join(DailyQueue)
             .filter(DailyQueue.day == today, DailyQueue.active == True)
             .all()
@@ -443,7 +448,7 @@ async def quick_call_next_patient(
 
         # Находим врача по специальности
         doctor = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(Doctor.specialty == specialty, Doctor.active == True)
             .first()
         )
@@ -463,7 +468,7 @@ async def quick_call_next_patient(
         daily_queue = None
         if doctor_user_id:
             daily_queue = (
-                db.query(DailyQueue)
+                _repo(db).query(DailyQueue)
                 .filter(
                     DailyQueue.day == today,
                     DailyQueue.specialist_id
@@ -480,7 +485,7 @@ async def quick_call_next_patient(
 
         # Находим следующего пациента в статусе "waiting"
         next_entry = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == daily_queue.id,
                 OnlineQueueEntry.status == "waiting",

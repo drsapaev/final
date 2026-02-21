@@ -12,9 +12,14 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
+from app.repositories.telegram_bot_management_api_repository import TelegramBotManagementApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> TelegramBotManagementApiRepository:
+    return TelegramBotManagementApiRepository(db)
 
 class TelegramNotificationRequest(BaseModel):
     """Запрос на отправку Telegram уведомления"""
@@ -51,18 +56,18 @@ async def get_telegram_bot_stats(
     """Получить статистику Telegram бота"""
     try:
         # Подсчитываем пользователей с Telegram
-        total_users = db.query(User).filter(User.telegram_chat_id.isnot(None)).count()
+        total_users = _repo(db).query(User).filter(User.telegram_chat_id.isnot(None)).count()
 
         # Активные пользователи (с активным Telegram)
         active_users = (
-            db.query(User)
+            _repo(db).query(User)
             .filter(User.telegram_chat_id.isnot(None), User.is_active == True)
             .count()
         )
 
         # Администраторы с Telegram
         admin_users = (
-            db.query(User)
+            _repo(db).query(User)
             .filter(
                 User.telegram_chat_id.isnot(None),
                 User.role.in_(["Admin", "SuperAdmin"]),
@@ -111,7 +116,7 @@ async def send_telegram_notification(
             # Отправляем всем администраторам
             await bot.send_admin_notification(request.message, db)
             success_count = (
-                db.query(User)
+                _repo(db).query(User)
                 .filter(
                     User.role.in_(["Admin", "SuperAdmin"]),
                     User.telegram_chat_id.isnot(None),
@@ -123,7 +128,7 @@ async def send_telegram_notification(
             # Отправляем всем пользователям
             all_user_ids = [
                 user.id
-                for user in db.query(User)
+                for user in _repo(db).query(User)
                 .filter(User.telegram_chat_id.isnot(None), User.is_active == True)
                 .all()
             ]
@@ -196,7 +201,7 @@ async def get_users_with_telegram(
 ):
     """Получить список пользователей с настроенным Telegram"""
     try:
-        users = db.query(User).filter(User.telegram_chat_id.isnot(None)).all()
+        users = _repo(db).query(User).filter(User.telegram_chat_id.isnot(None)).all()
 
         result = []
         for user in users:
@@ -297,7 +302,7 @@ async def broadcast_system_message(
         # Отправляем всем активным пользователям
         all_user_ids = [
             user.id
-            for user in db.query(User)
+            for user in _repo(db).query(User)
             .filter(User.telegram_chat_id.isnot(None), User.is_active == True)
             .all()
         ]

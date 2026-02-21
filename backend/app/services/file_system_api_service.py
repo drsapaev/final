@@ -42,9 +42,14 @@ from app.schemas.file_system import (
 )
 from app.services.file_system_service import get_file_system_service
 from app.utils.file_validator import validate_upload_file
+from app.repositories.file_system_api_repository import FileSystemApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> FileSystemApiRepository:
+    return FileSystemApiRepository(db)
 
 @router.post("/upload", response_model=FileOut)
 async def upload_file(
@@ -103,7 +108,7 @@ async def upload_file(
         uploaded_file = service.upload_file(db, file, file_data, current_user.id)
 
         # ✅ AUDIT LOG: Логируем загрузку файла
-        db.refresh(uploaded_file)
+        _repo(db).refresh(uploaded_file)
         _, new_data = extract_model_changes(None, uploaded_file)
         log_critical_change(
             db=db,
@@ -116,7 +121,7 @@ async def upload_file(
             request=request,
             description=f"Загружен файл: {uploaded_file.filename} (ID={uploaded_file.id})",
         )
-        db.commit()
+        _repo(db).commit()
 
         return FileOut.from_orm(uploaded_file)
 
@@ -323,7 +328,7 @@ async def get_files(
         )
 
         # Подсчитываем общее количество
-        total_query = db.query(file.model).filter(file.model.owner_id == owner_id)
+        total_query = _repo(db).query(file.model).filter(file.model.owner_id == owner_id)
         if file_type:
             total_query = total_query.filter(file.model.file_type == file_type)
         if patient_id:
@@ -411,7 +416,7 @@ async def update_file(
         updated_file = file.update(db, db_obj=db_file, obj_in=update_data)
 
         # ✅ AUDIT LOG: Логируем обновление файла
-        db.refresh(updated_file)
+        _repo(db).refresh(updated_file)
         _, new_data = extract_model_changes(None, updated_file)
         log_critical_change(
             db=db,
@@ -424,7 +429,7 @@ async def update_file(
             request=request,
             description=f"Обновлен файл ID={file_id}: {updated_file.filename}",
         )
-        db.commit()
+        _repo(db).commit()
 
         return FileOut.from_orm(updated_file)
 
@@ -461,7 +466,7 @@ async def replace_file_content(
         )
 
         # ✅ AUDIT LOG: Логируем замену содержимого
-        db.refresh(updated_file)
+        _repo(db).refresh(updated_file)
         _, new_data = extract_model_changes(None, updated_file)
         log_critical_change(
             db=db,
@@ -474,7 +479,7 @@ async def replace_file_content(
             request=request,
             description=f"Заменено содержимое файла ID={file_id}: {updated_file.filename} (хеш: {updated_file.file_hash[:8]}...)",
         )
-        db.commit()
+        _repo(db).commit()
 
         return FileOut.from_orm(updated_file)
 
@@ -532,7 +537,7 @@ async def delete_file(
             request=request,
             description=f"Удален файл ID={file_id}: {filename}",
         )
-        db.commit()
+        _repo(db).commit()
 
         return {"success": True, "message": "Файл удален"}
 

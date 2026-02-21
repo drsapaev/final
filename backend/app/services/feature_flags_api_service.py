@@ -12,8 +12,13 @@ from app.api.deps import get_db, require_roles
 from app.models.feature_flags import FeatureFlag
 from app.models.user import User
 from app.services.feature_flags import get_feature_flag_service
+from app.repositories.feature_flags_api_repository import FeatureFlagsApiRepository
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> FeatureFlagsApiRepository:
+    return FeatureFlagsApiRepository(db)
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -152,7 +157,7 @@ def get_feature_flag(
     Получает конкретный фича-флаг по ключу
     Доступно только администраторам
     """
-    flag = db.query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
+    flag = _repo(db).query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
 
     if not flag:
         raise HTTPException(
@@ -187,7 +192,7 @@ def create_feature_flag(
     Доступно только администраторам
     """
     # Проверяем что флаг с таким ключом не существует
-    existing = db.query(FeatureFlag).filter(FeatureFlag.key == request.key).first()
+    existing = _repo(db).query(FeatureFlag).filter(FeatureFlag.key == request.key).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -242,7 +247,7 @@ def update_feature_flag(
     Обновляет фича-флаг
     Доступно только администраторам
     """
-    flag = db.query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
+    flag = _repo(db).query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
 
     if not flag:
         raise HTTPException(
@@ -284,8 +289,8 @@ def update_feature_flag(
             )
 
         flag.updated_by = current_user.username
-        db.commit()
-        db.refresh(flag)
+        _repo(db).commit()
+        _repo(db).refresh(flag)
 
         return FeatureFlagResponse(
             id=flag.id,
@@ -303,7 +308,7 @@ def update_feature_flag(
         )
 
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления фича-флага: {str(e)}",

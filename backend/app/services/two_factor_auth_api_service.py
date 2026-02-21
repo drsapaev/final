@@ -33,9 +33,14 @@ from app.schemas.two_factor_auth import (
 )
 from app.services.authentication_service import get_authentication_service
 from app.services.two_factor_service import get_two_factor_service
+from app.repositories.two_factor_auth_api_repository import TwoFactorAuthApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> TwoFactorAuthApiRepository:
+    return TwoFactorAuthApiRepository(db)
 
 def get_client_info(request: Request) -> tuple[str, str]:
     """Получить информацию о клиенте"""
@@ -174,7 +179,7 @@ async def verify_two_factor(
         # Если access_token не сработал, пробуем pending_2fa_token
         if not user and request_data.pending_2fa_token:
             pending_session = (
-                db.query(UserSession)
+                _repo(db).query(UserSession)
                 .filter(
                     UserSession.refresh_token == request_data.pending_2fa_token,
                     UserSession.revoked == False,
@@ -183,7 +188,7 @@ async def verify_two_factor(
                 .first()
             )
             if pending_session:
-                user = db.query(User).filter(User.id == pending_session.user_id).first()
+                user = _repo(db).query(User).filter(User.id == pending_session.user_id).first()
 
         if not user:
             raise HTTPException(
@@ -221,7 +226,7 @@ async def verify_two_factor(
             if pending:
                 # Найдём сессию с таким временным токеном
                 pending_session = (
-                    db.query(UserSession)
+                    _repo(db).query(UserSession)
                     .filter(
                         UserSession.user_id == user.id,
                         UserSession.refresh_token == pending,
@@ -245,7 +250,7 @@ async def verify_two_factor(
                     )
                     refresh_token = auth.create_refresh_token(user.id, jti)
                     # Сохраняем refresh
-                    db.add(
+                    _repo(db).add(
                         RefreshToken(
                             user_id=user.id,
                             token=refresh_token,
@@ -258,7 +263,7 @@ async def verify_two_factor(
                     pending_session.user_agent = (
                         pending_session.user_agent or ""
                     ) + "|2fa-verified"
-                    db.commit()
+                    _repo(db).commit()
                     tokens_payload = {
                         "access_token": access_token,
                         "refresh_token": refresh_token,

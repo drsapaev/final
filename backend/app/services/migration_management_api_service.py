@@ -13,8 +13,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.migration_service import MigrationService
+from app.repositories.migration_management_api_repository import MigrationManagementApiRepository
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> MigrationManagementApiRepository:
+    return MigrationManagementApiRepository(db)
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -260,7 +265,7 @@ def get_migration_stats(
         from sqlalchemy import text
 
         # Статистика по очередям
-        queue_stats = db.execute(
+        queue_stats = _repo(db).execute(
             text(
                 """
             SELECT
@@ -275,7 +280,7 @@ def get_migration_stats(
         ).fetchone()
 
         # Статистика по записям в очередях
-        entry_stats = db.execute(
+        entry_stats = _repo(db).execute(
             text(
                 """
             SELECT
@@ -291,7 +296,7 @@ def get_migration_stats(
         ).fetchone()
 
         # Статистика по источникам записей
-        source_stats = db.execute(
+        source_stats = _repo(db).execute(
             text(
                 """
             SELECT
@@ -305,7 +310,7 @@ def get_migration_stats(
         ).fetchall()
 
         # Статистика по тегам очередей
-        tag_stats = db.execute(
+        tag_stats = _repo(db).execute(
             text(
                 """
             SELECT
@@ -399,7 +404,7 @@ def check_migration_health(
 
                 if table_exists:
                     # Безопасно: table из whitelist
-                    result = db.execute(text(f"SELECT COUNT(*) FROM {table}"))
+                    result = _repo(db).execute(text(f"SELECT COUNT(*) FROM {table}"))
                     table_check["record_count"] = result.fetchone()[0]
                 elif table in required_tables:
                     required_ok = False
@@ -429,7 +434,7 @@ def check_migration_health(
         # 3. Проверяем миграции Alembic (optional для test DB)
         try:
             if inspector.has_table("alembic_version"):
-                current_revision = db.execute(
+                current_revision = _repo(db).execute(
                     text(
                         """
                     SELECT version_num FROM alembic_version

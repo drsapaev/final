@@ -13,8 +13,13 @@ from app.models.user import User
 from app.services.morning_assignment import (
     MorningAssignmentService,
 )
+from app.repositories.morning_assignment_api_repository import MorningAssignmentApiRepository
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> MorningAssignmentApiRepository:
+    return MorningAssignmentApiRepository(db)
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -148,7 +153,7 @@ def manual_assignment_for_visits(
                 # Получаем визит
                 from app.models.visit import Visit
 
-                visit = db.query(Visit).filter(Visit.id == visit_id).first()
+                visit = _repo(db).query(Visit).filter(Visit.id == visit_id).first()
 
                 if not visit:
                     results.append(
@@ -204,7 +209,7 @@ def manual_assignment_for_visits(
                         }
                     )
 
-            db.commit()
+            _repo(db).commit()
 
             return {
                 "success": True,
@@ -215,7 +220,7 @@ def manual_assignment_for_visits(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка ручного присвоения: {str(e)}",
@@ -258,7 +263,7 @@ def get_pending_visits(
                 from app.models.patient import Patient
 
                 patient = (
-                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
                 )
 
                 queue_tags = service._get_visit_queue_tags(visit)
@@ -327,19 +332,19 @@ def get_queue_summary(
         from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
         # Получаем все очереди на дату
-        queues = db.query(DailyQueue).filter(DailyQueue.day == parsed_date).all()
+        queues = _repo(db).query(DailyQueue).filter(DailyQueue.day == parsed_date).all()
 
         queue_summary = []
         for queue in queues:
             # Подсчитываем записи в очереди
             entries_count = (
-                db.query(OnlineQueueEntry)
+                _repo(db).query(OnlineQueueEntry)
                 .filter(OnlineQueueEntry.queue_id == queue.id)
                 .count()
             )
 
             # Получаем информацию о враче
-            doctor = db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
+            doctor = _repo(db).query(Doctor).filter(Doctor.id == queue.specialist_id).first()
             doctor_name = (
                 doctor.user.full_name
                 if doctor and doctor.user

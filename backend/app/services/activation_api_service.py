@@ -24,9 +24,14 @@ from app.schemas.activation import (
     ActivationRevokeIn,
     ActivationStatusOut,
 )
+from app.repositories.activation_api_repository import ActivationApiRepository
 
 router = APIRouter(prefix="/activation", tags=["activation"])
 
+
+
+def _repo(db: Session) -> ActivationApiRepository:
+    return ActivationApiRepository(db)
 
 @router.post(
     "/issue", response_model=ActivationIssueOut, summary="Выдать новый ключ (Admin)"
@@ -109,8 +114,8 @@ async def activation_list(
     if machine_hash:
         q = q.where(Activation.machine_hash == machine_hash)
 
-    total = db.execute(select(func.count()).select_from(q.subquery())).scalar() or 0
-    rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
+    total = _repo(db).execute(select(func.count()).select_from(q.subquery())).scalar() or 0
+    rows = _repo(db).execute(q.limit(limit).offset(offset)).scalars().all()
 
     items = [
         ActivationListRow(
@@ -138,7 +143,7 @@ async def activation_revoke(
     user=Depends(require_roles("Admin")),
 ):
     r: Activation | None = (
-        db.execute(select(Activation).where(Activation.key == body.key))
+        _repo(db).execute(select(Activation).where(Activation.key == body.key))
         .scalars()
         .first()
     )
@@ -146,8 +151,8 @@ async def activation_revoke(
         return {"ok": False, "reason": "KEY_NOT_FOUND"}
     r.status = ActivationStatus.REVOKED
     r.updated_at = datetime.utcnow()
-    db.flush()
-    db.commit()
+    _repo(db).flush()
+    _repo(db).commit()
     return {"ok": True}
 
 
@@ -158,7 +163,7 @@ async def activation_extend(
     user=Depends(require_roles("Admin")),
 ):
     r: Activation | None = (
-        db.execute(select(Activation).where(Activation.key == body.key))
+        _repo(db).execute(select(Activation).where(Activation.key == body.key))
         .scalars()
         .first()
     )
@@ -173,8 +178,8 @@ async def activation_extend(
     ):
         r.status = ActivationStatus.ACTIVE
     r.updated_at = datetime.utcnow()
-    db.flush()
-    db.commit()
+    _repo(db).flush()
+    _repo(db).commit()
     return {
         "ok": True,
         "expiry_date": r.expiry_date.strftime("%Y-%m-%d"),

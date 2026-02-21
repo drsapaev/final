@@ -295,3 +295,93 @@ def test_user_management_service_avoids_direct_session_calls() -> None:
         logic,
     )
     assert direct_db_call is None
+
+
+def test_file_system_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("file_system")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_discount_benefits_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("discount_benefits")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_activation_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("activation")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_telegram_bot_management_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("telegram_bot_management")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_morning_assignment_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("morning_assignment")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_migration_management_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("migration_management")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_feature_flags_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("feature_flags")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_display_websocket_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("display_websocket")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_two_factor_auth_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("two_factor_auth")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_phrase_suggest_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("phrase_suggest")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None

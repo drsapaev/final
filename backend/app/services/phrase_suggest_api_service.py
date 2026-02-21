@@ -13,9 +13,14 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.services.doctor_phrase_service import get_doctor_phrase_service
+from app.repositories.phrase_suggest_api_repository import PhraseSuggestApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> PhraseSuggestApiRepository:
+    return PhraseSuggestApiRepository(db)
 
 # ============================================
 # SCHEMAS
@@ -147,7 +152,7 @@ async def get_phrase_stats(
 
     from app.models.doctor_phrase_history import DoctorPhraseHistory
 
-    stats = db.query(
+    stats = _repo(db).query(
         DoctorPhraseHistory.field,
         func.count(DoctorPhraseHistory.id).label('count'),
         func.sum(DoctorPhraseHistory.usage_count).label('total_usage')
@@ -237,7 +242,7 @@ async def record_telemetry(
 
     try:
         if request.phraseId:
-            phrase = db.query(DoctorPhraseHistory).filter(
+            phrase = _repo(db).query(DoctorPhraseHistory).filter(
                 DoctorPhraseHistory.id == request.phraseId
             ).first()
 
@@ -247,7 +252,7 @@ async def record_telemetry(
                 elif request.event == "accepted":
                     phrase.suggestions_accepted += 1
 
-                db.commit()
+                _repo(db).commit()
 
         return TelemetryResponse(
             success=True,
@@ -289,7 +294,7 @@ async def get_telemetry_stats(
     from app.models.doctor_phrase_history import DoctorPhraseHistory
 
     # Агрегированная статистика
-    stats = db.query(
+    stats = _repo(db).query(
         func.sum(DoctorPhraseHistory.suggestions_shown).label('total_shown'),
         func.sum(DoctorPhraseHistory.suggestions_accepted).label('total_accepted')
     ).filter(
@@ -301,7 +306,7 @@ async def get_telemetry_stats(
     acceptance_rate = (total_accepted / total_shown * 100) if total_shown > 0 else 0
 
     # Топ принятых фраз
-    top_phrases = db.query(
+    top_phrases = _repo(db).query(
         DoctorPhraseHistory.phrase,
         DoctorPhraseHistory.field,
         DoctorPhraseHistory.suggestions_accepted
