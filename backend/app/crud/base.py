@@ -18,7 +18,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     # Read
     def get(self, db: Session, id: Any) -> ModelType | None:
-        return db.query(self.model).get(id)
+        return db.get(self.model, id)
 
     def get_multi(
         self, db: Session, *, skip: int = 0, limit: int = 100
@@ -27,7 +27,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     # Create
     def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
-        data: dict[str, Any] = obj_in.dict(exclude_unset=True)
+        data: dict[str, Any] = obj_in.model_dump(exclude_unset=True)
         # ✅ ИСКЛЮЧАЕМ поля, которых нет в модели Patient
         # full_name используется только для нормализации ДО создания модели, но не сохраняется в БД
         # email не существует в модели Patient (есть только в схеме для валидации)
@@ -65,7 +65,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     ) -> ModelType:
         update_data: dict[str, Any]
         if isinstance(obj_in, BaseModel):
-            update_data = obj_in.dict(exclude_unset=True)
+            update_data = obj_in.model_dump(exclude_unset=True)
         else:
             update_data = dict(obj_in)
 
@@ -95,7 +95,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     # Delete
     def remove(self, db: Session, *, id: Any) -> ModelType | None:
-        obj = db.query(self.model).get(id)
+        obj = db.get(self.model, id)
         if not obj:
             return None
         db.delete(obj)

@@ -45,7 +45,7 @@ class CRUDFile:
     def create(self, db: Session, *, obj_in: FileCreate, owner_id: int) -> File:
         """Создать файл"""
         # Преобразуем tags в JSON строку если это список
-        file_data = obj_in.dict()
+        file_data = obj_in.model_dump()
         if 'tags' in file_data and isinstance(file_data['tags'], list):
             file_data['tags'] = json.dumps(file_data['tags'])
 
@@ -197,7 +197,7 @@ class CRUDFile:
 
     def update(self, db: Session, *, db_obj: File, obj_in: FileUpdate) -> File:
         """Обновить файл"""
-        update_data = obj_in.dict(exclude_unset=True)
+        update_data = obj_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
@@ -356,7 +356,7 @@ class CRUDFileShare:
             file_id=file_id,
             created_by=created_by,
             access_token=secrets.token_urlsafe(32),
-            **share_data.dict(),
+            **share_data.model_dump(),
         )
         db.add(db_obj)
         db.commit()
@@ -404,7 +404,7 @@ class CRUDFileShare:
         self, db: Session, *, db_obj: FileShare, obj_in: FileShareUpdate
     ) -> FileShare:
         """Обновить совместное использование"""
-        update_data = obj_in.dict(exclude_unset=True)
+        update_data = obj_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
@@ -434,7 +434,7 @@ class CRUDFileFolder:
         self, db: Session, *, folder_data: FileFolderCreate, owner_id: int
     ) -> FileFolder:
         """Создать папку"""
-        db_obj = FileFolder(**folder_data.dict(), owner_id=owner_id)
+        db_obj = FileFolder(**folder_data.model_dump(), owner_id=owner_id)
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
@@ -482,7 +482,7 @@ class CRUDFileFolder:
         self, db: Session, *, db_obj: FileFolder, obj_in: FileFolderUpdate
     ) -> FileFolder:
         """Обновить папку"""
-        update_data = obj_in.dict(exclude_unset=True)
+        update_data = obj_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
@@ -521,7 +521,7 @@ class CRUDFileQuota:
 
     def create(self, db: Session, *, quota_data: FileQuotaCreate) -> FileQuota:
         """Создать квоту пользователя"""
-        db_obj = FileQuota(**quota_data.dict())
+        db_obj = FileQuota(**quota_data.model_dump())
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
@@ -585,7 +585,7 @@ class CRUDFileStorage:
 
     def create(self, db: Session, *, storage_data: FileStorageCreate) -> FileStorage:
         """Создать хранилище"""
-        db_obj = FileStorage(**storage_data.dict())
+        db_obj = FileStorage(**storage_data.model_dump())
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
