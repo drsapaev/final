@@ -12,9 +12,14 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.dynamic_pricing import DiscountType, PricingRuleType
 from app.models.user import User
+from app.repositories.dynamic_pricing_api_repository import DynamicPricingApiRepository
 from app.services.dynamic_pricing_service import DynamicPricingService
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> DynamicPricingApiRepository:
+    return DynamicPricingApiRepository(db)
 
 
 # === Pydantic схемы ===
@@ -155,6 +160,7 @@ def create_pricing_rule(
 ):
     """Создать правило ценообразования"""
     service = DynamicPricingService(db)
+    repository = _repo(db)
 
     try:
         rule = service.create_pricing_rule(
@@ -176,13 +182,8 @@ def create_pricing_rule(
             created_by=current_user.id,
         )
 
-        # Добавляем услуги к правилу
-        from app.models.dynamic_pricing import PricingRuleService
-
-        for service_id in rule_data.service_ids:
-            rule_service = PricingRuleService(rule_id=rule.id, service_id=service_id)
-            db.add(rule_service)
-        db.commit()
+        repository.add_pricing_rule_services(rule_id=rule.id, service_ids=rule_data.service_ids)
+        repository.commit()
 
         return rule
     except Exception as e:
@@ -199,17 +200,13 @@ def get_pricing_rules(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список правил ценообразования"""
-    from app.models.dynamic_pricing import PricingRule
-
-    query = db.query(PricingRule)
-
-    if rule_type:
-        query = query.filter(PricingRule.rule_type == rule_type)
-    if is_active is not None:
-        query = query.filter(PricingRule.is_active == is_active)
-
-    rules = query.offset(skip).limit(limit).all()
-    return rules
+    repository = _repo(db)
+    return repository.list_pricing_rules(
+        skip=skip,
+        limit=limit,
+        rule_type=rule_type,
+        is_active=is_active,
+    )
 
 
 @router.get("/pricing-rules/{rule_id}", response_model=PricingRuleResponse)
@@ -219,9 +216,8 @@ def get_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить правило ценообразования по ID"""
-    from app.models.dynamic_pricing import PricingRule
-
-    rule = db.query(PricingRule).filter(PricingRule.id == rule_id).first()
+    repository = _repo(db)
+    rule = repository.get_pricing_rule_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Правило не найдено")
 
@@ -236,9 +232,8 @@ def update_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Обновить правило ценообразования"""
-    from app.models.dynamic_pricing import PricingRule
-
-    rule = db.query(PricingRule).filter(PricingRule.id == rule_id).first()
+    repository = _repo(db)
+    rule = repository.get_pricing_rule_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Правило не найдено")
 
@@ -246,8 +241,8 @@ def update_pricing_rule(
     for field, value in rule_data.dict(exclude_unset=True).items():
         setattr(rule, field, value)
 
-    db.commit()
-    db.refresh(rule)
+    repository.commit()
+    repository.refresh(rule)
     return rule
 
 
@@ -258,14 +253,13 @@ def delete_pricing_rule(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Удалить правило ценообразования"""
-    from app.models.dynamic_pricing import PricingRule
-
-    rule = db.query(PricingRule).filter(PricingRule.id == rule_id).first()
+    repository = _repo(db)
+    rule = repository.get_pricing_rule_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Правило не найдено")
 
-    db.delete(rule)
-    db.commit()
+    repository.delete(rule)
+    repository.commit()
     return {"message": "Правило удалено"}
 
 
@@ -326,18 +320,16 @@ def get_service_packages(
 ):
     """Получить список пакетов услуг"""
     service = DynamicPricingService(db)
+    repository = _repo(db)
 
     if patient_id:
         packages = service.get_available_packages(patient_id=patient_id)
     else:
-        from app.models.dynamic_pricing import ServicePackage
-
-        query = db.query(ServicePackage)
-
-        if is_active is not None:
-            query = query.filter(ServicePackage.is_active == is_active)
-
-        packages = query.offset(skip).limit(limit).all()
+        packages = repository.list_service_packages(
+            skip=skip,
+            limit=limit,
+            is_active=is_active,
+        )
 
     return packages
 
@@ -349,9 +341,8 @@ def get_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить пакет услуг по ID"""
-    from app.models.dynamic_pricing import ServicePackage
-
-    package = db.query(ServicePackage).filter(ServicePackage.id == package_id).first()
+    repository = _repo(db)
+    package = repository.get_service_package_by_id(package_id)
     if not package:
         raise HTTPException(status_code=404, detail="Пакет не найден")
 
@@ -366,9 +357,8 @@ def update_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Обновить пакет услуг"""
-    from app.models.dynamic_pricing import ServicePackage
-
-    package = db.query(ServicePackage).filter(ServicePackage.id == package_id).first()
+    repository = _repo(db)
+    package = repository.get_service_package_by_id(package_id)
     if not package:
         raise HTTPException(status_code=404, detail="Пакет не найден")
 
@@ -388,8 +378,8 @@ def update_service_package(
     for field, value in update_data.items():
         setattr(package, field, value)
 
-    db.commit()
-    db.refresh(package)
+    repository.commit()
+    repository.refresh(package)
     return package
 
 
@@ -400,14 +390,13 @@ def delete_service_package(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Удалить пакет услуг"""
-    from app.models.dynamic_pricing import ServicePackage
-
-    package = db.query(ServicePackage).filter(ServicePackage.id == package_id).first()
+    repository = _repo(db)
+    package = repository.get_service_package_by_id(package_id)
     if not package:
         raise HTTPException(status_code=404, detail="Пакет не найден")
 
-    db.delete(package)
-    db.commit()
+    repository.delete(package)
+    repository.commit()
     return {"message": "Пакет удален"}
 
 
@@ -486,15 +475,11 @@ def get_price_history(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить историю изменения цен для услуги"""
-    from app.models.dynamic_pricing import PriceHistory
-
-    history = (
-        db.query(PriceHistory)
-        .filter(PriceHistory.service_id == service_id)
-        .order_by(PriceHistory.changed_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+    repository = _repo(db)
+    history = repository.list_price_history(
+        service_id=service_id,
+        skip=skip,
+        limit=limit,
     )
 
     return [
