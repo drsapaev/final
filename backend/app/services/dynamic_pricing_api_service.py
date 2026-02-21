@@ -45,7 +45,7 @@ class PricingRuleCreate(BaseModel):
     min_amount: float | None = Field(None, ge=0)
     priority: int = Field(0, ge=0)
     max_uses: int | None = Field(None, ge=1)
-    service_ids: list[int] = Field(..., min_items=1)
+    service_ids: list[int] = Field(..., min_length=1)
 
 
 class PricingRuleUpdate(BaseModel):
@@ -72,7 +72,7 @@ class PricingRuleUpdate(BaseModel):
 class ServicePackageCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    service_ids: list[int] = Field(..., min_items=2)
+    service_ids: list[int] = Field(..., min_length=2)
     package_price: float = Field(..., gt=0)
     valid_from: datetime | None = None
     valid_to: datetime | None = None
@@ -92,7 +92,7 @@ class ServicePackageUpdate(BaseModel):
 
 
 class PriceCalculationRequest(BaseModel):
-    services: list[dict[str, Any]] = Field(..., min_items=1)
+    services: list[dict[str, Any]] = Field(..., min_length=1)
     patient_id: int | None = None
     appointment_time: datetime | None = None
 

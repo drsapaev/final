@@ -38,7 +38,7 @@ class InvoiceCreate(BaseModel):
     visit_id: int | None = None
     appointment_id: int | None = None
     invoice_type: InvoiceType = InvoiceType.STANDARD
-    items: list[InvoiceItemCreate] = Field(..., min_items=1)
+    items: list[InvoiceItemCreate] = Field(..., min_length=1)
     description: str | None = None
     notes: str | None = None
     payment_terms: str | None = None

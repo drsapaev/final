@@ -571,7 +571,7 @@ class UserBulkActionRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    user_ids: list[int] = Field(..., min_items=1, max_items=100)
+    user_ids: list[int] = Field(..., min_length=1, max_length=100)
     action: str = Field(
         ..., pattern="^(activate|deactivate|suspend|unsuspend|delete|change_role)$"
     )

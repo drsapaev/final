@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     #   - Публичный доступ: "https://clinic.example.com" или "http://123.45.67.89:5173"
     #   - Туннель (ngrok): "https://abc123.ngrok.io"
     # Установите через переменную окружения: FRONTEND_URL=https://your-domain.com
-    FRONTEND_URL: str = Field(default="http://192.168.1.9:5173", env="FRONTEND_URL")
+    FRONTEND_URL: str = Field(default="http://192.168.1.9:5173")
 
     # --- Queue / Time ---
     TIMEZONE: str = "Asia/Tashkent"
@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     ONLINE_MAX_PER_DAY: int = 15  # лимит онлайн-талонов на отделение/день
 
     # --- Celery ---
-    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", env="CELERY_BROKER_URL")
-    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0", env="CELERY_RESULT_BACKEND")
+    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
 
     # --- App meta ---
     APP_NAME: str = "Clinic Manager"

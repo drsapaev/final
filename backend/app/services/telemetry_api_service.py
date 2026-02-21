@@ -92,7 +92,7 @@ class TelemetryEvent(BaseModel):
 
 class TelemetryBatch(BaseModel):
     """Batch of telemetry events"""
-    events: list[TelemetryEvent] = Field(..., max_items=100)
+    events: list[TelemetryEvent] = Field(..., max_length=100)
 
 
 class TelemetryResponse(BaseModel):

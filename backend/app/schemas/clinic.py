@@ -122,7 +122,7 @@ class ScheduleOut(ScheduleBase):
 class WeeklyScheduleUpdate(BaseModel):
     """Обновление расписания на всю неделю"""
 
-    schedules: list[ScheduleBase] = Field(..., max_items=7)
+    schedules: list[ScheduleBase] = Field(..., max_length=7)
 
 
 # ===================== КАТЕГОРИИ УСЛУГ =====================
