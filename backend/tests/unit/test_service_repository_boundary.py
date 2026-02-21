@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -69,3 +70,12 @@ def test_dynamic_pricing_service_avoids_direct_orm_calls() -> None:
     logic = _service_logic_block("dynamic_pricing")
     assert "repository.db" not in logic
     assert ".query(" not in logic
+
+
+def test_qr_queue_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("qr_queue")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None

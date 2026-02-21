@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
+from app.repositories.qr_queue_api_repository import QrQueueApiRepository
 from app.services.qr_queue_service import QRQueueService
 from app.services.queue_service import (
     QueueNotFoundError,
@@ -42,6 +43,10 @@ from app.services.service_mapping import get_service_code
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> QrQueueApiRepository:
+    return QrQueueApiRepository(db)
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -343,7 +348,7 @@ def get_available_specialists(db: Session = Depends(get_db)):
 
         # Получаем всех активных врачей с eager loading user relationship
         doctors = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(Doctor.active == True)
             .options(joinedload(Doctor.user))
             .all()
@@ -667,7 +672,7 @@ async def call_next_patient(
                 # Re-fetch entry to ensure attached to session if needed, or use ID
                 # Actually notify_patient_called needs entry object
                 notify_service = get_queue_position_service(db)
-                entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+                entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
 
                 if entry:
                     # Determine cabinet (optional)
@@ -689,7 +694,7 @@ async def call_next_patient(
 
                 # Fetch fresh entry or use existing
                 if not entry: # Should have been fetched above
-                     entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+                     entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
 
                 if entry:
                     specialist_name = (
@@ -789,7 +794,7 @@ async def restore_entry_to_next(
     """
     from app.models.online_queue import OnlineQueueEntry
 
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -805,7 +810,7 @@ async def restore_entry_to_next(
     # Восстанавливаем с приоритетом "следующий"
     entry.status = "waiting"
     entry.priority = 1  # Следующий в очереди
-    db.commit()
+    _repo(db).commit()
 
     logger.info(
         "[restore_entry_to_next] Запись %d восстановлена следующей по запросу пользователя %d",
@@ -842,7 +847,7 @@ async def mark_entry_no_show(
     """
     from app.models.online_queue import OnlineQueueEntry
 
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -856,7 +861,7 @@ async def mark_entry_no_show(
         )
 
     entry.status = "no_show"
-    db.commit()
+    _repo(db).commit()
 
     logger.info(
         "[mark_entry_no_show] Запись %d отмечена как no_show пользователем %d",
@@ -894,7 +899,7 @@ def send_entry_to_diagnostics(
     """
     from app.models.online_queue import OnlineQueueEntry
 
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -909,7 +914,7 @@ def send_entry_to_diagnostics(
 
     entry.status = "diagnostics"
     entry.diagnostics_started_at = datetime.utcnow()
-    db.commit()
+    _repo(db).commit()
 
     logger.info(
         "[send_entry_to_diagnostics] Запись %d отправлена на диагностику пользователем %d",
@@ -938,7 +943,7 @@ def mark_entry_incomplete(
     """
     from app.models.online_queue import OnlineQueueEntry
 
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -953,7 +958,7 @@ def mark_entry_incomplete(
 
     entry.status = "incomplete"
     entry.incomplete_reason = request.reason
-    db.commit()
+    _repo(db).commit()
 
     logger.info(
         "[mark_entry_incomplete] Запись %d отмечена как incomplete (причина: %s) пользователем %d",
@@ -1018,7 +1023,7 @@ def get_queue_analytics(
 
     # Получаем статистику
     stats = (
-        db.query(QueueStatistics)
+        _repo(db).query(QueueStatistics)
         .join(DailyQueue)
         .filter(
         DailyQueue.specialist_id == specialist_id,
@@ -1111,7 +1116,7 @@ def update_online_entry(
 
         # Находим запись
         entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
 
         if not entry:
@@ -1134,7 +1139,7 @@ def update_online_entry(
 
         # Если есть patient_id, обновляем также данные в Patient
         if entry.patient_id:
-            patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
+            patient = _repo(db).query(Patient).filter(Patient.id == entry.patient_id).first()
             if patient:
                 if request.patient_name:
                     # Разбираем ФИО
@@ -1157,8 +1162,8 @@ def update_online_entry(
                 if request.address:
                     patient.address = request.address
 
-        db.commit()
-        db.refresh(entry)
+        _repo(db).commit()
+        _repo(db).refresh(entry)
 
         return {
             "success": True,
@@ -1234,7 +1239,7 @@ def full_update_online_entry(
 
         # 1. Находим запись
         entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
 
         if not entry:
@@ -1309,13 +1314,13 @@ def full_update_online_entry(
         computed_aggregated_ids = []
         today = date.today()
 
-        queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
         queue_day = queue.day if queue else today
 
         if entry.visit_id:
             # ⭐ FIX 4: Если есть visit_id, ищем строго по нему (это одна сессия обслуживания)
             visit_entries = (
-                db.query(OnlineQueueEntry)
+                _repo(db).query(OnlineQueueEntry)
                 .filter(
                     OnlineQueueEntry.visit_id == entry.visit_id,
                     OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
@@ -1332,7 +1337,7 @@ def full_update_online_entry(
             # (это случай первой регистрации или когда visit еще не создан)
             if entry.patient_id:
                 patient_entries = (
-                    db.query(OnlineQueueEntry)
+                    _repo(db).query(OnlineQueueEntry)
                     .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
                     .filter(
                         OnlineQueueEntry.patient_id == entry.patient_id,
@@ -1349,7 +1354,7 @@ def full_update_online_entry(
                 )
             elif entry.phone:
                 phone_entries = (
-                    db.query(OnlineQueueEntry)
+                    _repo(db).query(OnlineQueueEntry)
                     .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
                     .filter(
                         OnlineQueueEntry.phone == entry.phone,
@@ -1388,7 +1393,7 @@ def full_update_online_entry(
                 final_aggregated_ids,
             )
             all_entries = (
-                db.query(OnlineQueueEntry)
+                _repo(db).query(OnlineQueueEntry)
                 .filter(OnlineQueueEntry.id.in_(final_aggregated_ids))
                 .all()
             )
@@ -1429,7 +1434,7 @@ def full_update_online_entry(
             if entry.patient_id and queue:
                 # ⭐ Запрашиваем ВСЕ записи этого пациента за этот день
                 all_patient_entries = (
-                    db.query(OnlineQueueEntry)
+                    _repo(db).query(OnlineQueueEntry)
                     .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
                     .filter(
                         OnlineQueueEntry.patient_id == entry.patient_id,
@@ -1586,7 +1591,7 @@ def full_update_online_entry(
 
             for service_item in request.services:
                 svc_id = service_item['service_id']
-                service = db.query(Service).filter(Service.id == svc_id).first()
+                service = _repo(db).query(Service).filter(Service.id == svc_id).first()
 
                 # ⭐ Консультация определяется ТОЛЬКО явным флагом is_consultation
                 if service and service.is_consultation and consultation_service_id is None:
@@ -1639,7 +1644,7 @@ def full_update_online_entry(
                 )
 
                 for new_service_id in new_service_ids:
-                    new_service = db.query(Service).filter(Service.id == new_service_id).first()
+                    new_service = _repo(db).query(Service).filter(Service.id == new_service_id).first()
                     if not new_service:
                         continue
 
@@ -1647,7 +1652,7 @@ def full_update_online_entry(
                     target_queue_id = default_queue_id
                     if new_service.queue_tag:
                         candidate_queue = (
-                            db.query(DailyQueue)
+                            _repo(db).query(DailyQueue)
                             .filter(
                                 DailyQueue.day == entry.queue.day,
                                 DailyQueue.queue_tag == new_service.queue_tag,
@@ -1681,7 +1686,7 @@ def full_update_online_entry(
                     # else: queue_tag is None → fallback to original queue is OK
 
                     # Вычисляем номер в целевой очереди
-                    next_number = db.execute(
+                    next_number = _repo(db).execute(
                         text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
                         {"qid": target_queue_id}
                     ).scalar()
@@ -1728,8 +1733,8 @@ def full_update_online_entry(
                         service_codes=json.dumps([new_service.code or "UNKNOWN"], ensure_ascii=False),
                         total_amount=int(item_price),
                     )
-                    db.add(new_entry)
-                    db.flush()
+                    _repo(db).add(new_entry)
+                    _repo(db).flush()
 
                     logger.info(
                         "[full_update_online_entry] ⭐ FIX 13: Created Independent Entry for %s (ID=%d), queue_id=%d, number=%d, time=%s",
@@ -1750,7 +1755,7 @@ def full_update_online_entry(
                     # Подготавливаем услуги для Visit
                     services_for_visit = []
                     for svc_item in request.services:
-                        svc = db.query(Service).filter(Service.id == svc_item['service_id']).first()
+                        svc = _repo(db).query(Service).filter(Service.id == svc_item['service_id']).first()
                         if svc:
                             services_for_visit.append({
                                 'service_id': svc.id,
@@ -1813,7 +1818,7 @@ def full_update_online_entry(
                 default_queue_id = entry.queue_id
 
                 for new_service_id in new_service_ids:
-                    new_service = db.query(Service).filter(Service.id == new_service_id).first()
+                    new_service = _repo(db).query(Service).filter(Service.id == new_service_id).first()
                     if not new_service:
                         continue
 
@@ -1823,7 +1828,7 @@ def full_update_online_entry(
                     # Если у услуги есть тег (например, 'echokg', 'lab'), ищем соответствующую очередь на сегодня
                     if new_service.queue_tag:
                          candidate_queue = (
-                             db.query(DailyQueue)
+                             _repo(db).query(DailyQueue)
                              .filter(
                                  DailyQueue.day == entry.queue.day, # Та же дата, что у оригинальной записи
                                  DailyQueue.queue_tag == new_service.queue_tag,
@@ -1858,7 +1863,7 @@ def full_update_online_entry(
 
                     # ⭐ FIX: Вычисляем номер для КОНКРЕТНОЙ целевой очереди
                     # (теперь внутри цикла, так как очередь может меняться)
-                    next_number = db.execute(
+                    next_number = _repo(db).execute(
                         text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
                         {"qid": target_queue_id}
                     ).scalar()
@@ -1905,8 +1910,8 @@ def full_update_online_entry(
                         service_codes=json.dumps([new_service.code or "UNKNOWN"], ensure_ascii=False),
                         total_amount=int(item_price),
                     )
-                    db.add(new_entry)
-                    db.flush() # Важно сохранить, чтобы следующий next_number (в этой же очереди) был корректным
+                    _repo(db).add(new_entry)
+                    _repo(db).flush() # Важно сохранить, чтобы следующий next_number (в этой же очереди) был корректным
 
                     logger.info(
                         "[full_update_online_entry] ⭐ PHASE 2.2: Создана новая entry для услуги %s (ID=%d), queue_id=%d, number=%d",
@@ -1916,7 +1921,7 @@ def full_update_online_entry(
                         next_number,
                     )
 
-                db.flush()  # Сохраняем новые entries
+                _repo(db).flush()  # Сохраняем новые entries
 
         # ⭐ Обрабатываем услуги для текущей entry
         # При первичной регистрации - добавляем все услуги
@@ -1935,7 +1940,7 @@ def full_update_online_entry(
                 )
                 continue
 
-            service = db.query(Service).filter(Service.id == service_id).first()
+            service = _repo(db).query(Service).filter(Service.id == service_id).first()
             if service:
                 # Рассчитываем стоимость с учетом скидок
                 item_price = service.price * service_item.get('quantity', 1)
@@ -2058,7 +2063,7 @@ def full_update_online_entry(
             )
 
             # Получаем данные из связанной очереди
-            queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+            queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
             visit_date = queue.day if queue else date.today()
             doctor_id = queue.specialist_id if queue else None
 
@@ -2084,7 +2089,7 @@ def full_update_online_entry(
             if not department and request.services:
                 for service_item in request.services:
                     service = (
-                        db.query(Service)
+                        _repo(db).query(Service)
                         .filter(Service.id == service_item['service_id'])
                         .first()
                     )
@@ -2118,7 +2123,7 @@ def full_update_online_entry(
             original_total_amount = Decimal('0')
             for service_item in request.services:
                 service = (
-                    db.query(Service)
+                    _repo(db).query(Service)
                     .filter(Service.id == service_item['service_id'])
                     .first()
                 )
@@ -2156,8 +2161,8 @@ def full_update_online_entry(
                     ),
                     address=patient_data.get('address', ''),
                 )
-                db.add(temp_patient)
-                db.flush()
+                _repo(db).add(temp_patient)
+                _repo(db).flush()
                 patient_id_for_visit = temp_patient.id
                 # ✅ Связываем OnlineQueueEntry с созданным пациентом
                 entry.patient_id = patient_id_for_visit
@@ -2171,7 +2176,7 @@ def full_update_online_entry(
 
             # Приоритет 1: Ищем по entry.visit_id (если уже связан)
             if entry.visit_id:
-                visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
+                visit = _repo(db).query(Visit).filter(Visit.id == entry.visit_id).first()
                 if visit:
                     logger.info(
                         "[full_update_online_entry] Найден Visit по entry.visit_id: %d",
@@ -2182,7 +2187,7 @@ def full_update_online_entry(
             # Это важно, так как при первом редактировании может быть создан Visit с другим discount_mode
             if not visit and patient_id_for_visit:
                 visit = (
-                    db.query(Visit)
+                    _repo(db).query(Visit)
                     .filter(
                     Visit.patient_id == patient_id_for_visit,
                         Visit.visit_date == visit_date,
@@ -2200,7 +2205,7 @@ def full_update_online_entry(
             # Приоритет 3: Если все еще не найден, ищем по patient_id + visit_date + discount_mode="all_free"
             if not visit and patient_id_for_visit:
                 visit = (
-                    db.query(Visit)
+                    _repo(db).query(Visit)
                     .filter(
                     Visit.patient_id == patient_id_for_visit,
                     Visit.visit_date == visit_date,
@@ -2234,7 +2239,7 @@ def full_update_online_entry(
                 )
 
                 has_paid_invoice = (
-                    db.query(PaymentInvoiceVisit)
+                    _repo(db).query(PaymentInvoiceVisit)
                     .join(PaymentInvoice)
                     .filter(
                     PaymentInvoiceVisit.visit_id == visit.id,
@@ -2254,11 +2259,11 @@ def full_update_online_entry(
                 else:
                     # ✅ Визит не оплачен - безопасно удалять и пересоздавать услуги
                     deleted_count = (
-                        db.query(VisitService)
+                        _repo(db).query(VisitService)
                         .filter(VisitService.visit_id == visit.id)
                         .delete()
                     )
-                    db.flush()  # Коммитим удаление перед добавлением новых
+                    _repo(db).flush()  # Коммитим удаление перед добавлением новых
                     logger.info(
                         "[full_update_online_entry] Удалено старых услуг: %d",
                         deleted_count,
@@ -2297,8 +2302,8 @@ def full_update_online_entry(
                     notes=f"All Free заявка из онлайн записи #{entry.id}",
                     source="online",  # ✅ SSOT: QR-запись
                 )
-                db.add(visit)
-                db.flush()  # Получаем ID визита
+                _repo(db).add(visit)
+                _repo(db).flush()  # Получаем ID визита
 
                 # Связываем OnlineQueueEntry с Visit
                 entry.visit_id = visit.id
@@ -2316,14 +2321,14 @@ def full_update_online_entry(
             added_services = []
             for service_item in request.services:
                 service = (
-                    db.query(Service)
+                    _repo(db).query(Service)
                     .filter(Service.id == service_item['service_id'])
                     .first()
                 )
                 if service:
                     # ✅ Проверяем, нет ли уже такой услуги
                     existing_service = (
-                        db.query(VisitService)
+                        _repo(db).query(VisitService)
                         .filter(
                         VisitService.visit_id == visit.id,
                             VisitService.service_id == service.id,
@@ -2344,7 +2349,7 @@ def full_update_online_entry(
                             price=Decimal('0'),  # All Free - всё бесплатно
                             currency="UZS",
                         )
-                        db.add(visit_service)
+                        _repo(db).add(visit_service)
                         added_services.append(service.name)
                         if has_paid_invoice:
                             logger.info(
@@ -2356,7 +2361,7 @@ def full_update_online_entry(
                         existing_service.qty = service_item.get('quantity', 1)
                         added_services.append(f"{service.name} (обновлено)")
 
-            db.flush()  # Коммитим добавление услуг
+            _repo(db).flush()  # Коммитим добавление услуг
             logger.info(
                 "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
                 visit.id,
@@ -2365,7 +2370,7 @@ def full_update_online_entry(
 
         # 5. Если есть patient_id, обновляем также запись Patient
         if entry.patient_id:
-            patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
+            patient = _repo(db).query(Patient).filter(Patient.id == entry.patient_id).first()
             if patient:
                 logger.info(
                     "[full_update_online_entry] Обновление связанного пациента ID=%d",
@@ -2400,7 +2405,7 @@ def full_update_online_entry(
                 # ✅ НОВОЕ: Синхронизируем все остальные queue_entries для этого пациента
                 # Это предотвращает дубликаты в UI (одна запись с данными, другие без)
                 other_entries = (
-                    db.query(OnlineQueueEntry)
+                    _repo(db).query(OnlineQueueEntry)
                     .filter(
                     OnlineQueueEntry.patient_id == entry.patient_id,
                         OnlineQueueEntry.id
@@ -2452,7 +2457,7 @@ def full_update_online_entry(
                             from app.models.visit import VisitService
 
                             visit_services = (
-                                db.query(VisitService)
+                                _repo(db).query(VisitService)
                                 .filter(VisitService.visit_id == other_entry.visit_id)
                                 .all()
                             )
@@ -2528,7 +2533,7 @@ def full_update_online_entry(
                 if service_id not in new_service_ids:
                     continue
 
-                service = db.query(Service).filter(Service.id == service_id).first()
+                service = _repo(db).query(Service).filter(Service.id == service_id).first()
                 if not service:
                     continue
 
@@ -2570,7 +2575,7 @@ def full_update_online_entry(
             )
 
             # ⭐ FIX: Определяем queue_tag оригинальной entry
-            original_queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+            original_queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
             original_queue_tag = original_queue.queue_tag if original_queue else None
             logger.info(
                 "[full_update_online_entry] ⭐ Оригинальный queue_tag записи: %s",
@@ -2598,14 +2603,14 @@ def full_update_online_entry(
 
                 # Получаем specialist_id из текущей очереди
                 current_queue = (
-                    db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+                    _repo(db).query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
                 )
                 specialist_id_for_queue = (
                     current_queue.specialist_id if current_queue else None
                 )
 
                 daily_queue = (
-                    db.query(DailyQueue)
+                    _repo(db).query(DailyQueue)
                     .filter(DailyQueue.day == today, DailyQueue.queue_tag == queue_tag)
                     .first()
                 )
@@ -2616,7 +2621,7 @@ def full_update_online_entry(
                         from app.models.user import User
 
                         fallback_user = (
-                            db.query(User).filter(User.is_active == True).first()
+                            _repo(db).query(User).filter(User.is_active == True).first()
                         )
                         specialist_id_for_queue = (
                             fallback_user.id if fallback_user else 1
@@ -2628,8 +2633,8 @@ def full_update_online_entry(
                         queue_tag=queue_tag,
                         active=True,
                     )
-                    db.add(daily_queue)
-                    db.flush()
+                    _repo(db).add(daily_queue)
+                    _repo(db).flush()
                     logger.info(
                         "[full_update_online_entry] Создана новая DailyQueue для %s",
                         queue_tag,
@@ -2701,8 +2706,8 @@ def full_update_online_entry(
                     discount_mode=entry.discount_mode,
                 )
 
-                db.add(new_queue_entry)
-                db.flush()
+                _repo(db).add(new_queue_entry)
+                _repo(db).flush()
 
                 service_names = [svc_data['service'].name for svc_data in services]
                 logger.info(
@@ -2714,7 +2719,7 @@ def full_update_online_entry(
                 )
 
 
-            db.flush()  # Сохраняем новые entries
+            _repo(db).flush()  # Сохраняем новые entries
             logger.info(
                 "[full_update_online_entry] ✅ Создано %d новых queue_entries",
                 len(services_by_category),
@@ -2722,12 +2727,12 @@ def full_update_online_entry(
 
         # ✅ ИСПРАВЛЕНО: Коммитим все изменения одной транзакцией
         try:
-            db.commit()
-            db.refresh(entry)
+            _repo(db).commit()
+            _repo(db).refresh(entry)
 
             # ✅ Проверяем, что Visit правильно связан с OnlineQueueEntry (если all_free)
             if request.all_free and visit:
-                db.refresh(visit)
+                _repo(db).refresh(visit)
                 if entry.visit_id != visit.id:
                     logger.warning(
                         "[full_update_online_entry] ⚠️ Предупреждение: entry.visit_id (%s) != visit.id (%d), исправляем...",
@@ -2735,13 +2740,13 @@ def full_update_online_entry(
                         visit.id,
                     )
                     entry.visit_id = visit.id
-                    db.commit()
-                    db.refresh(entry)
+                    _repo(db).commit()
+                    _repo(db).refresh(entry)
 
             # ✅ Проверяем количество VisitService для отладки (если all_free)
             if request.all_free and visit:
                 visit_services_count = (
-                    db.query(VisitService)
+                    _repo(db).query(VisitService)
                     .filter(VisitService.visit_id == visit.id)
                     .count()
                 )
@@ -2796,7 +2801,7 @@ def full_update_online_entry(
                 },
             }
         except Exception as commit_error:
-            db.rollback()
+            _repo(db).rollback()
 
             logger.error(
                 "[full_update_online_entry] ❌ Ошибка при коммите: %s: %s",
@@ -2863,7 +2868,7 @@ def cancel_service_in_entry(
     try:
         # Получаем запись
         entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
         if not entry:
             raise HTTPException(
@@ -2926,7 +2931,7 @@ def cancel_service_in_entry(
         # Синхронизируем с другими queue_entries этого пациента
         if entry.patient_id:
             other_entries = (
-                db.query(OnlineQueueEntry)
+                _repo(db).query(OnlineQueueEntry)
                 .filter(
                 OnlineQueueEntry.patient_id == entry.patient_id,
                     OnlineQueueEntry.id != entry.id,
@@ -2985,8 +2990,8 @@ def cancel_service_in_entry(
                             )
 
         # Коммитим изменения
-        db.commit()
-        db.refresh(entry)
+        _repo(db).commit()
+        _repo(db).refresh(entry)
 
         logger.info("[cancel_service] ✅ Услуга успешно отменена")
 
@@ -3000,7 +3005,7 @@ def cancel_service_in_entry(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
 
         logger.error(
             "[cancel_service] Ошибка: %s: %s",
