@@ -2,10 +2,9 @@
 MCP сервер для анализа жалоб пациентов
 """
 
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
 from .base_server import BaseMCPServer, MCPResource, MCPTool
@@ -31,7 +30,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
         """Завершение работы сервера"""
         logger.info("Medical Complaint MCP Server shutting down")
 
-    def _load_complaint_templates(self) -> Dict[str, List[str]]:
+    def _load_complaint_templates(self) -> dict[str, list[str]]:
         """Загрузка шаблонов жалоб"""
         return {
             "cardiology": [
@@ -71,7 +70,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
             ],
         }
 
-    def _load_validation_rules(self) -> Dict[str, Any]:
+    def _load_validation_rules(self) -> dict[str, Any]:
         """Загрузка правил валидации"""
         return {
             "min_length": 10,
@@ -88,10 +87,10 @@ class MedicalComplaintMCPServer(BaseMCPServer):
     async def analyze_complaint(
         self,
         complaint: str,
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
+        patient_info: dict[str, Any] | None = None,
+        provider: str | None = None,
         urgency_assessment: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Анализ жалоб пациента
 
@@ -131,12 +130,10 @@ class MedicalComplaintMCPServer(BaseMCPServer):
 
             # Проверяем на ошибки и используем fallback на другие провайдеры
             if result.get("error"):
-                error_msg = result.get("error", "").lower()
+                _error_msg = result.get("error", "").lower()
                 logger.warning(f"Primary AI provider failed: {result.get('error')}")
 
                 # Пробуем альтернативные провайдеры
-                from ..ai.ai_manager import AIProviderType
-
                 alternative_providers = [
                     AIProviderType.DEEPSEEK,
                     AIProviderType.GEMINI,
@@ -194,7 +191,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
         name="validate_complaint",
         description="Валидация жалоб на корректность и полноту",
     )
-    async def validate_complaint(self, complaint: str) -> Dict[str, Any]:
+    async def validate_complaint(self, complaint: str) -> dict[str, Any]:
         """
         Валидация жалоб пациента
 
@@ -265,8 +262,8 @@ class MedicalComplaintMCPServer(BaseMCPServer):
         name="suggest_questions", description="Предложить уточняющие вопросы по жалобам"
     )
     async def suggest_questions(
-        self, complaint: str, specialty: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, complaint: str, specialty: str | None = None
+    ) -> dict[str, Any]:
         """
         Генерация уточняющих вопросов
 
@@ -317,8 +314,8 @@ class MedicalComplaintMCPServer(BaseMCPServer):
         name="complaint_templates", description="Шаблоны жалоб по специальностям"
     )
     async def get_complaint_templates(
-        self, specialty: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, specialty: str | None = None
+    ) -> dict[str, Any]:
         """
         Получение шаблонов жалоб
 
@@ -345,7 +342,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
     @MCPResource(
         name="urgency_levels", description="Уровни срочности медицинской помощи"
     )
-    async def get_urgency_levels(self) -> Dict[str, Any]:
+    async def get_urgency_levels(self) -> dict[str, Any]:
         """Получение описания уровней срочности"""
         return {
             "levels": {
@@ -376,7 +373,7 @@ class MedicalComplaintMCPServer(BaseMCPServer):
             }
         }
 
-    def _assess_urgency(self, complaint: str, analysis_result: Dict[str, Any]) -> str:
+    def _assess_urgency(self, complaint: str, analysis_result: dict[str, Any]) -> str:
         """Оценка срочности на основе жалоб и анализа"""
         complaint_lower = complaint.lower()
 

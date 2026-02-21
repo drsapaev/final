@@ -2,7 +2,7 @@
 CRUD операции для Telegram системы
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -17,12 +17,12 @@ from app.models.telegram_config import (
 # ===================== КОНФИГУРАЦИЯ =====================
 
 
-def get_telegram_config(db: Session) -> Optional[TelegramConfig]:
+def get_telegram_config(db: Session) -> TelegramConfig | None:
     """Получить конфигурацию Telegram бота"""
     return db.query(TelegramConfig).first()
 
 
-def create_telegram_config(db: Session, config_data: Dict[str, Any]) -> TelegramConfig:
+def create_telegram_config(db: Session, config_data: dict[str, Any]) -> TelegramConfig:
     """Создать конфигурацию Telegram"""
     config = TelegramConfig(**config_data)
     db.add(config)
@@ -32,8 +32,8 @@ def create_telegram_config(db: Session, config_data: Dict[str, Any]) -> Telegram
 
 
 def update_telegram_config(
-    db: Session, config_data: Dict[str, Any]
-) -> Optional[TelegramConfig]:
+    db: Session, config_data: dict[str, Any]
+) -> TelegramConfig | None:
     """Обновить конфигурацию Telegram"""
     config = get_telegram_config(db)
     if not config:
@@ -53,10 +53,10 @@ def update_telegram_config(
 
 def get_telegram_templates(
     db: Session,
-    template_type: Optional[str] = None,
-    language: Optional[str] = None,
+    template_type: str | None = None,
+    language: str | None = None,
     active_only: bool = True,
-) -> List[TelegramTemplate]:
+) -> list[TelegramTemplate]:
     """Получить шаблоны сообщений"""
     query = db.query(TelegramTemplate)
 
@@ -74,7 +74,7 @@ def get_telegram_templates(
 
 def get_template_by_key(
     db: Session, template_key: str, language: str = "ru"
-) -> Optional[TelegramTemplate]:
+) -> TelegramTemplate | None:
     """Получить шаблон по ключу"""
     return (
         db.query(TelegramTemplate)
@@ -90,7 +90,7 @@ def get_template_by_key(
 
 
 def create_telegram_template(
-    db: Session, template_data: Dict[str, Any]
+    db: Session, template_data: dict[str, Any]
 ) -> TelegramTemplate:
     """Создать шаблон сообщения"""
     template = TelegramTemplate(**template_data)
@@ -101,8 +101,8 @@ def create_telegram_template(
 
 
 def update_telegram_template(
-    db: Session, template_id: int, template_data: Dict[str, Any]
-) -> Optional[TelegramTemplate]:
+    db: Session, template_id: int, template_data: dict[str, Any]
+) -> TelegramTemplate | None:
     """Обновить шаблон сообщения"""
     template = (
         db.query(TelegramTemplate).filter(TelegramTemplate.id == template_id).first()
@@ -122,14 +122,14 @@ def update_telegram_template(
 # ===================== ПОЛЬЗОВАТЕЛИ =====================
 
 
-def get_telegram_user_by_chat_id(db: Session, chat_id: int) -> Optional[TelegramUser]:
+def get_telegram_user_by_chat_id(db: Session, chat_id: int) -> TelegramUser | None:
     """Получить пользователя по chat_id"""
     return db.query(TelegramUser).filter(TelegramUser.chat_id == chat_id).first()
 
 
 def get_telegram_users(
     db: Session, active_only: bool = True, skip: int = 0, limit: int = 100
-) -> List[TelegramUser]:
+) -> list[TelegramUser]:
     """Получить список пользователей Telegram"""
     query = db.query(TelegramUser)
 
@@ -139,7 +139,7 @@ def get_telegram_users(
     return query.offset(skip).limit(limit).all()
 
 
-def create_telegram_user(db: Session, user_data: Dict[str, Any]) -> TelegramUser:
+def create_telegram_user(db: Session, user_data: dict[str, Any]) -> TelegramUser:
     """Создать пользователя Telegram"""
     user = TelegramUser(**user_data)
     db.add(user)
@@ -149,8 +149,8 @@ def create_telegram_user(db: Session, user_data: Dict[str, Any]) -> TelegramUser
 
 
 def update_telegram_user(
-    db: Session, user_id: int, user_data: Dict[str, Any]
-) -> Optional[TelegramUser]:
+    db: Session, user_id: int, user_data: dict[str, Any]
+) -> TelegramUser | None:
     """Обновить пользователя Telegram"""
     user = db.query(TelegramUser).filter(TelegramUser.id == user_id).first()
     if not user:
@@ -167,7 +167,7 @@ def update_telegram_user(
 
 def link_patient_to_telegram(
     db: Session, chat_id: int, patient_id: int
-) -> Optional[TelegramUser]:
+) -> TelegramUser | None:
     """Привязать пациента к Telegram аккаунту"""
     user = get_telegram_user_by_chat_id(db, chat_id)
     if user:
@@ -181,7 +181,7 @@ def link_patient_to_telegram(
 # ===================== СООБЩЕНИЯ =====================
 
 
-def create_message_log(db: Session, message_data: Dict[str, Any]) -> TelegramMessage:
+def create_message_log(db: Session, message_data: dict[str, Any]) -> TelegramMessage:
     """Создать лог сообщения"""
     message = TelegramMessage(**message_data)
     db.add(message)
@@ -192,11 +192,11 @@ def create_message_log(db: Session, message_data: Dict[str, Any]) -> TelegramMes
 
 def get_message_logs(
     db: Session,
-    chat_id: Optional[int] = None,
-    message_type: Optional[str] = None,
+    chat_id: int | None = None,
+    message_type: str | None = None,
     skip: int = 0,
     limit: int = 100,
-) -> List[TelegramMessage]:
+) -> list[TelegramMessage]:
     """Получить логи сообщений"""
     query = db.query(TelegramMessage)
 
@@ -219,7 +219,7 @@ def get_message_logs(
 
 def get_users_for_notifications(
     db: Session, notification_type: str
-) -> List[TelegramUser]:
+) -> list[TelegramUser]:
     """Получить пользователей для уведомлений"""
     query = db.query(TelegramUser).filter(
         and_(
@@ -237,7 +237,7 @@ def get_users_for_notifications(
     return query.all()
 
 
-def find_patient_by_phone(db: Session, phone: str) -> Optional[Dict[str, Any]]:
+def find_patient_by_phone(db: Session, phone: str) -> dict[str, Any] | None:
     """
     Найти пациента по номеру телефона.
 

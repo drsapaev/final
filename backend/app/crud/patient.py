@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -19,9 +19,9 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
         *,
         skip: int = 0,
         limit: int = 100,
-        search_query: Optional[str] = None,
-        phone: Optional[str] = None,
-    ) -> List[Patient]:
+        search_query: str | None = None,
+        phone: str | None = None,
+    ) -> list[Patient]:
         """
         Получить список пациентов с поиском
 
@@ -68,7 +68,7 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
 
         return query.offset(skip).limit(limit).all()
 
-    def get_patient_by_phone(self, db: Session, *, phone: str) -> Optional[Patient]:
+    def get_patient_by_phone(self, db: Session, *, phone: str) -> Patient | None:
         """
         Получить пациента по номеру телефона
         """
@@ -98,7 +98,7 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
 
     def get_patient_appointments(
         self, db: Session, *, patient_id: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Получить все записи пациента
         """
@@ -131,7 +131,7 @@ patient = CRUDPatient(Patient)
 # === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
 
 
-def get_patient_by_user_id(db: Session, user_id: int) -> Optional[Patient]:
+def get_patient_by_user_id(db: Session, user_id: int) -> Patient | None:
     """Получить пациента по ID пользователя"""
     return db.query(Patient).filter(Patient.user_id == user_id).first()
 
@@ -186,11 +186,11 @@ def create_patient_from_user(db: Session, user: User) -> Patient:
 
 
 def normalize_patient_name(
-    full_name: Optional[str] = None,
-    last_name: Optional[str] = None,
-    first_name: Optional[str] = None,
-    middle_name: Optional[str] = None,
-) -> Dict[str, str]:
+    full_name: str | None = None,
+    last_name: str | None = None,
+    first_name: str | None = None,
+    middle_name: str | None = None,
+) -> dict[str, str]:
     """
     Нормализация ФИО пациента - единая функция для всего проекта.
 
@@ -273,7 +273,7 @@ def normalize_patient_name(
         }
 
 
-def validate_birthdate(birth_date: Optional[date]) -> bool:
+def validate_birthdate(birth_date: date | None) -> bool:
     """
     Валидация даты рождения пациента.
 
@@ -303,10 +303,10 @@ def validate_birthdate(birth_date: Optional[date]) -> bool:
 def find_patient(
     db: Session,
     *,
-    phone: Optional[str] = None,
-    search_query: Optional[str] = None,
-    patient_id: Optional[int] = None,
-) -> Optional[Patient]:
+    phone: str | None = None,
+    search_query: str | None = None,
+    patient_id: int | None = None,
+) -> Patient | None:
     """
     Универсальный поиск пациента - единая функция для всего проекта.
 
@@ -362,7 +362,7 @@ def find_patient(
     return None
 
 
-def find_or_create_patient(db: Session, patient_data: Dict[str, Any]) -> Patient:
+def find_or_create_patient(db: Session, patient_data: dict[str, Any]) -> Patient:
     """
     Найти существующего пациента или создать нового.
 
@@ -464,7 +464,7 @@ def find_or_create_patient(db: Session, patient_data: Dict[str, Any]) -> Patient
     return new_patient
 
 
-def search_patients(db: Session, query: str, limit: int = 10) -> List[Patient]:
+def search_patients(db: Session, query: str, limit: int = 10) -> list[Patient]:
     """
     Поиск пациентов с сортировкой по релевантности.
 

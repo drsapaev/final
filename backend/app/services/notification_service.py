@@ -4,14 +4,13 @@
 """
 
 import logging
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.patient import Patient
-from app.models.user import User
 from app.models.visit import Visit
 from app.services.telegram.bot import TelegramBotService
 
@@ -27,7 +26,7 @@ class NotificationService:
 
     async def send_visit_confirmation_invitation(
         self, visit: Visit, channel: str = "auto"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Отправляет приглашение на подтверждение визита
 
@@ -84,7 +83,7 @@ class NotificationService:
 
     def _prepare_notification_data(
         self, visit: Visit, patient: Patient
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Подготавливает данные для уведомления"""
         # Получаем услуги визита
         from app.models.visit import VisitService
@@ -121,7 +120,7 @@ class NotificationService:
             "visit_type": self._get_visit_type_text(visit.discount_mode),
         }
 
-    def _get_visit_type_text(self, discount_mode: Optional[str]) -> str:
+    def _get_visit_type_text(self, discount_mode: str | None) -> str:
         """Возвращает текстовое описание типа визита"""
         if discount_mode == "repeat":
             return "Повторный визит"
@@ -133,8 +132,8 @@ class NotificationService:
             return "Платный визит"
 
     async def _send_telegram_invitation(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Отправляет приглашение через Telegram"""
         try:
             if not hasattr(patient, 'telegram_id') or not patient.telegram_id:
@@ -168,7 +167,7 @@ class NotificationService:
             logger.error(f"Ошибка отправки Telegram приглашения: {e}")
             return {"success": False, "error": str(e)}
 
-    def _format_telegram_message(self, data: Dict[str, Any]) -> str:
+    def _format_telegram_message(self, data: dict[str, Any]) -> str:
         """Форматирует сообщение для Telegram"""
         services_list = "\n".join(data["services"])
 
@@ -195,7 +194,7 @@ class NotificationService:
 
     def _create_telegram_keyboard(
         self, confirmation_token: str
-    ) -> List[List[Dict[str, str]]]:
+    ) -> list[list[dict[str, str]]]:
         """Создает inline клавиатуру для Telegram"""
         return [
             [
@@ -219,8 +218,8 @@ class NotificationService:
         ]
 
     async def _send_pwa_invitation(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Отправляет приглашение через PWA (SMS с deep link)"""
         try:
             if not patient.phone:
@@ -248,7 +247,7 @@ class NotificationService:
             logger.error(f"Ошибка отправки PWA приглашения: {e}")
             return {"success": False, "error": str(e)}
 
-    def _format_sms_message(self, data: Dict[str, Any], pwa_url: str) -> str:
+    def _format_sms_message(self, data: dict[str, Any], pwa_url: str) -> str:
         """Форматирует SMS сообщение"""
         return f"""
 Клиника: Подтвердите визит на {data["visit_date"]} в {data["visit_time"]} к врачу {data["doctor_name"]}.
@@ -256,15 +255,15 @@ class NotificationService:
 Подтвердить: {pwa_url}
         """.strip()
 
-    async def _send_sms(self, phone: str, text: str) -> Dict[str, Any]:
+    async def _send_sms(self, phone: str, text: str) -> dict[str, Any]:
         """Отправляет SMS (заглушка для интеграции с SMS провайдером)"""
         # TODO: Интеграция с реальным SMS провайдером (Eskiz, PlayMobile и т.д.)
         logger.info(f"SMS отправлено на {phone}: {text}")
         return {"success": True, "sms_id": f"mock_sms_{datetime.now().timestamp()}"}
 
     async def _send_phone_invitation(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Создает задачу для регистратуры - позвонить пациенту"""
         try:
             # Создаем уведомление для регистратуры
@@ -285,8 +284,8 @@ class NotificationService:
             return {"success": False, "error": str(e)}
 
     async def _create_registrar_notification(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Создает уведомление для регистратуры"""
         # TODO: Интеграция с системой уведомлений регистратуры
         # Это может быть запись в базу данных, отправка в очередь задач и т.д.
@@ -311,7 +310,7 @@ class NotificationService:
 
     async def send_confirmation_reminder(
         self, visit: Visit, hours_before: int = 24
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Отправляет напоминание о необходимости подтверждения"""
         try:
             patient = (
@@ -341,8 +340,8 @@ class NotificationService:
             return {"success": False, "error": str(e)}
 
     async def _send_telegram_reminder(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Отправляет напоминание через Telegram"""
         message = f"""
 🔔 **Напоминание о подтверждении визита**
@@ -367,8 +366,8 @@ class NotificationService:
         return result
 
     async def _send_pwa_reminder(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Отправляет напоминание через PWA"""
         pwa_url = (
             f"{settings.PWA_BASE_URL}/confirm-visit?token={data['confirmation_token']}"
@@ -382,8 +381,8 @@ class NotificationService:
         return await self._send_sms(patient.phone, sms_text)
 
     async def _send_phone_reminder(
-        self, patient: Patient, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Patient, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Создает задачу для регистратуры - напомнить пациенту"""
         data["is_reminder"] = True
         return await self._create_registrar_notification(patient, data)

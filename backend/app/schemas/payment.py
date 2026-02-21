@@ -1,7 +1,5 @@
 ﻿from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import Field
 
 from app.schemas.base import ORMModel
@@ -13,8 +11,8 @@ class PaymentIn(ORMModel):
     currency: str = Field(default="UZS", max_length=8)
     method: str = Field(default="cash", max_length=32)
     status: str = Field(default="paid", max_length=16)
-    receipt_no: Optional[str] = Field(default=None, max_length=64)
-    note: Optional[str] = Field(default=None, max_length=500)
+    receipt_no: str | None = Field(default=None, max_length=64)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class PaymentOut(ORMModel):
@@ -24,5 +22,5 @@ class PaymentOut(ORMModel):
     currency: str
     method: str
     status: str
-    receipt_no: Optional[str] = None
-    note: Optional[str] = None
+    receipt_no: str | None = None
+    note: str | None = None

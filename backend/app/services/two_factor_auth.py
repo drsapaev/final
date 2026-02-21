@@ -3,7 +3,6 @@ import hashlib
 import io
 import secrets
 from datetime import datetime
-from typing import Optional, Tuple
 
 import pyotp
 import qrcode
@@ -23,7 +22,7 @@ class TwoFactorAuthService:
         return pyotp.random_base32()
 
     def generate_totp_uri(
-        self, secret: str, username: str, email: Optional[str] = None
+        self, secret: str, username: str, email: str | None = None
     ) -> str:
         """Генерация URI для TOTP приложения"""
         totp = pyotp.TOTP(
@@ -65,7 +64,7 @@ class TwoFactorAuthService:
 
         return totp.verify(token, valid_window=window)
 
-    def generate_backup_codes(self, count: int = 10) -> Tuple[list, list]:
+    def generate_backup_codes(self, count: int = 10) -> tuple[list, list]:
         """Генерация резервных кодов"""
         backup_codes = []
         hashed_codes = []
@@ -98,7 +97,7 @@ class TwoFactorAuthService:
         """Получение оставшегося времени до следующего токена"""
         return self.interval - (datetime.now().timestamp() % self.interval)
 
-    def setup_2fa(self, username: str, email: Optional[str] = None) -> dict:
+    def setup_2fa(self, username: str, email: str | None = None) -> dict:
         """Настройка 2FA для пользователя"""
         # Генерируем секретный ключ
         secret = self.generate_secret()
@@ -130,7 +129,7 @@ class TwoFactorAuthService:
 
     def authenticate_with_2fa(
         self, secret: str, token: str, backup_codes: list, used_backup_codes: list
-    ) -> Tuple[bool, str, Optional[str]]:
+    ) -> tuple[bool, str, str | None]:
         """
         Аутентификация с 2FA
 
@@ -150,7 +149,7 @@ class TwoFactorAuthService:
 
         return False, "Неверный токен или резервный код", None
 
-    def is_2fa_enabled(self, secret: Optional[str]) -> bool:
+    def is_2fa_enabled(self, secret: str | None) -> bool:
         """Проверка, включена ли 2FA"""
         return secret is not None and secret.strip() != ""
 

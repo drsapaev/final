@@ -2,21 +2,17 @@
 Telegram бот для системы клиники
 """
 
-import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from aiogram.webhook.aiohttp_server import setup_application, SimpleRequestHandler
-from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 from ...core.config import settings
-from ...models.user import User
-from ...models.visit import Visit
 from ..queue_service import QueueBusinessService
 
 logger = logging.getLogger(__name__)
@@ -40,7 +36,7 @@ class ClinicTelegramBot:
 
     async def send_confirmation_invitation(
         self, chat_id: int, message: str, keyboard: list
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Отправляет приглашение на подтверждение визита"""
         try:
             if not self.bot:
@@ -109,15 +105,8 @@ class ClinicTelegramBot:
         async def help_handler(message: types.Message):
             await self.handle_help(message)
 
-        # Обработка callback query
-        @self.dp.callback_query()
-        async def callback_handler(callback: types.CallbackQuery):
-            await self.handle_callback(callback)
-
     async def handle_start(self, message: types.Message):
         """Обработка команды /start"""
-        user_id = message.from_user.id
-        username = message.from_user.username
         first_name = message.from_user.first_name
 
         # Создаем клавиатуру с основными функциями
@@ -149,7 +138,7 @@ class ClinicTelegramBot:
         welcome_text = f"""
 👋 Добро пожаловать в систему клиники!
 
-Привет, {first_name}! 
+Привет, {first_name}!
 
 Я помогу вам:
 • 🏥 Встать в утреннюю очередь (с 07:00)
@@ -165,8 +154,6 @@ class ClinicTelegramBot:
 
     async def handle_queue(self, message: types.Message):
         """Обработка команды /queue"""
-        user_id = message.from_user.id
-
         # Проверяем время (07:00 - 08:00)
         current_time = datetime.now()
         if current_time.hour < 7 or current_time.hour >= 8:
@@ -268,18 +255,41 @@ class ClinicTelegramBot:
     async def handle_callback(self, callback: types.CallbackQuery):
         """Обработка callback запросов"""
         data = callback.data
-        user_id = callback.from_user.id
+        if not data:
+            await callback.answer("Пустая команда", show_alert=True)
+            return
 
-        if data.startswith("queue_"):
-            await self._handle_queue_callback(callback, data)
-        elif data == "appointment":
-            await self.handle_appointment(callback.message)
-        elif data == "my_appointments":
-            await self._handle_my_appointments(callback)
-        elif data == "help":
-            await self.handle_help(callback.message)
+        try:
+            if data.startswith("confirm_visit:") or data.startswith("cancel_visit:"):
+                confirm = data.startswith("confirm_visit:")
+                token = data.split(":", 1)[1]
+                answered = await self._handle_visit_confirmation(
+                    callback, token, confirm
+                )
+                if not answered:
+                    await callback.answer()
+                return
 
-        await callback.answer()
+            if data.startswith("queue_"):
+                await self._handle_queue_callback(callback, data)
+            elif data == "appointment":
+                await self.handle_appointment(callback.message)
+            elif data == "my_appointments":
+                await self._handle_my_appointments(callback)
+            elif data == "help":
+                await self.handle_help(callback.message)
+            else:
+                await callback.answer("Неизвестная команда", show_alert=True)
+                return
+
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Ошибка обработки callback: {e}")
+            try:
+                await callback.answer("Произошла ошибка", show_alert=True)
+            except Exception:
+                pass
 
     async def _handle_queue_callback(self, callback: types.CallbackQuery, data: str):
         """Обработка выбора специалиста для очереди"""
@@ -354,7 +364,7 @@ class ClinicTelegramBot:
         self,
         user_id: int,
         message: str,
-        keyboard: Optional[InlineKeyboardMarkup] = None,
+        keyboard: InlineKeyboardMarkup | None = None,
     ):
         """Отправка уведомления пользователю"""
         if not self.bot:
@@ -373,7 +383,7 @@ class ClinicTelegramBot:
             return False
 
     async def send_appointment_reminder(
-        self, user_id: int, appointment_data: Dict[str, Any]
+        self, user_id: int, appointment_data: dict[str, Any]
     ):
         """Отправка напоминания о визите"""
         doctor = appointment_data.get("doctor", "Врач")
@@ -407,7 +417,7 @@ class ClinicTelegramBot:
 
         await self.send_notification(user_id, message, keyboard)
 
-    async def send_lab_results_ready(self, user_id: int, results_info: Dict[str, Any]):
+    async def send_lab_results_ready(self, user_id: int, results_info: dict[str, Any]):
         """Уведомление о готовности результатов"""
         message = f"""
 🔬 **Результаты анализов готовы**
@@ -464,33 +474,13 @@ class ClinicTelegramBot:
 
         return SimpleRequestHandler(dispatcher=self.dp, bot=self.bot)
 
-    async def handle_callback(self, callback: types.CallbackQuery):
-        """Обработчик callback'ов для подтверждения визитов"""
-        try:
-            callback_data = callback.data
-
-            if callback_data.startswith("confirm_visit:"):
-                # Подтверждение визита
-                token = callback_data.split(":", 1)[1]
-                await self._handle_visit_confirmation(callback, token, True)
-
-            elif callback_data.startswith("cancel_visit:"):
-                # Отмена визита
-                token = callback_data.split(":", 1)[1]
-                await self._handle_visit_confirmation(callback, token, False)
-
-            else:
-                # Неизвестный callback
-                await callback.answer("Неизвестная команда", show_alert=True)
-
-        except Exception as e:
-            logger.error(f"Ошибка обработки callback: {e}")
-            await callback.answer("Произошла ошибка", show_alert=True)
-
     async def _handle_visit_confirmation(
         self, callback: types.CallbackQuery, token: str, confirm: bool
-    ):
-        """Обрабатывает подтверждение или отмену визита"""
+    ) -> bool:
+        """Обрабатывает подтверждение или отмену визита.
+
+        Возвращает True, если callback уже был подтвержден/обработан через answer().
+        """
         try:
             if confirm:
                 # Подтверждаем визит через API
@@ -511,27 +501,32 @@ class ClinicTelegramBot:
                         text=f"{callback.message.text}\n\n{message}",
                         parse_mode="Markdown",
                     )
-                else:
-                    await callback.answer(
-                        f"Ошибка подтверждения: {result.get('message', 'Неизвестная ошибка')}",
-                        show_alert=True,
-                    )
-            else:
-                # Отменяем визит
-                await callback.message.edit_text(
-                    text=f"{callback.message.text}\n\n❌ Визит отменен",
-                    parse_mode="Markdown",
-                )
+                    return False
 
-            await callback.answer()
+                await callback.answer(
+                    f"Ошибка подтверждения: {result.get('message', 'Неизвестная ошибка')}",
+                    show_alert=True,
+                )
+                return True
+
+            # Отменяем визит
+            await callback.message.edit_text(
+                text=f"{callback.message.text}\n\n❌ Визит отменен",
+                parse_mode="Markdown",
+            )
+            return False
 
         except Exception as e:
             logger.error(f"Ошибка подтверждения визита: {e}")
-            await callback.answer("Произошла ошибка при подтверждении", show_alert=True)
+            try:
+                await callback.answer("Произошла ошибка при подтверждении", show_alert=True)
+            except Exception:
+                pass
+            return True
 
     async def _confirm_visit_via_api(
         self, token: str, telegram_user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Подтверждает визит через API"""
         try:
             # Здесь должен быть вызов API подтверждения
@@ -568,7 +563,7 @@ class TelegramBotService:
 
     async def send_confirmation_invitation(
         self, chat_id: int, message: str, keyboard: list
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Отправляет приглашение на подтверждение визита"""
         if not self.bot or not self.bot.bot:
             return {"success": False, "error": "Telegram bot не доступен"}

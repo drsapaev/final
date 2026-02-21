@@ -2,20 +2,18 @@
 CRUD операции для файловой системы
 """
 
-import hashlib
 import json
 import os
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any
 
-from sqlalchemy import and_, asc, desc, func, or_
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.file_system import (
     File,
     FileAccessLog,
     FileFolder,
-    FilePermission,
     FileQuota,
     FileShare,
     FileStatus,
@@ -28,12 +26,10 @@ from app.schemas.file_system import (
     FileFolderCreate,
     FileFolderUpdate,
     FileQuotaCreate,
-    FileQuotaUpdate,
     FileSearchRequest,
     FileShareCreate,
     FileShareUpdate,
     FileStorageCreate,
-    FileStorageUpdate,
     FileUpdate,
 )
 
@@ -59,11 +55,11 @@ class CRUDFile:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[File]:
+    def get(self, db: Session, *, id: int) -> File | None:
         """Получить файл по ID"""
         return db.query(File).filter(File.id == id).first()
 
-    def get_by_hash(self, db: Session, *, file_hash: str) -> Optional[File]:
+    def get_by_hash(self, db: Session, *, file_hash: str) -> File | None:
         """Получить файл по хешу"""
         return db.query(File).filter(File.file_hash == file_hash).first()
 
@@ -73,14 +69,14 @@ class CRUDFile:
         *,
         skip: int = 0,
         limit: int = 100,
-        file_type: Optional[FileType] = None,
-        status: Optional[FileStatus] = None,
-        owner_id: Optional[int] = None,
-        patient_id: Optional[int] = None,
-        appointment_id: Optional[int] = None,
-        emr_id: Optional[int] = None,
-        folder_id: Optional[int] = None,
-    ) -> List[File]:
+        file_type: FileType | None = None,
+        status: FileStatus | None = None,
+        owner_id: int | None = None,
+        patient_id: int | None = None,
+        appointment_id: int | None = None,
+        emr_id: int | None = None,
+        folder_id: int | None = None,
+    ) -> list[File]:
         """Получить список файлов с фильтрацией"""
         query = db.query(File)
 
@@ -103,7 +99,7 @@ class CRUDFile:
 
     def search(
         self, db: Session, *, search_request: FileSearchRequest
-    ) -> Tuple[List[File], int, Dict[str, Any]]:
+    ) -> tuple[list[File], int, dict[str, Any]]:
         """Поиск файлов с фильтрацией"""
         query = db.query(File)
 
@@ -176,7 +172,7 @@ class CRUDFile:
 
         return files, total, facets
 
-    def _get_size_ranges(self, db: Session, query) -> List[Dict[str, Any]]:
+    def _get_size_ranges(self, db: Session, query) -> list[dict[str, Any]]:
         """Получить диапазоны размеров файлов"""
         ranges = [
             {"label": "0-1MB", "min": 0, "max": 1024 * 1024},
@@ -210,7 +206,7 @@ class CRUDFile:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[File]:
+    def delete(self, db: Session, *, id: int) -> File | None:
         """Удалить файл"""
         obj = db.query(File).filter(File.id == id).first()
         if obj:
@@ -240,7 +236,7 @@ class CRUDFile:
 
     def get_user_files(
         self, db: Session, *, user_id: int, skip: int = 0, limit: int = 100
-    ) -> List[File]:
+    ) -> list[File]:
         """Получить файлы пользователя"""
         return self.get_multi(
             db=db, skip=skip, limit=limit, owner_id=user_id, status=FileStatus.READY
@@ -248,7 +244,7 @@ class CRUDFile:
 
     def get_patient_files(
         self, db: Session, *, patient_id: int, skip: int = 0, limit: int = 100
-    ) -> List[File]:
+    ) -> list[File]:
         """Получить файлы пациента"""
         return self.get_multi(
             db=db,
@@ -258,7 +254,7 @@ class CRUDFile:
             status=FileStatus.READY,
         )
 
-    def get_expired_files(self, db: Session) -> List[File]:
+    def get_expired_files(self, db: Session) -> list[File]:
         """Получить истекшие файлы"""
         return (
             db.query(File)
@@ -321,7 +317,7 @@ class CRUDFileVersion:
         db.refresh(db_obj)
         return db_obj
 
-    def get_file_versions(self, db: Session, *, file_id: int) -> List[FileVersion]:
+    def get_file_versions(self, db: Session, *, file_id: int) -> list[FileVersion]:
         """Получить версии файла"""
         return (
             db.query(FileVersion)
@@ -332,7 +328,7 @@ class CRUDFileVersion:
 
     def get_version(
         self, db: Session, *, file_id: int, version_number: int
-    ) -> Optional[FileVersion]:
+    ) -> FileVersion | None:
         """Получить конкретную версию файла"""
         return (
             db.query(FileVersion)
@@ -367,7 +363,7 @@ class CRUDFileShare:
         db.refresh(db_obj)
         return db_obj
 
-    def get_file_shares(self, db: Session, *, file_id: int) -> List[FileShare]:
+    def get_file_shares(self, db: Session, *, file_id: int) -> list[FileShare]:
         """Получить совместные использования файла"""
         return (
             db.query(FileShare)
@@ -375,7 +371,7 @@ class CRUDFileShare:
             .all()
         )
 
-    def get_user_shares(self, db: Session, *, user_id: int) -> List[FileShare]:
+    def get_user_shares(self, db: Session, *, user_id: int) -> list[FileShare]:
         """Получить файлы, доступные пользователю"""
         return (
             db.query(FileShare)
@@ -389,7 +385,7 @@ class CRUDFileShare:
             .all()
         )
 
-    def get_by_token(self, db: Session, *, access_token: str) -> Optional[FileShare]:
+    def get_by_token(self, db: Session, *, access_token: str) -> FileShare | None:
         """Получить совместное использование по токену"""
         return (
             db.query(FileShare)
@@ -444,13 +440,13 @@ class CRUDFileFolder:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[FileFolder]:
+    def get(self, db: Session, *, id: int) -> FileFolder | None:
         """Получить папку по ID"""
         return db.query(FileFolder).filter(FileFolder.id == id).first()
 
     def get_user_folders(
-        self, db: Session, *, user_id: int, parent_id: Optional[int] = None
-    ) -> List[FileFolder]:
+        self, db: Session, *, user_id: int, parent_id: int | None = None
+    ) -> list[FileFolder]:
         """Получить папки пользователя"""
         query = db.query(FileFolder).filter(FileFolder.owner_id == user_id)
         if parent_id is not None:
@@ -458,8 +454,8 @@ class CRUDFileFolder:
         return query.order_by(FileFolder.name).all()
 
     def get_folder_tree(
-        self, db: Session, *, user_id: int, parent_id: Optional[int] = None
-    ) -> List[FileFolder]:
+        self, db: Session, *, user_id: int, parent_id: int | None = None
+    ) -> list[FileFolder]:
         """Получить дерево папок"""
         folders = self.get_user_folders(db, user_id=user_id, parent_id=parent_id)
         result = []
@@ -531,7 +527,7 @@ class CRUDFileQuota:
         db.refresh(db_obj)
         return db_obj
 
-    def get_user_quota(self, db: Session, *, user_id: int) -> Optional[FileQuota]:
+    def get_user_quota(self, db: Session, *, user_id: int) -> FileQuota | None:
         """Получить квоту пользователя"""
         return db.query(FileQuota).filter(FileQuota.user_id == user_id).first()
 
@@ -555,7 +551,7 @@ class CRUDFileQuota:
         user_id: int,
         additional_size: int = 0,
         additional_files: int = 0,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Проверить квоту пользователя"""
         quota = self.get_user_quota(db, user_id=user_id)
         if not quota:
@@ -595,7 +591,7 @@ class CRUDFileStorage:
         db.refresh(db_obj)
         return db_obj
 
-    def get_default(self, db: Session) -> Optional[FileStorage]:
+    def get_default(self, db: Session) -> FileStorage | None:
         """Получить хранилище по умолчанию"""
         return (
             db.query(FileStorage)
@@ -603,7 +599,7 @@ class CRUDFileStorage:
             .first()
         )
 
-    def get_active(self, db: Session) -> List[FileStorage]:
+    def get_active(self, db: Session) -> list[FileStorage]:
         """Получить активные хранилища"""
         return db.query(FileStorage).filter(FileStorage.is_active == True).all()
 
@@ -619,10 +615,10 @@ class CRUDFileAccessLog:
         db: Session,
         *,
         file_id: int,
-        user_id: Optional[int],
+        user_id: int | None,
         action: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> FileAccessLog:
         """Создать лог доступа"""
         db_obj = FileAccessLog(
@@ -639,7 +635,7 @@ class CRUDFileAccessLog:
 
     def get_file_logs(
         self, db: Session, *, file_id: int, skip: int = 0, limit: int = 100
-    ) -> List[FileAccessLog]:
+    ) -> list[FileAccessLog]:
         """Получить логи доступа к файлу"""
         return (
             db.query(FileAccessLog)
@@ -652,7 +648,7 @@ class CRUDFileAccessLog:
 
     def get_user_logs(
         self, db: Session, *, user_id: int, skip: int = 0, limit: int = 100
-    ) -> List[FileAccessLog]:
+    ) -> list[FileAccessLog]:
         """Получить логи доступа пользователя"""
         return (
             db.query(FileAccessLog)

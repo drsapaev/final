@@ -6,16 +6,15 @@ WebSocket сервис для табло очереди
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
 
-from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
-from app.models.display_config import DisplayBoard
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.services.ws_redis_pubsub import RedisPubSubBridge
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +22,16 @@ logger = logging.getLogger(__name__)
 class DisplayWebSocketManager:
     """Менеджер WebSocket соединений для табло"""
 
-    def __init__(self):
+    def __init__(self, pubsub: RedisPubSubBridge | None = None):
         # Активные соединения по board_id
-        self.connections: Dict[str, Set[WebSocket]] = {}
+        self.connections: dict[str, set[WebSocket]] = {}
         # Последнее состояние каждого табло
-        self.board_states: Dict[str, Dict[str, Any]] = {}
+        self.board_states: dict[str, dict[str, Any]] = {}
+        self._pubsub = pubsub or RedisPubSubBridge(
+            channel_prefix="display_ws",
+            redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
+        )
+        self._redis_handlers: dict[str, Any] = {}
 
     async def connect(self, websocket: WebSocket, board_id: str, user=None) -> None:
         """Подключение нового WebSocket с опциональной аутентификацией"""
@@ -54,6 +58,7 @@ class DisplayWebSocketManager:
             logger.info(
                 f"Всего соединений к табло {board_id}: {len(self.connections[board_id])}"
             )
+            await self._ensure_redis_subscription(board_id)
 
             # Отправляем текущее состояние табло
             await self._send_current_state(websocket, board_id)
@@ -69,52 +74,76 @@ class DisplayWebSocketManager:
 
                 if len(self.connections[board_id]) == 0:
                     del self.connections[board_id]
+                    await self._remove_redis_subscription(board_id)
 
             logger.info(f"WebSocket отключен от табло {board_id}")
 
         except Exception as e:
             logger.error(f"Ошибка отключения WebSocket: {e}")
 
-    async def broadcast_to_board(self, board_id: str, message: Dict[str, Any]) -> None:
+    async def broadcast_to_board(self, board_id: str, message: dict[str, Any]) -> None:
         """Отправка сообщения всем подключенным к табло"""
         try:
-            if board_id not in self.connections:
-                return
-
-            # Обновляем состояние табло
-            self.board_states[board_id] = {
-                **self.board_states.get(board_id, {}),
-                **message,
-                "last_update": datetime.utcnow().isoformat(),
-            }
-
-            # Отправляем всем подключенным
-            disconnected = set()
-            for websocket in self.connections[board_id].copy():
-                try:
-                    await websocket.send_text(json.dumps(message, ensure_ascii=False))
-                except WebSocketDisconnect:
-                    disconnected.add(websocket)
-                except Exception as e:
-                    logger.error(f"Ошибка отправки WebSocket сообщения: {e}")
-                    disconnected.add(websocket)
-
-            # Удаляем отключенные соединения
-            for ws in disconnected:
-                self.connections[board_id].discard(ws)
-
-            if disconnected:
-                logger.info(f"Удалено {len(disconnected)} отключенных соединений")
+            await self._broadcast_to_board_local(board_id, message)
+            await self._pubsub.publish(self._board_channel(board_id), message)
 
         except Exception as e:
             logger.error(f"Ошибка broadcast сообщения: {e}")
+
+    def _board_channel(self, board_id: str) -> str:
+        return f"board:{board_id}"
+
+    async def _ensure_redis_subscription(self, board_id: str) -> None:
+        if board_id in self._redis_handlers:
+            return
+
+        async def _handler(payload: dict[str, Any], _board_id: str = board_id) -> None:
+            await self._broadcast_to_board_local(_board_id, payload)
+
+        self._redis_handlers[board_id] = _handler
+        await self._pubsub.subscribe(self._board_channel(board_id), _handler)
+
+    async def _remove_redis_subscription(self, board_id: str) -> None:
+        handler = self._redis_handlers.pop(board_id, None)
+        if handler is None:
+            return
+        await self._pubsub.unsubscribe(self._board_channel(board_id), handler)
+
+    async def _broadcast_to_board_local(self, board_id: str, message: dict[str, Any]) -> None:
+        if board_id not in self.connections:
+            return
+
+        # Обновляем состояние табло
+        self.board_states[board_id] = {
+            **self.board_states.get(board_id, {}),
+            **message,
+            "last_update": datetime.utcnow().isoformat(),
+        }
+
+        # Отправляем всем подключенным
+        disconnected = set()
+        for websocket in self.connections[board_id].copy():
+            try:
+                await websocket.send_text(json.dumps(message, ensure_ascii=False))
+            except WebSocketDisconnect:
+                disconnected.add(websocket)
+            except Exception as e:
+                logger.error(f"Ошибка отправки WebSocket сообщения: {e}")
+                disconnected.add(websocket)
+
+        # Удаляем отключенные соединения
+        for ws in disconnected:
+            self.connections[board_id].discard(ws)
+
+        if disconnected:
+            logger.info(f"Удалено {len(disconnected)} отключенных соединений")
 
     async def broadcast_patient_call(
         self,
         queue_entry: OnlineQueueEntry,
         doctor_name: str,
         cabinet: str = None,
-        board_ids: List[str] = None,
+        board_ids: list[str] = None,
     ) -> None:
         """Трансляция вызова пациента на табло"""
         try:
@@ -160,7 +189,10 @@ class DisplayWebSocketManager:
             logger.error(f"Ошибка трансляции вызова пациента: {e}")
 
     async def broadcast_daily_queue_state(
-        self, daily_queue: DailyQueue, board_ids: List[str] = None
+        self,
+        daily_queue: DailyQueue,
+        board_ids: list[str] = None,
+        event_type: str | None = None,
     ) -> None:
         """Трансляция обновления очереди"""
         try:
@@ -192,6 +224,7 @@ class DisplayWebSocketManager:
 
             update_message = {
                 "type": "queue_update",
+                **({"event_type": event_type} if event_type else {}),
                 "data": {
                     "doctor_name": (
                         daily_queue.specialist.user.full_name
@@ -247,7 +280,7 @@ class DisplayWebSocketManager:
         announcement_text: str,
         announcement_type: str = "info",
         duration: int = 60,
-        board_ids: List[str] = None,
+        board_ids: list[str] = None,
     ) -> None:
         """Трансляция объявления"""
         try:
@@ -406,7 +439,7 @@ class DisplayWebSocketManager:
         """Получить количество подключений к табло"""
         return len(self.connections.get(board_id, set()))
 
-    def get_all_boards_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_boards_status(self) -> dict[str, dict[str, Any]]:
         """Получить статус всех табло"""
         status = {}
         for board_id, connections in self.connections.items():
@@ -422,17 +455,33 @@ class DisplayWebSocketManager:
     async def broadcast_queue_update(self, queue_entry, event_type: str) -> None:
         """Трансляция обновления очереди"""
         try:
+            if event_type != "queue.created":
+                if queue_entry.queue:
+                    await self.broadcast_daily_queue_state(
+                        queue_entry.queue,
+                        event_type=event_type,
+                    )
+                    return
+
             message = {
                 "type": "queue_update",
                 "event_type": event_type,
                 "data": {
                     "queue_entry_id": queue_entry.id,
                     "number": queue_entry.number,
-                    "patient_name": queue_entry.patient_name,
+                    "patient_name": self._format_patient_name(
+                        queue_entry.patient_name
+                    ),
                     "status": queue_entry.status,
+                    "source": queue_entry.source,
                     "created_at": (
                         queue_entry.created_at.isoformat()
                         if queue_entry.created_at
+                        else None
+                    ),
+                    "called_at": (
+                        queue_entry.called_at.isoformat()
+                        if queue_entry.called_at
                         else None
                     ),
                     "specialist_id": queue_entry.queue.specialist_id,
@@ -454,7 +503,7 @@ class DisplayWebSocketManager:
             logger.error(f"Ошибка трансляции обновления очереди: {e}")
 
     async def broadcast_queue_event(
-        self, department: str, event_type: str, data: Dict[str, Any]
+        self, department: str, event_type: str, data: dict[str, Any]
     ) -> None:
         """
         Отправляет события очереди всем подключенным табло отделения
@@ -484,3 +533,15 @@ display_manager = DisplayWebSocketManager()
 def get_display_manager() -> DisplayWebSocketManager:
     """Получить экземпляр менеджера табло"""
     return display_manager
+
+
+def dispatch_async(coro) -> None:
+    """
+    Safely dispatch an async coroutine from sync or async contexts.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(coro)
+    else:
+        loop.create_task(coro)

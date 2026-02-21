@@ -14,7 +14,7 @@ def test_secret_key_min_length():
     valid_key = "a" * 32
     settings = Settings(SECRET_KEY=valid_key)
     assert len(settings.SECRET_KEY) >= 32
-    
+
     # Invalid key (too short)
     with pytest.raises(ValidationError) as exc_info:
         Settings(SECRET_KEY="short")
@@ -29,7 +29,7 @@ def test_secret_key_required():
     # The requirement is enforced by min_length=32 in Field definition
     settings = Settings(SECRET_KEY="a" * 32)
     assert len(settings.SECRET_KEY) == 32
-    
+
     # Test that too short keys are rejected
     with pytest.raises(ValidationError):
         Settings(SECRET_KEY="short")
@@ -60,14 +60,14 @@ def test_backup_retention_validation():
     # Valid values
     settings1 = Settings(SECRET_KEY="a" * 32, BACKUP_RETENTION_DAYS=1)
     assert settings1.BACKUP_RETENTION_DAYS == 1
-    
+
     settings2 = Settings(SECRET_KEY="a" * 32, BACKUP_RETENTION_DAYS=365)
     assert settings2.BACKUP_RETENTION_DAYS == 365
-    
+
     # Invalid: too low
     with pytest.raises(ValidationError):
         Settings(SECRET_KEY="a" * 32, BACKUP_RETENTION_DAYS=0)
-    
+
     # Invalid: too high
     with pytest.raises(ValidationError):
         Settings(SECRET_KEY="a" * 32, BACKUP_RETENTION_DAYS=366)
@@ -86,7 +86,7 @@ def test_get_settings_validation():
     # This test requires environment variable manipulation
     # We'll test the validation logic indirectly
     os.environ.pop("SECRET_KEY", None)  # Clear any existing SECRET_KEY
-    
+
     # In dev mode, it should work with default or generated key
     # In production mode, it should fail
     try:

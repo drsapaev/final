@@ -20,7 +20,8 @@ export const tokenManager = {
    */
   getAccessToken() {
     try {
-      return localStorage.getItem(TOKEN_KEY);
+      const t = localStorage.getItem(TOKEN_KEY);
+      return t ? t.trim() : null;
     } catch (error) {
       logger.error('Error reading access token:', error);
       return null;
@@ -34,7 +35,9 @@ export const tokenManager = {
   setAccessToken(token) {
     try {
       if (token) {
-        localStorage.setItem(TOKEN_KEY, token);
+        const trimmed = typeof token === 'string' ? token.trim() : token;
+        if (trimmed) localStorage.setItem(TOKEN_KEY, trimmed);
+        else localStorage.removeItem(TOKEN_KEY);
       } else {
         localStorage.removeItem(TOKEN_KEY);
       }

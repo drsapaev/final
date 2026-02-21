@@ -2,11 +2,10 @@
 Google Gemini провайдер для AI функций
 """
 
-import base64
 import io
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import google.generativeai as genai
 from PIL import Image
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 class GeminiProvider(BaseAIProvider):
     """Провайдер Google Gemini"""
 
-    def __init__(self, api_key: str, model: Optional[str] = None):
+    def __init__(self, api_key: str, model: str | None = None):
         super().__init__(api_key, model)
         genai.configure(api_key=api_key)
         self.text_model = genai.GenerativeModel(self.model)
@@ -55,8 +54,8 @@ class GeminiProvider(BaseAIProvider):
             )
 
     async def analyze_complaint(
-        self, complaint: str, patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, complaint: str, patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ жалоб и создание плана обследования"""
         system_prompt = self._build_system_prompt("doctor")
 
@@ -109,8 +108,8 @@ class GeminiProvider(BaseAIProvider):
             }
 
     async def suggest_icd10(
-        self, symptoms: List[str], diagnosis: Optional[str] = None
-    ) -> List[Dict[str, str]]:
+        self, symptoms: list[str], diagnosis: str | None = None
+    ) -> list[dict[str, str]]:
         """Подсказки кодов МКБ-10"""
         system_prompt = self._build_system_prompt("icd")
 
@@ -154,8 +153,8 @@ class GeminiProvider(BaseAIProvider):
             return []
 
     async def interpret_lab_results(
-        self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, results: list[dict[str, Any]], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Интерпретация результатов анализов"""
         system_prompt = self._build_system_prompt("lab")
 
@@ -215,14 +214,14 @@ class GeminiProvider(BaseAIProvider):
             }
 
     async def analyze_skin(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ кожи по фото через Gemini Vision"""
         try:
             # Преобразуем bytes в PIL Image
             image = Image.open(io.BytesIO(image_data))
 
-            prompt = """Проанализируйте состояние кожи на фото. 
+            prompt = """Проанализируйте состояние кожи на фото.
 
 Определите:
 1. Тип кожи (сухая/жирная/комбинированная/нормальная)
@@ -257,8 +256,8 @@ class GeminiProvider(BaseAIProvider):
             return {"error": self._format_error(e)}
 
     async def interpret_ecg(
-        self, ecg_data: Dict[str, Any], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, ecg_data: dict[str, Any], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Интерпретация ЭКГ"""
         system_prompt = self._build_system_prompt("cardiologist")
 

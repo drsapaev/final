@@ -27,7 +27,7 @@ def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: U
         json={"username": admin_user.username, "password": "admin123"},
     )
     token = response.json()["access_token"]
-    
+
     # Создаем пациента
     patient_data = {
         "last_name": "Тестов",
@@ -36,23 +36,23 @@ def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: U
         "sex": "M",
         "phone": "+998901234999",
     }
-    
+
     response = client.post(
         "/api/v1/patients/",
         json=patient_data,
         headers={"Authorization": f"Bearer {token}"},
     )
-    
+
     assert response.status_code == 200
     patient_id = response.json()["id"]
-    
+
     # Проверяем, что создан audit log
     audit_log = db.query(UserAuditLog).filter(
         UserAuditLog.resource_type == "patients",
         UserAuditLog.resource_id == patient_id,
         UserAuditLog.action == "CREATE",
     ).first()
-    
+
     assert audit_log is not None, "Audit log для создания пациента должен существовать"
     assert audit_log.user_id == admin_user.id
     assert audit_log.action == "CREATE"
@@ -71,28 +71,28 @@ def test_audit_log_update_patient(client: TestClient, db: Session, admin_user: U
         json={"username": admin_user.username, "password": "admin123"},
     )
     token = response.json()["access_token"]
-    
+
     # Обновляем пациента
     update_data = {
         "last_name": "Обновленный",
         "first_name": test_patient.first_name,
     }
-    
+
     response = client.put(
         f"/api/v1/patients/{test_patient.id}",
         json=update_data,
         headers={"Authorization": f"Bearer {token}"},
     )
-    
+
     assert response.status_code == 200
-    
+
     # Проверяем, что создан audit log
     audit_log = db.query(UserAuditLog).filter(
         UserAuditLog.resource_type == "patients",
         UserAuditLog.resource_id == test_patient.id,
         UserAuditLog.action == "UPDATE",
     ).order_by(UserAuditLog.created_at.desc()).first()
-    
+
     assert audit_log is not None, "Audit log для обновления пациента должен существовать"
     assert audit_log.user_id == admin_user.id
     assert audit_log.action == "UPDATE"
@@ -109,24 +109,24 @@ def test_audit_log_delete_patient(client: TestClient, db: Session, admin_user: U
         json={"username": admin_user.username, "password": "admin123"},
     )
     token = response.json()["access_token"]
-    
+
     patient_id = test_patient.id
-    
+
     # Удаляем пациента
     response = client.delete(
         f"/api/v1/patients/{patient_id}",
         headers={"Authorization": f"Bearer {token}"},
     )
-    
+
     assert response.status_code in [200, 204]
-    
+
     # Проверяем, что создан audit log
     audit_log = db.query(UserAuditLog).filter(
         UserAuditLog.resource_type == "patients",
         UserAuditLog.resource_id == patient_id,
         UserAuditLog.action == "DELETE",
     ).first()
-    
+
     assert audit_log is not None, "Audit log для удаления пациента должен существовать"
     assert audit_log.user_id == admin_user.id
     assert audit_log.action == "DELETE"
@@ -205,10 +205,10 @@ def test_calculate_diff_hash():
     """Тест: вычисление хеша различий"""
     old_data = {"name": "Old", "value": 1}
     new_data = {"name": "New", "value": 2}
-    
+
     hash1 = calculate_diff_hash(old_data, new_data)
     hash2 = calculate_diff_hash(old_data, new_data)
-    
+
     # Хеш должен быть одинаковым для одинаковых данных
     assert hash1 == hash2
     assert len(hash1) == 16  # Первые 16 символов SHA256
@@ -223,7 +223,7 @@ def test_log_critical_change_non_critical_table(db: Session, admin_user: User):
         table_name="non_critical_table",
         row_id=1,
     )
-    
+
     assert result is None, "Не критичные таблицы не должны логироваться"
 
 
@@ -235,7 +235,7 @@ def test_audit_log_request_id(client: TestClient, db: Session, admin_user: User)
         json={"username": admin_user.username, "password": "admin123"},
     )
     token = response.json()["access_token"]
-    
+
     # Создаем несколько пациентов
     patient_ids = []
     for i in range(3):
@@ -246,20 +246,20 @@ def test_audit_log_request_id(client: TestClient, db: Session, admin_user: User)
             "sex": "M",
             "phone": f"+99890123499{i}",
         }
-        
+
         response = client.post(
             "/api/v1/patients/",
             json=patient_data,
             headers={"Authorization": f"Bearer {token}"},
         )
         patient_ids.append(response.json()["id"])
-    
+
     # Проверяем, что у каждого audit log есть request_id
     audit_logs = db.query(UserAuditLog).filter(
         UserAuditLog.resource_type == "patients",
         UserAuditLog.resource_id.in_(patient_ids),
     ).all()
-    
+
     assert len(audit_logs) >= 3
     request_ids = {log.request_id for log in audit_logs if log.request_id}
     # Все request_id должны быть уникальными (или хотя бы присутствовать)
@@ -277,11 +277,11 @@ def test_audit_log_critical_table(db: Session, admin_user: User, table_name: str
         row_id=1,
         new_data={"test": "data"},
     )
-    
+
     assert result is not None, f"Таблица {table_name} должна логироваться"
     assert result.action == "CREATE"
     assert result.resource_type == table_name
-    
+
     db.rollback()  # Откатываем изменения
 
 

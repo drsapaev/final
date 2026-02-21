@@ -6,12 +6,10 @@
 
 import logging
 import uuid
-from typing import Union
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.services.queue_service import (

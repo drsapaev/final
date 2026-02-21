@@ -3,7 +3,7 @@ import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import httpx
 from jinja2 import Template
@@ -14,15 +14,15 @@ from app.crud.notification import (
     crud_notification_history,
     crud_notification_template,
 )
-from app.crud.user_management import user_notification_settings as crud_user_notification_settings
+from app.crud.user_management import (
+    user_notification_settings as crud_user_notification_settings,
+)
 from app.models.notification import NotificationHistory
-from app.schemas.notification import NotificationHistoryCreate
-from app.models.notification import NotificationHistory
-from app.schemas.notification import NotificationHistoryCreate
-from app.services.telegram.bot import telegram_bot
-from app.services.fcm_service import get_fcm_service
 from app.models.user import User
+from app.schemas.notification import NotificationHistoryCreate
+from app.services.fcm_service import get_fcm_service
 from app.services.notification_websocket import get_notification_ws_manager
+from app.services.telegram.bot import telegram_bot
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +41,15 @@ class NotificationSenderService:
 
         self.sms_api_key = getattr(settings, "SMS_API_KEY", None)
         self.sms_api_url = getattr(settings, "SMS_API_URL", None)
-        
+
         # Интеграция с Telegram ботом
         self.telegram_bot = telegram_bot
-        
+
         # Интеграция с FCM
         self.fcm_service = get_fcm_service()
 
     async def send_email(
-        self, to_email: str, subject: str, body: str, html_body: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html_body: str | None = None
     ) -> bool:
         """Отправка email уведомления"""
         if not all([self.smtp_username, self.smtp_password]):
@@ -63,7 +63,7 @@ class NotificationSenderService:
         )
 
     def _send_email_sync(
-        self, to_email: str, subject: str, body: str, html_body: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html_body: str | None = None
     ) -> bool:
         """Синхронная отправка email (для запуска в executor)"""
         try:
@@ -96,7 +96,7 @@ class NotificationSenderService:
             logger.error(f"Ошибка отправки email: {e}")
             return False
 
-    async def send_telegram(self, message: str, chat_id: Optional[str] = None) -> bool:
+    async def send_telegram(self, message: str, chat_id: str | None = None) -> bool:
         """Отправка уведомления в Telegram"""
         if not self.telegram_bot_token:
             logger.warning("Telegram bot token не настроен")
@@ -126,10 +126,10 @@ class NotificationSenderService:
         """Отправка SMS уведомления"""
         try:
             from app.services.sms_providers import get_sms_manager
-            
+
             sms_manager = get_sms_manager()
             response = await sms_manager.send_sms(phone, message)
-            
+
             if response.success:
                 logger.info(f"SMS отправлено на {phone} через {response.provider}")
                 return True
@@ -146,14 +146,14 @@ class NotificationSenderService:
         user_id: int,
         title: str,
         message: str,
-        data: Optional[Dict[str, Any]] = None,
-        db: Optional[Session] = None,
+        data: dict[str, Any] | None = None,
+        db: Session | None = None,
     ) -> bool:
         """Отправка Push-уведомления (Mobile + WebSocket)"""
         try:
             # --- WebSocket Integration ---
             # Attempt to send to connected WebSocket client (In-App Notification)
-            # We try this regardless of DB/User presence if we have user_id, 
+            # We try this regardless of DB/User presence if we have user_id,
             # but user_id is integer so we can try.
             try:
                 ws_manager = get_notification_ws_manager()
@@ -174,7 +174,7 @@ class NotificationSenderService:
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
                     return False
-                
+
                 # Сохраняем в историю
                 try:
                     notification_data = {
@@ -199,7 +199,7 @@ class NotificationSenderService:
                         body=message,
                         data=data or {},
                     )
-            
+
             return True
         except Exception as e:
             logger.error(f"Ошибка отправки Push: {e}")
@@ -212,19 +212,19 @@ class NotificationSenderService:
         appointment_date: datetime,
         doctor_name: str,
         department: str,
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """Отправка напоминания о записи"""
         subject = "Напоминание о записи к врачу"
 
         # Формируем сообщения
         email_body = f"""
         Здравствуйте!
-        
+
         Напоминаем о записи к врачу {doctor_name} в отделении {department}.
         Дата и время: {appointment_date.strftime('%d.%m.%Y в %H:%M')}
-        
+
         Пожалуйста, не забудьте взять с собой документы и прийти за 10 минут до приёма.
-        
+
         С уважением,
         Администрация клиники
         """
@@ -233,7 +233,7 @@ class NotificationSenderService:
 
         telegram_message = f"""
         📅 <b>Напоминание о записи</b>
-        
+
         👤 Пациент: {patient_email}
         📱 Телефон: {patient_phone}
         👨‍⚕️ Врач: {doctor_name}
@@ -261,14 +261,14 @@ class NotificationSenderService:
         visit_date: datetime,
         doctor_name: str,
         department: str,
-        queue_number: Optional[int] = None,
-    ) -> Dict[str, bool]:
+        queue_number: int | None = None,
+    ) -> dict[str, bool]:
         """Отправка подтверждения визита"""
         subject = "Подтверждение визита к врачу"
 
         email_body = f"""
         Здравствуйте!
-        
+
         Ваш визит к врачу {doctor_name} в отделении {department} подтверждён.
         Дата и время: {visit_date.strftime('%d.%m.%Y в %H:%M')}
         """
@@ -278,7 +278,7 @@ class NotificationSenderService:
 
         email_body += """
         Пожалуйста, придите за 10 минут до назначенного времени.
-        
+
         С уважением,
         Администрация клиники
         """
@@ -291,7 +291,7 @@ class NotificationSenderService:
 
         telegram_message = f"""
         ✅ <b>Подтверждение визита</b>
-        
+
         👤 Пациент: {patient_email}
         📱 Телефон: {patient_phone}
         👨‍⚕️ Врач: {doctor_name}
@@ -319,27 +319,27 @@ class NotificationSenderService:
         self,
         db: Session,
         appointment_id: int,
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """Отправка подтверждения записи (Unified: Push, Email, SMS, Telegram)"""
         from app.models.appointment import Appointment
         from app.models.user import User
-        
+
         try:
             appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
             if not appointment:
                 return {}
-                
+
             doctor_name = appointment.doctor.name if appointment.doctor else "Врач"
             specialty = appointment.doctor.specialty if appointment.doctor else ""
             visit_date_str = appointment.appointment_date.strftime('%d.%m.%Y в %H:%M')
-            
+
             # --- Push Notification Logic ---
             if appointment.patient and appointment.patient.user_id:
                 user = db.query(User).filter(User.id == appointment.patient.user_id).first()
                 if user and user.device_token:
                     title = "Запись подтверждена"
                     message = f"Ваша запись к врачу {doctor_name} на {visit_date_str} подтверждена"
-                    
+
                     await self.send_push(
                         user_id=user.id,
                         title=title,
@@ -356,11 +356,11 @@ class NotificationSenderService:
             # We need patient email/phone.
             patient_email = appointment.patient.email if appointment.patient else None
             patient_phone = appointment.patient.phone if appointment.patient else None
-            
+
             # Use send_visit_confirmation which handles Email/SMS/Telegram template formatting
             # Note: send_visit_confirmation sends "confirmation" logic.
             # Ideally we reuse it.
-            
+
             return await self.send_visit_confirmation(
                 patient_email=patient_email,
                 patient_phone=patient_phone,
@@ -381,19 +381,19 @@ class NotificationSenderService:
         currency: str,
         visit_date: datetime,
         doctor_name: str,
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """Отправка уведомления об оплате"""
         subject = "Подтверждение оплаты"
 
         email_body = f"""
         Здравствуйте!
-        
+
         Получена оплата за визит к врачу {doctor_name}.
         Сумма: {amount} {currency}
         Дата визита: {visit_date.strftime('%d.%m.%Y в %H:%M')}
-        
+
         Спасибо за оплату!
-        
+
         С уважением,
         Администрация клиники
         """
@@ -402,7 +402,7 @@ class NotificationSenderService:
 
         telegram_message = f"""
         💰 <b>Подтверждение оплаты</b>
-        
+
         👤 Пациент: {patient_email}
         📱 Телефон: {patient_phone}
         💵 Сумма: {amount} {currency}
@@ -428,36 +428,35 @@ class NotificationSenderService:
         department: str,
         current_number: int,
         estimated_wait: str,
-        patient_id: Optional[int] = None,
-        db: Optional[Session] = None,
+        patient_id: int | None = None,
+        db: Session | None = None,
     ) -> bool:
         """Отправка обновления очереди (Telegram + Push)"""
         message = f"""
         📊 <b>Обновление очереди</b>
-        
+
         🏥 Отделение: {department}
         🎫 Текущий номер: {current_number}
         ⏱️ Примерное время ожидания: {estimated_wait}
-        
+
         Обновлено: {datetime.now().strftime('%H:%M:%S')}
         """
-        
+
         # Основная рассылка (в канал/чат отделения, если есть - пока только return telegram logic)
         # TODO: Если это обновление для КОНКРЕТНОГО пациента (mobile view), отправляем ему лично.
-        
+
         if patient_id and db:
              # Отправка конкретному пациенту
-             from app.models.user import User
-             
+
              # Push logic if patient has user linked
              # Assuming patient_id is ID from Patient model
              # We need User object.
              # This method signature originally was for GENERAL update.
              # MobileNotificationService had send_queue_update(patient_id, queue_position, specialty)
-             pass 
+             pass
 
-        return await self.send_telegram(message) 
-        
+        return await self.send_telegram(message)
+
     async def send_patient_queue_update(
         self,
         db: Session,
@@ -470,18 +469,18 @@ class NotificationSenderService:
              # Находим пользователя через пациента
              from app.models.patient import Patient
              from app.models.user import User
-             
+
              patient = db.query(Patient).filter(Patient.id == patient_id).first()
              if not patient or not patient.user_id:
                  return False
-                 
+
              user = db.query(User).filter(User.id == patient.user_id).first()
              if not user:
                  return False
 
              title = "Обновление очереди"
              message = f"Ваша позиция в очереди к {specialty}: #{queue_position}"
-             
+
              # Push
              if user.device_token:
                  await self.send_push(
@@ -495,26 +494,26 @@ class NotificationSenderService:
                      },
                      db=db
                  )
-             
+
              # Telegram (если есть)
              if user.telegram_id:
                  await self.send_telegram_message(
                      user.telegram_id,
                      f"🔢 <b>{title}</b>\n\n{message}"
                  )
-                 
+
              return True
         except Exception as e:
             logger.error(f"Error sending patient queue update: {e}")
             return False
 
     async def send_system_alert(
-        self, alert_type: str, message: str, details: Optional[Dict[str, Any]] = None
+        self, alert_type: str, message: str, details: dict[str, Any] | None = None
     ) -> bool:
         """Отправка системного оповещения"""
         alert_message = f"""
         🚨 <b>Системное оповещение</b>
-        
+
         Тип: {alert_type}
         Сообщение: {message}
         """
@@ -528,7 +527,7 @@ class NotificationSenderService:
 
         return await self.send_telegram(alert_message)
 
-    def render_template(self, template_text: str, data: Dict[str, Any]) -> str:
+    def render_template(self, template_text: str, data: dict[str, Any]) -> str:
         """Рендеринг шаблона с данными"""
         try:
             template = Template(template_text)
@@ -543,11 +542,11 @@ class NotificationSenderService:
         notification_type: str,
         channel: str,
         recipient_contact: str,
-        template_data: Dict[str, Any],
+        template_data: dict[str, Any],
         recipient_type: str = "patient",
-        recipient_id: Optional[int] = None,
-        related_entity_type: Optional[str] = None,
-        related_entity_id: Optional[int] = None,
+        recipient_id: int | None = None,
+        related_entity_type: str | None = None,
+        related_entity_id: int | None = None,
     ) -> NotificationHistory:
         """Отправка уведомления с использованием шаблона"""
 
@@ -618,10 +617,10 @@ class NotificationSenderService:
         self,
         db: Session,
         notification_type: str,
-        channels: List[str],
-        recipients: List[Dict[str, Any]],
-        template_data: Dict[str, Any],
-    ) -> List[NotificationHistory]:
+        channels: list[str],
+        recipients: list[dict[str, Any]],
+        template_data: dict[str, Any],
+    ) -> list[NotificationHistory]:
         """Массовая отправка уведомлений с проверкой настроек пользователей"""
         results = []
 
@@ -636,14 +635,14 @@ class NotificationSenderService:
                     # Проверяем конкретную настройку для этого типа уведомления и канала
                     # формат: email_appointment_reminder
                     # Если тип уведомления "appointment_reminder", то ищем "email_appointment_reminder"
-                    
+
                     setting_key = f"{channel}_{notification_type}"
-                    
+
                     # Проверяем наличие атрибута, если нет - считаем включенным по умолчанию (или глобальным)
                     if hasattr(settings, setting_key):
                         if not getattr(settings, setting_key):
                             continue # Выключено пользователем
-                
+
                 # Получаем контакт для канала
                 contact = None
                 if channel == "email":
@@ -680,8 +679,8 @@ class NotificationSenderService:
         appointment_id: int,
         patient_id: int,
         notification_type: str = "appointment_reminder",
-        channels: Optional[List[str]] = None,
-    ) -> List[NotificationHistory]:
+        channels: list[str] | None = None,
+    ) -> list[NotificationHistory]:
         """Отправка уведомления о записи"""
         from app.crud import patient as patient_crud
         from app.models.appointment import Appointment
@@ -754,8 +753,8 @@ class NotificationSenderService:
         amount: float,
         currency: str = "UZS",
         notification_type: str = "payment_success",
-        channels: Optional[List[str]] = None,
-    ) -> List[NotificationHistory]:
+        channels: list[str] | None = None,
+    ) -> list[NotificationHistory]:
         """Отправка уведомления об оплате"""
         from app.crud import patient as patient_crud
 
@@ -817,8 +816,8 @@ class NotificationSenderService:
         user_id: int,
         test_name: str,
         test_date: datetime,
-        lab_result_id: Optional[int] = None,
-    ) -> Dict[str, bool]:
+        lab_result_id: int | None = None,
+    ) -> dict[str, bool]:
         """Уведомление о готовности результатов анализов"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -827,14 +826,14 @@ class NotificationSenderService:
 
             subject = "Результаты анализов готовы"
             message = f"Результаты анализа '{test_name}' от {test_date.strftime('%d.%m.%Y')} готовы к просмотру."
-            
+
             results = {}
-            
+
             # Telegram
             if user.telegram_id:
                 tele_msg = f"🔬 <b>{subject}</b>\n\n{message}"
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
-            
+
             # Push
             if user.device_token:
                 results["push"] = await self.send_push(
@@ -844,7 +843,7 @@ class NotificationSenderService:
                     data={"type": "lab_results", "lab_result_id": lab_result_id},
                     db=db
                 )
-                
+
             return results
         except Exception as e:
             logger.error(f"Error sending lab results notification: {e}")
@@ -856,7 +855,7 @@ class NotificationSenderService:
         user_id: int,
         prescription_id: int,
         doctor_name: str,
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """Уведомление о готовности рецепта"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -865,7 +864,7 @@ class NotificationSenderService:
 
             subject = "Рецепт готов"
             message = f"Ваш рецепт №{prescription_id} от врача {doctor_name} готов."
-            
+
             results = {}
 
             # Telegram
@@ -879,8 +878,8 @@ class NotificationSenderService:
 
 Рецепт доступен в приложении.
 """
-                # TODO: Add download button if using pure telegram bot API manually, 
-                # but send_telegram_message is simple text. 
+                # TODO: Add download button if using pure telegram bot API manually,
+                # but send_telegram_message is simple text.
                 # For now keeping clear text.
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
@@ -893,7 +892,7 @@ class NotificationSenderService:
                     data={"type": "prescription_ready", "prescription_id": prescription_id},
                     db=db
                 )
-            
+
             return results
         except Exception as e:
             logger.error(f"Error sending prescription notification: {e}")
@@ -904,18 +903,18 @@ class NotificationSenderService:
         db: Session,
         user_id: int,
         change_type: str,
-        old_data: Dict[str, Any],
-        new_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, bool]:
+        old_data: dict[str, Any],
+        new_data: dict[str, Any] | None = None,
+    ) -> dict[str, bool]:
         """Уведомление об изменении в расписании"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
                 return {}
-            
+
             subject = ""
             message = ""
-            
+
             if change_type == "cancelled":
                 subject = "Визит отменен"
                 message = f"Визит к врачу {old_data.get('doctor')} на {old_data.get('date')} {old_data.get('time')} отменен."
@@ -942,31 +941,31 @@ class NotificationSenderService:
                     data={"type": "schedule_change", "change_type": change_type},
                     db=db
                 )
-                
+
             return results
         except Exception as e:
             logger.error(f"Error sending schedule change notification: {e}")
             return {}
-            
+
     async def send_appointment_cancellation(
         self,
         db: Session,
         appointment_id: int,
-        reason: Optional[str] = None
+        reason: str | None = None
     ) -> bool:
         """Отправка уведомления об отмене записи (Wrapper logic)"""
         from app.models.appointment import Appointment
-        
+
         appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
         if not appointment:
             return False
-            
+
         old_data = {
             "doctor": appointment.doctor.name if appointment.doctor else "Врач",
             "date": appointment.appointment_date.strftime("%d.%m.%Y"),
             "time": appointment.appointment_date.strftime("%H:%M") # Assuming appointment_date has time or separate field
         }
-        
+
         return await self.send_schedule_change_notification(
             db=db,
             user_id=appointment.patient_id,
@@ -976,12 +975,12 @@ class NotificationSenderService:
 
     async def send_visit_confirmation_invitation(
         self, db: Session, visit_id: int, channel: str = "auto"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Отправляет приглашение на подтверждение визита
         """
-        from app.models.visit import Visit
         from app.models.patient import Patient
+        from app.models.visit import Visit
 
         try:
             visit = db.query(Visit).filter(Visit.id == visit_id).first()
@@ -1024,10 +1023,10 @@ class NotificationSenderService:
 
     def _prepare_notification_data(
         self, db: Session, visit: Any, patient: Any
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Подготавливает данные для уведомления"""
-        from app.models.visit import VisitService
         from app.models.clinic import Doctor
+        from app.models.visit import VisitService
 
         visit_services = (
             db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
@@ -1058,7 +1057,7 @@ class NotificationSenderService:
             "visit_type": self._get_visit_type_text(visit.discount_mode),
         }
 
-    def _get_visit_type_text(self, discount_mode: Optional[str]) -> str:
+    def _get_visit_type_text(self, discount_mode: str | None) -> str:
         if discount_mode == "repeat":
             return "Повторный визит"
         elif discount_mode == "benefit":
@@ -1069,8 +1068,8 @@ class NotificationSenderService:
             return "Платный визит"
 
     async def _send_telegram_invitation(
-        self, patient: Any, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Any, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Отправляет приглашение через Telegram"""
         try:
             if not hasattr(patient, 'telegram_id') or not patient.telegram_id:
@@ -1101,7 +1100,7 @@ class NotificationSenderService:
             logger.error(f"Ошибка отправки Telegram приглашения: {e}")
             return {"success": False, "error": str(e)}
 
-    def _format_telegram_message(self, data: Dict[str, Any]) -> str:
+    def _format_telegram_message(self, data: dict[str, Any]) -> str:
         services_list = "\n".join(data["services"])
         message = f"""
 🏥 **Подтверждение визита в клинику**
@@ -1125,7 +1124,7 @@ class NotificationSenderService:
 
     def _create_telegram_keyboard(
         self, confirmation_token: str
-    ) -> List[List[Dict[str, str]]]:
+    ) -> list[list[dict[str, str]]]:
         return [
             [
                 {
@@ -1148,8 +1147,8 @@ class NotificationSenderService:
         ]
 
     async def _send_pwa_invitation(
-        self, patient: Any, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Any, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Отправляет приглашение через PWA (SMS с deep link)"""
         try:
             if not patient.phone:
@@ -1170,7 +1169,7 @@ class NotificationSenderService:
             logger.error(f"Ошибка отправки PWA приглашения: {e}")
             return {"success": False, "error": str(e)}
 
-    def _format_sms_message(self, data: Dict[str, Any], pwa_url: str) -> str:
+    def _format_sms_message(self, data: dict[str, Any], pwa_url: str) -> str:
         return f"""
 Клиника: Подтвердите визит на {data["visit_date"]} в {data["visit_time"]} к врачу {data["doctor_name"]}.
 Сумма: {data["total_amount"]} сум.
@@ -1178,8 +1177,8 @@ class NotificationSenderService:
         """.strip()
 
     async def _send_phone_invitation(
-        self, patient: Any, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient: Any, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Создает задачу для регистратуры - позвонить пациенту"""
         # Пока просто логируем, в будущем можно интегрировать с CRM/Task системой
         logger.info(f"Создано уведомление для регистратуры: позвонить пациенту {patient.id} для подтверждения визита {data['visit_id']}")
@@ -1191,10 +1190,10 @@ class NotificationSenderService:
 
     async def send_confirmation_reminder(
         self, db: Session, visit_id: int, hours_before: int = 24
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Отправляет напоминание о необходимости подтверждения"""
-        from app.models.visit import Visit
         from app.models.patient import Patient
+        from app.models.visit import Visit
 
         try:
             visit = db.query(Visit).filter(Visit.id == visit_id).first()
@@ -1228,8 +1227,8 @@ class NotificationSenderService:
             return {"success": False, "error": str(e)}
 
     async def send_telegram_message(
-        self, user_id: Union[int, str], message: str, parse_mode: str = "HTML"
-    ) -> Dict[str, Any]:
+        self, user_id: int | str, message: str, parse_mode: str = "HTML"
+    ) -> dict[str, Any]:
         """
         Отправляет сообщение через Telegram бот.
         Метод-обертка для совместимости с кодом, использующим NotificationService.
@@ -1242,9 +1241,9 @@ class NotificationSenderService:
             # Используем telegram_bot.send_message (предполагая что такой метод есть или будет добавлен)
             # Если в TelegramBotService нет send_message, используем telegram_bot.application.bot.send_message
             # Но лучше использовать методы сервиса.
-            # Проверим есть ли метод send_message в TelegramBotService, 
+            # Проверим есть ли метод send_message в TelegramBotService,
             # если нет - используем send_message из bot instance
-            
+
             # В TelegramBotService обычно есть send_message
             if hasattr(self.telegram_bot, "send_message"):
                  return await self.telegram_bot.send_message(user_id=user_id, text=message, parse_mode=parse_mode)
@@ -1252,7 +1251,7 @@ class NotificationSenderService:
                  # Fallback
                  await self.telegram_bot.application.bot.send_message(chat_id=user_id, text=message, parse_mode=parse_mode)
                  return {"success": True}
-                 
+
         except Exception as e:
             logger.error(f"Error sending telegram message: {e}")
             return {"success": False, "error": str(e)}

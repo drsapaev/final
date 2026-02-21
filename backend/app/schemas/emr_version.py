@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -15,9 +15,9 @@ class EMRVersionBase(ORMModel):
 
     emr_id: int
     version_number: int
-    data: Dict[str, Any]
+    data: dict[str, Any]
     change_type: str = Field(..., max_length=50)  # created, updated, deleted
-    change_description: Optional[str] = Field(None, max_length=1000)
+    change_description: str | None = Field(None, max_length=1000)
     changed_by: int
     is_current: bool = False
 
@@ -31,8 +31,8 @@ class EMRVersionCreate(EMRVersionBase):
 class EMRVersionUpdate(ORMModel):
     """Схема обновления версии EMR"""
 
-    change_description: Optional[str] = Field(None, max_length=1000)
-    is_current: Optional[bool] = None
+    change_description: str | None = Field(None, max_length=1000)
+    is_current: bool | None = None
 
 
 class EMRVersionOut(EMRVersionBase):
@@ -40,7 +40,7 @@ class EMRVersionOut(EMRVersionBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_orm = True
@@ -51,23 +51,23 @@ class EMRVersionComparison(ORMModel):
 
     version1_id: int
     version2_id: int
-    fields_changed: List[str]
-    changes: Dict[str, Dict[str, Any]]
-    summary: Dict[str, Any]
+    fields_changed: list[str]
+    changes: dict[str, dict[str, Any]]
+    summary: dict[str, Any]
 
 
 class EMRVersionTimeline(ORMModel):
     """Схема временной линии версий EMR"""
 
-    versions: List[EMRVersionOut]
+    versions: list[EMRVersionOut]
     total_versions: int
-    current_version_id: Optional[int] = None
+    current_version_id: int | None = None
 
 
 class EMRVersionStatistics(ORMModel):
     """Схема статистики версий EMR"""
 
     total_versions: int
-    versions_by_type: Dict[str, int]
-    recent_changes: List[EMRVersionOut]
-    most_active_users: List[Dict[str, Any]]
+    versions_by_type: dict[str, int]
+    recent_changes: list[EMRVersionOut]
+    most_active_users: list[dict[str, Any]]

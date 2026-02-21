@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,21 +13,21 @@ UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     """Generic CRUD operations for SQLAlchemy models with Pydantic schemas."""
 
-    def __init__(self, model: Type[ModelType]):
+    def __init__(self, model: type[ModelType]):
         self.model = model
 
     # Read
-    def get(self, db: Session, id: Any) -> Optional[ModelType]:
+    def get(self, db: Session, id: Any) -> ModelType | None:
         return db.query(self.model).get(id)
 
     def get_multi(
         self, db: Session, *, skip: int = 0, limit: int = 100
-    ) -> List[ModelType]:
+    ) -> list[ModelType]:
         return db.query(self.model).offset(skip).limit(limit).all()
 
     # Create
     def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
-        data: Dict[str, Any] = obj_in.dict(exclude_unset=True)
+        data: dict[str, Any] = obj_in.dict(exclude_unset=True)
         # ✅ ИСКЛЮЧАЕМ поля, которых нет в модели Patient
         # full_name используется только для нормализации ДО создания модели, но не сохраняется в БД
         # email не существует в модели Patient (есть только в схеме для валидации)
@@ -61,9 +61,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db: Session,
         *,
         db_obj: ModelType,
-        obj_in: Union[UpdateSchemaType, Dict[str, Any]],
+        obj_in: UpdateSchemaType | dict[str, Any],
     ) -> ModelType:
-        update_data: Dict[str, Any]
+        update_data: dict[str, Any]
         if isinstance(obj_in, BaseModel):
             update_data = obj_in.dict(exclude_unset=True)
         else:
@@ -94,7 +94,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return db_obj
 
     # Delete
-    def remove(self, db: Session, *, id: Any) -> Optional[ModelType]:
+    def remove(self, db: Session, *, id: Any) -> ModelType | None:
         obj = db.query(self.model).get(id)
         if not obj:
             return None

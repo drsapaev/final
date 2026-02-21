@@ -4,7 +4,7 @@ MCP сервер для работы с МКБ-10
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
 from .base_server import BaseMCPServer, MCPResource, MCPTool
@@ -30,7 +30,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
         """Завершение работы сервера"""
         logger.info("Medical ICD-10 MCP Server shutting down")
 
-    def _load_common_codes(self) -> Dict[str, Dict[str, str]]:
+    def _load_common_codes(self) -> dict[str, dict[str, str]]:
         """Загрузка часто используемых кодов МКБ-10"""
         return {
             "respiratory": {
@@ -194,12 +194,12 @@ class MedicalICD10MCPServer(BaseMCPServer):
     )
     async def suggest_icd10(
         self,
-        symptoms: List[str],
-        diagnosis: Optional[str] = None,
-        specialty: Optional[str] = None,
-        provider: Optional[str] = None,
+        symptoms: list[str],
+        diagnosis: str | None = None,
+        specialty: str | None = None,
+        provider: str | None = None,
         max_suggestions: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Подсказки кодов МКБ-10
 
@@ -270,9 +270,9 @@ class MedicalICD10MCPServer(BaseMCPServer):
     async def validate_icd10(
         self,
         code: str,
-        symptoms: Optional[List[str]] = None,
-        diagnosis: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        symptoms: list[str] | None = None,
+        diagnosis: str | None = None,
+    ) -> dict[str, Any]:
         """
         Валидация кода МКБ-10
 
@@ -327,8 +327,8 @@ class MedicalICD10MCPServer(BaseMCPServer):
 
     @MCPTool(name="search_icd10", description="Поиск кодов МКБ-10 по тексту")
     async def search_icd10(
-        self, query: str, category: Optional[str] = None, limit: int = 10
-    ) -> Dict[str, Any]:
+        self, query: str, category: str | None = None, limit: int = 10
+    ) -> dict[str, Any]:
         """
         Поиск кодов МКБ-10
 
@@ -393,7 +393,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
     @MCPResource(
         name="common_icd10_codes", description="Часто используемые коды МКБ-10"
     )
-    async def get_common_codes(self, category: Optional[str] = None) -> Dict[str, Any]:
+    async def get_common_codes(self, category: str | None = None) -> dict[str, Any]:
         """
         Получение часто используемых кодов
 
@@ -425,7 +425,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
         }
 
     @MCPResource(name="icd10_categories", description="Категории МКБ-10")
-    async def get_categories(self) -> Dict[str, Any]:
+    async def get_categories(self) -> dict[str, Any]:
         """Получение списка категорий МКБ-10"""
         categories = {
             "A00-B99": "Инфекционные и паразитарные болезни",
@@ -459,8 +459,8 @@ class MedicalICD10MCPServer(BaseMCPServer):
         }
 
     def _find_relevant_cached_codes(
-        self, symptoms: List[str], diagnosis: Optional[str], specialty: Optional[str]
-    ) -> List[Dict[str, str]]:
+        self, symptoms: list[str], diagnosis: str | None, specialty: str | None
+    ) -> list[dict[str, str]]:
         """Поиск релевантных кодов в кеше"""
         relevant = []
 
@@ -498,7 +498,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
         relevant.sort(key=lambda x: x["relevance_score"], reverse=True)
         return relevant[:3]
 
-    def _find_code_in_cache(self, code: str) -> Optional[Dict[str, str]]:
+    def _find_code_in_cache(self, code: str) -> dict[str, str] | None:
         """Поиск кода в кеше"""
         for category, codes in self.common_codes.items():
             if code in codes:
@@ -506,7 +506,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
         return None
 
     def _calculate_relevance(
-        self, description: str, symptoms: List[str], diagnosis: Optional[str]
+        self, description: str, symptoms: list[str], diagnosis: str | None
     ) -> float:
         """Расчет релевантности кода"""
         score = 0.0

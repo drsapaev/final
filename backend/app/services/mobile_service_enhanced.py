@@ -4,17 +4,18 @@
 
 import asyncio
 import logging
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any
 
-from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.crud import (
     appointment as crud_appointment,
-    clinic as crud_doctor,
+)
+from app.crud import (
     patient as crud_patient,
-    service as crud_service,
+)
+from app.crud import (
     user as crud_user,
 )
 from app.services.fcm_service import get_fcm_service
@@ -104,7 +105,7 @@ class MobileServiceEnhanced:
             # lab_result = crud_lab.get_lab_result(db, result_id=lab_result_id)
 
             # Пока заглушка
-            message = f"📊 Результаты ваших анализов готовы. Вы можете посмотреть их в мобильном приложении."
+            _message = "📊 Результаты ваших анализов готовы. Вы можете посмотреть их в мобильном приложении."
 
             # Логика отправки аналогична напоминаниям
             return True
@@ -170,7 +171,7 @@ class MobileServiceEnhanced:
                 "cancelled": "🚫 Платеж отменен",
             }
 
-            message = status_messages.get(status, f"Статус платежа: {status}")
+            _message = status_messages.get(status, f"Статус платежа: {status}")
 
             # Логика отправки
             return True
@@ -182,10 +183,10 @@ class MobileServiceEnhanced:
     async def send_promotional_notification(
         self,
         db: Session,
-        user_ids: List[int],
+        user_ids: list[int],
         title: str,
         message: str,
-        promo_data: Optional[Dict[str, Any]] = None,
+        promo_data: dict[str, Any] | None = None,
     ) -> int:
         """Отправка промо-уведомлений"""
         try:
@@ -219,12 +220,12 @@ class MobileServiceEnhanced:
     async def send_fcm_notification_to_users(
         self,
         db: Session,
-        user_ids: List[int],
+        user_ids: list[int],
         title: str,
         body: str,
-        data: Optional[Dict[str, Any]] = None,
-        image: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+        image: str | None = None,
+    ) -> dict[str, Any]:
         """Отправка FCM уведомлений списку пользователей"""
         try:
             if not self.fcm_service.active:
@@ -327,7 +328,7 @@ class MobileServiceEnhanced:
             logger.error(f"Ошибка планирования напоминаний: {e}")
             return 0
 
-    async def get_mobile_analytics(self, db: Session, user_id: int) -> Dict[str, Any]:
+    async def get_mobile_analytics(self, db: Session, user_id: int) -> dict[str, Any]:
         """Аналитика для мобильного приложения"""
         try:
             patient = crud_patient.get_patient_by_user_id(db, user_id=user_id)

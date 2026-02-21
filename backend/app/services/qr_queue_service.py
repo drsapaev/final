@@ -2,6 +2,8 @@
 Сервис для управления QR очередями
 """
 
+from __future__ import annotations
+
 import base64
 import io
 import logging
@@ -9,13 +11,11 @@ import re
 import secrets
 import socket
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import qrcode
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-
-logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.models.clinic import Doctor
@@ -28,13 +28,17 @@ from app.models.online_queue import (
 )
 from app.models.patient import Patient
 from app.models.user import User
-from app.services.feature_flags import is_feature_enabled
 from app.services.queue_service import (
-    queue_service,
     QueueConflictError,
     QueueNotFoundError,
     QueueValidationError,
+    queue_service,
 )
+
+if TYPE_CHECKING:
+    from app.models.visit import Visit
+
+logger = logging.getLogger(__name__)
 
 
 class QRQueueService:
@@ -47,33 +51,33 @@ class QRQueueService:
         self,
         patient_name: str,
         phone: str,
-        birth_year: Optional[int] = None,
-        address: Optional[str] = None,
+        birth_year: int | None = None,
+        address: str | None = None,
     ) -> Patient:
         """
         ⭐ FIX: Находит или создаёт пациента по телефону.
-        
+
         SSOT для создания пациентов при QR-регистрации.
         Гарантирует, что patient_id ВСЕГДА будет заполнен.
-        
+
         Args:
             patient_name: ФИО пациента
             phone: Номер телефона
             birth_year: Год рождения (опционально)
             address: Адрес (опционально)
-            
+
         Returns:
             Patient instance (существующий или новый)
         """
         # Нормализуем телефон для поиска
         clean_phone = re.sub(r'\D', '', phone or '')
-        
+
         if not clean_phone:
             logger.warning(
                 "[QRQueueService._find_or_create_patient] ⚠️ Пустой телефон, невозможно найти/создать пациента"
             )
             return None
-        
+
         # Ищем по телефону (с нормализацией)
         patient = (
             self.db.query(Patient)
@@ -82,21 +86,21 @@ class QRQueueService:
             )
             .first()
         )
-        
+
         if patient:
             logger.info(
                 "[QRQueueService._find_or_create_patient] ✅ Найден существующий пациент ID=%d по телефону %s",
                 patient.id, phone
             )
             return patient
-        
+
         # Создаём нового пациента
         # Парсим ФИО
         name_parts = patient_name.strip().split() if patient_name else []
         last_name = name_parts[0] if len(name_parts) > 0 else "Неизвестный"
         first_name = name_parts[1] if len(name_parts) > 1 else "Пациент"
         middle_name = name_parts[2] if len(name_parts) > 2 else None
-        
+
         patient = Patient(
             last_name=last_name,
             first_name=first_name,
@@ -107,29 +111,29 @@ class QRQueueService:
         )
         self.db.add(patient)
         self.db.flush()
-        
+
         logger.info(
             "[QRQueueService._find_or_create_patient] ✅ Создан новый пациент ID=%d для QR-регистрации: %s, %s",
             patient.id, patient_name, phone
         )
-        
+
         return patient
 
     def _create_visit_for_qr(
         self,
         patient_id: int,
         visit_date: date,
-        services: List[Dict[str, Any]],
+        services: list[dict[str, Any]],
         visit_type: str = "paid",
         discount_mode: str = "none",
-        notes: Optional[str] = None,
-    ) -> "Visit":
+        notes: str | None = None,
+    ) -> Visit:
         """
         ⭐ FIX 2: Создаёт Visit для QR-регистрации.
-        
+
         Вызывается при первом заполнении QR-записи (когда регистратор добавляет услуги).
         Visit создаётся сразу со списком услуг.
-        
+
         Args:
             patient_id: ID пациента
             visit_date: Дата визита
@@ -137,13 +141,14 @@ class QRQueueService:
             visit_type: Тип визита (paid, repeat, benefit)
             discount_mode: Режим скидки (none, repeat, benefit, all_free)
             notes: Заметки к визиту
-            
+
         Returns:
             Visit instance
         """
-        from app.models.visit import Visit, VisitService
         from decimal import Decimal
-        
+
+        from app.models.visit import Visit, VisitService
+
         # Создаём Visit
         # ✅ SSOT: source='online' для QR/Telegram регистрации
         visit = Visit(
@@ -157,7 +162,7 @@ class QRQueueService:
         )
         self.db.add(visit)
         self.db.flush()  # Получаем ID
-        
+
         # Добавляем услуги к Visit
         for svc_data in services:
             visit_service = VisitService(
@@ -169,14 +174,14 @@ class QRQueueService:
                 price=Decimal(str(svc_data.get("price", 0))) if svc_data.get("price") else None,
             )
             self.db.add(visit_service)
-        
+
         self.db.flush()
-        
+
         logger.info(
             "[QRQueueService._create_visit_for_qr] ✅ Создан Visit ID=%d для QR-пациента %d с %d услугами",
             visit.id, patient_id, len(services)
         )
-        
+
         return visit
 
     def generate_qr_token(
@@ -185,9 +190,9 @@ class QRQueueService:
         department: str,
         generated_by_user_id: int,
         expires_hours: int = 24,
-        target_date: Optional[str] = None,
+        target_date: str | None = None,
         visit_type: str = "paid",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Генерирует QR токен для присоединения к очереди
 
@@ -260,7 +265,7 @@ class QRQueueService:
             "active": True,
         }
 
-    def get_qr_token_info(self, token: str) -> Optional[Dict[str, Any]]:
+    def get_qr_token_info(self, token: str) -> dict[str, Any] | None:
         """
         Получает информацию о QR токене
 
@@ -294,7 +299,7 @@ class QRQueueService:
             )
 
             if qr_token_any:
-                logger.debug(f"[QRQueueService.get_qr_token_info] Токен найден в БД:")
+                logger.debug("[QRQueueService.get_qr_token_info] Токен найден в БД:")
                 logger.debug(f"  - active: {qr_token_any.active}")
                 logger.debug(f"  - expires_at: {qr_token_any.expires_at}")
                 logger.debug(f"  - specialist_id: {qr_token_any.specialist_id}")
@@ -309,7 +314,7 @@ class QRQueueService:
                     logger.debug(f"  - истек: {expires_aware <= now}")
             else:
                 logger.debug(
-                    f"[QRQueueService.get_qr_token_info] Токен вообще не найден в БД!"
+                    "[QRQueueService.get_qr_token_info] Токен вообще не найден в БД!"
                 )
 
             # Используем timezone-aware datetime для сравнения
@@ -321,7 +326,7 @@ class QRQueueService:
 
             if not qr_token:
                 logger.debug(
-                    f"[QRQueueService.get_qr_token_info] Токен не найден или неактивен"
+                    "[QRQueueService.get_qr_token_info] Токен не найден или неактивен"
                 )
                 return None
 
@@ -489,7 +494,7 @@ class QRQueueService:
                 try:
                     # Используем target_date из токена
                     target_date = qr_token.day
-                    
+
                     # Находим DailyQueue для этого специалиста и дня
                     daily_queue = (
                         self.db.query(DailyQueue)
@@ -499,7 +504,7 @@ class QRQueueService:
                         )
                         .first()
                     )
-                    
+
                     if daily_queue:
                         # Считаем OnlineQueueEntry записи в этой очереди (waiting/called)
                         queue_length = (
@@ -512,7 +517,7 @@ class QRQueueService:
                         ) or 0
                     else:
                         queue_length = 0
-                        
+
                     logger.debug(f"[QRQueueService] online_queue_length: {queue_length}")
                 except Exception as e:
                     logger.debug(f"[QRQueueService] Ошибка подсчета очереди: {e}")
@@ -531,7 +536,7 @@ class QRQueueService:
             )
 
         try:
-            logger.debug(f"[QRQueueService.get_qr_token_info] Формируем ответ...")
+            logger.debug("[QRQueueService.get_qr_token_info] Формируем ответ...")
 
             # ✅ ФИНАЛЬНАЯ ПРОВЕРКА: Гарантируем что specialist_name не None
             if specialist_name is None or specialist_name == "":
@@ -597,7 +602,7 @@ class QRQueueService:
 
     def start_join_session(
         self, token: str, ip_address: str = None, user_agent: str = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Начинает сессию присоединения к очереди
 
@@ -636,7 +641,7 @@ class QRQueueService:
 
             # Проверяем временные ограничения
             logger.debug(
-                f"[QRQueueService.start_join_session] Проверка временных ограничений..."
+                "[QRQueueService.start_join_session] Проверка временных ограничений..."
             )
             time_check = self._check_online_time_restrictions(token)
             logger.debug(
@@ -691,8 +696,8 @@ class QRQueueService:
         session_token: str,
         patient_name: str,
         phone: str,
-        telegram_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        telegram_id: int | None = None,
+    ) -> dict[str, Any]:
         """
         Завершает сессию присоединения к очереди
 
@@ -735,7 +740,7 @@ class QRQueueService:
         # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
         patient = self._find_or_create_patient(patient_name, phone)
         patient_id = patient.id if patient else None
-        
+
         if not patient_id:
             logger.warning(
                 "[complete_join_session] ⚠️ Не удалось создать/найти пациента для %s, %s",
@@ -772,6 +777,24 @@ class QRQueueService:
 
         if not join_result["duplicate"]:
             self._update_queue_statistics(queue_entry.queue_id, "online_joins")
+            try:
+                from app.services.display_websocket import (
+                    dispatch_async,
+                    get_display_manager,
+                )
+
+                manager = get_display_manager()
+                dispatch_async(
+                    manager.broadcast_queue_update(
+                        queue_entry=queue_entry,
+                        event_type="queue.created",
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[complete_join_session] Failed to broadcast queue.created: %s",
+                    exc,
+                )
 
         # ✅ Получаем имя врача правильно (из User)
         specialist_name = join_result.get("specialist_name")
@@ -790,11 +813,11 @@ class QRQueueService:
     def complete_join_session_multiple(
         self,
         session_token: str,
-        specialist_ids: List[int],
+        specialist_ids: list[int],
         patient_name: str,
         phone: str,
-        telegram_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        telegram_id: int | None = None,
+    ) -> dict[str, Any]:
         """
         Завершает сессию присоединения для нескольких специалистов (общий QR).
         """
@@ -828,15 +851,16 @@ class QRQueueService:
         # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
         patient = self._find_or_create_patient(patient_name, phone)
         patient_id = patient.id if patient else None
-        
+
         if not patient_id:
             logger.warning(
                 "[complete_join_session_multiple] ⚠️ Не удалось создать/найти пациента для %s, %s",
                 patient_name, phone
             )
 
-        entries: List[Dict[str, Any]] = []
-        errors: List[Dict[str, Any]] = []
+        entries: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+        created_entries: list[OnlineQueueEntry] = []
 
         for specialist_id in specialist_ids:
             try:
@@ -865,6 +889,7 @@ class QRQueueService:
                 )
                 if not join_result["duplicate"]:
                     self._update_queue_statistics(entry.queue_id, "online_joins")
+                    created_entries.append(entry)
             except (
                 QueueValidationError,
                 QueueConflictError,
@@ -886,6 +911,27 @@ class QRQueueService:
         session.joined_at = datetime.utcnow()
         self.db.commit()
 
+        if created_entries:
+            try:
+                from app.services.display_websocket import (
+                    dispatch_async,
+                    get_display_manager,
+                )
+
+                manager = get_display_manager()
+                for entry in created_entries:
+                    dispatch_async(
+                        manager.broadcast_queue_update(
+                            queue_entry=entry,
+                            event_type="queue.created",
+                        )
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "[complete_join_session_multiple] Failed to broadcast queue.created: %s",
+                    exc,
+                )
+
         return {
             "success": len(entries) > 0,
             "queue_time": datetime.utcnow().isoformat(),
@@ -896,7 +942,7 @@ class QRQueueService:
 
     def get_queue_status(
         self, specialist_id: int, target_date: date = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Получает статус очереди специалиста
 
@@ -973,8 +1019,8 @@ class QRQueueService:
         self,
         specialist_id: int,
         called_by_user_id: int,
-        target_date: Optional[date] = None,
-    ) -> Dict[str, Any]:
+        target_date: date | None = None,
+    ) -> dict[str, Any]:
         """
         Вызывает следующего пациента в очереди
 
@@ -1033,7 +1079,7 @@ class QRQueueService:
             "queue_length": self._get_queue_length(daily_queue.id),
         }
 
-    def get_active_qr_tokens(self, user_id: int) -> List[Dict[str, Any]]:
+    def get_active_qr_tokens(self, user_id: int) -> list[dict[str, Any]]:
         """
         Получает активные QR токены пользователя
 
@@ -1201,7 +1247,7 @@ class QRQueueService:
     def _get_queue_length(self, queue_id: int) -> int:
         """
         Получает текущую длину очереди (только OnlineQueueEntry).
-        
+
         ⭐ ИСПРАВЛЕНО: Для онлайн-очереди считаем только записи OnlineQueueEntry,
         а не Visit/Appointment. Это обеспечивает консистентность с логикой
         позиционирования в queue_position_notifications.py.
@@ -1216,13 +1262,13 @@ class QRQueueService:
                 )
                 .count()
             )
-            
+
             logger.debug(
                 f"[_get_queue_length] queue_id={queue_id}, online_count={online_count}"
             )
-            
+
             return online_count or 0
-            
+
         except Exception as e:
             logger.error(f"[_get_queue_length] Ошибка: {e}")
             import traceback
@@ -1294,7 +1340,7 @@ class QRQueueService:
 
         self.db.commit()
 
-    def _check_online_time_restrictions(self, token: str) -> Dict[str, Any]:
+    def _check_online_time_restrictions(self, token: str) -> dict[str, Any]:
         """
         Проверяет временные ограничения для онлайн записи
 
@@ -1318,7 +1364,7 @@ class QRQueueService:
         # ✅ ИСПРАВЛЕНИЕ: Используем дату из токена, а не сегодняшнюю
         target_date = qr_token.day
 
-        logger.debug(f"[_check_online_time_restrictions] Ищем DailyQueue:")
+        logger.debug("[_check_online_time_restrictions] Ищем DailyQueue:")
         logger.debug(f"  target_date: {target_date}")
         logger.debug(f"  specialist_id: {qr_token.specialist_id}")
         logger.debug(f"  is_clinic_wide: {qr_token.is_clinic_wide}")
@@ -1422,7 +1468,7 @@ class QRQueueService:
 
             if not daily_queue:
                 logger.debug(
-                    f"[_check_online_time_restrictions] ❌ DailyQueue НЕ НАЙДЕНА!"
+                    "[_check_online_time_restrictions] ❌ DailyQueue НЕ НАЙДЕНА!"
                 )
                 # Дополнительная диагностика
                 all_queues = (
@@ -1538,7 +1584,7 @@ class QRQueueService:
         if end_time_str:
             # Парсим строку времени в объект time
             end_hour, end_minute = map(int, end_time_str.split(':'))
-            end_time_obj = (
+            _end_time_obj = (
                 datetime.now()
                 .replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
                 .time()

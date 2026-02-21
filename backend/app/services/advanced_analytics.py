@@ -5,9 +5,9 @@
 import logging
 import statistics
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import and_, asc, desc, func, or_
+from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -29,8 +29,8 @@ class AdvancedAnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Получить ключевые показатели эффективности (KPI)"""
         try:
             # Базовые фильтры
@@ -180,8 +180,8 @@ class AdvancedAnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Получить показатели эффективности врачей"""
         try:
             # Базовые фильтры
@@ -293,7 +293,7 @@ class AdvancedAnalyticsService:
     @staticmethod
     def get_patient_analytics(
         db: Session, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Расширенная аналитика пациентов"""
         try:
             # Новые пациенты
@@ -411,8 +411,8 @@ class AdvancedAnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Расширенная аналитика доходов"""
         try:
             # Базовые фильтры
@@ -506,7 +506,7 @@ class AdvancedAnalyticsService:
             return {"error": str(e)}
 
     @staticmethod
-    def get_predictive_analytics(db: Session, days_ahead: int = 30) -> Dict[str, Any]:
+    def get_predictive_analytics(db: Session, days_ahead: int = 30) -> dict[str, Any]:
         """Предиктивная аналитика и прогнозы"""
         try:
             end_date = datetime.now()

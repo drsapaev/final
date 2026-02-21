@@ -6,7 +6,6 @@ Scheduled Backup Service
 import asyncio
 import logging
 from datetime import datetime, time
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -22,14 +21,14 @@ class ScheduledBackupService:
         self.db = db
         self.backup_service = BackupService(db, backup_dir)
         self.running = False
-        self.task: Optional[asyncio.Task] = None
+        self.task: asyncio.Task | None = None
 
     async def start_daily_backups(
         self, backup_time: time = time(2, 0)  # 2 AM by default
     ):
         """
         Start daily backup scheduler
-        
+
         Args:
             backup_time: Time of day to run backups (default: 2:00 AM)
         """
@@ -45,16 +44,16 @@ class ScheduledBackupService:
                 try:
                     now = datetime.now()
                     next_backup = datetime.combine(now.date(), backup_time)
-                    
+
                     # If backup time has passed today, schedule for tomorrow
                     if next_backup < now:
                         next_backup += asyncio.timedelta(days=1)
-                    
+
                     wait_seconds = (next_backup - now).total_seconds()
                     logger.info(f"⏰ Next backup scheduled for: {next_backup} (in {wait_seconds/3600:.1f} hours)")
-                    
+
                     await asyncio.sleep(wait_seconds)
-                    
+
                     if self.running:
                         logger.info("🔄 Starting scheduled backup...")
                         try:
@@ -62,7 +61,7 @@ class ScheduledBackupService:
                             logger.info(f"✅ Scheduled backup completed: {backup_info['filename']}")
                         except Exception as e:
                             logger.error(f"❌ Scheduled backup failed: {e}")
-                
+
                 except asyncio.CancelledError:
                     break
                 except Exception as e:

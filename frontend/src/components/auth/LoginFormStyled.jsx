@@ -105,10 +105,11 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 
       // Обычный вход без 2FA
       if (data.access_token) {
+        const accessToken = typeof data.access_token === 'string' ? data.access_token.trim() : data.access_token;
         // Проверяем, требуется ли смена пароля
         if (data.must_change_password) {
-          setToken(data.access_token);
-          localStorage.setItem('auth_token', data.access_token);
+          setToken(accessToken);
+          localStorage.setItem('auth_token', accessToken);
           navigate('/change-password-required', {
             state: { currentPassword: formData.password },
             replace: true
@@ -117,8 +118,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         }
 
         // Сохраняем токен единообразно для всех клиентов
-        setToken(data.access_token);
-        localStorage.setItem('auth_token', data.access_token);
+        setToken(accessToken);
+        localStorage.setItem('auth_token', accessToken);
 
         try {
           // Используем данные пользователя из ответа авторизации
@@ -195,7 +196,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const handle2FASuccess = async (response) => {
     try {
       if (response.data?.access_token) {
-        setToken(response.data.access_token);
+        const accessToken = typeof response.data.access_token === 'string' ? response.data.access_token.trim() : response.data.access_token;
+        setToken(accessToken);
 
         const profileResponse = await api.get('/auth/me');
         setProfile(profileResponse.data);

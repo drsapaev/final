@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,10 +12,10 @@ def log(
     db: Session,
     *,
     action: str,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[int] = None,
-    actor_user_id: Optional[int] = None,
-    payload: Optional[Dict[str, Any]] = None,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    actor_user_id: int | None = None,
+    payload: dict[str, Any] | None = None,
 ) -> AuditLog:
     row = AuditLog(
         action=action,
@@ -32,13 +32,13 @@ def log(
 def list_logs(
     db: Session,
     *,
-    action: Optional[str] = None,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[int] = None,
-    actor_user_id: Optional[int] = None,
+    action: str | None = None,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    actor_user_id: int | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> List[AuditLog]:
+) -> list[AuditLog]:
     stmt = select(AuditLog)
     if action:
         stmt = stmt.where(AuditLog.action == action)

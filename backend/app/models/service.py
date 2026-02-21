@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 from app.db.base_class import Base
 
@@ -18,47 +18,49 @@ class Service(Base):
     __tablename__ = "services"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
-    department_id: Mapped[Optional[int]] = mapped_column(
+    department_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("departments.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
-    unit: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    currency: Mapped[Optional[str]] = mapped_column(
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str | None] = mapped_column(
         String(8), nullable=True, default="UZS"
     )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Backward compatibility for tests/legacy code that still pass `is_active=...`.
+    is_active = synonym("active")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ КЛАССИФИКАЦИИ
-    category_code: Mapped[Optional[str]] = mapped_column(
+    category_code: Mapped[str | None] = mapped_column(
         String(1), nullable=True, index=True
     )  # K, D, C, L, S, O
-    service_code: Mapped[Optional[str]] = mapped_column(
+    service_code: Mapped[str | None] = mapped_column(
         String(10), nullable=True, unique=True, index=True
     )  # K01, D02, C03, etc.
 
     # Новые поля для админ панели
-    category_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("service_categories.id", ondelete="SET NULL"), 
+    category_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("service_categories.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve service if category deleted
-    duration_minutes: Mapped[Optional[int]] = mapped_column(
+    duration_minutes: Mapped[int | None] = mapped_column(
         Integer, default=30, nullable=True
     )
-    doctor_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("doctors.id", ondelete="SET NULL"), 
+    doctor_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("doctors.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve service if doctor deleted
 
@@ -66,7 +68,7 @@ class Service(Base):
     requires_doctor: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, index=True
     )
-    queue_tag: Mapped[Optional[str]] = mapped_column(
+    queue_tag: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
     )
     is_consultation: Mapped[bool] = mapped_column(
@@ -78,7 +80,7 @@ class Service(Base):
 
     # ✅ СВЯЗЬ С ОТДЕЛЕНИЕМ
     # NOTE: ForeignKey temporarily disabled - departments table doesn't exist
-    department_key: Mapped[Optional[str]] = mapped_column(
+    department_key: Mapped[str | None] = mapped_column(
         String(50), nullable=True, index=True
     )
 
@@ -94,10 +96,10 @@ class ServiceCatalog(Base):
     __tablename__ = "service_catalog"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
-    price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    currency: Mapped[Optional[str]] = mapped_column(
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str | None] = mapped_column(
         String(8), nullable=True, default="UZS"
     )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -3,20 +3,17 @@
 """
 
 import csv
-import hashlib
 import json
 import logging
-import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import and_, desc, func, or_, text
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import get_password_hash, verify_password
-from app.models.role_permission import UserGroup, UserPermissionOverride
+from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.user_profile import (
     UserAuditLog,
@@ -29,17 +26,8 @@ from app.schemas.user_management import (
     UserBulkActionRequest,
     UserCreateRequest,
     UserExportRequest,
-    UserGroupCreate,
-    UserGroupMemberCreate,
-    UserGroupUpdate,
-    UserNotificationSettingsCreate,
     UserNotificationSettingsUpdate,
-    UserPreferencesCreate,
     UserPreferencesUpdate,
-    UserProfileCreate,
-    UserProfileUpdate,
-    UserRoleCreate,
-    UserRoleUpdate,
     UserSearchRequest,
     UserUpdateRequest,
 )
@@ -104,7 +92,7 @@ class UserManagementService:
 
     def create_user(
         self, db: Session, user_data: UserCreateRequest, created_by: int
-    ) -> Tuple[bool, str, Optional[User]]:
+    ) -> tuple[bool, str, User | None]:
         """Создает нового пользователя с профилем"""
         try:
             # Проверяем уникальность username и email
@@ -184,7 +172,7 @@ class UserManagementService:
 
     def update_user(
         self, db: Session, user_id: int, user_data: UserUpdateRequest, updated_by: int
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Обновляет пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -227,8 +215,8 @@ class UserManagementService:
         db: Session,
         user_id: int,
         deleted_by: int,
-        transfer_to: Optional[int] = None,
-    ) -> Tuple[bool, str]:
+        transfer_to: int | None = None,
+    ) -> tuple[bool, str]:
         """Удаляет пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -280,7 +268,7 @@ class UserManagementService:
             logger.error(f"Error deleting user: {e}")
             return False, f"Ошибка удаления пользователя: {str(e)}"
 
-    def get_user_profile(self, db: Session, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_user_profile(self, db: Session, user_id: int) -> dict[str, Any] | None:
         """Получает полный профиль пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -401,7 +389,7 @@ class UserManagementService:
 
     def search_users(
         self, db: Session, search_params: UserSearchRequest
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """Поиск пользователей с фильтрацией"""
         try:
             query = db.query(User)
@@ -511,7 +499,7 @@ class UserManagementService:
             logger.error(f"Error searching users: {e}")
             return [], 0
 
-    def get_user_stats(self, db: Session) -> Dict[str, Any]:
+    def get_user_stats(self, db: Session) -> dict[str, Any]:
         """Получает статистику пользователей"""
         try:
             # Общая статистика
@@ -583,7 +571,7 @@ class UserManagementService:
 
     def bulk_action_users(
         self, db: Session, action_data: UserBulkActionRequest, executed_by: int
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """Выполняет массовые действия с пользователями"""
         try:
             processed_count = 0
@@ -676,7 +664,7 @@ class UserManagementService:
 
     def update_user_preferences(
         self, db: Session, user_id: int, preferences_data: UserPreferencesUpdate
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Обновляет настройки пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -712,7 +700,7 @@ class UserManagementService:
 
     def update_notification_settings(
         self, db: Session, user_id: int, settings_data: UserNotificationSettingsUpdate
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Обновляет настройки уведомлений пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -759,8 +747,8 @@ class UserManagementService:
         executed_by: int,
         resource_type: str = None,
         resource_id: int = None,
-        old_values: Dict = None,
-        new_values: Dict = None,
+        old_values: dict = None,
+        new_values: dict = None,
         ip_address: str = None,
         user_agent: str = None,
     ):
@@ -785,7 +773,7 @@ class UserManagementService:
 
     def export_users_background(
         self,
-        users: List[User],
+        users: list[User],
         export_data: UserExportRequest,
         current_user_id: int,
         db: Session,
@@ -794,9 +782,6 @@ class UserManagementService:
         Фоновый экспорт пользователей в различных форматах
         """
         try:
-            import csv
-            import json
-            import os
             from datetime import datetime
             from pathlib import Path
 
@@ -929,7 +914,7 @@ class UserManagementService:
                 f"Ошибка экспорта пользователей: {str(e)}",
             )
 
-    def _export_to_csv(self, data: List[Dict], file_path: Path):
+    def _export_to_csv(self, data: list[dict], file_path: Path):
         """Экспорт в CSV формат"""
         if not data:
             return
@@ -940,7 +925,7 @@ class UserManagementService:
             writer.writeheader()
             writer.writerows(data)
 
-    def _export_to_json(self, data: List[Dict], file_path: Path):
+    def _export_to_json(self, data: list[dict], file_path: Path):
         """Экспорт в JSON формат"""
         with open(file_path, 'w', encoding='utf-8') as jsonfile:
             json.dump(
@@ -958,7 +943,7 @@ class UserManagementService:
                 default=str,
             )
 
-    def _export_to_excel(self, data: List[Dict], file_path: Path):
+    def _export_to_excel(self, data: list[dict], file_path: Path):
         """Экспорт в Excel формат"""
         try:
             import pandas as pd
@@ -990,13 +975,12 @@ class UserManagementService:
             )
             self._export_to_csv(data, file_path.with_suffix('.csv'))
 
-    def _export_to_pdf(self, data: List[Dict], file_path: Path):
+    def _export_to_pdf(self, data: list[dict], file_path: Path):
         """Экспорт в PDF формат"""
         try:
             from reportlab.lib import colors
-            from reportlab.lib.pagesizes import A4, letter
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.units import inch
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
             from reportlab.platypus import (
                 Paragraph,
                 SimpleDocTemplate,

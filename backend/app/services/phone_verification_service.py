@@ -2,19 +2,15 @@
 Сервис верификации телефонных номеров
 """
 
-import asyncio
 import logging
 import secrets
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.crud import user as crud_user
-from app.models.user import User
-from app.services.sms_providers import get_sms_manager, SMSProviderType
+from app.services.sms_providers import SMSProviderType, get_sms_manager
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +63,9 @@ class PhoneVerificationService:
         self,
         phone: str,
         purpose: str = "verification",
-        provider_type: Optional[SMSProviderType] = None,
-        custom_message: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        provider_type: SMSProviderType | None = None,
+        custom_message: str | None = None,
+    ) -> dict[str, Any]:
         """Отправка кода верификации"""
         try:
             # Очищаем истекшие коды
@@ -149,7 +145,7 @@ class PhoneVerificationService:
         code: str,
         purpose: str = "verification",
         remove_after_verification: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Проверка кода верификации"""
         try:
             # Очищаем истекшие коды
@@ -222,7 +218,7 @@ class PhoneVerificationService:
 
     def get_verification_status(
         self, phone: str, purpose: str = "verification"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Получение статуса верификации"""
         try:
             self._clean_expired_codes()
@@ -281,7 +277,7 @@ class PhoneVerificationService:
         phone: str,
         code: str,
         purpose: str = "phone_change",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Верификация и обновление номера телефона пользователя"""
         try:
             # Проверяем код
@@ -329,7 +325,7 @@ class PhoneVerificationService:
             logger.error(f"Error verifying and updating user phone: {e}")
             return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Статистика верификаций"""
         try:
             self._clean_expired_codes()

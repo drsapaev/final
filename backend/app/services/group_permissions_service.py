@@ -4,22 +4,20 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.crud import user as crud_user
 from app.models.role_permission import (
-    group_roles_table,
     Permission,
     PermissionAuditLog,
     Role,
-    RoleHierarchy,
-    user_groups_table,
-    user_roles_table,
     UserGroup,
     UserPermissionOverride,
+    group_roles_table,
+    user_groups_table,
+    user_roles_table,
 )
 from app.models.user import User
 
@@ -37,7 +35,7 @@ class GroupPermissionsService:
 
     def get_user_permissions(
         self, db: Session, user_id: int, use_cache: bool = True
-    ) -> Set[str]:
+    ) -> set[str]:
         """
         Получить все разрешения пользователя из БД
         Включает разрешения из ролей, групп и индивидуальные переопределения
@@ -123,8 +121,8 @@ class GroupPermissionsService:
             return set()
 
     def _get_role_permissions_recursive(
-        self, db: Session, role_id: int, visited: Set[int] = None
-    ) -> Set[str]:
+        self, db: Session, role_id: int, visited: set[int] = None
+    ) -> set[str]:
         """
         Получить разрешения роли с учетом иерархии (рекурсивно)
         """
@@ -155,7 +153,7 @@ class GroupPermissionsService:
 
         return permissions
 
-    def _get_group_permissions(self, db: Session, group_id: int) -> Set[str]:
+    def _get_group_permissions(self, db: Session, group_id: int) -> set[str]:
         """
         Получить все разрешения группы через её роли
         """
@@ -189,7 +187,7 @@ class GroupPermissionsService:
         return permission_codename in user_permissions
 
     def has_any_permission(
-        self, db: Session, user_id: int, permission_codenames: List[str]
+        self, db: Session, user_id: int, permission_codenames: list[str]
     ) -> bool:
         """
         Проверить, есть ли у пользователя хотя бы одно из указанных разрешений
@@ -198,7 +196,7 @@ class GroupPermissionsService:
         return any(perm in user_permissions for perm in permission_codenames)
 
     def has_all_permissions(
-        self, db: Session, user_id: int, permission_codenames: List[str]
+        self, db: Session, user_id: int, permission_codenames: list[str]
     ) -> bool:
         """
         Проверить, есть ли у пользователя все указанные разрешения
@@ -208,7 +206,7 @@ class GroupPermissionsService:
 
     def get_group_permissions_summary(
         self, db: Session, group_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Получить сводку разрешений группы
         """
@@ -291,7 +289,7 @@ class GroupPermissionsService:
 
     def assign_role_to_group(
         self, db: Session, group_id: int, role_id: int, assigned_by_user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Назначить роль группе
         """
@@ -341,7 +339,7 @@ class GroupPermissionsService:
 
     def revoke_role_from_group(
         self, db: Session, group_id: int, role_id: int, revoked_by_user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Отозвать роль у группы
         """
@@ -389,7 +387,7 @@ class GroupPermissionsService:
 
     def add_user_to_group(
         self, db: Session, user_id: int, group_id: int, added_by_user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Добавить пользователя в группу
         """
@@ -438,7 +436,7 @@ class GroupPermissionsService:
 
     def remove_user_from_group(
         self, db: Session, user_id: int, group_id: int, removed_by_user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Удалить пользователя из группы
         """
@@ -503,13 +501,13 @@ class GroupPermissionsService:
         action: str,
         target_type: str,
         target_id: int,
-        permission_id: Optional[int] = None,
-        role_id: Optional[int] = None,
-        old_value: Optional[str] = None,
-        new_value: Optional[str] = None,
-        reason: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        permission_id: int | None = None,
+        role_id: int | None = None,
+        old_value: str | None = None,
+        new_value: str | None = None,
+        reason: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ):
         """Логировать изменения разрешений"""
         try:
@@ -535,7 +533,7 @@ class GroupPermissionsService:
         """Очистить весь кэш разрешений"""
         self._permissions_cache.clear()
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Получить статистику кэша"""
         return {
             "cache_size": len(self._permissions_cache),

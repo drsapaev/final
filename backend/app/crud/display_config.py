@@ -2,9 +2,8 @@
 CRUD операции для системы табло
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.display_config import DisplayAnnouncement, DisplayBoard, DisplayTheme
@@ -12,19 +11,19 @@ from app.models.display_config import DisplayAnnouncement, DisplayBoard, Display
 # ===================== ТАБЛО =====================
 
 
-def get_display_board(db: Session, board_id: int) -> Optional[DisplayBoard]:
+def get_display_board(db: Session, board_id: int) -> DisplayBoard | None:
     """Получить табло по ID"""
     return db.query(DisplayBoard).filter(DisplayBoard.id == board_id).first()
 
 
-def get_display_board_by_name(db: Session, name: str) -> Optional[DisplayBoard]:
+def get_display_board_by_name(db: Session, name: str) -> DisplayBoard | None:
     """Получить табло по имени"""
     return db.query(DisplayBoard).filter(DisplayBoard.name == name).first()
 
 
 def get_display_boards(
     db: Session, active_only: bool = True, skip: int = 0, limit: int = 100
-) -> List[DisplayBoard]:
+) -> list[DisplayBoard]:
     """Получить список табло"""
     query = db.query(DisplayBoard)
 
@@ -34,7 +33,7 @@ def get_display_boards(
     return query.offset(skip).limit(limit).all()
 
 
-def create_display_board(db: Session, board_data: Dict[str, Any]) -> DisplayBoard:
+def create_display_board(db: Session, board_data: dict[str, Any]) -> DisplayBoard:
     """Создать табло"""
     board = DisplayBoard(**board_data)
     db.add(board)
@@ -44,8 +43,8 @@ def create_display_board(db: Session, board_data: Dict[str, Any]) -> DisplayBoar
 
 
 def update_display_board(
-    db: Session, board_id: int, board_data: Dict[str, Any]
-) -> Optional[DisplayBoard]:
+    db: Session, board_id: int, board_data: dict[str, Any]
+) -> DisplayBoard | None:
     """Обновить табло"""
     board = get_display_board(db, board_id)
     if not board:
@@ -63,7 +62,7 @@ def update_display_board(
 # ===================== ТЕМЫ =====================
 
 
-def get_display_themes(db: Session, active_only: bool = True) -> List[DisplayTheme]:
+def get_display_themes(db: Session, active_only: bool = True) -> list[DisplayTheme]:
     """Получить темы табло"""
     query = db.query(DisplayTheme)
 
@@ -73,7 +72,7 @@ def get_display_themes(db: Session, active_only: bool = True) -> List[DisplayThe
     return query.all()
 
 
-def create_display_theme(db: Session, theme_data: Dict[str, Any]) -> DisplayTheme:
+def create_display_theme(db: Session, theme_data: dict[str, Any]) -> DisplayTheme:
     """Создать тему табло"""
     theme = DisplayTheme(**theme_data)
     db.add(theme)
@@ -90,7 +89,7 @@ def create_display_theme(db: Session, theme_data: Dict[str, Any]) -> DisplayThem
 
 def get_board_announcements(
     db: Session, board_id: int, active_only: bool = True
-) -> List[DisplayAnnouncement]:
+) -> list[DisplayAnnouncement]:
     """Получить объявления табло"""
     query = db.query(DisplayAnnouncement).filter(
         DisplayAnnouncement.board_id == board_id
@@ -105,7 +104,7 @@ def get_board_announcements(
 
 
 def create_board_announcement(
-    db: Session, announcement_data: Dict[str, Any]
+    db: Session, announcement_data: dict[str, Any]
 ) -> DisplayAnnouncement:
     """Создать объявление для табло"""
     announcement = DisplayAnnouncement(**announcement_data)

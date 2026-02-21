@@ -7,21 +7,19 @@ import json
 import logging
 import os
 from datetime import date, datetime, timedelta
-from io import BytesIO, StringIO
-from typing import Any, Dict, List, Optional, Union
+from io import StringIO
+from typing import Any
 
 import pandas as pd
 from jinja2 import Template
-from sqlalchemy import and_, desc, func, or_, text
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit, VisitService
 
 logger = logging.getLogger(__name__)
@@ -43,7 +41,7 @@ class ReportingService:
         end_date: date = None,
         department: str = None,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Генерирует отчет по пациентам"""
         try:
             query = self.db.query(Patient)
@@ -138,7 +136,7 @@ class ReportingService:
         doctor_id: int = None,
         department: str = None,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Генерирует отчет по записям"""
         try:
             # Объединяем данные из appointments и visits
@@ -202,7 +200,7 @@ class ReportingService:
                     doctor_names[doctor_id] = f"Врач #{doctor_id}"
 
             # Статистика по дням недели
-            weekday_stats = {i: 0 for i in range(7)}  # 0 = понедельник
+            weekday_stats = dict.fromkeys(range(7), 0)  # 0 = понедельник
             for appointment in appointments:
                 if appointment.appointment_date:
                     weekday_stats[appointment.appointment_date.weekday()] += 1
@@ -358,7 +356,7 @@ class ReportingService:
         end_date: date = None,
         department: str = None,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Генерирует финансовый отчет"""
         try:
             # Получаем данные о визитах с оплатами
@@ -509,7 +507,7 @@ class ReportingService:
         end_date: date = None,
         doctor_id: int = None,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Генерирует отчет по очередям"""
         try:
             query = self.db.query(OnlineQueueEntry)
@@ -557,7 +555,7 @@ class ReportingService:
             avg_wait_time = sum(wait_times) / len(wait_times) if wait_times else 0
 
             # Статистика по часам
-            hourly_stats = {i: 0 for i in range(24)}
+            hourly_stats = dict.fromkeys(range(24), 0)
             for entry in queue_entries:
                 if entry.created_at:
                     hour = entry.created_at.hour
@@ -621,7 +619,7 @@ class ReportingService:
         end_date: date = None,
         doctor_id: int = None,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Генерирует отчет по производительности врачей"""
         try:
             # Получаем всех врачей или конкретного врача
@@ -728,7 +726,7 @@ class ReportingService:
             logger.error(f"Ошибка генерации отчета по производительности врачей: {e}")
             raise
 
-    def generate_daily_summary(self, target_date: date = None) -> Dict[str, Any]:
+    def generate_daily_summary(self, target_date: date = None) -> dict[str, Any]:
         """Генерирует ежедневную сводку"""
         try:
             if not target_date:
@@ -760,7 +758,7 @@ class ReportingService:
             total_revenue = sum(
                 float(v.total_amount) for v in visits if v.total_amount
             )
-            
+
             # Новые пациенты за сегодня
             new_patients = (
                 self.db.query(Patient)
@@ -797,7 +795,7 @@ class ReportingService:
 
     # ===================== ФОРМАТИРОВАНИЕ ОТЧЕТОВ =====================
 
-    def _format_report(self, data: Dict[str, Any], format: str) -> Dict[str, Any]:
+    def _format_report(self, data: dict[str, Any], format: str) -> dict[str, Any]:
         """Форматирует отчет в указанный формат"""
         if format.lower() == "json":
             return data
@@ -810,7 +808,7 @@ class ReportingService:
         else:
             return data
 
-    def _convert_to_csv(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_to_csv(self, data: dict[str, Any]) -> dict[str, Any]:
         """Конвертирует данные в CSV"""
         try:
             csv_content = StringIO()
@@ -906,7 +904,7 @@ class ReportingService:
             logger.error(f"Ошибка конвертации в CSV: {e}")
             return {"error": str(e), "data": data}
 
-    def _convert_to_excel(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_to_excel(self, data: dict[str, Any]) -> dict[str, Any]:
         """Конвертирует данные в Excel"""
         try:
             # Создаем Excel файл
@@ -991,7 +989,7 @@ class ReportingService:
             # Fallback to CSV if Excel fails
             return self._convert_to_csv(data)
 
-    def _convert_to_pdf(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_to_pdf(self, data: dict[str, Any]) -> dict[str, Any]:
         """Конвертирует данные в PDF"""
         try:
             # Простой HTML шаблон для PDF
@@ -1020,7 +1018,7 @@ class ReportingService:
                     <p>Период: {{ period.start_date }} - {{ period.end_date }}</p>
                     {% endif %}
                 </div>
-                
+
                 {% if summary %}
                 <div class="summary">
                     <h3>Сводка</h3>
@@ -1029,7 +1027,7 @@ class ReportingService:
                     {% endfor %}
                 </div>
                 {% endif %}
-                
+
                 <!-- Здесь можно добавить таблицы с данными -->
                 <p>Подробные данные доступны в JSON формате.</p>
             </body>
@@ -1078,10 +1076,10 @@ class ReportingService:
         self,
         report_type: str,
         schedule: str,  # "daily", "weekly", "monthly"
-        recipients: List[str],
+        recipients: list[str],
         format: str = "excel",
-        filters: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
+        filters: dict[str, Any] = None,
+    ) -> dict[str, Any]:
         """Планирует автоматический отчет"""
         try:
             # В реальной системе здесь была бы интеграция с Celery или другим планировщиком
@@ -1152,7 +1150,7 @@ class ReportingService:
 
     # ===================== УТИЛИТЫ =====================
 
-    def get_available_reports(self) -> List[Dict[str, Any]]:
+    def get_available_reports(self) -> list[dict[str, Any]]:
         """Возвращает список доступных типов отчетов"""
         return [
             {

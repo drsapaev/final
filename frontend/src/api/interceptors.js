@@ -124,9 +124,11 @@ export function setupInterceptors() {
           });
         }
         
-        // Если обновление токена не удалось, выходим
-        tokenManager.clearAll();
-        delete api.defaults.headers.common['Authorization'];
+        // Не очищаем токен при начальной загрузке (после логина), чтобы не терять только что выданный токен
+        if (!isInitialLoad) {
+          tokenManager.clearAll();
+          delete api.defaults.headers.common['Authorization'];
+        }
         
         // Перенаправляем только если:
         // 1. Это не некритичный эндпоинт

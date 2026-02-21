@@ -68,6 +68,7 @@ dependencies = [
   "uvicorn[standard]>=0.29,<0.31",
   "pydantic>=2.7,<2.9",
   "SQLAlchemy>=2.0,<2.1",
+  "redis>=5.0,<6.0",
   "alembic>=1.13,<1.14",
   "python-jose[cryptography]>=3.3,<4.0",
   "passlib[bcrypt]>=1.7,<1.8",
@@ -137,6 +138,9 @@ ignore = [
     "E501",  # line too long (handled by black)
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
+    "B904",  # exception chaining in legacy code (TODO: tighten)
+    "E712",  # comparisons to True/False (common in SQLAlchemy filters)
+    "E722",  # bare excepts in legacy code (TODO: tighten)
 ]
 
 [tool.ruff.lint.isort]

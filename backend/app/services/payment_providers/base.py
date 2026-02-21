@@ -4,9 +4,8 @@
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class PaymentResult:
         status: str = None,
         payment_url: str = None,
         error_message: str = None,
-        provider_data: Dict[str, Any] = None,
+        provider_data: dict[str, Any] = None,
     ):
         self.success = success
         self.payment_id = payment_id
@@ -45,7 +44,7 @@ class PaymentResult:
 class BasePaymentProvider(ABC):
     """Базовый класс для всех провайдеров платежей"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.provider_name = self.__class__.__name__.replace("Provider", "").lower()
 
@@ -91,7 +90,7 @@ class BasePaymentProvider(ABC):
         pass
 
     @abstractmethod
-    def process_webhook(self, webhook_data: Dict[str, Any]) -> PaymentResult:
+    def process_webhook(self, webhook_data: dict[str, Any]) -> PaymentResult:
         """
         Обработка webhook от провайдера
 
@@ -119,7 +118,7 @@ class BasePaymentProvider(ABC):
         )
 
     def refund_payment(
-        self, payment_id: str, amount: Optional[Decimal] = None
+        self, payment_id: str, amount: Decimal | None = None
     ) -> PaymentResult:
         """
         Возврат платежа (опционально)
@@ -137,7 +136,7 @@ class BasePaymentProvider(ABC):
         )
 
     def validate_webhook_signature(
-        self, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
+        self, webhook_data: dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """
         Валидация подписи webhook (опционально)
@@ -180,11 +179,11 @@ class BasePaymentProvider(ABC):
         """
         return Decimal(amount) / 100
 
-    def log_operation(self, operation: str, data: Dict[str, Any]):
+    def log_operation(self, operation: str, data: dict[str, Any]):
         """Логирование операций"""
         logger.info(f"[{self.provider_name.upper()}] {operation}: {data}")
 
-    def log_error(self, operation: str, error: str, data: Dict[str, Any] = None):
+    def log_error(self, operation: str, error: str, data: dict[str, Any] = None):
         """Логирование ошибок"""
         logger.error(f"[{self.provider_name.upper()}] {operation} ERROR: {error}")
         if data:

@@ -2,32 +2,19 @@
 GraphQL резолверы для API клиники
 """
 
-from datetime import date, datetime
-from typing import List, Optional
+from datetime import date
 
 import strawberry
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.crud import (
-    appointment as crud_appointment,
-    clinic as crud_clinic,
-    patient as crud_patient,
-    service as crud_service,
-    visit as crud_visit,
-)
 from app.db.session import get_db
 from app.graphql.types import (
     AppointmentFilter,
-    AppointmentInput,
-    AppointmentMutationResponse,
     AppointmentStats,
     AppointmentType,
-    ClinicSettingsType,
     DailyQueueType,
     DoctorFilter,
-    DoctorInput,
-    DoctorMutationResponse,
     DoctorStats,
     DoctorType,
     PaginatedAppointments,
@@ -39,34 +26,24 @@ from app.graphql.types import (
     PaginationInfo,
     PaginationInput,
     PatientFilter,
-    PatientInput,
-    PatientMutationResponse,
     PatientType,
-    PatientUpdateInput,
-    QueueEntryInput,
     QueueEntryType,
     QueueFilter,
-    QueueMutationResponse,
     QueueStats,
     ServiceFilter,
-    ServiceInput,
-    ServiceMutationResponse,
     ServiceType,
     UserType,
     VisitFilter,
-    VisitInput,
-    VisitMutationResponse,
-    VisitServiceType,
     VisitStats,
     VisitType,
 )
 from app.models.appointment import Appointment
-from app.models.clinic import ClinicSettings, Doctor
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit, VisitService
+from app.models.visit import Visit
 
 
 def get_db_session() -> Session:
@@ -245,8 +222,8 @@ class Query:
     @strawberry.field
     def patients(
         self,
-        filter: Optional[PatientFilter] = None,
-        pagination: Optional[PaginationInput] = None,
+        filter: PatientFilter | None = None,
+        pagination: PaginationInput | None = None,
     ) -> PaginatedPatients:
         """Получить список пациентов"""
         db = get_db_session()
@@ -286,7 +263,7 @@ class Query:
         )
 
     @strawberry.field
-    def patient(self, id: int) -> Optional[PatientType]:
+    def patient(self, id: int) -> PatientType | None:
         """Получить пациента по ID"""
         db = get_db_session()
         patient = db.query(Patient).filter(Patient.id == id).first()
@@ -297,8 +274,8 @@ class Query:
     @strawberry.field
     def doctors(
         self,
-        filter: Optional[DoctorFilter] = None,
-        pagination: Optional[PaginationInput] = None,
+        filter: DoctorFilter | None = None,
+        pagination: PaginationInput | None = None,
     ) -> PaginatedDoctors:
         """Получить список врачей"""
         db = get_db_session()
@@ -334,7 +311,7 @@ class Query:
         )
 
     @strawberry.field
-    def doctor(self, id: int) -> Optional[DoctorType]:
+    def doctor(self, id: int) -> DoctorType | None:
         """Получить врача по ID"""
         db = get_db_session()
         doctor = db.query(Doctor).filter(Doctor.id == id).first()
@@ -345,8 +322,8 @@ class Query:
     @strawberry.field
     def services(
         self,
-        filter: Optional[ServiceFilter] = None,
-        pagination: Optional[PaginationInput] = None,
+        filter: ServiceFilter | None = None,
+        pagination: PaginationInput | None = None,
     ) -> PaginatedServices:
         """Получить список услуг"""
         db = get_db_session()
@@ -390,7 +367,7 @@ class Query:
         )
 
     @strawberry.field
-    def service(self, id: int) -> Optional[ServiceType]:
+    def service(self, id: int) -> ServiceType | None:
         """Получить услугу по ID"""
         db = get_db_session()
         service = db.query(Service).filter(Service.id == id).first()
@@ -401,8 +378,8 @@ class Query:
     @strawberry.field
     def appointments(
         self,
-        filter: Optional[AppointmentFilter] = None,
-        pagination: Optional[PaginationInput] = None,
+        filter: AppointmentFilter | None = None,
+        pagination: PaginationInput | None = None,
     ) -> PaginatedAppointments:
         """Получить список записей"""
         db = get_db_session()
@@ -448,7 +425,7 @@ class Query:
         )
 
     @strawberry.field
-    def appointment(self, id: int) -> Optional[AppointmentType]:
+    def appointment(self, id: int) -> AppointmentType | None:
         """Получить запись по ID"""
         db = get_db_session()
         appointment = db.query(Appointment).filter(Appointment.id == id).first()
@@ -459,8 +436,8 @@ class Query:
     @strawberry.field
     def visits(
         self,
-        filter: Optional[VisitFilter] = None,
-        pagination: Optional[PaginationInput] = None,
+        filter: VisitFilter | None = None,
+        pagination: PaginationInput | None = None,
     ) -> PaginatedVisits:
         """Получить список визитов"""
         db = get_db_session()
@@ -506,7 +483,7 @@ class Query:
         )
 
     @strawberry.field
-    def visit(self, id: int) -> Optional[VisitType]:
+    def visit(self, id: int) -> VisitType | None:
         """Получить визит по ID"""
         db = get_db_session()
         visit = db.query(Visit).filter(Visit.id == id).first()
@@ -517,8 +494,8 @@ class Query:
     @strawberry.field
     def queue_entries(
         self,
-        filter: Optional[QueueFilter] = None,
-        pagination: Optional[PaginationInput] = None,
+        filter: QueueFilter | None = None,
+        pagination: PaginationInput | None = None,
     ) -> PaginatedQueueEntries:
         """Получить список записей в очереди"""
         db = get_db_session()
@@ -616,7 +593,7 @@ class Query:
         )
 
     @strawberry.field
-    def doctor_stats(self, doctor_id: int) -> Optional[DoctorStats]:
+    def doctor_stats(self, doctor_id: int) -> DoctorStats | None:
         """Получить статистику врача"""
         db = get_db_session()
 

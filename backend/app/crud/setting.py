@@ -1,8 +1,6 @@
 # CRUD для settings (Sync Session). Если у тебя Async CRUD — скажи, выдам async-версию.
 from __future__ import annotations
 
-from typing import List, Optional
-
 from sqlalchemy.orm import Session
 
 from app.models.setting import Setting
@@ -10,7 +8,7 @@ from app.models.setting import Setting
 
 def list_settings(
     db: Session, category: str, limit: int = 100, offset: int = 0
-) -> List[Setting]:
+) -> list[Setting]:
     q = db.query(Setting).filter(Setting.category == category)
     if offset:
         q = q.offset(offset)
@@ -19,7 +17,7 @@ def list_settings(
     return q.all()
 
 
-def get_setting(db: Session, category: str, key: str) -> Optional[Setting]:
+def get_setting(db: Session, category: str, key: str) -> Setting | None:
     return (
         db.query(Setting)
         .filter(Setting.category == category, Setting.key == key)

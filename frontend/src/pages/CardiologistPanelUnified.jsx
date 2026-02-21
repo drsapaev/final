@@ -29,7 +29,7 @@ import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import EMRSystem from '../components/medical/EMRSystem';
+import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import tokenManager from '../utils/tokenManager';
 
@@ -1206,19 +1206,10 @@ const MacOSCardiologistPanelUnified = () => {
                   <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                   Электронная медицинская карта
                 </h3>
-                <EMRSystem
-                  appointment={{
-                    id: selectedPatient?.appointment_id || selectedPatient?.id,
-                    patient_id: selectedPatient?.patient?.id || selectedPatient?.patient_id,
-                    patient_name: selectedPatient?.patient_name || selectedPatient?.name,
-                    status: selectedPatient?.status || 'waiting',
-                    payment_status: selectedPatient?.payment_status || (selectedPatient?.discount_mode === 'paid' ? 'paid' : 'pending'),
-                    specialty: 'cardiology',
-                    discount_mode: selectedPatient?.discount_mode
-                  }}
-                  emr={emr}
-                  onSave={saveEMR}
-                  onComplete={handleCompleteVisitFromEMR}
+                <EMRContainerV2
+                  visitId={selectedPatient?.appointment_id || selectedPatient?.id}
+                  patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
+                  specialty="cardiology"
                 />
               </MacOSCard>
 

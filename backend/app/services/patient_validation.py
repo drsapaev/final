@@ -3,11 +3,9 @@ Patient Data Validation Service
 
 ✅ SECURITY: Comprehensive validation and sanitization for patient data
 """
-import re
 import logging
+import re
 from datetime import date, datetime
-from typing import Dict, List, Optional, Tuple
-from html import escape
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +29,14 @@ class PatientValidationService:
     # Document types
     VALID_DOC_TYPES = ["passport", "id_card", "birth_certificate", "driver_license"]
 
-    def sanitize_string(self, value: Optional[str], max_length: int = None) -> Optional[str]:
+    def sanitize_string(self, value: str | None, max_length: int = None) -> str | None:
         """
         Sanitize string input
-        
+
         Args:
             value: Input string
             max_length: Maximum allowed length
-        
+
         Returns:
             Sanitized string or None
         """
@@ -58,10 +56,10 @@ class PatientValidationService:
 
         return value if value else None
 
-    def validate_name(self, name: Optional[str], field_name: str = "name") -> Tuple[bool, Optional[str]]:
+    def validate_name(self, name: str | None, field_name: str = "name") -> tuple[bool, str | None]:
         """
         Validate name field
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -91,10 +89,10 @@ class PatientValidationService:
 
         return True, None
 
-    def validate_phone(self, phone: Optional[str]) -> Tuple[bool, Optional[str]]:
+    def validate_phone(self, phone: str | None) -> tuple[bool, str | None]:
         """
         Validate phone number
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -117,10 +115,10 @@ class PatientValidationService:
 
         return True, None
 
-    def validate_birth_date(self, birth_date: Optional[date]) -> Tuple[bool, Optional[str]]:
+    def validate_birth_date(self, birth_date: date | None) -> tuple[bool, str | None]:
         """
         Validate birth date
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -141,11 +139,11 @@ class PatientValidationService:
         return True, None
 
     def validate_document(
-        self, doc_type: Optional[str], doc_number: Optional[str]
-    ) -> Tuple[bool, Optional[str]]:
+        self, doc_type: str | None, doc_number: str | None
+    ) -> tuple[bool, str | None]:
         """
         Validate document information
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -171,10 +169,10 @@ class PatientValidationService:
 
         return True, None
 
-    def validate_address(self, address: Optional[str]) -> Tuple[bool, Optional[str]]:
+    def validate_address(self, address: str | None) -> tuple[bool, str | None]:
         """
         Validate address
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -196,29 +194,28 @@ class PatientValidationService:
 
         return True, None
 
-    def validate_sex(self, sex: Optional[str]) -> Tuple[bool, Optional[str]]:
+    def validate_sex(self, sex: str | None) -> tuple[bool, str | None]:
         """
         Validate sex/gender field
-        
+
         Returns:
             (is_valid, error_message)
         """
         if not sex:
             return True, None  # Sex is optional
 
-        valid_values = ["M", "F", "X", "m", "f", "x", "M", "F", "X"]
         if sex.upper() not in ["M", "F", "X"]:
             return False, "Sex must be M (Male), F (Female), or X (Other)"
 
         return True, None
 
-    def validate_patient_data(self, patient_data: Dict) -> Tuple[bool, List[str]]:
+    def validate_patient_data(self, patient_data: dict) -> tuple[bool, list[str]]:
         """
         Comprehensive validation of patient data
-        
+
         Args:
             patient_data: Dictionary with patient fields
-        
+
         Returns:
             (is_valid, list_of_errors)
         """
@@ -310,13 +307,13 @@ class PatientValidationService:
 
         return len(errors) == 0, errors
 
-    def sanitize_patient_data(self, patient_data: Dict) -> Dict:
+    def sanitize_patient_data(self, patient_data: dict) -> dict:
         """
         Sanitize all patient data fields
-        
+
         Args:
             patient_data: Dictionary with patient fields
-        
+
         Returns:
             Sanitized dictionary
         """

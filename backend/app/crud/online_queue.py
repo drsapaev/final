@@ -29,7 +29,7 @@ See Also:
 
 import logging
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_
@@ -49,10 +49,10 @@ logger = logging.getLogger(__name__)
 def join_online_queue(
     db: Session,
     token: str,
-    phone: Optional[str] = None,
-    telegram_id: Optional[int] = None,
-    patient_name: Optional[str] = None,
-) -> Dict[str, Any]:
+    phone: str | None = None,
+    telegram_id: int | None = None,
+    patient_name: str | None = None,
+) -> dict[str, Any]:
     """
     Вступление в онлайн-очередь
     Из detail.md стр. 235: POST /api/online-queue/join { token, phone?, telegram_id? } → номер
@@ -252,11 +252,11 @@ def join_online_queue(
 def join_online_queue_multiple(
     db: Session,
     token: str,
-    specialist_ids: List[int],
-    phone: Optional[str] = None,
-    telegram_id: Optional[int] = None,
-    patient_name: Optional[str] = None,
-) -> Dict[str, Any]:
+    specialist_ids: list[int],
+    phone: str | None = None,
+    telegram_id: int | None = None,
+    patient_name: str | None = None,
+) -> dict[str, Any]:
     """
     Вступление в онлайн-очередь для нескольких специалистов одновременно
     Создает отдельные записи OnlineQueueEntry для каждого специалиста с одинаковым queue_time
@@ -450,7 +450,6 @@ def join_online_queue_multiple(
                 from app.crud.patient import (
                     find_or_create_patient,
                     find_patient,
-                    normalize_patient_name,
                 )
 
                 # Ищем существующего пациента
@@ -585,8 +584,8 @@ def join_online_queue_multiple(
 
 
 def open_daily_queue(
-    db: Session, day: date, specialist_id: int, user_id: Optional[int] = None
-) -> Dict[str, Any]:
+    db: Session, day: date, specialist_id: int, user_id: int | None = None
+) -> dict[str, Any]:
     """
     Открытие приема и закрытие онлайн-набора
     Из detail.md стр. 253: POST /api/online-queue/open?day&specialist_id
@@ -625,7 +624,7 @@ def open_daily_queue(
 
     return {
         "success": True,
-        "message": f"Прием открыт. Онлайн-набор закрыт.",
+        "message": "Прием открыт. Онлайн-набор закрыт.",
         "opened_at": daily_queue.opened_at,
         "online_entries_count": online_entries_count,
         "closed_online_registration": True,
@@ -635,7 +634,7 @@ def open_daily_queue(
 # ===================== ПОЛУЧЕНИЕ СОСТОЯНИЯ ОЧЕРЕДИ =====================
 
 
-def get_queue_status(db: Session, day: date, specialist_id: int) -> Dict[str, Any]:
+def get_queue_status(db: Session, day: date, specialist_id: int) -> dict[str, Any]:
     """Получить статус очереди"""
 
     # Получаем очередь
@@ -680,7 +679,7 @@ def get_queue_status(db: Session, day: date, specialist_id: int) -> Dict[str, An
 
 def check_queue_availability(
     db: Session, day: date, specialist_id: int
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Проверка доступности онлайн-очереди
     Из detail.md стр. 238-246: правила доступности
@@ -758,9 +757,9 @@ def check_queue_availability(
 def find_existing_entry(
     db: Session,
     queue_id: int,
-    phone: Optional[str] = None,
-    telegram_id: Optional[int] = None,
-) -> Optional[OnlineQueueEntry]:
+    phone: str | None = None,
+    telegram_id: int | None = None,
+) -> OnlineQueueEntry | None:
     """
     Поиск существующей записи по телефону или Telegram ID
     Из detail.md стр. 241: "Один номер на телефон или Telegram‑чат"
@@ -797,7 +796,7 @@ def find_existing_entry(
 
 def validate_queue_token(
     db: Session, token: str
-) -> Tuple[bool, Optional[QueueToken], str]:
+) -> tuple[bool, QueueToken | None, str]:
     """Валидация QR токена"""
 
     queue_token = (
@@ -828,10 +827,10 @@ def get_or_create_daily_queue(
     db: Session,
     day: date,
     specialist_id: int,
-    queue_tag: Optional[str] = None,
-    cabinet_number: Optional[str] = None,
-    cabinet_floor: Optional[int] = None,
-    cabinet_building: Optional[str] = None,
+    queue_tag: str | None = None,
+    cabinet_number: str | None = None,
+    cabinet_floor: int | None = None,
+    cabinet_building: str | None = None,
 ) -> DailyQueue:
     """
     Получить или создать дневную очередь с поддержкой queue_tag и информации о кабинете
@@ -907,8 +906,8 @@ def count_queue_entries(db: Session, queue_id: int) -> int:
 
 
 def get_queue_statistics(
-    db: Session, day: date, specialist_id: Optional[int] = None
-) -> Dict[str, Any]:
+    db: Session, day: date, specialist_id: int | None = None
+) -> dict[str, Any]:
     """Статистика очереди за день"""
 
     query = db.query(DailyQueue).filter(DailyQueue.day == day)

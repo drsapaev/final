@@ -2,7 +2,7 @@
 import hashlib
 import hmac
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,7 @@ class PaymentWebhookService:
 
     @staticmethod
     def verify_payme_signature(
-        data: Dict[str, Any], signature: str, secret_key: str
+        data: dict[str, Any], signature: str, secret_key: str
     ) -> bool:
         """Верификация подписи Payme"""
         try:
@@ -59,7 +59,7 @@ class PaymentWebhookService:
             return False
 
     @staticmethod
-    def verify_click_signature(data: Dict[str, Any], secret_key: str) -> bool:
+    def verify_click_signature(data: dict[str, Any], secret_key: str) -> bool:
         """Верификация подписи Click"""
         try:
             # Создаём строку для подписи
@@ -74,8 +74,8 @@ class PaymentWebhookService:
 
     @staticmethod
     def process_payme_webhook(
-        db: Session, data: Dict[str, Any], signature: str
-    ) -> Tuple[bool, str, Optional[PaymentWebhook]]:
+        db: Session, data: dict[str, Any], signature: str
+    ) -> tuple[bool, str, PaymentWebhook | None]:
         """Обработка вебхука от Payme"""
         try:
             # Парсим данные
@@ -210,8 +210,8 @@ class PaymentWebhookService:
 
     @staticmethod
     def process_click_webhook(
-        db: Session, data: Dict[str, Any]
-    ) -> Tuple[bool, str, Optional[PaymentWebhook]]:
+        db: Session, data: dict[str, Any]
+    ) -> tuple[bool, str, PaymentWebhook | None]:
         """Обработка вебхука от Click"""
         try:
             # Парсим данные
@@ -342,8 +342,8 @@ class PaymentWebhookService:
 
     @staticmethod
     def get_webhook_summary(
-        db: Session, provider: Optional[str] = None
-    ) -> Dict[str, Any]:
+        db: Session, provider: str | None = None
+    ) -> dict[str, Any]:
         """Получение сводки по вебхукам"""
         try:
             # Используем глобальные импорты

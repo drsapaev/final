@@ -5,13 +5,12 @@ OpenAI провайдер для AI функций
 import base64
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import openai
 from openai import AsyncOpenAI
 
-from .base_provider import AIRequest, AIResponse, BaseAIProvider
 from ...core.config import settings
+from .base_provider import AIRequest, AIResponse, BaseAIProvider
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ _PROVIDER_TIMEOUT = float(getattr(settings, "AI_PROVIDER_TIMEOUT", 180))
 class OpenAIProvider(BaseAIProvider):
     """Провайдер OpenAI (GPT-4, GPT-3.5)"""
 
-    def __init__(self, api_key: str, model: Optional[str] = None):
+    def __init__(self, api_key: str, model: str | None = None):
         super().__init__(api_key, model)
         self.client = AsyncOpenAI(api_key=api_key, timeout=_PROVIDER_TIMEOUT)
 
@@ -60,8 +59,8 @@ class OpenAIProvider(BaseAIProvider):
             )
 
     async def analyze_complaint(
-        self, complaint: str, patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, complaint: str, patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ жалоб и создание плана обследования"""
         system_prompt = self._build_system_prompt("doctor")
 
@@ -107,9 +106,9 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def differential_diagnosis(
-        self, symptoms: List[str], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+    async def _differential_diagnosis_legacy(
+        self, symptoms: list[str], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Дифференциальная диагностика на основе симптомов"""
         age = patient_info.get("age", "не указан") if patient_info else "не указан"
         gender = (
@@ -120,17 +119,17 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проведите дифференциальную диагностику для пациента со следующими симптомами:
-        
+
         Симптомы: {symptoms_text}
         Возраст: {age}
         Пол: {gender}
-        
+
         Предоставьте:
         1. Список наиболее вероятных диагнозов (с вероятностью в %)
         2. Дополнительные вопросы для уточнения диагноза
         3. Рекомендуемые обследования
         4. Красные флаги (симптомы, требующие немедленного внимания)
-        
+
         Ответ в формате JSON:
         {{
             "differential_diagnoses": [
@@ -148,8 +147,8 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы опытный врач-диагност с 25-летним стажем. 
-        Специализируетесь на дифференциальной диагностике. 
+        system_prompt = """Вы опытный врач-диагност с 25-летним стажем.
+        Специализируетесь на дифференциальной диагностике.
         Всегда учитываете возраст и пол пациента при постановке диагноза.
         Ответы даете только в формате JSON."""
 
@@ -170,9 +169,9 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def symptom_analysis(
-        self, symptoms: List[str], severity: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+    async def _symptom_analysis_legacy(
+        self, symptoms: list[str], severity: list[int] | None = None
+    ) -> dict[str, Any]:
         """Расширенный анализ симптомов с оценкой тяжести"""
         symptoms_with_severity = []
 
@@ -189,16 +188,16 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте следующие симптомы:
-        
+
         {symptoms_text}
-        
+
         Предоставьте:
         1. Группировку симптомов по системам органов
         2. Анализ взаимосвязей между симптомами
         3. Оценку общей тяжести состояния
         4. Возможные синдромы
         5. Рекомендации по приоритетности обследования
-        
+
         Ответ в формате JSON:
         {{
             "symptom_groups": {{
@@ -222,7 +221,7 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии. 
+        system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии.
         Анализируете симптомы системно, учитывая их взаимосвязи и клиническое значение.
         Ответы даете только в формате JSON."""
 
@@ -243,15 +242,15 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def clinical_decision_support(
-        self, case_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _clinical_decision_support_legacy(
+        self, case_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Поддержка клинических решений"""
         prompt = f"""
         Проанализируйте клинический случай и предоставьте рекомендации:
-        
+
         Данные пациента: {json.dumps(case_data, ensure_ascii=False, indent=2)}
-        
+
         Предоставьте:
         1. Анализ представленных данных
         2. Наиболее вероятный диагноз
@@ -259,7 +258,7 @@ class OpenAIProvider(BaseAIProvider):
         4. Рекомендации по лечению
         5. Прогноз
         6. Критерии для направления к специалисту
-        
+
         Ответ в формате JSON:
         {{
             "data_analysis": "анализ представленных данных",
@@ -290,7 +289,7 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине. 
+        system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине.
         Предоставляете комплексные рекомендации по ведению пациентов.
         Ответы даете только в формате JSON."""
 
@@ -312,8 +311,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def suggest_icd10(
-        self, symptoms: List[str], diagnosis: Optional[str] = None
-    ) -> List[Dict[str, str]]:
+        self, symptoms: list[str], diagnosis: str | None = None
+    ) -> list[dict[str, str]]:
         """Подсказки кодов МКБ-10"""
         system_prompt = self._build_system_prompt("icd")
 
@@ -352,8 +351,8 @@ class OpenAIProvider(BaseAIProvider):
             return []
 
     async def interpret_lab_results(
-        self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, results: list[dict[str, Any]], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Интерпретация результатов анализов"""
         system_prompt = self._build_system_prompt("lab")
 
@@ -407,9 +406,9 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def differential_diagnosis(
-        self, symptoms: List[str], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+    async def _differential_diagnosis_v2(
+        self, symptoms: list[str], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Дифференциальная диагностика на основе симптомов"""
         age = patient_info.get("age", "не указан") if patient_info else "не указан"
         gender = (
@@ -420,17 +419,17 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проведите дифференциальную диагностику для пациента со следующими симптомами:
-        
+
         Симптомы: {symptoms_text}
         Возраст: {age}
         Пол: {gender}
-        
+
         Предоставьте:
         1. Список наиболее вероятных диагнозов (с вероятностью в %)
         2. Дополнительные вопросы для уточнения диагноза
         3. Рекомендуемые обследования
         4. Красные флаги (симптомы, требующие немедленного внимания)
-        
+
         Ответ в формате JSON:
         {{
             "differential_diagnoses": [
@@ -448,8 +447,8 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы опытный врач-диагност с 25-летним стажем. 
-        Специализируетесь на дифференциальной диагностике. 
+        system_prompt = """Вы опытный врач-диагност с 25-летним стажем.
+        Специализируетесь на дифференциальной диагностике.
         Всегда учитываете возраст и пол пациента при постановке диагноза.
         Ответы даете только в формате JSON."""
 
@@ -470,9 +469,9 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def symptom_analysis(
-        self, symptoms: List[str], severity: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+    async def _symptom_analysis_v2(
+        self, symptoms: list[str], severity: list[int] | None = None
+    ) -> dict[str, Any]:
         """Расширенный анализ симптомов с оценкой тяжести"""
         symptoms_with_severity = []
 
@@ -489,16 +488,16 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте следующие симптомы:
-        
+
         {symptoms_text}
-        
+
         Предоставьте:
         1. Группировку симптомов по системам органов
         2. Анализ взаимосвязей между симптомами
         3. Оценку общей тяжести состояния
         4. Возможные синдромы
         5. Рекомендации по приоритетности обследования
-        
+
         Ответ в формате JSON:
         {{
             "symptom_groups": {{
@@ -522,7 +521,7 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии. 
+        system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии.
         Анализируете симптомы системно, учитывая их взаимосвязи и клиническое значение.
         Ответы даете только в формате JSON."""
 
@@ -543,15 +542,15 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def clinical_decision_support(
-        self, case_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _clinical_decision_support_v2(
+        self, case_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Поддержка клинических решений"""
         prompt = f"""
         Проанализируйте клинический случай и предоставьте рекомендации:
-        
+
         Данные пациента: {json.dumps(case_data, ensure_ascii=False, indent=2)}
-        
+
         Предоставьте:
         1. Анализ представленных данных
         2. Наиболее вероятный диагноз
@@ -559,7 +558,7 @@ class OpenAIProvider(BaseAIProvider):
         4. Рекомендации по лечению
         5. Прогноз
         6. Критерии для направления к специалисту
-        
+
         Ответ в формате JSON:
         {{
             "data_analysis": "анализ представленных данных",
@@ -590,7 +589,7 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине. 
+        system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине.
         Предоставляете комплексные рекомендации по ведению пациентов.
         Ответы даете только в формате JSON."""
 
@@ -612,8 +611,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def analyze_skin(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ кожи по фото через GPT-4 Vision"""
         try:
             # Кодируем изображение в base64
@@ -672,8 +671,8 @@ class OpenAIProvider(BaseAIProvider):
             return {"error": self._format_error(e)}
 
     async def interpret_ecg(
-        self, ecg_data: Dict[str, Any], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, ecg_data: dict[str, Any], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Интерпретация ЭКГ"""
         system_prompt = self._build_system_prompt("cardiologist")
 
@@ -730,8 +729,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def differential_diagnosis(
-        self, symptoms: List[str], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, symptoms: list[str], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Дифференциальная диагностика на основе симптомов"""
         age = patient_info.get("age", "не указан") if patient_info else "не указан"
         gender = (
@@ -742,17 +741,17 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проведите дифференциальную диагностику для пациента со следующими симптомами:
-        
+
         Симптомы: {symptoms_text}
         Возраст: {age}
         Пол: {gender}
-        
+
         Предоставьте:
         1. Список наиболее вероятных диагнозов (с вероятностью в %)
         2. Дополнительные вопросы для уточнения диагноза
         3. Рекомендуемые обследования
         4. Красные флаги (симптомы, требующие немедленного внимания)
-        
+
         Ответ в формате JSON:
         {{
             "differential_diagnoses": [
@@ -770,8 +769,8 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы опытный врач-диагност с 25-летним стажем. 
-        Специализируетесь на дифференциальной диагностике. 
+        system_prompt = """Вы опытный врач-диагност с 25-летним стажем.
+        Специализируетесь на дифференциальной диагностике.
         Всегда учитываете возраст и пол пациента при постановке диагноза.
         Ответы даете только в формате JSON."""
 
@@ -793,8 +792,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def symptom_analysis(
-        self, symptoms: List[str], severity: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+        self, symptoms: list[str], severity: list[int] | None = None
+    ) -> dict[str, Any]:
         """Расширенный анализ симптомов с оценкой тяжести"""
         symptoms_with_severity = []
 
@@ -811,16 +810,16 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте следующие симптомы:
-        
+
         {symptoms_text}
-        
+
         Предоставьте:
         1. Группировку симптомов по системам органов
         2. Анализ взаимосвязей между симптомами
         3. Оценку общей тяжести состояния
         4. Возможные синдромы
         5. Рекомендации по приоритетности обследования
-        
+
         Ответ в формате JSON:
         {{
             "symptom_groups": {{
@@ -844,7 +843,7 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии. 
+        system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии.
         Анализируете симптомы системно, учитывая их взаимосвязи и клиническое значение.
         Ответы даете только в формате JSON."""
 
@@ -866,14 +865,14 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def clinical_decision_support(
-        self, case_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, case_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Поддержка клинических решений"""
         prompt = f"""
         Проанализируйте клинический случай и предоставьте рекомендации:
-        
+
         Данные пациента: {json.dumps(case_data, ensure_ascii=False, indent=2)}
-        
+
         Предоставьте:
         1. Анализ представленных данных
         2. Наиболее вероятный диагноз
@@ -881,7 +880,7 @@ class OpenAIProvider(BaseAIProvider):
         4. Рекомендации по лечению
         5. Прогноз
         6. Критерии для направления к специалисту
-        
+
         Ответ в формате JSON:
         {{
             "data_analysis": "анализ представленных данных",
@@ -912,7 +911,7 @@ class OpenAIProvider(BaseAIProvider):
         }}
         """
 
-        system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине. 
+        system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине.
         Предоставляете комплексные рекомендации по ведению пациентов.
         Ответы даете только в формате JSON."""
 
@@ -935,8 +934,8 @@ class OpenAIProvider(BaseAIProvider):
 
     # Новые методы для анализа медицинских изображений
     async def analyze_xray_image(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ рентгеновского снимка"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
 
@@ -949,11 +948,11 @@ class OpenAIProvider(BaseAIProvider):
         clinical_info = metadata.get("clinical_info", "") if metadata else ""
 
         prompt = f"""Проанализируйте рентгеновский снимок как опытный врач-рентгенолог.
-        
+
         Область исследования: {body_part}
         Возраст пациента: {patient_age}
         Клиническая информация: {clinical_info}
-        
+
         Предоставьте анализ в формате JSON с техническим качеством, анатомическими структурами, патологическими находками и рекомендациями."""
 
         try:
@@ -986,8 +985,8 @@ class OpenAIProvider(BaseAIProvider):
             return {"error": self._format_error(e)}
 
     async def analyze_ultrasound_image(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ УЗИ изображения"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
 
@@ -997,10 +996,10 @@ class OpenAIProvider(BaseAIProvider):
         )
 
         prompt = f"""Проанализируйте ультразвуковое изображение как врач УЗИ-диагностики.
-        
+
         Исследуемый орган: {organ}
         Возраст пациента: {patient_age}
-        
+
         Предоставьте анализ в формате JSON с качеством изображения, анатомической оценкой, патологическими изменениями и рекомендациями."""
 
         try:
@@ -1033,8 +1032,8 @@ class OpenAIProvider(BaseAIProvider):
             return {"error": self._format_error(e)}
 
     async def analyze_dermatoscopy_image(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Анализ дерматоскопического изображения"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
 
@@ -1046,10 +1045,10 @@ class OpenAIProvider(BaseAIProvider):
         )
 
         prompt = f"""Проанализируйте дерматоскопическое изображение как дерматолог-онколог.
-        
+
         Локализация образования: {lesion_location}
         Возраст пациента: {patient_age}
-        
+
         Проведите анализ по системе ABCDE и предоставьте результат в формате JSON с дерматоскопическими признаками, оценкой риска, дифференциальной диагностикой и рекомендациями."""
 
         try:
@@ -1082,8 +1081,8 @@ class OpenAIProvider(BaseAIProvider):
             return {"error": self._format_error(e)}
 
     async def analyze_medical_image_generic(
-        self, image_data: bytes, image_type: str, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, image_type: str, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Универсальный анализ медицинского изображения"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
 
@@ -1092,9 +1091,9 @@ class OpenAIProvider(BaseAIProvider):
             patient_info = f"Возраст: {metadata.get('patient_age', 'не указан')}, Пол: {metadata.get('patient_gender', 'не указан')}"
 
         prompt = f"""Проанализируйте медицинское изображение типа {image_type} как врач-специалист.
-        
+
         {patient_info}
-        
+
         Предоставьте профессиональный анализ в формате JSON с качеством изображения, патологическими находками, нормальными структурами, дифференциальной диагностикой и рекомендациями."""
 
         try:
@@ -1128,10 +1127,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def generate_treatment_plan(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         diagnosis: str,
-        medical_history: Optional[List[Dict]] = None,
-    ) -> Dict[str, Any]:
+        medical_history: list[dict] | None = None,
+    ) -> dict[str, Any]:
         """Генерация персонализированного плана лечения"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -1150,19 +1149,19 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Создайте персонализированный план лечения для пациента:
-        
+
         ДАННЫЕ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
         - Вес: {weight}
         - Аллергии: {', '.join(allergies) if allergies else 'не указаны'}
         - Сопутствующие заболевания: {', '.join(comorbidities) if comorbidities else 'не указаны'}
-        
+
         ТЕКУЩИЙ ДИАГНОЗ: {diagnosis}
-        
+
         МЕДИЦИНСКАЯ ИСТОРИЯ:
         {history_text if history_text else 'История отсутствует'}
-        
+
         Предоставьте комплексный план лечения в формате JSON с целями лечения, медикаментозной терапией, немедикаментозными вмешательствами, рекомендациями по образу жизни и графиком наблюдения.
         """
 
@@ -1190,10 +1189,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def optimize_medication_regimen(
         self,
-        current_medications: List[Dict],
-        patient_profile: Dict[str, Any],
+        current_medications: list[dict],
+        patient_profile: dict[str, Any],
         condition: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Оптимизация медикаментозной терапии"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1211,7 +1210,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Оптимизируйте медикаментозную терапию для пациента:
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -1219,12 +1218,12 @@ class OpenAIProvider(BaseAIProvider):
         - Функция почек: {kidney_function}
         - Функция печени: {liver_function}
         - Аллергии: {', '.join(allergies) if allergies else 'не указаны'}
-        
+
         СОСТОЯНИЕ: {condition}
-        
+
         ТЕКУЩИЕ ПРЕПАРАТЫ:
         {medications_text}
-        
+
         Предоставьте оптимизированный план в формате JSON с изменениями препаратов, анализом взаимодействий и рекомендациями по мониторингу.
         """
 
@@ -1251,8 +1250,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def assess_treatment_effectiveness(
-        self, treatment_history: List[Dict], patient_response: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, treatment_history: list[dict], patient_response: dict[str, Any]
+    ) -> dict[str, Any]:
         """Оценка эффективности лечения"""
         history_text = "\n".join(
             [
@@ -1268,16 +1267,16 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Оцените эффективность проводимого лечения:
-        
+
         ИСТОРИЯ ЛЕЧЕНИЯ:
         {history_text}
-        
+
         ТЕКУЩИЙ ОТВЕТ ПАЦИЕНТА:
         - Симптомы: {', '.join(current_symptoms) if current_symptoms else 'отсутствуют'}
         - Побочные эффекты: {', '.join(side_effects) if side_effects else 'отсутствуют'}
         - Качество жизни (1-10): {quality_of_life}
         - Приверженность лечению (%): {adherence}
-        
+
         Предоставьте анализ эффективности в формате JSON с оценкой ответа на лечение, анализом побочных эффектов и рекомендациями по корректировке.
         """
 
@@ -1304,8 +1303,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def suggest_lifestyle_modifications(
-        self, patient_profile: Dict[str, Any], conditions: List[str]
-    ) -> Dict[str, Any]:
+        self, patient_profile: dict[str, Any], conditions: list[str]
+    ) -> dict[str, Any]:
         """Рекомендации по изменению образа жизни"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1319,7 +1318,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Разработайте персонализированные рекомендации по изменению образа жизни:
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -1328,9 +1327,9 @@ class OpenAIProvider(BaseAIProvider):
         - Курение: {smoking_status}
         - Употребление алкоголя: {alcohol_consumption}
         - Профессия: {occupation}
-        
+
         СОСТОЯНИЯ: {conditions_text}
-        
+
         Предоставьте рекомендации в формате JSON с диетическими рекомендациями, физической активностью, управлением стрессом и модификацией привычек.
         """
 
@@ -1358,9 +1357,9 @@ class OpenAIProvider(BaseAIProvider):
 
     async def check_drug_interactions(
         self,
-        medications: List[Dict[str, Any]],
-        patient_profile: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        medications: list[dict[str, Any]],
+        patient_profile: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Проверка лекарственных взаимодействий"""
         medications_text = "\n".join(
             [
@@ -1390,11 +1389,11 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте лекарственные взаимодействия между препаратами:
-        
+
         ПРЕПАРАТЫ:
         {medications_text}
         {patient_info}
-        
+
         Предоставьте детальный анализ в формате JSON:
         {{
             "interaction_summary": {{
@@ -1491,10 +1490,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def analyze_drug_safety(
         self,
-        medication: Dict[str, Any],
-        patient_profile: Dict[str, Any],
-        conditions: List[str],
-    ) -> Dict[str, Any]:
+        medication: dict[str, Any],
+        patient_profile: dict[str, Any],
+        conditions: list[str],
+    ) -> dict[str, Any]:
         """Анализ безопасности препарата для конкретного пациента"""
         med_name = medication.get("name", "не указано")
         med_dosage = medication.get("dosage", "не указано")
@@ -1513,12 +1512,12 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте безопасность препарата для конкретного пациента:
-        
+
         ПРЕПАРАТ:
         - Название: {med_name}
         - Дозировка: {med_dosage}
         - Частота: {med_frequency}
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -1528,9 +1527,9 @@ class OpenAIProvider(BaseAIProvider):
         - Функция почек: {kidney_function}
         - Функция печени: {liver_function}
         - Аллергии: {', '.join(allergies) if allergies else 'не указаны'}
-        
+
         ЗАБОЛЕВАНИЯ: {conditions_text}
-        
+
         Предоставьте анализ безопасности в формате JSON:
         {{
             "safety_assessment": {{
@@ -1621,8 +1620,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def suggest_drug_alternatives(
-        self, medication: str, reason: str, patient_profile: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, medication: str, reason: str, patient_profile: dict[str, Any]
+    ) -> dict[str, Any]:
         """Предложение альтернативных препаратов"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1634,10 +1633,10 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Предложите альтернативные препараты для замены:
-        
+
         ПРЕПАРАТ ДЛЯ ЗАМЕНЫ: {medication}
         ПРИЧИНА ЗАМЕНЫ: {reason}
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -1646,7 +1645,7 @@ class OpenAIProvider(BaseAIProvider):
         - Функция печени: {liver_function}
         - Аллергии: {', '.join(allergies) if allergies else 'не указаны'}
         - Заболевания: {', '.join(conditions) if conditions else 'не указаны'}
-        
+
         Предоставьте альтернативы в формате JSON:
         {{
             "original_medication": {{
@@ -1734,8 +1733,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def calculate_drug_dosage(
-        self, medication: str, patient_profile: Dict[str, Any], indication: str
-    ) -> Dict[str, Any]:
+        self, medication: str, patient_profile: dict[str, Any], indication: str
+    ) -> dict[str, Any]:
         """Расчет дозировки препарата"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1748,10 +1747,10 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Рассчитайте оптимальную дозировку препарата для пациента:
-        
+
         ПРЕПАРАТ: {medication}
         ПОКАЗАНИЕ: {indication}
-        
+
         ПАРАМЕТРЫ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -1761,7 +1760,7 @@ class OpenAIProvider(BaseAIProvider):
         - Креатинин: {creatinine} мкмоль/л
         - Клиренс креатинина: {creatinine_clearance} мл/мин
         - Функция печени: {liver_function}
-        
+
         Предоставьте расчет дозировки в формате JSON:
         {{
             "medication_info": {{
@@ -1863,8 +1862,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def assess_patient_risk(
-        self, patient_data: Dict[str, Any], risk_factors: List[str], condition: str
-    ) -> Dict[str, Any]:
+        self, patient_data: dict[str, Any], risk_factors: list[str], condition: str
+    ) -> dict[str, Any]:
         """Комплексная оценка рисков пациента"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -1890,7 +1889,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проведите комплексную оценку рисков для пациента:
-        
+
         ДАННЫЕ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -1902,10 +1901,10 @@ class OpenAIProvider(BaseAIProvider):
         - Сопутствующие заболевания: {comorbidities_text}
         - Текущие препараты: {medications_text}
         - Семейный анамнез: {family_history_text}
-        
+
         СОСТОЯНИЕ/ЗАБОЛЕВАНИЕ: {condition}
         ФАКТОРЫ РИСКА: {risk_factors_text}
-        
+
         Предоставьте детальную оценку рисков в формате JSON:
         {{
             "overall_risk_assessment": {{
@@ -2015,10 +2014,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def predict_complications(
         self,
-        patient_profile: Dict[str, Any],
+        patient_profile: dict[str, Any],
         procedure_or_condition: str,
         timeline: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Прогнозирование возможных осложнений"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -2042,7 +2041,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Спрогнозируйте возможные осложнения для пациента:
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -2050,10 +2049,10 @@ class OpenAIProvider(BaseAIProvider):
         - Текущие препараты: {medications_text}
         - Аллергии: {allergies_text}
         - Предыдущие осложнения: {complications_text}
-        
+
         ПРОЦЕДУРА/СОСТОЯНИЕ: {procedure_or_condition}
         ВРЕМЕННЫЕ РАМКИ: {timeline}
-        
+
         Предоставьте прогноз осложнений в формате JSON:
         {{
             "complication_overview": {{
@@ -2150,10 +2149,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def calculate_mortality_risk(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         condition: str,
-        scoring_system: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        scoring_system: str | None = None,
+    ) -> dict[str, Any]:
         """Расчет риска смертности"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -2187,7 +2186,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Рассчитайте риск смертности для пациента:
-        
+
         ДАННЫЕ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -2195,10 +2194,10 @@ class OpenAIProvider(BaseAIProvider):
         - Лабораторные показатели: {lab_values_text}
         - Сопутствующие заболевания: {comorbidities_text}
         - Показатели тяжести: {severity_text}
-        
+
         СОСТОЯНИЕ: {condition}
         СИСТЕМА ОЦЕНКИ: {scoring_system_info}
-        
+
         Предоставьте расчет риска смертности в формате JSON:
         {{
             "mortality_assessment": {{
@@ -2295,8 +2294,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def assess_surgical_risk(
-        self, patient_profile: Dict[str, Any], surgery_type: str, anesthesia_type: str
-    ) -> Dict[str, Any]:
+        self, patient_profile: dict[str, Any], surgery_type: str, anesthesia_type: str
+    ) -> dict[str, Any]:
         """Оценка хирургических рисков"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -2322,7 +2321,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Оцените хирургические риски для пациента:
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -2334,10 +2333,10 @@ class OpenAIProvider(BaseAIProvider):
         - Предыдущие операции: {surgeries_text}
         - Аллергии: {allergies_text}
         - Функциональный статус: {functional_status}
-        
+
         ТИП ОПЕРАЦИИ: {surgery_type}
         ТИП АНЕСТЕЗИИ: {anesthesia_type}
-        
+
         Предоставьте оценку хирургических рисков в формате JSON:
         {{
             "surgical_risk_assessment": {{
@@ -2455,10 +2454,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def predict_readmission_risk(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         discharge_condition: str,
-        social_factors: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        social_factors: dict[str, Any],
+    ) -> dict[str, Any]:
         """Прогнозирование риска повторной госпитализации"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -2486,7 +2485,7 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Спрогнозируйте риск повторной госпитализации для пациента:
-        
+
         ДАННЫЕ ПАЦИЕНТА:
         - Возраст: {age}
         - Пол: {gender}
@@ -2495,9 +2494,9 @@ class OpenAIProvider(BaseAIProvider):
         - Текущие препараты: {medications_text}
         - Длительность госпитализации: {length_of_stay}
         - Предыдущие госпитализации: {previous_admissions}
-        
+
         СОСТОЯНИЕ ПРИ ВЫПИСКЕ: {discharge_condition}
-        
+
         СОЦИАЛЬНЫЕ ФАКТОРЫ:
         - Социальная поддержка: {social_support}
         - Страховой статус: {insurance_status}
@@ -2505,7 +2504,7 @@ class OpenAIProvider(BaseAIProvider):
         - Жилищные условия: {housing_situation}
         - Доступность ухода: {caregiver_availability}
         - Медицинская грамотность: {health_literacy}
-        
+
         Предоставьте прогноз риска повторной госпитализации в формате JSON:
         {{
             "readmission_risk_assessment": {{
@@ -2642,7 +2641,7 @@ class OpenAIProvider(BaseAIProvider):
 
     async def transcribe_audio(
         self, audio_data: bytes, language: str = "ru", medical_context: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Транскрипция аудио в текст с медицинской терминологией"""
         try:
             # Создаем временный файл для аудио
@@ -2702,7 +2701,7 @@ class OpenAIProvider(BaseAIProvider):
 
     async def structure_medical_text(
         self, text: str, document_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Структурирование медицинского текста в формализованные поля"""
         document_templates = {
             "consultation": {
@@ -2755,12 +2754,12 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Структурируйте медицинский текст ({template["description"]}) в формализованные поля.
-        
+
         ИСХОДНЫЙ ТЕКСТ:
         {text}
-        
+
         ТРЕБУЕМЫЕ ПОЛЯ: {fields_list}
-        
+
         Предоставьте структурированный результат в формате JSON:
         {{
             "document_type": "{document_type}",
@@ -2817,14 +2816,14 @@ class OpenAIProvider(BaseAIProvider):
                 "raw_response": response.content,
             }
 
-    async def extract_medical_entities(self, text: str) -> Dict[str, Any]:
+    async def extract_medical_entities(self, text: str) -> dict[str, Any]:
         """Извлечение медицинских сущностей из текста"""
         prompt = f"""
         Извлеките медицинские сущности из следующего текста:
-        
+
         ТЕКСТ:
         {text}
-        
+
         Предоставьте результат в формате JSON:
         {{
             "medications": [
@@ -2963,8 +2962,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def generate_medical_summary(
-        self, consultation_text: str, patient_history: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, consultation_text: str, patient_history: str | None = None
+    ) -> dict[str, Any]:
         """Генерация медицинского резюме из текста консультации"""
         history_context = (
             f"\n\nИСТОРИЯ ПАЦИЕНТА:\n{patient_history}" if patient_history else ""
@@ -2972,10 +2971,10 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Создайте медицинское резюме на основе текста консультации:
-        
+
         ТЕКСТ КОНСУЛЬТАЦИИ:
         {consultation_text}{history_context}
-        
+
         Предоставьте резюме в формате JSON:
         {{
             "executive_summary": {{
@@ -3084,17 +3083,17 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def validate_medical_record(
-        self, record_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, record_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Валидация и проверка медицинской записи на полноту и корректность"""
         record_json = json.dumps(record_data, ensure_ascii=False, indent=2)
 
         prompt = f"""
         Проведите валидацию медицинской записи на полноту, корректность и соответствие стандартам:
-        
+
         МЕДИЦИНСКАЯ ЗАПИСЬ:
         {record_json}
-        
+
         Предоставьте результат валидации в формате JSON:
         {{
             "validation_summary": {{
@@ -3198,8 +3197,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def optimize_doctor_schedule(
-        self, schedule_data: Dict[str, Any], constraints: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, schedule_data: dict[str, Any], constraints: dict[str, Any]
+    ) -> dict[str, Any]:
         """Оптимизация расписания врача с учетом ограничений и предпочтений"""
         doctor_info = schedule_data.get("doctor", {})
         current_schedule = schedule_data.get("current_schedule", [])
@@ -3231,25 +3230,25 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Оптимизируйте расписание врача с учетом всех ограничений и предпочтений:
-        
+
         ИНФОРМАЦИЯ О ВРАЧЕ:
         - Имя: {doctor_name}
         - Специальность: {specialty}
         - Опыт работы: {experience} лет
         - Предпочтения: {preferences}
-        
+
         ТЕКУЩЕЕ РАСПИСАНИЕ:
         {current_schedule_text}
-        
+
         ЗАПЛАНИРОВАННЫЕ ПРИЕМЫ:
         {appointments_text}
-        
+
         ОГРАНИЧЕНИЯ:
         - Рабочие часы: {working_hours}
         - Требования к перерывам: {break_requirements}
         - Максимум пациентов в день: {max_patients_per_day}
         - Типы приемов: {appointment_types}
-        
+
         Предоставьте оптимизированное расписание в формате JSON:
         {{
             "optimization_summary": {{
@@ -3358,8 +3357,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def predict_appointment_duration(
-        self, appointment_data: Dict[str, Any], historical_data: List[Dict]
-    ) -> Dict[str, Any]:
+        self, appointment_data: dict[str, Any], historical_data: list[dict]
+    ) -> dict[str, Any]:
         """Прогнозирование длительности приема на основе исторических данных"""
         patient_info = appointment_data.get("patient", {})
         appointment_type = appointment_data.get("type", "не указан")
@@ -3399,20 +3398,20 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Спрогнозируйте длительность медицинского приема на основе данных:
-        
+
         ИНФОРМАЦИЯ О ПРИЕМЕ:
         - Тип приема: {appointment_type}
         - Жалоба пациента: {complaint}
         - Специальность врача: {doctor_specialty}
         - Первичный визит: {"да" if is_first_visit else "нет"}
         - Информация о пациенте: {patient_info}
-        
+
         ИСТОРИЧЕСКИЕ ДАННЫЕ:
         - Всего приемов в базе: {historical_summary["total_appointments"]}
         - Средняя длительность: {historical_summary["average_duration"]:.1f} минут
         - Диапазон длительности: {historical_summary["duration_range"]["min"]}-{historical_summary["duration_range"]["max"]} минут
         - Похожих случаев: {len(similar_cases)}
-        
+
         Предоставьте прогноз в формате JSON:
         {{
             "duration_prediction": {{
@@ -3495,10 +3494,10 @@ class OpenAIProvider(BaseAIProvider):
 
     async def suggest_optimal_slots(
         self,
-        doctor_profile: Dict[str, Any],
-        patient_requirements: Dict[str, Any],
-        available_slots: List[Dict],
-    ) -> Dict[str, Any]:
+        doctor_profile: dict[str, Any],
+        patient_requirements: dict[str, Any],
+        available_slots: list[dict],
+    ) -> dict[str, Any]:
         """Предложение оптимальных временных слотов для записи"""
         doctor_name = doctor_profile.get("name", "не указан")
         specialty = doctor_profile.get("specialty", "не указана")
@@ -3519,22 +3518,22 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Предложите оптимальные временные слоты для записи пациента:
-        
+
         ПРОФИЛЬ ВРАЧА:
         - Имя: {doctor_name}
         - Специальность: {specialty}
         - Паттерны работы: {working_patterns}
         - Показатели производительности: {performance_metrics}
-        
+
         ТРЕБОВАНИЯ ПАЦИЕНТА:
         - Предпочтения: {patient_preferences}
         - Срочность: {urgency_level}
         - Тип приема: {appointment_type}
         - Ожидаемая длительность: {estimated_duration} минут
-        
+
         ДОСТУПНЫЕ СЛОТЫ:
         {slots_text}
-        
+
         Предоставьте рекомендации в формате JSON:
         {{
             "optimal_slots": [
@@ -3626,8 +3625,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def analyze_workload_distribution(
-        self, doctors_data: List[Dict], time_period: str
-    ) -> Dict[str, Any]:
+        self, doctors_data: list[dict], time_period: str
+    ) -> dict[str, Any]:
         """Анализ распределения рабочей нагрузки между врачами"""
         doctors_summary = []
         for doctor in doctors_data:
@@ -3649,12 +3648,12 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте распределение рабочей нагрузки между врачами:
-        
+
         ПЕРИОД АНАЛИЗА: {time_period}
-        
+
         ДАННЫЕ ПО ВРАЧАМ:
         {doctors_text}
-        
+
         Предоставьте анализ в формате JSON:
         {{
             "workload_analysis": {{
@@ -3768,8 +3767,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def generate_shift_recommendations(
-        self, department_data: Dict[str, Any], staffing_requirements: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, department_data: dict[str, Any], staffing_requirements: dict[str, Any]
+    ) -> dict[str, Any]:
         """Генерация рекомендаций по составлению смен и графиков работы"""
         department_name = department_data.get("name", "не указано")
         staff_list = department_data.get("staff", [])
@@ -3797,23 +3796,23 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Создайте оптимальные рекомендации по составлению смен и графиков работы:
-        
+
         ИНФОРМАЦИЯ О ОТДЕЛЕНИИ:
         - Название: {department_name}
         - Паттерны потока пациентов: {patient_flow_patterns}
-        
+
         ПЕРСОНАЛ:
         {staff_text}
-        
+
         ТЕКУЩИЕ СМЕНЫ:
         {shifts_text}
-        
+
         ТРЕБОВАНИЯ К ПЕРСОНАЛУ:
         - Минимум сотрудников на смену: {min_staff_per_shift}
         - Часы покрытия: {coverage_hours}
         - Требования к навыкам: {skill_requirements}
         - Правила соответствия: {compliance_rules}
-        
+
         Предоставьте рекомендации в формате JSON:
         {{
             "shift_recommendations": {{
@@ -3945,8 +3944,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def analyze_documentation_quality(
-        self, medical_records: List[Dict], quality_standards: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, medical_records: list[dict], quality_standards: dict[str, Any]
+    ) -> dict[str, Any]:
         """Анализ качества медицинской документации"""
         records_summary = []
         for record in medical_records[:10]:  # Ограничиваем для анализа
@@ -3977,13 +3976,13 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте качество медицинской документации на соответствие стандартам:
-        
+
         СТАНДАРТЫ КАЧЕСТВА:
         {standards_text}
-        
+
         АНАЛИЗИРУЕМЫЕ ЗАПИСИ:
         {records_text}
-        
+
         Предоставьте анализ в формате JSON:
         {{
             "quality_assessment": {{
@@ -4088,10 +4087,10 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def detect_documentation_gaps(
-        self, patient_record: Dict[str, Any], required_fields: List[str]
-    ) -> Dict[str, Any]:
+        self, patient_record: dict[str, Any], required_fields: list[str]
+    ) -> dict[str, Any]:
         """Выявление пробелов в медицинской документации"""
-        record_fields = list(patient_record.keys())
+        _record_fields = list(patient_record.keys())
         missing_fields = [
             field
             for field in required_fields
@@ -4121,14 +4120,14 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Выявите пробелы в медицинской документации пациента:
-        
+
         МЕДИЦИНСКАЯ ЗАПИСЬ:
         {record_text}
-        
+
         ОБЯЗАТЕЛЬНЫЕ ПОЛЯ: {required_text}
         ОТСУТСТВУЮЩИЕ ПОЛЯ: {missing_text}
         СТАТИСТИКА: {record_summary}
-        
+
         Предоставьте анализ пробелов в формате JSON:
         {{
             "gap_analysis": {{
@@ -4231,21 +4230,21 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def suggest_documentation_improvements(
-        self, record_analysis: Dict[str, Any], best_practices: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, record_analysis: dict[str, Any], best_practices: dict[str, Any]
+    ) -> dict[str, Any]:
         """Предложение улучшений для медицинской документации"""
         analysis_text = json.dumps(record_analysis, ensure_ascii=False, indent=2)
         practices_text = json.dumps(best_practices, ensure_ascii=False, indent=2)
 
         prompt = f"""
         На основе анализа медицинской документации предложите улучшения:
-        
+
         АНАЛИЗ ДОКУМЕНТАЦИИ:
         {analysis_text}
-        
+
         ЛУЧШИЕ ПРАКТИКИ:
         {practices_text}
-        
+
         Предоставьте рекомендации по улучшению в формате JSON:
         {{
             "improvement_summary": {{
@@ -4401,8 +4400,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def validate_clinical_consistency(
-        self, diagnosis: str, symptoms: List[str], treatment: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, diagnosis: str, symptoms: list[str], treatment: dict[str, Any]
+    ) -> dict[str, Any]:
         """Валидация клинической согласованности диагноза, симптомов и лечения"""
         symptoms_text = ", ".join(symptoms) if symptoms else "не указаны"
         treatment_text = (
@@ -4411,11 +4410,11 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проверьте клиническую согласованность диагноза, симптомов и лечения:
-        
+
         ДИАГНОЗ: {diagnosis}
         СИМПТОМЫ: {symptoms_text}
         ЛЕЧЕНИЕ: {treatment_text}
-        
+
         Предоставьте валидацию согласованности в формате JSON:
         {{
             "consistency_assessment": {{
@@ -4526,8 +4525,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def audit_prescription_safety(
-        self, prescriptions: List[Dict], patient_profile: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, prescriptions: list[dict], patient_profile: dict[str, Any]
+    ) -> dict[str, Any]:
         """Аудит безопасности назначений и рецептов"""
         prescriptions_text = "\n".join(
             [
@@ -4540,13 +4539,13 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проведите аудит безопасности назначений и рецептов:
-        
+
         НАЗНАЧЕНИЯ:
         {prescriptions_text}
-        
+
         ПРОФИЛЬ ПАЦИЕНТА:
         {patient_text}
-        
+
         Предоставьте аудит безопасности в формате JSON:
         {{
             "safety_assessment": {{
@@ -4695,8 +4694,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def analyze_medical_trends(
-        self, medical_data: List[Dict], time_period: str, analysis_type: str
-    ) -> Dict[str, Any]:
+        self, medical_data: list[dict], time_period: str, analysis_type: str
+    ) -> dict[str, Any]:
         """Анализ медицинских трендов и паттернов в данных"""
         # Ограничиваем данные для анализа
         data_sample = medical_data[:100] if len(medical_data) > 100 else medical_data
@@ -4708,7 +4707,7 @@ class OpenAIProvider(BaseAIProvider):
             "time_period": time_period,
             "analysis_type": analysis_type,
             "data_types": list(
-                set([record.get("type", "unknown") for record in data_sample])
+                {record.get("type", "unknown") for record in data_sample}
             ),
             "date_range": {
                 "start": (
@@ -4733,18 +4732,18 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Проанализируйте медицинские тренды и паттерны в предоставленных данных:
-        
+
         ПАРАМЕТРЫ АНАЛИЗА:
         - Период анализа: {time_period}
         - Тип анализа: {analysis_type}
         - Общее количество записей: {data_summary['total_records']}
         - Размер выборки: {data_summary['sample_size']}
-        
+
         ОБРАЗЕЦ ДАННЫХ:
         {sample_data_text}
-        
+
         СВОДКА ДАННЫХ: {json.dumps(data_summary, ensure_ascii=False)}
-        
+
         Предоставьте комплексный анализ трендов в формате JSON:
         {{
             "trend_analysis": {{
@@ -4903,8 +4902,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def detect_anomalies(
-        self, dataset: List[Dict], baseline_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, dataset: list[dict], baseline_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Выявление аномалий в медицинских данных"""
         # Ограничиваем данные для анализа
         data_sample = dataset[:50] if len(dataset) > 50 else dataset
@@ -4918,7 +4917,7 @@ class OpenAIProvider(BaseAIProvider):
                 else []
             ),
             "record_types": list(
-                set([record.get("type", "unknown") for record in data_sample])
+                {record.get("type", "unknown") for record in data_sample}
             ),
         }
 
@@ -4933,18 +4932,18 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Выявите аномалии в медицинских данных по сравнению с базовыми показателями:
-        
+
         БАЗОВЫЕ ДАННЫЕ:
         {baseline_text}
-        
+
         АНАЛИЗИРУЕМЫЙ ДАТАСЕТ:
         Общее количество записей: {dataset_summary['total_records']}
         Размер выборки: {dataset_summary['sample_size']}
         Типы записей: {dataset_summary['record_types']}
-        
+
         ОБРАЗЕЦ ДАННЫХ:
         {sample_text}
-        
+
         Предоставьте анализ аномалий в формате JSON:
         {{
             "anomaly_detection": {{
@@ -5105,8 +5104,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def predict_outcomes(
-        self, patient_data: Dict[str, Any], historical_outcomes: List[Dict]
-    ) -> Dict[str, Any]:
+        self, patient_data: dict[str, Any], historical_outcomes: list[dict]
+    ) -> dict[str, Any]:
         """Прогнозирование медицинских исходов на основе данных"""
         patient_text = json.dumps(patient_data, ensure_ascii=False, indent=2)
 
@@ -5120,7 +5119,7 @@ class OpenAIProvider(BaseAIProvider):
             "total_cases": len(historical_outcomes),
             "sample_size": len(outcomes_sample),
             "outcome_types": list(
-                set([outcome.get("result", "unknown") for outcome in outcomes_sample])
+                {outcome.get("result", "unknown") for outcome in outcomes_sample}
             ),
             "success_rate": (
                 len([o for o in outcomes_sample if o.get("result") == "success"])
@@ -5140,19 +5139,19 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Спрогнозируйте медицинские исходы для пациента на основе исторических данных:
-        
+
         ДАННЫЕ ПАЦИЕНТА:
         {patient_text}
-        
+
         ИСТОРИЧЕСКИЕ ИСХОДЫ:
         Общее количество случаев: {outcomes_summary['total_cases']}
         Размер выборки: {outcomes_summary['sample_size']}
         Типы исходов: {outcomes_summary['outcome_types']}
         Общий процент успеха: {outcomes_summary['success_rate']:.1f}%
-        
+
         ОБРАЗЕЦ ИСТОРИЧЕСКИХ СЛУЧАЕВ:
         {outcomes_text}
-        
+
         Предоставьте прогноз исходов в формате JSON:
         {{
             "outcome_predictions": {{
@@ -5348,19 +5347,19 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def generate_insights_report(
-        self, analytics_data: Dict[str, Any], report_type: str
-    ) -> Dict[str, Any]:
+        self, analytics_data: dict[str, Any], report_type: str
+    ) -> dict[str, Any]:
         """Генерация отчета с аналитическими инсайтами"""
         analytics_text = json.dumps(analytics_data, ensure_ascii=False, indent=2)
 
         prompt = f"""
         Сгенерируйте комплексный отчет с аналитическими инсайтами на основе предоставленных данных:
-        
+
         ТИП ОТЧЕТА: {report_type}
-        
+
         АНАЛИТИЧЕСКИЕ ДАННЫЕ:
         {analytics_text}
-        
+
         Создайте структурированный отчет в формате JSON:
         {{
             "executive_summary": {{
@@ -5607,8 +5606,8 @@ class OpenAIProvider(BaseAIProvider):
             }
 
     async def identify_risk_patterns(
-        self, population_data: List[Dict], risk_factors: List[str]
-    ) -> Dict[str, Any]:
+        self, population_data: list[dict], risk_factors: list[str]
+    ) -> dict[str, Any]:
         """Выявление паттернов рисков в популяционных данных"""
         # Ограничиваем данные для анализа
         data_sample = (
@@ -5619,7 +5618,7 @@ class OpenAIProvider(BaseAIProvider):
             "total_population": len(population_data),
             "sample_size": len(data_sample),
             "age_groups": list(
-                set([p.get("age_group", "unknown") for p in data_sample])
+                {p.get("age_group", "unknown") for p in data_sample}
             ),
             "gender_distribution": {
                 "male": len([p for p in data_sample if p.get("gender") == "male"]),
@@ -5639,18 +5638,18 @@ class OpenAIProvider(BaseAIProvider):
 
         prompt = f"""
         Выявите паттерны рисков в популяционных медицинских данных:
-        
+
         АНАЛИЗИРУЕМЫЕ ФАКТОРЫ РИСКА: {risk_factors_text}
-        
+
         ПОПУЛЯЦИОННЫЕ ДАННЫЕ:
         Общая популяция: {population_summary['total_population']} человек
         Размер выборки: {population_summary['sample_size']} человек
         Возрастные группы: {population_summary['age_groups']}
         Распределение по полу: М={population_summary['gender_distribution']['male']}, Ж={population_summary['gender_distribution']['female']}
-        
+
         ОБРАЗЕЦ ДАННЫХ:
         {sample_text}
-        
+
         Предоставьте анализ паттернов рисков в формате JSON:
         {{
             "risk_pattern_analysis": {{

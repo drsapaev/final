@@ -2,21 +2,18 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     Boolean,
-    Column,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
-    Numeric,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
 
@@ -48,7 +45,7 @@ class PaymentWebhook(Base):
     raw_data: Mapped[dict] = mapped_column(
         JSON, nullable=False
     )  # сырые данные от провайдера
-    signature: Mapped[Optional[str]] = mapped_column(
+    signature: Mapped[str | None] = mapped_column(
         String(500), nullable=True
     )  # подпись для верификации
 
@@ -57,8 +54,8 @@ class PaymentWebhook(Base):
 
     # Связи
     # payment_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("payments.id"), nullable=True, index=True)
-    visit_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
-    patient_id: Mapped[Optional[int]] = mapped_column(
+    visit_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    patient_id: Mapped[int | None] = mapped_column(
         Integer, nullable=True, index=True
     )
 
@@ -66,8 +63,8 @@ class PaymentWebhook(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
-    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи (временно отключены для отладки)
     # payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="webhooks")
@@ -100,23 +97,23 @@ class PaymentTransaction(Base):
     )  # pending, processing, completed, failed, cancelled, refunded
 
     # Связи
-    payment_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("payments.id", ondelete="SET NULL"), 
-        nullable=True, 
+    payment_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("payments.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve webhook for audit
-    webhook_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("payment_webhooks.id", ondelete="SET NULL"), 
-        nullable=True, 
+    webhook_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("payment_webhooks.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve transaction for audit
-    visit_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    visit_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     # Дополнительные данные
-    provider_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Метаданные
     created_at: Mapped[datetime] = mapped_column(
@@ -142,13 +139,13 @@ class PaymentProvider(Base):
 
     # Конфигурация
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    webhook_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Настройки безопасности
-    api_key: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    secret_key: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    merchant_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    service_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    api_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    secret_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    merchant_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    service_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Финансовые настройки
     commission_percent: Mapped[int] = mapped_column(
@@ -162,12 +159,12 @@ class PaymentProvider(Base):
     )  # максимальная сумма в тийинах
 
     # Поддерживаемые валюты
-    supported_currencies: Mapped[Optional[str]] = mapped_column(
+    supported_currencies: Mapped[str | None] = mapped_column(
         String(100), default="UZS"
     )  # "UZS,KZT,USD"
 
     # Дополнительные настройки
-    config: Mapped[Optional[dict]] = mapped_column(
+    config: Mapped[dict | None] = mapped_column(
         JSON, nullable=True
     )  # дополнительные настройки провайдера
 

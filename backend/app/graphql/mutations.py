@@ -3,25 +3,27 @@ GraphQL мутации для API клиники
 """
 
 from datetime import date, datetime
-from typing import List, Optional
 
 import strawberry
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from app.crud import (
     appointment as crud_appointment,
-    clinic as crud_clinic,
+)
+from app.crud import (
     online_queue as crud_queue,
+)
+from app.crud import (
     patient as crud_patient,
+)
+from app.crud import (
     service as crud_service,
+)
+from app.crud import (
     visit as crud_visit,
 )
-from app.db.session import get_db
 from app.graphql.resolvers import (
     appointment_to_type,
-    doctor_to_type,
     get_db_session,
     patient_to_type,
     queue_entry_to_type,
@@ -31,8 +33,6 @@ from app.graphql.resolvers import (
 from app.graphql.types import (
     AppointmentInput,
     AppointmentMutationResponse,
-    DoctorInput,
-    DoctorMutationResponse,
     MutationResponse,
     PatientInput,
     PatientMutationResponse,
@@ -49,7 +49,7 @@ from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.visit import Visit, VisitService
+from app.models.visit import Visit
 
 
 @strawberry.type
@@ -297,7 +297,7 @@ class Mutation:
 
     @strawberry.mutation
     def cancel_appointment(
-        self, id: int, reason: Optional[str] = None
+        self, id: int, reason: str | None = None
     ) -> AppointmentMutationResponse:
         """Отменить запись"""
         try:
@@ -654,7 +654,7 @@ class Mutation:
 
     @strawberry.mutation
     def call_next_patient(
-        self, doctor_id: int, queue_tag: Optional[str] = None
+        self, doctor_id: int, queue_tag: str | None = None
     ) -> QueueMutationResponse:
         """Вызвать следующего пациента"""
         try:

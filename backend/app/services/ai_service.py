@@ -3,17 +3,15 @@
 Основа: passport.md стр. 3325-3888, detail.md стр. 3889-4282
 """
 
-import asyncio
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.crud import ai_config as crud_ai
-from app.models.ai_config import AIPromptTemplate, AIProvider, AIUsageLog
+from app.models.ai_config import AIPromptTemplate, AIProvider
 
 
 class AIService:
@@ -35,7 +33,7 @@ class AIService:
 
     async def analyze_complaints(
         self, complaints_text: str, specialty: str = "general", language: str = "ru"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Анализ жалоб пациента с помощью AI
         Из passport.md стр. 3325: анализ жалоб → план обследования
@@ -99,7 +97,7 @@ class AIService:
 
     async def suggest_icd10(
         self, diagnosis: str, specialty: str = "general", language: str = "ru"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Подбор кодов МКБ-10 по диагнозу
         Из passport.md стр. 3456: автоподбор МКБ-10
@@ -152,7 +150,7 @@ class AIService:
         document_text: str,
         document_type: str = "medical_report",
         specialty: str = "general",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Анализ медицинских документов
         Из passport.md стр. 3678: анализ документов и извлечение данных
@@ -298,7 +296,7 @@ class AIService:
                     f"Yandex GPT API error: {response.status} - {error_text}"
                 )
 
-    def _build_prompt(self, template: AIPromptTemplate, data: Dict[str, Any]) -> str:
+    def _build_prompt(self, template: AIPromptTemplate, data: dict[str, Any]) -> str:
         """Построить промпт из шаблона"""
         try:
             from jinja2 import Environment
@@ -367,7 +365,7 @@ class AIService:
             },
         )()
 
-    def _parse_complaints_response(self, response: str) -> Dict[str, Any]:
+    def _parse_complaints_response(self, response: str) -> dict[str, Any]:
         """Парсинг ответа анализа жалоб"""
         try:
             # Пробуем парсить как JSON
@@ -381,7 +379,7 @@ class AIService:
                 "recommendations": [],
             }
 
-    def _parse_icd10_response(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_icd10_response(self, response: str) -> list[dict[str, Any]]:
         """Парсинг ответа подбора МКБ-10"""
         try:
             # Пробуем парсить как JSON
@@ -402,7 +400,7 @@ class AIService:
                 }
             ]
 
-    def _parse_document_response(self, response: str) -> Dict[str, Any]:
+    def _parse_document_response(self, response: str) -> dict[str, Any]:
         """Парсинг ответа анализа документов"""
         try:
             return json.loads(response)

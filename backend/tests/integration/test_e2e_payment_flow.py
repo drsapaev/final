@@ -47,7 +47,7 @@ def payment_test_data(db_session):
         db_session.add(patient)
         db_session.commit()
         db_session.refresh(patient)
-    
+
     # Услуга
     service = db_session.query(Service).filter(Service.code == "PAY_TEST_SVC").first()
     if not service:
@@ -62,7 +62,7 @@ def payment_test_data(db_session):
         db_session.add(service)
         db_session.commit()
         db_session.refresh(service)
-    
+
     # Визит
     visit = Visit(
         patient_id=patient.id,
@@ -74,7 +74,7 @@ def payment_test_data(db_session):
     db_session.add(visit)
     db_session.commit()
     db_session.refresh(visit)
-    
+
     return {
         "patient": patient,
         "service": service,
@@ -97,7 +97,7 @@ class TestPaymentFlow:
         """Можно создать платёж для визита"""
         visit = payment_test_data["visit"]
         service = payment_test_data["service"]
-        
+
         # Создаем платёж
         response = client.post(
             "/api/v1/payments/init",
@@ -110,12 +110,12 @@ class TestPaymentFlow:
                 "description": f"Оплата за {service.name}",
             },
         )
-        
+
         # Может вернуть 200, 201 или 422 если endpoint не полностью реализован
         if response.status_code in [200, 201]:
             data = response.json()
             assert "payment_id" in data or "id" in data
-    
+
     def test_get_pending_payments_list(
         self, client: TestClient, auth_headers
     ):
@@ -124,11 +124,11 @@ class TestPaymentFlow:
             "/api/v1/appointments/pending-payments",
             headers=auth_headers,
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-    
+
     def test_payment_webhook_processing(
         self, client: TestClient, db_session
     ):
@@ -145,16 +145,16 @@ class TestPaymentFlow:
             "sign_time": datetime.now().isoformat(),
             "sign_string": "test_signature",
         }
-        
+
         response = client.post(
             "/api/v1/payments/webhook/click/prepare",
             json=webhook_data,
         )
-        
+
         # Webhook может вернуть разные статусы в зависимости от реализации
         # 200 - успех, 400 - ошибка валидации, 404 - не найден order
         assert response.status_code in [200, 400, 404, 422]
-    
+
     def test_get_payment_status(
         self, client: TestClient, auth_headers, payment_test_data, db_session
     ):
@@ -171,16 +171,16 @@ class TestPaymentFlow:
         db_session.add(payment)
         db_session.commit()
         db_session.refresh(payment)
-        
+
         response = client.get(
             f"/api/v1/payments/{payment.id}",
             headers=auth_headers,
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             assert data["status"] == "pending"
-    
+
     def test_payment_receipt_generation(
         self, client: TestClient, auth_headers, payment_test_data, db_session
     ):
@@ -197,19 +197,19 @@ class TestPaymentFlow:
         db_session.add(payment)
         db_session.commit()
         db_session.refresh(payment)
-        
+
         # Пробуем получить чек (если endpoint реализован)
         response = client.get(
             f"/api/v1/payments/{payment.id}/receipt",
             headers=auth_headers,
         )
-        
+
         # 200 - PDF/JSON чек, 404 - endpoint не реализован
         assert response.status_code in [200, 404]
 
 
 @pytest.mark.integration
-@pytest.mark.e2e  
+@pytest.mark.e2e
 class TestPaymentProviders:
     """Тесты разных платёжных провайдеров"""
 
@@ -227,7 +227,7 @@ class TestPaymentProviders:
         )
         # Проверяем что endpoint доступен
         assert response.status_code in [200, 201, 400, 422]
-    
+
     def test_payme_payment_init(self, client: TestClient, auth_headers):
         """Инициализация Payme платежа"""
         response = client.post(
@@ -252,7 +252,7 @@ class TestPaymentSecurity:
         """Неавторизованный доступ к платежам отклоняется"""
         response = client.get("/api/v1/payments/1")
         assert response.status_code == 401
-    
+
     def test_invalid_amount_rejected(self, client: TestClient, auth_headers):
         """Некорректная сумма отклоняется"""
         response = client.post(

@@ -4,7 +4,7 @@ Pydantic схемы для управления пользователями
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic.config import ConfigDict
@@ -51,18 +51,18 @@ class UserProfileBase(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    middle_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    phone: Optional[str] = Field(None, min_length=10, max_length=20)
-    date_of_birth: Optional[datetime] = None
-    gender: Optional[Gender] = None
-    nationality: Optional[str] = Field(None, max_length=50)
-    language: Optional[str] = Field(None, max_length=10)
-    timezone: Optional[str] = Field(None, max_length=50)
-    bio: Optional[str] = Field(None, max_length=1000)
-    website: Optional[str] = Field(None, max_length=200)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    middle_name: str | None = Field(None, min_length=1, max_length=50)
+    phone: str | None = Field(None, min_length=10, max_length=20)
+    date_of_birth: datetime | None = None
+    gender: Gender | None = None
+    nationality: str | None = Field(None, max_length=50)
+    language: str | None = Field(None, max_length=10)
+    timezone: str | None = Field(None, max_length=50)
+    bio: str | None = Field(None, max_length=1000)
+    website: str | None = Field(None, max_length=200)
 
 
 class UserProfileCreate(UserProfileBase):
@@ -85,25 +85,25 @@ class UserProfileResponse(UserProfileBase):
     user_id: int
     phone_verified: bool
     email_verified: bool
-    alternative_email: Optional[str] = None
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    postal_code: Optional[str] = None
-    country: Optional[str] = None
-    job_title: Optional[str] = None
-    department: Optional[str] = None
-    employee_id: Optional[str] = None
-    hire_date: Optional[datetime] = None
-    avatar_url: Optional[str] = None
-    social_links: Optional[Dict[str, str]] = None
+    alternative_email: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+    job_title: str | None = None
+    department: str | None = None
+    employee_id: str | None = None
+    hire_date: datetime | None = None
+    avatar_url: str | None = None
+    social_links: dict[str, str] | None = None
     status: UserStatus
-    last_login: Optional[datetime] = None
-    last_activity: Optional[datetime] = None
+    last_login: datetime | None = None
+    last_activity: datetime | None = None
     login_count: int
     failed_login_attempts: int
-    locked_until: Optional[datetime] = None
+    locked_until: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -116,15 +116,15 @@ class UserPreferencesBase(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    theme: Optional[Theme] = Theme.LIGHT
-    language: Optional[str] = Field(None, max_length=10)
-    timezone: Optional[str] = Field(None, max_length=50)
-    date_format: Optional[str] = Field(None, max_length=20)
-    time_format: Optional[TimeFormat] = TimeFormat.HOUR_24
-    email_notifications: Optional[bool] = True
-    sms_notifications: Optional[bool] = False
-    push_notifications: Optional[bool] = True
-    desktop_notifications: Optional[bool] = True
+    theme: Theme | None = Theme.LIGHT
+    language: str | None = Field(None, max_length=10)
+    timezone: str | None = Field(None, max_length=50)
+    date_format: str | None = Field(None, max_length=20)
+    time_format: TimeFormat | None = TimeFormat.HOUR_24
+    email_notifications: bool | None = True
+    sms_notifications: bool | None = False
+    push_notifications: bool | None = True
+    desktop_notifications: bool | None = True
 
 
 class UserPreferencesCreate(UserPreferencesBase):
@@ -137,39 +137,39 @@ class UserPreferencesCreate(UserPreferencesBase):
 class UserPreferencesUpdate(UserPreferencesBase):
     """Схема обновления настроек пользователя"""
 
-    working_hours_start: Optional[str] = Field(
+    working_hours_start: str | None = Field(
         None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
     )
-    working_hours_end: Optional[str] = Field(
+    working_hours_end: str | None = Field(
         None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
     )
-    working_days: Optional[List[int]] = Field(None, min_length=1, max_length=7)
-    break_duration: Optional[int] = Field(None, ge=0, le=480)  # 0-8 часов
-    dashboard_layout: Optional[Dict[str, Any]] = None
-    sidebar_collapsed: Optional[bool] = False
-    compact_mode: Optional[bool] = False
-    show_tooltips: Optional[bool] = True
-    session_timeout: Optional[int] = Field(None, ge=5, le=480)  # 5 минут - 8 часов
-    require_2fa: Optional[bool] = False
-    auto_logout: Optional[bool] = True
+    working_days: list[int] | None = Field(None, min_length=1, max_length=7)
+    break_duration: int | None = Field(None, ge=0, le=480)  # 0-8 часов
+    dashboard_layout: dict[str, Any] | None = None
+    sidebar_collapsed: bool | None = False
+    compact_mode: bool | None = False
+    show_tooltips: bool | None = True
+    session_timeout: int | None = Field(None, ge=5, le=480)  # 5 минут - 8 часов
+    require_2fa: bool | None = False
+    auto_logout: bool | None = True
 
     # ============================================
     # EMR PREFERENCES (Smart Autocomplete)
     # ============================================
     # Режим умного поля (ghost | mvp | hybrid | word)
-    emr_smart_field_mode: Optional[str] = Field(None, pattern=r"^(ghost|mvp|hybrid|word)$")
+    emr_smart_field_mode: str | None = Field(None, pattern=r"^(ghost|mvp|hybrid|word)$")
     # Показывать переключатель режимов
-    emr_show_mode_switcher: Optional[bool] = None
+    emr_show_mode_switcher: bool | None = None
     # Задержка debounce в мс
-    emr_debounce_ms: Optional[int] = Field(None, ge=100, le=2000)
+    emr_debounce_ms: int | None = Field(None, ge=100, le=2000)
     # Недавно использованные коды МКБ-10
-    emr_recent_icd10: Optional[List[str]] = Field(None, max_length=20)
+    emr_recent_icd10: list[str] | None = Field(None, max_length=20)
     # Недавно использованные шаблоны назначений
-    emr_recent_templates: Optional[List[str]] = Field(None, max_length=20)
+    emr_recent_templates: list[str] | None = Field(None, max_length=20)
     # Избранные шаблоны по специальностям
-    emr_favorite_templates: Optional[Dict[str, List[str]]] = None
+    emr_favorite_templates: dict[str, list[str]] | None = None
     # Кастомные шаблоны пользователя
-    emr_custom_templates: Optional[List[Dict[str, Any]]] = None
+    emr_custom_templates: list[dict[str, Any]] | None = None
 
 
 class UserPreferencesResponse(UserPreferencesBase):
@@ -181,9 +181,9 @@ class UserPreferencesResponse(UserPreferencesBase):
     profile_id: int
     working_hours_start: str
     working_hours_end: str
-    working_days: List[int]
+    working_days: list[int]
     break_duration: int
-    dashboard_layout: Optional[Dict[str, Any]] = None
+    dashboard_layout: dict[str, Any] | None = None
     sidebar_collapsed: bool
     compact_mode: bool
     show_tooltips: bool
@@ -192,13 +192,13 @@ class UserPreferencesResponse(UserPreferencesBase):
     auto_logout: bool
 
     # EMR Preferences
-    emr_smart_field_mode: Optional[str] = "ghost"
-    emr_show_mode_switcher: Optional[bool] = True
-    emr_debounce_ms: Optional[int] = 500
-    emr_recent_icd10: Optional[List[str]] = None
-    emr_recent_templates: Optional[List[str]] = None
-    emr_favorite_templates: Optional[Dict[str, List[str]]] = None
-    emr_custom_templates: Optional[List[Dict[str, Any]]] = None
+    emr_smart_field_mode: str | None = "ghost"
+    emr_show_mode_switcher: bool | None = True
+    emr_debounce_ms: int | None = 500
+    emr_recent_icd10: list[str] | None = None
+    emr_recent_templates: list[str] | None = None
+    emr_favorite_templates: dict[str, list[str]] | None = None
+    emr_custom_templates: list[dict[str, Any]] | None = None
 
     created_at: datetime
     updated_at: datetime
@@ -212,25 +212,25 @@ class UserNotificationSettingsBase(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    email_appointment_reminder: Optional[bool] = True
-    email_appointment_cancellation: Optional[bool] = True
-    email_appointment_confirmation: Optional[bool] = True
-    email_payment_receipt: Optional[bool] = True
-    email_payment_reminder: Optional[bool] = True
-    email_system_updates: Optional[bool] = True
-    email_security_alerts: Optional[bool] = True
-    email_newsletter: Optional[bool] = False
-    sms_appointment_reminder: Optional[bool] = False
-    sms_appointment_cancellation: Optional[bool] = False
-    sms_appointment_confirmation: Optional[bool] = False
-    sms_payment_receipt: Optional[bool] = False
-    sms_emergency: Optional[bool] = True
-    push_appointment_reminder: Optional[bool] = True
-    push_appointment_cancellation: Optional[bool] = True
-    push_appointment_confirmation: Optional[bool] = True
-    push_payment_receipt: Optional[bool] = True
-    push_system_updates: Optional[bool] = True
-    push_security_alerts: Optional[bool] = True
+    email_appointment_reminder: bool | None = True
+    email_appointment_cancellation: bool | None = True
+    email_appointment_confirmation: bool | None = True
+    email_payment_receipt: bool | None = True
+    email_payment_reminder: bool | None = True
+    email_system_updates: bool | None = True
+    email_security_alerts: bool | None = True
+    email_newsletter: bool | None = False
+    sms_appointment_reminder: bool | None = False
+    sms_appointment_cancellation: bool | None = False
+    sms_appointment_confirmation: bool | None = False
+    sms_payment_receipt: bool | None = False
+    sms_emergency: bool | None = True
+    push_appointment_reminder: bool | None = True
+    push_appointment_cancellation: bool | None = True
+    push_appointment_confirmation: bool | None = True
+    push_payment_receipt: bool | None = True
+    push_system_updates: bool | None = True
+    push_security_alerts: bool | None = True
 
 
 class UserNotificationSettingsCreate(UserNotificationSettingsBase):
@@ -243,16 +243,16 @@ class UserNotificationSettingsCreate(UserNotificationSettingsBase):
 class UserNotificationSettingsUpdate(UserNotificationSettingsBase):
     """Схема обновления настроек уведомлений"""
 
-    reminder_time_before: Optional[int] = Field(
+    reminder_time_before: int | None = Field(
         None, ge=5, le=10080
     )  # 5 минут - 7 дней
-    quiet_hours_start: Optional[str] = Field(
+    quiet_hours_start: str | None = Field(
         None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
     )
-    quiet_hours_end: Optional[str] = Field(
+    quiet_hours_end: str | None = Field(
         None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
     )
-    weekend_notifications: Optional[bool] = False
+    weekend_notifications: bool | None = False
 
 
 class UserNotificationSettingsResponse(UserNotificationSettingsBase):
@@ -280,15 +280,15 @@ class UserRoleBase(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=50)
     display_name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    permissions: Optional[List[str]] = None
+    description: str | None = Field(None, max_length=500)
+    permissions: list[str] | None = None
 
 
 class UserRoleCreate(UserRoleBase):
     """Схема создания роли пользователя"""
 
-    is_system: Optional[bool] = False
-    is_active: Optional[bool] = True
+    is_system: bool | None = False
+    is_active: bool | None = True
 
 
 class UserRoleUpdate(BaseModel):
@@ -296,10 +296,10 @@ class UserRoleUpdate(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    permissions: Optional[List[str]] = None
-    is_active: Optional[bool] = None
+    display_name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    permissions: list[str] | None = None
+    is_active: bool | None = None
 
 
 class UserRoleResponse(UserRoleBase):
@@ -319,15 +319,15 @@ class UserPermissionBase(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=500)
-    category: Optional[str] = Field(None, max_length=50)
+    description: str | None = Field(None, max_length=500)
+    category: str | None = Field(None, max_length=50)
 
 
 class UserPermissionCreate(UserPermissionBase):
     """Схема создания разрешения пользователя"""
 
-    is_system: Optional[bool] = False
-    is_active: Optional[bool] = True
+    is_system: bool | None = False
+    is_active: bool | None = True
 
 
 class UserPermissionResponse(UserPermissionBase):
@@ -349,14 +349,14 @@ class UserGroupBase(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=500)
 
 
 class UserGroupCreate(UserGroupBase):
     """Схема создания группы пользователей"""
 
-    is_active: Optional[bool] = True
-    is_system: Optional[bool] = False
+    is_active: bool | None = True
+    is_system: bool | None = False
 
 
 class UserGroupUpdate(BaseModel):
@@ -364,9 +364,9 @@ class UserGroupUpdate(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    display_name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=500)
-    is_active: Optional[bool] = None
+    display_name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = Field(None, max_length=500)
+    is_active: bool | None = None
 
 
 class UserGroupResponse(UserGroupBase):
@@ -411,20 +411,20 @@ class UserAuditLogBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     action: str = Field(..., min_length=1, max_length=50)
-    resource_type: Optional[str] = Field(None, max_length=50)
-    resource_id: Optional[int] = None
-    description: Optional[str] = Field(None, max_length=1000)
-    old_values: Optional[Dict[str, Any]] = None
-    new_values: Optional[Dict[str, Any]] = None
+    resource_type: str | None = Field(None, max_length=50)
+    resource_id: int | None = None
+    description: str | None = Field(None, max_length=1000)
+    old_values: dict[str, Any] | None = None
+    new_values: dict[str, Any] | None = None
 
 
 class UserAuditLogCreate(UserAuditLogBase):
     """Схема создания аудита пользователя"""
 
     user_id: int
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    session_id: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    session_id: str | None = None
 
 
 class UserAuditLogResponse(UserAuditLogBase):
@@ -432,9 +432,9 @@ class UserAuditLogResponse(UserAuditLogBase):
 
     id: int
     user_id: int
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    session_id: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    session_id: str | None = None
     created_at: datetime
 
 
@@ -451,15 +451,15 @@ class UserCreateRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
-    is_active: Optional[bool] = True
-    is_superuser: Optional[bool] = False
-    must_change_password: Optional[bool] = False  # Требуется смена пароля при первом входе
+    is_active: bool | None = True
+    is_superuser: bool | None = False
+    must_change_password: bool | None = False  # Требуется смена пароля при первом входе
 
     # Профиль
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    phone: Optional[str] = Field(None, min_length=10, max_length=20)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    phone: str | None = Field(None, min_length=10, max_length=20)
 
     @field_validator('password')
     @classmethod
@@ -480,20 +480,20 @@ class UserUpdateRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    username: Optional[str] = Field(None, min_length=3, max_length=50)
-    email: Optional[EmailStr] = None
+    username: str | None = Field(None, min_length=3, max_length=50)
+    email: EmailStr | None = None
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: Optional[str] = Field(
+    role: str | None = Field(
         None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
 
     # Профиль
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    phone: Optional[str] = Field(None, min_length=10, max_length=20)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    phone: str | None = Field(None, min_length=10, max_length=20)
 
 
 class UserResponse(BaseModel):
@@ -503,17 +503,17 @@ class UserResponse(BaseModel):
 
     id: int
     username: str
-    email: Optional[str] = None
+    email: str | None = None
     role: str
     is_active: bool
     is_superuser: bool
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     # Профиль
-    profile: Optional[UserProfileResponse] = None
-    preferences: Optional[UserPreferencesResponse] = None
-    notification_settings: Optional[UserNotificationSettingsResponse] = None
+    profile: UserProfileResponse | None = None
+    preferences: UserPreferencesResponse | None = None
+    notification_settings: UserNotificationSettingsResponse | None = None
 
 
 class UserListResponse(BaseModel):
@@ -521,7 +521,7 @@ class UserListResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    users: List[UserResponse]
+    users: list[UserResponse]
     total: int
     page: int
     per_page: int
@@ -538,7 +538,7 @@ class UserStatsResponse(BaseModel):
     inactive_users: int
     suspended_users: int
     locked_users: int
-    users_by_role: Dict[str, int]
+    users_by_role: dict[str, int]
     users_with_profiles: int
     users_with_2fa: int
     recent_registrations: int  # За последние 30 дней
@@ -550,18 +550,18 @@ class UserSearchRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    query: Optional[str] = Field(None, min_length=1, max_length=100)
+    query: str | None = Field(None, min_length=1, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: Optional[str] = Field(
+    role: str | None = Field(
         None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
-    status: Optional[UserStatus] = None
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
-    created_from: Optional[datetime] = None
-    created_to: Optional[datetime] = None
-    last_login_from: Optional[datetime] = None
-    last_login_to: Optional[datetime] = None
+    status: UserStatus | None = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+    last_login_from: datetime | None = None
+    last_login_to: datetime | None = None
     page: int = Field(1, ge=1)
     per_page: int = Field(20, ge=1, le=100)
 
@@ -571,15 +571,15 @@ class UserBulkActionRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    user_ids: List[int] = Field(..., min_items=1, max_items=100)
+    user_ids: list[int] = Field(..., min_items=1, max_items=100)
     action: str = Field(
         ..., pattern="^(activate|deactivate|suspend|unsuspend|delete|change_role)$"
     )
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: Optional[str] = Field(
+    role: str | None = Field(
         None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: str | None = Field(None, max_length=500)
 
 
 class UserBulkActionResponse(BaseModel):
@@ -591,7 +591,7 @@ class UserBulkActionResponse(BaseModel):
     message: str
     processed_count: int
     failed_count: int
-    failed_users: List[Dict[str, Any]] = []
+    failed_users: list[dict[str, Any]] = []
 
 
 class UserExportRequest(BaseModel):
@@ -600,8 +600,8 @@ class UserExportRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     format: str = Field(..., pattern="^(csv|excel|json|pdf)$")
-    fields: Optional[List[str]] = None
-    filters: Optional[UserSearchRequest] = None
+    fields: list[str] | None = None
+    filters: UserSearchRequest | None = None
     include_profile: bool = False
     include_preferences: bool = False
     include_audit_logs: bool = False
@@ -614,6 +614,6 @@ class UserExportResponse(BaseModel):
 
     success: bool
     message: str
-    file_url: Optional[str] = None
-    file_size: Optional[int] = None
+    file_url: str | None = None
+    file_size: int | None = None
     record_count: int

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Шаблоны уведомлений
@@ -11,7 +11,7 @@ class NotificationTemplateBase(BaseModel):
     name: str = Field(..., max_length=100, description="Название шаблона")
     type: str = Field(..., max_length=50, description="Тип уведомления")
     channel: str = Field(..., max_length=20, description="Канал отправки")
-    subject: Optional[str] = Field(None, max_length=200, description="Тема (для email)")
+    subject: str | None = Field(None, max_length=200, description="Тема (для email)")
     template: str = Field(..., description="Шаблон сообщения")
     is_active: bool = Field(True, description="Активен ли шаблон")
 
@@ -21,12 +21,12 @@ class NotificationTemplateCreate(NotificationTemplateBase):
 
 
 class NotificationTemplateUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=100)
-    type: Optional[str] = Field(None, max_length=50)
-    channel: Optional[str] = Field(None, max_length=20)
-    subject: Optional[str] = Field(None, max_length=200)
-    template: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, max_length=100)
+    type: str | None = Field(None, max_length=50)
+    channel: str | None = Field(None, max_length=20)
+    subject: str | None = Field(None, max_length=200)
+    template: str | None = None
+    is_active: bool | None = None
 
 
 class NotificationTemplate(NotificationTemplateBase):
@@ -40,22 +40,22 @@ class NotificationTemplate(NotificationTemplateBase):
 # История уведомлений
 class NotificationHistoryBase(BaseModel):
     recipient_type: str = Field(..., max_length=20, description="Тип получателя")
-    recipient_id: Optional[int] = Field(None, description="ID получателя")
+    recipient_id: int | None = Field(None, description="ID получателя")
     recipient_contact: str = Field(
         ..., max_length=255, description="Контакт получателя"
     )
     notification_type: str = Field(..., max_length=50, description="Тип уведомления")
     channel: str = Field(..., max_length=20, description="Канал отправки")
-    template_id: Optional[int] = Field(None, description="ID шаблона")
-    subject: Optional[str] = Field(None, max_length=200, description="Тема")
+    template_id: int | None = Field(None, description="ID шаблона")
+    subject: str | None = Field(None, max_length=200, description="Тема")
     content: str = Field(..., description="Содержание")
     status: str = Field("pending", max_length=20, description="Статус")
-    error_message: Optional[str] = Field(None, description="Сообщение об ошибке")
-    related_entity_type: Optional[str] = Field(
+    error_message: str | None = Field(None, description="Сообщение об ошибке")
+    related_entity_type: str | None = Field(
         None, max_length=50, description="Тип связанной сущности"
     )
-    related_entity_id: Optional[int] = Field(None, description="ID связанной сущности")
-    notification_metadata: Optional[Dict[str, Any]] = Field(
+    related_entity_id: int | None = Field(None, description="ID связанной сущности")
+    notification_metadata: dict[str, Any] | None = Field(
         None, description="Метаданные"
     )
 
@@ -67,8 +67,8 @@ class NotificationHistoryCreate(NotificationHistoryBase):
 class NotificationHistory(NotificationHistoryBase):
     id: int
     created_at: datetime
-    sent_at: Optional[datetime]
-    delivered_at: Optional[datetime]
+    sent_at: datetime | None
+    delivered_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,14 +92,14 @@ class NotificationSettingsCreate(NotificationSettingsBase):
 
 
 class NotificationSettingsUpdate(BaseModel):
-    email_enabled: Optional[bool] = None
-    sms_enabled: Optional[bool] = None
-    telegram_enabled: Optional[bool] = None
-    push_enabled: Optional[bool] = None
-    appointment_reminders: Optional[bool] = None
-    payment_notifications: Optional[bool] = None
-    queue_updates: Optional[bool] = None
-    system_alerts: Optional[bool] = None
+    email_enabled: bool | None = None
+    sms_enabled: bool | None = None
+    telegram_enabled: bool | None = None
+    push_enabled: bool | None = None
+    appointment_reminders: bool | None = None
+    payment_notifications: bool | None = None
+    queue_updates: bool | None = None
+    system_alerts: bool | None = None
 
 
 class NotificationSettings(NotificationSettingsBase):
@@ -115,37 +115,37 @@ class SendNotificationRequest(BaseModel):
     recipient_type: str = Field(
         ..., description="Тип получателя: patient, doctor, admin"
     )
-    recipient_id: Optional[int] = Field(None, description="ID получателя")
+    recipient_id: int | None = Field(None, description="ID получателя")
     notification_type: str = Field(..., description="Тип уведомления")
-    channels: List[str] = Field(["email"], description="Каналы отправки")
-    template_data: Dict[str, Any] = Field(
+    channels: list[str] = Field(["email"], description="Каналы отправки")
+    template_data: dict[str, Any] = Field(
         {}, description="Данные для подстановки в шаблон"
     )
-    related_entity_type: Optional[str] = Field(
+    related_entity_type: str | None = Field(
         None, description="Тип связанной сущности"
     )
-    related_entity_id: Optional[int] = Field(None, description="ID связанной сущности")
+    related_entity_id: int | None = Field(None, description="ID связанной сущности")
     priority: str = Field("normal", description="Приоритет: low, normal, high, urgent")
-    scheduled_at: Optional[datetime] = Field(
+    scheduled_at: datetime | None = Field(
         None, description="Время отправки (для отложенных)"
     )
 
 
 class BulkNotificationRequest(BaseModel):
     recipient_type: str = Field(..., description="Тип получателей")
-    recipient_ids: List[int] = Field(..., description="ID получателей")
+    recipient_ids: list[int] = Field(..., description="ID получателей")
     notification_type: str = Field(..., description="Тип уведомления")
-    channels: List[str] = Field(["email"], description="Каналы отправки")
-    template_data: Dict[str, Any] = Field({}, description="Общие данные для шаблона")
+    channels: list[str] = Field(["email"], description="Каналы отправки")
+    template_data: dict[str, Any] = Field({}, description="Общие данные для шаблона")
     priority: str = Field("normal", description="Приоритет")
 
 
 class NotificationStatusResponse(BaseModel):
     id: int
     status: str
-    sent_at: Optional[datetime]
-    delivered_at: Optional[datetime]
-    error_message: Optional[str]
+    sent_at: datetime | None
+    delivered_at: datetime | None
+    error_message: str | None
 
 
 class NotificationStatsResponse(BaseModel):
@@ -153,6 +153,6 @@ class NotificationStatsResponse(BaseModel):
     successful: int
     failed: int
     pending: int
-    by_channel: Dict[str, int]
-    by_type: Dict[str, int]
-    recent_activity: List[NotificationHistory]
+    by_channel: dict[str, int]
+    by_type: dict[str, int]
+    recent_activity: list[NotificationHistory]

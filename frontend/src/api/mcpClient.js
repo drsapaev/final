@@ -107,13 +107,15 @@ export const mcpAPI = {
   /**
    * Анализ жалоб пациента
    */
-  async analyzeComplaint(data) {
+  async analyzeComplaint(data, options = {}) {
     const response = await mcpClient.post('/complaint/analyze', {
       complaint: data.complaint,
       patient_age: data.patientAge,
       patient_gender: data.patientGender,
       urgency_assessment: data.urgencyAssessment !== false,
       provider: data.provider
+    }, {
+      signal: options.signal
     });
     return response.data;
   },
@@ -142,13 +144,15 @@ export const mcpAPI = {
   /**
    * Подсказки кодов МКБ-10
    */
-  async suggestICD10(data) {
+  async suggestICD10(data, options = {}) {
     const response = await mcpClient.post('/icd10/suggest', {
       symptoms: data.symptoms,
       diagnosis: data.diagnosis,
       specialty: data.specialty,
       provider: data.provider,
       max_suggestions: data.maxSuggestions || 5
+    }, {
+      signal: options.signal
     });
     return response.data;
   },

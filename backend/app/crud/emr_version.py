@@ -3,7 +3,6 @@ CRUD операции для версий EMR
 """
 
 from datetime import datetime
-from typing import List, Optional
 
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
@@ -12,12 +11,12 @@ from app.models.emr_version import EMRVersion
 from app.schemas.emr_version import EMRVersionCreate, EMRVersionUpdate
 
 
-def get_version(db: Session, version_id: int) -> Optional[EMRVersion]:
+def get_version(db: Session, version_id: int) -> EMRVersion | None:
     """Получить версию EMR по ID"""
     return db.query(EMRVersion).filter(EMRVersion.id == version_id).first()
 
 
-def get_versions_by_emr(db: Session, emr_id: int, limit: int = 100) -> List[EMRVersion]:
+def get_versions_by_emr(db: Session, emr_id: int, limit: int = 100) -> list[EMRVersion]:
     """Получить все версии EMR"""
     return (
         db.query(EMRVersion)
@@ -28,7 +27,7 @@ def get_versions_by_emr(db: Session, emr_id: int, limit: int = 100) -> List[EMRV
     )
 
 
-def get_current_version(db: Session, emr_id: int) -> Optional[EMRVersion]:
+def get_current_version(db: Session, emr_id: int) -> EMRVersion | None:
     """Получить текущую версию EMR"""
     return (
         db.query(EMRVersion)
@@ -48,7 +47,7 @@ def create_version(db: Session, version_data: EMRVersionCreate) -> EMRVersion:
 
 def update_version(
     db: Session, version_id: int, version_data: EMRVersionUpdate
-) -> Optional[EMRVersion]:
+) -> EMRVersion | None:
     """Обновить версию EMR"""
     db_version = get_version(db, version_id)
     if not db_version:
@@ -105,7 +104,7 @@ def get_next_version_number(db: Session, emr_id: int) -> int:
 
 def get_versions_by_user(
     db: Session, user_id: int, limit: int = 50
-) -> List[EMRVersion]:
+) -> list[EMRVersion]:
     """Получить версии по пользователю"""
     return (
         db.query(EMRVersion)
@@ -118,7 +117,7 @@ def get_versions_by_user(
 
 def get_versions_by_date_range(
     db: Session, date_from: datetime, date_to: datetime, limit: int = 100
-) -> List[EMRVersion]:
+) -> list[EMRVersion]:
     """Получить версии в диапазоне дат"""
     return (
         db.query(EMRVersion)

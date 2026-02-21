@@ -24,7 +24,7 @@ import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import EMRSystem from '../components/medical/EMRSystem';
+import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import PhotoUploader from '../components/dermatology/PhotoUploader';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
@@ -1142,10 +1142,10 @@ const DermatologistPanelUnified = () => {
                     <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                     Электронная медицинская карта
                   </h4>
-                  <EMRSystem
-                    appointment={currentAppointment}
-                    emr={emr}
-                    onSave={saveEMR}
+                  <EMRContainerV2
+                    visitId={currentAppointment?.id}
+                    patientId={currentAppointment?.patient_id}
+                    specialty="dermatology"
                   />
                 </div>
 
@@ -1381,10 +1381,10 @@ const DermatologistPanelUnified = () => {
                     <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                     Электронная медицинская карта
                   </h3>
-                  <EMRSystem
-                    appointment={currentAppointment}
-                    emr={emr}
-                    onSave={saveEMR}
+                  <EMRContainerV2
+                    visitId={currentAppointment?.id}
+                    patientId={currentAppointment?.patient_id}
+                    specialty="dermatology"
                   />
                 </MacOSCard>
               )}

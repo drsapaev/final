@@ -2,11 +2,11 @@
 Базовый MCP сервер для медицинских сервисов
 """
 
-import json
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -45,19 +45,19 @@ class MCPRequest(BaseModel):
     """Базовая модель запроса MCP"""
 
     method: str
-    params: Dict[str, Any] = Field(default_factory=dict)
-    id: Optional[str] = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    id: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class MCPResponse(BaseModel):
     """Базовая модель ответа MCP"""
 
-    result: Optional[Any] = None
-    error: Optional[Dict[str, Any]] = None
-    id: Optional[str] = None
+    result: Any | None = None
+    error: dict[str, Any] | None = None
+    id: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class BaseMCPServer(ABC):
@@ -66,8 +66,8 @@ class BaseMCPServer(ABC):
     def __init__(self, name: str, version: str = "1.0.0"):
         self.name = name
         self.version = version
-        self.tools: Dict[str, Callable] = {}
-        self.resources: Dict[str, Callable] = {}
+        self.tools: dict[str, Callable] = {}
+        self.resources: dict[str, Callable] = {}
         self._register_tools_and_resources()
         logger.info(f"MCP Server '{self.name}' v{self.version} initialized")
 
@@ -165,7 +165,7 @@ class BaseMCPServer(ABC):
                 id=request.id,
             )
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         """Получить список возможностей сервера"""
         return {
             "server": {"name": self.name, "version": self.version},

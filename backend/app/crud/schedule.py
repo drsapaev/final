@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
@@ -13,13 +13,13 @@ from app.models.schedule import ScheduleTemplate
 def list_schedules(
     db: Session,
     *,
-    department: Optional[str] = None,
-    doctor_id: Optional[int] = None,
-    weekday: Optional[int] = None,
-    active: Optional[bool] = None,
+    department: str | None = None,
+    doctor_id: int | None = None,
+    weekday: int | None = None,
+    active: bool | None = None,
     limit: int = 200,
     offset: int = 0,
-) -> List[ScheduleTemplate]:
+) -> list[ScheduleTemplate]:
     stmt = select(ScheduleTemplate)
     if department:
         stmt = stmt.where(ScheduleTemplate.department == department)
@@ -45,13 +45,13 @@ def list_schedules(
 def create_schedule(
     db: Session,
     *,
-    department: Optional[str],
-    doctor_id: Optional[int],
+    department: str | None,
+    doctor_id: int | None,
     weekday: int,
     start_time: str,
     end_time: str,
-    room: Optional[str],
-    capacity_per_hour: Optional[int],
+    room: str | None,
+    capacity_per_hour: int | None,
     active: bool,
 ) -> ScheduleTemplate:
     row = ScheduleTemplate(
@@ -85,9 +85,9 @@ def get_weekly_schedule(
     db: Session,
     *,
     start_date: date,
-    department: Optional[str] = None,
-    doctor_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+    department: str | None = None,
+    doctor_id: int | None = None,
+) -> list[dict[str, Any]]:
     """
     Получить расписание на неделю
     """
@@ -166,9 +166,9 @@ def get_daily_schedule(
     db: Session,
     *,
     target_date: date,
-    department: Optional[str] = None,
-    doctor_id: Optional[int] = None,
-) -> Dict[str, Any]:
+    department: str | None = None,
+    doctor_id: int | None = None,
+) -> dict[str, Any]:
     """
     Получить расписание на конкретный день
     """
@@ -238,8 +238,8 @@ def get_available_slots(
     *,
     target_date: date,
     department: str,
-    doctor_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+    doctor_id: int | None = None,
+) -> list[dict[str, Any]]:
     """
     Получить доступные слоты времени для записи
     """
@@ -320,8 +320,8 @@ def get_available_slots(
 def get_doctors_by_department(
     db: Session,
     *,
-    department: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    department: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Получить список врачей, сгруппированных по отделениям
     """
@@ -366,7 +366,7 @@ def get_doctors_by_department(
     return result
 
 
-def get_departments(db: Session) -> List[Dict[str, Any]]:
+def get_departments(db: Session) -> list[dict[str, Any]]:
     """
     Получить список всех отделений с расписанием
     """

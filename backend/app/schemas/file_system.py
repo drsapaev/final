@@ -4,11 +4,9 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
-
-from app.models.file_system import FilePermission, FileStatus, FileType
+from pydantic import BaseModel, Field
 
 
 class FileTypeEnum(str, Enum):
@@ -50,39 +48,39 @@ class FileBase(BaseModel):
     original_filename: str = Field(..., max_length=255)
     file_type: FileTypeEnum
     mime_type: str = Field(..., max_length=100)
-    title: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
+    title: str | None = Field(None, max_length=255)
+    description: str | None = None
+    tags: list[str] | None = None
     permission: FilePermissionEnum = FilePermissionEnum.PRIVATE
-    patient_id: Optional[int] = None
-    appointment_id: Optional[int] = None
-    emr_id: Optional[int] = None
-    expires_at: Optional[datetime] = None
+    patient_id: int | None = None
+    appointment_id: int | None = None
+    emr_id: int | None = None
+    expires_at: datetime | None = None
 
 
 class FileCreate(FileBase):
     file_path: str = Field(..., max_length=500)  # ✅ CERTIFICATION: Обязательное поле для file_path
     file_size: int = Field(..., gt=0)
-    file_hash: Optional[str] = Field(None, max_length=64)
-    file_metadata: Optional[Dict[str, Any]] = None
+    file_hash: str | None = Field(None, max_length=64)
+    file_metadata: dict[str, Any] | None = None
 
 
 class FileUpdate(BaseModel):
-    title: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
-    permission: Optional[FilePermissionEnum] = None
-    expires_at: Optional[datetime] = None
-    file_metadata: Optional[Dict[str, Any]] = None
+    title: str | None = Field(None, max_length=255)
+    description: str | None = None
+    tags: list[str] | None = None
+    permission: FilePermissionEnum | None = None
+    expires_at: datetime | None = None
+    file_metadata: dict[str, Any] | None = None
 
 
 class FileOut(FileBase):
     id: int
     file_path: str
     file_size: int
-    file_hash: Optional[str]
+    file_hash: str | None
     status: FileStatusEnum
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
     owner_id: int
     created_at: datetime
     updated_at: datetime
@@ -115,7 +113,7 @@ class FileOut(FileBase):
             "created_at": obj.created_at,
             "updated_at": obj.updated_at,
         }
-        
+
         # Преобразуем tags из JSON строки в список
         if obj.tags:
             try:
@@ -124,7 +122,7 @@ class FileOut(FileBase):
                 data["tags"] = []
         else:
             data["tags"] = None
-        
+
         # Преобразуем file_metadata из JSON строки в словарь (и переименовываем в metadata)
         if obj.file_metadata:
             try:
@@ -133,12 +131,12 @@ class FileOut(FileBase):
                 data["metadata"] = {}
         else:
             data["metadata"] = None
-        
+
         return cls(**data)
 
 
 class FileList(BaseModel):
-    files: List[FileOut]
+    files: list[FileOut]
     total: int
     page: int
     size: int
@@ -150,13 +148,13 @@ class FileList(BaseModel):
 
 class FileVersionBase(BaseModel):
     version_number: int = Field(..., gt=0)
-    change_description: Optional[str] = None
+    change_description: str | None = None
 
 
 class FileVersionCreate(FileVersionBase):
     file_path: str
     file_size: int = Field(..., gt=0)
-    file_hash: Optional[str] = Field(None, max_length=64)
+    file_hash: str | None = Field(None, max_length=64)
 
 
 class FileVersionOut(FileVersionBase):
@@ -164,7 +162,7 @@ class FileVersionOut(FileVersionBase):
     file_id: int
     file_path: str
     file_size: int
-    file_hash: Optional[str]
+    file_hash: str | None
     created_by: int
     created_at: datetime
 
@@ -176,10 +174,10 @@ class FileVersionOut(FileVersionBase):
 
 
 class FileShareBase(BaseModel):
-    shared_with_user_id: Optional[int] = None
-    shared_with_email: Optional[str] = Field(None, max_length=255)
+    shared_with_user_id: int | None = None
+    shared_with_email: str | None = Field(None, max_length=255)
     permission: FilePermissionEnum
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 class FileShareCreate(FileShareBase):
@@ -187,15 +185,15 @@ class FileShareCreate(FileShareBase):
 
 
 class FileShareUpdate(BaseModel):
-    permission: Optional[FilePermissionEnum] = None
-    expires_at: Optional[datetime] = None
-    is_active: Optional[bool] = None
+    permission: FilePermissionEnum | None = None
+    expires_at: datetime | None = None
+    is_active: bool | None = None
 
 
 class FileShareOut(FileShareBase):
     id: int
     file_id: int
-    access_token: Optional[str]
+    access_token: str | None
     is_active: bool
     created_by: int
     created_at: datetime
@@ -209,8 +207,8 @@ class FileShareOut(FileShareBase):
 
 class FileFolderBase(BaseModel):
     name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
+    description: str | None = None
+    parent_id: int | None = None
 
 
 class FileFolderCreate(FileFolderBase):
@@ -218,9 +216,9 @@ class FileFolderCreate(FileFolderBase):
 
 
 class FileFolderUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
+    name: str | None = Field(None, max_length=255)
+    description: str | None = None
+    parent_id: int | None = None
 
 
 class FileFolderOut(FileFolderBase):
@@ -235,8 +233,8 @@ class FileFolderOut(FileFolderBase):
 
 
 class FileFolderTree(FileFolderOut):
-    children: List['FileFolderTree'] = []
-    files: List[FileOut] = []
+    children: list['FileFolderTree'] = []
+    files: list[FileOut] = []
 
 
 # ===================== ЗАГРУЗКА ФАЙЛОВ =====================
@@ -245,16 +243,16 @@ class FileFolderTree(FileFolderOut):
 class FileUploadRequest(BaseModel):
     filename: str = Field(..., max_length=255)
     file_type: FileTypeEnum
-    title: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
+    title: str | None = Field(None, max_length=255)
+    description: str | None = None
+    tags: list[str] | None = None
     permission: FilePermissionEnum = FilePermissionEnum.PRIVATE
-    patient_id: Optional[int] = None
-    appointment_id: Optional[int] = None
-    emr_id: Optional[int] = None
-    folder_id: Optional[int] = None
-    expires_at: Optional[datetime] = None
-    file_metadata: Optional[Dict[str, Any]] = None
+    patient_id: int | None = None
+    appointment_id: int | None = None
+    emr_id: int | None = None
+    folder_id: int | None = None
+    expires_at: datetime | None = None
+    file_metadata: dict[str, Any] | None = None
 
 
 class FileUploadResponse(BaseModel):
@@ -262,7 +260,7 @@ class FileUploadResponse(BaseModel):
     upload_url: str
     expires_at: datetime
     max_file_size: int
-    allowed_types: List[str]
+    allowed_types: list[str]
 
 
 class FileUploadComplete(BaseModel):
@@ -275,30 +273,30 @@ class FileUploadComplete(BaseModel):
 
 
 class FileSearchRequest(BaseModel):
-    query: Optional[str] = None
-    file_type: Optional[FileTypeEnum] = None
-    permission: Optional[FilePermissionEnum] = None
-    patient_id: Optional[int] = None
-    appointment_id: Optional[int] = None
-    emr_id: Optional[int] = None
-    folder_id: Optional[int] = None
-    tags: Optional[List[str]] = None
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
-    size_min: Optional[int] = None
-    size_max: Optional[int] = None
-    owner_id: Optional[int] = None
+    query: str | None = None
+    file_type: FileTypeEnum | None = None
+    permission: FilePermissionEnum | None = None
+    patient_id: int | None = None
+    appointment_id: int | None = None
+    emr_id: int | None = None
+    folder_id: int | None = None
+    tags: list[str] | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    size_min: int | None = None
+    size_max: int | None = None
+    owner_id: int | None = None
     page: int = Field(1, ge=1)
     size: int = Field(20, ge=1, le=100)
 
 
 class FileSearchResponse(BaseModel):
-    files: List[FileOut]
+    files: list[FileOut]
     total: int
     page: int
     size: int
     pages: int
-    facets: Dict[str, Any] = {}
+    facets: dict[str, Any] = {}
 
 
 # ===================== КВОТЫ =====================
@@ -306,7 +304,7 @@ class FileSearchResponse(BaseModel):
 
 class FileQuotaBase(BaseModel):
     max_storage_bytes: int = Field(..., gt=0)
-    max_files: Optional[int] = Field(None, gt=0)
+    max_files: int | None = Field(None, gt=0)
 
 
 class FileQuotaCreate(FileQuotaBase):
@@ -314,8 +312,8 @@ class FileQuotaCreate(FileQuotaBase):
 
 
 class FileQuotaUpdate(BaseModel):
-    max_storage_bytes: Optional[int] = Field(None, gt=0)
-    max_files: Optional[int] = Field(None, gt=0)
+    max_storage_bytes: int | None = Field(None, gt=0)
+    max_files: int | None = Field(None, gt=0)
 
 
 class FileQuotaOut(FileQuotaBase):
@@ -336,9 +334,9 @@ class FileQuotaOut(FileQuotaBase):
 class FileStorageBase(BaseModel):
     name: str = Field(..., max_length=100)
     storage_type: str = Field(..., max_length=50)
-    config: Dict[str, Any]
-    max_file_size: Optional[int] = None
-    allowed_types: Optional[List[str]] = None
+    config: dict[str, Any]
+    max_file_size: int | None = None
+    allowed_types: list[str] | None = None
 
 
 class FileStorageCreate(FileStorageBase):
@@ -346,11 +344,11 @@ class FileStorageCreate(FileStorageBase):
 
 
 class FileStorageUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=100)
-    config: Optional[Dict[str, Any]] = None
-    max_file_size: Optional[int] = None
-    allowed_types: Optional[List[str]] = None
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, max_length=100)
+    config: dict[str, Any] | None = None
+    max_file_size: int | None = None
+    allowed_types: list[str] | None = None
+    is_active: bool | None = None
 
 
 class FileStorageOut(FileStorageBase):
@@ -370,17 +368,17 @@ class FileStorageOut(FileStorageBase):
 class FileStats(BaseModel):
     total_files: int
     total_size: int
-    files_by_type: Dict[str, int]
-    files_by_permission: Dict[str, int]
-    recent_uploads: List[FileOut]
-    storage_usage: Dict[str, Any]
+    files_by_type: dict[str, int]
+    files_by_permission: dict[str, int]
+    recent_uploads: list[FileOut]
+    storage_usage: dict[str, Any]
 
 
 # ===================== ЭКСПОРТ/ИМПОРТ =====================
 
 
 class FileExportRequest(BaseModel):
-    file_ids: List[int]
+    file_ids: list[int]
     format: str = Field(..., pattern="^(zip|tar|tar.gz)$")
     include_metadata: bool = True
     include_versions: bool = False
@@ -390,20 +388,20 @@ class FileExportResponse(BaseModel):
     export_id: str
     download_url: str
     expires_at: datetime
-    file_size: Optional[int] = None
+    file_size: int | None = None
 
 
 class FileImportRequest(BaseModel):
     import_data: bytes
     format: str = Field(..., pattern="^(zip|tar|tar.gz)$")
-    target_folder_id: Optional[int] = None
+    target_folder_id: int | None = None
     overwrite_existing: bool = False
 
 
 class FileImportResponse(BaseModel):
     import_id: str
     processed_files: int
-    errors: List[str] = []
+    errors: list[str] = []
     success: bool
 
 

@@ -3,16 +3,16 @@ Middleware для проверки прав пользователей
 """
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 from starlette.responses import Response
 
-from app.crud.user_management import user_group, user_permission, user_role
+from app.crud.user_management import user_role
 from app.db.session import get_db
-from app.models.role_permission import UserGroup, UserPermissionOverride
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ class UserPermissionsMiddleware:
             "/api/v1/settings": {"GET": ["settings:read"], "PUT": ["settings:write"]},
         }
 
-    def get_required_permissions(self, path: str, method: str) -> List[str]:
+    def get_required_permissions(self, path: str, method: str) -> list[str]:
         """Получить требуемые разрешения для endpoint"""
         # Ищем точное совпадение
         if path in self.endpoint_permissions:
@@ -150,7 +150,7 @@ class UserPermissionsMiddleware:
 
         return pattern == path
 
-    def get_user_permissions(self, db: Session, user: User) -> List[str]:
+    def get_user_permissions(self, db: Session, user: User) -> list[str]:
         """Получить разрешения пользователя"""
         try:
             # Проверяем кэш
@@ -191,7 +191,7 @@ class UserPermissionsMiddleware:
             logger.error(f"Error getting user permissions: {e}")
             return []
 
-    def _get_group_permissions(self, db: Session, group_id: int) -> List[str]:
+    def _get_group_permissions(self, db: Session, group_id: int) -> list[str]:
         """Получить разрешения группы"""
         try:
             # TODO: Реализовать получение разрешений группы из БД
@@ -201,7 +201,7 @@ class UserPermissionsMiddleware:
             return []
 
     def has_permission(
-        self, user_permissions: List[str], required_permissions: List[str]
+        self, user_permissions: list[str], required_permissions: list[str]
     ) -> bool:
         """Проверяет, есть ли у пользователя нужные разрешения"""
         if not required_permissions:
@@ -332,7 +332,7 @@ class UserPermissionsMiddleware:
             response = await call_next(request)
             return response
 
-    def _extract_resource_id(self, path: str) -> Optional[int]:
+    def _extract_resource_id(self, path: str) -> int | None:
         """Извлекает ID ресурса из пути"""
         try:
             # Ищем паттерн /resource/{id}
@@ -435,7 +435,7 @@ class UserRateLimitMiddleware:
         }
         self.request_counts = {}  # В реальном приложении использовать Redis
 
-    def get_rate_limit(self, user_role: str) -> Dict[str, int]:
+    def get_rate_limit(self, user_role: str) -> dict[str, int]:
         """Получить лимит для роли пользователя"""
         return self.rate_limits.get(user_role, {"requests": 100, "window": 3600})
 

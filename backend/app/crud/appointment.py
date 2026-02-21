@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import and_
@@ -22,12 +22,12 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         *,
         skip: int = 0,
         limit: int = 100,
-        patient_id: Optional[int] = None,
-        doctor_id: Optional[int] = None,
-        department: Optional[str] = None,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None,
-    ) -> List[Appointment]:
+        patient_id: int | None = None,
+        doctor_id: int | None = None,
+        department: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[Appointment]:
         """
         Получить список записей с фильтрацией
         """
@@ -68,9 +68,9 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         db: Session,
         *,
         doctor_id: int,
-        appointment_date: Union[str, date],
+        appointment_date: str | date,
         appointment_time: str,
-        exclude_appointment_id: Optional[int] = None,
+        exclude_appointment_id: int | None = None,
     ) -> bool:
         """
         Проверить, занято ли время у врача
@@ -99,7 +99,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def get_doctor_schedule(
         self, db: Session, *, doctor_id: int, date: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Получить расписание врача на определенную дату
         """
@@ -135,7 +135,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def get_department_schedule(
         self, db: Session, *, department: str, date: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Получить расписание отделения на определенную дату
         """
@@ -171,7 +171,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def get_upcoming_appointments(
         self, db: Session, *, patient_id: int, limit: int = 10
-    ) -> List[Appointment]:
+    ) -> list[Appointment]:
         """
         Получить предстоящие записи пациента
         """
@@ -198,7 +198,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         appointment_id: int,
         new_status: str,
         validate_transition: bool = True,
-    ) -> Optional[Appointment]:
+    ) -> Appointment | None:
         """
         Обновить статус записи с валидацией перехода
         """
@@ -225,7 +225,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         db.refresh(appointment)
         return appointment
 
-    def start_visit(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+    def start_visit(self, db: Session, *, appointment_id: int) -> Appointment | None:
         """
         Начать прием (переход paid -> in_visit)
         """
@@ -235,7 +235,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def complete_visit(
         self, db: Session, *, appointment_id: int
-    ) -> Optional[Appointment]:
+    ) -> Appointment | None:
         """
         Завершить прием (переход in_visit -> completed)
         """
@@ -243,7 +243,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             db, appointment_id=appointment_id, new_status=AppointmentStatus.COMPLETED
         )
 
-    def mark_paid(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+    def mark_paid(self, db: Session, *, appointment_id: int) -> Appointment | None:
         """
         Отметить как оплаченное (переход pending -> paid)
         """
@@ -259,7 +259,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def cancel_appointment(
         self, db: Session, *, appointment_id: int
-    ) -> Optional[Appointment]:
+    ) -> Appointment | None:
         """
         Отменить запись
         """
@@ -269,7 +269,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def mark_no_show(
         self, db: Session, *, appointment_id: int
-    ) -> Optional[Appointment]:
+    ) -> Appointment | None:
         """
         Отметить как неявку
         """
@@ -279,7 +279,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def get_by_status(
         self, db: Session, *, status: str, skip: int = 0, limit: int = 100
-    ) -> List[Appointment]:
+    ) -> list[Appointment]:
         """
         Получить записи по статусу
         """
@@ -294,7 +294,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def get_paid_appointments(
         self, db: Session, *, skip: int = 0, limit: int = 100
-    ) -> List[Appointment]:
+    ) -> list[Appointment]:
         """
         Получить оплаченные записи для отправки к врачу
         """
@@ -304,7 +304,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
     def get_active_visits(
         self, db: Session, *, skip: int = 0, limit: int = 100
-    ) -> List[Appointment]:
+    ) -> list[Appointment]:
         """
         Получить активные приемы (in_visit)
         """
@@ -351,7 +351,7 @@ def count_patient_visits(db: Session, patient_id: int) -> int:
     )
 
 
-def get_last_visit(db: Session, patient_id: int) -> Optional[Appointment]:
+def get_last_visit(db: Session, patient_id: int) -> Appointment | None:
     """Получить последний визит пациента"""
     return (
         db.query(Appointment)
@@ -368,7 +368,7 @@ def get_last_visit(db: Session, patient_id: int) -> Optional[Appointment]:
 
 def get_upcoming_appointments(
     db: Session, patient_id: int, limit: int = 10
-) -> List[Appointment]:
+) -> list[Appointment]:
     """Получить предстоящие записи пациента"""
     from datetime import datetime
 
@@ -388,7 +388,7 @@ def get_upcoming_appointments(
     )
 
 
-def get_appointment(db: Session, appointment_id: int) -> Optional[Appointment]:
+def get_appointment(db: Session, appointment_id: int) -> Appointment | None:
     """Получить запись по ID"""
     return db.query(Appointment).filter(Appointment.id == appointment_id).first()
 

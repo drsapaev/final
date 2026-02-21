@@ -3,20 +3,14 @@
 Поддерживает многоязычность и персонализацию
 """
 
-import json
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-
-from sqlalchemy.orm import Session
-
-from app.crud import telegram_config as crud_telegram
+from typing import Any
 
 
 class TelegramTemplatesService:
     def __init__(self):
         self.templates = self._load_default_templates()
 
-    def _load_default_templates(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def _load_default_templates(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Загрузка базовых шаблонов сообщений"""
         return {
             "welcome": {
@@ -351,8 +345,8 @@ class TelegramTemplatesService:
         }
 
     def get_template(
-        self, template_key: str, language: str = "ru", data: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+        self, template_key: str, language: str = "ru", data: dict[str, Any] = None
+    ) -> dict[str, Any]:
         """Получить шаблон сообщения с подстановкой данных"""
         try:
             template = self.templates.get(template_key, {}).get(language, {})
@@ -385,8 +379,8 @@ class TelegramTemplatesService:
             }
 
     def _format_keyboard(
-        self, keyboard: Dict[str, Any], data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, keyboard: dict[str, Any], data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Форматирование клавиатуры с подстановкой данных"""
         try:
             if "inline_keyboard" in keyboard:
@@ -414,19 +408,19 @@ class TelegramTemplatesService:
 
             return keyboard
 
-        except Exception as e:
+        except Exception:
             return keyboard
 
-    def get_supported_languages(self) -> List[str]:
+    def get_supported_languages(self) -> list[str]:
         """Получить список поддерживаемых языков"""
         return ["ru", "uz", "en"]
 
-    def get_template_keys(self) -> List[str]:
+    def get_template_keys(self) -> list[str]:
         """Получить список доступных шаблонов"""
         return list(self.templates.keys())
 
     def add_custom_template(
-        self, template_key: str, language: str, template_data: Dict[str, Any]
+        self, template_key: str, language: str, template_data: dict[str, Any]
     ):
         """Добавить пользовательский шаблон"""
         if template_key not in self.templates:

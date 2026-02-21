@@ -3,18 +3,18 @@ Middleware для аутентификации и авторизации
 """
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, List, Optional
+from typing import Any
 
 from fastapi import HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
 from starlette.responses import Response
 
-from app.crud.authentication import refresh_token, user, user_session
+from app.crud.authentication import user, user_session
 from app.db.session import get_db
-from app.models.user import User
 from app.schemas.authentication import TokenValidationResponse
 from app.services.authentication_service import get_authentication_service
 
@@ -56,7 +56,7 @@ class AuthenticationMiddleware:
         """Проверяет, является ли путь публичным"""
         return any(path.startswith(public_path) for public_path in self.public_paths)
 
-    def extract_token(self, request: Request) -> Optional[str]:
+    def extract_token(self, request: Request) -> str | None:
         """Извлекает токен из заголовка Authorization"""
         authorization = request.headers.get("Authorization")
         if not authorization:
@@ -70,7 +70,7 @@ class AuthenticationMiddleware:
 
     def validate_token(
         self, token: str, db: Session
-    ) -> Optional[TokenValidationResponse]:
+    ) -> TokenValidationResponse | None:
         """Валидирует JWT токен"""
         try:
             # Проверяем токен
@@ -87,37 +87,36 @@ class AuthenticationMiddleware:
             # ✅ SECURITY: Check 2FA status
             requires_2fa = False
             two_factor_verified = False
-            
+
             try:
                 from app.models.two_factor_auth import TwoFactorAuth
-                from app.models.user_session import UserSession
-                
+
                 # Check if user has 2FA enabled
                 two_factor_auth = (
                     db.query(TwoFactorAuth)
                     .filter(TwoFactorAuth.user_id == user_id)
                     .first()
                 )
-                
+
                 if two_factor_auth and two_factor_auth.totp_enabled:
                     requires_2fa = True
-                    
+
                     # Check if 2FA is verified for this session
                     # Get session token from JWT payload (if stored)
-                    jti = payload.get("jti")  # JWT ID that might link to session
-                    
+                    _jti = payload.get("jti")  # JWT ID that might link to session
+
                     # Try to find active session with 2FA verified
                     # For now, we check if token was issued after 2FA verification
                     # In a full implementation, we'd link token to TwoFactorSession
                     two_factor_verified = payload.get("2fa_verified", False)
-                    
+
                     # If 2FA is required but not verified, token is invalid
                     if requires_2fa and not two_factor_verified:
                         logger.warning(
                             f"User {user_id} has 2FA enabled but token not verified"
                         )
                         return None
-                        
+
             except Exception as e:
                 logger.error(f"Error checking 2FA status: {e}")
                 # In case of error, be conservative: if 2FA might be enabled, block access
@@ -159,7 +158,7 @@ class AuthenticationMiddleware:
             logger.error(f"Error checking session: {e}")
             return True  # В случае ошибки пропускаем проверку
 
-    def get_device_fingerprint(self, request: Request) -> Optional[str]:
+    def get_device_fingerprint(self, request: Request) -> str | None:
         """Получает отпечаток устройства"""
         try:
             user_agent = request.headers.get("user-agent", "")
@@ -221,8 +220,7 @@ class AuthenticationMiddleware:
                     # Additional check: verify 2FA status from session
                     try:
                         from app.models.two_factor_auth import TwoFactorSession
-                        from app.models.user_session import UserSession as USession
-                        
+
                         device_fingerprint = self.get_device_fingerprint(request)
                         if device_fingerprint:
                             # Check if there's a verified 2FA session
@@ -239,7 +237,7 @@ class AuthenticationMiddleware:
                                     .order_by(TwoFactorSession.created_at.desc())
                                     .first()
                                 )
-                                
+
                                 if not two_factor_session:
                                     logger.warning(
                                         f"User {token_validation.user_id} requires 2FA but no verified session found"
@@ -325,14 +323,14 @@ class AuthorizationMiddleware:
             "/api/v1/settings": ["Admin"],
         }
 
-    def get_required_permissions(self, path: str) -> List[str]:
+    def get_required_permissions(self, path: str) -> list[str]:
         """Получает требуемые разрешения для пути"""
         for path_prefix, roles in self.path_permissions.items():
             if path.startswith(path_prefix):
                 return roles
         return []
 
-    def has_permission(self, user_role: str, required_roles: List[str]) -> bool:
+    def has_permission(self, user_role: str, required_roles: list[str]) -> bool:
         """Проверяет, есть ли у пользователя нужные разрешения"""
         if not required_roles:
             return True

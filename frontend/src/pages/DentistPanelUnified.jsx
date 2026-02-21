@@ -19,7 +19,7 @@ import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { queueService } from '../services/queue';
-import EMRSystem from '../components/medical/EMRSystem';
+import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import {
   Calendar,
   Stethoscope,
@@ -1720,17 +1720,10 @@ const DentistPanelUnified = () => {
             </div>
 
             {/* EMR System */}
-            <EMRSystem
-              appointment={{
-                id: selectedPatient.id,
-                patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
-                patient_name: selectedPatient.patient_name || selectedPatient.name,
-                specialty: 'dentist',
-                status: selectedPatient.status || 'in_visit'
-              }}
-              emr={emr}
-              onSave={saveEMR}
-              onComplete={handleCompleteVisit}
+            <EMRContainerV2
+              visitId={selectedPatient.id}
+              patientId={selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id}
+              specialty="dentistry"
             />
           </Card>
         </div>

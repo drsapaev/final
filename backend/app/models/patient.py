@@ -1,53 +1,56 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
+if TYPE_CHECKING:
+    from app.models.user import User
+
 
 class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
-        nullable=True, 
+    user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         unique=True
     )  # ✅ SECURITY: SET NULL (patient can exist without user account)
     last_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    middle_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    middle_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    birth_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    sex: Mapped[Optional[str]] = mapped_column(
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sex: Mapped[str | None] = mapped_column(
         String(8), nullable=True, name="gender"
     )  # M|F|X
 
-    phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    doc_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    doc_number: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    address: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    doc_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    doc_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-    
+
     # ✅ SOFT-DELETE: Безопасное удаление пациентов
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    deleted_by: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
 
     # Связь с пользователем
-    user: Mapped[Optional["User"]] = relationship("User", back_populates="patient", foreign_keys=[user_id])
+    user: Mapped[User | None] = relationship("User", back_populates="patient", foreign_keys=[user_id])
 
     def short_name(self) -> str:
         """

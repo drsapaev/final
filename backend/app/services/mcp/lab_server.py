@@ -4,7 +4,7 @@ MCP сервер для лабораторных анализов
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
 from .base_server import BaseMCPServer, MCPResource, MCPTool
@@ -30,7 +30,7 @@ class MedicalLabMCPServer(BaseMCPServer):
         """Завершение работы сервера"""
         logger.info("Medical Lab MCP Server shutting down")
 
-    def _load_normal_ranges(self) -> Dict[str, Dict[str, Any]]:
+    def _load_normal_ranges(self) -> dict[str, dict[str, Any]]:
         """Загрузка нормальных диапазонов для анализов"""
         return {
             "hemoglobin": {
@@ -89,7 +89,7 @@ class MedicalLabMCPServer(BaseMCPServer):
             },
         }
 
-    def _load_test_panels(self) -> Dict[str, Dict[str, Any]]:
+    def _load_test_panels(self) -> dict[str, dict[str, Any]]:
         """Загрузка панелей анализов"""
         return {
             "general_blood": {
@@ -155,11 +155,11 @@ class MedicalLabMCPServer(BaseMCPServer):
     )
     async def interpret_lab_results(
         self,
-        results: List[Dict[str, Any]],
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
+        results: list[dict[str, Any]],
+        patient_info: dict[str, Any] | None = None,
+        provider: str | None = None,
         include_recommendations: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Интерпретация лабораторных результатов
 
@@ -233,8 +233,8 @@ class MedicalLabMCPServer(BaseMCPServer):
         description="Проверка критических значений в анализах",
     )
     async def check_critical_values(
-        self, results: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, results: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Проверка критических значений
 
@@ -296,10 +296,10 @@ class MedicalLabMCPServer(BaseMCPServer):
     )
     async def suggest_follow_up_tests(
         self,
-        current_results: List[Dict[str, Any]],
-        abnormal_findings: List[str],
-        clinical_context: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        current_results: list[dict[str, Any]],
+        abnormal_findings: list[str],
+        clinical_context: str | None = None,
+    ) -> dict[str, Any]:
         """
         Рекомендации дополнительных анализов
 
@@ -393,8 +393,8 @@ class MedicalLabMCPServer(BaseMCPServer):
 
     @MCPResource(name="normal_ranges", description="Нормальные диапазоны для анализов")
     async def get_normal_ranges(
-        self, test_name: Optional[str] = None, patient_gender: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, test_name: str | None = None, patient_gender: str | None = None
+    ) -> dict[str, Any]:
         """
         Получение нормальных диапазонов
 
@@ -433,8 +433,8 @@ class MedicalLabMCPServer(BaseMCPServer):
 
     @MCPResource(name="test_panels", description="Панели лабораторных анализов")
     async def get_test_panels(
-        self, panel_name: Optional[str] = None, indication: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, panel_name: str | None = None, indication: str | None = None
+    ) -> dict[str, Any]:
         """
         Получение панелей анализов
 
@@ -476,8 +476,8 @@ class MedicalLabMCPServer(BaseMCPServer):
         }
 
     def _analyze_abnormalities(
-        self, results: List[Dict[str, Any]], patient_info: Optional[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, results: list[dict[str, Any]], patient_info: dict[str, Any] | None
+    ) -> list[dict[str, Any]]:
         """Анализ отклонений в результатах"""
         abnormal = []
 
@@ -571,7 +571,7 @@ class MedicalLabMCPServer(BaseMCPServer):
 
         return f"{'Критическое' if is_critical else 'Умеренное'} отклонение {'выше' if deviation == 'high' else 'ниже'} нормы"
 
-    def _get_overall_assessment(self, abnormal_results: List[Dict[str, Any]]) -> str:
+    def _get_overall_assessment(self, abnormal_results: list[dict[str, Any]]) -> str:
         """Общая оценка результатов"""
         if not abnormal_results:
             return "Все показатели в пределах нормы"
@@ -588,8 +588,8 @@ class MedicalLabMCPServer(BaseMCPServer):
             return "Незначительные отклонения - рекомендуется наблюдение"
 
     def _generate_recommendations(
-        self, abnormal_results: List[Dict[str, Any]], ai_interpretation: Dict[str, Any]
-    ) -> List[str]:
+        self, abnormal_results: list[dict[str, Any]], ai_interpretation: dict[str, Any]
+    ) -> list[str]:
         """Генерация рекомендаций"""
         recommendations = []
 

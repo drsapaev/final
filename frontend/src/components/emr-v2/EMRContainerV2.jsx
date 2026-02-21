@@ -11,12 +11,16 @@
  * - Sticky header
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
 import { useBeforeUnload } from '../../hooks/useNavigationGuard';
 import { useEMRKeyboard } from '../../hooks/useEMRKeyboard';
+import { useVisitLifecycle } from '../../hooks/useVisitLifecycle';
+import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
+import { cacheService, CACHE_CONFIG, CACHE_TAGS } from '../../core/cache';
+import { DEBOUNCE } from '../../core/debouncePolicy';
 import EMRStatusIndicator from './EMRStatusIndicator';
 import EMRHistoryPanel from './EMRHistoryPanel';
 import EMRDiffViewer from './EMRDiffViewer';
@@ -37,6 +41,13 @@ import {
     RecommendationsSection,
     NotesSection,
 } from './sections';
+
+// Import specialty sections (lazy loaded)
+import {
+    CardiologySection,
+    DermatologySection,
+    DentistrySection,
+} from './sections/specialty';
 
 import './EMRContainerV2.css';
 
@@ -85,7 +96,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         isSigned,
         status,
         saveEMR,
-        debounceMs: 3000,
+        debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
         enabled: !isSigned,
     });
@@ -106,6 +117,30 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
     const [aiSuggestions, setAiSuggestions] = useState({});
     const [aiLoading, setAiLoading] = useState({});
 
+    // 🔄 Visit Lifecycle Management - критично для безопасности данных
+    const visitLifecycle = useVisitLifecycle(visitId, patientId, {
+        invalidateCacheOnChange: true,
+        onVisitChange: ({ prevVisitId, newVisitId }) => {
+            // Очищаем AI-состояние при смене визита
+            setAiSuggestions({});
+            setAiLoading({});
+            // eslint-disable-next-line no-console
+            console.log('[EMR] Visit changed', { prevVisitId, newVisitId });
+        },
+        onCleanup: () => {
+            // Дополнительная очистка при размонтировании
+            setExperimentalGhostMode(false);
+        },
+    });
+    const { getAbortSignal } = visitLifecycle;
+
+    // Cache EMR snapshot for the current visit
+    useEffect(() => {
+        if (visitId && data) {
+            cacheService.cacheEMR(visitId, data);
+        }
+    }, [visitId, data]);
+
     // 🔒 1. Strict Rules for Ghost Mode
     // Auto-disable if signed, amended, or conflict occurs
     React.useEffect(() => {
@@ -118,6 +153,28 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
     React.useEffect(() => {
         setExperimentalGhostMode(false);
     }, [visitId]);
+
+    const buildAiCacheKey = useCallback((fieldName) => {
+        const specialty = data.specialty || 'general';
+        const complaints = (data.complaints || '').trim().toLowerCase();
+        const diagnosis = (data.diagnosis || '').trim().toLowerCase();
+        return cacheService.generateKey(
+            'ai',
+            fieldName,
+            specialty,
+            complaints,
+            diagnosis,
+            data.patient_age,
+            data.patient_gender
+        );
+    }, [data.specialty, data.complaints, data.diagnosis, data.patient_age, data.patient_gender]);
+
+    const buildAiTags = useCallback(() => {
+        const tags = [CACHE_TAGS.aiAnalysis];
+        if (visitId) tags.push(CACHE_TAGS.visit(visitId));
+        if (patientId) tags.push(CACHE_TAGS.patient(patientId));
+        return tags;
+    }, [visitId, patientId]);
 
     // Handle Telemetry
     const handleTelemetry = useCallback((event) => {
@@ -143,12 +200,22 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         });
         handleTelemetry({ type: 'ai.requested', payload: { fieldName } });
 
+        const cacheKey = buildAiCacheKey(fieldName);
+        const cachedSuggestions = cacheService.get(cacheKey);
+        if (cachedSuggestions) {
+            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }));
+            setAiLoading(prev => ({ ...prev, [fieldName]: false }));
+            handleTelemetry({ type: 'ai.cache.hit', payload: { fieldName } });
+            return;
+        }
+
         // Set loading state for this field
         setAiLoading(prev => ({ ...prev, [fieldName]: true }));
 
         try {
             let result;
             const specialty = data.specialty || 'general';
+            const requestOptions = { signal: getAbortSignal() };
 
             switch (fieldName) {
                 case 'diagnosis':
@@ -158,7 +225,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         diagnosis: data.diagnosis || '',
                         specialty,
                         maxSuggestions: 5
-                    });
+                    }, requestOptions);
                     // eslint-disable-next-line no-console
                     console.log('[EMR AI] ICD10 result:', result);
 
@@ -175,16 +242,21 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                     const suggestions = icd10Data?.suggestions || [];
 
                     if (suggestions.length > 0) {
+                        const formattedSuggestions = suggestions.map(s => ({
+                            id: s.code || s.id,
+                            content: `${s.code} - ${s.label || s.name || s.description}`,
+                            source: 'ai',
+                            confidence: s.confidence || 0.8,
+                            meta: { code: s.code, label: s.label }
+                        }));
                         setAiSuggestions(prev => ({
                             ...prev,
-                            [fieldName]: suggestions.map(s => ({
-                                id: s.code || s.id,
-                                content: `${s.code} - ${s.label || s.name || s.description}`,
-                                source: 'ai',
-                                confidence: s.confidence || 0.8,
-                                meta: { code: s.code, label: s.label }
-                            }))
+                            [fieldName]: formattedSuggestions
                         }));
+                        cacheService.set(cacheKey, formattedSuggestions, {
+                            ttl: CACHE_CONFIG.aiTTL,
+                            tags: buildAiTags(),
+                        });
                     } else {
                         // eslint-disable-next-line no-console
                         console.log('[EMR AI] No ICD-10 suggestions returned');
@@ -199,7 +271,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                             complaint: data.complaints,
                             patientAge: data.patient_age,
                             patientGender: data.patient_gender
-                        });
+                        }, requestOptions);
                         // eslint-disable-next-line no-console
                         console.log('[EMR AI] Complaint analysis result:', result);
 
@@ -241,6 +313,10 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                             }
                             if (fieldSuggestions.length > 0) {
                                 setAiSuggestions(prev => ({ ...prev, [fieldName]: fieldSuggestions }));
+                                cacheService.set(cacheKey, fieldSuggestions, {
+                                    ttl: CACHE_CONFIG.aiTTL,
+                                    tags: buildAiTags(),
+                                });
                             }
                         }
                     } else {
@@ -266,13 +342,32 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                     console.log('[EMR AI] No AI handler for field:', fieldName);
             }
         } catch (err) {
+            if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+                return;
+            }
             // eslint-disable-next-line no-console
             console.error('[EMR AI Error]', err);
             handleTelemetry({ type: 'ai.error', payload: { fieldName, error: err.message } });
         } finally {
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
         }
-    }, [data.specialty, data.complaints, data.diagnosis, data.patient_age, data.patient_gender, handleTelemetry]);
+    }, [
+        data.specialty,
+        data.complaints,
+        data.diagnosis,
+        data.patient_age,
+        data.patient_gender,
+        handleTelemetry,
+        buildAiCacheKey,
+        buildAiTags,
+        getAbortSignal
+    ]);
+
+    const debouncedRequestAI = useDebouncedCallback(handleRequestAI, 'ai', [handleRequestAI]);
+
+    useEffect(() => {
+        debouncedRequestAI.cancel?.();
+    }, [visitId, debouncedRequestAI]);
 
     // Toggle Ghost Mode with validation
     const toggleGhostMode = () => {
@@ -429,7 +524,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         doctorId={doctorId}
                         experimentalGhostMode={experimentalGhostMode}
                         onTelemetry={handleTelemetry}
-                        onRequestAI={handleRequestAI}
+                        onRequestAI={debouncedRequestAI}
                         suggestions={aiSuggestions.examination || []}
                         aiLoading={aiLoading.examination || false}
                     />
@@ -444,7 +539,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         doctorId={doctorId}
                         experimentalGhostMode={experimentalGhostMode}
                         onTelemetry={handleTelemetry}
-                        onRequestAI={handleRequestAI}
+                        onRequestAI={debouncedRequestAI}
                         suggestions={aiSuggestions.diagnosis || []}
                         aiLoading={aiLoading.diagnosis || false}
                     />
@@ -467,7 +562,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         experimentalGhostMode={experimentalGhostMode}
                         doctorId={doctorId}
                         onTelemetry={handleTelemetry}
-                        onRequestAI={handleRequestAI}
+                        onRequestAI={debouncedRequestAI}
                         suggestions={aiSuggestions.treatment || []}
                         aiLoading={aiLoading.treatment || false}
                     />
@@ -502,6 +597,53 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         onChange={handleFieldChange('notes')}
                         disabled={isSigned}
                     />
+
+                    {/* Specialty-specific sections */}
+                    {data.specialty === 'cardiology' && (
+                        <CardiologySection
+                            ecgData={data.specialty_data?.ecg || {}}
+                            echoData={data.specialty_data?.echo || {}}
+                            labResults={data.specialty_data?.cardio_labs || {}}
+                            onChange={(field, value) => handleFieldChange('specialty_data')({
+                                ...(data.specialty_data || {}),
+                                [field]: value
+                            })}
+                            disabled={isSigned}
+                            visitId={visitId}
+                            patientId={patientId}
+                        />
+                    )}
+
+                    {data.specialty === 'dermatology' && (
+                        <DermatologySection
+                            photos={data.specialty_data?.photos || []}
+                            skinType={data.specialty_data?.skin_type || ''}
+                            conditions={data.specialty_data?.conditions || []}
+                            localization={data.specialty_data?.localization || {}}
+                            onChange={(field, value) => handleFieldChange('specialty_data')({
+                                ...(data.specialty_data || {}),
+                                [field]: value
+                            })}
+                            disabled={isSigned}
+                            visitId={visitId}
+                            patientId={patientId}
+                        />
+                    )}
+
+                    {(data.specialty === 'dentist' || data.specialty === 'dentistry') && (
+                        <DentistrySection
+                            toothStatus={data.specialty_data?.tooth_status || {}}
+                            hygieneIndices={data.specialty_data?.hygiene_indices || {}}
+                            periodontalPockets={data.specialty_data?.periodontal_pockets || {}}
+                            measurements={data.specialty_data?.measurements || {}}
+                            radiographs={data.specialty_data?.radiographs || {}}
+                            onChange={(field, value) => handleFieldChange('specialty_data')({
+                                ...(data.specialty_data || {}),
+                                [field]: value
+                            })}
+                            disabled={isSigned}
+                        />
+                    )}
                 </div>
 
                 {/* Actions */}

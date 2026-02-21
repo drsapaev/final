@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.visit import Visit
 
 
 class PaymentVisit(Base):
@@ -39,10 +42,10 @@ class PaymentVisit(Base):
     )
 
     # Relationships
-    payment: Mapped["Payment"] = relationship(
+    payment: Mapped[Payment] = relationship(
         "Payment", back_populates="payment_visits"
     )
-    visit: Mapped["Visit"] = relationship("Visit", foreign_keys=[visit_id])
+    visit: Mapped[Visit] = relationship("Visit", foreign_keys=[visit_id])
 
 
 class Payment(Base):
@@ -50,9 +53,9 @@ class Payment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     visit_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("visits.id", ondelete="RESTRICT"), 
-        nullable=False, 
+        Integer,
+        ForeignKey("visits.id", ondelete="RESTRICT"),
+        nullable=False,
         index=True
     )  # ✅ SECURITY: RESTRICT to prevent visit deletion if payment exists (financial integrity)
 
@@ -69,28 +72,28 @@ class Payment(Base):
     )  # pending|processing|paid|failed|cancelled|refunded|void
 
     # Данные чека/квитанции
-    receipt_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    note: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    receipt_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     # Онлайн-платежи
-    provider: Mapped[Optional[str]] = mapped_column(
+    provider: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
     )  # click|payme|kaspi
-    provider_payment_id: Mapped[Optional[str]] = mapped_column(
+    provider_payment_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True, index=True
     )  # ID у провайдера
-    provider_transaction_id: Mapped[Optional[str]] = mapped_column(
+    provider_transaction_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True, index=True
     )  # ID транзакции
-    payment_url: Mapped[Optional[str]] = mapped_column(
+    payment_url: Mapped[str | None] = mapped_column(
         String(512), nullable=True
     )  # URL для оплаты
 
     # Дополнительные данные от провайдера
-    provider_data: Mapped[Optional[dict]] = mapped_column(
+    provider_data: Mapped[dict | None] = mapped_column(
         JSON, nullable=True
     )  # Данные от провайдера
-    commission: Mapped[Optional[Decimal]] = mapped_column(
+    commission: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2), nullable=True, default=0
     )  # Комиссия
 
@@ -98,33 +101,33 @@ class Payment(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, onupdate=datetime.utcnow
     )
-    paid_at: Mapped[Optional[datetime]] = mapped_column(
+    paid_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    
+
     # Возврат средств
-    refunded_amount: Mapped[Optional[Decimal]] = mapped_column(
+    refunded_amount: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 2), nullable=True, default=None,
         comment="Сумма возврата (может быть частичной)"
     )
-    refund_reason: Mapped[Optional[str]] = mapped_column(
+    refund_reason: Mapped[str | None] = mapped_column(
         String(512), nullable=True,
         comment="Причина возврата"
     )
-    refunded_at: Mapped[Optional[datetime]] = mapped_column(
+    refunded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
         comment="Дата и время возврата"
     )
-    refunded_by: Mapped[Optional[int]] = mapped_column(
+    refunded_by: Mapped[int | None] = mapped_column(
         Integer, nullable=True,
         comment="ID кассира, выполнившего возврат"
     )
 
     # Relationships
-    payment_visits: Mapped[list["PaymentVisit"]] = relationship(
+    payment_visits: Mapped[list[PaymentVisit]] = relationship(
         "PaymentVisit",
         back_populates="payment",
         cascade="all, delete-orphan",

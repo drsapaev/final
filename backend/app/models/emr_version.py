@@ -5,9 +5,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
@@ -30,7 +29,7 @@ class EMRVersion(Base):
     change_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # created, updated, deleted
-    change_description: Mapped[Optional[str]] = mapped_column(
+    change_description: Mapped[str | None] = mapped_column(
         String(1000), nullable=True
     )
     changed_by: Mapped[int] = mapped_column(Integer, nullable=False)  # ID пользователя
@@ -40,6 +39,6 @@ class EMRVersion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

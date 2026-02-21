@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -15,11 +15,11 @@ from sqlalchemy.sql import func
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
-    from app.models.patient import Patient
-    from app.models.visit import Visit
     from app.models.appointment import Appointment
+    from app.models.patient import Patient
     from app.models.service import Service
+    from app.models.user import User
+    from app.models.visit import Visit
 
 
 class PricingRuleType(str, enum.Enum):
@@ -49,42 +49,42 @@ class PricingRule(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     rule_type: Mapped[PricingRuleType] = mapped_column(Enum(PricingRuleType), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Условия применения
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    start_time: Mapped[Optional[str]] = mapped_column(String(8))  # HH:MM:SS
-    end_time: Mapped[Optional[str]] = mapped_column(String(8))  # HH:MM:SS
-    days_of_week: Mapped[Optional[str]] = mapped_column(String(20))  # 1,2,3,4,5,6,7 (пн-вс)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime)
+    start_time: Mapped[str | None] = mapped_column(String(8))  # HH:MM:SS
+    end_time: Mapped[str | None] = mapped_column(String(8))  # HH:MM:SS
+    days_of_week: Mapped[str | None] = mapped_column(String(20))  # 1,2,3,4,5,6,7 (пн-вс)
 
     # Параметры скидки
     discount_type: Mapped[DiscountType] = mapped_column(Enum(DiscountType), nullable=False)
     discount_value: Mapped[float] = mapped_column(Float, nullable=False)  # Процент или сумма
     min_quantity: Mapped[int] = mapped_column(Integer, default=1)
-    max_quantity: Mapped[Optional[int]] = mapped_column(Integer)
-    min_amount: Mapped[Optional[float]] = mapped_column(Float)  # Минимальная сумма заказа
+    max_quantity: Mapped[int | None] = mapped_column(Integer)
+    min_amount: Mapped[float | None] = mapped_column(Float)  # Минимальная сумма заказа
 
     # Дополнительные параметры
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Приоритет применения
-    max_uses: Mapped[Optional[int]] = mapped_column(Integer)  # Максимальное количество использований
+    max_uses: Mapped[int | None] = mapped_column(Integer)  # Максимальное количество использований
     current_uses: Mapped[int] = mapped_column(Integer, default=0)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    rule_services: Mapped[List["PricingRuleService"]] = relationship(
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    rule_services: Mapped[list[PricingRuleService]] = relationship(
         "PricingRuleService", back_populates="rule"
     )
-    rule_packages: Mapped[List["ServicePackage"]] = relationship(
+    rule_packages: Mapped[list[ServicePackage]] = relationship(
         "ServicePackage", back_populates="pricing_rule"
     )
 
@@ -99,14 +99,14 @@ class PricingRuleService(Base):
     service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id"), nullable=False)
 
     # Специфичные параметры для услуги
-    custom_discount_value: Mapped[Optional[float]] = mapped_column(
+    custom_discount_value: Mapped[float | None] = mapped_column(
         Float
     )  # Переопределение скидки для конкретной услуги
     is_excluded: Mapped[bool] = mapped_column(Boolean, default=False)  # Исключить услугу из правила
 
     # Связи
-    rule: Mapped["PricingRule"] = relationship("PricingRule", back_populates="rule_services")
-    service: Mapped["Service"] = relationship("Service")
+    rule: Mapped[PricingRule] = relationship("PricingRule", back_populates="rule_services")
+    service: Mapped[Service] = relationship("Service")
 
 
 class ServicePackage(Base):
@@ -116,45 +116,45 @@ class ServicePackage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Ценообразование
     package_price: Mapped[float] = mapped_column(Float, nullable=False)
-    original_price: Mapped[Optional[float]] = mapped_column(Float)  # Сумма цен отдельных услуг
-    savings_amount: Mapped[Optional[float]] = mapped_column(Float)  # Размер экономии
-    savings_percentage: Mapped[Optional[float]] = mapped_column(Float)  # Процент экономии
+    original_price: Mapped[float | None] = mapped_column(Float)  # Сумма цен отдельных услуг
+    savings_amount: Mapped[float | None] = mapped_column(Float)  # Размер экономии
+    savings_percentage: Mapped[float | None] = mapped_column(Float)  # Процент экономии
 
     # Условия
     min_services: Mapped[int] = mapped_column(Integer, default=1)
-    max_services: Mapped[Optional[int]] = mapped_column(Integer)
-    valid_from: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    valid_to: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    max_services: Mapped[int | None] = mapped_column(Integer)
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime)
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Ограничения
-    max_purchases: Mapped[Optional[int]] = mapped_column(Integer)  # Максимальное количество покупок
+    max_purchases: Mapped[int | None] = mapped_column(Integer)  # Максимальное количество покупок
     current_purchases: Mapped[int] = mapped_column(Integer, default=0)
-    per_patient_limit: Mapped[Optional[int]] = mapped_column(Integer)  # Лимит на пациента
+    per_patient_limit: Mapped[int | None] = mapped_column(Integer)  # Лимит на пациента
 
     # Связи с правилами ценообразования
-    pricing_rule_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("pricing_rules.id"))
-    pricing_rule: Mapped[Optional["PricingRule"]] = relationship(
+    pricing_rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("pricing_rules.id"))
+    pricing_rule: Mapped[PricingRule | None] = relationship(
         "PricingRule", back_populates="rule_packages"
     )
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    package_services: Mapped[List["PackageService"]] = relationship(
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    package_services: Mapped[list[PackageService]] = relationship(
         "PackageService", back_populates="package"
     )
-    package_purchases: Mapped[List["PackagePurchase"]] = relationship(
+    package_purchases: Mapped[list[PackagePurchase]] = relationship(
         "PackagePurchase", back_populates="package"
     )
 
@@ -173,11 +173,11 @@ class PackageService(Base):
     # Параметры услуги в пакете
     quantity: Mapped[int] = mapped_column(Integer, default=1)  # Количество данной услуги в пакете
     is_required: Mapped[bool] = mapped_column(Boolean, default=True)  # Обязательная услуга
-    discount_percentage: Mapped[Optional[float]] = mapped_column(Float)  # Индивидуальная скидка на услугу
+    discount_percentage: Mapped[float | None] = mapped_column(Float)  # Индивидуальная скидка на услугу
 
     # Связи
-    package: Mapped["ServicePackage"] = relationship("ServicePackage", back_populates="package_services")
-    service: Mapped["Service"] = relationship("Service")
+    package: Mapped[ServicePackage] = relationship("ServicePackage", back_populates="package_services")
+    service: Mapped[Service] = relationship("Service")
 
 
 class PackagePurchase(Base):
@@ -190,8 +190,8 @@ class PackagePurchase(Base):
         Integer, ForeignKey("service_packages.id"), nullable=False
     )
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), nullable=False)
-    visit_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("visits.id"))
-    appointment_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("appointments.id"))
+    visit_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("visits.id"))
+    appointment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("appointments.id"))
 
     # Детали покупки
     purchase_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -202,15 +202,15 @@ class PackagePurchase(Base):
     status: Mapped[str] = mapped_column(String(50), default="active")  # active, used, expired, cancelled
 
     # Временные метки
-    purchased_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    purchased_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Связи
-    package: Mapped["ServicePackage"] = relationship("ServicePackage", back_populates="package_purchases")
-    patient: Mapped["Patient"] = relationship("Patient")
-    visit: Mapped[Optional["Visit"]] = relationship("Visit")
-    appointment: Mapped[Optional["Appointment"]] = relationship("Appointment")
+    package: Mapped[ServicePackage] = relationship("ServicePackage", back_populates="package_purchases")
+    patient: Mapped[Patient] = relationship("Patient")
+    visit: Mapped[Visit | None] = relationship("Visit")
+    appointment: Mapped[Appointment | None] = relationship("Appointment")
 
 
 class DynamicPrice(Base):
@@ -235,19 +235,19 @@ class DynamicPrice(Base):
 
     # Статистика
     price_changes_count: Mapped[int] = mapped_column(Integer, default=0)
-    last_price_change: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    avg_price_last_30d: Mapped[Optional[float]] = mapped_column(Float)
+    last_price_change: Mapped[datetime | None] = mapped_column(DateTime)
+    avg_price_last_30d: Mapped[float | None] = mapped_column(Float)
 
     # Временные метки
-    effective_from: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    effective_to: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    effective_from: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
     # Связи
-    service: Mapped["Service"] = relationship("Service")
+    service: Mapped[Service] = relationship("Service")
 
 
 class PriceHistory(Base):
@@ -264,15 +264,15 @@ class PriceHistory(Base):
     price_type: Mapped[str] = mapped_column(String(50), default="base")  # base, dynamic, package
 
     # Причина изменения
-    change_reason: Mapped[Optional[str]] = mapped_column(String(255))
-    change_type: Mapped[Optional[str]] = mapped_column(String(50))  # manual, automatic, rule_based
+    change_reason: Mapped[str | None] = mapped_column(String(255))
+    change_type: Mapped[str | None] = mapped_column(String(50))  # manual, automatic, rule_based
 
     # Метаданные
-    changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    changed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
-    effective_from: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    effective_to: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    changed_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    changed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    effective_from: Mapped[datetime | None] = mapped_column(DateTime)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Связи
-    service: Mapped["Service"] = relationship("Service")
-    changed_by_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[changed_by])
+    service: Mapped[Service] = relationship("Service")
+    changed_by_user: Mapped[User | None] = relationship("User", foreign_keys=[changed_by])

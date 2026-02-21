@@ -3,8 +3,6 @@ GraphQL типы для API клиники
 """
 
 from datetime import date, datetime, time
-from decimal import Decimal
-from typing import List, Optional
 
 import strawberry
 
@@ -16,8 +14,8 @@ class UserType:
     id: int
     username: str
     email: str
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
     role: str
     is_active: bool
     created_at: datetime
@@ -31,11 +29,11 @@ class PatientType:
     id: int
     full_name: str
     phone: str
-    email: Optional[str] = None
-    birth_date: Optional[date] = None
-    address: Optional[str] = None
-    passport_series: Optional[str] = None
-    passport_number: Optional[str] = None
+    email: str | None = None
+    birth_date: date | None = None
+    address: str | None = None
+    passport_series: str | None = None
+    passport_number: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -45,13 +43,13 @@ class DoctorType:
     """Тип врача"""
 
     id: int
-    user: Optional[UserType] = None
+    user: UserType | None = None
     specialty: str
-    cabinet: Optional[str] = None
-    price_default: Optional[float] = None
+    cabinet: str | None = None
+    price_default: float | None = None
     start_number_online: int
     max_online_per_day: int
-    auto_close_time: Optional[time] = None
+    auto_close_time: time | None = None
     active: bool
     created_at: datetime
     updated_at: datetime
@@ -65,10 +63,10 @@ class ServiceType:
     name: str
     code: str
     price: float
-    category: Optional[str] = None
-    description: Optional[str] = None
-    duration_minutes: Optional[int] = None
-    doctor: Optional[DoctorType] = None
+    category: str | None = None
+    description: str | None = None
+    duration_minutes: int | None = None
+    doctor: DoctorType | None = None
     active: bool
     created_at: datetime
     updated_at: datetime
@@ -84,9 +82,9 @@ class AppointmentType:
     service: ServiceType
     appointment_date: datetime
     status: str
-    notes: Optional[str] = None
+    notes: str | None = None
     payment_status: str
-    payment_amount: Optional[float] = None
+    payment_amount: float | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -99,11 +97,11 @@ class VisitType:
     patient: PatientType
     doctor: DoctorType
     visit_date: date
-    visit_time: Optional[time] = None
+    visit_time: time | None = None
     status: str
-    discount_mode: Optional[str] = None
+    discount_mode: str | None = None
     all_free: bool
-    total_amount: Optional[float] = None
+    total_amount: float | None = None
     payment_status: str
     created_at: datetime
     updated_at: datetime
@@ -132,8 +130,8 @@ class QueueEntryType:
     queue_number: int
     status: str
     created_at: datetime
-    called_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    called_at: datetime | None = None
+    completed_at: datetime | None = None
 
 
 @strawberry.type
@@ -143,13 +141,13 @@ class DailyQueueType:
     id: int
     doctor: DoctorType
     queue_date: date
-    queue_tag: Optional[str] = None
+    queue_tag: str | None = None
     current_number: int
     last_called_number: int
     is_active: bool
-    cabinet_number: Optional[str] = None
-    cabinet_floor: Optional[str] = None
-    cabinet_building: Optional[str] = None
+    cabinet_number: str | None = None
+    cabinet_floor: str | None = None
+    cabinet_building: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -160,9 +158,9 @@ class ClinicSettingsType:
 
     id: int
     key: str
-    value: Optional[str] = None
-    category: Optional[str] = None
-    description: Optional[str] = None
+    value: str | None = None
+    category: str | None = None
+    description: str | None = None
     updated_at: datetime
     created_at: datetime
 
@@ -176,24 +174,24 @@ class PatientInput:
 
     full_name: str
     phone: str
-    email: Optional[str] = None
-    birth_date: Optional[date] = None
-    address: Optional[str] = None
-    passport_series: Optional[str] = None
-    passport_number: Optional[str] = None
+    email: str | None = None
+    birth_date: date | None = None
+    address: str | None = None
+    passport_series: str | None = None
+    passport_number: str | None = None
 
 
 @strawberry.input
 class PatientUpdateInput:
     """Входные данные для обновления пациента"""
 
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    birth_date: Optional[date] = None
-    address: Optional[str] = None
-    passport_series: Optional[str] = None
-    passport_number: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    birth_date: date | None = None
+    address: str | None = None
+    passport_series: str | None = None
+    passport_number: str | None = None
 
 
 @strawberry.input
@@ -204,7 +202,7 @@ class AppointmentInput:
     doctor_id: int
     service_id: int
     appointment_date: datetime
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 @strawberry.input
@@ -214,10 +212,10 @@ class VisitInput:
     patient_id: int
     doctor_id: int
     visit_date: date
-    visit_time: Optional[time] = None
-    discount_mode: Optional[str] = None
+    visit_time: time | None = None
+    discount_mode: str | None = None
     all_free: bool = False
-    service_ids: List[int]
+    service_ids: list[int]
 
 
 @strawberry.input
@@ -227,20 +225,20 @@ class ServiceInput:
     name: str
     code: str
     price: float
-    category: Optional[str] = None
-    description: Optional[str] = None
-    duration_minutes: Optional[int] = None
-    doctor_id: Optional[int] = None
+    category: str | None = None
+    description: str | None = None
+    duration_minutes: int | None = None
+    doctor_id: int | None = None
 
 
 @strawberry.input
 class DoctorInput:
     """Входные данные для создания врача"""
 
-    user_id: Optional[int] = None
+    user_id: int | None = None
     specialty: str
-    cabinet: Optional[str] = None
-    price_default: Optional[float] = None
+    cabinet: str | None = None
+    price_default: float | None = None
     max_online_per_day: int = 15
 
 
@@ -250,7 +248,7 @@ class QueueEntryInput:
 
     patient_id: int
     doctor_id: int
-    queue_tag: Optional[str] = None
+    queue_tag: str | None = None
 
 
 # ===================== FILTER TYPES =====================
@@ -260,70 +258,70 @@ class QueueEntryInput:
 class PatientFilter:
     """Фильтр для пациентов"""
 
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    created_after: Optional[datetime] = None
-    created_before: Optional[datetime] = None
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
 
 
 @strawberry.input
 class AppointmentFilter:
     """Фильтр для записей"""
 
-    patient_id: Optional[int] = None
-    doctor_id: Optional[int] = None
-    service_id: Optional[int] = None
-    status: Optional[str] = None
-    payment_status: Optional[str] = None
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+    patient_id: int | None = None
+    doctor_id: int | None = None
+    service_id: int | None = None
+    status: str | None = None
+    payment_status: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
 
 
 @strawberry.input
 class VisitFilter:
     """Фильтр для визитов"""
 
-    patient_id: Optional[int] = None
-    doctor_id: Optional[int] = None
-    status: Optional[str] = None
-    payment_status: Optional[str] = None
-    date_from: Optional[date] = None
-    date_to: Optional[date] = None
-    discount_mode: Optional[str] = None
-    all_free: Optional[bool] = None
+    patient_id: int | None = None
+    doctor_id: int | None = None
+    status: str | None = None
+    payment_status: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    discount_mode: str | None = None
+    all_free: bool | None = None
 
 
 @strawberry.input
 class ServiceFilter:
     """Фильтр для услуг"""
 
-    name: Optional[str] = None
-    code: Optional[str] = None
-    category: Optional[str] = None
-    doctor_id: Optional[int] = None
-    active: Optional[bool] = None
-    price_min: Optional[float] = None
-    price_max: Optional[float] = None
+    name: str | None = None
+    code: str | None = None
+    category: str | None = None
+    doctor_id: int | None = None
+    active: bool | None = None
+    price_min: float | None = None
+    price_max: float | None = None
 
 
 @strawberry.input
 class DoctorFilter:
     """Фильтр для врачей"""
 
-    specialty: Optional[str] = None
-    cabinet: Optional[str] = None
-    active: Optional[bool] = None
+    specialty: str | None = None
+    cabinet: str | None = None
+    active: bool | None = None
 
 
 @strawberry.input
 class QueueFilter:
     """Фильтр для очередей"""
 
-    doctor_id: Optional[int] = None
-    queue_date: Optional[date] = None
-    status: Optional[str] = None
-    queue_tag: Optional[str] = None
+    doctor_id: int | None = None
+    queue_date: date | None = None
+    status: str | None = None
+    queue_tag: str | None = None
 
 
 # ===================== PAGINATION =====================
@@ -353,7 +351,7 @@ class PaginationInfo:
 class PaginatedPatients:
     """Пагинированный список пациентов"""
 
-    items: List[PatientType]
+    items: list[PatientType]
     pagination: PaginationInfo
 
 
@@ -361,7 +359,7 @@ class PaginatedPatients:
 class PaginatedAppointments:
     """Пагинированный список записей"""
 
-    items: List[AppointmentType]
+    items: list[AppointmentType]
     pagination: PaginationInfo
 
 
@@ -369,7 +367,7 @@ class PaginatedAppointments:
 class PaginatedVisits:
     """Пагинированный список визитов"""
 
-    items: List[VisitType]
+    items: list[VisitType]
     pagination: PaginationInfo
 
 
@@ -377,7 +375,7 @@ class PaginatedVisits:
 class PaginatedServices:
     """Пагинированный список услуг"""
 
-    items: List[ServiceType]
+    items: list[ServiceType]
     pagination: PaginationInfo
 
 
@@ -385,7 +383,7 @@ class PaginatedServices:
 class PaginatedDoctors:
     """Пагинированный список врачей"""
 
-    items: List[DoctorType]
+    items: list[DoctorType]
     pagination: PaginationInfo
 
 
@@ -393,7 +391,7 @@ class PaginatedDoctors:
 class PaginatedQueueEntries:
     """Пагинированный список записей в очереди"""
 
-    items: List[QueueEntryType]
+    items: list[QueueEntryType]
     pagination: PaginationInfo
 
 
@@ -408,8 +406,8 @@ class AppointmentStats:
     today: int
     this_week: int
     this_month: int
-    by_status: List[str]
-    by_payment_status: List[str]
+    by_status: list[str]
+    by_payment_status: list[str]
 
 
 @strawberry.type
@@ -420,8 +418,8 @@ class VisitStats:
     today: int
     this_week: int
     this_month: int
-    by_status: List[str]
-    by_discount_mode: List[str]
+    by_status: list[str]
+    by_discount_mode: list[str]
     total_revenue: float
 
 
@@ -444,7 +442,7 @@ class DoctorStats:
     total_visits: int
     today_appointments: int
     today_visits: int
-    average_rating: Optional[float] = None
+    average_rating: float | None = None
     total_revenue: float
 
 
@@ -457,46 +455,46 @@ class MutationResponse:
 
     success: bool
     message: str
-    errors: Optional[List[str]] = None
+    errors: list[str] | None = None
 
 
 @strawberry.type
 class PatientMutationResponse(MutationResponse):
     """Ответ мутации пациента"""
 
-    patient: Optional[PatientType] = None
+    patient: PatientType | None = None
 
 
 @strawberry.type
 class AppointmentMutationResponse(MutationResponse):
     """Ответ мутации записи"""
 
-    appointment: Optional[AppointmentType] = None
+    appointment: AppointmentType | None = None
 
 
 @strawberry.type
 class VisitMutationResponse(MutationResponse):
     """Ответ мутации визита"""
 
-    visit: Optional[VisitType] = None
+    visit: VisitType | None = None
 
 
 @strawberry.type
 class ServiceMutationResponse(MutationResponse):
     """Ответ мутации услуги"""
 
-    service: Optional[ServiceType] = None
+    service: ServiceType | None = None
 
 
 @strawberry.type
 class DoctorMutationResponse(MutationResponse):
     """Ответ мутации врача"""
 
-    doctor: Optional[DoctorType] = None
+    doctor: DoctorType | None = None
 
 
 @strawberry.type
 class QueueMutationResponse(MutationResponse):
     """Ответ мутации очереди"""
 
-    queue_entry: Optional[QueueEntryType] = None
+    queue_entry: QueueEntryType | None = None

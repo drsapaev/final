@@ -5,7 +5,6 @@
 
 import logging
 from datetime import date, datetime
-from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -25,15 +24,18 @@ logger = logging.getLogger(__name__)
 class MorningAssignmentService:
     """Сервис утренней сборки для присвоения номеров в очередях"""
 
-    def __init__(self):
-        self.db: Optional[Session] = None
+    def __init__(self, db: Session | None = None):
+        self.db: Session | None = db
+        self._owns_session = db is None
 
     def __enter__(self):
-        self.db = SessionLocal()
+        if self.db is None:
+            self.db = SessionLocal()
+            self._owns_session = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.db:
+        if self.db and self._owns_session:
             self.db.close()
 
     def ensure_daily_queues_for_all_tags(self, target_date: date) -> int:
@@ -41,7 +43,7 @@ class MorningAssignmentService:
         ⭐ PHASE 2: Pre-create DailyQueues for all unique Service.queue_tag values.
         This ensures queues exist BEFORE any registration/editing happens,
         preventing race conditions and silent fallbacks.
-        
+
         Returns: number of queues created/verified
         """
         # Get all unique non-null queue_tags from active services
@@ -51,9 +53,9 @@ class MorningAssignmentService:
             .distinct()
             .all()
         )
-        
+
         created_count = 0
-        
+
         # Get default resource doctor for fallback
         default_doctor = (
             self.db.query(Doctor)
@@ -61,15 +63,15 @@ class MorningAssignmentService:
             .filter(User.username == "general_resource", User.is_active == True)
             .first()
         )
-        
+
         if not default_doctor:
             # Fallback to any active doctor
-            default_doctor = self.db.query(Doctor).filter(Doctor.is_active == True).first()
-        
+            default_doctor = self.db.query(Doctor).filter(Doctor.active == True).first()
+
         if not default_doctor:
             logger.warning("No default doctor found for pre-creating queues")
             return 0
-        
+
         for (queue_tag,) in unique_tags:
             try:
                 # Check if queue already exists for this tag on this day
@@ -82,7 +84,7 @@ class MorningAssignmentService:
                     )
                     .first()
                 )
-                
+
                 if not existing:
                     # Create new DailyQueue for this tag
                     queue_service.get_or_create_daily_queue(
@@ -93,19 +95,19 @@ class MorningAssignmentService:
                     )
                     created_count += 1
                     logger.info(f"✅ Pre-created DailyQueue for queue_tag={queue_tag}")
-                    
+
             except Exception as e:
                 logger.error(f"Error pre-creating queue for {queue_tag}: {e}")
-        
+
         if created_count > 0:
             self.db.flush()
             logger.info(f"🏗️ Pre-created {created_count} DailyQueues for {len(unique_tags)} unique queue_tags")
-        
+
         return created_count
 
     def run_morning_assignment(
-        self, target_date: Optional[date] = None
-    ) -> Dict[str, any]:
+        self, target_date: date | None = None
+    ) -> dict[str, any]:
         """
         Основная функция утренней сборки
         Присваивает номера всем подтвержденным визитам на указанную дату
@@ -121,7 +123,7 @@ class MorningAssignmentService:
             precreated_count = self.ensure_daily_queues_for_all_tags(target_date)
             if precreated_count > 0:
                 logger.info(f"🏗️ Pre-created {precreated_count} missing DailyQueues")
-            
+
             # Получаем все подтвержденные визиты на сегодня без номеров в очередях
             confirmed_visits = self._get_confirmed_visits_without_queues(target_date)
 
@@ -133,8 +135,11 @@ class MorningAssignmentService:
                     "success": True,
                     "message": f"Нет визитов для обработки на {target_date}",
                     "processed_visits": 0,
+                    "assigned_visits": 0,
                     "assigned_queues": 0,
+                    "total_queue_entries": 0,
                     "errors": [],
+                    "date": target_date.isoformat(),
                 }
 
             logger.info(
@@ -177,7 +182,9 @@ class MorningAssignmentService:
                 "success": True,
                 "message": f"Утренняя сборка завершена для {target_date}",
                 "processed_visits": processed_count,
+                "assigned_visits": processed_count,
                 "assigned_queues": assigned_queues_count,
+                "total_queue_entries": assigned_queues_count,
                 "errors": errors,
                 "date": target_date.isoformat(),
             }
@@ -195,11 +202,23 @@ class MorningAssignmentService:
                 "success": False,
                 "message": error_msg,
                 "processed_visits": 0,
+                "assigned_visits": 0,
                 "assigned_queues": 0,
+                "total_queue_entries": 0,
                 "errors": [error_msg],
+                "date": target_date.isoformat(),
             }
 
-    def _get_confirmed_visits_without_queues(self, target_date: date) -> List[Visit]:
+    def run_assignment_job(self, target_date: date | None = None) -> dict[str, any]:
+        """
+        Backward-compatible wrapper used by legacy tests/callers.
+        """
+        result = self.run_morning_assignment(target_date)
+        result.setdefault("assigned_visits", result.get("processed_visits", 0))
+        result.setdefault("total_queue_entries", result.get("assigned_queues", 0))
+        return result
+
+    def _get_confirmed_visits_without_queues(self, target_date: date) -> list[Visit]:
         """Получает подтвержденные визиты на указанную дату без номеров в очередях"""
 
         # Находим визиты со статусом "confirmed" на указанную дату
@@ -274,7 +293,7 @@ class MorningAssignmentService:
         visit: Visit,
         target_date: date,
         source: str = "morning_assignment",
-    ) -> List[Dict[str, any]]:
+    ) -> list[dict[str, any]]:
         """Присваивает номера в очередях для конкретного визита"""
 
         # Получаем уникальные queue_tag из услуг визита
@@ -316,11 +335,20 @@ class MorningAssignmentService:
         target_date: date,
         *,
         source: str = "morning_assignment",
-    ) -> Optional[Dict[str, any]]:
+    ) -> dict[str, any] | None:
         """Присваивает номер в конкретной очереди"""
 
         # Определяем врача для очереди
         doctor_id = visit.doctor_id
+        doctor = None
+
+        if doctor_id:
+            doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
+            if not doctor:
+                logger.warning(
+                    f"Врач с ID {doctor_id} не найден для queue_tag={queue_tag}, visit_id={visit.id}; используем fallback"
+                )
+                doctor_id = None
 
         # Для очередей без конкретного врача используем ресурс-врачей
         if not doctor_id:
@@ -356,6 +384,7 @@ class MorningAssignmentService:
 
                 if resource_doctor:
                     doctor_id = resource_doctor.id  # Используем doctor_id, а не user_id
+                    doctor = resource_doctor
                     logger.info(
                         f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (Doctor ID: {doctor_id})"
                     )
@@ -363,27 +392,29 @@ class MorningAssignmentService:
                     logger.warning(
                         f"У ресурс-пользователя {resource_username} (User ID: {resource_user.id}) нет записи в таблице doctors"
                     )
-                    return None
             else:
                 logger.warning(
                     f"Ресурс-врач {resource_username} не найден для queue_tag={queue_tag}"
                 )
-                return None
 
         if not doctor_id:
-            logger.warning(
-                f"Не найден врач для queue_tag={queue_tag}, visit_id={visit.id}"
+            # Last-resort fallback: reuse already opened queue for this tag/day.
+            existing_queue = (
+                self.db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == target_date,
+                    DailyQueue.queue_tag == queue_tag,
+                    DailyQueue.active == True,
+                )
+                .first()
             )
-            return None
-
-        # ✅ ИСПРАВЛЕНО: DailyQueue.specialist_id - это ForeignKey на doctors.id, а не users.id
-        # Проверяем, что врач существует
-        doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
-        if not doctor:
-            logger.warning(
-                f"Врач с ID {doctor_id} не найден для queue_tag={queue_tag}, visit_id={visit.id}"
-            )
-            return None
+            if existing_queue:
+                doctor_id = existing_queue.specialist_id
+            else:
+                logger.warning(
+                    f"Не найден врач для queue_tag={queue_tag}, visit_id={visit.id}"
+                )
+                return None
 
         logger.info(
             f"Используем doctor_id={doctor_id} для queue_tag={queue_tag}, visit_id={visit.id}"
@@ -402,14 +433,26 @@ class MorningAssignmentService:
                 ),
             }
 
-        # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id (ForeignKey на doctors.id)
-        daily_queue = queue_service.get_or_create_daily_queue(
-            self.db,
-            day=target_date,
-            specialist_id=doctor_id,  # ✅ Используем doctor_id, а не user_id
-            queue_tag=queue_tag,
-            defaults=defaults,
+        # Сначала пытаемся использовать уже созданную очередь на текущую дату.
+        daily_queue = (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            )
+            .first()
         )
+
+        if not daily_queue:
+            # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id (ForeignKey на doctors.id)
+            daily_queue = queue_service.get_or_create_daily_queue(
+                self.db,
+                day=target_date,
+                specialist_id=doctor_id,  # ✅ Используем doctor_id, а не user_id
+                queue_tag=queue_tag,
+                defaults=defaults,
+            )
 
         # Проверяем нет ли уже записи для этого пациента в этой очереди
         existing_entry = (
@@ -446,7 +489,6 @@ class MorningAssignmentService:
             phone = patient.phone if hasattr(patient, 'phone') else None
 
         # Получаем queue_time (бизнес-время регистрации)
-        from datetime import datetime
         from zoneinfo import ZoneInfo
 
         from app.crud.clinic import get_queue_settings
@@ -459,11 +501,11 @@ class MorningAssignmentService:
         visit_services = (
             self.db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
         )
-        
+
         # Фильтруем услуги по queue_tag и формируем services/service_codes
         services_for_entry = []
         service_codes_for_entry = []
-        
+
         for vs in visit_services:
             service = self.db.query(Service).filter(Service.id == vs.service_id).first()
             if service and service.queue_tag == queue_tag:
@@ -477,7 +519,7 @@ class MorningAssignmentService:
                         "name": service.name,
                         "price": float(vs.price) if vs.price else 0,
                     })
-        
+
         # Если не нашли услуги с matching queue_tag, добавляем все услуги визита
         if not services_for_entry:
             for vs in visit_services:
@@ -522,8 +564,8 @@ class MorningAssignmentService:
         }
 
     def get_morning_assignment_stats(
-        self, target_date: Optional[date] = None
-    ) -> Dict[str, any]:
+        self, target_date: date | None = None
+    ) -> dict[str, any]:
         """Получает статистику утренней сборки"""
         if not target_date:
             target_date = date.today()
@@ -566,7 +608,7 @@ class MorningAssignmentService:
 
 
 # Глобальная функция для запуска утренней сборки
-def run_morning_assignment(target_date: Optional[date] = None) -> Dict[str, any]:
+def run_morning_assignment(target_date: date | None = None) -> dict[str, any]:
     """
     Запускает утреннюю сборку для присвоения номеров в очередях
     Может быть вызвана из cron job или API эндпоинта
@@ -575,7 +617,7 @@ def run_morning_assignment(target_date: Optional[date] = None) -> Dict[str, any]
         return service.run_morning_assignment(target_date)
 
 
-def get_assignment_stats(target_date: Optional[date] = None) -> Dict[str, any]:
+def get_assignment_stats(target_date: date | None = None) -> dict[str, any]:
     """Получает статистику утренней сборки"""
     with MorningAssignmentService() as service:
         return service.get_morning_assignment_stats(target_date)

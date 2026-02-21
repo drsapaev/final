@@ -5,9 +5,10 @@ Transaction Management Utilities
 to prevent partial updates, data inconsistency, and race conditions.
 """
 import logging
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Generator, TypeVar
+from typing import Any, TypeVar
 
 from sqlalchemy.orm import Session
 
@@ -20,7 +21,7 @@ T = TypeVar("T")
 def transaction(db: Session) -> Generator[Session, None, None]:
     """
     Context manager for explicit transaction boundaries
-    
+
     Usage:
         with transaction(db) as txn:
             # Perform operations
@@ -41,7 +42,7 @@ def transaction(db: Session) -> Generator[Session, None, None]:
 def with_transaction(func: Callable[..., T]) -> Callable[..., T]:
     """
     Decorator for functions that need explicit transaction boundaries
-    
+
     Usage:
         @with_transaction
         def critical_operation(db: Session, ...):
@@ -59,12 +60,12 @@ def with_transaction(func: Callable[..., T]) -> Callable[..., T]:
                 break
         if not db and "db" in kwargs:
             db = kwargs["db"]
-        
+
         if not db:
             # No db session found, execute without transaction wrapper
             logger.warning(f"Function {func.__name__} called without db session, executing without transaction")
             return func(*args, **kwargs)
-        
+
         try:
             result = func(*args, **kwargs)
             db.commit()
@@ -74,14 +75,14 @@ def with_transaction(func: Callable[..., T]) -> Callable[..., T]:
             db.rollback()
             logger.error(f"Transaction rolled back for {func.__name__} due to error: {e}")
             raise
-    
+
     return wrapper
 
 
 def retry_on_deadlock(max_retries: int = 3, delay: float = 0.1):
     """
     Decorator to retry operations on database deadlocks
-    
+
     Usage:
         @retry_on_deadlock(max_retries=5, delay=0.2)
         def critical_operation(db: Session, ...):
@@ -92,7 +93,7 @@ def retry_on_deadlock(max_retries: int = 3, delay: float = 0.1):
         def wrapper(*args: Any, **kwargs: Any) -> T:
             import time
             last_exception = None
-            
+
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
@@ -104,7 +105,7 @@ def retry_on_deadlock(max_retries: int = 3, delay: float = 0.1):
                         "lock" in error_str or
                         "timeout" in error_str
                     )
-                    
+
                     if is_deadlock and attempt < max_retries - 1:
                         logger.warning(
                             f"Deadlock detected in {func.__name__}, attempt {attempt + 1}/{max_retries}, retrying..."
@@ -114,14 +115,14 @@ def retry_on_deadlock(max_retries: int = 3, delay: float = 0.1):
                         continue
                     else:
                         raise
-            
+
             # If we exhausted retries, raise the last exception
             if last_exception:
                 raise last_exception
-            
+
             # Should never reach here
             raise RuntimeError("Unexpected retry logic error")
-        
+
         return wrapper
     return decorator
 

@@ -3,8 +3,8 @@
 """
 
 import logging
-from datetime import date, datetime, time
-from typing import Any, Dict, List
+from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ class QueueAutoCloseService:
     def __init__(self, db: Session):
         self.db = db
 
-    def check_and_close_expired_queues(self) -> Dict[str, Any]:
+    def check_and_close_expired_queues(self) -> dict[str, Any]:
         """
         Проверяет и закрывает очереди, у которых истекло время онлайн записи
 
@@ -83,7 +83,7 @@ class QueueAutoCloseService:
             "date": today.isoformat(),
         }
 
-    def get_queues_pending_close(self) -> List[Dict[str, Any]]:
+    def get_queues_pending_close(self) -> list[dict[str, Any]]:
         """
         Возвращает список очередей, которые скоро будут закрыты
 
@@ -123,7 +123,7 @@ class QueueAutoCloseService:
 
         return result
 
-    def force_close_queue(self, queue_id: int, user_id: int) -> Dict[str, Any]:
+    def force_close_queue(self, queue_id: int, user_id: int) -> dict[str, Any]:
         """
         Принудительно закрывает очередь
 

@@ -2,14 +2,12 @@
 Сервис для динамического ценообразования и пакетных услуг
 """
 
-import math
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
-from app.models.appointment import Appointment
 from app.models.dynamic_pricing import (
     DiscountType,
     DynamicPrice,
@@ -21,7 +19,6 @@ from app.models.dynamic_pricing import (
     PricingRuleType,
     ServicePackage,
 )
-from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
 
@@ -79,8 +76,8 @@ class DynamicPricingService:
         return rule
 
     def get_active_pricing_rules(
-        self, service_ids: List[int] = None, rule_type: PricingRuleType = None
-    ) -> List[PricingRule]:
+        self, service_ids: list[int] = None, rule_type: PricingRuleType = None
+    ) -> list[PricingRule]:
         """Получить активные правила ценообразования"""
         query = self.db.query(PricingRule).filter(PricingRule.is_active == True)
 
@@ -105,10 +102,10 @@ class DynamicPricingService:
 
     def apply_pricing_rules(
         self,
-        services: List[Dict[str, Any]],
+        services: list[dict[str, Any]],
         patient_id: int = None,
         appointment_time: datetime = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Применить правила ценообразования к списку услуг"""
         if not appointment_time:
             appointment_time = datetime.now()
@@ -154,7 +151,7 @@ class DynamicPricingService:
     def _can_apply_rule(
         self,
         rule: PricingRule,
-        services: List[Dict[str, Any]],
+        services: list[dict[str, Any]],
         appointment_time: datetime,
         patient_id: int = None,
     ) -> bool:
@@ -194,7 +191,7 @@ class DynamicPricingService:
         return True
 
     def _calculate_rule_discount(
-        self, rule: PricingRule, services: List[Dict[str, Any]], current_total: float
+        self, rule: PricingRule, services: list[dict[str, Any]], current_total: float
     ) -> float:
         """Рассчитать размер скидки по правилу"""
 
@@ -226,8 +223,8 @@ class DynamicPricingService:
         return 0
 
     def _update_service_prices(
-        self, services: List[Dict[str, Any]], applied_discounts: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, services: list[dict[str, Any]], applied_discounts: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Обновить цены услуг с учетом скидок"""
         # Пропорционально распределяем скидку по всем услугам
         total_discount = sum(d['discount_amount'] for d in applied_discounts)
@@ -259,7 +256,7 @@ class DynamicPricingService:
         self,
         name: str,
         description: str,
-        service_ids: List[int],
+        service_ids: list[int],
         package_price: float,
         valid_from: datetime = None,
         valid_to: datetime = None,
@@ -306,8 +303,8 @@ class DynamicPricingService:
         return package
 
     def get_available_packages(
-        self, patient_id: int = None, service_ids: List[int] = None
-    ) -> List[ServicePackage]:
+        self, patient_id: int = None, service_ids: list[int] = None
+    ) -> list[ServicePackage]:
         """Получить доступные пакеты услуг"""
         query = self.db.query(ServicePackage).filter(ServicePackage.is_active == True)
 
@@ -407,7 +404,7 @@ class DynamicPricingService:
 
     # === Динамические цены ===
 
-    def update_dynamic_prices(self) -> Dict[str, Any]:
+    def update_dynamic_prices(self) -> dict[str, Any]:
         """Обновить динамические цены на основе спроса и загруженности"""
         updated_count = 0
 
@@ -565,7 +562,7 @@ class DynamicPricingService:
 
     def get_pricing_analytics(
         self, start_date: datetime = None, end_date: datetime = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Получить аналитику по ценообразованию"""
         if not start_date:
             start_date = datetime.now() - timedelta(days=30)

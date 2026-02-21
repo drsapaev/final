@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,9 +14,9 @@ class MobileLoginRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     phone: str = Field(..., description="Номер телефона")
-    password: Optional[str] = Field(None, description="Пароль (опционально)")
-    telegram_id: Optional[str] = Field(None, description="Telegram ID")
-    device_token: Optional[str] = Field(
+    password: str | None = Field(None, description="Пароль (опционально)")
+    telegram_id: str | None = Field(None, description="Telegram ID")
+    device_token: str | None = Field(
         None, description="Токен устройства для push-уведомлений"
     )
 
@@ -29,8 +29,8 @@ class MobileLoginResponse(BaseModel):
     access_token: str = Field(..., description="JWT токен")
     token_type: str = Field(default="bearer", description="Тип токена")
     expires_in: int = Field(..., description="Время жизни токена в секундах")
-    user: Dict[str, Any] = Field(..., description="Информация о пользователе")
-    permissions: List[str] = Field(
+    user: dict[str, Any] = Field(..., description="Информация о пользователе")
+    permissions: list[str] = Field(
         default_factory=list, description="Разрешения пользователя"
     )
 
@@ -43,11 +43,11 @@ class MobilePatientProfile(BaseModel):
     id: int
     name: str
     phone: str
-    birth_year: Optional[int] = None
-    address: Optional[str] = None
-    telegram_id: Optional[str] = None
+    birth_year: int | None = None
+    address: str | None = None
+    telegram_id: str | None = None
     created_at: datetime
-    last_visit: Optional[datetime] = None
+    last_visit: datetime | None = None
     total_visits: int = 0
     upcoming_appointments: int = 0
 
@@ -60,9 +60,9 @@ class PatientProfileOut(BaseModel):
     id: int
     fio: str
     phone: str
-    birth_year: Optional[int] = None
-    address: Optional[str] = None
-    telegram_id: Optional[str] = None
+    birth_year: int | None = None
+    address: str | None = None
+    telegram_id: str | None = None
     created_at: datetime
 
 
@@ -76,8 +76,8 @@ class MobileAppointmentSummary(BaseModel):
     doctor_specialty: str
     appointment_date: datetime
     status: str
-    total_cost: Optional[float] = None
-    services: List[str] = Field(default_factory=list)
+    total_cost: float | None = None
+    services: list[str] = Field(default_factory=list)
     can_cancel: bool = True
     can_reschedule: bool = True
 
@@ -90,18 +90,18 @@ class MobileAppointmentDetail(BaseModel):
     id: int
     doctor_name: str
     doctor_specialty: str
-    doctor_phone: Optional[str] = None
+    doctor_phone: str | None = None
     appointment_date: datetime
     status: str
-    complaint: Optional[str] = None
-    diagnosis: Optional[str] = None
-    prescription: Optional[str] = None
-    total_cost: Optional[float] = None
-    services: List[Dict[str, Any]] = Field(default_factory=list)
+    complaint: str | None = None
+    diagnosis: str | None = None
+    prescription: str | None = None
+    total_cost: float | None = None
+    services: list[dict[str, Any]] = Field(default_factory=list)
     payment_status: str
     can_cancel: bool = True
     can_reschedule: bool = True
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class MobileBookAppointmentRequest(BaseModel):
@@ -111,12 +111,12 @@ class MobileBookAppointmentRequest(BaseModel):
 
     doctor_id: int = Field(..., description="ID врача")
     preferred_date: str = Field(..., description="Предпочтительная дата (YYYY-MM-DD)")
-    preferred_time: Optional[str] = Field(
+    preferred_time: str | None = Field(
         None, description="Предпочтительное время (HH:MM)"
     )
-    complaint: Optional[str] = Field(None, description="Жалобы")
-    services: List[int] = Field(default_factory=list, description="ID услуг")
-    notes: Optional[str] = Field(None, description="Дополнительные заметки")
+    complaint: str | None = Field(None, description="Жалобы")
+    services: list[int] = Field(default_factory=list, description="ID услуг")
+    notes: str | None = Field(None, description="Дополнительные заметки")
 
 
 class MobileBookAppointmentResponse(BaseModel):
@@ -130,9 +130,9 @@ class MobileBookAppointmentResponse(BaseModel):
     doctor_specialty: str
     total_cost: float
     status: str
-    confirmation_code: Optional[str] = None
+    confirmation_code: str | None = None
     payment_required: bool = False
-    payment_url: Optional[str] = None
+    payment_url: str | None = None
 
 
 class MobileQueueRequest(BaseModel):
@@ -141,8 +141,8 @@ class MobileQueueRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     specialty: str = Field(..., description="Специализация")
-    services: List[int] = Field(default_factory=list, description="ID услуг")
-    notes: Optional[str] = Field(None, description="Дополнительные заметки")
+    services: list[int] = Field(default_factory=list, description="ID услуг")
+    notes: str | None = Field(None, description="Дополнительные заметки")
 
 
 class MobileQueueResponse(BaseModel):
@@ -153,7 +153,7 @@ class MobileQueueResponse(BaseModel):
     queue_id: int
     queue_number: int
     specialty: str
-    estimated_wait_time: Optional[int] = None  # в минутах
+    estimated_wait_time: int | None = None  # в минутах
     status: str
     position_in_queue: int
     can_cancel: bool = True
@@ -167,11 +167,11 @@ class MobileLabResult(BaseModel):
     id: int
     test_name: str
     result: str
-    normal_range: Optional[str] = None
+    normal_range: str | None = None
     status: str  # normal, abnormal, critical
     test_date: datetime
-    doctor_notes: Optional[str] = None
-    file_url: Optional[str] = None  # PDF с результатами
+    doctor_notes: str | None = None
+    file_url: str | None = None  # PDF с результатами
 
 
 class MobilePaymentRequest(BaseModel):
@@ -182,7 +182,7 @@ class MobilePaymentRequest(BaseModel):
     appointment_id: int
     amount: float
     payment_method: str  # card, payme, click
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class MobilePaymentResponse(BaseModel):
@@ -221,8 +221,8 @@ class MobileQuickStats(BaseModel):
     upcoming_appointments: int = 0
     completed_appointments: int = 0
     total_spent: float = 0.0
-    last_visit: Optional[datetime] = None
-    favorite_doctor: Optional[str] = None
+    last_visit: datetime | None = None
+    favorite_doctor: str | None = None
     pending_payments: int = 0
 
 
@@ -233,7 +233,7 @@ class MobileErrorResponse(BaseModel):
 
     error: str = Field(..., description="Код ошибки")
     message: str = Field(..., description="Сообщение об ошибке")
-    details: Optional[Dict[str, Any]] = Field(None, description="Дополнительные детали")
+    details: dict[str, Any] | None = Field(None, description="Дополнительные детали")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -244,7 +244,7 @@ class MobileSuccessResponse(BaseModel):
 
     success: bool = Field(default=True)
     message: str = Field(..., description="Сообщение об успехе")
-    data: Optional[Dict[str, Any]] = Field(None, description="Данные ответа")
+    data: dict[str, Any] | None = Field(None, description="Данные ответа")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -272,9 +272,9 @@ class BookAppointmentRequest(BaseModel):
     doctor_id: int = Field(..., description="ID врача")
     appointment_date: datetime = Field(..., description="Дата записи")
     specialty: str = Field(..., description="Специализация")
-    patient_id: Optional[int] = Field(None, description="ID пациента")
-    patient_fio: Optional[str] = Field(None, description="ФИО пациента")
-    patient_phone: Optional[str] = Field(None, description="Телефон пациента")
+    patient_id: int | None = Field(None, description="ID пациента")
+    patient_fio: str | None = Field(None, description="ФИО пациента")
+    patient_phone: str | None = Field(None, description="Телефон пациента")
 
 
 class LabResultOut(BaseModel):
@@ -289,7 +289,7 @@ class LabResultOut(BaseModel):
     unit: str
     result_date: datetime
     status: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class MobileNotificationOut(BaseModel):
@@ -328,9 +328,9 @@ class MobileAppointmentDetailOut(BaseModel):
     specialty: str
     appointment_date: datetime
     status: str
-    complaint: Optional[str] = None
-    diagnosis: Optional[str] = None
-    total_cost: Optional[float] = None
+    complaint: str | None = None
+    diagnosis: str | None = None
+    total_cost: float | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -347,9 +347,9 @@ class MobileVisitDetailOut(BaseModel):
     doctor_name: str
     visit_date: datetime
     status: str
-    diagnosis: Optional[str] = None
-    prescription: Optional[str] = None
-    recommendations: Optional[str] = None
-    total_cost: Optional[float] = None
+    diagnosis: str | None = None
+    prescription: str | None = None
+    recommendations: str | None = None
+    total_cost: float | None = None
     created_at: datetime
     updated_at: datetime

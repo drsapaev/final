@@ -4,30 +4,44 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import List
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 
+from app.core.config import get_settings
+from app.core.logging_config import setup_logging
+
 # -----------------------------------------------------------------------------
 # Логирование
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=logging.DEBUG)  # Temporarily DEBUG for auth investigation
-log = logging.getLogger("clinic.main")
-
 # -----------------------------------------------------------------------------
 # Конфиг
 # -----------------------------------------------------------------------------
-from app.core.config import get_settings
-
 settings = get_settings()
+log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+setup_logging(level=log_level, structured=settings.LOG_STRUCTURED)
+log = logging.getLogger("clinic.main")
 API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
 
 # Use settings for CORS configuration
 CORS_DISABLE = settings.CORS_DISABLE
 CORS_ALLOW_ALL = settings.CORS_ALLOW_ALL
 CORS_ORIGINS = settings.BACKEND_CORS_ORIGINS
+ENV = os.getenv("ENV", "dev").lower()
+IS_PROD = ENV in ("prod", "production")
+TESTING = os.getenv("TESTING", "0").lower() in ("1", "true", "yes")
+
+# Fail fast on insecure CORS in production
+if IS_PROD and (CORS_DISABLE or CORS_ALLOW_ALL):
+    raise ValueError(
+        "Refusing to start in production: CORS_DISABLE or CORS_ALLOW_ALL is enabled. "
+        "Set BACKEND_CORS_ORIGINS to a strict whitelist."
+    )
+
+# Disallow DEV auth fallback knob in production
+if IS_PROD and os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true":
+    raise ValueError("ENABLE_DEV_AUTH must be false in production.")
 
 
 # -----------------------------------------------------------------------------
@@ -38,9 +52,9 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # === STARTUP ===
     await _startup_tasks()
-    
+
     yield  # Application is running
-    
+
     # === SHUTDOWN ===
     # Add any cleanup code here if needed
     log.info("Application shutdown complete")
@@ -69,8 +83,9 @@ log.info("Exception handlers registered")
 # -----------------------------------------------------------------------------
 # WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
-from app.ws.queue_ws import router as queue_ws_router, ws_queue  # noqa: E402
 from app.ws.chat_ws import chat_websocket_handler  # noqa: E402
+from app.ws.queue_ws import router as queue_ws_router  # noqa: E402
+from app.ws.queue_ws import ws_queue  # noqa: E402
 
 app.include_router(queue_ws_router)  # /ws/queue
 app.add_api_websocket_route("/ws/dev-queue", ws_queue)
@@ -89,8 +104,21 @@ log.info("Audit middleware registered")
 # -----------------------------------------------------------------------------
 from app.middleware.security_middleware import SecurityMiddleware  # noqa: E402
 
-app.add_middleware(SecurityMiddleware)
-log.info("Security middleware registered")
+if TESTING:
+    log.info("Security middleware skipped in testing mode (TESTING=1)")
+else:
+    app.add_middleware(SecurityMiddleware)
+    log.info("Security middleware registered")
+
+# -----------------------------------------------------------------------------
+# Observability Middleware (SLIs, trace-id, structured request logs)
+# -----------------------------------------------------------------------------
+from app.middleware.observability_middleware import (  # noqa: E402
+    ObservabilityMiddleware,
+)
+
+app.add_middleware(ObservabilityMiddleware)
+log.info("Observability middleware registered")
 
 # -----------------------------------------------------------------------------
 # CSRF Protection Middleware (optional, enable via CSRF_ENABLED=1)
@@ -107,7 +135,11 @@ else:
 # CORS
 # -----------------------------------------------------------------------------
 if not CORS_DISABLE:
-    cfg = dict(allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    cfg = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
     if CORS_ALLOW_ALL:
         app.add_middleware(CORSMiddleware, allow_origins=["*"], **cfg)
     else:
@@ -123,6 +155,8 @@ try:
         create_access_token,
     )
 except Exception as e:  # pragma: no cover
+    if IS_PROD:
+        raise RuntimeError("Authentication dependencies unavailable in production") from e
     log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)
     _USE_DEV_AUTH_FALLBACK = True
 
@@ -144,10 +178,9 @@ log.info("Included GraphQL router at /api/graphql")
 # -----------------------------------------------------------------------------
 if _USE_DEV_AUTH_FALLBACK:
     enable_dev = os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true"
-    is_prod = os.getenv("ENV", "dev").lower() in ("prod", "production")
 
-    if is_prod or not enable_dev:
-        log.warning("DEV auth fallback DISABLED (ENV=%s, ENABLE_DEV_AUTH=%s)", os.getenv("ENV"), enable_dev)
+    if IS_PROD or not enable_dev:
+        log.warning("DEV auth fallback DISABLED (ENV=%s, ENABLE_DEV_AUTH=%s)", ENV, enable_dev)
     else:
         log.warning("Using DEV auth fallback endpoints at %s/auth", API_V1_STR)
 
@@ -192,11 +225,11 @@ async def _startup_tasks() -> None:
     """Startup tasks - validates security settings and prints routes"""
     # Validate SECRET_KEY on startup
     try:
-        from app.core.config import get_settings, _DEFAULT_SECRET_KEY
-        
+        from app.core.config import _DEFAULT_SECRET_KEY, get_settings
+
         settings = get_settings()
         env = os.getenv("ENV", "dev").lower()
-        
+
         # Critical security check: fail if default SECRET_KEY in production
         if settings.SECRET_KEY == _DEFAULT_SECRET_KEY and env in ("prod", "production"):
             log.error("=" * 80)
@@ -208,46 +241,46 @@ async def _startup_tasks() -> None:
                 "Cannot start in production with default SECRET_KEY. "
                 "Set SECRET_KEY environment variable."
             )
-        
+
         # Warn if SECRET_KEY is weak
         if len(settings.SECRET_KEY) < 32:
             log.warning(
                 "SECRET_KEY is too short (%d chars). Should be at least 32 characters.",
                 len(settings.SECRET_KEY)
             )
-        
+
         log.info("Security validation passed: SECRET_KEY is configured")
-        
+
     except Exception as e:
         log.error("Security validation failed: %s", e)
         if os.getenv("ENV", "dev").lower() in ("prod", "production"):
             raise  # Fail fast in production
         log.warning("Continuing in development mode despite security warning")
-    
+
     # ✅ SECURITY: Start scheduled backups if enabled
     backup_enabled = settings.AUTO_BACKUP_ENABLED
     if backup_enabled:
         try:
-            from app.services.scheduled_backup import ScheduledBackupService
             from app.db.session import SessionLocal
-            
+            from app.services.scheduled_backup import ScheduledBackupService
+
             backup_db = SessionLocal()
             backup_service = ScheduledBackupService(backup_db)
-            
+
             # Get backup time from env (default: 2 AM)
             backup_hour = int(os.getenv("BACKUP_HOUR", "2"))
             backup_minute = int(os.getenv("BACKUP_MINUTE", "0"))
             from datetime import time
             backup_time = time(backup_hour, backup_minute)
-            
+
             await backup_service.start_daily_backups(backup_time)
             log.info(f"✅ Scheduled backups enabled (daily at {backup_time})")
         except Exception as e:
             log.error(f"Failed to start backup scheduler: {e}")
-    
+
     # Print routes
     try:
-        lines: List[str] = []
+        lines: list[str] = []
         for r in app.router.routes:
             path = getattr(r, "path", "")
             methods = ",".join(sorted(getattr(r, "methods", []) or []))

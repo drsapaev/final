@@ -6,7 +6,6 @@ Medical Record Validation Service
 import logging
 import re
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +64,10 @@ class MedicalValidationService:
     HEIGHT_MIN = 30.0  # cm
     HEIGHT_MAX = 250.0
 
-    def validate_icd10_code(self, code: Optional[str]) -> Tuple[bool, Optional[str]]:
+    def validate_icd10_code(self, code: str | None) -> tuple[bool, str | None]:
         """
         Validate ICD-10 code
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -84,14 +83,14 @@ class MedicalValidationService:
         # Check letter and number range
         letter = code[0]
         number_str = code[1:3]
-        
+
         if letter not in self.ICD10_RANGES:
             return False, f"Invalid ICD-10 category: {letter}"
 
         try:
             number = int(number_str)
             min_num, max_num = self.ICD10_RANGES[letter]
-            
+
             if number < min_num or number > max_num:
                 return False, f"ICD-10 code {code} is out of valid range for category {letter}"
 
@@ -107,14 +106,14 @@ class MedicalValidationService:
         return True, None
 
     def validate_date_range(
-        self, 
-        start_date: Optional[date], 
-        end_date: Optional[date],
+        self,
+        start_date: date | None,
+        end_date: date | None,
         field_name: str = "date range"
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate date range
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -131,17 +130,17 @@ class MedicalValidationService:
         return True, None
 
     def validate_visit_date(
-        self, 
-        visit_date: Optional[date],
-        birth_date: Optional[date] = None
-    ) -> Tuple[bool, Optional[str]]:
+        self,
+        visit_date: date | None,
+        birth_date: date | None = None
+    ) -> tuple[bool, str | None]:
         """
         Validate visit date
-        
+
         Args:
             visit_date: Date of visit
             birth_date: Patient's birth date (optional)
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -166,11 +165,11 @@ class MedicalValidationService:
         return True, None
 
     def validate_blood_pressure(
-        self, systolic: Optional[float], diastolic: Optional[float]
-    ) -> Tuple[bool, Optional[str]]:
+        self, systolic: float | None, diastolic: float | None
+    ) -> tuple[bool, str | None]:
         """
         Validate blood pressure values
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -196,10 +195,10 @@ class MedicalValidationService:
 
         return True, None
 
-    def validate_heart_rate(self, heart_rate: Optional[float]) -> Tuple[bool, Optional[str]]:
+    def validate_heart_rate(self, heart_rate: float | None) -> tuple[bool, str | None]:
         """
         Validate heart rate
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -214,10 +213,10 @@ class MedicalValidationService:
 
         return True, None
 
-    def validate_temperature(self, temperature: Optional[float]) -> Tuple[bool, Optional[str]]:
+    def validate_temperature(self, temperature: float | None) -> tuple[bool, str | None]:
         """
         Validate body temperature
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -232,10 +231,10 @@ class MedicalValidationService:
 
         return True, None
 
-    def validate_weight(self, weight: Optional[float]) -> Tuple[bool, Optional[str]]:
+    def validate_weight(self, weight: float | None) -> tuple[bool, str | None]:
         """
         Validate weight
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -250,10 +249,10 @@ class MedicalValidationService:
 
         return True, None
 
-    def validate_height(self, height: Optional[float]) -> Tuple[bool, Optional[str]]:
+    def validate_height(self, height: float | None) -> tuple[bool, str | None]:
         """
         Validate height
-        
+
         Returns:
             (is_valid, error_message)
         """
@@ -268,14 +267,14 @@ class MedicalValidationService:
 
         return True, None
 
-    def validate_medical_record(self, record_data: Dict, patient_birth_date: Optional[date] = None) -> Tuple[bool, List[str]]:
+    def validate_medical_record(self, record_data: dict, patient_birth_date: date | None = None) -> tuple[bool, list[str]]:
         """
         Comprehensive validation of medical record data
-        
+
         Args:
             record_data: Dictionary with medical record fields
             patient_birth_date: Patient's birth date for date validation
-        
+
         Returns:
             (is_valid, list_of_errors)
         """
@@ -305,7 +304,7 @@ class MedicalValidationService:
 
         # Validate vital signs if present
         vital_signs = record_data.get("vital_signs") or {}
-        
+
         if "blood_pressure" in vital_signs:
             bp = vital_signs["blood_pressure"]
             if isinstance(bp, dict):
@@ -342,21 +341,21 @@ class MedicalValidationService:
                     if "start_date" in procedure and "end_date" in procedure:
                         start = procedure.get("start_date")
                         end = procedure.get("end_date")
-                        
+
                         if isinstance(start, str):
                             try:
                                 start = datetime.strptime(start, "%Y-%m-%d").date()
                             except ValueError:
                                 errors.append(f"Procedure {i+1}: Invalid start date format")
                                 start = None
-                        
+
                         if isinstance(end, str):
                             try:
                                 end = datetime.strptime(end, "%Y-%m-%d").date()
                             except ValueError:
                                 errors.append(f"Procedure {i+1}: Invalid end date format")
                                 end = None
-                        
+
                         if start and end:
                             valid, error = self.validate_date_range(start, end, f"procedure {i+1}")
                             if not valid:

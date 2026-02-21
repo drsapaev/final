@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 from passlib.context import CryptContext
 from sqlalchemy import or_, select
@@ -15,7 +14,7 @@ from app.models.user import User
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 
-def _to_dict(u: User) -> Dict:
+def _to_dict(u: User) -> dict:
     return {
         "id": getattr(u, "id", None),
         "username": getattr(u, "username", None),
@@ -28,25 +27,25 @@ def _to_dict(u: User) -> Dict:
 
 
 # === СИНХРОННЫЕ ВАРИАНТЫ (если где-то используются) ===
-def get_user_by_username(db: Session, username: str) -> Optional[Dict]:
+def get_user_by_username(db: Session, username: str) -> dict | None:
     stmt = select(User).where(User.username == username)
     user = db.execute(stmt).scalar_one_or_none()
     return _to_dict(user) if user else None
 
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[Dict]:
+def get_user_by_id(db: Session, user_id: int) -> dict | None:
     stmt = select(User).where(User.id == user_id)
     user = db.execute(stmt).scalar_one_or_none()
     return _to_dict(user) if user else None
 
 
 # === АСИНХРОННЫЕ ВАРИАНТЫ (для AsyncSession) ===
-async def a_get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+async def a_get_user_by_username(db: AsyncSession, username: str) -> User | None:
     res = await db.execute(select(User).where(User.username == username))
     return res.scalars().first()
 
 
-async def a_get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+async def a_get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
     res = await db.execute(select(User).where(User.id == user_id))
     return res.scalars().first()
 
@@ -54,13 +53,13 @@ async def a_get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
 # === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
 
 
-def get_user_by_phone(db: Session, phone: str) -> Optional[User]:
+def get_user_by_phone(db: Session, phone: str) -> User | None:
     """Получить пользователя по номеру телефона"""
     stmt = select(User).where(User.phone == phone)
     return db.execute(stmt).scalar_one_or_none()
 
 
-def get_user_by_telegram_id(db: Session, telegram_id: str) -> Optional[User]:
+def get_user_by_telegram_id(db: Session, telegram_id: str) -> User | None:
     """Получить пользователя по Telegram ID"""
     stmt = select(User).where(User.telegram_id == telegram_id)
     return db.execute(stmt).scalar_one_or_none()
@@ -89,7 +88,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
     return pwd_context.verify(password, hashed_password)
 
 
-def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
+def authenticate_user(db: Session, username: str, password: str) -> User | None:
     """Аутентификация пользователя"""
     user = get_user_by_username(db, username)
     if not user:
@@ -110,7 +109,7 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     return user
 
 
-def get_user_permissions(user: User) -> List[str]:
+def get_user_permissions(user: User) -> list[str]:
     """Получить разрешения пользователя"""
     permissions = []
 
@@ -203,7 +202,7 @@ def create_access_token(data: dict) -> str:
     return encoded_jwt
 
 
-def search_users(db: Session, query: str, limit: int = 10) -> List[User]:
+def search_users(db: Session, query: str, limit: int = 10) -> list[User]:
     """
     Поиск пользователей по имени, телефону или email
     """
@@ -226,6 +225,6 @@ def search_users(db: Session, query: str, limit: int = 10) -> List[User]:
     return result.scalars().all()
 
 
-def get(db: Session, id: int) -> Optional[User]:
+def get(db: Session, id: int) -> User | None:
     """Получить пользователя по ID"""
     return db.query(User).filter(User.id == id).first()

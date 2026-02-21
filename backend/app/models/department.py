@@ -6,10 +6,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
-    Column,
     DateTime,
     ForeignKey,
     Integer,
@@ -22,6 +22,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.appointment import Appointment
+    from app.models.clinic import Doctor
+    from app.models.schedule import ScheduleTemplate
+    from app.models.service import Service
 
 
 class Department(Base):
@@ -72,15 +78,15 @@ class Department(Base):
 
     # ==================== RELATIONSHIPS ====================
     # Привязка услуг к отделению (Many-to-Many с атрибутами)
-    services: Mapped[list["DepartmentService"]] = relationship(
+    services: Mapped[list[DepartmentService]] = relationship(
         back_populates="department", cascade="all, delete-orphan"
     )
 
     # Врачи отделения (One-to-Many)
-    doctors: Mapped[list["Doctor"]] = relationship(back_populates="department")
+    doctors: Mapped[list[Doctor]] = relationship(back_populates="department")
 
     # Записи в отделение (One-to-Many)
-    appointments: Mapped[list["Appointment"]] = relationship(
+    appointments: Mapped[list[Appointment]] = relationship(
         back_populates="department"
     )
 
@@ -90,17 +96,17 @@ class Department(Base):
     # )
 
     # Расписания отделения (One-to-Many)
-    schedules: Mapped[list["ScheduleTemplate"]] = relationship(
+    schedules: Mapped[list[ScheduleTemplate]] = relationship(
         back_populates="department"
     )
 
     # Настройки очереди (One-to-One)
-    queue_settings: Mapped["DepartmentQueueSettings"] = relationship(
+    queue_settings: Mapped[DepartmentQueueSettings] = relationship(
         back_populates="department", uselist=False, cascade="all, delete-orphan"
     )
 
     # Настройки регистрации (One-to-One)
-    registration_settings: Mapped["DepartmentRegistrationSettings"] = relationship(
+    registration_settings: Mapped[DepartmentRegistrationSettings] = relationship(
         back_populates="department", uselist=False, cascade="all, delete-orphan"
     )
 
@@ -151,7 +157,7 @@ class DepartmentService(Base):
 
     # Relationships
     department: Mapped[Department] = relationship(back_populates="services")
-    service: Mapped["Service"] = relationship()
+    service: Mapped[Service] = relationship()
 
     __table_args__ = (
         UniqueConstraint("department_id", "service_id", name="uq_department_service"),

@@ -4,7 +4,7 @@
 
 import logging
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .base import BasePaymentProvider, PaymentResult
 from .click import ClickProvider
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class PaymentProviderManager:
     """Менеджер для управления провайдерами платежей"""
 
-    def __init__(self, config: Dict[str, Dict[str, Any]]):
+    def __init__(self, config: dict[str, dict[str, Any]]):
         """
         Инициализация менеджера
 
@@ -29,7 +29,7 @@ class PaymentProviderManager:
                 "kaspi": {"merchant_id": "...", "secret_key": "..."}
             }
         """
-        self.providers: Dict[str, BasePaymentProvider] = {}
+        self.providers: dict[str, BasePaymentProvider] = {}
         self.config = config
 
         # Инициализируем провайдеры
@@ -56,7 +56,7 @@ class PaymentProviderManager:
                         f"Ошибка инициализации провайдера {provider_name}: {e}"
                     )
 
-    def get_provider(self, provider_name: str) -> Optional[BasePaymentProvider]:
+    def get_provider(self, provider_name: str) -> BasePaymentProvider | None:
         """
         Получение провайдера по имени
 
@@ -166,7 +166,7 @@ class PaymentProviderManager:
         return provider.check_payment_status(payment_id)
 
     def process_webhook(
-        self, provider_name: str, webhook_data: Dict[str, Any]
+        self, provider_name: str, webhook_data: dict[str, Any]
     ) -> PaymentResult:
         """
         Обработка webhook от провайдера
@@ -231,7 +231,7 @@ class PaymentProviderManager:
         return provider.refund_payment(payment_id, amount)
 
     def validate_webhook_signature(
-        self, provider_name: str, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
+        self, provider_name: str, webhook_data: dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """
         Валидация подписи webhook
@@ -257,7 +257,7 @@ class PaymentProviderManager:
         else:
             return provider.validate_webhook_signature(webhook_data, signature)
 
-    def get_provider_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_provider_info(self) -> dict[str, dict[str, Any]]:
         """
         Получение информации о провайдерах
 
@@ -281,7 +281,7 @@ class PaymentProviderManager:
         currency_map = {"click": ["UZS"], "payme": ["UZS"], "kaspi": ["KZT"]}
         return currency_map.get(provider_name, [])
 
-    def _get_provider_features(self, provider: BasePaymentProvider) -> Dict[str, bool]:
+    def _get_provider_features(self, provider: BasePaymentProvider) -> dict[str, bool]:
         """Получение поддерживаемых функций провайдера"""
         return {
             "create_payment": True,

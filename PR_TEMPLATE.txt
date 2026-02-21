@@ -16,3 +16,17 @@ fix: improve CI/CD integration tests and error handling
 
 Связано с #184
 
+---
+
+## ✅ Performance Checklist (EMR v2)
+
+- [ ] Не использую `localStorage` и локальные TTL для кэша внутри компонентов.
+- [ ] Debounce применяется только через `frontend/src/core/debouncePolicy.js` или `useDebouncedCallback`.
+- [ ] При смене `visitId` используется `useVisitLifecycle` (очистка, abort, инвалидация).
+- [ ] Любые async‑загрузки поддерживают отмену (AbortController/axios `signal`) или безопасный ignore.
+
+Ссылки:
+- `docs/architecture/ADR-0001-centralized-caching.md`
+- `docs/architecture/performance-lessons.md`
+- `docs/architecture/performance-checklist.md`
+

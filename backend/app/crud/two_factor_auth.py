@@ -2,9 +2,8 @@
 CRUD операции для двухфакторной аутентификации (2FA)
 """
 
-from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, desc, or_
+from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -15,7 +14,6 @@ from app.models.two_factor_auth import (
     TwoFactorRecovery,
     TwoFactorSession,
 )
-from app.models.user import User
 from app.schemas.two_factor_auth import (
     TwoFactorAuthCreate,
     TwoFactorAuthUpdate,
@@ -31,7 +29,7 @@ class CRUDTwoFactorAuth(
 ):
     """CRUD операции для 2FA"""
 
-    def get_by_user_id(self, db: Session, user_id: int) -> Optional[TwoFactorAuth]:
+    def get_by_user_id(self, db: Session, user_id: int) -> TwoFactorAuth | None:
         """Получить 2FA по ID пользователя"""
         return db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
 
@@ -85,7 +83,7 @@ class CRUDTwoFactorBackupCode(
 
     def get_by_two_factor_auth_id(
         self, db: Session, two_factor_auth_id: int
-    ) -> List[TwoFactorBackupCode]:
+    ) -> list[TwoFactorBackupCode]:
         """Получить все backup коды для 2FA"""
         return (
             db.query(TwoFactorBackupCode)
@@ -95,7 +93,7 @@ class CRUDTwoFactorBackupCode(
 
     def get_unused_codes(
         self, db: Session, two_factor_auth_id: int
-    ) -> List[TwoFactorBackupCode]:
+    ) -> list[TwoFactorBackupCode]:
         """Получить неиспользованные backup коды"""
         return (
             db.query(TwoFactorBackupCode)
@@ -158,7 +156,7 @@ class CRUDTwoFactorBackupCode(
 class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate, None]):
     """CRUD операции для восстановления 2FA"""
 
-    def get_by_token(self, db: Session, token: str) -> Optional[TwoFactorRecovery]:
+    def get_by_token(self, db: Session, token: str) -> TwoFactorRecovery | None:
         """Получить попытку восстановления по токену"""
         return (
             db.query(TwoFactorRecovery)
@@ -166,7 +164,7 @@ class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate,
             .first()
         )
 
-    def get_valid_token(self, db: Session, token: str) -> Optional[TwoFactorRecovery]:
+    def get_valid_token(self, db: Session, token: str) -> TwoFactorRecovery | None:
         """Получить действительный токен восстановления"""
         from datetime import datetime
 
@@ -196,7 +194,7 @@ class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate,
 
     def get_by_two_factor_auth_id(
         self, db: Session, two_factor_auth_id: int
-    ) -> List[TwoFactorRecovery]:
+    ) -> list[TwoFactorRecovery]:
         """Получить все попытки восстановления для 2FA"""
         return (
             db.query(TwoFactorRecovery)
@@ -221,7 +219,7 @@ class CRUDTwoFactorRecovery(CRUDBase[TwoFactorRecovery, TwoFactorRecoveryCreate,
 class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, None]):
     """CRUD операции для сессий 2FA"""
 
-    def get_by_token(self, db: Session, token: str) -> Optional[TwoFactorSession]:
+    def get_by_token(self, db: Session, token: str) -> TwoFactorSession | None:
         """Получить сессию по токену"""
         return (
             db.query(TwoFactorSession)
@@ -229,7 +227,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
             .first()
         )
 
-    def get_valid_session(self, db: Session, token: str) -> Optional[TwoFactorSession]:
+    def get_valid_session(self, db: Session, token: str) -> TwoFactorSession | None:
         """Получить действительную сессию"""
         from datetime import datetime
 
@@ -244,7 +242,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
             .first()
         )
 
-    def get_by_user_id(self, db: Session, user_id: int) -> List[TwoFactorSession]:
+    def get_by_user_id(self, db: Session, user_id: int) -> list[TwoFactorSession]:
         """Получить все сессии пользователя"""
         return (
             db.query(TwoFactorSession)
@@ -255,7 +253,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
 
     def get_by_device_fingerprint(
         self, db: Session, device_fingerprint: str
-    ) -> Optional[TwoFactorSession]:
+    ) -> TwoFactorSession | None:
         """Получить сессию по отпечатку устройства"""
         from datetime import datetime
 
@@ -297,7 +295,7 @@ class CRUDTwoFactorSession(CRUDBase[TwoFactorSession, TwoFactorSessionCreate, No
 class CRUDTwoFactorDevice(CRUDBase[TwoFactorDevice, TwoFactorDeviceCreate, None]):
     """CRUD операции для устройств 2FA"""
 
-    def get_by_user_id(self, db: Session, user_id: int) -> List[TwoFactorDevice]:
+    def get_by_user_id(self, db: Session, user_id: int) -> list[TwoFactorDevice]:
         """Получить все устройства пользователя"""
         return (
             db.query(TwoFactorDevice)
@@ -308,7 +306,7 @@ class CRUDTwoFactorDevice(CRUDBase[TwoFactorDevice, TwoFactorDeviceCreate, None]
 
     def get_by_fingerprint(
         self, db: Session, fingerprint: str
-    ) -> Optional[TwoFactorDevice]:
+    ) -> TwoFactorDevice | None:
         """Получить устройство по отпечатку"""
         return (
             db.query(TwoFactorDevice)
@@ -316,7 +314,7 @@ class CRUDTwoFactorDevice(CRUDBase[TwoFactorDevice, TwoFactorDeviceCreate, None]
             .first()
         )
 
-    def get_trusted_devices(self, db: Session, user_id: int) -> List[TwoFactorDevice]:
+    def get_trusted_devices(self, db: Session, user_id: int) -> list[TwoFactorDevice]:
         """Получить доверенные устройства пользователя"""
         return (
             db.query(TwoFactorDevice)

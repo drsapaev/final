@@ -40,13 +40,13 @@ def ensure_admin() -> dict:
         row = (
             db.execute(select(User).where(User.username == username)).scalars().first()
         )
-        
+
         # If not found by username, check by email
         if not row and email:
             row = (
                 db.execute(select(User).where(User.email == email)).scalars().first()
             )
-        
+
         if row:
             changed = False
             # Only update email if it's different and doesn't conflict
@@ -101,7 +101,7 @@ def ensure_admin() -> dict:
                 "full_name": existing_email.full_name,
                 "role": existing_email.role,
             }
-        
+
         row = User(
             username=username,
             full_name=full_name,

@@ -8,16 +8,22 @@ from datetime import date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import get_db
 from app.core.security import get_password_hash
+
 # ✅ КРИТИЧЕСКИ ВАЖНО: Импортируем app.db.base, который загружает ВСЕ модели
 # Это гарантирует, что Base.metadata содержит все таблицы
 from app.db import base  # noqa: F401 - импорт для регистрации моделей
 from app.db.base_class import Base
+
+# Ensure app boots in test mode before importing app.main.
+os.environ.setdefault("TESTING", "1")
+
 from app.main import app
+
 # ✅ Импортируем все модели явно для гарантии регистрации
 from app.models import (  # noqa: F401
     appointment,
@@ -29,15 +35,11 @@ from app.models import (  # noqa: F401
     file_system,
     lab,
     online_queue,
-    patient,
     payment,
     payment_webhook,
     role_permission,
     schedule,
-    service,
-    user,
     user_profile,
-    visit,
 )
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -52,13 +54,12 @@ def test_db():
     """Создает тестовую базу данных"""
     # Используем временную файловую БД вместо in-memory
     # In-memory SQLite не работает в разных потоках даже с check_same_thread=False
-    import tempfile
     import os
-    
+
     # Создаем временный файл БД
     db_fd, db_path = tempfile.mkstemp(suffix='.db')
     os.close(db_fd)  # Закрываем файловый дескриптор, SQLAlchemy откроет сам
-    
+
     # check_same_thread=False позволяет использовать БД в разных потоках (для TestClient)
     engine = create_engine(f"sqlite:///{db_path}", echo=False, connect_args={"check_same_thread": False})
 
@@ -66,7 +67,7 @@ def test_db():
     # app.db.base уже импортирует все модели через app.models.__init__
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
-    
+
     # Проверяем, что таблицы созданы (для отладки)
     from sqlalchemy import inspect
     inspector = inspect(engine)
@@ -86,12 +87,32 @@ def test_db():
 @pytest.fixture(scope="function")
 def db_session(test_db):
     """Создает сессию БД для каждого теста"""
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db)
+    connection = test_db.connect()
+    transaction = connection.begin()
+    TestingSessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=connection,
+    )
     session = TestingSessionLocal()
+    nested = connection.begin_nested()
 
-    yield session
+    @event.listens_for(session, "after_transaction_end")
+    def restart_savepoint(sess, trans):  # type: ignore[no-untyped-def]
+        nonlocal nested
+        if trans.nested and not getattr(trans._parent, "nested", False):
+            nested = connection.begin_nested()
 
-    session.close()
+    try:
+        yield session
+    finally:
+        event.remove(session, "after_transaction_end", restart_savepoint)
+        session.close()
+        if nested.is_active:
+            nested.rollback()
+        if transaction.is_active:
+            transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture(scope="function")
@@ -147,7 +168,7 @@ def cardio_user(db_session):
     existing = db_session.query(User).filter(User.username == "test_cardio").first()
     if existing:
         return existing
-    
+
     user = User(
         username="test_cardio",
         email="cardio@test.com",
@@ -170,7 +191,7 @@ def test_doctor_user(db_session):
     existing = db_session.query(User).filter(User.username == "test_doctor").first()
     if existing:
         return existing
-    
+
     user = User(
         username="test_doctor",
         email="doctor@test.com",
@@ -193,7 +214,7 @@ def registrar_user(db_session):
     existing = db_session.query(User).filter(User.username == "test_registrar").first()
     if existing:
         return existing
-    
+
     user = User(
         username="test_registrar",
         email="registrar@test.com",
@@ -324,7 +345,7 @@ def patient_token(client: TestClient, db_session: Session) -> str:
         db_session.add(patient_user)
         db_session.commit()
         db_session.refresh(patient_user)
-    
+
     response = client.post(
         "/api/v1/auth/minimal-login",
         json={"username": patient_user.username, "password": "patient123"},
@@ -392,9 +413,10 @@ def registrar_auth_headers(client, registrar_user):
 # Маркеры для pytest
 def pytest_configure(config):
     """Конфигурация pytest"""
-    os.environ["DISABLE_2FA_REQUIREMENT"] = "true"  # Disable 2FA for tests
+    os.environ.setdefault("DISABLE_2FA_REQUIREMENT", "true")  # Disable 2FA for most tests
     config.addinivalue_line("markers", "unit: Юнит тесты")
     config.addinivalue_line("markers", "integration: Интеграционные тесты")
+    config.addinivalue_line("markers", "e2e: Сквозные E2E тесты")
     config.addinivalue_line("markers", "slow: Медленные тесты")
     config.addinivalue_line("markers", "security: Тесты безопасности")
     config.addinivalue_line("markers", "migration: Тесты миграций")

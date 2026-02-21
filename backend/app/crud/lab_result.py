@@ -3,21 +3,19 @@ CRUD операции для лабораторных результатов
 """
 
 from datetime import datetime
-from typing import List, Optional
 
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.lab import LabOrder, LabResult
 from app.schemas.lab import LabResultCreate, LabResultUpdate
 
 
-def get_lab_result(db: Session, result_id: int) -> Optional[LabResult]:
+def get_lab_result(db: Session, result_id: int) -> LabResult | None:
     """Получить лабораторный результат по ID"""
     return db.query(LabResult).filter(LabResult.id == result_id).first()
 
 
-def get_lab_results_by_order(db: Session, order_id: int) -> List[LabResult]:
+def get_lab_results_by_order(db: Session, order_id: int) -> list[LabResult]:
     """Получить все результаты по заказу"""
     return db.query(LabResult).filter(LabResult.order_id == order_id).all()
 
@@ -25,9 +23,9 @@ def get_lab_results_by_order(db: Session, order_id: int) -> List[LabResult]:
 def get_lab_results_by_patient(
     db: Session,
     patient_id: int,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
-) -> List[LabResult]:
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[LabResult]:
     """Получить результаты пациента"""
     query = db.query(LabResult).join(LabOrder).filter(LabOrder.patient_id == patient_id)
 
@@ -50,7 +48,7 @@ def create_lab_result(db: Session, result_data: LabResultCreate) -> LabResult:
 
 def update_lab_result(
     db: Session, result_id: int, result_data: LabResultUpdate
-) -> Optional[LabResult]:
+) -> LabResult | None:
     """Обновить лабораторный результат"""
     db_result = get_lab_result(db, result_id)
     if not db_result:
@@ -77,10 +75,10 @@ def delete_lab_result(db: Session, result_id: int) -> bool:
 
 def get_abnormal_results(
     db: Session,
-    patient_id: Optional[int] = None,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
-) -> List[LabResult]:
+    patient_id: int | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[LabResult]:
     """Получить аномальные результаты"""
     query = db.query(LabResult).filter(LabResult.abnormal == True)
 
@@ -96,8 +94,8 @@ def get_abnormal_results(
 
 
 def get_results_by_test_code(
-    db: Session, test_code: str, patient_id: Optional[int] = None
-) -> List[LabResult]:
+    db: Session, test_code: str, patient_id: int | None = None
+) -> list[LabResult]:
     """Получить результаты по коду теста"""
     query = db.query(LabResult).filter(LabResult.test_code == test_code)
 

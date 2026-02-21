@@ -10,13 +10,12 @@ import logging
 import secrets
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import qrcode
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.security import verify_password
 from app.models.two_factor_auth import (
     TwoFactorAuth,
@@ -27,7 +26,7 @@ from app.models.two_factor_auth import (
 )
 from app.models.user import User
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
-from app.services.sms_providers import get_sms_manager, SMSProviderType
+from app.services.sms_providers import SMSProviderType, get_sms_manager
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ class TwoFactorService:
         """Генерирует секретный ключ для TOTP"""
         return base64.b32encode(secrets.token_bytes(20)).decode('utf-8')
 
-    def generate_totp_code(self, secret: str, timestamp: Optional[int] = None) -> str:
+    def generate_totp_code(self, secret: str, timestamp: int | None = None) -> str:
         """Генерирует TOTP код"""
         if timestamp is None:
             timestamp = int(time.time())
@@ -78,7 +77,7 @@ class TwoFactorService:
         return str(code % 1000000).zfill(6)
 
     def verify_totp_code(
-        self, secret: str, code: str, timestamp: Optional[int] = None
+        self, secret: str, code: str, timestamp: int | None = None
     ) -> bool:
         """Проверяет TOTP код"""
         if timestamp is None:
@@ -113,7 +112,7 @@ class TwoFactorService:
 
         return f"data:image/png;base64,{img_str}"
 
-    def generate_backup_codes(self, count: int = None) -> List[str]:
+    def generate_backup_codes(self, count: int = None) -> list[str]:
         """Генерирует backup коды"""
         if count is None:
             count = self.backup_codes_count
@@ -141,9 +140,9 @@ class TwoFactorService:
         self,
         db: Session,
         user_id: int,
-        recovery_email: Optional[str] = None,
-        recovery_phone: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        recovery_email: str | None = None,
+        recovery_phone: str | None = None,
+    ) -> dict[str, Any]:
         """Настраивает 2FA для пользователя"""
         try:
             # Получаем пользователя
@@ -256,13 +255,13 @@ class TwoFactorService:
         self,
         db: Session,
         user_id: int,
-        totp_code: Optional[str] = None,
-        backup_code: Optional[str] = None,
-        recovery_token: Optional[str] = None,
-        device_fingerprint: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[str]]:
+        totp_code: str | None = None,
+        backup_code: str | None = None,
+        recovery_token: str | None = None,
+        device_fingerprint: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, str, str | None]:
         """Верифицирует 2FA код"""
         try:
             two_factor_auth = (
@@ -271,14 +270,14 @@ class TwoFactorService:
             if not two_factor_auth or not two_factor_auth.totp_enabled:
                 return False, "2FA not enabled", None
 
-            method_used = None
+            _method_used = None
             success = False
 
             # Проверяем TOTP код
             if totp_code and two_factor_auth.totp_secret:
                 if self.verify_totp_code(two_factor_auth.totp_secret, totp_code):
                     success = True
-                    method_used = "totp"
+                    _method_used = "totp"
 
             # Проверяем backup код
             elif backup_code:
@@ -299,7 +298,7 @@ class TwoFactorService:
                     backup_code_obj.used = True
                     backup_code_obj.used_at = datetime.utcnow()
                     success = True
-                    method_used = "backup_code"
+                    _method_used = "backup_code"
 
             # Проверяем токен восстановления
             elif recovery_token:
@@ -320,7 +319,7 @@ class TwoFactorService:
                     recovery.verified = True
                     recovery.verified_at = datetime.utcnow()
                     success = True
-                    method_used = "recovery"
+                    _method_used = "recovery"
 
             if success:
                 # Обновляем время последнего использования
@@ -348,9 +347,9 @@ class TwoFactorService:
         db: Session,
         user_id: int,
         device_fingerprint: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        device_name: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        device_name: str | None = None,
     ) -> str:
         """Создает доверенную сессию"""
         try:
@@ -409,8 +408,8 @@ class TwoFactorService:
         db: Session,
         user_id: int,
         password: str,
-        totp_code: Optional[str] = None,
-        backup_code: Optional[str] = None,
+        totp_code: str | None = None,
+        backup_code: str | None = None,
     ) -> bool:
         """Отключает 2FA для пользователя"""
         try:
@@ -463,7 +462,7 @@ class TwoFactorService:
             logger.error(f"Error disabling 2FA: {e}")
             return False
 
-    def get_two_factor_status(self, db: Session, user_id: int) -> Dict[str, Any]:
+    def get_two_factor_status(self, db: Session, user_id: int) -> dict[str, Any]:
         """Получает статус 2FA для пользователя"""
         try:
             two_factor_auth = (
@@ -537,7 +536,7 @@ class TwoFactorService:
                 "last_used": None,
             }
 
-    def regenerate_backup_codes(self, db: Session, user_id: int) -> List[str]:
+    def regenerate_backup_codes(self, db: Session, user_id: int) -> list[str]:
         """Перегенерирует backup коды"""
         try:
             two_factor_auth = (
@@ -572,8 +571,8 @@ class TwoFactorService:
             raise
 
     async def send_sms_code(
-        self, phone: str, code: str, provider_type: Optional[SMSProviderType] = None
-    ) -> Dict[str, Any]:
+        self, phone: str, code: str, provider_type: SMSProviderType | None = None
+    ) -> dict[str, Any]:
         """Отправить SMS код для 2FA"""
         try:
             response = await self.sms_manager.send_2fa_code(
@@ -592,8 +591,8 @@ class TwoFactorService:
             return {"success": False, "error": str(e), "provider": "unknown"}
 
     async def send_email_code(
-        self, email: str, code: str, user_name: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, email: str, code: str, user_name: str | None = None
+    ) -> dict[str, Any]:
         """Отправить email код для 2FA"""
         try:
             subject = "Код подтверждения двухфакторной аутентификации"
@@ -605,31 +604,31 @@ class TwoFactorService:
                 <div style="background: linear-gradient(135deg, #0078d4, #106ebe); padding: 20px; text-align: center;">
                     <h1 style="color: white; margin: 0;">🔐 Код подтверждения</h1>
                 </div>
-                
+
                 <div style="padding: 30px; background: #f8fafc;">
                     <p>Здравствуйте{', ' + user_name if user_name else ''}!</p>
-                    
+
                     <p>Ваш код подтверждения для двухфакторной аутентификации:</p>
-                    
+
                     <div style="text-align: center; margin: 30px 0;">
                         <div style="display: inline-block; background: #0078d4; color: white; padding: 15px 30px; border-radius: 8px; font-size: 24px; font-weight: bold; letter-spacing: 3px;">
                             {code}
                         </div>
                     </div>
-                    
+
                     <p style="color: #dc2626; font-weight: bold;">⚠️ Важно:</p>
                     <ul style="color: #6b7280;">
                         <li>Код действителен в течение 5 минут</li>
                         <li>Никому не сообщайте этот код</li>
                         <li>Если вы не запрашивали код, проигнорируйте это письмо</li>
                     </ul>
-                    
+
                     <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
                         С уважением,<br>
                         Команда клиники
                     </p>
                 </div>
-                
+
                 <div style="background: #e5e7eb; padding: 15px; text-align: center; color: #6b7280; font-size: 12px;">
                     Это автоматическое сообщение. Пожалуйста, не отвечайте на него.
                 </div>
@@ -640,16 +639,16 @@ class TwoFactorService:
             # Текстовая версия
             text_content = f"""
             Код подтверждения двухфакторной аутентификации
-            
+
             Здравствуйте{', ' + user_name if user_name else ''}!
-            
+
             Ваш код подтверждения: {code}
-            
+
             Важно:
             - Код действителен в течение 5 минут
             - Никому не сообщайте этот код
             - Если вы не запрашивали код, проигнорируйте это письмо
-            
+
             С уважением,
             Команда клиники
             """
@@ -680,9 +679,9 @@ class TwoFactorService:
         self,
         method: str,  # 'sms' или 'email'
         contact: str,  # номер телефона или email
-        user_name: Optional[str] = None,
-        provider_type: Optional[SMSProviderType] = None,
-    ) -> Dict[str, Any]:
+        user_name: str | None = None,
+        provider_type: SMSProviderType | None = None,
+    ) -> dict[str, Any]:
         """Отправить код верификации по SMS или email"""
         try:
             code = self.generate_verification_code()

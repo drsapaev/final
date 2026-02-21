@@ -3,9 +3,9 @@
 """
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class DoctorSearchResponse(BaseModel):
@@ -14,13 +14,13 @@ class DoctorSearchResponse(BaseModel):
     id: int
     name: str
     specialty: str
-    experience_years: Optional[int] = None
-    education: Optional[str] = None
-    photo_url: Optional[str] = None
+    experience_years: int | None = None
+    education: str | None = None
+    photo_url: str | None = None
     rating: float = 0.0
     total_patients: int = 0
     available_today: bool = False
-    next_available_slot: Optional[datetime] = None
+    next_available_slot: datetime | None = None
     consultation_fee: float = 0.0
 
 
@@ -29,12 +29,12 @@ class ServiceSearchResponse(BaseModel):
 
     id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     category: str
     price: float
-    duration_minutes: Optional[int] = None
+    duration_minutes: int | None = None
     requires_preparation: bool = False
-    preparation_instructions: Optional[str] = None
+    preparation_instructions: str | None = None
     available_doctors: int = 0
 
 
@@ -43,10 +43,10 @@ class ServiceCategoryResponse(BaseModel):
 
     name: str
     display_name: str
-    description: Optional[str] = None
-    icon: Optional[str] = None
+    description: str | None = None
+    icon: str | None = None
     services_count: int = 0
-    average_price: Optional[float] = None
+    average_price: float | None = None
 
 
 class QueuePositionResponse(BaseModel):
@@ -76,7 +76,7 @@ class EmergencyContactResponse(BaseModel):
     success: bool
     message: str
     emergency_id: int
-    contacts: Dict[str, Dict[str, str]]
+    contacts: dict[str, dict[str, str]]
 
 
 class ProfileResponse(BaseModel):
@@ -84,7 +84,7 @@ class ProfileResponse(BaseModel):
 
     success: bool
     message: str
-    patient: Dict[str, Any]
+    patient: dict[str, Any]
 
 
 class NotificationSettingsResponse(BaseModel):
@@ -106,10 +106,10 @@ class ClinicInfoResponse(BaseModel):
     phone: str
     email: str
     website: str
-    working_hours: Dict[str, str]
-    services: List[str]
+    working_hours: dict[str, str]
+    services: list[str]
     emergency_phone: str
-    location: Dict[str, float]
+    location: dict[str, float]
 
 
 class APIVersionResponse(BaseModel):
@@ -117,7 +117,7 @@ class APIVersionResponse(BaseModel):
 
     version: str
     build: str
-    features: List[str]
+    features: list[str]
     last_updated: str
 
 
@@ -126,7 +126,7 @@ class AppointmentActionResponse(BaseModel):
 
     success: bool
     message: str
-    new_date: Optional[str] = None
+    new_date: str | None = None
 
 
 class DoctorScheduleSlot(BaseModel):
@@ -135,15 +135,15 @@ class DoctorScheduleSlot(BaseModel):
     date: date
     time: str
     available: bool
-    appointment_id: Optional[int] = None
-    patient_name: Optional[str] = None
+    appointment_id: int | None = None
+    patient_name: str | None = None
 
 
 class DoctorScheduleResponse(BaseModel):
     """Расписание врача"""
 
     doctor_id: int
-    schedule: List[DoctorScheduleSlot]
+    schedule: list[DoctorScheduleSlot]
 
 
 class MobileStatsExtended(BaseModel):
@@ -154,10 +154,10 @@ class MobileStatsExtended(BaseModel):
     completed_appointments: int = 0
     cancelled_appointments: int = 0
     total_spent: float = 0.0
-    last_visit: Optional[datetime] = None
-    favorite_doctor: Optional[str] = None
+    last_visit: datetime | None = None
+    favorite_doctor: str | None = None
     pending_payments: int = 0
-    average_rating_given: Optional[float] = None
+    average_rating_given: float | None = None
     loyalty_points: int = 0
 
 
@@ -169,22 +169,22 @@ class MobileNotificationExtended(BaseModel):
     message: str
     type: str  # appointment, lab_result, promotion, system
     created_at: datetime
-    read_at: Optional[datetime] = None
-    data: Optional[Dict[str, Any]] = None
+    read_at: datetime | None = None
+    data: dict[str, Any] | None = None
     priority: str = "normal"  # low, normal, high, urgent
-    action_url: Optional[str] = None
+    action_url: str | None = None
 
 
 class PatientMedicalHistory(BaseModel):
     """Медицинская история пациента"""
 
-    allergies: Optional[str] = None
-    chronic_conditions: Optional[str] = None
-    medications: List[str] = []
-    previous_surgeries: List[str] = []
-    family_history: Optional[str] = None
-    blood_type: Optional[str] = None
-    emergency_contact: Optional[str] = None
+    allergies: str | None = None
+    chronic_conditions: str | None = None
+    medications: list[str] = []
+    previous_surgeries: list[str] = []
+    family_history: str | None = None
+    blood_type: str | None = None
+    emergency_contact: str | None = None
 
 
 class AppointmentReminderSettings(BaseModel):
@@ -213,9 +213,9 @@ class PaymentMethodMobile(BaseModel):
     id: int
     type: str  # card, cash, click, payme, kaspi
     name: str
-    details: Optional[str] = None  # Последние 4 цифры карты и т.д.
+    details: str | None = None  # Последние 4 цифры карты и т.д.
     is_default: bool = False
-    expires_at: Optional[date] = None
+    expires_at: date | None = None
 
 
 class MobilePaymentRequest(BaseModel):
@@ -231,8 +231,8 @@ class MobilePaymentResponse(BaseModel):
     """Ответ оплаты через мобильное"""
 
     success: bool
-    payment_id: Optional[int] = None
-    payment_url: Optional[str] = None  # Для онлайн оплаты
+    payment_id: int | None = None
+    payment_url: str | None = None  # Для онлайн оплаты
     message: str
     status: str  # pending, completed, failed
 
@@ -243,24 +243,24 @@ class LabResultExtended(BaseModel):
     id: int
     test_name: str
     result_value: str
-    reference_range: Optional[str] = None
-    unit: Optional[str] = None
+    reference_range: str | None = None
+    unit: str | None = None
     result_date: datetime
     status: str  # pending, ready, reviewed
-    notes: Optional[str] = None
-    doctor_comments: Optional[str] = None
+    notes: str | None = None
+    doctor_comments: str | None = None
     abnormal: bool = False
     critical: bool = False
-    file_url: Optional[str] = None  # PDF результата
+    file_url: str | None = None  # PDF результата
 
 
 class MobileSearchFilters(BaseModel):
     """Фильтры поиска для мобильного"""
 
-    specialty: Optional[str] = None
-    rating_min: Optional[float] = None
-    price_min: Optional[float] = None
-    price_max: Optional[float] = None
-    available_today: Optional[bool] = None
-    location: Optional[str] = None
-    insurance_accepted: Optional[bool] = None
+    specialty: str | None = None
+    rating_min: float | None = None
+    price_min: float | None = None
+    price_max: float | None = None
+    available_today: bool | None = None
+    location: str | None = None
+    insurance_accepted: bool | None = None

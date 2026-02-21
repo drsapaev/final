@@ -64,7 +64,7 @@ def test_doctor_user(db_session, registrar_user):
     db_session.refresh(doctor_user)
 
     from datetime import time
-    
+
     doctor = Doctor(
         user_id=doctor_user.id,
         specialty="Терапия",
@@ -303,7 +303,7 @@ def test_e2e_clinic_flow(
 
     # ========== ШАГ 7: SIMULATE PAYME WEBHOOK ==========
     # Используем тестовый secret key из фикстуры
-    
+
     # Получаем order_id из payment (он должен быть в provider_data или payment_id)
     # PayMe использует order_id в формате "clinic_{payment_id}_{timestamp}"
     # Обновляем payment из БД для получения актуальных данных
@@ -361,7 +361,7 @@ def test_e2e_clinic_flow(
     )
     assert create_response.status_code == 200, f"CreateTransaction webhook failed: {create_response.text}"
     create_result = create_response.json()
-    
+
     # Извлекаем transaction ID из ответа CreateTransaction
     # PayMe возвращает transaction ID в result.transaction
     if "result" in create_result and "transaction" in create_result["result"]:
@@ -390,7 +390,7 @@ def test_e2e_clinic_flow(
     # ========== ШАГ 8: VERIFY PAYMENT STATUS ==========
     # Обновляем payment из БД
     db_session.refresh(payment_obj)
-    
+
     # Проверяем статус платежа (может быть "paid" или "pending" в зависимости от обработки webhook)
     # В реальном сценарии webhook должен обновить статус
     payment_status_response = client.get(

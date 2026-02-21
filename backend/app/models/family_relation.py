@@ -9,9 +9,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Boolean, Index
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -35,7 +35,7 @@ class RelationType(str):
 class FamilyRelation(Base):
     """
     Связь между двумя пациентами.
-    
+
     Например:
     - patient_id=5 (ребёнок) -> related_patient_id=3 (мама), relation_type="parent"
     - Это значит: у пациента 5 родитель - пациент 3
@@ -48,21 +48,21 @@ class FamilyRelation(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    
+
     # Пациент, для которого указана связь
     patient_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False
     )
-    
+
     # Связанный пациент (родственник/опекун)
     related_patient_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False
     )
-    
+
     # Тип связи (с точки зрения related_patient по отношению к patient)
     # Например: "parent" означает, что related_patient - родитель patient
     relation_type: Mapped[str] = mapped_column(
@@ -70,34 +70,34 @@ class FamilyRelation(Base):
         nullable=False,
         default=RelationType.OTHER
     )
-    
+
     # Описание связи (опционально)
-    description: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    
+    description: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
     # Является ли основным контактом (для уведомлений)
     is_primary_contact: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
 
     # Relationships
-    patient: Mapped["Patient"] = relationship(
+    patient: Mapped[Patient] = relationship(
         "Patient",
         foreign_keys=[patient_id],
         backref="family_relations"
     )
-    related_patient: Mapped["Patient"] = relationship(
+    related_patient: Mapped[Patient] = relationship(
         "Patient",
         foreign_keys=[related_patient_id]
     )
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
 
     def __repr__(self) -> str:
         return f"<FamilyRelation {self.patient_id} -> {self.related_patient_id} ({self.relation_type})>"

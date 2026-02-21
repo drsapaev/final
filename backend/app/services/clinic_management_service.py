@@ -2,12 +2,8 @@
 Сервисы для управления клиникой
 """
 
-import json
 import os
-import shutil
-import zipfile
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -33,12 +29,10 @@ from app.schemas.clinic import (
     EquipmentCreate,
     EquipmentMaintenanceCreate,
     EquipmentMaintenanceOut,
-    EquipmentMaintenanceUpdate,
     EquipmentOut,
     EquipmentUpdate,
     LicenseActivationCreate,
     LicenseActivationOut,
-    LicenseActivationUpdate,
     LicenseCreate,
     LicenseOut,
     LicenseUpdate,
@@ -56,7 +50,7 @@ class BranchManagementService:
         db_branch = branch.create(db=db, obj_in=branch_data)
         return BranchOut.from_orm(db_branch)
 
-    def get_branch(self, db: Session, branch_id: int) -> Optional[BranchOut]:
+    def get_branch(self, db: Session, branch_id: int) -> BranchOut | None:
         """Получить филиал"""
         db_branch = branch.get(db=db, id=branch_id)
         if not db_branch:
@@ -68,9 +62,9 @@ class BranchManagementService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[BranchOut]:
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[BranchOut]:
         """Получить список филиалов"""
         db_branches = branch.get_multi(
             db=db, skip=skip, limit=limit, status=status, search=search
@@ -79,7 +73,7 @@ class BranchManagementService:
 
     def update_branch(
         self, db: Session, branch_id: int, branch_data: BranchUpdate
-    ) -> Optional[BranchOut]:
+    ) -> BranchOut | None:
         """Обновить филиал"""
         db_branch = branch.get(db=db, id=branch_id)
         if not db_branch:
@@ -93,7 +87,7 @@ class BranchManagementService:
         db_branch = branch.delete(db=db, id=branch_id)
         return db_branch is not None
 
-    def get_branch_stats(self, db: Session, branch_id: int) -> Optional[BranchStatsOut]:
+    def get_branch_stats(self, db: Session, branch_id: int) -> BranchStatsOut | None:
         """Получить статистику филиала"""
         return branch.get_stats(db=db, branch_id=branch_id)
 
@@ -108,7 +102,7 @@ class EquipmentManagementService:
         db_equipment = equipment.create(db=db, obj_in=equipment_data)
         return EquipmentOut.from_orm(db_equipment)
 
-    def get_equipment(self, db: Session, equipment_id: int) -> Optional[EquipmentOut]:
+    def get_equipment(self, db: Session, equipment_id: int) -> EquipmentOut | None:
         """Получить оборудование"""
         db_equipment = equipment.get(db=db, id=equipment_id)
         if not db_equipment:
@@ -120,11 +114,11 @@ class EquipmentManagementService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        branch_id: Optional[int] = None,
-        equipment_type: Optional[str] = None,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[EquipmentOut]:
+        branch_id: int | None = None,
+        equipment_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[EquipmentOut]:
         """Получить список оборудования"""
         db_equipment = equipment.get_multi(
             db=db,
@@ -139,7 +133,7 @@ class EquipmentManagementService:
 
     def update_equipment(
         self, db: Session, equipment_id: int, equipment_data: EquipmentUpdate
-    ) -> Optional[EquipmentOut]:
+    ) -> EquipmentOut | None:
         """Обновить оборудование"""
         db_equipment = equipment.get(db=db, id=equipment_id)
         if not db_equipment:
@@ -157,7 +151,7 @@ class EquipmentManagementService:
 
     def get_maintenance_due(
         self, db: Session, days_ahead: int = 30
-    ) -> List[EquipmentOut]:
+    ) -> list[EquipmentOut]:
         """Получить оборудование, требующее обслуживания"""
         db_equipment = equipment.get_maintenance_due(db=db, days_ahead=days_ahead)
         return [EquipmentOut.from_orm(e) for e in db_equipment]
@@ -174,7 +168,7 @@ class EquipmentManagementService:
 
     def get_maintenance_history(
         self, db: Session, equipment_id: int, skip: int = 0, limit: int = 100
-    ) -> List[EquipmentMaintenanceOut]:
+    ) -> list[EquipmentMaintenanceOut]:
         """Получить историю обслуживания"""
         db_maintenance = equipment_maintenance.get_by_equipment(
             db=db, equipment_id=equipment_id, skip=skip, limit=limit
@@ -190,7 +184,7 @@ class LicenseManagementService:
         db_license = license.create(db=db, obj_in=license_data)
         return LicenseOut.from_orm(db_license)
 
-    def get_license(self, db: Session, license_id: int) -> Optional[LicenseOut]:
+    def get_license(self, db: Session, license_id: int) -> LicenseOut | None:
         """Получить лицензию"""
         db_license = license.get(db=db, id=license_id)
         if not db_license:
@@ -202,10 +196,10 @@ class LicenseManagementService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        license_type: Optional[str] = None,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[LicenseOut]:
+        license_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[LicenseOut]:
         """Получить список лицензий"""
         db_licenses = license.get_multi(
             db=db,
@@ -215,11 +209,11 @@ class LicenseManagementService:
             status=status,
             search=search,
         )
-        return [LicenseOut.from_orm(l) for l in db_licenses]
+        return [LicenseOut.from_orm(license_row) for license_row in db_licenses]
 
     def update_license(
         self, db: Session, license_id: int, license_data: LicenseUpdate
-    ) -> Optional[LicenseOut]:
+    ) -> LicenseOut | None:
         """Обновить лицензию"""
         db_license = license.get(db=db, id=license_id)
         if not db_license:
@@ -235,10 +229,10 @@ class LicenseManagementService:
 
     def get_expiring_licenses(
         self, db: Session, days_ahead: int = 30
-    ) -> List[LicenseOut]:
+    ) -> list[LicenseOut]:
         """Получить лицензии, истекающие в ближайшее время"""
         db_licenses = license.get_expiring_soon(db=db, days_ahead=days_ahead)
-        return [LicenseOut.from_orm(l) for l in db_licenses]
+        return [LicenseOut.from_orm(license_row) for license_row in db_licenses]
 
     def activate_license(
         self, db: Session, license_id: int, activation_data: LicenseActivationCreate
@@ -250,7 +244,7 @@ class LicenseManagementService:
 
     def get_license_activations(
         self, db: Session, license_id: int, skip: int = 0, limit: int = 100
-    ) -> List[LicenseActivationOut]:
+    ) -> list[LicenseActivationOut]:
         """Получить активации лицензии"""
         db_activations = license_activation.get_by_license(
             db=db, license_id=license_id, skip=skip, limit=limit
@@ -266,7 +260,7 @@ class BackupManagementService:
         db_backup = backup.create(db=db, obj_in=backup_data)
         return BackupOut.from_orm(db_backup)
 
-    def get_backup(self, db: Session, backup_id: int) -> Optional[BackupOut]:
+    def get_backup(self, db: Session, backup_id: int) -> BackupOut | None:
         """Получить резервную копию"""
         db_backup = backup.get(db=db, id=backup_id)
         if not db_backup:
@@ -278,9 +272,9 @@ class BackupManagementService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[str] = None,
-        backup_type: Optional[str] = None,
-    ) -> List[BackupOut]:
+        status: str | None = None,
+        backup_type: str | None = None,
+    ) -> list[BackupOut]:
         """Получить список резервных копий"""
         db_backups = backup.get_multi(
             db=db, skip=skip, limit=limit, status=status, backup_type=backup_type
@@ -289,7 +283,7 @@ class BackupManagementService:
 
     def update_backup(
         self, db: Session, backup_id: int, backup_data: BackupUpdate
-    ) -> Optional[BackupOut]:
+    ) -> BackupOut | None:
         """Обновить резервную копию"""
         db_backup = backup.get(db=db, id=backup_id)
         if not db_backup:
@@ -343,7 +337,7 @@ class BackupManagementService:
 class SystemInfoService:
     """Сервис системной информации"""
 
-    def get_system_info(self, db: Session, key: str) -> Optional[SystemInfoOut]:
+    def get_system_info(self, db: Session, key: str) -> SystemInfoOut | None:
         """Получить системную информацию по ключу"""
         db_info = system_info.get_by_key(db=db, key=key)
         if not db_info:
@@ -354,8 +348,8 @@ class SystemInfoService:
         self,
         db: Session,
         key: str,
-        value: Dict[str, Any],
-        description: Optional[str] = None,
+        value: dict[str, Any],
+        description: str | None = None,
     ) -> SystemInfoOut:
         """Установить системную информацию"""
         existing = system_info.get_by_key(db=db, key=key)
@@ -373,7 +367,7 @@ class SystemInfoService:
             new_info = system_info.create(db=db, obj_in=create_data)
             return SystemInfoOut.from_orm(new_info)
 
-    def get_all_system_info(self, db: Session) -> Dict[str, Any]:
+    def get_all_system_info(self, db: Session) -> dict[str, Any]:
         """Получить всю системную информацию"""
         db_infos = system_info.get_multi(db=db, skip=0, limit=1000)
         return {info.key: info.value for info in db_infos}
@@ -393,7 +387,7 @@ class ClinicManagementService:
         """Получить общую статистику клиники"""
         return clinic_stats.get_clinic_stats(db=db)
 
-    def get_system_health(self, db: Session) -> Dict[str, Any]:
+    def get_system_health(self, db: Session) -> dict[str, Any]:
         """Получить состояние системы"""
         stats = self.get_clinic_stats(db=db)
 
@@ -417,7 +411,7 @@ class ClinicManagementService:
             "stats": stats.dict(),
         }
 
-    def initialize_default_data(self, db: Session) -> Dict[str, Any]:
+    def initialize_default_data(self, db: Session) -> dict[str, Any]:
         """Инициализировать данные по умолчанию"""
         results = {}
 

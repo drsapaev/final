@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from io import BytesIO
-from typing import Optional, Sequence, Tuple
 
 from reportlab.lib.pagesizes import A4, A6
 from reportlab.lib.units import mm
@@ -46,8 +46,8 @@ def build_ticket_pdf(
     *,
     ticket_number: int,
     department: str,
-    clinic_name: Optional[str] = None,
-    footer_enabled: Optional[bool] = None,
+    clinic_name: str | None = None,
+    footer_enabled: bool | None = None,
 ) -> bytes:
     """
     Сгенерировать PDF талон (A6 портрет). Минимальная вёрстка: номер крупно,
@@ -96,10 +96,10 @@ def build_ticket_pdf(
 def build_invoice_pdf(
     *,
     visit_id: int,
-    items: Sequence[Tuple[str, float, str]] | None = None,
+    items: Sequence[tuple[str, float, str]] | None = None,
     totals_currency: str = "UZS",
-    clinic_name: Optional[str] = None,
-    footer_enabled: Optional[bool] = None,
+    clinic_name: str | None = None,
+    footer_enabled: bool | None = None,
 ) -> bytes:
     """
     Счет-фактура (A4): простая таблица: Наименование | Сумма | Валюта.

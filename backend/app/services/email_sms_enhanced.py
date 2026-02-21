@@ -4,23 +4,19 @@
 """
 
 import asyncio
-import json
 import logging
 import smtplib
 import ssl
-from datetime import datetime, timedelta
+from datetime import datetime
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
-from jinja2 import Environment, FileSystemLoader, Template
-from sqlalchemy.orm import Session
+from jinja2 import Environment, FileSystemLoader
 
 from app.core.config import settings
-from app.crud import notification as crud_notification
-from app.models.notification import NotificationHistory
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +56,12 @@ class EmailSMSEnhancedService:
         to_email: str,
         subject: str,
         template_name: str = None,
-        template_data: Dict[str, Any] = None,
+        template_data: dict[str, Any] = None,
         html_content: str = None,
         text_content: str = None,
-        attachments: List[Dict[str, Any]] = None,
+        attachments: list[dict[str, Any]] = None,
         priority: str = "normal",
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Расширенная отправка email с поддержкой шаблонов"""
         try:
             if not all([self.smtp_username, self.smtp_password]):
@@ -124,10 +120,10 @@ class EmailSMSEnhancedService:
         phone: str,
         message: str,
         template_name: str = None,
-        template_data: Dict[str, Any] = None,
+        template_data: dict[str, Any] = None,
         sender: str = None,
         priority: str = "normal",
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Расширенная отправка SMS с поддержкой шаблонов"""
         try:
             if not all([self.sms_api_key, self.sms_api_url]):
@@ -176,15 +172,15 @@ class EmailSMSEnhancedService:
 
     async def send_bulk_email(
         self,
-        recipients: List[Dict[str, Any]],
+        recipients: list[dict[str, Any]],
         subject: str,
         template_name: str = None,
-        template_data: Dict[str, Any] = None,
+        template_data: dict[str, Any] = None,
         html_content: str = None,
         text_content: str = None,
         batch_size: int = 50,
         delay_between_batches: float = 1.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Массовая отправка email"""
         results = {'total': len(recipients), 'sent': 0, 'failed': 0, 'errors': []}
 
@@ -233,13 +229,13 @@ class EmailSMSEnhancedService:
 
     async def send_bulk_sms(
         self,
-        recipients: List[Dict[str, Any]],
+        recipients: list[dict[str, Any]],
         message: str = None,
         template_name: str = None,
-        template_data: Dict[str, Any] = None,
+        template_data: dict[str, Any] = None,
         batch_size: int = 100,
         delay_between_batches: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Массовая отправка SMS"""
         results = {'total': len(recipients), 'sent': 0, 'failed': 0, 'errors': []}
 
@@ -286,11 +282,11 @@ class EmailSMSEnhancedService:
 
     async def send_appointment_reminder_enhanced(
         self,
-        patient_data: Dict[str, Any],
-        appointment_data: Dict[str, Any],
-        channels: List[str] = None,
-        template_data: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
+        patient_data: dict[str, Any],
+        appointment_data: dict[str, Any],
+        channels: list[str] = None,
+        template_data: dict[str, Any] = None,
+    ) -> dict[str, Any]:
         """Расширенное напоминание о записи"""
         if channels is None:
             channels = ['email', 'sms']
@@ -348,11 +344,11 @@ class EmailSMSEnhancedService:
 
     async def send_lab_results_enhanced(
         self,
-        patient_data: Dict[str, Any],
-        lab_data: Dict[str, Any],
-        channels: List[str] = None,
-        template_data: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
+        patient_data: dict[str, Any],
+        lab_data: dict[str, Any],
+        channels: list[str] = None,
+        template_data: dict[str, Any] = None,
+    ) -> dict[str, Any]:
         """Расширенная отправка результатов анализов"""
         if channels is None:
             channels = ['email', 'sms']
@@ -409,11 +405,11 @@ class EmailSMSEnhancedService:
 
     async def send_payment_confirmation_enhanced(
         self,
-        patient_data: Dict[str, Any],
-        payment_data: Dict[str, Any],
-        channels: List[str] = None,
-        template_data: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
+        patient_data: dict[str, Any],
+        payment_data: dict[str, Any],
+        channels: list[str] = None,
+        template_data: dict[str, Any] = None,
+    ) -> dict[str, Any]:
         """Расширенное подтверждение платежа"""
         if channels is None:
             channels = ['email', 'sms']
@@ -471,8 +467,8 @@ class EmailSMSEnhancedService:
         return results
 
     async def _render_email_template(
-        self, template_name: str, template_data: Dict[str, Any]
-    ) -> Tuple[str, str]:
+        self, template_name: str, template_data: dict[str, Any]
+    ) -> tuple[str, str]:
         """Рендеринг HTML и текстового шаблона email"""
         try:
             # HTML шаблон
@@ -490,7 +486,7 @@ class EmailSMSEnhancedService:
             return self._get_basic_email_template(template_data)
 
     async def _render_sms_template(
-        self, template_name: str, template_data: Dict[str, Any]
+        self, template_name: str, template_data: dict[str, Any]
     ) -> str:
         """Рендеринг SMS шаблона"""
         try:
@@ -516,7 +512,7 @@ class EmailSMSEnhancedService:
 
         return phone
 
-    async def _add_attachment(self, msg: MIMEMultipart, attachment: Dict[str, Any]):
+    async def _add_attachment(self, msg: MIMEMultipart, attachment: dict[str, Any]):
         """Добавление вложения к email"""
         try:
             if attachment.get('type') == 'image':
@@ -531,7 +527,7 @@ class EmailSMSEnhancedService:
         except Exception as e:
             logger.error(f"Ошибка добавления вложения: {e}")
 
-    def _get_basic_email_template(self, data: Dict[str, Any]) -> Tuple[str, str]:
+    def _get_basic_email_template(self, data: dict[str, Any]) -> tuple[str, str]:
         """Базовый HTML шаблон email"""
         html = f"""
         <!DOCTYPE html>
@@ -558,11 +554,11 @@ class EmailSMSEnhancedService:
 
         text = f"""
         Programma Clinic
-        
+
         Здравствуйте, {data.get('patient_name', 'Пациент')}!
-        
+
         {data.get('message', 'Уведомление от клиники')}
-        
+
         ---
         Programma Clinic
         г. Ташкент, ул. Медицинская, 15
@@ -571,11 +567,11 @@ class EmailSMSEnhancedService:
 
         return html, text
 
-    def _get_basic_sms_template(self, data: Dict[str, Any]) -> str:
+    def _get_basic_sms_template(self, data: dict[str, Any]) -> str:
         """Базовый SMS шаблон"""
         return f"Programma Clinic: {data.get('message', 'Уведомление от клиники')}"
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Получение статистики отправки"""
         return {
             **self.stats,

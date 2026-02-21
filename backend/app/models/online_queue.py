@@ -25,9 +25,18 @@ See also:
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -36,8 +45,8 @@ from app.db.base_class import Base
 if TYPE_CHECKING:
     from app.models.clinic import Doctor
     from app.models.patient import Patient
-    from app.models.visit import Visit
     from app.models.user import User
+    from app.models.visit import Visit
 
 
 class DailyQueue(Base):
@@ -50,18 +59,18 @@ class DailyQueue(Base):
     specialist_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doctors.id"), nullable=False, index=True
     )  # ИСПРАВЛЕНО: FK к doctors.id
-    queue_tag: Mapped[Optional[str]] = mapped_column(
+    queue_tag: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
     )  # ecg, lab, cardiology_common, etc.
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    opened_at: Mapped[Optional[datetime]] = mapped_column(
+    opened_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )  # Факт открытия приема
 
     # Информация о кабинете
-    cabinet_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
-    cabinet_floor: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    cabinet_building: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    cabinet_number: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    cabinet_floor: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cabinet_building: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Временные ограничения для онлайн записи
     online_start_time: Mapped[str] = mapped_column(String(5), default="07:00", nullable=False)
@@ -72,15 +81,20 @@ class DailyQueue(Base):
         Integer, default=15, nullable=False
     )  # Максимум записей онлайн
 
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Relationships
-    specialist: Mapped["Doctor"] = relationship("Doctor", foreign_keys=[specialist_id])
-    entries: Mapped[List["OnlineQueueEntry"]] = relationship(
+    specialist: Mapped[Doctor] = relationship("Doctor", foreign_keys=[specialist_id])
+    entries: Mapped[list[OnlineQueueEntry]] = relationship(
         "OnlineQueueEntry", back_populates="queue", cascade="all, delete-orphan"
     )
+
+    @property
+    def is_clinic_wide(self) -> bool:
+        """Backward compatibility for legacy tests/clients."""
+        return False
 
 
 class OnlineQueueEntry(Base):
@@ -98,22 +112,22 @@ class OnlineQueueEntry(Base):
     number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # Номер в очереди (1..N)
 
     # Идентификация пациента
-    patient_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("patients.id", ondelete="SET NULL"), 
+    patient_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("patients.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve queue history for analytics and audit
-    patient_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # Если пациент не зарегистрирован
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
-    telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
-    birth_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    patient_name: Mapped[str | None] = mapped_column(String(200), nullable=True)  # Если пациент не зарегистрирован
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    birth_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Связь с визитом (для подтвержденных визитов)
-    visit_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("visits.id", ondelete="SET NULL"), 
-        nullable=True, 
+    visit_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("visits.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve queue history for analytics and audit
 
@@ -124,10 +138,10 @@ class OnlineQueueEntry(Base):
     discount_mode: Mapped[str] = mapped_column(
         String(20), default="none", nullable=False
     )  # none, repeat, benefit, all_free
-    services: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
+    services: Mapped[list[dict[str, Any]] | None] = mapped_column(
         JSON, nullable=True
     )  # Список услуг с полными данными
-    service_codes: Mapped[Optional[List[str]]] = mapped_column(
+    service_codes: Mapped[list[str] | None] = mapped_column(
         JSON, nullable=True
     )  # DEPRECATED: Коды услуг ["K01", "K02", ...]
     total_amount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -143,15 +157,15 @@ class OnlineQueueEntry(Base):
     )  # waiting, called, in_service, diagnostics, served, incomplete, no_show, cancelled
 
     # ✅ НОВОЕ: Дополнительные поля для статусов
-    incomplete_reason: Mapped[Optional[str]] = mapped_column(
+    incomplete_reason: Mapped[str | None] = mapped_column(
         String(200), nullable=True
     )  # Причина incomplete: "Пациент ушёл", "Не вернулся" и т.д.
-    diagnostics_started_at: Mapped[Optional[datetime]] = mapped_column(
+    diagnostics_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )  # Время начала обследования (для таймера)
 
     # Время регистрации в очереди
-    queue_time: Mapped[Optional[datetime]] = mapped_column(
+    queue_time: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
 
@@ -163,19 +177,19 @@ class OnlineQueueEntry(Base):
     # ⭐ Session ID для группировки услуг пациента в одной очереди
     # FORMAT: opaque string, НЕ интерпретируется frontend
     # RULE: Same patient + same queue + same day = same session_id
-    session_id: Mapped[Optional[str]] = mapped_column(
+    session_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True, index=True
     )
 
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
-    called_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    queue: Mapped["DailyQueue"] = relationship("DailyQueue", back_populates="entries")
-    patient: Mapped[Optional["Patient"]] = relationship("Patient", foreign_keys=[patient_id])
-    visit: Mapped[Optional["Visit"]] = relationship("Visit", foreign_keys=[visit_id])
+    queue: Mapped[DailyQueue] = relationship("DailyQueue", back_populates="entries")
+    patient: Mapped[Patient | None] = relationship("Patient", foreign_keys=[patient_id])
+    visit: Mapped[Visit | None] = relationship("Visit", foreign_keys=[visit_id])
 
 
 class QueueToken(Base):
@@ -188,20 +202,20 @@ class QueueToken(Base):
 
     # Параметры токена
     day: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    specialist_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("doctors.id", ondelete="SET NULL"), 
+    specialist_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("doctors.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve queue tokens
-    department: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    department: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     is_clinic_wide: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )  # True для общего QR клиники
 
     # Метаданные
-    generated_by_user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    generated_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
     usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -210,13 +224,13 @@ class QueueToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Relationships
-    specialist: Mapped[Optional["Doctor"]] = relationship("Doctor", foreign_keys=[specialist_id])
-    generated_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[generated_by_user_id])
+    specialist: Mapped[Doctor | None] = relationship("Doctor", foreign_keys=[specialist_id])
+    generated_by: Mapped[User | None] = relationship("User", foreign_keys=[generated_by_user_id])
 
 
 class QueueJoinSession(Base):
@@ -230,17 +244,17 @@ class QueueJoinSession(Base):
     session_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
 
     # QR токен, по которому присоединились
-    qr_token: Mapped[Optional[str]] = mapped_column(
-        String(64), 
-        ForeignKey("queue_tokens.token", ondelete="SET NULL"), 
-        nullable=True, 
+    qr_token: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("queue_tokens.token", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve session history
 
     # Данные пациента
     patient_name: Mapped[str] = mapped_column(String(200), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    telegram_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
 
     # Статус сессии
     status: Mapped[str] = mapped_column(
@@ -248,29 +262,29 @@ class QueueJoinSession(Base):
     )  # pending, joined, expired, cancelled
 
     # Результат присоединения
-    queue_entry_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("queue_entries.id", ondelete="SET NULL"), 
+    queue_entry_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("queue_entries.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve session history
-    queue_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    queue_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Метаданные
-    user_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
 
     # Временные метки
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # Relationships
-    qr_token_rel: Mapped[Optional["QueueToken"]] = relationship(
+    qr_token_rel: Mapped[QueueToken | None] = relationship(
         "QueueToken", foreign_keys=[qr_token]
     )
-    queue_entry: Mapped[Optional["OnlineQueueEntry"]] = relationship(
+    queue_entry: Mapped[OnlineQueueEntry | None] = relationship(
         "OnlineQueueEntry", foreign_keys=[queue_entry_id]
     )
 
@@ -299,19 +313,19 @@ class QueueStatistics(Base):
     # Статистика по статусам
     total_served: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_no_show: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    average_wait_time: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # В минутах
+    average_wait_time: Mapped[int | None] = mapped_column(Integer, nullable=True)  # В минутах
 
     # Пиковые нагрузки
-    peak_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Час пик (0-23)
+    peak_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Час пик (0-23)
     max_queue_length: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Временные метки
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), onupdate=func.now()
     )
 
     # Relationships
-    queue: Mapped["DailyQueue"] = relationship("DailyQueue", foreign_keys=[queue_id])
+    queue: Mapped[DailyQueue] = relationship("DailyQueue", foreign_keys=[queue_id])

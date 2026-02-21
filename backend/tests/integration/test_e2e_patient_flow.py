@@ -45,7 +45,7 @@ def patient_user_with_data(db_session):
         db_session.add(user)
         db_session.commit()
         db_session.refresh(user)
-    
+
     # Создаем запись пациента
     patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
     if not patient:
@@ -59,7 +59,7 @@ def patient_user_with_data(db_session):
         db_session.add(patient)
         db_session.commit()
         db_session.refresh(patient)
-    
+
     # Создаем записи на приём
     # 1. Запись в будущем (можно отменить/перенести)
     future_apt = Appointment(
@@ -71,7 +71,7 @@ def patient_user_with_data(db_session):
         services=["Консультация кардиолога"],
     )
     db_session.add(future_apt)
-    
+
     # 2. Запись через 12 часов (нельзя отменить - меньше 24ч)
     tomorrow_apt = Appointment(
         patient_id=patient.id,
@@ -82,7 +82,7 @@ def patient_user_with_data(db_session):
         services=["Консультация терапевта"],
     )
     db_session.add(tomorrow_apt)
-    
+
     # 3. Завершенная запись
     past_apt = Appointment(
         patient_id=patient.id,
@@ -93,7 +93,7 @@ def patient_user_with_data(db_session):
         services=["Осмотр дерматолога"],
     )
     db_session.add(past_apt)
-    
+
     # Создаем результаты анализов (используем LabOrder)
     lab_result = LabOrder(
         patient_id=patient.id,
@@ -102,9 +102,9 @@ def patient_user_with_data(db_session):
         created_at=datetime.now() - timedelta(days=3),
     )
     db_session.add(lab_result)
-    
+
     db_session.commit()
-    
+
     return {
         "user": user,
         "patient": patient,
@@ -145,26 +145,26 @@ class TestPatientFlow:
             "/api/v1/patients/appointments",
             headers=patient_auth_headers,
         )
-        
+
         assert response.status_code == 200
         appointments = response.json()
         assert isinstance(appointments, list)
-        
+
         # Проверяем, что у нас есть записи
         # Может быть пустой список, если пациент не найден
         # В реальных тестах нужно проверить связь user -> patient
-    
+
     def test_patient_can_view_single_appointment(
         self, client: TestClient, patient_auth_headers, patient_user_with_data
     ):
         """Пациент может просмотреть детали записи"""
         apt = patient_user_with_data["future_appointment"]
-        
+
         response = client.get(
             f"/api/v1/patients/appointments/{apt.id}",
             headers=patient_auth_headers,
         )
-        
+
         # Может вернуть 404 если patient не связан с user
         # В production нужно исправить get_patient_for_user
         if response.status_code == 200:
@@ -172,84 +172,84 @@ class TestPatientFlow:
             assert "id" in data
             assert "appointment_date" in data
             assert "status" in data
-    
+
     def test_patient_can_cancel_future_appointment(
         self, client: TestClient, patient_auth_headers, patient_user_with_data, db_session
     ):
         """Пациент может отменить запись за 24+ часов до приёма"""
         apt = patient_user_with_data["future_appointment"]
-        
+
         response = client.post(
             f"/api/v1/patients/appointments/{apt.id}/cancel",
             headers=patient_auth_headers,
         )
-        
+
         # Если пациент правильно связан с user
         if response.status_code == 200:
             data = response.json()
             assert data["success"] is True
             assert "appointment_id" in data
-            
+
             # Проверяем статус в БД
             db_session.refresh(apt)
             assert apt.status == "cancelled"
-    
+
     def test_patient_cannot_cancel_soon_appointment(
         self, client: TestClient, patient_auth_headers, patient_user_with_data
     ):
         """Пациент НЕ может отменить запись менее чем за 24 часа"""
         apt = patient_user_with_data["tomorrow_appointment"]
-        
+
         response = client.post(
             f"/api/v1/patients/appointments/{apt.id}/cancel",
             headers=patient_auth_headers,
         )
-        
+
         # Ожидаем ошибку если запись слишком скоро
         # или 404 если пациент не связан
         if response.status_code == 400:
             data = response.json()
             assert "24" in data.get("detail", "").lower() or "час" in data.get("detail", "").lower()
-    
+
     def test_patient_can_reschedule_appointment(
         self, client: TestClient, patient_auth_headers, patient_user_with_data, db_session
     ):
         """Пациент может перенести запись"""
         apt = patient_user_with_data["future_appointment"]
         new_date = (date.today() + timedelta(days=10)).isoformat()
-        
+
         response = client.post(
             f"/api/v1/patients/appointments/{apt.id}/reschedule",
             headers=patient_auth_headers,
             json={"new_date": new_date, "new_time": "14:00"},
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             assert data["success"] is True
             assert data["new_date"] == new_date
             assert data["new_time"] == "14:00"
-    
+
     def test_patient_can_get_available_slots(
         self, client: TestClient, patient_auth_headers, patient_user_with_data
     ):
         """Пациент может получить доступные слоты для переноса"""
         apt = patient_user_with_data["future_appointment"]
         date_from = (date.today() + timedelta(days=1)).isoformat()
-        
+
         response = client.get(
             f"/api/v1/patients/appointments/{apt.id}/available-slots",
             params={"date_from": date_from},
             headers=patient_auth_headers,
         )
-        
+
         if response.status_code == 200:
             slots = response.json()
             assert isinstance(slots, list)
             if len(slots) > 0:
                 assert "date" in slots[0]
                 assert "time" in slots[0]
-    
+
     def test_patient_can_view_results(
         self, client: TestClient, patient_auth_headers
     ):
@@ -258,11 +258,11 @@ class TestPatientFlow:
             "/api/v1/patients/results",
             headers=patient_auth_headers,
         )
-        
+
         assert response.status_code == 200
         results = response.json()
         assert isinstance(results, list)
-    
+
     def test_patient_cannot_view_others_appointments(
         self, client: TestClient, patient_auth_headers, db_session
     ):
@@ -276,7 +276,7 @@ class TestPatientFlow:
         )
         db_session.add(other_patient)
         db_session.commit()
-        
+
         other_apt = Appointment(
             patient_id=other_patient.id,
             # department="therapy",  # Removed
@@ -286,13 +286,13 @@ class TestPatientFlow:
         )
         db_session.add(other_apt)
         db_session.commit()
-        
+
         # Пытаемся получить чужую запись
         response = client.get(
             f"/api/v1/patients/appointments/{other_apt.id}",
             headers=patient_auth_headers,
         )
-        
+
         # Должен вернуть 404 (не найдено для этого пациента)
         assert response.status_code == 404
 
@@ -306,7 +306,7 @@ class TestPatientAuthFlow:
         """Неавторизованный доступ отклоняется"""
         response = client.get("/api/v1/patients/appointments")
         assert response.status_code == 401
-    
+
     def test_invalid_token_rejected(self, client: TestClient):
         """Невалидный токен отклоняется"""
         response = client.get(

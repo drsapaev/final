@@ -3,9 +3,9 @@ CRUD операции для AI конфигурации
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.ai_config import AIPromptTemplate, AIProvider, AIUsageLog
@@ -21,7 +21,7 @@ from app.schemas.ai_config import (
 
 def get_ai_providers(
     db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
-) -> List[AIProvider]:
+) -> list[AIProvider]:
     """Получить список AI провайдеров"""
     query = db.query(AIProvider)
 
@@ -31,17 +31,17 @@ def get_ai_providers(
     return query.offset(skip).limit(limit).all()
 
 
-def get_ai_provider_by_id(db: Session, provider_id: int) -> Optional[AIProvider]:
+def get_ai_provider_by_id(db: Session, provider_id: int) -> AIProvider | None:
     """Получить AI провайдера по ID"""
     return db.query(AIProvider).filter(AIProvider.id == provider_id).first()
 
 
-def get_ai_provider_by_name(db: Session, name: str) -> Optional[AIProvider]:
+def get_ai_provider_by_name(db: Session, name: str) -> AIProvider | None:
     """Получить AI провайдера по имени"""
     return db.query(AIProvider).filter(AIProvider.name == name).first()
 
 
-def get_default_ai_provider(db: Session) -> Optional[AIProvider]:
+def get_default_ai_provider(db: Session) -> AIProvider | None:
     """Получить провайдера по умолчанию"""
     return (
         db.query(AIProvider)
@@ -74,7 +74,7 @@ def create_ai_provider(db: Session, provider: AIProviderCreate) -> AIProvider:
 
 def update_ai_provider(
     db: Session, provider_id: int, provider: AIProviderUpdate
-) -> Optional[AIProvider]:
+) -> AIProvider | None:
     """Обновить AI провайдера"""
     db_provider = get_ai_provider_by_id(db, provider_id)
     if not db_provider:
@@ -122,12 +122,12 @@ def delete_ai_provider(db: Session, provider_id: int) -> bool:
 
 def get_prompt_templates(
     db: Session,
-    provider_id: Optional[int] = None,
-    task_type: Optional[str] = None,
-    specialty: Optional[str] = None,
+    provider_id: int | None = None,
+    task_type: str | None = None,
+    specialty: str | None = None,
     language: str = "ru",
     active_only: bool = True,
-) -> List[AIPromptTemplate]:
+) -> list[AIPromptTemplate]:
     """Получить шаблоны промптов"""
     query = db.query(AIPromptTemplate)
 
@@ -147,7 +147,7 @@ def get_prompt_templates(
 
 def get_prompt_template_by_id(
     db: Session, template_id: int
-) -> Optional[AIPromptTemplate]:
+) -> AIPromptTemplate | None:
     """Получить шаблон промпта по ID"""
     return db.query(AIPromptTemplate).filter(AIPromptTemplate.id == template_id).first()
 
@@ -165,7 +165,7 @@ def create_prompt_template(
 
 def update_prompt_template(
     db: Session, template_id: int, template: AIPromptTemplateUpdate
-) -> Optional[AIPromptTemplate]:
+) -> AIPromptTemplate | None:
     """Обновить шаблон промпта"""
     db_template = get_prompt_template_by_id(db, template_id)
     if not db_template:
@@ -195,20 +195,20 @@ def delete_prompt_template(db: Session, template_id: int) -> bool:
 
 def create_ai_usage_log(
     db: Session,
-    user_id: Optional[int],
+    user_id: int | None,
     provider_id: int,
     task_type: str,
-    specialty: Optional[str] = None,
-    tokens_used: Optional[int] = None,
-    response_time_ms: Optional[int] = None,
+    specialty: str | None = None,
+    tokens_used: int | None = None,
+    response_time_ms: int | None = None,
     success: bool = True,
-    error_message: Optional[str] = None,
-    request_hash: Optional[str] = None,
+    error_message: str | None = None,
+    request_hash: str | None = None,
     cached_response: bool = False,
 ) -> AIUsageLog:
     """Создать лог использования AI"""
     # Получаем провайдера для копирования его имени в audit log
-    provider = get_ai_provider(db, provider_id)
+    provider = get_ai_provider_by_id(db, provider_id)
     if not provider:
         raise ValueError(f"AI Provider с ID {provider_id} не найден")
 
@@ -234,9 +234,9 @@ def create_ai_usage_log(
 def get_ai_usage_stats(
     db: Session,
     days_back: int = 30,
-    provider_id: Optional[int] = None,
-    specialty: Optional[str] = None,
-) -> Dict[str, Any]:
+    provider_id: int | None = None,
+    specialty: str | None = None,
+) -> dict[str, Any]:
     """Получить статистику использования AI"""
     start_date = datetime.utcnow() - timedelta(days=days_back)
 
@@ -250,16 +250,16 @@ def get_ai_usage_stats(
     logs = query.all()
 
     total_requests = len(logs)
-    successful_requests = len([l for l in logs if l.success])
+    successful_requests = len([log for log in logs if log.success])
     failed_requests = total_requests - successful_requests
 
-    total_tokens = sum(l.tokens_used for l in logs if l.tokens_used)
+    total_tokens = sum(log.tokens_used for log in logs if log.tokens_used)
     avg_response_time = (
-        sum(l.response_time_ms for l in logs if l.response_time_ms) / len(logs)
+        sum(log.response_time_ms for log in logs if log.response_time_ms) / len(logs)
         if logs
         else 0
     )
-    cache_hits = len([l for l in logs if l.cached_response])
+    cache_hits = len([log for log in logs if log.cached_response])
     cache_hit_rate = (cache_hits / total_requests) * 100 if total_requests > 0 else 0
 
     # Статистика по провайдерам
@@ -275,9 +275,9 @@ def get_ai_usage_stats(
     # Вычисляем success rate для каждого провайдера
     for provider_name in by_provider:
         provider_logs = [
-            l for l in logs if l.provider and l.provider.name == provider_name
+            log for log in logs if log.provider and log.provider.name == provider_name
         ]
-        successful = len([l for l in provider_logs if l.success])
+        successful = len([log for log in provider_logs if log.success])
         by_provider[provider_name]["success_rate"] = (
             (successful / len(provider_logs)) * 100 if provider_logs else 0
         )
@@ -316,7 +316,7 @@ def get_ai_usage_stats(
 # ===================== НАСТРОЙКИ СИСТЕМЫ =====================
 
 
-def get_ai_system_settings(db: Session) -> Dict[str, Any]:
+def get_ai_system_settings(db: Session) -> dict[str, Any]:
     """Получить настройки AI системы"""
     from app.crud.clinic import get_settings_by_category
 
@@ -347,8 +347,8 @@ def get_ai_system_settings(db: Session) -> Dict[str, Any]:
 
 
 def update_ai_system_settings(
-    db: Session, settings: Dict[str, Any], user_id: int
-) -> Dict[str, Any]:
+    db: Session, settings: dict[str, Any], user_id: int
+) -> dict[str, Any]:
     """Обновить настройки AI системы"""
     from app.crud.clinic import update_settings_batch
 

@@ -2,7 +2,6 @@
 MCP Configuration Settings
 """
 
-from typing import Optional
 
 from pydantic import BaseSettings
 
@@ -36,7 +35,7 @@ class MCPSettings(BaseSettings):
     MCP_MAX_REQUEST_SIZE_MB: int = 50
 
     # Настройки AI провайдеров через MCP
-    MCP_DEFAULT_AI_PROVIDER: Optional[str] = None  # None = auto-select
+    MCP_DEFAULT_AI_PROVIDER: str | None = None  # None = auto-select
     MCP_PREFER_OPENAI_FOR_IMAGES: bool = True
     MCP_PREFER_GEMINI_FOR_ANALYSIS: bool = False
 
