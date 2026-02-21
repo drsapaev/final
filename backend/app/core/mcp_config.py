@@ -3,11 +3,16 @@ MCP Configuration Settings
 """
 
 
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class MCPSettings(BaseSettings):
     """Настройки для MCP (Model Context Protocol)"""
+
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+    )
 
     # Основные настройки
     MCP_ENABLED: bool = True
@@ -38,10 +43,5 @@ class MCPSettings(BaseSettings):
     MCP_DEFAULT_AI_PROVIDER: str | None = None  # None = auto-select
     MCP_PREFER_OPENAI_FOR_IMAGES: bool = True
     MCP_PREFER_GEMINI_FOR_ANALYSIS: bool = False
-
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
-
 
 mcp_settings = MCPSettings()

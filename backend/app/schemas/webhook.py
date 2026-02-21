@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import ConfigDict
 
 # ===================== БАЗОВЫЕ СХЕМЫ =====================
 
@@ -159,8 +160,7 @@ class WebhookInDB(WebhookBase):
     created_at: datetime
     updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Webhook(WebhookInDB):
@@ -215,8 +215,7 @@ class WebhookCallInDB(WebhookCallBase):
     updated_at: datetime | None = None
     completed_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WebhookCall(WebhookCallInDB):
@@ -254,8 +253,7 @@ class WebhookEventInDB(WebhookEventBase):
     failed_webhooks: list[str] = []
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WebhookEvent(WebhookEventInDB):

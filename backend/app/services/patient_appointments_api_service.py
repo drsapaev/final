@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -47,8 +48,7 @@ class PatientAppointmentResponse(BaseModel):
     can_reschedule: bool = False
     hours_until_appointment: float | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PatientResultResponse(BaseModel):
@@ -59,8 +59,7 @@ class PatientResultResponse(BaseModel):
     status: str
     file_url: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RescheduleRequest(BaseModel):

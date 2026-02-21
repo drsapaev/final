@@ -6,6 +6,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -144,8 +145,7 @@ class InvoiceResponse(BaseModel):
     is_recurring: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentResponse(BaseModel):
@@ -162,8 +162,7 @@ class PaymentResponse(BaseModel):
     confirmed_at: datetime | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === API endpoints ===

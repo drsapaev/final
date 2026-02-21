@@ -18,6 +18,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -58,8 +59,7 @@ class ChatSessionResponse(BaseModel):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatMessageCreate(BaseModel):
@@ -81,8 +81,7 @@ class ChatMessageResponse(BaseModel):
     was_cached: bool
     created_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatFeedbackCreate(BaseModel):

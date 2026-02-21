@@ -274,6 +274,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -290,8 +291,7 @@ class ServiceCategoryOut(BaseModel):
     specialty: Optional[str] = None
     active: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceCategoryCreate(BaseModel):
@@ -332,8 +332,7 @@ class ServiceOut(BaseModel):
     allow_doctor_price_override: Optional[bool] = None
     department_key: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceCreate(BaseModel):
@@ -426,8 +425,7 @@ class DoctorOut(BaseModel):
     cabinet: Optional[str] = None
     active: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceResolveResponse(BaseModel):
@@ -439,8 +437,7 @@ class ServiceResolveResponse(BaseModel):
     departments: List[str] = []
     ui_type: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceCodeMappingsResponse(BaseModel):

@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -39,8 +40,7 @@ class FeatureFlagResponse(BaseModel):
     created_by: str | None = None
     updated_by: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeatureFlagCreateRequest(BaseModel):
@@ -92,8 +92,7 @@ class FeatureFlagHistoryResponse(BaseModel):
     user_agent: str | None = None
     reason: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeatureFlagStatusResponse(BaseModel):

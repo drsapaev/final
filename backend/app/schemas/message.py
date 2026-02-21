@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict
 
 
 class MessageType(str, Enum):
@@ -50,8 +51,7 @@ class MessageReactionOut(MessageReactionBase):
     user_name: str | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageOut(BaseModel):
@@ -82,8 +82,7 @@ class MessageOut(BaseModel):
     # Реакции
     reactions: list[MessageReactionOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationOut(BaseModel):
@@ -96,8 +95,7 @@ class ConversationOut(BaseModel):
     unread_count: int
     is_online: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageListResponse(BaseModel):

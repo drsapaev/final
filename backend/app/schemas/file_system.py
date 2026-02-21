@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 
 
 class FileTypeEnum(str, Enum):
@@ -85,8 +86,7 @@ class FileOut(FileBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @classmethod
     def from_orm(cls, obj):
@@ -166,8 +166,7 @@ class FileVersionOut(FileVersionBase):
     created_by: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== СОВМЕСТНОЕ ИСПОЛЬЗОВАНИЕ =====================
@@ -198,8 +197,7 @@ class FileShareOut(FileShareBase):
     created_by: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== ПАПКИ =====================
@@ -228,8 +226,7 @@ class FileFolderOut(FileFolderBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FileFolderTree(FileFolderOut):
@@ -324,8 +321,7 @@ class FileQuotaOut(FileQuotaBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== ХРАНИЛИЩЕ =====================
@@ -358,8 +354,7 @@ class FileStorageOut(FileStorageBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===================== СТАТИСТИКА =====================

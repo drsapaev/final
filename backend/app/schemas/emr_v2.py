@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import Field
+from pydantic import ConfigDict
 
 from app.schemas.base import ORMModel
 
@@ -145,8 +146,7 @@ class EMRRecordOut(ORMModel):
     signed_by: int | None = None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRRecordSummary(ORMModel):
@@ -162,8 +162,7 @@ class EMRRecordSummary(ORMModel):
     updated_at: datetime | None = None
     signed_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================
@@ -184,8 +183,7 @@ class EMRRevisionOut(ORMModel):
     created_at: datetime  # DB column name
     client_session_id: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRRevisionSummary(ORMModel):
@@ -198,8 +196,7 @@ class EMRRevisionSummary(ORMModel):
     created_by: int  # DB column name
     created_at: datetime  # DB column name
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRHistoryOut(ORMModel):
@@ -269,5 +266,4 @@ class EMRAuditLogOut(ORMModel):
     extra_data: dict[str, Any] | None = None
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -46,8 +46,7 @@ class TwoFactorAuthOut(TwoFactorAuthBase):
     updated_at: datetime | None = None
     last_used: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorBackupCodeBase(BaseModel):
@@ -73,8 +72,7 @@ class TwoFactorBackupCodeOut(TwoFactorBackupCodeBase):
     used_at: datetime | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorRecoveryBase(BaseModel):
@@ -114,8 +112,7 @@ class TwoFactorRecoveryOut(TwoFactorRecoveryBase):
     ip_address: str | None = None
     user_agent: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorSessionBase(BaseModel):
@@ -153,8 +150,7 @@ class TwoFactorSessionOut(TwoFactorSessionBase):
     user_agent: str | None = None
     device_name: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorDeviceBase(BaseModel):
@@ -187,8 +183,7 @@ class TwoFactorDeviceOut(TwoFactorDeviceBase):
     ip_address: str | None = None
     user_agent: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схемы для API запросов

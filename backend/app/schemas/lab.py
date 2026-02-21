@@ -5,6 +5,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 
 
 class LabResultBase(BaseModel):
@@ -44,8 +45,7 @@ class LabResultOut(LabResultBase):
     order_id: int
     created_at: datetime
 
-    class Config:
-        from_orm = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LabOrderBase(BaseModel):
@@ -77,5 +77,4 @@ class LabOrderOut(LabOrderBase):
     created_at: datetime
     completed_at: datetime | None = None
 
-    class Config:
-        from_orm = True
+    model_config = ConfigDict(from_attributes=True)

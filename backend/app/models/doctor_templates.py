@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy import (
     Boolean,
     Column,
@@ -98,8 +99,7 @@ class DoctorTreatmentTemplateResponse(BaseModel):
     frequency_label: str | None = None  # "часто" / "редко" / None
     is_stale: bool = False  # last_used_at > 12 months → 🕒 "Давно не использовал"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DoctorTreatmentTemplatesListResponse(BaseModel):

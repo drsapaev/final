@@ -4,6 +4,7 @@ Pydantic schemas for Role management
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 
 
 class RoleBase(BaseModel):
@@ -42,8 +43,7 @@ class RoleResponse(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoleListResponse(BaseModel):
@@ -57,8 +57,7 @@ class RoleOptionResponse(BaseModel):
     value: str  # role.name (e.g., "Admin")
     label: str  # role.display_name (e.g., "Администратор")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoleOptionsListResponse(BaseModel):

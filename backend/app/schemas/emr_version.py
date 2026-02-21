@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import Field
+from pydantic import ConfigDict
 
 from app.schemas.base import ORMModel
 
@@ -42,8 +43,7 @@ class EMRVersionOut(EMRVersionBase):
     created_at: datetime
     updated_at: datetime | None = None
 
-    class Config:
-        from_orm = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRVersionComparison(ORMModel):

@@ -996,6 +996,7 @@ from typing import Any, Generic, List, Optional, TypeVar
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -1020,8 +1021,7 @@ class PendingPaymentItem(BaseModel):
     queue_number: Optional[str] = None
     department: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentHistoryItem(BaseModel):
@@ -1037,8 +1037,7 @@ class PaymentHistoryItem(BaseModel):
     note: Optional[str] = None
     cashier_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 T = TypeVar("T")
@@ -1072,8 +1071,7 @@ class PaymentResponse(BaseModel):
     paid_at: Optional[datetime] = None
     note: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CancelPaymentRequest(BaseModel):

@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -125,8 +126,7 @@ class PricingRuleResponse(BaseModel):
     current_uses: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServicePackageResponse(BaseModel):
@@ -145,8 +145,7 @@ class ServicePackageResponse(BaseModel):
     per_patient_limit: int | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === API endpoints ===

@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -64,8 +65,7 @@ class PatientSearchResult(BaseModel):
     phone: str | None = None
     birth_date: date | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VisitSearchResult(BaseModel):
@@ -77,8 +77,7 @@ class VisitSearchResult(BaseModel):
     visit_time: str | None = None
     specialist_name: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LabResultSearchResult(BaseModel):
@@ -89,8 +88,7 @@ class LabResultSearchResult(BaseModel):
     test_type: str | None = None
     created_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GlobalSearchResponse(BaseModel):

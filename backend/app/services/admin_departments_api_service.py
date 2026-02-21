@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -99,8 +100,7 @@ class DepartmentResponse(BaseModel):
     active: bool
     description: str | None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentResponseWithSettings(DepartmentResponse):
