@@ -24,6 +24,9 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.admin_departments_api_repository import (
+    AdminDepartmentsApiRepository,
+)
 from app.schemas.department import (
     DepartmentQueueSettingsUpdate,
     DepartmentRegistrationSettingsUpdate,
@@ -32,6 +35,10 @@ from app.schemas.department import (
 from app.services.service_mapping import normalize_service_code
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> AdminDepartmentsApiRepository:
+    return AdminDepartmentsApiRepository(db)
 
 
 # Pydantic schemas
@@ -116,11 +123,11 @@ def _ensure_clinic_setting(
     db: Session, key: str, value: Any, description: str, category: str = "queue"
 ) -> bool:
     """Создать настройку клиники, если она отсутствует."""
-    setting = db.query(ClinicSettings).filter(ClinicSettings.key == key).first()
+    setting = _repo(db).query(ClinicSettings).filter(ClinicSettings.key == key).first()
     if setting:
         return False
 
-    db.add(
+    _repo(db).add(
         ClinicSettings(
             key=key,
             value=value,
@@ -149,7 +156,7 @@ def _ensure_department_integrations(
 
     # Queue settings
     queue_settings = (
-        db.query(DepartmentQueueSettings)
+        _repo(db).query(DepartmentQueueSettings)
         .filter(DepartmentQueueSettings.department_id == department.id)
         .first()
     )
@@ -163,12 +170,12 @@ def _ensure_department_integrations(
             avg_wait_time=20,
             auto_close_time=opts.get("auto_close_time") or "09:00",
         )
-        db.add(queue_settings)
+        _repo(db).add(queue_settings)
         integration_result["queue_settings_created"] = True
 
     # Registration settings
     registration_settings = (
-        db.query(DepartmentRegistrationSettings)
+        _repo(db).query(DepartmentRegistrationSettings)
         .filter(DepartmentRegistrationSettings.department_id == department.id)
         .first()
     )
@@ -182,7 +189,7 @@ def _ensure_department_integrations(
             auto_assign_doctor=False,
             allow_walkin=True,
         )
-        db.add(registration_settings)
+        _repo(db).add(registration_settings)
         integration_result["registration_settings_created"] = True
 
     # Clinic queue settings (start numbers / limits)
@@ -210,7 +217,7 @@ def _ensure_department_integrations(
         opts.get("service_category_code") or department.key[:1] or "O"
     ).upper()
     service_category = (
-        db.query(ServiceCategory).filter(ServiceCategory.code == category_code).first()
+        _repo(db).query(ServiceCategory).filter(ServiceCategory.code == category_code).first()
     )
     if not service_category:
         service_category = ServiceCategory(
@@ -220,12 +227,12 @@ def _ensure_department_integrations(
             specialty=department.key,
             active=True,
         )
-        db.add(service_category)
-        db.flush()
+        _repo(db).add(service_category)
+        _repo(db).flush()
         integration_result["service_category_created"] = True
 
     # Update existing services to link department_id if key matches
-    db.query(Service).filter(
+    _repo(db).query(Service).filter(
         Service.department_key == department.key,
         Service.department_id.is_(None),
     ).update(
@@ -237,7 +244,7 @@ def _ensure_department_integrations(
 
     # Default service (used by wizard/queue mapping)
     existing_service = (
-        db.query(Service)
+        _repo(db).query(Service)
         .filter(
             (Service.department_id == department.id)
             | (Service.department_key == department.key)
@@ -254,7 +261,7 @@ def _ensure_department_integrations(
         suffix = 1
         unique_code = normalized_code.upper()
         while (
-            db.query(Service).filter(Service.service_code == unique_code).first()
+            _repo(db).query(Service).filter(Service.service_code == unique_code).first()
             is not None
         ):
             suffix += 1
@@ -274,10 +281,10 @@ def _ensure_department_integrations(
             requires_doctor=False,
             is_consultation=True,
         )
-        db.add(default_service)
-        db.flush()
+        _repo(db).add(default_service)
+        _repo(db).flush()
 
-        db.add(
+        _repo(db).add(
             DepartmentService(
                 department_id=department.id,
                 service_id=default_service.id,
@@ -294,7 +301,7 @@ def _ensure_department_integrations(
 def _collect_department_overview(db: Session) -> dict[str, Any]:
     """Формирует реальные показатели по отделениям."""
     today = date.today()
-    departments = db.query(Department).order_by(Department.display_order).all()
+    departments = _repo(db).query(Department).order_by(Department.display_order).all()
     overview_items: list[dict[str, Any]] = []
 
     totals = {
@@ -312,7 +319,7 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
         stats = _default_stats()
 
         stats["appointments_today"] = (
-            db.query(func.count(Appointment.id))
+            _repo(db).query(func.count(Appointment.id))
             .filter(
                 Appointment.department_id == department.id,
                 Appointment.appointment_date == today,
@@ -321,7 +328,7 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             or 0
         )
         stats["visits_today"] = (
-            db.query(func.count(Visit.id))
+            _repo(db).query(func.count(Visit.id))
             .filter(
                 Visit.department_id == department.id,
                 func.date(Visit.visit_date) == today,
@@ -330,7 +337,7 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             or 0
         )
         stats["services"] = (
-            db.query(func.count(Service.id))
+            _repo(db).query(func.count(Service.id))
             .filter(
                 (Service.department_id == department.id)
                 | (Service.department_key == department.key)
@@ -339,13 +346,13 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             or 0
         )
         stats["doctors"] = (
-            db.query(func.count(Doctor.id))
+            _repo(db).query(func.count(Doctor.id))
             .filter(Doctor.department_id == department.id)
             .scalar()
             or 0
         )
         stats["queue_entries_today"] = (
-            db.query(func.count(OnlineQueueEntry.id))
+            _repo(db).query(func.count(OnlineQueueEntry.id))
             .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
             .join(Doctor, DailyQueue.specialist_id == Doctor.id)
             .filter(
@@ -360,7 +367,7 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
         integrations = {
             "has_queue_settings": department.queue_settings is not None,
             "has_registration_settings": department.registration_settings is not None,
-            "has_service_category": db.query(ServiceCategory)
+            "has_service_category": _repo(db).query(ServiceCategory)
             .filter(ServiceCategory.specialty == department.key)
             .first()
             is not None,
@@ -372,7 +379,7 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             integrations["max_daily_queue"] = department.queue_settings.max_daily_queue
 
         start_setting = (
-            db.query(ClinicSettings)
+            _repo(db).query(ClinicSettings)
             .filter(ClinicSettings.key == f"start_number_{department.key}")
             .first()
         )
@@ -380,7 +387,7 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             integrations["start_number"] = start_setting.value
 
         max_setting = (
-            db.query(ClinicSettings)
+            _repo(db).query(ClinicSettings)
             .filter(ClinicSettings.key == f"max_per_day_{department.key}")
             .first()
         )
@@ -422,7 +429,7 @@ def list_departments(
 
     Доступно только для администраторов
     """
-    query = db.query(Department)
+    query = _repo(db).query(Department)
 
     if active_only:
         query = query.filter(Department.active == True)
@@ -465,7 +472,7 @@ def get_department(
 
     Доступно только для администраторов
     """
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
 
     if not department:
         raise HTTPException(
@@ -489,7 +496,7 @@ def create_department(
     """
     # Проверяем уникальность ключа
     existing = (
-        db.query(Department).filter(Department.key == department_data.key).first()
+        _repo(db).query(Department).filter(Department.key == department_data.key).first()
     )
     if existing:
         raise HTTPException(
@@ -501,28 +508,28 @@ def create_department(
 
     # Создаем новое отделение
     department = Department(**payload)
-    db.add(department)
-    db.flush()
+    _repo(db).add(department)
+    _repo(db).flush()
 
     integration_result = _ensure_department_integrations(
         db, department, department_data.integration
     )
 
-    db.commit()
-    db.refresh(department)
+    _repo(db).commit()
+    _repo(db).refresh(department)
 
     # Создаем дефолтные настройки очереди
     queue_settings = DepartmentQueueSettings(
         department_id=department.id,
         queue_prefix=department.key.upper()[0] if department.key else "Q",
     )
-    db.add(queue_settings)
+    _repo(db).add(queue_settings)
 
     # Создаем дефолтные настройки регистрации
     reg_settings = DepartmentRegistrationSettings(department_id=department.id)
-    db.add(reg_settings)
+    _repo(db).add(reg_settings)
 
-    db.commit()
+    _repo(db).commit()
 
     return {
         "success": True,
@@ -544,7 +551,7 @@ def update_department(
 
     Доступно только для администраторов
     """
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
 
     if not department:
         raise HTTPException(
@@ -557,8 +564,8 @@ def update_department(
     for field, value in update_data.items():
         setattr(department, field, value)
 
-    db.commit()
-    db.refresh(department)
+    _repo(db).commit()
+    _repo(db).refresh(department)
 
     return {
         "success": True,
@@ -579,7 +586,7 @@ def initialize_department(
 
     Позволяет принудительно создать настройки очередей, регистрацию и дефолтные услуги.
     """
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
 
     if not department:
         raise HTTPException(
@@ -588,8 +595,8 @@ def initialize_department(
         )
 
     integration_result = _ensure_department_integrations(db, department, integration)
-    db.commit()
-    db.refresh(department)
+    _repo(db).commit()
+    _repo(db).refresh(department)
 
     return {
         "success": True,
@@ -610,7 +617,7 @@ def delete_department(
 
     Доступно только для администраторов
     """
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
 
     if not department:
         raise HTTPException(
@@ -618,8 +625,8 @@ def delete_department(
             detail=f"Department with id {department_id} not found",
         )
 
-    db.delete(department)
-    db.commit()
+    _repo(db).delete(department)
+    _repo(db).commit()
 
     return {
         "success": True,
@@ -638,7 +645,7 @@ def toggle_department(
 
     Доступно только для администраторов
     """
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
 
     if not department:
         raise HTTPException(
@@ -648,8 +655,8 @@ def toggle_department(
 
     # Переключаем active
     department.active = not department.active
-    db.commit()
-    db.refresh(department)
+    _repo(db).commit()
+    _repo(db).refresh(department)
 
     status_text = "активировано" if department.active else "деактивировано"
 
@@ -672,12 +679,12 @@ def get_department_services(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить услуги отделения"""
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
 
     services = (
-        db.query(DepartmentService)
+        _repo(db).query(DepartmentService)
         .filter(DepartmentService.department_id == department_id)
         .order_by(DepartmentService.display_order)
         .all()
@@ -716,17 +723,17 @@ def add_service_to_department(
 ):
     """Добавить услугу в отделение"""
     # Проверки
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
 
-    service = db.query(Service).filter(Service.id == service_id).first()
+    service = _repo(db).query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
 
     # Проверка дубликатов
     existing = (
-        db.query(DepartmentService)
+        _repo(db).query(DepartmentService)
         .filter(
             DepartmentService.department_id == department_id,
             DepartmentService.service_id == service_id,
@@ -742,9 +749,9 @@ def add_service_to_department(
     dept_service = DepartmentService(
         department_id=department_id, service_id=service_id, **data.dict()
     )
-    db.add(dept_service)
-    db.commit()
-    db.refresh(dept_service)
+    _repo(db).add(dept_service)
+    _repo(db).commit()
+    _repo(db).refresh(dept_service)
 
     return {"success": True, "message": f"Service '{service.name}' added to department"}
 
@@ -758,7 +765,7 @@ def remove_service_from_department(
 ):
     """Удалить услугу из отделения"""
     dept_service = (
-        db.query(DepartmentService)
+        _repo(db).query(DepartmentService)
         .filter(
             DepartmentService.department_id == department_id,
             DepartmentService.service_id == service_id,
@@ -769,8 +776,8 @@ def remove_service_from_department(
     if not dept_service:
         raise HTTPException(status_code=404, detail="Service not found in department")
 
-    db.delete(dept_service)
-    db.commit()
+    _repo(db).delete(dept_service)
+    _repo(db).commit()
 
     return {"success": True, "message": "Service removed from department"}
 
@@ -788,7 +795,7 @@ def get_queue_settings(
 ):
     """Получить настройки очереди отделения"""
     settings = (
-        db.query(DepartmentQueueSettings)
+        _repo(db).query(DepartmentQueueSettings)
         .filter(DepartmentQueueSettings.department_id == department_id)
         .first()
     )
@@ -820,7 +827,7 @@ def update_queue_settings(
 ):
     """Обновить настройки очереди отделения"""
     settings = (
-        db.query(DepartmentQueueSettings)
+        _repo(db).query(DepartmentQueueSettings)
         .filter(DepartmentQueueSettings.department_id == department_id)
         .first()
     )
@@ -828,15 +835,15 @@ def update_queue_settings(
     if not settings:
         # Если настроек нет, создаем их
         settings = DepartmentQueueSettings(department_id=department_id)
-        db.add(settings)
+        _repo(db).add(settings)
         # Не делаем commit здесь, он будет ниже
 
     # Обновление полей
     for field, value in data.dict(exclude_unset=True).items():
         setattr(settings, field, value)
 
-    db.commit()
-    db.refresh(settings)
+    _repo(db).commit()
+    _repo(db).refresh(settings)
 
     return {"success": True, "message": "Queue settings updated"}
 
@@ -854,7 +861,7 @@ def get_registration_settings(
 ):
     """Получить настройки регистрации отделения"""
     settings = (
-        db.query(DepartmentRegistrationSettings)
+        _repo(db).query(DepartmentRegistrationSettings)
         .filter(DepartmentRegistrationSettings.department_id == department_id)
         .first()
     )
@@ -884,7 +891,7 @@ def update_registration_settings(
 ):
     """Обновить настройки регистрации отделения"""
     settings = (
-        db.query(DepartmentRegistrationSettings)
+        _repo(db).query(DepartmentRegistrationSettings)
         .filter(DepartmentRegistrationSettings.department_id == department_id)
         .first()
     )
@@ -892,14 +899,14 @@ def update_registration_settings(
     if not settings:
         # Если настроек нет, создаем их
         settings = DepartmentRegistrationSettings(department_id=department_id)
-        db.add(settings)
+        _repo(db).add(settings)
 
     # Обновление полей
     for field, value in data.dict(exclude_unset=True).items():
         setattr(settings, field, value)
 
-    db.commit()
-    db.refresh(settings)
+    _repo(db).commit()
+    _repo(db).refresh(settings)
 
     return {"success": True, "message": "Registration settings updated"}
 
@@ -916,11 +923,11 @@ def get_department_doctors(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список врачей отделения"""
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
 
-    doctors = db.query(Doctor).filter(Doctor.department_id == department_id).all()
+    doctors = _repo(db).query(Doctor).filter(Doctor.department_id == department_id).all()
 
     return {
         "success": True,
@@ -945,18 +952,18 @@ def assign_doctor_to_department(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Назначить врача в отделение"""
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
 
-    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    doctor = _repo(db).query(Doctor).filter(Doctor.id == doctor_id).first()
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
     # Назначение
     doctor.department_id = department_id
-    db.commit()
-    db.refresh(doctor)
+    _repo(db).commit()
+    _repo(db).refresh(doctor)
 
     return {
         "success": True,
@@ -973,7 +980,7 @@ def remove_doctor_from_department(
 ):
     """Убрать врача из отделения"""
     doctor = (
-        db.query(Doctor)
+        _repo(db).query(Doctor)
         .filter(Doctor.id == doctor_id, Doctor.department_id == department_id)
         .first()
     )
@@ -985,6 +992,6 @@ def remove_doctor_from_department(
 
     # Убираем привязку
     doctor.department_id = None
-    db.commit()
+    _repo(db).commit()
 
     return {"success": True, "message": "Doctor removed from department"}
