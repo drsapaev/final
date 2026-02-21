@@ -12,9 +12,14 @@ from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.derma_api_repository import DermaApiRepository
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 
+
+
+def _repo(db: Session) -> DermaApiRepository:
+    return DermaApiRepository(db)
 
 class PriceOverrideRequest(BaseModel):
     visit_id: int
@@ -125,13 +130,13 @@ async def create_price_override(
     """
     try:
         # Проверяем существование визита
-        visit = db.query(Visit).filter(Visit.id == override_data.visit_id).first()
+        visit = _repo(db).query(Visit).filter(Visit.id == override_data.visit_id).first()
         if not visit:
             raise HTTPException(status_code=404, detail="Визит не найден")
 
         # Проверяем существование услуги
         service = (
-            db.query(Service).filter(Service.id == override_data.service_id).first()
+            _repo(db).query(Service).filter(Service.id == override_data.service_id).first()
         )
         if not service:
             raise HTTPException(status_code=404, detail="Услуга не найдена")
@@ -144,7 +149,7 @@ async def create_price_override(
             )
 
         # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+        doctor = _repo(db).query(Doctor).filter(Doctor.user_id == user.id).first()
         if not doctor:
             raise HTTPException(status_code=404, detail="Врач не найден")
 
@@ -167,9 +172,9 @@ async def create_price_override(
             status="pending",
         )
 
-        db.add(price_override)
-        db.commit()
-        db.refresh(price_override)
+        _repo(db).add(price_override)
+        _repo(db).commit()
+        _repo(db).refresh(price_override)
 
         return PriceOverrideResponse(
             id=price_override.id,
@@ -186,7 +191,7 @@ async def create_price_override(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=500, detail=f"Ошибка создания изменения цены: {str(e)}"
         )
@@ -207,11 +212,11 @@ async def get_price_overrides(
     """
     try:
         # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+        doctor = _repo(db).query(Doctor).filter(Doctor.user_id == user.id).first()
         if not doctor:
             raise HTTPException(status_code=404, detail="Врач не найден")
 
-        query = db.query(DoctorPriceOverride).filter(
+        query = _repo(db).query(DoctorPriceOverride).filter(
             DoctorPriceOverride.doctor_id == doctor.id
         )
 

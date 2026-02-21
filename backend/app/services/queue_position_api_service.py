@@ -19,9 +19,14 @@ from app.db.session import get_db
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.services.queue_position_notifications import get_queue_position_service
+from app.repositories.queue_position_api_repository import QueuePositionApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> QueuePositionApiRepository:
+    return QueuePositionApiRepository(db)
 
 # ========================= СХЕМЫ =========================
 
@@ -76,7 +81,7 @@ async def get_queue_position(
     Публичный эндпоинт для отображения позиции на дисплее
     или в мобильном приложении.
     """
-    entry = db.query(OnlineQueueEntry).filter(
+    entry = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.id == entry_id
     ).first()
 
@@ -107,7 +112,7 @@ async def get_queue_position_by_number(
     from datetime import date as date_type
     today = date_type.today()
 
-    queue = db.query(DailyQueue).filter(
+    queue = _repo(db).query(DailyQueue).filter(
         DailyQueue.specialist_id == specialist_id,
         DailyQueue.day == today
     ).first()
@@ -118,7 +123,7 @@ async def get_queue_position_by_number(
             detail="Очередь не найдена"
         )
 
-    entry = db.query(OnlineQueueEntry).filter(
+    entry = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.queue_id == queue.id,
         OnlineQueueEntry.number == queue_number,
         OnlineQueueEntry.status != "cancelled"
@@ -150,7 +155,7 @@ async def send_position_notification(
 
     Доступно: Admin, Registrar, Doctor
     """
-    entry = db.query(OnlineQueueEntry).filter(
+    entry = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.id == request.entry_id
     ).first()
 
@@ -185,7 +190,7 @@ async def send_call_notification(
 
     Доступно: Admin, Registrar, Doctor
     """
-    entry = db.query(OnlineQueueEntry).filter(
+    entry = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.id == request.entry_id
     ).first()
 
@@ -218,7 +223,7 @@ async def send_queue_update_notifications(
 
     Доступно: Admin, Registrar
     """
-    queue = db.query(DailyQueue).filter(
+    queue = _repo(db).query(DailyQueue).filter(
         DailyQueue.id == queue_id
     ).first()
 
@@ -250,7 +255,7 @@ async def send_diagnostics_return_notification(
 
     Доступно: Admin, Doctor
     """
-    entry = db.query(OnlineQueueEntry).filter(
+    entry = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.id == entry_id,
         OnlineQueueEntry.status == "diagnostics"
     ).first()
@@ -288,7 +293,7 @@ async def send_waiting_reminder(
 
     Доступно: Admin, Registrar
     """
-    entry = db.query(OnlineQueueEntry).filter(
+    entry = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.id == entry_id,
         OnlineQueueEntry.status == "waiting"
     ).first()
@@ -317,7 +322,7 @@ async def get_queue_positions_stats(
 
     Возвращает список всех записей с их позициями.
     """
-    queue = db.query(DailyQueue).filter(
+    queue = _repo(db).query(DailyQueue).filter(
         DailyQueue.id == queue_id
     ).first()
 
@@ -327,7 +332,7 @@ async def get_queue_positions_stats(
             detail="Очередь не найдена"
         )
 
-    entries = db.query(OnlineQueueEntry).filter(
+    entries = _repo(db).query(OnlineQueueEntry).filter(
         OnlineQueueEntry.queue_id == queue_id,
         OnlineQueueEntry.status.in_(["waiting", "called", "in_service", "diagnostics"])
     ).order_by(

@@ -205,3 +205,93 @@ def test_registrar_notifications_service_avoids_direct_session_calls() -> None:
         logic,
     )
     assert direct_db_call is None
+
+
+def test_queue_limits_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("queue_limits")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_group_permissions_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("group_permissions")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_appointment_flow_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("appointment_flow")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_queue_position_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("queue_position")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_analytics_simple_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("analytics_simple")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_payment_webhooks_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("payment_webhooks")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_patients_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("patients")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_derma_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("derma")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_analytics_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("analytics")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_user_management_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("user_management")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None

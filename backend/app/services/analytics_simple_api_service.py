@@ -5,9 +5,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.repositories.analytics_simple_api_repository import AnalyticsSimpleApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> AnalyticsSimpleApiRepository:
+    return AnalyticsSimpleApiRepository(db)
 
 @router.get("/quick-stats")
 async def get_quick_stats(
@@ -25,20 +30,20 @@ async def get_quick_stats(
         from app.models.payment_webhook import PaymentWebhook
 
         # Подсчитываем пациентов
-        total_patients = db.query(Patient).count()
+        total_patients = _repo(db).query(Patient).count()
 
         # Подсчитываем записи на сегодня
         today_appointments = (
-            db.query(Appointment)
+            _repo(db).query(Appointment)
             .filter(func.date(Appointment.appointment_date) == today)
             .count()
         )
 
         # Подсчитываем общие записи
-        total_appointments = db.query(Appointment).count()
+        total_appointments = _repo(db).query(Appointment).count()
 
         # Подсчитываем платежи
-        total_payments = db.query(PaymentWebhook).count()
+        total_payments = _repo(db).query(PaymentWebhook).count()
 
         return {
             "total_patients": total_patients,
@@ -68,13 +73,13 @@ async def get_dashboard_data(
         from app.models.payment_webhook import PaymentWebhook
 
         # Базовые метрики
-        total_patients = db.query(Patient).count()
-        total_appointments = db.query(Appointment).count()
-        total_payments = db.query(PaymentWebhook).count()
+        total_patients = _repo(db).query(Patient).count()
+        total_appointments = _repo(db).query(Appointment).count()
+        total_payments = _repo(db).query(PaymentWebhook).count()
 
         # Записи на сегодня
         today_appointments = (
-            db.query(Appointment)
+            _repo(db).query(Appointment)
             .filter(func.date(Appointment.appointment_date) == today)
             .count()
         )
@@ -82,7 +87,7 @@ async def get_dashboard_data(
         # Записи на завтра
         tomorrow = today + timedelta(days=1)
         tomorrow_appointments = (
-            db.query(Appointment)
+            _repo(db).query(Appointment)
             .filter(func.date(Appointment.appointment_date) == tomorrow)
             .count()
         )
@@ -120,7 +125,7 @@ async def get_trends_analytics(
 
         # Простой подсчет записей по дням
         appointments_by_day = (
-            db.query(
+            _repo(db).query(
                 func.date(Appointment.appointment_date).label('date'),
                 func.count(Appointment.id).label('count'),
             )

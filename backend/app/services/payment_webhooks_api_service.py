@@ -15,8 +15,13 @@ from app.db.session import get_db
 from app.db.transactions import transaction as transaction_ctx
 from app.models.payment import Payment
 from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+from app.repositories.payment_webhooks_api_repository import PaymentWebhooksApiRepository
 
 router = APIRouter()
+
+def _repo(db: Session) -> PaymentWebhooksApiRepository:
+    return PaymentWebhooksApiRepository(db)
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +62,7 @@ async def click_webhook(
 
         # Check if this transaction was already processed
         existing_transaction = (
-            db.query(PaymentTransaction)
+            _repo(db).query(PaymentTransaction)
             .filter(
                 PaymentTransaction.transaction_id == click_trans_id,
                 PaymentTransaction.provider == "click"
@@ -232,7 +237,7 @@ async def payme_webhook(
         existing_transaction = None
         if payme_transaction_id:
             existing_transaction = (
-                db.query(PaymentTransaction)
+                _repo(db).query(PaymentTransaction)
                 .filter(
                     PaymentTransaction.transaction_id == payme_transaction_id,
                     PaymentTransaction.provider == "payme"
@@ -427,9 +432,9 @@ async def kaspi_webhook(
             signature=webhook_data.get("signature"),
         )
 
-        db.add(webhook)
-        db.commit()
-        db.refresh(webhook)
+        _repo(db).add(webhook)
+        _repo(db).commit()
+        _repo(db).refresh(webhook)
 
         # Обрабатываем webhook через менеджер
         manager = get_payment_manager()
@@ -445,7 +450,7 @@ async def kaspi_webhook(
             payment = None
             if result.payment_id:
                 payment = (
-                    db.query(Payment)
+                    _repo(db).query(Payment)
                     .filter(Payment.provider_payment_id == result.payment_id)
                     .first()
                 )
@@ -477,9 +482,9 @@ async def kaspi_webhook(
                     provider_data=result.provider_data,
                 )
 
-                db.add(transaction)
+                _repo(db).add(transaction)
 
-            db.commit()
+            _repo(db).commit()
 
             # Kaspi ожидает простой ответ
             return {"status": "success", "message": "Webhook processed successfully"}
@@ -489,7 +494,7 @@ async def kaspi_webhook(
             webhook.status = "failed"
             webhook.error_message = result.error_message
             webhook.processed_at = datetime.utcnow()
-            db.commit()
+            _repo(db).commit()
 
             return {
                 "status": "error",

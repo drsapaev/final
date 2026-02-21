@@ -12,11 +12,16 @@ from app.models.user import User
 from app.schemas import appointment as appointment_schemas
 from app.schemas import lab as lab_schemas
 from app.schemas import patient as patient_schemas
+from app.repositories.patients_api_repository import PatientsApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> PatientsApiRepository:
+    return PatientsApiRepository(db)
 
 @router.get("/appointments", response_model=list[appointment_schemas.Appointment])
 def get_my_appointments(
@@ -47,7 +52,7 @@ def get_my_appointment_details(
 
     # Ищем запись, которая принадлежит этому пациенту
     appointment = (
-        db.query(Appointment)
+        _repo(db).query(Appointment)
         .filter(
             Appointment.id == appointment_id,
             Appointment.patient_id == current_user.patient.id
@@ -74,7 +79,7 @@ def get_my_results(
 
     # Получаем результаты (LabOrder) для пациента
     results = (
-        db.query(LabOrder)
+        _repo(db).query(LabOrder)
         .filter(LabOrder.patient_id == current_user.patient.id)
         .all()
     )
@@ -129,7 +134,7 @@ def create_patient(
     # ✅ NEW: Проверяем уникальность номера документа
     from app.models.patient import Patient
     if patient_in.doc_number:
-        existing_by_doc = db.query(Patient).filter(
+        existing_by_doc = _repo(db).query(Patient).filter(
             Patient.doc_number == patient_in.doc_number
         ).first()
         if existing_by_doc:
@@ -273,7 +278,7 @@ def create_patient(
 
     # ✅ ФИНАЛЬНАЯ ПРОВЕРКА: Убеждаемся, что данные сохранены корректно
     # Это критическая проверка - если после сохранения поля пустые, значит что-то пошло не так
-    db.refresh(patient)
+    _repo(db).refresh(patient)
     if not patient.last_name or not patient.last_name.strip():
         raise HTTPException(
             status_code=500,
@@ -297,7 +302,7 @@ def create_patient(
         request=request,
         description=f"Создан пациент: {patient.last_name} {patient.first_name}",
     )
-    db.commit()
+    _repo(db).commit()
 
     return patient
 
@@ -349,7 +354,7 @@ def update_patient(
     patient = patient_crud.update(db=db, db_obj=patient, obj_in=patient_in)
 
     # ✅ AUDIT LOG: Логируем обновление пациента
-    db.refresh(patient)
+    _repo(db).refresh(patient)
     _, new_data = extract_model_changes(None, patient)
     log_critical_change(
         db=db,
@@ -362,7 +367,7 @@ def update_patient(
         request=request,
         description=f"Обновлен пациент: {patient.last_name} {patient.first_name}",
     )
-    db.commit()
+    _repo(db).commit()
 
     return patient
 
@@ -410,9 +415,9 @@ def delete_patient(
         )
 
         # ✅ FIX: Один commit для атомарности - если аудит не запишется, удаление откатится
-        db.commit()
+        _repo(db).commit()
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка удаления пациента: {str(e)}",

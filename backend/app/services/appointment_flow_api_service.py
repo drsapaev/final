@@ -26,6 +26,7 @@ from app.schemas.emr import (
     PrescriptionCreate,
     PrescriptionUpdate,
 )
+from app.repositories.appointment_flow_api_repository import AppointmentFlowApiRepository
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,10 @@ def convert_datetimes_to_iso(obj):
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> AppointmentFlowApiRepository:
+    return AppointmentFlowApiRepository(db)
 
 @router.post("/{appointment_id}/start-visit", response_model=Appointment)
 def start_visit(
@@ -156,7 +161,7 @@ def create_or_update_emr(
         )
         from app.models.visit import Visit
 
-        visit = db.query(Visit).filter(Visit.id == appointment_id).first()
+        visit = _repo(db).query(Visit).filter(Visit.id == appointment_id).first()
         if visit:
             logger.info(
                 "[create_or_update_emr] Найден Visit %d, проверяем существующий Appointment...",
@@ -164,7 +169,7 @@ def create_or_update_emr(
             )
             # Проверяем, нет ли уже Appointment для этого Visit (по patient_id, дате, doctor_id)
             existing_appointment = (
-                db.query(AppointmentModel)
+                _repo(db).query(AppointmentModel)
                 .filter(
                     and_(
                         AppointmentModel.patient_id == visit.patient_id,
@@ -205,9 +210,9 @@ def create_or_update_emr(
                     notes=visit.notes,
                     created_at=visit.created_at,
                 )
-                db.add(appointment)
-                db.commit()
-                db.refresh(appointment)
+                _repo(db).add(appointment)
+                _repo(db).commit()
+                _repo(db).refresh(appointment)
             logger.info(
                 "[create_or_update_emr] Создан Appointment %d из Visit %d",
                 appointment.id,
@@ -250,8 +255,8 @@ def create_or_update_emr(
         # Это позволяет начать сохранение EMR для вызванных или оплаченных пациентов
         if status_str in ['called', 'calling', 'paid', 'waiting', 'queued']:
             appointment.status = AppointmentStatus.IN_VISIT
-            db.commit()
-            db.refresh(appointment)
+            _repo(db).commit()
+            _repo(db).refresh(appointment)
             logger.info(
                 "[create_or_update_emr] Статус appointment %d обновлен с '%s' на 'in_visit'",
                 appointment_id,
@@ -320,7 +325,7 @@ def create_or_update_emr(
             )
 
             # ✅ AUDIT LOG: Логируем обновление EMR
-            db.refresh(updated_emr)
+            _repo(db).refresh(updated_emr)
             _, new_data = extract_model_changes(None, updated_emr)
             log_critical_change(
                 db=db,
@@ -333,7 +338,7 @@ def create_or_update_emr(
                 request=request,
                 description=f"Обновлен EMR ID={updated_emr.id} для записи {appointment_id}",
             )
-            db.commit()
+            _repo(db).commit()
 
             logger.info("[create_or_update_emr] EMR обновлен успешно")
             return updated_emr
@@ -358,7 +363,7 @@ def create_or_update_emr(
                 logger.info("[create_or_update_emr] EMR создан, id=%d", new_emr.id)
 
                 # ✅ AUDIT LOG: Логируем создание EMR
-                db.refresh(new_emr)
+                _repo(db).refresh(new_emr)
                 _, new_data = extract_model_changes(None, new_emr)
                 log_critical_change(
                     db=db,
@@ -371,7 +376,7 @@ def create_or_update_emr(
                     request=request,
                     description=f"Создан EMR ID={new_emr.id} для записи {appointment_id}",
                 )
-                db.commit()
+                _repo(db).commit()
             except Exception as create_error:
                 logger.error(
                     "[create_or_update_emr] Ошибка при создании EMR: %s: %s",

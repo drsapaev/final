@@ -19,10 +19,15 @@ from app.models.role_permission import (
 )
 from app.models.user import User
 from app.services.group_permissions_service import get_group_permissions_service
+from app.repositories.group_permissions_api_repository import GroupPermissionsApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> GroupPermissionsApiRepository:
+    return GroupPermissionsApiRepository(db)
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -113,7 +118,7 @@ def get_user_permissions(
         service = get_group_permissions_service()
 
         # Получаем пользователя
-        user = db.query(User).filter(User.id == user_id).first()
+        user = _repo(db).query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден"
@@ -192,7 +197,7 @@ def get_groups(
     Получить список групп пользователей
     """
     try:
-        query = db.query(UserGroup)
+        query = _repo(db).query(UserGroup)
 
         if active_only:
             query = query.filter(UserGroup.is_active == True)
@@ -406,7 +411,7 @@ def get_roles(
     Получить список ролей
     """
     try:
-        query = db.query(Role)
+        query = _repo(db).query(Role)
 
         if active_only:
             query = query.filter(Role.is_active == True)
@@ -453,7 +458,7 @@ def get_permissions(
     Получить список разрешений
     """
     try:
-        query = db.query(Permission)
+        query = _repo(db).query(Permission)
 
         if active_only:
             query = query.filter(Permission.is_active == True)
@@ -500,9 +505,9 @@ def create_permission_override(
     """
     try:
         # Проверяем существование пользователя и разрешения
-        user = db.query(User).filter(User.id == request.user_id).first()
+        user = _repo(db).query(User).filter(User.id == request.user_id).first()
         permission = (
-            db.query(Permission).filter(Permission.id == request.permission_id).first()
+            _repo(db).query(Permission).filter(Permission.id == request.permission_id).first()
         )
 
         if not user:
@@ -517,7 +522,7 @@ def create_permission_override(
 
         # Проверяем, нет ли уже такого переопределения
         existing = (
-            db.query(UserPermissionOverride)
+            _repo(db).query(UserPermissionOverride)
             .filter(
                 UserPermissionOverride.user_id == request.user_id,
                 UserPermissionOverride.permission_id == request.permission_id,
@@ -548,9 +553,9 @@ def create_permission_override(
             granted_by=current_user.id,
         )
 
-        db.add(override)
-        db.commit()
-        db.refresh(override)
+        _repo(db).add(override)
+        _repo(db).commit()
+        _repo(db).refresh(override)
 
         # Очищаем кэш пользователя
         service = get_group_permissions_service()
@@ -569,7 +574,7 @@ def create_permission_override(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         logger.error(f"Ошибка создания переопределения разрешения: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

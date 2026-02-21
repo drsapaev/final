@@ -14,9 +14,14 @@ from app.crud.clinic import get_queue_settings, update_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
+from app.repositories.queue_limits_api_repository import QueueLimitsApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> QueueLimitsApiRepository:
+    return QueueLimitsApiRepository(db)
 
 # ===================== PYDANTIC МОДЕЛИ =====================
 
@@ -95,7 +100,7 @@ def get_queue_limits(
         start_numbers_settings = queue_settings.get("start_numbers", {})
 
         # Получаем все специальности из базы врачей
-        doctors_query = db.query(Doctor).filter(Doctor.active == True)
+        doctors_query = _repo(db).query(Doctor).filter(Doctor.active == True)
         if specialty:
             doctors_query = doctors_query.filter(Doctor.specialty == specialty)
 
@@ -114,7 +119,7 @@ def get_queue_limits(
             total_usage = 0
             for doctor in spec_data["doctors"]:
                 daily_queue = (
-                    db.query(DailyQueue)
+                    _repo(db).query(DailyQueue)
                     .filter(
                         and_(
                             DailyQueue.day == today,
@@ -127,7 +132,7 @@ def get_queue_limits(
 
                 if daily_queue:
                     entries_count = (
-                        db.query(OnlineQueueEntry)
+                        _repo(db).query(OnlineQueueEntry)
                         .filter(OnlineQueueEntry.queue_id == daily_queue.id)
                         .count()
                     )
@@ -233,7 +238,7 @@ def get_queue_status_with_limits(
         max_per_day_settings = queue_settings.get("max_per_day", {})
 
         # Получаем врачей
-        doctors_query = db.query(Doctor).filter(Doctor.active == True)
+        doctors_query = _repo(db).query(Doctor).filter(Doctor.active == True)
         if specialty:
             doctors_query = doctors_query.filter(Doctor.specialty == specialty)
 
@@ -243,7 +248,7 @@ def get_queue_status_with_limits(
         for doctor in doctors:
             # Получаем очередь на день
             daily_queue = (
-                db.query(DailyQueue)
+                _repo(db).query(DailyQueue)
                 .filter(
                     and_(
                         DailyQueue.day == day,
@@ -259,7 +264,7 @@ def get_queue_status_with_limits(
 
             if daily_queue:
                 current_entries = (
-                    db.query(OnlineQueueEntry)
+                    _repo(db).query(OnlineQueueEntry)
                     .filter(OnlineQueueEntry.queue_id == daily_queue.id)
                     .count()
                 )
@@ -311,7 +316,7 @@ def set_doctor_queue_limit(
     """
     try:
         # Проверяем существование врача
-        doctor = db.query(Doctor).filter(Doctor.id == limit_data.doctor_id).first()
+        doctor = _repo(db).query(Doctor).filter(Doctor.id == limit_data.doctor_id).first()
         if not doctor:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Врач не найден"
@@ -319,7 +324,7 @@ def set_doctor_queue_limit(
 
         # Получаем или создаем очередь на день
         daily_queue = (
-            db.query(DailyQueue)
+            _repo(db).query(DailyQueue)
             .filter(
                 and_(
                     DailyQueue.day == limit_data.day,
@@ -336,11 +341,11 @@ def set_doctor_queue_limit(
                 active=True,
                 max_online_entries=limit_data.max_online_entries,
             )
-            db.add(daily_queue)
+            _repo(db).add(daily_queue)
         else:
             daily_queue.max_online_entries = limit_data.max_online_entries
 
-        db.commit()
+        _repo(db).commit()
 
         return {
             "success": True,
@@ -354,7 +359,7 @@ def set_doctor_queue_limit(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка установки лимита: {str(e)}",

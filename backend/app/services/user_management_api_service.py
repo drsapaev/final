@@ -46,9 +46,14 @@ from app.schemas.user_management import (
 from app.services.user_management_service import (
     get_user_management_service,
 )
+from app.repositories.user_management_api_repository import UserManagementApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> UserManagementApiRepository:
+    return UserManagementApiRepository(db)
 
 # ============================================
 # CURRENT USER SELF-SERVICE ENDPOINTS
@@ -155,7 +160,7 @@ async def update_current_user_preferences(
                 compact_mode=preferences_data.get("compact_mode", False),
                 sidebar_collapsed=preferences_data.get("sidebar_collapsed", False),
             )
-            db.add(preferences)
+            _repo(db).add(preferences)
         else:
             # Обновляем существующие поля
             if "theme" in preferences_data:
@@ -192,13 +197,13 @@ async def update_current_user_preferences(
             import json
             preferences.emr_settings = json.dumps(emr_data)
 
-        db.commit()
-        db.refresh(preferences)
+        _repo(db).commit()
+        _repo(db).refresh(preferences)
 
         return {"success": True, "message": "Preferences updated"}
 
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         import logging
         logging.error(f"Failed to update preferences for user {current_user.id}: {e}")
         raise HTTPException(
@@ -478,8 +483,8 @@ async def update_user_profile(
             if hasattr(profile, field):
                 setattr(profile, field, value)
 
-        db.commit()
-        db.refresh(profile)
+        _repo(db).commit()
+        _repo(db).refresh(profile)
 
         return UserProfileResponse(
             id=profile.id,
@@ -525,7 +530,7 @@ async def update_user_profile(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления профиля: {str(e)}",
@@ -912,7 +917,7 @@ async def export_users(
         service = get_user_management_service()
 
         # Получаем пользователей для экспорта
-        users_query = db.query(User)
+        users_query = _repo(db).query(User)
 
         # Применяем фильтры если есть
         if export_data.filters:
