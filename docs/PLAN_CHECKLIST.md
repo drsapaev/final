@@ -41,7 +41,9 @@
 - [x] GO only if: DR test passes; alerts wired; E2E critical flows green; load metrics within targets.
 
 ## P2 Architecture Finish
-- [ ] Controllers free of business logic; services unit-tested; repositories encapsulate ORM.
+- [ ] Controllers free of business logic.
+- [ ] Services unit-tested (critical business paths).
+- [x] Repositories encapsulate ORM (no direct `db.*` calls in `backend/app/services/*_api_service.py`).
 
 ## P3 UX & Docs (Phase 3)
 - [ ] A11y: WCAG contrast, focus, ARIA validated on key flows.
