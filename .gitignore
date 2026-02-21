@@ -83,3 +83,9 @@ secrets/
 # Local dev artifacts
 .mypy_cache/
 .ruff_cache/
+
+# Generated CI/debug artifacts (large)
+backend/mypy_ci_check.txt
+run_*.final.html
+run_latest.html
+wf_page*.html
