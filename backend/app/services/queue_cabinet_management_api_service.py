@@ -10,9 +10,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue
 from app.models.user import User
+from app.repositories.queue_cabinet_management_api_repository import (
+    QueueCabinetManagementApiRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +65,10 @@ def get_queues_cabinet_info(
     """
     Получить информацию о кабинетах для очередей
     """
+    repository = QueueCabinetManagementApiRepository(db)
     try:
         # Строим запрос
-        query = db.query(DailyQueue)
+        query = repository.query_daily_queues()
 
         # Фильтры
         if day:
@@ -90,9 +93,7 @@ def get_queues_cabinet_info(
         result = []
         for queue in queues:
             # Получаем информацию о специалисте
-            specialist = (
-                db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
-            )
+            specialist = repository.get_doctor_by_id(queue.specialist_id)
             specialist_name = (
                 specialist.user.full_name
                 if (specialist and specialist.user)
@@ -100,11 +101,7 @@ def get_queues_cabinet_info(
             )
 
             # Подсчитываем записи в очереди
-            entries_count = (
-                db.query(OnlineQueueEntry)
-                .filter(OnlineQueueEntry.queue_id == queue.id)
-                .count()
-            )
+            entries_count = repository.count_entries_for_queue(queue.id)
 
             result.append(
                 QueueCabinetResponse(
@@ -142,8 +139,9 @@ def get_queue_cabinet_info(
     """
     Получить информацию о кабинете для конкретной очереди
     """
+    repository = QueueCabinetManagementApiRepository(db)
     try:
-        queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+        queue = repository.get_daily_queue_by_id(queue_id)
 
         if not queue:
             raise HTTPException(
@@ -151,7 +149,7 @@ def get_queue_cabinet_info(
             )
 
         # Получаем информацию о специалисте
-        specialist = db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
+        specialist = repository.get_doctor_by_id(queue.specialist_id)
         specialist_name = (
             specialist.user.full_name
             if (specialist and specialist.user)
@@ -159,11 +157,7 @@ def get_queue_cabinet_info(
         )
 
         # Подсчитываем записи в очереди
-        entries_count = (
-            db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.queue_id == queue.id)
-            .count()
-        )
+        entries_count = repository.count_entries_for_queue(queue.id)
 
         return QueueCabinetResponse(
             id=queue.id,
@@ -204,8 +198,9 @@ def update_queue_cabinet_info(
     Обновить информацию о кабинете для очереди
     Доступно только администраторам и регистраторам
     """
+    repository = QueueCabinetManagementApiRepository(db)
     try:
-        queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+        queue = repository.get_daily_queue_by_id(queue_id)
 
         if not queue:
             raise HTTPException(
@@ -228,8 +223,8 @@ def update_queue_cabinet_info(
             updated = True
 
         if updated:
-            db.commit()
-            db.refresh(queue)
+            repository.commit()
+            repository.refresh(queue)
 
         return {
             "success": True,
@@ -247,7 +242,7 @@ def update_queue_cabinet_info(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         logger.error(
             f"Ошибка обновления информации о кабинете для очереди {queue_id}: {e}"
         )
@@ -266,17 +261,14 @@ def bulk_update_cabinet_info(
     """
     Массовое обновление информации о кабинетах для нескольких очередей
     """
+    repository = QueueCabinetManagementApiRepository(db)
     try:
         updated_queues = []
         errors = []
 
         for update in request.updates:
             try:
-                queue = (
-                    db.query(DailyQueue)
-                    .filter(DailyQueue.id == update.queue_id)
-                    .first()
-                )
+                queue = repository.get_daily_queue_by_id(update.queue_id)
 
                 if not queue:
                     errors.append(
@@ -316,7 +308,7 @@ def bulk_update_cabinet_info(
 
         # Сохраняем изменения
         if updated_queues:
-            db.commit()
+            repository.commit()
 
         return {
             "success": True,
@@ -328,7 +320,7 @@ def bulk_update_cabinet_info(
         }
 
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         logger.error(f"Ошибка массового обновления информации о кабинетах: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -354,6 +346,7 @@ def sync_cabinet_info_from_doctors(
     Синхронизировать информацию о кабинетах из таблицы doctors
     Доступно только администраторам
     """
+    repository = QueueCabinetManagementApiRepository(db)
     try:
         # Определяем дату
         if day:
@@ -368,7 +361,7 @@ def sync_cabinet_info_from_doctors(
             day_obj = date.today()
 
         # Строим запрос для очередей
-        query = db.query(DailyQueue).filter(DailyQueue.day == day_obj)
+        query = repository.query_daily_queues().filter(DailyQueue.day == day_obj)
 
         if specialist_id:
             query = query.filter(DailyQueue.specialist_id == specialist_id)
@@ -381,9 +374,7 @@ def sync_cabinet_info_from_doctors(
         for queue in queues:
             try:
                 # Получаем информацию о враче
-                doctor = (
-                    db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
-                )
+                doctor = repository.get_doctor_by_id(queue.specialist_id)
 
                 if doctor and doctor.cabinet and queue.cabinet_number != doctor.cabinet:
                     queue.cabinet_number = doctor.cabinet
@@ -400,7 +391,7 @@ def sync_cabinet_info_from_doctors(
 
         # Сохраняем изменения
         if updated_count > 0:
-            db.commit()
+            repository.commit()
 
         return {
             "success": True,
@@ -416,7 +407,7 @@ def sync_cabinet_info_from_doctors(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         logger.error(f"Ошибка синхронизации информации о кабинетах: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -441,9 +432,10 @@ def get_cabinet_statistics(
     """
     Получить статистику использования кабинетов
     """
+    repository = QueueCabinetManagementApiRepository(db)
     try:
         # Строим запрос
-        query = db.query(DailyQueue)
+        query = repository.query_daily_queues()
 
         # Фильтры по датам
         if date_from:
@@ -493,11 +485,7 @@ def get_cabinet_statistics(
                 )
 
                 # Подсчитываем записи
-                entries_count = (
-                    db.query(OnlineQueueEntry)
-                    .filter(OnlineQueueEntry.queue_id == queue.id)
-                    .count()
-                )
+                entries_count = repository.count_entries_for_queue(queue.id)
                 cabinet_stats[queue.cabinet_number]["total_entries"] += entries_count
 
         # Преобразуем в список и убираем set
