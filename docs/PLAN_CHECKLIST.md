@@ -46,6 +46,6 @@
 - [x] Repositories encapsulate ORM (no direct `db.*` calls in `backend/app/services/*_api_service.py`).
 
 ## P3 UX & Docs (Phase 3)
-- [ ] A11y: WCAG contrast, focus, ARIA validated on key flows.
-- [ ] UX polish: save states, clear errors/recovery, meaningful empty states.
-- [ ] OpenAPI complete; contract tests; onboarding/runbooks current.
+- [x] A11y: WCAG contrast, focus, ARIA validated on key flows.
+- [x] UX polish: save states, clear errors/recovery, meaningful empty states.
+- [x] OpenAPI complete; contract tests; onboarding/runbooks current.

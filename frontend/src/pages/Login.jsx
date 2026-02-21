@@ -4,6 +4,7 @@ import { login, me, setToken } from '../api/client';
 import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
+import { A11Y_COLORS } from '../constants/a11yTokens';
 import ForgotPassword from '../components/auth/ForgotPassword';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
 import logger from '../utils/logger';
@@ -387,7 +388,13 @@ export default function Login() {
         </div>
 
         {err && (
-          <div className="status-message status-error">
+          <div
+            className="status-message status-error"
+            id="login-error"
+            role="alert"
+            aria-live="assertive"
+            data-testid="login-error"
+          >
             <AlertCircle size={18} />
             {err}
           </div>
@@ -395,12 +402,17 @@ export default function Login() {
 
         <form onSubmit={onLoginClick}>
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
+            <label
+              htmlFor="login-role"
+              style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}
+            >
               {t.selectRole.toUpperCase()}
             </label>
             <div style={{ position: 'relative' }}>
               <User size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)', pointerEvents: 'none' }} />
               <select
+                id="login-role"
+                name="role"
                 value={selectedRoleKey}
                 onChange={(e) => onSelectRole(e.target.value)}
                 disabled={busy}
@@ -416,29 +428,40 @@ export default function Login() {
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
+            <label
+              htmlFor="login-username"
+              style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}
+            >
               {t.username.toUpperCase()}
             </label>
             <div style={{ position: 'relative' }}>
               <User size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
               <input
+                id="login-username"
+                name="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="glass-input"
                 style={{ paddingLeft: '44px', opacity: 0.7 }}
                 disabled
                 readOnly
+                autoComplete="username"
               />
             </div>
           </div>
 
           <div style={{ marginBottom: '32px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
+            <label
+              htmlFor="login-password"
+              style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}
+            >
               {t.password.toUpperCase()}
             </label>
             <div style={{ position: 'relative' }}>
               <Key size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
               <input
+                id="login-password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -446,6 +469,9 @@ export default function Login() {
                 style={{ paddingLeft: '44px', paddingRight: '44px' }}
                 disabled={busy}
                 placeholder="••••••••"
+                autoComplete="current-password"
+                aria-invalid={Boolean(err)}
+                aria-describedby={err ? 'login-error' : undefined}
               />
               <button
                 type="button"
@@ -472,7 +498,19 @@ export default function Login() {
             type="submit"
             disabled={busy}
             className="btn-premium btn-primary"
-            style={{ width: '100%', justifyContent: 'center', marginBottom: '20px' }}
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              marginBottom: '20px',
+              background: A11Y_COLORS.primary,
+              color: A11Y_COLORS.onPrimary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = A11Y_COLORS.primaryHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = A11Y_COLORS.primary;
+            }}
           >
             {busy ? (
               <>
