@@ -101,6 +101,7 @@ class VisitsApiService:
                 "finished_at": None,
                 "notes": visit.notes,
                 "planned_date": visit.visit_date,
+                "source": getattr(visit, "source", None),
             }
 
         table = self._visits()
@@ -115,6 +116,8 @@ class VisitsApiService:
         }
         if hasattr(table.c, "planned_date") and payload.planned_date is not None:
             ins_values["planned_date"] = payload.planned_date
+        if hasattr(table.c, "source"):
+            ins_values["source"] = payload.source or "desk"
 
         ins = table.insert().values(**ins_values).returning(table)
         row = self.repository.execute(ins).mappings().first()
@@ -286,6 +289,7 @@ class VisitCreate(BaseModel):
     doctor_id: Optional[int] = None
     notes: Optional[str] = None
     planned_date: Optional[date] = None
+    source: Optional[str] = Field(default="desk", max_length=20)
 
 
 class VisitOut(BaseModel):
@@ -298,6 +302,7 @@ class VisitOut(BaseModel):
     finished_at: Optional[datetime] = None
     notes: Optional[str] = None
     planned_date: Optional[date] = None
+    source: Optional[str] = None
 
 
 class VisitServiceIn(BaseModel):
