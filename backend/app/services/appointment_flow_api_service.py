@@ -283,7 +283,9 @@ def create_or_update_emr(
                 # Используем Pydantic схему для безопасной сериализации
                 from app.schemas.emr import EMR as EMRSchema
 
-                emr_dict = EMRSchema.from_orm(existing_emr).dict()
+                emr_dict = EMRSchema.model_validate(
+                    existing_emr, from_attributes=True
+                ).model_dump()
 
                 # Преобразуем все datetime объекты в ISO строки для JSON сериализации
                 emr_dict_clean = convert_datetimes_to_iso(emr_dict)
@@ -307,7 +309,7 @@ def create_or_update_emr(
             # ✅ AUDIT LOG: Сохраняем старые данные перед обновлением
             old_data, _ = extract_model_changes(existing_emr, None)
 
-            emr_update_dict = emr_data.dict(exclude={"appointment_id"})
+            emr_update_dict = emr_data.model_dump(exclude={"appointment_id"})
             logger.info(
                 "[create_or_update_emr] Данные для обновления: %s",
                 list(emr_update_dict.keys()),
@@ -387,7 +389,9 @@ def create_or_update_emr(
                 # Используем Pydantic схему для безопасной сериализации
                 from app.schemas.emr import EMR as EMRSchema
 
-                emr_dict = EMRSchema.from_orm(new_emr).dict()
+                emr_dict = EMRSchema.model_validate(
+                    new_emr, from_attributes=True
+                ).model_dump()
 
                 # Преобразуем все datetime объекты в ISO строки для JSON сериализации
                 emr_dict_clean = convert_datetimes_to_iso(emr_dict)
@@ -518,7 +522,7 @@ def create_or_update_prescription(
     if existing_prescription:
         # Обновляем существующий рецепт
         prescription_update = PrescriptionUpdate(
-            **prescription_data.dict(exclude={"appointment_id", "emr_id"})
+            **prescription_data.model_dump(exclude={"appointment_id", "emr_id"})
         )
         updated_prescription = crud_emr.prescription.update(
             db, db_obj=existing_prescription, obj_in=prescription_update
