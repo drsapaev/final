@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud import service as crud
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
@@ -89,7 +88,7 @@ class ServicesApiService:
         limit: int,
         offset: int,
     ):
-        rows = crud.list_services(self.repository.db, q=q, active=active, limit=limit, offset=offset)
+        rows = self.repository.list_services(q=q, active=active, limit=limit, offset=offset)
         if category_id is not None:
             rows = [row for row in rows if getattr(row, "category_id", None) == category_id]
         if department:
@@ -212,9 +211,7 @@ class ServicesApiService:
         return self.repository.list_active_doctors()
 
     def resolve_service(self, *, service_id: int | None, code: str | None):
-        from app.services.service_mapping import resolve_service
-
-        return resolve_service(service_id=service_id, code=code, db=self.repository.db)
+        return self.repository.resolve_service(service_id=service_id, code=code)
 
     def get_service_code_mappings_payload(self) -> dict[str, Any]:
         from app.services.service_mapping import SPECIALTY_ALIASES

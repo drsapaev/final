@@ -8,8 +8,8 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from app.models.patient import Patient
 from app.models.payment import Payment
@@ -45,7 +45,6 @@ class CashierApiService:
         return f"Пациент #{patient_id}"
 
     def get_pending_payments(self, *, date_from: Optional[date], date_to: Optional[date], search: Optional[str], page: int, size: int):
-        db = self.repository.db
         """
         Получить список ожидающих оплаты записей/визитов.
         
@@ -62,18 +61,7 @@ class CashierApiService:
             # Исключаем визиты со статусами: canceled, paid, completed, done, closed
             excluded_statuses = ["canceled", "cancelled", "paid", "completed", "done", "closed"]
         
-            # ✅ ОПТИМИЗАЦИЯ: Используем joinedload для eager loading services
-            # Примечание: Visit.patient relationship не существует, поэтому используем batch loading
-            query = db.query(Visit).options(
-                joinedload(Visit.services)
-            ).filter(
-                ~Visit.status.in_(excluded_statuses),
-                # Также исключаем визиты с discount_mode='paid' (SSOT признак оплаты)
-                or_(
-                    Visit.discount_mode.is_(None),
-                    Visit.discount_mode != "paid"
-                )
-            )
+            query = self.repository.query_active_visits_with_services(excluded_statuses)
         
             # Фильтр по датам
             if date_from:
@@ -108,17 +96,14 @@ class CashierApiService:
             patient_ids = list(set([v.patient_id for v in all_visits if v.patient_id]))
             patients_map = {}
             if patient_ids:
-                patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+                patients = self.repository.list_patients_by_ids(patient_ids)
                 patients_map = {p.id: p for p in patients}
         
             # Batch Loading: Платежи для всех визитов (этот запрос всё ещё нужен)
             visit_ids = [v.id for v in all_visits]
             payments_map = defaultdict(list)  # visit_id -> list[Payment]
             if visit_ids:
-                payments_batch = db.query(Payment).filter(
-                    Payment.visit_id.in_(visit_ids),
-                    Payment.status.in_(["paid", "completed"])
-                ).all()
+                payments_batch = self.repository.list_paid_payments_by_visit_ids(visit_ids)
                 for p in payments_batch:
                     payments_map[p.visit_id].append(p)
         
@@ -268,12 +253,11 @@ class CashierApiService:
                 detail=f"Ошибка получения ожидающих оплаты: {str(e)}"
             )
     def get_cashier_stats(self, *, date_from: Optional[date], date_to: Optional[date]):
-        db = self.repository.db
         """
         Получить агрегированную статистику платежей за период.
         """
         try:
-            query = db.query(Payment)
+            query = self.repository.query_payments()
         
             if date_from:
                 query = query.filter(Payment.created_at >= datetime.combine(date_from, datetime.min.time()))
@@ -303,7 +287,7 @@ class CashierApiService:
         
         
             # Считаем pending из Visit
-            pending_query = db.query(Visit).filter(Visit.status != "canceled")
+            pending_query = self.repository.query_visits().filter(Visit.status != "canceled")
             if date_from:
                 pending_query = pending_query.filter(Visit.created_at >= datetime.combine(date_from, datetime.min.time()))
             if date_to:
@@ -318,10 +302,7 @@ class CashierApiService:
                 # Получаем суммы платежей для каждого визита
                 from collections import defaultdict
                 paid_by_visit = defaultdict(Decimal)
-                existing = db.query(Payment).filter(
-                    Payment.visit_id.in_(visit_ids),
-                    Payment.status.in_(["paid", "completed"])
-                ).all()
+                existing = self.repository.list_paid_payments_by_visit_ids(visit_ids)
                 for ep in existing:
                     paid_by_visit[ep.visit_id] += ep.amount
         
@@ -361,7 +342,6 @@ class CashierApiService:
                 detail=f"Ошибка получения статистики: {str(e)}"
             )
     def export_payments(self, *, date_from: Optional[date], date_to: Optional[date]):
-        db = self.repository.db
         """
         Экспорт всех платежей за период в CSV.
         """
@@ -370,7 +350,7 @@ class CashierApiService:
         import csv
         
         try:
-            query = db.query(Payment)
+            query = self.repository.query_payments()
         
             if date_from:
                 query = query.filter(Payment.created_at >= datetime.combine(date_from, datetime.min.time()))
@@ -386,12 +366,12 @@ class CashierApiService:
             patients_map = {}
         
             if visit_ids:
-                visits = db.query(Visit).filter(Visit.id.in_(visit_ids)).all()
+                visits = self.repository.list_visits_by_ids(visit_ids)
                 visits_map = {v.id: v for v in visits}
-        
+
                 patient_ids = [v.patient_id for v in visits if v.patient_id]
                 if patient_ids:
-                    patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+                    patients = self.repository.list_patients_by_ids(patient_ids)
                     patients_map = {p.id: p for p in patients}
         
             # Create CSV
@@ -446,12 +426,11 @@ class CashierApiService:
                 detail=f"Ошибка экспорта: {str(e)}"
             )
     def get_payments(self, *, date_from: Optional[date], date_to: Optional[date], search: Optional[str], status_filter: Optional[str], method: Optional[str], page: int, size: int):
-        db = self.repository.db
         """
         Получить историю платежей с пагинацией и поиском.
         """
         try:
-            query = db.query(Payment)
+            query = self.repository.query_payments()
         
             # Фильтр по статусу
             if status_filter:
@@ -498,12 +477,12 @@ class CashierApiService:
             patients_map = {}
         
             if visit_ids:
-                visits = db.query(Visit).filter(Visit.id.in_(visit_ids)).all()
+                visits = self.repository.list_visits_by_ids(visit_ids)
                 visits_map = {v.id: v for v in visits}
-        
+
                 patient_ids = [v.patient_id for v in visits if v.patient_id]
                 if patient_ids:
-                    patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+                    patients = self.repository.list_patients_by_ids(patient_ids)
                     patients_map = {p.id: p for p in patients}
         
             items = []
@@ -549,7 +528,6 @@ class CashierApiService:
                 detail=f"Ошибка получения истории платежей: {str(e)}"
             )
     def create_payment(self, *, payment_data, current_user):
-        db = self.repository.db
         """
         Создать новый платеж.
         """
@@ -559,7 +537,7 @@ class CashierApiService:
         
             if payment_data.visit_id:
                 # ✅ FIX: Use lazy load to ensure consistency with get_pending_payments
-                visit = db.query(Visit).filter(Visit.id == payment_data.visit_id).first()
+                visit = self.repository.get_visit_by_id(payment_data.visit_id)
                 if not visit:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
@@ -585,10 +563,7 @@ class CashierApiService:
         
                 # 2. Считаем уже оплаченное
                 paid_amount = Decimal("0")
-                existing_payments = db.query(Payment).filter(
-                    Payment.visit_id == visit.id,
-                    Payment.status.in_(["paid", "completed"])
-                ).all()
+                existing_payments = self.repository.list_paid_payments_for_visit(visit.id)
                 for p in existing_payments:
                     paid_amount += p.amount
         
@@ -617,9 +592,9 @@ class CashierApiService:
                 paid_at=datetime.utcnow(),
             )
         
-            db.add(new_payment)
-            db.commit()
-            db.refresh(new_payment)
+            self.repository.add(new_payment)
+            self.repository.commit()
+            self.repository.refresh(new_payment)
         
             # 🔔 WebSocket: Broadcast payment_created event
             try:
@@ -651,7 +626,7 @@ class CashierApiService:
         except HTTPException:
             raise
         except Exception as e:
-            db.rollback()
+            self.repository.rollback()
             import traceback
             traceback.print_exc()
             raise HTTPException(
@@ -659,11 +634,10 @@ class CashierApiService:
                 detail=f"Ошибка создания платежа: {str(e)}"
             )
     def get_payment_by_id(self, *, payment_id: int):
-        db = self.repository.db
         """
         Получить платеж по ID.
         """
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        payment = self.repository.get_payment_by_id(payment_id)
         
         if not payment:
             raise HTTPException(
@@ -674,7 +648,7 @@ class CashierApiService:
         # Определяем patient_id через visit
         patient_id = None
         if payment.visit_id:
-            visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+            visit = self.repository.get_visit_by_id(payment.visit_id)
             if visit:
                 patient_id = visit.patient_id
         
@@ -690,11 +664,10 @@ class CashierApiService:
             note=payment.note if hasattr(payment, 'note') else None,
         )
     def cancel_payment(self, *, payment_id: int, cancel_data):
-        db = self.repository.db
         """
         Отменить платеж.
         """
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        payment = self.repository.get_payment_by_id(payment_id)
         
         if not payment:
             raise HTTPException(
@@ -716,13 +689,13 @@ class CashierApiService:
         
             # Возвращаем статус визита в 'pending', чтобы он появился в списке
             if payment.visit_id:
-                visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+                visit = self.repository.get_visit_by_id(payment.visit_id)
                 if visit and visit.status == 'paid':
                      visit.status = 'pending'
                      visit.discount_mode = 'none'
-                     db.add(visit)
+                     self.repository.add(visit)
         
-            db.commit()
+            self.repository.commit()
         
             return {
                 "success": True,
@@ -731,7 +704,7 @@ class CashierApiService:
             }
         
         except Exception as e:
-            db.rollback()
+            self.repository.rollback()
             import traceback
             traceback.print_exc()
             raise HTTPException(
@@ -739,12 +712,11 @@ class CashierApiService:
                 detail=f"Ошибка отмены платежа: {str(e)}"
             )
     def mark_visit_as_paid(self, *, visit_id: int):
-        db = self.repository.db
         """
         Отметить визит как оплаченный.
         Создаёт платёж на полную сумму услуг визита.
         """
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        visit = self.repository.get_visit_by_id(visit_id)
         
         if not visit:
             raise HTTPException(
@@ -772,13 +744,13 @@ class CashierApiService:
                     created_at=datetime.utcnow(),
                     paid_at=datetime.utcnow(),
                 )
-                db.add(new_payment)
+                self.repository.add(new_payment)
         
             # Обновляем статус визита и discount_mode (SSOT)
             visit.status = "paid"  # Используем "paid" вместо "closed" для правильной фильтрации
             visit.discount_mode = "paid"  # SSOT признак оплаты
         
-            db.commit()
+            self.repository.commit()
         
             return {
                 "success": True,
@@ -788,7 +760,7 @@ class CashierApiService:
             }
         
         except Exception as e:
-            db.rollback()
+            self.repository.rollback()
             import traceback
             traceback.print_exc()
             raise HTTPException(
@@ -796,11 +768,10 @@ class CashierApiService:
                 detail=f"Ошибка обновления статуса визита: {str(e)}"
             )
     def confirm_payment(self, *, payment_id: int):
-        db = self.repository.db
         """
         Вручную подтвердить платеж.
         """
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        payment = self.repository.get_payment_by_id(payment_id)
         if not payment:
              raise HTTPException(status_code=404, detail="Платеж не найден")
         
@@ -818,21 +789,20 @@ class CashierApiService:
         
         # Обновляем статус визита
         if payment.visit_id:
-             visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+             visit = self.repository.get_visit_by_id(payment.visit_id)
              if visit:
                  visit.status = 'paid'
                  visit.discount_mode = 'paid'
-                 db.add(visit)
+                 self.repository.add(visit)
         
-        db.commit()
+        self.repository.commit()
         return {"success": True, "status": "paid"}
     def refund_payment(self, *, payment_id: int, refund_data, current_user):
-        db = self.repository.db
         """
         Частичный или полный возврат средств по платежу.
         """
         try:
-            payment = db.query(Payment).filter(Payment.id == payment_id).first()
+            payment = self.repository.get_payment_by_id(payment_id)
         
             if not payment:
                 raise HTTPException(
@@ -869,17 +839,17 @@ class CashierApiService:
         
                 # Возвращаем статус визита в 'pending' при полном возврате
                 if payment.visit_id:
-                    visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+                    visit = self.repository.get_visit_by_id(payment.visit_id)
                     if visit and visit.status == 'paid':
                          visit.status = 'pending'
                          visit.discount_mode = 'none'
-                         db.add(visit)
+                         self.repository.add(visit)
             else:
                 # Частичный возврат — оставляем "paid" но с пометкой
                 pass
         
-            db.commit()
-            db.refresh(payment)
+            self.repository.commit()
+            self.repository.refresh(payment)
         
             return dict(
                 id=payment.id,
@@ -894,7 +864,7 @@ class CashierApiService:
         except HTTPException:
             raise
         except Exception as e:
-            db.rollback()
+            self.repository.rollback()
             import traceback
             traceback.print_exc()
             raise HTTPException(
@@ -902,12 +872,11 @@ class CashierApiService:
                 detail=f"Ошибка возврата средств: {str(e)}"
             )
     def get_payment_receipt(self, *, payment_id: int):
-        db = self.repository.db
         from fastapi.responses import StreamingResponse
         import io
 
         try:
-            payment = db.query(Payment).filter(Payment.id == payment_id).first()
+            payment = self.repository.get_payment_by_id(payment_id)
 
             if not payment:
                 raise HTTPException(
@@ -916,7 +885,7 @@ class CashierApiService:
                 )
 
             visit = (
-                db.query(Visit).filter(Visit.id == payment.visit_id).first()
+                self.repository.get_visit_by_id(payment.visit_id)
                 if payment.visit_id
                 else None
             )
@@ -924,7 +893,7 @@ class CashierApiService:
             patient_name = "Неизвестно"
 
             if visit:
-                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                patient = self.repository.get_patient_by_id(visit.patient_id)
                 if patient:
                     patient_name = self._get_patient_name(patient, patient.id)
 
@@ -979,7 +948,6 @@ class CashierApiService:
             )
 
     def get_hourly_stats(self, *, target_date: Optional[date]):
-        db = self.repository.db
         try:
             if not target_date:
                 target_date = date.today()
@@ -988,7 +956,7 @@ class CashierApiService:
             end_of_day = datetime.combine(target_date, datetime.max.time())
 
             payments = (
-                db.query(Payment)
+                self.repository.query_payments()
                 .filter(
                     Payment.created_at >= start_of_day,
                     Payment.created_at <= end_of_day,
