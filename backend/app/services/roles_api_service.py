@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.models.role_permission import Role
 from app.models.user import User
+from app.repositories.roles_api_repository import RolesApiRepository
 from app.schemas.role import (
     RoleCreate,
     RoleListResponse,
@@ -23,6 +24,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+
+def _repo(db: Session) -> RolesApiRepository:
+    return RolesApiRepository(db)
+
 @router.get("/", response_model=RoleListResponse)
 async def get_roles(
     is_active: bool | None = Query(None, description="Filter by active status"),
@@ -36,7 +41,7 @@ async def get_roles(
     Returns a list of all roles, optionally filtered by active/system status.
     """
     try:
-        query = db.query(Role)
+        query = _repo(db).query(Role)
 
         if is_active is not None:
             query = query.filter(Role.is_active == is_active)
@@ -72,7 +77,7 @@ async def get_role_options(
     Used for role selection in forms and filters.
     """
     try:
-        roles = db.query(Role).filter(Role.is_active == True).order_by(Role.level.desc()).all()
+        roles = _repo(db).query(Role).filter(Role.is_active == True).order_by(Role.level.desc()).all()
 
         options = []
 
@@ -103,7 +108,7 @@ async def get_role(
     current_user: User = Depends(get_current_user),
 ):
     """Get a specific role by ID."""
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = _repo(db).query(Role).filter(Role.id == role_id).first()
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -131,7 +136,7 @@ async def create_role(
         )
 
     # Check if role name already exists
-    existing = db.query(Role).filter(Role.name == role_data.name).first()
+    existing = _repo(db).query(Role).filter(Role.name == role_data.name).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -140,12 +145,12 @@ async def create_role(
 
     try:
         role = Role(**role_data.model_dump())
-        db.add(role)
-        db.commit()
-        db.refresh(role)
+        _repo(db).add(role)
+        _repo(db).commit()
+        _repo(db).refresh(role)
         return RoleResponse.model_validate(role)
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         logger.error(f"Error creating role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -173,7 +178,7 @@ async def update_role(
             detail="Только администраторы могут изменять роли"
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = _repo(db).query(Role).filter(Role.id == role_id).first()
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -196,11 +201,11 @@ async def update_role(
         for field, value in update_data.items():
             setattr(role, field, value)
 
-        db.commit()
-        db.refresh(role)
+        _repo(db).commit()
+        _repo(db).refresh(role)
         return RoleResponse.model_validate(role)
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         logger.error(f"Error updating role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -227,7 +232,7 @@ async def delete_role(
             detail="Только администраторы могут удалять роли"
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = _repo(db).query(Role).filter(Role.id == role_id).first()
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -241,10 +246,10 @@ async def delete_role(
         )
 
     try:
-        db.delete(role)
-        db.commit()
+        _repo(db).delete(role)
+        _repo(db).commit()
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         logger.error(f"Error deleting role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

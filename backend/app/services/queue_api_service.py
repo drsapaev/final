@@ -15,6 +15,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from app.repositories.queue_api_repository import QueueApiRepository
 
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user
@@ -31,6 +32,10 @@ from app.services.queue_service import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _repo(db: Session) -> QueueApiRepository:
+    return QueueApiRepository(db)
 
 # Timezone для Узбекистана (UTC+5)
 TASHKENT_OFFSET = 5
@@ -103,7 +108,7 @@ def generate_qr_token(
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         specialist = (
-            db.query(User)
+            _repo(db).query(User)
             .filter(User.id == specialist_id, User.role == "Doctor")
             .first()
         )
@@ -269,7 +274,7 @@ def get_queue_statistics(
 
     # Получаем очередь
     daily_queue = (
-        db.query(DailyQueue)
+        _repo(db).query(DailyQueue)
         .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
         .first()
     )
@@ -333,7 +338,7 @@ def open_queue(
 
         # Получение или создание очереди
         daily_queue = (
-            db.query(DailyQueue)
+            _repo(db).query(DailyQueue)
             .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
             .first()
         )
@@ -341,16 +346,16 @@ def open_queue(
         if not daily_queue:
             # Создаем очередь если её нет
             daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
-            db.add(daily_queue)
-            db.commit()
-            db.refresh(daily_queue)
+            _repo(db).add(daily_queue)
+            _repo(db).commit()
+            _repo(db).refresh(daily_queue)
 
         if daily_queue.opened_at:
             raise HTTPException(status_code=400, detail="Прием уже открыт")
 
         # Открытие приема
         daily_queue.opened_at = datetime.now()
-        db.commit()
+        _repo(db).commit()
 
         return {
             "success": True,
@@ -382,7 +387,7 @@ def get_today_queue(
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
 
     # Проверка существования специалиста
-    specialist = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    specialist = _repo(db).query(Doctor).filter(Doctor.id == specialist_id).first()
     if not specialist:
         raise HTTPException(status_code=404, detail="Специалист не найден")
 
@@ -390,7 +395,7 @@ def get_today_queue(
 
     # Получение очереди
     daily_queue = (
-        db.query(DailyQueue)
+        _repo(db).query(DailyQueue)
         .filter(DailyQueue.day == today, DailyQueue.specialist_id == specialist_id)
         .first()
     )
@@ -400,7 +405,7 @@ def get_today_queue(
 
     # Получение записей
     entries = (
-        db.query(OnlineQueueEntry)
+        _repo(db).query(OnlineQueueEntry)
         .filter(OnlineQueueEntry.queue_id == daily_queue.id)
         .order_by(OnlineQueueEntry.number)
         .all()
@@ -458,7 +463,7 @@ def call_patient(
     if current_user.role not in ["Admin", "Registrar", "Doctor"]:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
 
     if not entry:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -470,7 +475,7 @@ def call_patient(
     entry.status = "called"
     entry.called_at = datetime.now()
 
-    db.commit()
+    _repo(db).commit()
 
     # Отправка WebSocket события для табло
     try:

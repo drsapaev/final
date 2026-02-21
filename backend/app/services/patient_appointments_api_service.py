@@ -16,11 +16,16 @@ from app.models.clinic import Doctor, Schedule
 from app.models.lab import LabOrder
 from app.models.patient import Patient
 from app.models.user import User
+from app.repositories.patient_appointments_api_repository import PatientAppointmentsApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/patient", tags=["patient"])
 
+
+
+def _repo(db: Session) -> PatientAppointmentsApiRepository:
+    return PatientAppointmentsApiRepository(db)
 
 # ============================================================================
 # Schemas
@@ -80,16 +85,16 @@ def get_patient_for_user(db: Session, user: User) -> Patient | None:
     """Получить пациента, связанного с пользователем"""
     # Пациент может быть связан по user_id или по телефону
     if hasattr(user, 'patient_id') and user.patient_id:
-        return db.query(Patient).filter(Patient.id == user.patient_id).first()
+        return _repo(db).query(Patient).filter(Patient.id == user.patient_id).first()
 
     # Попробуем найти по телефону или email
     if user.phone:
-        patient = db.query(Patient).filter(Patient.phone == user.phone).first()
+        patient = _repo(db).query(Patient).filter(Patient.phone == user.phone).first()
         if patient:
             return patient
 
     if user.email:
-        patient = db.query(Patient).filter(Patient.email == user.email).first()
+        patient = _repo(db).query(Patient).filter(Patient.email == user.email).first()
         if patient:
             return patient
 
@@ -141,12 +146,12 @@ def get_doctor_name(db: Session, doctor_id: int | None) -> str | None:
     if not doctor_id:
         return None
 
-    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+    doctor = _repo(db).query(Doctor).filter(Doctor.id == doctor_id).first()
     if not doctor:
         return None
 
     if doctor.user_id:
-        user = db.query(User).filter(User.id == doctor.user_id).first()
+        user = _repo(db).query(User).filter(User.id == doctor.user_id).first()
         if user:
             return user.full_name or user.username
 
@@ -175,7 +180,7 @@ async def get_my_appointments(
         return []
 
     # Базовый запрос
-    query = db.query(Appointment).filter(Appointment.patient_id == patient.id)
+    query = _repo(db).query(Appointment).filter(Appointment.patient_id == patient.id)
 
     # Фильтр по статусу
     if status_filter:
@@ -231,7 +236,7 @@ async def get_my_appointment(
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
-    appointment = db.query(Appointment).filter(
+    appointment = _repo(db).query(Appointment).filter(
         Appointment.id == appointment_id,
         Appointment.patient_id == patient.id
     ).first()
@@ -276,7 +281,7 @@ async def cancel_my_appointment(
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
-    appointment = db.query(Appointment).filter(
+    appointment = _repo(db).query(Appointment).filter(
         Appointment.id == appointment_id,
         Appointment.patient_id == patient.id
     ).first()
@@ -302,7 +307,7 @@ async def cancel_my_appointment(
     appointment.status = 'cancelled'
     appointment.updated_at = datetime.now()
 
-    db.commit()
+    _repo(db).commit()
 
     logger.info(f"Patient {patient.id} cancelled appointment {appointment_id}")
 
@@ -331,7 +336,7 @@ async def reschedule_my_appointment(
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
-    appointment = db.query(Appointment).filter(
+    appointment = _repo(db).query(Appointment).filter(
         Appointment.id == appointment_id,
         Appointment.patient_id == patient.id
     ).first()
@@ -376,7 +381,7 @@ async def reschedule_my_appointment(
     appointment.appointment_time = request.new_time
     appointment.updated_at = datetime.now()
 
-    db.commit()
+    _repo(db).commit()
 
     logger.info(
         f"Patient {patient.id} rescheduled appointment {appointment_id} "
@@ -410,7 +415,7 @@ async def get_available_slots(
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
-    appointment = db.query(Appointment).filter(
+    appointment = _repo(db).query(Appointment).filter(
         Appointment.id == appointment_id,
         Appointment.patient_id == patient.id
     ).first()
@@ -437,16 +442,16 @@ async def get_available_slots(
     schedules = []
 
     if appointment.doctor_id:
-        doctor = db.query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
+        doctor = _repo(db).query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
         if doctor:
             # Получаем имя через связанного пользователя
             if doctor.user_id:
-                user = db.query(User).filter(User.id == doctor.user_id).first()
+                user = _repo(db).query(User).filter(User.id == doctor.user_id).first()
                 if user:
                     doctor_name = f"{user.full_name or user.username}"
 
             # Получаем расписание врача
-            schedules = db.query(Schedule).filter(
+            schedules = _repo(db).query(Schedule).filter(
                 Schedule.doctor_id == doctor.id,
                 Schedule.active == True
             ).all()
@@ -454,7 +459,7 @@ async def get_available_slots(
     # Получаем все существующие записи врача в диапазоне дат
     existing_appointments = []
     if appointment.doctor_id:
-        existing_appointments = db.query(Appointment).filter(
+        existing_appointments = _repo(db).query(Appointment).filter(
             Appointment.doctor_id == appointment.doctor_id,
             Appointment.appointment_date >= start_date,
             Appointment.appointment_date <= end_date,
@@ -536,7 +541,7 @@ async def get_my_results(
         return []
 
     # Получаем лабораторные результаты
-    lab_results = db.query(LabOrder).filter(
+    lab_results = _repo(db).query(LabOrder).filter(
         LabOrder.patient_id == patient.id,
         LabOrder.status == 'done'
     ).order_by(LabOrder.created_at.desc()).limit(limit).all()

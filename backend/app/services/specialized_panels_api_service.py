@@ -13,9 +13,14 @@ from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.specialized_panels_api_repository import SpecializedPanelsApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> SpecializedPanelsApiRepository:
+    return SpecializedPanelsApiRepository(db)
 
 @router.get("/cardiology/patients")
 async def get_cardiology_patients(
@@ -28,7 +33,7 @@ async def get_cardiology_patients(
     """Получить пациентов кардиологического отделения"""
 
     query = (
-        db.query(Patient)
+        _repo(db).query(Patient)
         .join(Visit)
         .join(Service)
         .filter(Service.name.ilike("%кардиолог%"))
@@ -61,7 +66,7 @@ async def get_cardiology_visits(
 ):
     """Получить визиты кардиологического отделения"""
 
-    query = db.query(Visit).join(Service).filter(Service.name.ilike("%кардиолог%"))
+    query = _repo(db).query(Visit).join(Service).filter(Service.name.ilike("%кардиолог%"))
 
     if patient_id:
         query = query.filter(Visit.patient_id == patient_id)
@@ -91,7 +96,7 @@ async def get_cardiology_analytics(
     """Получить аналитику кардиологического отделения"""
 
     # Базовый запрос для кардиологических услуг
-    base_query = db.query(Visit).join(Service).filter(Service.name.ilike("%кардиолог%"))
+    base_query = _repo(db).query(Visit).join(Service).filter(Service.name.ilike("%кардиолог%"))
 
     if start_date:
         base_query = base_query.filter(Visit.created_at >= start_date)
@@ -107,7 +112,7 @@ async def get_cardiology_analytics(
 
     # Статистика по статусам
     status_stats = (
-        db.query(Visit.status, func.count(Visit.id).label('count'))
+        _repo(db).query(Visit.status, func.count(Visit.id).label('count'))
         .join(Service)
         .filter(Service.name.ilike("%кардиолог%"))
         .group_by(Visit.status)
@@ -116,7 +121,7 @@ async def get_cardiology_analytics(
 
     # Ежедневная статистика
     daily_stats = (
-        db.query(
+        _repo(db).query(
             func.date(Visit.created_at).label('date'),
             func.count(Visit.id).label('visits'),
             func.sum(Visit.payment_amount).label('revenue'),
@@ -155,7 +160,7 @@ async def get_dentistry_patients(
     """Получить пациентов стоматологического отделения"""
 
     query = (
-        db.query(Patient)
+        _repo(db).query(Patient)
         .join(Visit)
         .join(Service)
         .filter(
@@ -195,7 +200,7 @@ async def get_dentistry_visits(
     """Получить визиты стоматологического отделения"""
 
     query = (
-        db.query(Visit)
+        _repo(db).query(Visit)
         .join(Service)
         .filter(
             or_(
@@ -235,7 +240,7 @@ async def get_dentistry_analytics(
 
     # Базовый запрос для стоматологических услуг
     base_query = (
-        db.query(Visit)
+        _repo(db).query(Visit)
         .join(Service)
         .filter(
             or_(
@@ -260,7 +265,7 @@ async def get_dentistry_analytics(
 
     # Статистика по статусам
     status_stats = (
-        db.query(Visit.status, func.count(Visit.id).label('count'))
+        _repo(db).query(Visit.status, func.count(Visit.id).label('count'))
         .join(Service)
         .filter(
             or_(
@@ -275,7 +280,7 @@ async def get_dentistry_analytics(
 
     # Ежедневная статистика
     daily_stats = (
-        db.query(
+        _repo(db).query(
             func.date(Visit.created_at).label('date'),
             func.count(Visit.id).label('visits'),
             func.sum(Visit.payment_amount).label('revenue'),
@@ -319,7 +324,7 @@ async def get_specialized_services(
 ):
     """Получить услуги специализированных отделений"""
 
-    query = db.query(Service)
+    query = _repo(db).query(Service)
 
     if department == "cardiology":
         query = query.filter(Service.name.ilike("%кардиолог%"))
@@ -349,12 +354,12 @@ async def get_specialized_patient_history(
     """Получить историю пациента в специализированном отделении"""
 
     # Проверяем существование пациента
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    patient = _repo(db).query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
     # Получаем визиты пациента
-    query = db.query(Visit).filter(Visit.patient_id == patient_id)
+    query = _repo(db).query(Visit).filter(Visit.patient_id == patient_id)
 
     if department == "cardiology":
         query = query.join(Service).filter(Service.name.ilike("%кардиолог%"))
@@ -388,7 +393,7 @@ async def get_specialized_statistics(
 
     # Статистика по кардиологии
     cardiology_query = (
-        db.query(Visit).join(Service).filter(Service.name.ilike("%кардиолог%"))
+        _repo(db).query(Visit).join(Service).filter(Service.name.ilike("%кардиолог%"))
     )
 
     if start_date:
@@ -403,7 +408,7 @@ async def get_specialized_statistics(
 
     # Статистика по стоматологии
     dentistry_query = (
-        db.query(Visit)
+        _repo(db).query(Visit)
         .join(Service)
         .filter(
             or_(

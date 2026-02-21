@@ -15,11 +15,16 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.salary_history import SalaryHistory, SalaryPayment
 from app.models.user import User
+from app.repositories.salary_api_repository import SalaryApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/salary", tags=["salary"])
 
+
+
+def _repo(db: Session) -> SalaryApiRepository:
+    return SalaryApiRepository(db)
 
 # ===================== СХЕМЫ =====================
 
@@ -60,7 +65,7 @@ async def get_salary_history(
     """
     try:
         history = (
-            db.query(SalaryHistory)
+            _repo(db).query(SalaryHistory)
             .filter(SalaryHistory.user_id == user_id)
             .order_by(desc(SalaryHistory.effective_date))
             .limit(limit)
@@ -101,7 +106,7 @@ async def create_salary_change(
     try:
         # Получаем текущую зарплату
         last_record = (
-            db.query(SalaryHistory)
+            _repo(db).query(SalaryHistory)
             .filter(SalaryHistory.user_id == data.user_id)
             .order_by(desc(SalaryHistory.effective_date))
             .first()
@@ -127,9 +132,9 @@ async def create_salary_change(
             created_at=datetime.utcnow(),
         )
 
-        db.add(record)
-        db.commit()
-        db.refresh(record)
+        _repo(db).add(record)
+        _repo(db).commit()
+        _repo(db).refresh(record)
 
         return {
             "success": True,
@@ -139,7 +144,7 @@ async def create_salary_change(
         }
     except Exception as e:
         logger.error(f"Error creating salary change: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка записи изменения: {str(e)}")
 
 
@@ -153,7 +158,7 @@ async def confirm_salary_change(
     Подтвердить изменение зарплаты
     """
     try:
-        record = db.query(SalaryHistory).filter(SalaryHistory.id == record_id).first()
+        record = _repo(db).query(SalaryHistory).filter(SalaryHistory.id == record_id).first()
 
         if not record:
             raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -162,14 +167,14 @@ async def confirm_salary_change(
         record.confirmed_at = datetime.utcnow()
         record.confirmed_by_id = user.id
 
-        db.commit()
+        _repo(db).commit()
 
         return {"success": True, "message": "Изменение подтверждено"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error confirming salary change: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка подтверждения: {str(e)}")
 
 
@@ -188,7 +193,7 @@ async def get_salary_payments(
     Получить историю выплат зарплаты сотрудника
     """
     try:
-        query = db.query(SalaryPayment).filter(SalaryPayment.user_id == user_id)
+        query = _repo(db).query(SalaryPayment).filter(SalaryPayment.user_id == user_id)
 
         if year:
             query = query.filter(
@@ -247,9 +252,9 @@ async def create_salary_payment(
             created_at=datetime.utcnow(),
         )
 
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
+        _repo(db).add(payment)
+        _repo(db).commit()
+        _repo(db).refresh(payment)
 
         return {
             "success": True,
@@ -258,7 +263,7 @@ async def create_salary_payment(
         }
     except Exception as e:
         logger.error(f"Error creating salary payment: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка создания выплаты: {str(e)}")
 
 
@@ -275,7 +280,7 @@ async def update_payment_status(
     Обновить статус выплаты зарплаты
     """
     try:
-        payment = db.query(SalaryPayment).filter(SalaryPayment.id == payment_id).first()
+        payment = _repo(db).query(SalaryPayment).filter(SalaryPayment.id == payment_id).first()
 
         if not payment:
             raise HTTPException(status_code=404, detail="Выплата не найдена")
@@ -289,14 +294,14 @@ async def update_payment_status(
             payment.payment_date = payment_date or datetime.utcnow()
             payment.payment_method = payment_method
 
-        db.commit()
+        _repo(db).commit()
 
         return {"success": True, "message": f"Статус обновлён на {status}"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating payment status: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка обновления: {str(e)}")
 
 
@@ -312,7 +317,7 @@ async def get_salary_summary(
     """
     try:
         payments = (
-            db.query(SalaryPayment)
+            _repo(db).query(SalaryPayment)
             .filter(
                 SalaryPayment.user_id == user_id,
                 SalaryPayment.period_start >= datetime(year, 1, 1),

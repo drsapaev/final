@@ -29,12 +29,17 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.user import User
+from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
 from app.services.force_majeure_service import (
     get_force_majeure_service,
 )
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> ForceMajeureApiRepository:
+    return ForceMajeureApiRepository(db)
 
 # ========================= СХЕМЫ =========================
 
@@ -150,7 +155,7 @@ async def transfer_queue_to_tomorrow(
 
     # Получаем записи для переноса
     if request.entry_ids:
-        entries = db.query(OnlineQueueEntry).filter(
+        entries = _repo(db).query(OnlineQueueEntry).filter(
             OnlineQueueEntry.id.in_(request.entry_ids),
             OnlineQueueEntry.status.in_(["waiting", "called"])
         ).all()
@@ -206,7 +211,7 @@ async def cancel_queue_with_refund(
 
     # Получаем записи для отмены
     if request.entry_ids:
-        entries = db.query(OnlineQueueEntry).filter(
+        entries = _repo(db).query(OnlineQueueEntry).filter(
             OnlineQueueEntry.id.in_(request.entry_ids),
             OnlineQueueEntry.status.in_(["waiting", "called"])
         ).all()
@@ -286,7 +291,7 @@ async def get_refund_requests(
 
     Доступно: Admin, Cashier, Manager
     """
-    query = db.query(RefundRequest)
+    query = _repo(db).query(RefundRequest)
 
     if status_filter:
         query = query.filter(RefundRequest.status == status_filter)
@@ -339,7 +344,7 @@ async def get_refund_request(
 
     Доступно: Admin, Cashier, Manager
     """
-    req = db.query(RefundRequest).filter(RefundRequest.id == request_id).first()
+    req = _repo(db).query(RefundRequest).filter(RefundRequest.id == request_id).first()
 
     if not req:
         raise HTTPException(
@@ -391,7 +396,7 @@ async def process_refund_request(
 
     Доступно: Admin, Cashier, Manager
     """
-    req = db.query(RefundRequest).filter(RefundRequest.id == request_id).first()
+    req = _repo(db).query(RefundRequest).filter(RefundRequest.id == request_id).first()
 
     if not req:
         raise HTTPException(
@@ -447,8 +452,8 @@ async def process_refund_request(
     if process_request.manager_notes:
         req.manager_notes = process_request.manager_notes
 
-    db.commit()
-    db.refresh(req)
+    _repo(db).commit()
+    _repo(db).refresh(req)
 
     patient_name = None
     if req.patient:
@@ -489,7 +494,7 @@ async def get_deposits(
 
     Доступно: Admin, Cashier
     """
-    query = db.query(PatientDeposit)
+    query = _repo(db).query(PatientDeposit)
 
     if active_only:
         query = query.filter(PatientDeposit.is_active == True)
@@ -530,7 +535,7 @@ async def get_patient_deposit(
 
     Доступно: Admin, Cashier, Registrar
     """
-    deposit = db.query(PatientDeposit).filter(
+    deposit = _repo(db).query(PatientDeposit).filter(
         PatientDeposit.patient_id == patient_id
     ).first()
 
@@ -568,7 +573,7 @@ async def get_deposit_transactions(
 
     Доступно: Admin, Cashier
     """
-    transactions = db.query(DepositTransaction).filter(
+    transactions = _repo(db).query(DepositTransaction).filter(
         DepositTransaction.deposit_id == deposit_id
     ).order_by(
         DepositTransaction.created_at.desc()
@@ -604,7 +609,7 @@ async def add_to_deposit(
     amount = Decimal(str(request.amount))
 
     # Получаем или создаём депозит
-    deposit = db.query(PatientDeposit).filter(
+    deposit = _repo(db).query(PatientDeposit).filter(
         PatientDeposit.patient_id == request.patient_id
     ).first()
 
@@ -613,11 +618,11 @@ async def add_to_deposit(
             patient_id=request.patient_id,
             balance=amount
         )
-        db.add(deposit)
+        _repo(db).add(deposit)
     else:
         deposit.balance += amount
 
-    db.flush()
+    _repo(db).flush()
 
     # Создаём транзакцию
     transaction = DepositTransaction(
@@ -628,9 +633,9 @@ async def add_to_deposit(
         description=request.description or "Пополнение депозита",
         performed_by=current_user.id
     )
-    db.add(transaction)
-    db.commit()
-    db.refresh(deposit)
+    _repo(db).add(transaction)
+    _repo(db).commit()
+    _repo(db).refresh(deposit)
 
     patient_name = None
     if deposit.patient:
@@ -662,7 +667,7 @@ async def use_deposit_for_payment(
     """
     amount = Decimal(str(request.amount))
 
-    deposit = db.query(PatientDeposit).filter(
+    deposit = _repo(db).query(PatientDeposit).filter(
         PatientDeposit.patient_id == request.patient_id
     ).first()
 
@@ -685,7 +690,7 @@ async def use_deposit_for_payment(
         )
 
     deposit.balance -= amount
-    db.flush()
+    _repo(db).flush()
 
     # Создаём транзакцию
     transaction = DepositTransaction(
@@ -697,9 +702,9 @@ async def use_deposit_for_payment(
         visit_id=request.visit_id,
         performed_by=current_user.id
     )
-    db.add(transaction)
-    db.commit()
-    db.refresh(deposit)
+    _repo(db).add(transaction)
+    _repo(db).commit()
+    _repo(db).refresh(deposit)
 
     patient_name = None
     if deposit.patient:

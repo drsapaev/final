@@ -19,6 +19,7 @@ from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.registrar_notifications_api_repository import RegistrarNotificationsApiRepository
 from app.services.registrar_notification_service import (
     get_registrar_notification_service,
 )
@@ -26,6 +27,10 @@ from app.services.registrar_notification_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> RegistrarNotificationsApiRepository:
+    return RegistrarNotificationsApiRepository(db)
 
 # ===================== PYDANTIC СХЕМЫ =====================
 
@@ -161,11 +166,11 @@ async def notify_new_appointment(
         # Получаем запись
         if request_data.appointment_type == "visit":
             appointment = (
-                db.query(Visit).filter(Visit.id == request_data.appointment_id).first()
+                _repo(db).query(Visit).filter(Visit.id == request_data.appointment_id).first()
             )
         else:
             appointment = (
-                db.query(Appointment)
+                _repo(db).query(Appointment)
                 .filter(Appointment.id == request_data.appointment_id)
                 .first()
             )
@@ -176,7 +181,7 @@ async def notify_new_appointment(
             )
 
         # Получаем пациента
-        patient = db.query(Patient).filter(Patient.id == appointment.patient_id).first()
+        patient = _repo(db).query(Patient).filter(Patient.id == appointment.patient_id).first()
         if not patient:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
@@ -188,13 +193,13 @@ async def notify_new_appointment(
             from app.models.visit import VisitService
 
             visit_services = (
-                db.query(VisitService)
+                _repo(db).query(VisitService)
                 .filter(VisitService.visit_id == appointment.id)
                 .all()
             )
             for vs in visit_services:
                 service = (
-                    db.query(Service).filter(Service.code == vs.service_code).first()
+                    _repo(db).query(Service).filter(Service.code == vs.service_code).first()
                 )
                 if service:
                     services.append(service)
@@ -236,7 +241,7 @@ async def notify_price_change(
 
         # Получаем изменение цены
         price_override = (
-            db.query(DoctorPriceOverride)
+            _repo(db).query(DoctorPriceOverride)
             .filter(DoctorPriceOverride.id == request_data.price_override_id)
             .first()
         )
@@ -248,7 +253,7 @@ async def notify_price_change(
             )
 
         # Получаем врача
-        doctor = db.query(Doctor).filter(Doctor.id == price_override.doctor_id).first()
+        doctor = _repo(db).query(Doctor).filter(Doctor.id == price_override.doctor_id).first()
         if not doctor:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Врач не найден"
@@ -256,7 +261,7 @@ async def notify_price_change(
 
         # Получаем услугу
         service_obj = (
-            db.query(Service).filter(Service.id == price_override.service_id).first()
+            _repo(db).query(Service).filter(Service.id == price_override.service_id).first()
         )
         if not service_obj:
             raise HTTPException(
@@ -267,10 +272,10 @@ async def notify_price_change(
         visit = None
         patient = None
         if price_override.visit_id:
-            visit = db.query(Visit).filter(Visit.id == price_override.visit_id).first()
+            visit = _repo(db).query(Visit).filter(Visit.id == price_override.visit_id).first()
             if visit:
                 patient = (
-                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
                 )
 
         # Отправляем уведомление
@@ -311,7 +316,7 @@ async def notify_queue_status(
 
         # Получаем запись в очереди
         queue_entry = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(OnlineQueueEntry.id == request_data.queue_entry_id)
             .first()
         )

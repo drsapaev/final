@@ -12,9 +12,14 @@ from app.api import deps
 from app.models.billing import InvoiceStatus, InvoiceType, PaymentMethod, RecurrenceType
 from app.models.user import User
 from app.services.billing_service import BillingService
+from app.repositories.billing_api_repository import BillingApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> BillingApiRepository:
+    return BillingApiRepository(db)
 
 # === Pydantic схемы ===
 
@@ -209,7 +214,7 @@ def create_invoice(
                 invoice_data.recurrence_type,
                 invoice_data.recurrence_interval,
             )
-            db.commit()
+            _repo(db).commit()
 
         # Создаем напоминания
         if invoice_data.send_reminders:
@@ -235,7 +240,7 @@ def get_invoices(
     """Получить список счетов"""
     from app.models.billing import Invoice
 
-    query = db.query(Invoice)
+    query = _repo(db).query(Invoice)
 
     if patient_id:
         query = query.filter(Invoice.patient_id == patient_id)
@@ -261,7 +266,7 @@ def get_invoice(
     """Получить счет по ID"""
     from app.models.billing import Invoice
 
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = _repo(db).query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Счет не найден")
 
@@ -278,7 +283,7 @@ def update_invoice(
     """Обновить счет"""
     from app.models.billing import Invoice
 
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = _repo(db).query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Счет не найден")
 
@@ -286,8 +291,8 @@ def update_invoice(
     for field, value in invoice_data.dict(exclude_unset=True).items():
         setattr(invoice, field, value)
 
-    db.commit()
-    db.refresh(invoice)
+    _repo(db).commit()
+    _repo(db).refresh(invoice)
     return invoice
 
 
@@ -300,7 +305,7 @@ def delete_invoice(
     """Удалить счет"""
     from app.models.billing import Invoice
 
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = _repo(db).query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Счет не найден")
 
@@ -308,8 +313,8 @@ def delete_invoice(
     if invoice.status != InvoiceStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Можно удалять только черновики")
 
-    db.delete(invoice)
-    db.commit()
+    _repo(db).delete(invoice)
+    _repo(db).commit()
     return {"message": "Счет удален"}
 
 
@@ -385,7 +390,7 @@ def get_payments(
     """Получить список платежей"""
     from app.models.payment import Payment
 
-    query = db.query(Payment)
+    query = _repo(db).query(Payment)
 
     if date_from:
         query = query.filter(Payment.created_at >= date_from)
@@ -529,7 +534,7 @@ def update_billing_settings(
 
     settings.updated_by = current_user.id
 
-    db.commit()
+    _repo(db).commit()
     return {"message": "Настройки обновлены"}
 
 
@@ -547,8 +552,8 @@ def get_billing_analytics(
     from app.models.payment import Payment
 
     # Базовые фильтры
-    invoice_query = db.query(Invoice)
-    payment_query = db.query(Payment)
+    invoice_query = _repo(db).query(Invoice)
+    payment_query = _repo(db).query(Payment)
 
     if date_from:
         invoice_query = invoice_query.filter(Invoice.issue_date >= date_from)
@@ -583,7 +588,7 @@ def get_billing_analytics(
 
     # Статистика по статусам
     status_stats = (
-        db.query(
+        _repo(db).query(
             Invoice.status,
             func.count(Invoice.id).label('count'),
             func.sum(Invoice.total_amount).label('amount'),

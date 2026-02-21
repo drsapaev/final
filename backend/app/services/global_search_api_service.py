@@ -17,9 +17,14 @@ from app.models.lab import LabOrder
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.global_search_api_repository import GlobalSearchApiRepository
 
 router = APIRouter(tags=["search"])
 
+
+
+def _repo(db: Session) -> GlobalSearchApiRepository:
+    return GlobalSearchApiRepository(db)
 
 def log_search_query(
     db: Session,
@@ -41,11 +46,11 @@ def log_search_query(
             opened_id=None,
             created_at=datetime.utcnow()
         )
-        db.add(audit)
-        db.commit()
+        _repo(db).add(audit)
+        _repo(db).commit()
     except Exception as e:
         # Don't fail search if logging fails
-        db.rollback()
+        _repo(db).rollback()
         print(f"Audit logging error: {e}")
 
 
@@ -104,7 +109,7 @@ def search_patients(db: Session, query: str, limit: int = 5) -> list[PatientSear
 
     # Try exact ID match first
     if query.isdigit():
-        patient = db.query(Patient).filter(Patient.id == int(query)).first()
+        patient = _repo(db).query(Patient).filter(Patient.id == int(query)).first()
         if patient:
             results.append(PatientSearchResult(
                 id=patient.id,
@@ -117,7 +122,7 @@ def search_patients(db: Session, query: str, limit: int = 5) -> list[PatientSear
 
     # Search by name/phone
     search_term = f"%{query}%"
-    stmt = db.query(Patient).filter(
+    stmt = _repo(db).query(Patient).filter(
         or_(
             Patient.first_name.ilike(search_term),
             Patient.last_name.ilike(search_term),
@@ -146,9 +151,9 @@ def search_visits(db: Session, query: str, limit: int = 5) -> list[VisitSearchRe
 
     # Try exact visit ID match
     if query.isdigit():
-        visit = db.query(Visit).filter(Visit.id == int(query)).first()
+        visit = _repo(db).query(Visit).filter(Visit.id == int(query)).first()
         if visit:
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+            patient = _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
             patient_name = None
             if patient:
                 patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
@@ -166,7 +171,7 @@ def search_visits(db: Session, query: str, limit: int = 5) -> list[VisitSearchRe
     # Search by patient name in recent visits
     search_term = f"%{query}%"
     stmt = (
-        db.query(Visit)
+        _repo(db).query(Visit)
         .join(Patient, Visit.patient_id == Patient.id)
         .filter(
             or_(
@@ -181,7 +186,7 @@ def search_visits(db: Session, query: str, limit: int = 5) -> list[VisitSearchRe
 
     for v in stmt.all():
         if not any(r.id == v.id for r in results):
-            patient = db.query(Patient).filter(Patient.id == v.patient_id).first()
+            patient = _repo(db).query(Patient).filter(Patient.id == v.patient_id).first()
             patient_name = None
             if patient:
                 patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
@@ -205,11 +210,11 @@ def search_lab_results(db: Session, query: str, limit: int = 5) -> list[LabResul
 
     # Try exact order ID match
     if query.isdigit():
-        order = db.query(LabOrder).filter(LabOrder.id == int(query)).first()
+        order = _repo(db).query(LabOrder).filter(LabOrder.id == int(query)).first()
         if order:
             patient = None
             if order.patient_id:
-                patient = db.query(Patient).filter(Patient.id == order.patient_id).first()
+                patient = _repo(db).query(Patient).filter(Patient.id == order.patient_id).first()
             patient_name = None
             if patient:
                 patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
@@ -226,7 +231,7 @@ def search_lab_results(db: Session, query: str, limit: int = 5) -> list[LabResul
     # Search by patient name
     search_term = f"%{query}%"
     stmt = (
-        db.query(LabOrder)
+        _repo(db).query(LabOrder)
         .join(Patient, LabOrder.patient_id == Patient.id)
         .filter(
             or_(
@@ -240,7 +245,7 @@ def search_lab_results(db: Session, query: str, limit: int = 5) -> list[LabResul
 
     for o in stmt.all():
         if not any(r.id == o.id for r in results):
-            patient = db.query(Patient).filter(Patient.id == o.patient_id).first()
+            patient = _repo(db).query(Patient).filter(Patient.id == o.patient_id).first()
             patient_name = None
             if patient:
                 patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
@@ -331,9 +336,9 @@ async def log_search_click(
             opened_id=request.opened_id,
             created_at=datetime.utcnow()
         )
-        db.add(audit)
-        db.commit()
+        _repo(db).add(audit)
+        _repo(db).commit()
         return {"status": "ok"}
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         return {"status": "error", "message": str(e)}

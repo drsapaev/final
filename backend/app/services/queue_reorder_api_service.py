@@ -14,10 +14,15 @@ from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
+from app.repositories.queue_reorder_api_repository import QueueReorderApiRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> QueueReorderApiRepository:
+    return QueueReorderApiRepository(db)
 
 class QueueReorderRequest(BaseModel):
     """Запрос на изменение порядка очереди"""
@@ -78,7 +83,7 @@ async def reorder_queue(
     """
     try:
         # Проверяем существование очереди
-        queue = db.query(DailyQueue).filter(DailyQueue.id == request.queue_id).first()
+        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == request.queue_id).first()
         if not queue:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
@@ -93,7 +98,7 @@ async def reorder_queue(
 
         # Получаем все записи очереди
         entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == request.queue_id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
@@ -148,11 +153,11 @@ async def reorder_queue(
                 )
 
         # Сохраняем изменения
-        db.commit()
+        _repo(db).commit()
 
         # Обновляем информацию об очереди
         updated_entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == request.queue_id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
@@ -194,7 +199,7 @@ async def reorder_queue(
         raise
     except Exception as e:
         logger.error(f"Error reordering queue: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка изменения порядка очереди: {str(e)}",
@@ -214,7 +219,7 @@ async def move_queue_entry(
     try:
         # Находим запись
         entry = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.id == request.entry_id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
@@ -229,7 +234,7 @@ async def move_queue_entry(
             )
 
         # Проверяем права доступа к очереди
-        queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
         if current_user.role == "Doctor" and queue.specialist_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -238,7 +243,7 @@ async def move_queue_entry(
 
         # Получаем все записи очереди
         all_entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == entry.queue_id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
@@ -299,7 +304,7 @@ async def move_queue_entry(
         updated_count += 1
 
         # Сохраняем изменения
-        db.commit()
+        _repo(db).commit()
 
         logger.info(
             f"Queue entry move: Entry {entry.id} moved from position {old_position} "
@@ -308,7 +313,7 @@ async def move_queue_entry(
 
         # Получаем обновленную информацию об очереди
         updated_entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == entry.queue_id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
@@ -350,7 +355,7 @@ async def move_queue_entry(
         raise
     except Exception as e:
         logger.error(f"Error moving queue entry: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка перемещения записи в очереди: {str(e)}",
@@ -370,7 +375,7 @@ async def get_queue_status_by_specialist(
     try:
         # Находим очередь
         queue = (
-            db.query(DailyQueue)
+            _repo(db).query(DailyQueue)
             .filter(DailyQueue.specialist_id == specialist_id, DailyQueue.day == day)
             .first()
         )
@@ -382,7 +387,7 @@ async def get_queue_status_by_specialist(
 
         # Получаем записи очереди
         entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == queue.id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
@@ -441,7 +446,7 @@ async def get_queue_status(
     """
     try:
         # Проверяем существование очереди
-        queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == queue_id).first()
         if not queue:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
@@ -449,7 +454,7 @@ async def get_queue_status(
 
         # Получаем записи очереди
         entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == queue_id,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),

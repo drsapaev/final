@@ -115,3 +115,93 @@ def test_registrar_wizard_service_avoids_direct_session_calls() -> None:
         logic,
     )
     assert direct_db_call is None
+
+
+def test_force_majeure_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("force_majeure")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_salary_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("salary")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_patient_appointments_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("patient_appointments")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_roles_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("roles")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_global_search_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("global_search")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_specialized_panels_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("specialized_panels")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_queue_reorder_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("queue_reorder")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_billing_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("billing")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_queue_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("queue")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_registrar_notifications_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("registrar_notifications")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
