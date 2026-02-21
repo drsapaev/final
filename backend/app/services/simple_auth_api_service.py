@@ -12,9 +12,14 @@ from app.api.deps import create_access_token
 from app.core.security import verify_password
 from app.db.session import get_db
 from app.models.user import User
+from app.repositories.simple_auth_api_repository import SimpleAuthApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> SimpleAuthApiRepository:
+    return SimpleAuthApiRepository(db)
 
 class SimpleLoginRequest(BaseModel):
     """Простая схема для входа"""
@@ -43,7 +48,7 @@ async def simple_login(
         print(f"DEBUG: Simple login called with username={request_data.username}")
 
         # Ищем пользователя по username или email
-        user = db.query(User).filter(
+        user = _repo(db).query(User).filter(
             (User.username == request_data.username) |
             (User.email == request_data.username)
         ).first()

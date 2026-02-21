@@ -16,10 +16,15 @@ from app.models.clinic import ClinicSettings
 from app.models.user import User
 from app.services.payment_providers.click import ClickProvider
 from app.services.payment_providers.payme import PayMeProvider
+from app.repositories.payment_settings_api_repository import PaymentSettingsApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> PaymentSettingsApiRepository:
+    return PaymentSettingsApiRepository(db)
 
 # ===================== PYDANTIC МОДЕЛИ =====================
 
@@ -69,7 +74,7 @@ def get_payment_settings(db: Session) -> PaymentProviderSettings:
 
     # Получаем настройки из БД
     settings_record = (
-        db.query(ClinicSettings)
+        _repo(db).query(ClinicSettings)
         .filter(ClinicSettings.key == "payment_providers")
         .first()
     )
@@ -89,7 +94,7 @@ def save_payment_settings(db: Session, settings: PaymentProviderSettings) -> Non
     """Сохранение настроек платежных провайдеров"""
 
     settings_record = (
-        db.query(ClinicSettings)
+        _repo(db).query(ClinicSettings)
         .filter(ClinicSettings.key == "payment_providers")
         .first()
     )
@@ -104,9 +109,9 @@ def save_payment_settings(db: Session, settings: PaymentProviderSettings) -> Non
             value=settings_json,
             description="Настройки платежных провайдеров",
         )
-        db.add(settings_record)
+        _repo(db).add(settings_record)
 
-    db.commit()
+    _repo(db).commit()
 
 
 # ===================== API ENDPOINTS =====================

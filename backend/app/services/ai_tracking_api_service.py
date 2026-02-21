@@ -13,9 +13,14 @@ from app.schemas.ai_tracking import (
     AIProviderStats,
 )
 from app.services.ai_tracking_service import get_ai_tracking_service
+from app.repositories.ai_tracking_api_repository import AiTrackingApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> AiTrackingApiRepository:
+    return AiTrackingApiRepository(db)
 
 @router.get("/models/stats", response_model=list[AIModelStats])
 async def get_ai_model_stats(
@@ -133,7 +138,7 @@ async def get_recent_ai_requests(
     try:
         # Получаем последние записи
         logs = (
-            db.query(AIUsageLog, AIProvider)
+            _repo(db).query(AIUsageLog, AIProvider)
             .join(AIProvider, AIUsageLog.provider_id == AIProvider.id)
             .order_by(AIUsageLog.created_at.desc())
             .limit(limit)
@@ -293,7 +298,7 @@ async def get_ai_usage_trends(
         cutoff_date = datetime.utcnow() - timedelta(days=days_back)
 
         daily_usage = (
-            db.query(
+            _repo(db).query(
                 func.date(AIUsageLog.created_at).label('date'),
                 AIProvider.name.label('provider_name'),
                 AIProvider.model.label('model_name'),

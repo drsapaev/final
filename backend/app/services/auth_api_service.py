@@ -17,6 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import select
+from app.repositories.auth_api_repository import AuthApiRepository
 
 # helpers from deps
 from app.api.deps import create_access_token, get_current_user
@@ -35,6 +36,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> AuthApiRepository:
+    return AuthApiRepository(db)
 
 @router.post("/login")
 async def login(
@@ -61,7 +66,7 @@ async def login(
     execute_callable = getattr(db, "execute", None)
     if inspect.iscoroutinefunction(execute_callable):
         # AsyncSession: await directly
-        result = await db.execute(stmt)
+        result = await _repo(db).execute(stmt)
     else:
         # Sync Session: run in threadpool to avoid blocking event loop
         result = await run_in_threadpool(db.execute, stmt)
@@ -159,12 +164,12 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
                 (User.username == request_data.username)
                 | (User.email == request_data.username)
             )
-            result = await db.execute(stmt)
+            result = await _repo(db).execute(stmt)
             user = result.scalar_one_or_none()
         else:
             # Sync session
             user = await run_in_threadpool(
-                lambda: db.query(User)
+                lambda: _repo(db).query(User)
                 .filter(
                     (User.username == request_data.username)
                     | (User.email == request_data.username)

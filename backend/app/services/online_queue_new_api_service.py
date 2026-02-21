@@ -25,8 +25,13 @@ from app.services.queue_service import (
     QueueValidationError,
     queue_service,
 )
+from app.repositories.online_queue_new_api_repository import OnlineQueueNewApiRepository
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> OnlineQueueNewApiRepository:
+    return OnlineQueueNewApiRepository(db)
 
 # ===================== ГЕНЕРАЦИЯ QR ТОКЕНОВ =====================
 
@@ -290,10 +295,10 @@ def cancel_queue_entry(
     """
     Отмена записи в онлайн-очереди
     """
-    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Запись очереди не найдена")
 
     entry.status = "canceled"
-    db.commit()
+    _repo(db).commit()
     return {"message": "Запись отменена", "status": "canceled"}

@@ -36,9 +36,14 @@ from app.schemas.mobile import (
     PatientProfileOut,
 )
 from app.services.notifications import notification_sender_service
+from app.repositories.mobile_api_api_repository import MobileApiApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> MobileApiApiRepository:
+    return MobileApiApiRepository(db)
 
 # Функция для сжатия JSON ответов (будет использоваться в endpoints)
 def compress_json_response(data: dict) -> Response:
@@ -109,7 +114,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
         # Обновляем токен устройства
         if credentials.device_token:
             user.device_token = credentials.device_token
-            db.commit()
+            _repo(db).commit()
 
         return MobileLoginResponse(
             access_token=access_token,
@@ -469,7 +474,7 @@ async def mark_notification_read(
 
         if hasattr(notification, 'read'):
              notification.read = True
-             db.commit()
+             _repo(db).commit()
              success = True
         else:
              # If no read field, maybe status='read'?

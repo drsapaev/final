@@ -13,9 +13,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import create_access_token
 from app.core.security import verify_password
 from app.db.session import get_db
+from app.repositories.minimal_auth_api_repository import MinimalAuthApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> MinimalAuthApiRepository:
+    return MinimalAuthApiRepository(db)
 
 class MinimalLoginRequest(BaseModel):
     """Минимальная схема для входа"""
@@ -51,7 +56,7 @@ async def minimal_login(
         print(f"DEBUG: Minimal login called with username={request_data.username}")
 
         # Используем прямой SQL запрос для избежания проблем с моделями
-        result = db.execute(
+        result = _repo(db).execute(
             text(
                 """
             SELECT id, username, email, full_name, role, is_active, is_superuser, hashed_password

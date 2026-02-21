@@ -10,9 +10,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user, get_db
 from app.models.department import Department
 from app.models.user import User
+from app.repositories.departments_api_repository import DepartmentsApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> DepartmentsApiRepository:
+    return DepartmentsApiRepository(db)
 
 @router.get("/active")
 @router.get("")
@@ -26,7 +31,7 @@ async def get_departments(
 
     Fetches departments from database with optional filtering by active status.
     """
-    query = db.query(Department)
+    query = _repo(db).query(Department)
 
     if active_only:
         query = query.filter(Department.active == True)
@@ -62,7 +67,7 @@ async def get_department(
     """Get single department by ID"""
     from fastapi import HTTPException
 
-    department = db.query(Department).filter(Department.id == department_id).first()
+    department = _repo(db).query(Department).filter(Department.id == department_id).first()
 
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")

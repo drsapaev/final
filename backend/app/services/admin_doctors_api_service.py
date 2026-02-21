@@ -18,8 +18,13 @@ from app.schemas.clinic import (
     ScheduleOut,
     WeeklyScheduleUpdate,
 )
+from app.repositories.admin_doctors_api_repository import AdminDoctorsApiRepository
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> AdminDoctorsApiRepository:
+    return AdminDoctorsApiRepository(db)
 
 # ===================== УПРАВЛЕНИЕ ВРАЧАМИ =====================
 
@@ -396,7 +401,7 @@ def get_specialties(
         from app.models.clinic import Doctor
 
         specialties_query = (
-            db.query(distinct(Doctor.specialty)).filter(Doctor.active == True).all()
+            _repo(db).query(distinct(Doctor.specialty)).filter(Doctor.active == True).all()
         )
         specialties = [s[0] for s in specialties_query if s[0]]
 
@@ -440,7 +445,7 @@ def get_specialties(
 
             # Подсчитываем количество врачей
             doctor_count = (
-                db.query(Doctor)
+                _repo(db).query(Doctor)
                 .filter(Doctor.specialty == specialty, Doctor.active == True)
                 .count()
             )
@@ -463,18 +468,18 @@ def get_doctors_stats(
     try:
         from app.models.clinic import Doctor
 
-        total_doctors = db.query(Doctor).filter(Doctor.active == True).count()
+        total_doctors = _repo(db).query(Doctor).filter(Doctor.active == True).count()
 
         # Статистика по специальностям
         specialty_stats = {}
         specialties = (
-            db.query(Doctor.specialty).filter(Doctor.active == True).distinct().all()
+            _repo(db).query(Doctor.specialty).filter(Doctor.active == True).distinct().all()
         )
 
         for (specialty,) in specialties:
             if specialty:
                 count = (
-                    db.query(Doctor)
+                    _repo(db).query(Doctor)
                     .filter(Doctor.specialty == specialty, Doctor.active == True)
                     .count()
                 )

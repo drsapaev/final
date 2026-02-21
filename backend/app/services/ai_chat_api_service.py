@@ -25,11 +25,16 @@ from app.core.rbac import AIPermission, has_permission, require_ai_permission
 from app.models.ai_chat import AIChatMessage, AIChatSession
 from app.models.user import User
 from app.services.ai.chat_service import get_chat_service
+from app.repositories.ai_chat_api_repository import AiChatApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> AiChatApiRepository:
+    return AiChatApiRepository(db)
 
 # =============================================================================
 # Pydantic Schemas
@@ -165,7 +170,7 @@ async def get_session(
     """
     Получить информацию о сессии.
     """
-    session = db.query(AIChatSession).filter(
+    session = _repo(db).query(AIChatSession).filter(
         AIChatSession.id == session_id,
         AIChatSession.user_id == current_user.id
     ).first()
@@ -216,7 +221,7 @@ async def get_messages(
     Получить историю сообщений сессии.
     """
     # Проверяем доступ
-    session = db.query(AIChatSession).filter(
+    session = _repo(db).query(AIChatSession).filter(
         AIChatSession.id == session_id,
         AIChatSession.user_id == current_user.id
     ).first()
@@ -297,7 +302,7 @@ async def add_feedback(
     Используется для улучшения качества AI.
     """
     # Проверяем что сообщение принадлежит пользователю
-    message = db.query(AIChatMessage).join(AIChatSession).filter(
+    message = _repo(db).query(AIChatMessage).join(AIChatSession).filter(
         AIChatMessage.id == message_id,
         AIChatSession.user_id == current_user.id
     ).first()
@@ -345,7 +350,7 @@ async def authenticate_websocket(token: str, db: Session) -> User | None:
         if user_id is None:
             return None
 
-        user = db.query(User).filter(User.id == user_id).first()
+        user = _repo(db).query(User).filter(User.id == user_id).first()
         return user
 
     except JWTError:

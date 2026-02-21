@@ -20,8 +20,13 @@ from app.schemas.ai_config import (
     AITestResult,
     AIUsageLogOut,
 )
+from app.repositories.admin_ai_api_repository import AdminAiApiRepository
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> AdminAiApiRepository:
+    return AdminAiApiRepository(db)
 
 # ===================== AI ПРОВАЙДЕРЫ =====================
 
@@ -314,7 +319,7 @@ def get_ai_usage_logs(
 ):
     """Получить логи использования AI"""
     try:
-        query = db.query(crud_ai.AIUsageLog)
+        query = _repo(db).query(crud_ai.AIUsageLog)
 
         if provider_id:
             query = query.filter(crud_ai.AIUsageLog.provider_id == provider_id)

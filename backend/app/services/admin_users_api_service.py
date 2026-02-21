@@ -6,9 +6,14 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.security import require_roles
 from app.models.user import User
+from app.repositories.admin_users_api_repository import AdminUsersApiRepository
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+
+def _repo(db: Session) -> AdminUsersApiRepository:
+    return AdminUsersApiRepository(db)
 
 @router.get("/users", response_model=None)
 def list_users(
@@ -23,7 +28,7 @@ def list_users(
     from sqlalchemy import select
 
     stmt = select(User).order_by(User.id.asc())
-    users = db.execute(stmt).scalars().all()
+    users = _repo(db).execute(stmt).scalars().all()
 
     return [
         {

@@ -7,9 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.lab import LabOrder
+from app.repositories.lab_api_repository import LabApiRepository
 
 router = APIRouter(prefix="/lab", tags=["lab"])
 
+
+
+def _repo(db: Session) -> LabApiRepository:
+    return LabApiRepository(db)
 
 class LabRowOut(BaseModel):
     id: int
@@ -54,7 +59,7 @@ async def list_lab_requests(
     if patient_id:
         stmt = stmt.where(LabOrder.patient_id == patient_id)
     stmt = stmt.order_by(LabOrder.id.desc()).limit(limit).offset(offset)
-    rows = db.execute(stmt).scalars().all()
+    rows = _repo(db).execute(stmt).scalars().all()
     return [_row_to_out(r) for r in rows]
 
 
@@ -77,5 +82,5 @@ async def update_lab_result(
         row.notes = payload.notes
     if payload.status is not None:
         row.status = payload.status
-    db.flush()
+    _repo(db).flush()
     return _row_to_out(row)

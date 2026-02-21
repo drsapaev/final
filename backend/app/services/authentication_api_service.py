@@ -33,11 +33,16 @@ from app.schemas.authentication import (
     UserSessionResponse,
 )
 from app.services.authentication_service import get_authentication_service
+from app.repositories.authentication_api_repository import AuthenticationApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> AuthenticationApiRepository:
+    return AuthenticationApiRepository(db)
 
 def get_client_info(request: Request) -> tuple[str, str]:
     """Получить информацию о клиенте"""
@@ -362,8 +367,8 @@ async def update_user_profile(
             if hasattr(current_user, field):
                 setattr(current_user, field, value)
 
-        db.commit()
-        db.refresh(current_user)
+        _repo(db).commit()
+        _repo(db).refresh(current_user)
 
         # Получаем обновленный профиль
         service = get_authentication_service()
@@ -372,7 +377,7 @@ async def update_user_profile(
         return UserProfileResponse(**profile)
 
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления профиля: {str(e)}",
@@ -629,7 +634,7 @@ async def revoke_session_with_reason(
         # Проверяем, что сессия принадлежит текущему пользователю
         from app.models.authentication import UserSession
 
-        session = db.query(UserSession).filter(UserSession.id == session_id).first()
+        session = _repo(db).query(UserSession).filter(UserSession.id == session_id).first()
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
@@ -750,7 +755,7 @@ async def get_session_info(
         # Проверяем, что сессия принадлежит текущему пользователю или пользователь - администратор
         from app.models.authentication import UserSession
 
-        session = db.query(UserSession).filter(UserSession.id == session_id).first()
+        session = _repo(db).query(UserSession).filter(UserSession.id == session_id).first()
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"

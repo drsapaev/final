@@ -385,3 +385,147 @@ def test_phrase_suggest_service_avoids_direct_session_calls() -> None:
         logic,
     )
     assert direct_db_call is None
+
+
+def test_authentication_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("authentication")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_admin_doctors_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("admin_doctors")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_payment_settings_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("payment_settings")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_ai_chat_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("ai_chat")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_auth_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("auth")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_online_queue_new_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("online_queue_new")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_mobile_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("mobile")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_lab_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("lab")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_departments_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("departments")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_ai_tracking_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("ai_tracking")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_simple_auth_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("simple_auth")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_settings_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("settings")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_minimal_auth_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("minimal_auth")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_emr_v2_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("emr_v2")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_admin_users_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("admin_users")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None
+
+
+def test_admin_ai_service_avoids_direct_session_calls() -> None:
+    logic = _service_logic_block("admin_ai")
+    direct_db_call = re.search(
+        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
+        logic,
+    )
+    assert direct_db_call is None

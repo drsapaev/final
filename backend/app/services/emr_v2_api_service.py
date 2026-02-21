@@ -42,11 +42,16 @@ from app.services.emr_v2_service import (
     emr_v2_service,
 )
 from app.services.section_templates_service import DoctorSectionTemplatesService
+from app.repositories.emr_v2_api_repository import EmrV2ApiRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/emr", tags=["EMR v2"])
 
+
+
+def _repo(db: Session) -> EmrV2ApiRepository:
+    return EmrV2ApiRepository(db)
 
 # =============================================================================
 # Feature Flags
@@ -508,7 +513,7 @@ async def get_doctor_history(
 
         from app.models.emr_v2 import EMRRecord
 
-        query = db.query(EMRRecord).filter(
+        query = _repo(db).query(EMRRecord).filter(
             EMRRecord.created_by == doctor_id,
             getattr(EMRRecord, db_field).isnot(None),
             getattr(EMRRecord, db_field) != "",

@@ -6,9 +6,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.models.setting import Setting
 from app.schemas.setting import Setting as SettingSchema
+from app.repositories.settings_api_repository import SettingsApiRepository
 
 router = APIRouter()
 
+
+
+def _repo(db: Session) -> SettingsApiRepository:
+    return SettingsApiRepository(db)
 
 @router.get("/settings", response_model=list[SettingSchema])
 def get_settings(
@@ -21,7 +26,7 @@ def get_settings(
     """
     try:
         stmt = select(Setting).where(Setting.category == category)
-        result = db.execute(stmt)
+        result = _repo(db).execute(stmt)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
