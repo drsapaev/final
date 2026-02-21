@@ -13,6 +13,7 @@ from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
+from app.repositories.dental_api_repository import DentalApiRepository
 from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/dental", tags=["dental"])
 
 
 async def send_price_override_notification(
-    db: Session,
+    repository: DentalApiRepository,
     price_override: DoctorPriceOverride,
     doctor: Doctor,
     service: Service,
@@ -34,7 +35,7 @@ async def send_price_override_notification(
     try:
 
         # Получаем всех пользователей с ролью Registrar
-        registrars = db.query(User).filter(User.role == "Registrar").all()
+        registrars = repository.list_registrars()
 
         if not registrars:
             logger.warning(
@@ -95,7 +96,7 @@ async def send_price_override_notification(
         # Сохраняем информацию об отправленном уведомлении
         price_override.notification_sent = True
         price_override.notification_sent_at = datetime.utcnow()
-        db.commit()
+        repository.commit()
 
     except Exception as e:
         logger.error(f"Ошибка отправки уведомлений об изменении цены: {e}")
@@ -267,16 +268,15 @@ async def create_dental_price_override(
     """
     Стоматолог указывает цену после проведенного лечения
     """
+    repository = DentalApiRepository(db)
     try:
         # Проверяем существование визита
-        visit = db.query(Visit).filter(Visit.id == override_data.visit_id).first()
+        visit = repository.get_visit_by_id(override_data.visit_id)
         if not visit:
             raise HTTPException(status_code=404, detail="Визит не найден")
 
         # Проверяем существование услуги
-        service = (
-            db.query(Service).filter(Service.id == override_data.service_id).first()
-        )
+        service = repository.get_service_by_id(override_data.service_id)
         if not service:
             raise HTTPException(status_code=404, detail="Услуга не найдена")
 
@@ -288,7 +288,7 @@ async def create_dental_price_override(
             )
 
         # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+        doctor = repository.get_doctor_by_user_id(user.id)
         if not doctor:
             raise HTTPException(status_code=404, detail="Врач не найден")
 
@@ -311,14 +311,14 @@ async def create_dental_price_override(
             status="pending",  # Требует одобрения регистратуры
         )
 
-        db.add(price_override)
-        db.commit()
-        db.refresh(price_override)
+        repository.add(price_override)
+        repository.commit()
+        repository.refresh(price_override)
 
         # Отправляем уведомление в регистратуру
         try:
             await send_price_override_notification(
-                db=db,
+                repository=repository,
                 price_override=price_override,
                 doctor=doctor,
                 service=service,
@@ -344,7 +344,7 @@ async def create_dental_price_override(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         raise HTTPException(
             status_code=500, detail=f"Ошибка создания изменения цены: {str(e)}"
         )
@@ -363,24 +363,18 @@ async def get_dental_price_overrides(
     """
     Получить список изменений цен стоматолога
     """
+    repository = DentalApiRepository(db)
     try:
         # Получаем врача по пользователю
-        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+        doctor = repository.get_doctor_by_user_id(user.id)
         if not doctor:
             raise HTTPException(status_code=404, detail="Врач не найден")
 
-        query = db.query(DoctorPriceOverride).filter(
-            DoctorPriceOverride.doctor_id == doctor.id
-        )
-
-        if visit_id:
-            query = query.filter(DoctorPriceOverride.visit_id == visit_id)
-
-        if status:
-            query = query.filter(DoctorPriceOverride.status == status)
-
-        overrides = (
-            query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
+        overrides = repository.list_price_overrides_for_doctor(
+            doctor_id=doctor.id,
+            visit_id=visit_id,
+            status=status,
+            limit=limit,
         )
 
         return [
@@ -428,13 +422,10 @@ async def approve_price_override(
     Одобрить или отклонить изменение цены стоматологом
     Доступно только для регистраторов и администраторов
     """
+    repository = DentalApiRepository(db)
     try:
         # Находим запись об изменении цены
-        price_override = (
-            db.query(DoctorPriceOverride)
-            .filter(DoctorPriceOverride.id == override_id)
-            .first()
-        )
+        price_override = repository.get_price_override_by_id(override_id)
 
         if not price_override:
             raise HTTPException(status_code=404, detail="Изменение цены не найдено")
@@ -470,28 +461,23 @@ async def approve_price_override(
 
         # Если одобряем, обновляем цену услуги в визите
         if approval_data.action == "approve":
-            # Находим услугу в визите и обновляем цену
-            from app.models.visit import VisitService
-
-            visit_service = (
-                db.query(VisitService)
-                .filter(
-                    VisitService.visit_id == price_override.visit_id,
-                    VisitService.service_id == price_override.service_id,
-                )
-                .first()
+            visit_service = repository.get_visit_service(
+                visit_id=price_override.visit_id,
+                service_id=price_override.service_id,
             )
 
             if visit_service:
                 visit_service.price = price_override.new_price
                 visit_service.custom_price = price_override.new_price
 
-        db.commit()
+        repository.commit()
 
         # Отправляем уведомление врачу о результате
         try:
             await send_price_override_result_notification(
-                db=db, price_override=price_override, approved_by=user
+                repository=repository,
+                price_override=price_override,
+                approved_by=user,
             )
         except Exception as e:
             logger.warning(f"Не удалось отправить уведомление врачу о результате: {e}")
@@ -510,7 +496,7 @@ async def approve_price_override(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         raise HTTPException(
             status_code=500, detail=f"Ошибка обработки изменения цены: {str(e)}"
         )
@@ -528,23 +514,16 @@ async def get_pending_price_overrides(
     Получить список изменений цен, ожидающих одобрения
     Доступно только для регистраторов и администраторов
     """
+    repository = DentalApiRepository(db)
     try:
-        overrides = (
-            db.query(DoctorPriceOverride)
-            .filter(DoctorPriceOverride.status == "pending")
-            .order_by(DoctorPriceOverride.created_at.desc())
-            .limit(limit)
-            .all()
-        )
+        overrides = repository.list_pending_price_overrides(limit=limit)
 
         result = []
         for override in overrides:
             # Получаем дополнительную информацию
-            doctor = db.query(Doctor).filter(Doctor.id == override.doctor_id).first()
-            service = (
-                db.query(Service).filter(Service.id == override.service_id).first()
-            )
-            visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
+            doctor = repository.get_doctor_by_id(override.doctor_id)
+            service = repository.get_service_by_id(override.service_id)
+            visit = repository.get_visit_by_id(override.visit_id)
 
             result.append(
                 {
@@ -596,20 +575,20 @@ async def get_pending_price_overrides(
 
 
 async def send_price_override_result_notification(
-    db: Session, price_override: DoctorPriceOverride, approved_by: User
+    repository: DentalApiRepository,
+    price_override: DoctorPriceOverride,
+    approved_by: User,
 ):
     """Отправить уведомление врачу о результате рассмотрения изменения цены"""
     try:
 
         # Получаем врача
-        doctor = db.query(Doctor).filter(Doctor.id == price_override.doctor_id).first()
+        doctor = repository.get_doctor_by_id(price_override.doctor_id)
         if not doctor or not doctor.user:
             return
 
         # Получаем услугу
-        service = (
-            db.query(Service).filter(Service.id == price_override.service_id).first()
-        )
+        service = repository.get_service_by_id(price_override.service_id)
 
         # Формируем сообщение
         status_emoji = "✅" if price_override.status == "approved" else "❌"

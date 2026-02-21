@@ -45,3 +45,9 @@ def test_services_service_avoids_direct_orm_calls() -> None:
     logic = _service_logic_block("services")
     assert "repository.db" not in logic
     assert ".query(" not in logic
+
+
+def test_dental_service_avoids_direct_orm_calls() -> None:
+    logic = _service_logic_block("dental")
+    assert "repository.db" not in logic
+    assert ".query(" not in logic
