@@ -19,6 +19,9 @@ from app.crud import online_queue as crud_queue
 from app.models.department import Department, DepartmentService
 from app.models.service import Service
 from app.models.user import User
+from app.repositories.registrar_integration_api_repository import (
+    RegistrarIntegrationApiRepository,
+)
 from app.services.queue_batch_service import (
     QueueBatchDomainError,
     QueueBatchService,
@@ -34,6 +37,10 @@ from app.services.service_mapping import get_service_code
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> RegistrarIntegrationApiRepository:
+    return RegistrarIntegrationApiRepository(db)
 
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
 
@@ -51,7 +58,7 @@ def get_registrar_departments(
     Доступен для регистраторов, в отличие от admin endpoint
     """
     try:
-        query = db.query(Department)
+        query = _repo(db).query(Department)
 
         if active_only:
             query = query.filter(Department.active == True)
@@ -68,7 +75,7 @@ def get_registrar_departments(
             from app.models.department import DepartmentQueueSettings
 
             queue_settings = (
-                db.query(DepartmentQueueSettings)
+                _repo(db).query(DepartmentQueueSettings)
                 .filter(DepartmentQueueSettings.department_id == dept.id)
                 .first()
             )
@@ -133,7 +140,7 @@ def get_queue_profiles(
         from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
 
         # Пытаемся получить из БД
-        query = db.query(QueueProfile)
+        query = _repo(db).query(QueueProfile)
 
         if active_only:
             query = query.filter(QueueProfile.is_active == True)
@@ -223,7 +230,7 @@ def get_queue_profiles_public(
 
         # Получаем только активные профили, которые видны на QR странице
         profiles = (
-            db.query(QueueProfile)
+            _repo(db).query(QueueProfile)
             .filter(
                 QueueProfile.is_active == True,
                 QueueProfile.show_on_qr_page == True
@@ -345,7 +352,7 @@ def create_queue_profile(
         from app.models.queue_profile import QueueProfile
 
         # Check if key already exists
-        existing = db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
+        existing = _repo(db).query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
         if existing:
             raise HTTPException(status_code=400, detail=f"Profile with key '{profile_data.key}' already exists")
 
@@ -362,9 +369,9 @@ def create_queue_profile(
             color=profile_data.color,
         )
 
-        db.add(new_profile)
-        db.commit()
-        db.refresh(new_profile)
+        _repo(db).add(new_profile)
+        _repo(db).commit()
+        _repo(db).refresh(new_profile)
 
         logger.info(f"Created QueueProfile: {new_profile.key}")
 
@@ -388,7 +395,7 @@ def create_queue_profile(
         raise
     except Exception as e:
         logger.error(f"Error creating queue profile: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -408,7 +415,7 @@ def update_queue_profile(
         from app.models.queue_profile import QueueProfile
 
         # Find profile
-        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        profile = _repo(db).query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
 
@@ -418,8 +425,8 @@ def update_queue_profile(
             if hasattr(profile, field):
                 setattr(profile, field, value)
 
-        db.commit()
-        db.refresh(profile)
+        _repo(db).commit()
+        _repo(db).refresh(profile)
 
         logger.info(f"Updated QueueProfile: {profile.key}")
 
@@ -443,7 +450,7 @@ def update_queue_profile(
         raise
     except Exception as e:
         logger.error(f"Error updating queue profile: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -462,12 +469,12 @@ def delete_queue_profile(
         from app.models.queue_profile import QueueProfile
 
         # Find profile
-        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        profile = _repo(db).query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
 
-        db.delete(profile)
-        db.commit()
+        _repo(db).delete(profile)
+        _repo(db).commit()
 
         logger.info(f"Deleted QueueProfile: {profile_key}")
 
@@ -480,7 +487,7 @@ def delete_queue_profile(
         raise
     except Exception as e:
         logger.error(f"Error deleting queue profile: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -500,12 +507,12 @@ def reorder_queue_profiles(
 
         updated = 0
         for key, order in orders.items():
-            profile = db.query(QueueProfile).filter(QueueProfile.key == key).first()
+            profile = _repo(db).query(QueueProfile).filter(QueueProfile.key == key).first()
             if profile:
                 profile.display_order = order
                 updated += 1
 
-        db.commit()
+        _repo(db).commit()
 
         logger.info(f"Reordered {updated} QueueProfiles")
 
@@ -516,7 +523,7 @@ def reorder_queue_profiles(
 
     except Exception as e:
         logger.error(f"Error reordering queue profiles: {e}")
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -553,7 +560,7 @@ def get_registrar_services(
         )
 
         # Получаем услуги из основной таблицы
-        query = db.query(Service)
+        query = _repo(db).query(Service)
 
         if active_only:
             query = query.filter(Service.active == True)
@@ -562,7 +569,7 @@ def get_registrar_services(
 
         # Получаем маппинг услуг к отделениям
         dept_services = (
-            db.query(DepartmentService)
+            _repo(db).query(DepartmentService)
             .options(
                 # joinedload(DepartmentService.department) # Если нужно
             )
@@ -943,7 +950,7 @@ def create_registrar_appointment(
         if appointment_date == date.today():
             # Получаем или создаем дневную очередь
             daily_queue = (
-                db.query(crud_queue.DailyQueue)
+                _repo(db).query(crud_queue.DailyQueue)
                 .filter(
                     and_(
                         crud_queue.DailyQueue.day == appointment_date,
@@ -957,13 +964,13 @@ def create_registrar_appointment(
                 daily_queue = crud_queue.DailyQueue(
                     day=appointment_date, specialist_id=doctor.id, active=True
                 )
-                db.add(daily_queue)
-                db.commit()
-                db.refresh(daily_queue)
+                _repo(db).add(daily_queue)
+                _repo(db).commit()
+                _repo(db).refresh(daily_queue)
 
             # Вычисляем номер в очереди
             current_count = (
-                db.query(crud_queue.QueueEntry)
+                _repo(db).query(crud_queue.QueueEntry)
                 .filter(crud_queue.QueueEntry.queue_id == daily_queue.id)
                 .count()
             )
@@ -981,12 +988,12 @@ def create_registrar_appointment(
                 source="desk",
                 status="waiting",
             )
-            db.add(queue_entry)
+            _repo(db).add(queue_entry)
 
         # Здесь будет создание визита в основной таблице visits
         # Пока возвращаем успешный ответ
 
-        db.commit()
+        _repo(db).commit()
 
         return {
             "success": True,
@@ -1114,7 +1121,7 @@ def start_queue_visit(
         from app.models.visit import Visit
 
         # Сначала ищем в Visit
-        visit = db.query(Visit).filter(Visit.id == entry_id).first()
+        visit = _repo(db).query(Visit).filter(Visit.id == entry_id).first()
         if visit:
             # Обновляем статус визита
             visit.status = "in_progress"
@@ -1125,7 +1132,7 @@ def start_queue_visit(
                 from app.models.payment import Payment
 
                 payment = (
-                    db.query(Payment)
+                    _repo(db).query(Payment)
                     .filter(Payment.visit_id == visit.id)
                     .order_by(Payment.created_at.desc())
                     .first()
@@ -1170,8 +1177,8 @@ def start_queue_visit(
 
                     visit.discount_mode = "paid"
 
-            db.commit()
-            db.refresh(visit)
+            _repo(db).commit()
+            _repo(db).refresh(visit)
 
             return {
                 "success": True,
@@ -1184,7 +1191,7 @@ def start_queue_visit(
             }
 
         # Если не найден в Visit, ищем в Appointment
-        appointment = db.query(Appointment).filter(Appointment.id == entry_id).first()
+        appointment = _repo(db).query(Appointment).filter(Appointment.id == entry_id).first()
         if appointment:
             # Обновляем статус appointment
             appointment.status = "in_progress"
@@ -1200,7 +1207,7 @@ def start_queue_visit(
                 from app.models.payment import Payment
 
                 payment = (
-                    db.query(Payment)
+                    _repo(db).query(Payment)
                     .filter(Payment.visit_id == appointment.id)
                     .order_by(Payment.created_at.desc())
                     .first()
@@ -1225,8 +1232,8 @@ def start_queue_visit(
                 ):
                     appointment.visit_type = "paid"
 
-            db.commit()
-            db.refresh(appointment)
+            _repo(db).commit()
+            _repo(db).refresh(appointment)
 
             return {
                 "success": True,
@@ -1316,18 +1323,18 @@ def get_today_queues(
             today = date.today()
 
         # Получаем все визиты на сегодня (новая система)
-        visits = db.query(Visit).filter(Visit.visit_date == today).all()
+        visits = _repo(db).query(Visit).filter(Visit.visit_date == today).all()
 
         # Получаем все appointments на сегодня (старая система)
         appointments = (
-            db.query(Appointment).filter(Appointment.appointment_date == today).all()
+            _repo(db).query(Appointment).filter(Appointment.appointment_date == today).all()
         )
 
         # [OK] ДОБАВЛЕНО: Получаем записи из онлайн-очереди (OnlineQueueEntry)
         from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
         online_entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
             .filter(
                 DailyQueue.day == today,
@@ -1357,7 +1364,7 @@ def get_today_queues(
             # ⭐ PHASE 1.1: Пропускаем Visit если есть связанный OnlineQueueEntry
             # Очередь должна читаться ТОЛЬКО из OnlineQueueEntry (SSOT)
             from sqlalchemy import text
-            has_queue_entry = db.execute(
+            has_queue_entry = _repo(db).execute(
                 text("SELECT 1 FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
                 {"visit_id": visit.id}
             ).first()
@@ -1378,11 +1385,11 @@ def get_today_queues(
             from app.models.visit import VisitService
 
             visit_services = (
-                db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
             )
             service_ids = [vs.service_id for vs in visit_services]
             services = (
-                db.query(Service).filter(Service.id.in_(service_ids)).all()
+                _repo(db).query(Service).filter(Service.id.in_(service_ids)).all()
                 if service_ids
                 else []
             )
@@ -1508,7 +1515,7 @@ def get_today_queues(
                     try:
                         from sqlalchemy import text
 
-                        queue_entry_row = db.execute(
+                        queue_entry_row = _repo(db).execute(
                             text(
                                 "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
                             ),
@@ -1552,7 +1559,7 @@ def get_today_queues(
                     try:
                         from sqlalchemy import text
 
-                        queue_entry_row = db.execute(
+                        queue_entry_row = _repo(db).execute(
                             text(
                                 "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
                             ),
@@ -1612,7 +1619,7 @@ def get_today_queues(
                 try:
                     from sqlalchemy import text
 
-                    queue_entry_row = db.execute(
+                    queue_entry_row = _repo(db).execute(
                         text(
                             "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
                         ),
@@ -1678,7 +1685,7 @@ def get_today_queues(
             try:
                 from sqlalchemy import text
 
-                queue_entry_row = db.execute(
+                queue_entry_row = _repo(db).execute(
                     text(
                         "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
                     ),
@@ -1754,7 +1761,7 @@ def get_today_queues(
                         continue
 
             daily_queue = (
-                db.query(DailyQueue)
+                _repo(db).query(DailyQueue)
                 .filter(DailyQueue.id == online_entry.queue_id)
                 .first()
             )
@@ -1764,12 +1771,12 @@ def get_today_queues(
             # ✅ ИСПРАВЛЕНО: daily_queue.specialist_id может хранить как doctor.id, так и user_id
             # Проверяем оба варианта для совместимости с существующими данными
             doctor = (
-                db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
+                _repo(db).query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
             )
             # Если не нашли по doctor.id, пробуем по user_id (для совместимости со старыми данными)
             if not doctor:
                 doctor = (
-                    db.query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
+                    _repo(db).query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
                 )
             if not doctor:
                 continue
@@ -1877,18 +1884,18 @@ def get_today_queues(
                         service_id = service_item.get('id')
                         if service_id:
                             service = (
-                                db.query(Service)
+                                _repo(db).query(Service)
                                 .filter(Service.id == service_id)
                                 .first()
                             )
                     elif isinstance(service_item, int):
                         service = (
-                            db.query(Service).filter(Service.id == service_item).first()
+                            _repo(db).query(Service).filter(Service.id == service_item).first()
                         )
                     elif isinstance(service_item, str):
                         # [OK] ДОБАВЛЕНО: Поиск услуги по названию (Appointment.services - это JSON строк)
                         service = (
-                            db.query(Service)
+                            _repo(db).query(Service)
                             .filter(Service.name == service_item)
                             .first()
                         )
@@ -1933,7 +1940,7 @@ def get_today_queues(
                         visit_filters.append(Visit.doctor_id.is_(None))
 
                     existing_visit = (
-                        db.query(Visit).filter(and_(*visit_filters)).first()
+                        _repo(db).query(Visit).filter(and_(*visit_filters)).first()
                     )
                     if existing_visit:
                         visit_exists = True
@@ -1971,7 +1978,7 @@ def get_today_queues(
                 from sqlalchemy import text
 
                 if patient_id:
-                    queue_entry_row = db.execute(
+                    queue_entry_row = _repo(db).execute(
                         text(
                             "SELECT queue_time FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"
                         ),
@@ -2196,7 +2203,7 @@ def get_today_queues(
 
                     # Загружаем пациента
                     patient = (
-                        db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                        _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
                     )
                     if patient:
                         # [OK] ИСПОЛЬЗУЕМ short_name() - теперь он всегда возвращает корректное значение
@@ -2223,7 +2230,7 @@ def get_today_queues(
                     from app.models.visit import VisitService
 
                     all_visit_services = (
-                        db.query(VisitService)
+                        _repo(db).query(VisitService)
                         .filter(VisitService.visit_id == visit.id)
                         .all()
                     )
@@ -2238,7 +2245,7 @@ def get_today_queues(
                         for vs in all_visit_services:
                             if hasattr(vs, 'service_id') and vs.service_id:
                                 service = (
-                                    db.query(Service)
+                                    _repo(db).query(Service)
                                     .filter(Service.id == vs.service_id)
                                     .first()
                                 )
@@ -2256,7 +2263,7 @@ def get_today_queues(
                         for vs in all_visit_services:
                             if hasattr(vs, 'service_id') and vs.service_id:
                                 service = (
-                                    db.query(Service)
+                                    _repo(db).query(Service)
                                     .filter(Service.id == vs.service_id)
                                     .first()
                                 )
@@ -2282,7 +2289,7 @@ def get_today_queues(
                         if hasattr(vs, 'service_id') and vs.service_id:
                             # Получаем полные данные услуги из БД
                             svc = (
-                                db.query(Service)
+                                _repo(db).query(Service)
                                 .filter(Service.id == vs.service_id)
                                 .first()
                             )
@@ -2370,7 +2377,7 @@ def get_today_queues(
 
                     # Загружаем пациента
                     patient = (
-                        db.query(Patient)
+                        _repo(db).query(Patient)
                         .filter(Patient.id == appointment.patient_id)
                         .first()
                     )
@@ -2462,7 +2469,7 @@ def get_today_queues(
                         visit = entry_data
                         # ✅ SSOT FIX: Для QR-визитов нужно получить данные из OnlineQueueEntry
                         # Frontend использует этот ID для вызова full-update endpoint
-                        queue_entry_for_visit = db.execute(
+                        queue_entry_for_visit = _repo(db).execute(
                             text("SELECT id, number, queue_time, total_amount FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
                             {"visit_id": visit.id}
                         ).first()
@@ -2484,7 +2491,7 @@ def get_today_queues(
                         visit_time = str(visit.visit_time) if hasattr(visit, 'visit_time') and visit.visit_time else None
 
                         # Загружаем пациента для получения данных
-                        patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                        patient = _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
                         if patient:
                             patient_name = patient.short_name()
                             phone = patient.phone or "Не указан"
@@ -2513,9 +2520,9 @@ def get_today_queues(
                     if is_visit_object:
                         # Для Visit загружаем услуги из VisitService
                         from app.models.visit import VisitService
-                        visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                        visit_services = _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
                         for vs in visit_services:
-                            svc = db.query(Service).filter(Service.id == vs.service_id).first()
+                            svc = _repo(db).query(Service).filter(Service.id == vs.service_id).first()
                             if svc:
                                 service_codes.append(svc.service_code or svc.code or "")
                                 services.append({
@@ -2616,7 +2623,7 @@ def get_today_queues(
                         linked_visit_id = getattr(entry_data, 'visit_id', None) or entry_wrapper.get("visit_id")
                         if linked_visit_id:
                             try:
-                                cost_row = db.execute(
+                                cost_row = _repo(db).execute(
                                     text("SELECT SUM(price * qty) as total FROM visit_services WHERE visit_id = :vid"),
                                     {"vid": linked_visit_id}
                                 ).first()
@@ -2665,7 +2672,7 @@ def get_today_queues(
 
                     if visit_date and doctor_id:
                         existing_appointment = (
-                            db.query(Appointment)
+                            _repo(db).query(Appointment)
                             .filter(
                                 and_(
                                     Appointment.patient_id == patient_id,
@@ -2728,7 +2735,7 @@ def get_today_queues(
                             )
                         elif entry_type == "visit":
                             # Ищем запись по visit_id
-                            queue_entry_row = db.execute(
+                            queue_entry_row = _repo(db).execute(
                                 text(
                                     "SELECT number, queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
                                 ),
@@ -2739,7 +2746,7 @@ def get_today_queues(
                                 queue_entry_time = queue_entry_row.queue_time
                         elif entry_type == "appointment" and patient_id:
                             # Для Appointment ищем по patient_id
-                            queue_entry_row = db.execute(
+                            queue_entry_row = _repo(db).execute(
                                 text(
                                     "SELECT number, queue_time FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"
                                 ),
@@ -2767,14 +2774,14 @@ def get_today_queues(
                     from app.models.visit import VisitService
 
                     visit_services_for_dept = (
-                        db.query(VisitService)
+                        _repo(db).query(VisitService)
                         .filter(VisitService.visit_id == record_id)
                         .all()
                     )
                     for vs in visit_services_for_dept:
                         if vs.service_id:
                             svc = (
-                                db.query(Service)
+                                _repo(db).query(Service)
                                 .filter(Service.id == vs.service_id)
                                 .first()
                             )
@@ -2794,20 +2801,20 @@ def get_today_queues(
                                 service_id = service_item.get('id')
                                 if service_id:
                                     svc = (
-                                        db.query(Service)
+                                        _repo(db).query(Service)
                                         .filter(Service.id == service_id)
                                         .first()
                                     )
                             elif isinstance(service_item, int):
                                 svc = (
-                                    db.query(Service)
+                                    _repo(db).query(Service)
                                     .filter(Service.id == service_item)
                                     .first()
                                 )
                             elif isinstance(service_item, str):
                                 # [OK] ДОБАВЛЕНО: Поиск услуги по названию (Appointment.services - это JSON строк)
                                 svc = (
-                                    db.query(Service)
+                                    _repo(db).query(Service)
                                     .filter(Service.name == service_item)
                                     .first()
                                 )
@@ -3097,7 +3104,7 @@ def get_doctor_user_id(
     try:
         from app.models.clinic import Doctor
 
-        doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+        doctor = _repo(db).query(Doctor).filter(Doctor.id == doctor_id).first()
 
         if not doctor:
             raise HTTPException(

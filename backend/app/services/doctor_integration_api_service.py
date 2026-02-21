@@ -21,12 +21,19 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.repositories.doctor_integration_api_repository import (
+    DoctorIntegrationApiRepository,
+)
 from app.services.notification_service import NotificationService
 from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _repo(db: Session) -> DoctorIntegrationApiRepository:
+    return DoctorIntegrationApiRepository(db)
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -116,7 +123,7 @@ def get_doctor_queue_today(
 
         # Получаем врача по специальности и пользователю
         doctor = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(
                 and_(
                     Doctor.specialty.in_(specialty_variants),
@@ -130,7 +137,7 @@ def get_doctor_queue_today(
         if not doctor:
             # Если врач не найден по user_id, ищем по специальности (для админа и других ролей)
             doctor = (
-                db.query(Doctor)
+                _repo(db).query(Doctor)
                 .filter(
                     and_(
                         Doctor.specialty.in_(specialty_variants), Doctor.active == True
@@ -153,7 +160,7 @@ def get_doctor_queue_today(
         daily_queue = None
         if doctor_user_id:
             daily_queue = (
-                db.query(DailyQueue)
+                _repo(db).query(DailyQueue)
                 .filter(
                     and_(
                         DailyQueue.day == today,
@@ -181,7 +188,7 @@ def get_doctor_queue_today(
 
         # Получаем записи очереди
         entries = (
-            db.query(OnlineQueueEntry)
+            _repo(db).query(OnlineQueueEntry)
             .filter(OnlineQueueEntry.queue_id == daily_queue.id)
             .order_by(OnlineQueueEntry.number)
             .all()
@@ -291,7 +298,7 @@ def call_patient(
     try:
         # Получаем запись в очереди
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
 
         if not queue_entry:
@@ -330,8 +337,8 @@ def call_patient(
         queue_entry.status = "called"
         queue_entry.called_at = datetime.utcnow()
 
-        db.commit()
-        db.refresh(queue_entry)
+        _repo(db).commit()
+        _repo(db).refresh(queue_entry)
 
         # Отправляем событие в WebSocket для табло
         try:
@@ -401,7 +408,7 @@ def start_patient_visit(
     """
     try:
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
 
         if not queue_entry:
@@ -429,7 +436,7 @@ def start_patient_visit(
         visit.visit_time = datetime.now().strftime("%H:%M")
         visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"
 
-        db.commit()
+        _repo(db).commit()
 
         return {
             "success": True,
@@ -476,7 +483,7 @@ def complete_patient_visit(
         from app.models.visit import Visit
 
         # Сначала ищем в Visit
-        visit = db.query(Visit).filter(Visit.id == entry_id).first()
+        visit = _repo(db).query(Visit).filter(Visit.id == entry_id).first()
         if visit:
             # Обновляем статус визита
             visit.status = "completed"
@@ -487,7 +494,7 @@ def complete_patient_visit(
 
             if not visit.discount_mode or visit.discount_mode == "none":
                 payment = (
-                    db.query(Payment)
+                    _repo(db).query(Payment)
                     .filter(Payment.visit_id == visit.id)
                     .order_by(Payment.created_at.desc())
                     .first()
@@ -532,8 +539,8 @@ def complete_patient_visit(
 
                     visit.discount_mode = "paid"
 
-            db.commit()
-            db.refresh(visit)
+            _repo(db).commit()
+            _repo(db).refresh(visit)
 
             # Завершаем визит с медицинскими данными
             if visit_data:
@@ -549,7 +556,7 @@ def complete_patient_visit(
             }
 
         # Если не найден в Visit, ищем в Appointment
-        appointment = db.query(Appointment).filter(Appointment.id == entry_id).first()
+        appointment = _repo(db).query(Appointment).filter(Appointment.id == entry_id).first()
         if appointment:
             # Обновляем статус appointment
             appointment.status = "completed"
@@ -565,7 +572,7 @@ def complete_patient_visit(
                 from app.models.payment import Payment
 
                 payment = (
-                    db.query(Payment)
+                    _repo(db).query(Payment)
                     .filter(Payment.visit_id == appointment.id)
                     .order_by(Payment.created_at.desc())
                     .first()
@@ -590,8 +597,8 @@ def complete_patient_visit(
                 ):
                     appointment.visit_type = "paid"
 
-            db.commit()
-            db.refresh(appointment)
+            _repo(db).commit()
+            _repo(db).refresh(appointment)
 
             return {
                 "success": True,
@@ -604,7 +611,7 @@ def complete_patient_visit(
         from app.models.online_queue import OnlineQueueEntry
 
         queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+            _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
         if queue_entry:
             # Проверяем права врача на эту очередь
@@ -622,8 +629,8 @@ def complete_patient_visit(
 
             # Отмечаем запись очереди как обслуженную
             queue_entry.status = "served"
-            db.commit()
-            db.refresh(queue_entry)
+            _repo(db).commit()
+            _repo(db).refresh(queue_entry)
 
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
@@ -646,7 +653,7 @@ def complete_patient_visit(
                 from app.models.payment import Payment
 
                 payment = (
-                    db.query(Payment)
+                    _repo(db).query(Payment)
                     .filter(Payment.visit_id == visit.id)
                     .order_by(Payment.created_at.desc())
                     .first()
@@ -712,7 +719,7 @@ def complete_patient_visit(
                 from app.models.appointment import Appointment
 
                 appointment = (
-                    db.query(Appointment)
+                    _repo(db).query(Appointment)
                     .filter(
                         and_(
                             Appointment.patient_id == queue_entry.patient_id,
@@ -750,16 +757,16 @@ def complete_patient_visit(
                     )
 
                 # ✅ Коммитим все изменения (Visit и Appointment)
-                db.commit()
-                db.refresh(visit)
+                _repo(db).commit()
+                _repo(db).refresh(visit)
                 if appointment:
-                    db.refresh(appointment)
+                    _repo(db).refresh(appointment)
             except Exception as e:
                 # Не блокируем основной флоу очереди, если с визитом что-то пошло не так
                 logger.warning(
                     f"Ошибка создания/обновления визита при завершении приема: {e}"
                 )
-                db.rollback()
+                _repo(db).rollback()
 
             return {
                 "success": True,
@@ -817,7 +824,7 @@ def get_doctor_services(
         # Получаем услуги
         from app.models.service import Service
 
-        services = db.query(Service).filter(Service.active == True).all()
+        services = _repo(db).query(Service).filter(Service.active == True).all()
 
         # Группируем по категориям
         grouped_services = {}
@@ -885,7 +892,7 @@ def get_doctor_info(
     """
     try:
         doctor = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(and_(Doctor.user_id == current_user.id, Doctor.active == True))
             .first()
         )
@@ -973,7 +980,7 @@ def get_doctor_calendar(
     try:
         # Получаем врача
         doctor = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(and_(Doctor.user_id == current_user.id, Doctor.active == True))
             .first()
         )
@@ -1029,7 +1036,7 @@ def get_doctor_stats(
     try:
         # Получаем врача
         doctor = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(and_(Doctor.user_id == current_user.id, Doctor.active == True))
             .first()
         )
@@ -1045,7 +1052,7 @@ def get_doctor_stats(
 
         # Получаем очереди за период
         daily_queues = (
-            db.query(DailyQueue)
+            _repo(db).query(DailyQueue)
             .filter(
                 and_(
                     DailyQueue.specialist_id
@@ -1062,7 +1069,7 @@ def get_doctor_stats(
 
         for queue in daily_queues:
             entries = (
-                db.query(OnlineQueueEntry)
+                _repo(db).query(OnlineQueueEntry)
                 .filter(OnlineQueueEntry.queue_id == queue.id)
                 .all()
             )
@@ -1102,10 +1109,10 @@ def get_doctor_stats(
                     "opened_at": (
                         queue.opened_at.isoformat() if queue.opened_at else None
                     ),
-                    "total_entries": db.query(OnlineQueueEntry)
+                    "total_entries": _repo(db).query(OnlineQueueEntry)
                     .filter(OnlineQueueEntry.queue_id == queue.id)
                     .count(),
-                    "served_entries": db.query(OnlineQueueEntry)
+                    "served_entries": _repo(db).query(OnlineQueueEntry)
                     .filter(
                         and_(
                             OnlineQueueEntry.queue_id == queue.id,
@@ -1155,7 +1162,7 @@ async def schedule_next_visit(
     try:
         # Получаем врача
         doctor = (
-            db.query(Doctor)
+            _repo(db).query(Doctor)
             .filter(and_(Doctor.user_id == current_user.id, Doctor.active == True))
             .first()
         )
@@ -1175,7 +1182,7 @@ async def schedule_next_visit(
         # Проверяем существование пациента
         from app.models.patient import Patient
 
-        patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
+        patient = _repo(db).query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
@@ -1183,7 +1190,7 @@ async def schedule_next_visit(
 
         # Проверяем существование услуг
         service_ids = [s.service_id for s in request.services]
-        services = db.query(Service).filter(Service.id.in_(service_ids)).all()
+        services = _repo(db).query(Service).filter(Service.id.in_(service_ids)).all()
 
         if len(services) != len(service_ids):
             raise HTTPException(
@@ -1214,8 +1221,8 @@ async def schedule_next_visit(
             confirmation_expires_at=expires_at,
             source="desk",  # ✅ SSOT: Врач назначает = desk
         )
-        db.add(visit)
-        db.flush()  # Получаем ID визита
+        _repo(db).add(visit)
+        _repo(db).flush()  # Получаем ID визита
 
         # Добавляем услуги к визиту
         total_amount = 0
@@ -1246,12 +1253,12 @@ async def schedule_next_visit(
                 price=service_price,
                 currency="UZS",
             )
-            db.add(visit_service)
+            _repo(db).add(visit_service)
 
             total_amount += service_price * service_req.quantity
 
-        db.commit()
-        db.refresh(visit)
+        _repo(db).commit()
+        _repo(db).refresh(visit)
 
         # Отправляем приглашение на подтверждение
         notification_service = NotificationService(db)
@@ -1296,7 +1303,7 @@ async def schedule_next_visit(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         logger.error(f"Ошибка назначения следующего визита: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1337,7 +1344,7 @@ def get_today_visits(
             total_amount = 0
 
             for vs in visit_services:
-                service = db.query(Service).filter(Service.id == vs.service_id).first()
+                service = _repo(db).query(Service).filter(Service.id == vs.service_id).first()
                 service_data = {
                     "id": vs.id,
                     "service_id": vs.service_id,
@@ -1422,7 +1429,7 @@ def get_visit_details(
         total_amount = 0
 
         for vs in visit_services:
-            service = db.query(Service).filter(Service.id == vs.service_id).first()
+            service = _repo(db).query(Service).filter(Service.id == vs.service_id).first()
             service_data = {
                 "id": vs.id,
                 "service_id": vs.service_id,
@@ -1499,7 +1506,7 @@ def add_service_to_visit(
             )
 
         # Проверяем, что услуга существует
-        service = db.query(Service).filter(Service.id == service_id).first()
+        service = _repo(db).query(Service).filter(Service.id == service_id).first()
         if not service:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Услуга не найдена"
@@ -1626,7 +1633,7 @@ def get_visit_statistics(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        _repo(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка назначения визита: {str(e)}",
