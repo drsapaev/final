@@ -17,6 +17,7 @@ from app.models.enums import (
 )
 from app.models.payment import Payment
 from app.models.visit import Visit
+from app.repositories.payments_api_repository import PaymentsApiRepository
 from app.services.billing_service import BillingService
 from app.services.payment_init_service import PaymentInitDomainError, PaymentInitService
 from app.services.payment_providers.manager import PaymentProviderManager
@@ -101,6 +102,10 @@ def get_payment_manager() -> PaymentProviderManager:
         payment_manager = PaymentProviderManager(config)
 
     return payment_manager
+
+
+def _repo(db: Session) -> PaymentsApiRepository:
+    return PaymentsApiRepository(db)
 
 
 # Pydantic модели
@@ -234,6 +239,7 @@ def create_payment(
     current_user=Depends(deps.require_roles("Admin", "Cashier")),
 ) -> dict[str, Any]:
     """Создание платежа (для кассы)"""
+    repository = _repo(db)
     try:
         billing_service = BillingService(db)
 
@@ -241,25 +247,14 @@ def create_payment(
         visit_id = payment_request.visit_id
         if not visit_id and payment_request.appointment_id:
             # Если передан appointment_id, ищем связанный visit
-            from app.models.appointment import Appointment
-
-            appointment = (
-                db.query(Appointment)
-                .filter(Appointment.id == payment_request.appointment_id)
-                .first()
-            )
+            appointment = repository.get_appointment_by_id(payment_request.appointment_id)
             if appointment:
                 # Ищем visit по patient_id и дате
                 from datetime import date
 
-                visit = (
-                    db.query(Visit)
-                    .filter(
-                        Visit.patient_id == appointment.patient_id,
-                        Visit.visit_date
-                        == (appointment.appointment_date or date.today()),
-                    )
-                    .first()
+                visit = repository.find_visit_by_patient_and_date(
+                    patient_id=appointment.patient_id,
+                    visit_date=(appointment.appointment_date or date.today()),
                 )
                 if visit:
                     visit_id = visit.id
@@ -283,45 +278,35 @@ def create_payment(
         # =====================================================
         # ВАЖНО: Обновляем статус визита после оплаты
         # =====================================================
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        visit = repository.get_visit_by_id(visit_id)
         if visit:
             # Проверяем, полностью ли оплачен визит
             from decimal import Decimal
 
-            from app.models.visit import VisitService
-
             # Считаем общую сумму услуг визита
             total_cost = Decimal("0")
-            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+            visit_services = repository.list_visit_services(visit_id)
             for vs in visit_services:
                 price = Decimal(str(vs.price)) if vs.price else Decimal("0")
                 qty = vs.qty if vs.qty else 1
                 total_cost += price * qty
 
             # Считаем уже оплаченную сумму
-            from app.models.payment import Payment
-            paid_payments = db.query(Payment).filter(
-                Payment.visit_id == visit_id,
-                Payment.status.in_(["paid", "completed"])
-            ).all()
+            paid_payments = repository.list_paid_payments_for_visit(visit_id)
             total_paid = sum(p.amount for p in paid_payments)
 
             # Если оплачено >= стоимости услуг, обновляем статус визита
             if total_paid >= total_cost:
                 visit.status = "paid"
                 visit.discount_mode = "paid"
-                db.commit()
+                repository.commit()
 
         # Формируем ответ в том же формате, что и get_payments_list
-        from app.models.patient import Patient
-        from app.models.service import Service
-        from app.models.visit import VisitService
-
         patient_name = None
         service_name = None
         appointment_time = None
 
-        visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+        visit = repository.get_visit_by_id(payment.visit_id)
         if visit:
             if visit.visit_time:
                 appointment_time = visit.visit_time.strftime('%H:%M')
@@ -329,24 +314,16 @@ def create_payment(
                 appointment_time = visit.created_at.strftime('%H:%M')
 
             if visit.patient_id:
-                patient = (
-                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                )
+                patient = repository.get_patient_by_id(visit.patient_id)
                 if patient:
                     patient_name = (
                         patient.short_name()
                         or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
                     )
 
-            first_service = (
-                db.query(VisitService).filter(VisitService.visit_id == visit.id).first()
-            )
+            first_service = repository.get_first_visit_service(visit.id)
             if first_service:
-                service = (
-                    db.query(Service)
-                    .filter(Service.id == first_service.service_id)
-                    .first()
-                )
+                service = repository.get_service_by_id(first_service.service_id)
                 if service:
                     service_name = service.name
 
@@ -425,9 +402,10 @@ def get_payment_status(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ) -> PaymentStatusResponse:
     """Получение статуса платежа"""
+    repository = _repo(db)
 
     # Получаем платеж из БД
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    payment = repository.get_payment_by_id(payment_id)
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
@@ -478,8 +456,9 @@ def get_visit_payments(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение всех платежей по визиту"""
+    repository = _repo(db)
 
-    payments = db.query(Payment).filter(Payment.visit_id == visit_id).all()
+    payments = repository.list_payments_by_visit_id(visit_id)
 
     payment_responses = []
     for payment in payments:
@@ -509,9 +488,10 @@ def cancel_payment(
     current_user=Depends(deps.require_roles("Admin", "Cashier")),
 ) -> dict[str, Any]:
     """Отмена платежа"""
+    repository = _repo(db)
 
     # Получаем платеж
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    payment = repository.get_payment_by_id(payment_id)
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
@@ -568,6 +548,7 @@ def test_init_payment(
     payment_request: PaymentInitRequest, db: Session = Depends(get_db)
 ) -> PaymentInitResponse:
     """Тестовая инициализация платежа БЕЗ аутентификации"""
+    repository = _repo(db)
 
     try:
         # Получаем менеджер провайдеров
@@ -635,7 +616,7 @@ def test_init_payment(
             )
 
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка инициализации платежа: {str(e)}",
@@ -650,10 +631,11 @@ def generate_receipt(
     current_user=Depends(deps.get_current_user),
 ):
     """Генерация квитанции об оплате"""
+    repository = _repo(db)
 
     try:
         # Получаем платеж
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        payment = repository.get_payment_by_id(payment_id)
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
@@ -694,12 +676,13 @@ def download_receipt(
     current_user=Depends(deps.get_current_user),
 ):
     """Скачивание квитанции"""
+    repository = _repo(db)
 
     try:
         from fastapi.responses import PlainTextResponse
 
         # Получаем платеж
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        payment = repository.get_payment_by_id(payment_id)
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Платеж не найден"
@@ -747,6 +730,7 @@ async def create_payment_invoice(
     current_user: Any = Depends(deps.get_current_user),
 ):
     """Создание счета для оплаты из модуля оплаты"""
+    repository = _repo(db)
     try:
         from app.models.payment_invoice import PaymentInvoice
 
@@ -761,9 +745,9 @@ async def create_payment_invoice(
             created_by_id=current_user.id,
         )
 
-        db.add(invoice)
-        db.commit()
-        db.refresh(invoice)
+        repository.add(invoice)
+        repository.commit()
+        repository.refresh(invoice)
 
         return PaymentInvoiceResponse(
             invoice_id=invoice.id,
@@ -776,7 +760,7 @@ async def create_payment_invoice(
         )
 
     except Exception as e:
-        db.rollback()
+        repository.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания счета: {str(e)}",
@@ -788,17 +772,9 @@ async def get_pending_invoices(
     db: Session = Depends(get_db), current_user: Any = Depends(deps.get_current_user)
 ):
     """Получение списка неоплаченных счетов"""
+    repository = _repo(db)
     try:
-        from app.models.payment_invoice import PaymentInvoice
-
-        # Получаем неоплаченные счета
-        invoices = (
-            db.query(PaymentInvoice)
-            .filter(PaymentInvoice.status.in_(["pending", "processing"]))
-            .order_by(PaymentInvoice.created_at.desc())
-            .limit(50)
-            .all()
-        )
+        invoices = repository.list_pending_invoices(limit=50)
 
         return [
             PaymentInvoiceResponse(
