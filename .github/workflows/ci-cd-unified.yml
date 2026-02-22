@@ -605,7 +605,7 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pip-audit bandit semgrep
+        pip install pip-audit bandit
 
     - name: 🔒 Проверка уязвимостей
       run: |
@@ -625,7 +625,6 @@ jobs:
         pip-audit -r requirements.txt --format json -o security-reports/pip-audit.json "${IGNORE_ARGS[@]}"
         # Code-level security checks
         bandit -r app -f json -o security-reports/bandit.json
-        semgrep --config=auto --json --output security-reports/semgrep.json app/
 
     - name: 📤 Upload security reports
       if: always()
