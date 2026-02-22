@@ -325,7 +325,7 @@ export function validateEndpoint(endpoint) {
 /**
  * Получение endpoint по ключу
  */
-export function getEndpoint(category, key, ...args) {
+export function getEndpoint(category, key) {
   const categoryEndpoints = API_ENDPOINTS[category];
   if (!categoryEndpoints) {
     throw new Error(`Unknown API category: ${category}`);

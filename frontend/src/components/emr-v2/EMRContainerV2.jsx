@@ -218,7 +218,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
             const requestOptions = { signal: getAbortSignal() };
 
             switch (fieldName) {
-                case 'diagnosis':
+                case 'diagnosis': {
                     // Use ICD-10 suggestions
                     result = await mcpAPI.suggestICD10({
                         symptoms: data.complaints ? [data.complaints] : [],
@@ -262,6 +262,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         console.log('[EMR AI] No ICD-10 suggestions returned');
                     }
                     break;
+                }
 
                 case 'examination':
                 case 'treatment':

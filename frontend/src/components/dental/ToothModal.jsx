@@ -3,36 +3,40 @@
  * Модальное окно для работы с зубом
  * Согласно MASTER_TODO_LIST строка 285
  */
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Box,
-  Typography,
-  Button,
-  Input,
-  Select,
-  Option,
-  Badge,
   Alert,
+  Box,
   Checkbox,
-  Textarea,
-} from '../ui/macos';
-import {
-  Hospital,
-  Plus,
-  Trash2,
-  History,
-  DollarSign,
-  Calendar,
-  FileText,
-  AlertTriangle,
-  CheckCircle,
-  Wrench,
-  Heart,
-} from 'lucide-react';
+  Chip,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  MenuItem,
+  Select,
+  TextField,
+  Typography,
+} from '@mui/material';
+import Add from '@mui/icons-material/Add';
+import CalendarToday from '@mui/icons-material/CalendarToday';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Delete from '@mui/icons-material/Delete';
+import Healing from '@mui/icons-material/Healing';
+import History from '@mui/icons-material/History';
+import LocalHospital from '@mui/icons-material/LocalHospital';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -80,6 +84,19 @@ const ToothModal = ({
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Загрузка истории процедур
+  const loadToothHistory = useCallback(async () => {
+    if (!toothNumber || !patientId) return;
+    
+    try {
+      const response = await api.get(`/patients/${patientId}/teeth/${toothNumber}/history`);
+      setHistory(response.data || []);
+    } catch (error) {
+      logger.error('Ошибка загрузки истории зуба:', error);
+      setHistory([]);
+    }
+  }, [patientId, toothNumber]);
+
   useEffect(() => {
     if (open && toothData) {
       setFormData({
@@ -91,24 +108,11 @@ const ToothModal = ({
         nextVisitDate: toothData.nextVisitDate || '',
         requiresFollowUp: toothData.requiresFollowUp || false,
       });
-      
+
       // Загружаем историю зуба
       loadToothHistory();
     }
-  }, [open, toothData, toothNumber]);
-
-  // Загрузка истории процедур
-  const loadToothHistory = async () => {
-    if (!toothNumber || !patientId) return;
-    
-    try {
-      const response = await api.get(`/patients/${patientId}/teeth/${toothNumber}/history`);
-      setHistory(response.data || []);
-    } catch (error) {
-      logger.error('Ошибка загрузки истории зуба:', error);
-      setHistory([]);
-    }
-  };
+  }, [loadToothHistory, open, toothData]);
 
   // Добавление процедуры
   const addProcedure = (procedureId) => {
@@ -203,7 +207,7 @@ const ToothModal = ({
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6">
-            <Hospital sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <LocalHospital sx={{ mr: 1, verticalAlign: 'middle' }} />
             Зуб №{toothNumber} - {getToothName(toothNumber)}
           </Typography>
           <Chip 

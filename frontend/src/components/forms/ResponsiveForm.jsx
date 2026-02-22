@@ -1,6 +1,6 @@
-import React from 'react';
+import PropTypes from 'prop-types';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
-import { Button } from '../ui';
+
 
 const ResponsiveForm = ({
   children,
@@ -8,7 +8,7 @@ const ResponsiveForm = ({
   className = '',
   style = {}
 }) => {
-  const { isMobile, isTablet } = useBreakpoint();
+  const { isMobile } = useBreakpoint();
 
   return (
     <form
@@ -19,18 +19,18 @@ const ResponsiveForm = ({
         flexDirection: 'column',
         gap: isMobile ? '16px' : '20px',
         ...style
-      }}
-    >
+      }}>
+      
       {children}
-    </form>
-  );
+    </form>);
+
 };
 
 // Компонент для группы полей
-const FormGroup = ({ 
-  children, 
-  label, 
-  error, 
+const FormGroup = ({
+  children,
+  label,
+  error,
   required = false,
   className = '',
   style = {}
@@ -45,33 +45,33 @@ const FormGroup = ({
         flexDirection: 'column',
         gap: isMobile ? '6px' : '8px',
         ...style
-      }}
-    >
-      {label && (
-        <label
-          style={{
-            fontSize: isMobile ? '14px' : '16px',
-            fontWeight: '500',
-            color: '#374151'
-          }}
-        >
+      }}>
+      
+      {label &&
+      <label
+        style={{
+          fontSize: isMobile ? '14px' : '16px',
+          fontWeight: '500',
+          color: '#374151'
+        }}>
+        
           {label}
           {required && <span style={{ color: '#ef4444', marginLeft: '4px' }}>*</span>}
         </label>
-      )}
+      }
       {children}
-      {error && (
-        <span
-          style={{
-            fontSize: isMobile ? '12px' : '14px',
-            color: '#ef4444'
-          }}
-        >
+      {error &&
+      <span
+        style={{
+          fontSize: isMobile ? '12px' : '14px',
+          color: '#ef4444'
+        }}>
+        
           {error}
         </span>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 // Компонент для поля ввода
@@ -113,9 +113,9 @@ const FormInput = ({
       onBlur={(e) => {
         e.target.style.borderColor = '#d1d5db';
         e.target.style.boxShadow = 'none';
-      }}
-    />
-  );
+      }} />);
+
+
 };
 
 // Компонент для селекта
@@ -155,11 +155,11 @@ const FormSelect = ({
       onBlur={(e) => {
         e.target.style.borderColor = '#d1d5db';
         e.target.style.boxShadow = 'none';
-      }}
-    >
+      }}>
+      
       {children}
-    </select>
-  );
+    </select>);
+
 };
 
 // Компонент для textarea
@@ -203,16 +203,16 @@ const FormTextarea = ({
       onBlur={(e) => {
         e.target.style.borderColor = '#d1d5db';
         e.target.style.boxShadow = 'none';
-      }}
-    />
-  );
+      }} />);
+
+
 };
 
 // Компонент для кнопок формы
-const FormActions = ({ 
-  children, 
-  className = '', 
-  style = {} 
+const FormActions = ({
+  children,
+  className = '',
+  style = {}
 }) => {
   const { isMobile } = useBreakpoint();
 
@@ -225,11 +225,11 @@ const FormActions = ({
         justifyContent: isMobile ? 'stretch' : 'flex-end',
         marginTop: isMobile ? '20px' : '24px',
         ...style
-      }}
-    >
+      }}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 // Экспортируем все компоненты
@@ -239,5 +239,58 @@ ResponsiveForm.Select = FormSelect;
 ResponsiveForm.Textarea = FormTextarea;
 ResponsiveForm.Actions = FormActions;
 
-export default ResponsiveForm;
+ResponsiveForm.propTypes = {
+  children: PropTypes.node,
+  onSubmit: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
+FormGroup.propTypes = {
+  children: PropTypes.node,
+  label: PropTypes.node,
+  error: PropTypes.node,
+  required: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+FormInput.propTypes = {
+  type: PropTypes.string,
+  placeholder: PropTypes.string,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  disabled: PropTypes.bool,
+  required: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+FormSelect.propTypes = {
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  children: PropTypes.node,
+  disabled: PropTypes.bool,
+  required: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+FormTextarea.propTypes = {
+  placeholder: PropTypes.string,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  disabled: PropTypes.bool,
+  required: PropTypes.bool,
+  rows: PropTypes.number,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+FormActions.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+export default ResponsiveForm;

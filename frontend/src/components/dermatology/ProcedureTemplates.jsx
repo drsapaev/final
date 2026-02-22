@@ -3,7 +3,7 @@
  * Шаблоны косметологических процедур
  * Согласно MASTER_TODO_LIST строка 267
  */
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Card,
@@ -21,35 +21,35 @@ import {
   DialogActions,
   Select,
   Option,
-  Checkbox,
-  Textarea,
-} from '../ui/macos';
+
+  Textarea } from
+'../ui/macos';
 import {
   Hospital,
   Plus,
   Edit,
-  Trash2,
-  Copy,
-  ChevronDown,
+
+
+
   Clock,
   DollarSign,
-  Tag,
+
   CheckCircle,
-  AlertTriangle,
-  Search,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react';
-import { api } from '../../api/client';
+
+
+
+  Sparkles } from
+'lucide-react';
+
 
 import logger from '../../utils/logger';
-const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
+const ProcedureTemplates = ({ onSelectProcedure }) => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState('all');
-  
+
   // Форма для создания/редактирования шаблона
   const [templateForm, setTemplateForm] = useState({
     name: '',
@@ -60,127 +60,129 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
     materials: [],
     steps: [],
     contraindications: [],
-    aftercare: '',
+    aftercare: ''
   });
 
   // Категории процедур
   const categories = [
-    { id: 'all', name: 'Все процедуры', icon: <Hospital /> },
-    { id: 'injection', name: 'Инъекционные', icon: <Sparkles /> },
-    { id: 'hardware', name: 'Аппаратные', icon: <Sparkles /> },
-    { id: 'peeling', name: 'Пилинги', icon: <Sparkles /> },
-    { id: 'care', name: 'Уходовые', icon: <Sparkles /> },
-  ];
+  { id: 'all', name: 'Все процедуры', icon: <Hospital /> },
+  { id: 'injection', name: 'Инъекционные', icon: <Sparkles /> },
+  { id: 'hardware', name: 'Аппаратные', icon: <Sparkles /> },
+  { id: 'peeling', name: 'Пилинги', icon: <Sparkles /> },
+  { id: 'care', name: 'Уходовые', icon: <Sparkles /> }];
+
 
   // Предустановленные шаблоны
   const defaultTemplates = [
-    {
-      id: 'botox-forehead',
-      name: 'Ботулотоксин - лоб',
-      category: 'injection',
-      description: 'Коррекция морщин лба',
-      duration: 30,
-      price: 150000,
-      materials: [
-        { name: 'Ботулотоксин', unit: '50 ед.', quantity: 1 },
-        { name: 'Шприц 1мл', unit: 'шт.', quantity: 2 },
-        { name: 'Игла 30G', unit: 'шт.', quantity: 2 },
-      ],
-      steps: [
-        'Демакияж и обработка антисептиком',
-        'Разметка точек инъекций',
-        'Введение препарата в мышцы лба',
-        'Легкий массаж',
-        'Нанесение успокаивающего крема',
-      ],
-      contraindications: [
-        'Беременность и лактация',
-        'Миастения',
-        'Прием антибиотиков',
-        'Воспаления в зоне инъекций',
-      ],
-      aftercare: 'Не трогать зону инъекций 4 часа, не наклоняться, не заниматься спортом 24 часа',
-    },
-    {
-      id: 'mesotherapy-face',
-      name: 'Мезотерапия лица',
-      category: 'injection',
-      description: 'Биоревитализация кожи лица',
-      duration: 45,
-      price: 200000,
-      materials: [
-        { name: 'Препарат для мезотерапии', unit: '2мл', quantity: 1 },
-        { name: 'Шприц 2мл', unit: 'шт.', quantity: 1 },
-        { name: 'Игла 32G', unit: 'шт.', quantity: 5 },
-        { name: 'Анестетик', unit: 'мл', quantity: 5 },
-      ],
-      steps: [
-        'Очищение кожи',
-        'Нанесение анестетика на 20 минут',
-        'Обработка антисептиком',
-        'Инъекции по схеме',
-        'Нанесение маски',
-      ],
-      contraindications: [
-        'Аллергия на компоненты',
-        'Герпес в активной фазе',
-        'Онкология',
-        'Аутоиммунные заболевания',
-      ],
-      aftercare: 'Избегать солнца 3 дня, использовать SPF 50+, не посещать сауну 7 дней',
-    },
-    {
-      id: 'chemical-peel',
-      name: 'Химический пилинг',
-      category: 'peeling',
-      description: 'Поверхностный пилинг с гликолевой кислотой',
-      duration: 60,
-      price: 120000,
-      materials: [
-        { name: 'Гликолевая кислота 30%', unit: 'мл', quantity: 10 },
-        { name: 'Нейтрализатор', unit: 'мл', quantity: 20 },
-        { name: 'Постпилинговая маска', unit: 'шт.', quantity: 1 },
-      ],
-      steps: [
-        'Демакияж и очищение',
-        'Обезжиривание кожи',
-        'Нанесение пилинга на 3-5 минут',
-        'Нейтрализация',
-        'Нанесение успокаивающей маски',
-        'Финальный уход с SPF',
-      ],
-      contraindications: [
-        'Активные воспаления',
-        'Купероз',
-        'Беременность',
-        'Прием ретиноидов',
-      ],
-      aftercare: 'Использовать увлажняющие средства, SPF 50+ обязательно, не использовать скрабы 7 дней',
-    },
-  ];
+  {
+    id: 'botox-forehead',
+    name: 'Ботулотоксин - лоб',
+    category: 'injection',
+    description: 'Коррекция морщин лба',
+    duration: 30,
+    price: 150000,
+    materials: [
+    { name: 'Ботулотоксин', unit: '50 ед.', quantity: 1 },
+    { name: 'Шприц 1мл', unit: 'шт.', quantity: 2 },
+    { name: 'Игла 30G', unit: 'шт.', quantity: 2 }],
 
-  // Загрузка шаблонов
-  useEffect(() => {
-    loadTemplates();
-  }, []);
+    steps: [
+    'Демакияж и обработка антисептиком',
+    'Разметка точек инъекций',
+    'Введение препарата в мышцы лба',
+    'Легкий массаж',
+    'Нанесение успокаивающего крема'],
 
-  const loadTemplates = async () => {
+    contraindications: [
+    'Беременность и лактация',
+    'Миастения',
+    'Прием антибиотиков',
+    'Воспаления в зоне инъекций'],
+
+    aftercare: 'Не трогать зону инъекций 4 часа, не наклоняться, не заниматься спортом 24 часа'
+  },
+  {
+    id: 'mesotherapy-face',
+    name: 'Мезотерапия лица',
+    category: 'injection',
+    description: 'Биоревитализация кожи лица',
+    duration: 45,
+    price: 200000,
+    materials: [
+    { name: 'Препарат для мезотерапии', unit: '2мл', quantity: 1 },
+    { name: 'Шприц 2мл', unit: 'шт.', quantity: 1 },
+    { name: 'Игла 32G', unit: 'шт.', quantity: 5 },
+    { name: 'Анестетик', unit: 'мл', quantity: 5 }],
+
+    steps: [
+    'Очищение кожи',
+    'Нанесение анестетика на 20 минут',
+    'Обработка антисептиком',
+    'Инъекции по схеме',
+    'Нанесение маски'],
+
+    contraindications: [
+    'Аллергия на компоненты',
+    'Герпес в активной фазе',
+    'Онкология',
+    'Аутоиммунные заболевания'],
+
+    aftercare: 'Избегать солнца 3 дня, использовать SPF 50+, не посещать сауну 7 дней'
+  },
+  {
+    id: 'chemical-peel',
+    name: 'Химический пилинг',
+    category: 'peeling',
+    description: 'Поверхностный пилинг с гликолевой кислотой',
+    duration: 60,
+    price: 120000,
+    materials: [
+    { name: 'Гликолевая кислота 30%', unit: 'мл', quantity: 10 },
+    { name: 'Нейтрализатор', unit: 'мл', quantity: 20 },
+    { name: 'Постпилинговая маска', unit: 'шт.', quantity: 1 }],
+
+    steps: [
+    'Демакияж и очищение',
+    'Обезжиривание кожи',
+    'Нанесение пилинга на 3-5 минут',
+    'Нейтрализация',
+    'Нанесение успокаивающей маски',
+    'Финальный уход с SPF'],
+
+    contraindications: [
+    'Активные воспаления',
+    'Купероз',
+    'Беременность',
+    'Прием ретиноидов'],
+
+    aftercare: 'Использовать увлажняющие средства, SPF 50+ обязательно, не использовать скрабы 7 дней'
+  }];
+
+
+  const defaultTemplatesRef = useRef(defaultTemplates);
+
+  const loadTemplates = useCallback(async () => {
     try {
       // В реальном приложении загружаем с сервера
       // const response = await api.get('/procedure-templates');
       // setTemplates(response.data);
-      
+
       // Для демо используем предустановленные
-      setTemplates(defaultTemplates);
+      setTemplates(defaultTemplatesRef.current);
     } catch (error) {
       logger.error('Ошибка загрузки шаблонов:', error);
     }
-  };
+  }, []);
+
+  // Загрузка шаблонов
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   // Фильтрация шаблонов по категории
-  const filteredTemplates = expandedCategory === 'all'
-    ? templates
-    : templates.filter(t => t.category === expandedCategory);
+  const filteredTemplates = expandedCategory === 'all' ?
+  templates :
+  templates.filter((t) => t.category === expandedCategory);
 
   // Выбор шаблона
   const handleSelectTemplate = (template) => {
@@ -192,7 +194,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
         duration: template.duration,
         materials: template.materials,
         steps: template.steps,
-        aftercare: template.aftercare,
+        aftercare: template.aftercare
       });
     }
   };
@@ -209,7 +211,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
       materials: [],
       steps: [],
       contraindications: [],
-      aftercare: '',
+      aftercare: ''
     });
     setDialogOpen(true);
   };
@@ -225,44 +227,44 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
   const handleSave = async () => {
     try {
       if (editMode) {
+
+
+
+
         // Обновление существующего
         // await api.put(`/procedure-templates/${templateForm.id}`, templateForm);
       } else {
         // Создание нового
         // await api.post('/procedure-templates', templateForm);
-      }
-      
-      loadTemplates();
-      setDialogOpen(false);
-    } catch (error) {
+      }loadTemplates();setDialogOpen(false);} catch (error) {
       logger.error('Ошибка сохранения шаблона:', error);
     }
   };
 
   // Добавить материал
   const addMaterial = () => {
-    setTemplateForm(prev => ({
+    setTemplateForm((prev) => ({
       ...prev,
-      materials: [...prev.materials, { name: '', unit: '', quantity: 1 }],
+      materials: [...prev.materials, { name: '', unit: '', quantity: 1 }]
     }));
   };
 
   // Добавить шаг
   const addStep = () => {
-    setTemplateForm(prev => ({
+    setTemplateForm((prev) => ({
       ...prev,
-      steps: [...prev.steps, ''],
+      steps: [...prev.steps, '']
     }));
   };
 
   // Иконка категории
   const getCategoryIcon = (category) => {
     switch (category) {
-      case 'injection': return <Sparkles />;
-      case 'hardware': return <Sparkles />;
-      case 'peeling': return <Sparkles />;
-      case 'care': return <Sparkles />;
-      default: return <Hospital />;
+      case 'injection':return <Sparkles />;
+      case 'hardware':return <Sparkles />;
+      case 'peeling':return <Sparkles />;
+      case 'care':return <Sparkles />;
+      default:return <Hospital />;
     }
   };
 
@@ -278,8 +280,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
             
             <Button
               variant="primary"
-              onClick={handleCreateNew}
-            >
+              onClick={handleCreateNew}>
+              
               <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
               Создать шаблон
             </Button>
@@ -287,33 +289,41 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
 
           {/* Категории */}
           <div style={{ marginBottom: 16 }}>
-            {categories.map((category) => (
-              <Badge
-                key={category.id}
-                variant={expandedCategory === category.id ? 'primary' : 'info'}
-                style={{ marginRight: 8, marginBottom: 8, cursor: 'pointer' }}
-                onClick={() => setExpandedCategory(category.id)}
-              >
+            {categories.map((category) =>
+            <Badge
+              key={category.id}
+              variant={expandedCategory === category.id ? 'primary' : 'info'}
+              style={{ marginRight: 8, marginBottom: 8, cursor: 'pointer' }}
+              onClick={() => setExpandedCategory(category.id)}>
+              
                 {category.icon}
                 {category.name}
               </Badge>
-            ))}
+            )}
           </div>
 
           {/* Список шаблонов */}
           <div>
-            {filteredTemplates.map((template, index) => (
-              <div key={template.id} style={{ marginBottom: 16 }}>
+            {filteredTemplates.map((template) =>
+            <div key={template.id} style={{ marginBottom: 16 }}>
                 <div style={{
-                  padding: 16,
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 8,
-                  backgroundColor: 'var(--mac-bg-primary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onClick={() => handleSelectTemplate(template)}
-                >
+                padding: 16,
+                border: '1px solid var(--mac-border)',
+                borderRadius: 8,
+                backgroundColor: 'var(--mac-bg-primary)',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              role="button"
+              tabIndex={0}
+              onClick={() => handleSelectTemplate(template)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleSelectTemplate(template);
+                }
+              }}>
+                
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                     <div style={{ marginTop: 4 }}>
                       {getCategoryIcon(template.category)}
@@ -340,40 +350,40 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                     </div>
                     
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(template);
-                      }}
-                      style={{
-                        padding: '8px',
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 4,
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(template);
+                    }}
+                    style={{
+                      padding: '8px',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 4,
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                    
                       <Edit style={{ width: 16, height: 16 }} />
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
+            )}
           </div>
 
-          {filteredTemplates.length === 0 && (
-            <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', padding: '32px 0' }}>
+          {filteredTemplates.length === 0 &&
+          <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', padding: '32px 0' }}>
               Нет шаблонов в выбранной категории
             </Typography>
-          )}
+          }
         </CardContent>
       </Card>
 
       {/* Детали выбранного шаблона */}
-      {selectedTemplate && (
-        <Card sx={{ mt: 2 }}>
+      {selectedTemplate &&
+      <Card sx={{ mt: 2 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               {selectedTemplate.name}
@@ -385,13 +395,13 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                 <Typography variant="subtitle2" gutterBottom>
                   Необходимые материалы:
                 </Typography>
-                <List 
-                  items={selectedTemplate.materials.map(material => ({
-                    label: `${material.name} - ${material.quantity} ${material.unit}`,
-                    icon: CheckCircle
-                  }))}
-                  size="sm"
-                />
+                <List
+                items={selectedTemplate.materials.map((material) => ({
+                  label: `${material.name} - ${material.quantity} ${material.unit}`,
+                  icon: CheckCircle
+                }))}
+                size="sm" />
+              
               </Grid>
               
               {/* Этапы процедуры */}
@@ -399,31 +409,31 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                 <Typography variant="subtitle2" gutterBottom>
                   Этапы процедуры:
                 </Typography>
-                <List 
-                  items={selectedTemplate.steps.map((step, i) => `${i + 1}. ${step}`)}
-                  size="sm"
-                />
+                <List
+                items={selectedTemplate.steps.map((step, i) => `${i + 1}. ${step}`)}
+                size="sm" />
+              
               </Grid>
               
               {/* Противопоказания */}
-              {selectedTemplate.contraindications.length > 0 && (
-                <Grid item xs={12}>
+              {selectedTemplate.contraindications.length > 0 &&
+            <Grid item xs={12}>
                   <Alert severity="warning">
                     <Typography variant="subtitle2" gutterBottom>
                       Противопоказания:
                     </Typography>
-                    {selectedTemplate.contraindications.map((item, i) => (
-                      <Typography key={i} variant="body2">
+                    {selectedTemplate.contraindications.map((item, i) =>
+                <Typography key={i} variant="body2">
                         • {item}
                       </Typography>
-                    ))}
+                )}
                   </Alert>
                 </Grid>
-              )}
+            }
               
               {/* Постуход */}
-              {selectedTemplate.aftercare && (
-                <Grid item xs={12}>
+              {selectedTemplate.aftercare &&
+            <Grid item xs={12}>
                   <Alert severity="info">
                     <Typography variant="subtitle2" gutterBottom>
                       Рекомендации после процедуры:
@@ -433,19 +443,19 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                     </Typography>
                   </Alert>
                 </Grid>
-              )}
+            }
             </Grid>
           </CardContent>
         </Card>
-      )}
+      }
 
       {/* Диалог создания/редактирования */}
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         maxWidth="md"
-        fullWidth
-      >
+        fullWidth>
+        
         <DialogTitle>
           {editMode ? 'Редактировать шаблон' : 'Создать новый шаблон'}
         </DialogTitle>
@@ -456,16 +466,16 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Название процедуры</div>
               <Input
                 value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-              />
+                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} />
+              
             </Grid>
             
             <Grid item xs={12} md={4}>
               <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Категория</div>
               <Select
                 value={templateForm.category}
-                onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
-              >
+                onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}>
+                
                 <Option value="injection">Инъекционные</Option>
                 <Option value="hardware">Аппаратные</Option>
                 <Option value="peeling">Пилинги</Option>
@@ -478,8 +488,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <Textarea
                 value={templateForm.description}
                 onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                rows={3}
-              />
+                rows={3} />
+              
             </Grid>
             
             <Grid item xs={6}>
@@ -487,8 +497,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <Input
                 type="number"
                 value={templateForm.duration}
-                onChange={(e) => setTemplateForm({ ...templateForm, duration: parseInt(e.target.value || '0', 10) })}
-              />
+                onChange={(e) => setTemplateForm({ ...templateForm, duration: parseInt(e.target.value || '0', 10) })} />
+              
             </Grid>
             
             <Grid item xs={6}>
@@ -496,8 +506,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <Input
                 type="number"
                 value={templateForm.price}
-                onChange={(e) => setTemplateForm({ ...templateForm, price: e.target.value })}
-              />
+                onChange={(e) => setTemplateForm({ ...templateForm, price: e.target.value })} />
+              
             </Grid>
             
             {/* Материалы */}
@@ -505,43 +515,43 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <Typography variant="subtitle2" gutterBottom>
                 Материалы
               </Typography>
-              {templateForm.materials.map((material, index) => (
-                <Grid container spacing={1} key={index} sx={{ mb: 1 }}>
+              {templateForm.materials.map((material, index) =>
+              <Grid container spacing={1} key={index} sx={{ mb: 1 }}>
                   <Grid item xs={6}>
                     <Input
-                      placeholder="Название материала"
-                      value={material.name}
-                      onChange={(e) => {
-                        const newMaterials = [...templateForm.materials];
-                        newMaterials[index].name = e.target.value;
-                        setTemplateForm({ ...templateForm, materials: newMaterials });
-                      }}
-                    />
+                    placeholder="Название материала"
+                    value={material.name}
+                    onChange={(e) => {
+                      const newMaterials = [...templateForm.materials];
+                      newMaterials[index].name = e.target.value;
+                      setTemplateForm({ ...templateForm, materials: newMaterials });
+                    }} />
+                  
                   </Grid>
                   <Grid item xs={3}>
                     <Input
-                      placeholder="Кол-во"
-                      value={material.quantity}
-                      onChange={(e) => {
-                        const newMaterials = [...templateForm.materials];
-                        newMaterials[index].quantity = e.target.value;
-                        setTemplateForm({ ...templateForm, materials: newMaterials });
-                      }}
-                    />
+                    placeholder="Кол-во"
+                    value={material.quantity}
+                    onChange={(e) => {
+                      const newMaterials = [...templateForm.materials];
+                      newMaterials[index].quantity = e.target.value;
+                      setTemplateForm({ ...templateForm, materials: newMaterials });
+                    }} />
+                  
                   </Grid>
                   <Grid item xs={3}>
                     <Input
-                      placeholder="Ед."
-                      value={material.unit}
-                      onChange={(e) => {
-                        const newMaterials = [...templateForm.materials];
-                        newMaterials[index].unit = e.target.value;
-                        setTemplateForm({ ...templateForm, materials: newMaterials });
-                      }}
-                    />
+                    placeholder="Ед."
+                    value={material.unit}
+                    onChange={(e) => {
+                      const newMaterials = [...templateForm.materials];
+                      newMaterials[index].unit = e.target.value;
+                      setTemplateForm({ ...templateForm, materials: newMaterials });
+                    }} />
+                  
                   </Grid>
                 </Grid>
-              ))}
+              )}
               <Button size="small" onClick={addMaterial}>
                 <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> Добавить материал
               </Button>
@@ -552,19 +562,19 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <Typography variant="subtitle2" gutterBottom>
                 Этапы процедуры
               </Typography>
-              {templateForm.steps.map((step, index) => (
-                <Input
-                  key={index}
-                  sx={{ mb: 1 }}
-                  placeholder={`Шаг ${index + 1}`}
-                  value={step}
-                  onChange={(e) => {
-                    const newSteps = [...templateForm.steps];
-                    newSteps[index] = e.target.value;
-                    setTemplateForm({ ...templateForm, steps: newSteps });
-                  }}
-                />
-              ))}
+              {templateForm.steps.map((step, index) =>
+              <Input
+                key={index}
+                sx={{ mb: 1 }}
+                placeholder={`Шаг ${index + 1}`}
+                value={step}
+                onChange={(e) => {
+                  const newSteps = [...templateForm.steps];
+                  newSteps[index] = e.target.value;
+                  setTemplateForm({ ...templateForm, steps: newSteps });
+                }} />
+
+              )}
               <Button size="small" onClick={addStep}>
                 <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> Добавить шаг
               </Button>
@@ -576,8 +586,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               <Textarea
                 rows={3}
                 value={templateForm.aftercare}
-                onChange={(e) => setTemplateForm({ ...templateForm, aftercare: e.target.value })}
-              />
+                onChange={(e) => setTemplateForm({ ...templateForm, aftercare: e.target.value })} />
+              
             </Grid>
           </Grid>
         </DialogContent>
@@ -591,9 +601,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-  );
+    </Box>);
+
 };
 
 export default ProcedureTemplates;
-

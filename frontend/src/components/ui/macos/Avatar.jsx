@@ -1,5 +1,3 @@
-import React from 'react';
-
 function getInitials(name) {
   if (!name) return '';
   const parts = String(name).trim().split(/\s+/);

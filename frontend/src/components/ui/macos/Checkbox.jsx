@@ -14,6 +14,7 @@ const Checkbox = React.forwardRef(({
   id,
   ...props
 }, ref) => {
+  void variant;
   const [isChecked, setIsChecked] = useState(checkedProp ?? defaultChecked);
 
   useEffect(() => {
@@ -125,7 +126,7 @@ const Checkbox = React.forwardRef(({
   );
 });
 
+Checkbox.displayName = 'Checkbox';
+
 export default Checkbox;
-
-
 

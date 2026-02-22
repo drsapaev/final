@@ -1,20 +1,20 @@
 // Компонент для защищенных маршрутов с ролевыми ограничениями
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { Routes, Route } from 'react-router-dom';
 import { RequireAuth, RequireRoles, RequirePermissions } from '../auth/RequireAuth';
 import { useRoleAccess } from '../common/RoleGuard';
 
 /**
  * Компонент для создания защищенных маршрутов
  */
-export function ProtectedRoute({ 
-  path, 
-  element, 
-  roles = [], 
+export function ProtectedRoute({
+  path,
+  element,
+  roles = [],
   permissions = [],
   requireAuth = true,
   fallback = null,
-  ...props 
+  ...props
 }) {
   if (!requireAuth) {
     return <Route path={path} element={element} {...props} />;
@@ -22,54 +22,54 @@ export function ProtectedRoute({
 
   if (roles.length > 0) {
     return (
-      <Route 
-        path={path} 
+      <Route
+        path={path}
         element={
-          <RequireRoles roles={roles} fallback={fallback}>
+        <RequireRoles roles={roles} fallback={fallback}>
             {element}
           </RequireRoles>
-        } 
-        {...props} 
-      />
-    );
+        }
+        {...props} />);
+
+
   }
 
   if (permissions.length > 0) {
     return (
-      <Route 
-        path={path} 
+      <Route
+        path={path}
         element={
-          <RequirePermissions permissions={permissions} fallback={fallback}>
+        <RequirePermissions permissions={permissions} fallback={fallback}>
             {element}
           </RequirePermissions>
-        } 
-        {...props} 
-      />
-    );
+        }
+        {...props} />);
+
+
   }
 
   return (
-    <Route 
-      path={path} 
+    <Route
+      path={path}
       element={
-        <RequireAuth fallback={fallback}>
+      <RequireAuth fallback={fallback}>
           {element}
         </RequireAuth>
-      } 
-      {...props} 
-    />
-  );
+      }
+      {...props} />);
+
+
 }
 
 /**
  * Компонент для создания группы защищенных маршрутов
  */
-export function ProtectedRouteGroup({ 
-  children, 
-  roles = [], 
+export function ProtectedRouteGroup({
+  children,
+  roles = [],
   permissions = [],
   requireAuth = true,
-  fallback = null 
+  fallback = null
 }) {
   if (!requireAuth) {
     return <>{children}</>;
@@ -79,32 +79,32 @@ export function ProtectedRouteGroup({
     return (
       <RequireRoles roles={roles} fallback={fallback}>
         {children}
-      </RequireRoles>
-    );
+      </RequireRoles>);
+
   }
 
   if (permissions.length > 0) {
     return (
       <RequirePermissions permissions={permissions} fallback={fallback}>
         {children}
-      </RequirePermissions>
-    );
+      </RequirePermissions>);
+
   }
 
   return (
     <RequireAuth fallback={fallback}>
       {children}
-    </RequireAuth>
-  );
+    </RequireAuth>);
+
 }
 
 /**
  * Компонент для условного рендеринга маршрутов
  */
-export function ConditionalRoute({ 
-  condition, 
-  children, 
-  fallback = null 
+export function ConditionalRoute({
+  condition,
+  children,
+  fallback = null
 }) {
   return condition ? children : fallback;
 }
@@ -112,10 +112,10 @@ export function ConditionalRoute({
 /**
  * Компонент для ролевого условного рендеринга маршрутов
  */
-export function RoleBasedRoute({ 
-  roles = [], 
+export function RoleBasedRoute({
+  roles = [],
   permissions = [],
-  children, 
+  children,
   fallback = null,
   requireAll = false
 }) {
@@ -128,16 +128,16 @@ export function RoleBasedRoute({
   let hasAccess = true;
 
   if (roles.length > 0) {
-    hasAccess = requireAll ? 
-      roles.every(role => hasRole([role])) : 
-      hasRole(roles);
+    hasAccess = requireAll ?
+    roles.every((role) => hasRole([role])) :
+    hasRole(roles);
   }
 
   if (permissions.length > 0) {
-    const hasPerms = requireAll ? 
-      permissions.every(permission => hasPermission([permission])) : 
-      hasPermission(permissions);
-    
+    const hasPerms = requireAll ?
+    permissions.every((permission) => hasPermission([permission])) :
+    hasPermission(permissions);
+
     hasAccess = hasAccess && hasPerms;
   }
 
@@ -147,36 +147,36 @@ export function RoleBasedRoute({
 /**
  * Компонент для создания маршрутов на основе ролей
  */
-export function RoleBasedRoutes({ 
-  routes = [], 
-  fallback = null 
+export function RoleBasedRoutes({
+  routes = [],
+  fallback = null
 }) {
   return (
     <Routes>
-      {routes.map((route, index) => (
-        <RoleBasedRoute
-          key={index}
-          roles={route.roles}
-          permissions={route.permissions}
-          fallback={fallback}
-        >
-          <Route 
-            path={route.path} 
-            element={route.element} 
-            {...route.props} 
-          />
+      {routes.map((route, index) =>
+      <RoleBasedRoute
+        key={index}
+        roles={route.roles}
+        permissions={route.permissions}
+        fallback={fallback}>
+        
+          <Route
+          path={route.path}
+          element={route.element}
+          {...route.props} />
+        
         </RoleBasedRoute>
-      ))}
-    </Routes>
-  );
+      )}
+    </Routes>);
+
 }
 
 /**
  * Компонент для создания навигационного меню с ролевыми ограничениями
  */
-export function RoleBasedNavigation({ 
-  items = [], 
-  fallback = null 
+export function RoleBasedNavigation({
+  items = [],
+  fallback = null
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -184,7 +184,7 @@ export function RoleBasedNavigation({
     return fallback;
   }
 
-  const visibleItems = items.filter(item => {
+  const visibleItems = items.filter((item) => {
     if (item.roles && item.roles.length > 0) {
       return hasRole(item.roles);
     }
@@ -200,9 +200,9 @@ export function RoleBasedNavigation({
 /**
  * Компонент для создания бокового меню с ролевыми ограничениями
  */
-export function RoleBasedSidebar({ 
-  sections = [], 
-  fallback = null 
+export function RoleBasedSidebar({
+  sections = [],
+  fallback = null
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -210,7 +210,7 @@ export function RoleBasedSidebar({
     return fallback;
   }
 
-  const visibleSections = sections.filter(section => {
+  const visibleSections = sections.filter((section) => {
     if (section.roles && section.roles.length > 0) {
       return hasRole(section.roles);
     }
@@ -226,9 +226,9 @@ export function RoleBasedSidebar({
 /**
  * Компонент для создания кнопок действий с ролевыми ограничениями
  */
-export function RoleBasedActions({ 
-  actions = [], 
-  fallback = null 
+export function RoleBasedActions({
+  actions = [],
+  fallback = null
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -236,7 +236,7 @@ export function RoleBasedActions({
     return fallback;
   }
 
-  const visibleActions = actions.filter(action => {
+  const visibleActions = actions.filter((action) => {
     if (action.roles && action.roles.length > 0) {
       return hasRole(action.roles);
     }
@@ -270,13 +270,13 @@ export function useRoleBasedRoutes() {
   };
 
   const createRoutes = (routes) => {
-    return routes
-      .map(createRoute)
-      .filter(Boolean);
+    return routes.
+    map(createRoute).
+    filter(Boolean);
   };
 
   const createNavigationItems = (items) => {
-    return items.filter(item => {
+    return items.filter((item) => {
       if (item.roles && item.roles.length > 0) {
         return hasRole(item.roles);
       }
@@ -297,3 +297,77 @@ export function useRoleBasedRoutes() {
   };
 }
 
+const rolePermissionShape = {
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string)
+};
+
+ProtectedRoute.propTypes = {
+  path: PropTypes.string,
+  element: PropTypes.node,
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  requireAuth: PropTypes.bool,
+  fallback: PropTypes.node
+};
+
+ProtectedRouteGroup.propTypes = {
+  children: PropTypes.node,
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  requireAuth: PropTypes.bool,
+  fallback: PropTypes.node
+};
+
+ConditionalRoute.propTypes = {
+  condition: PropTypes.bool,
+  children: PropTypes.node,
+  fallback: PropTypes.node
+};
+
+RoleBasedRoute.propTypes = {
+  children: PropTypes.node,
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  fallback: PropTypes.node,
+  requireAll: PropTypes.bool
+};
+
+RoleBasedRoutes.propTypes = {
+  routes: PropTypes.arrayOf(
+    PropTypes.shape({
+      ...rolePermissionShape,
+      path: PropTypes.string,
+      element: PropTypes.node,
+      props: PropTypes.object
+    })
+  ),
+  fallback: PropTypes.node
+};
+
+RoleBasedNavigation.propTypes = {
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      ...rolePermissionShape
+    })
+  ),
+  fallback: PropTypes.node
+};
+
+RoleBasedSidebar.propTypes = {
+  sections: PropTypes.arrayOf(
+    PropTypes.shape({
+      ...rolePermissionShape
+    })
+  ),
+  fallback: PropTypes.node
+};
+
+RoleBasedActions.propTypes = {
+  actions: PropTypes.arrayOf(
+    PropTypes.shape({
+      ...rolePermissionShape
+    })
+  ),
+  fallback: PropTypes.node
+};

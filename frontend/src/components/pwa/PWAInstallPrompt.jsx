@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Card,
@@ -6,17 +6,18 @@ import {
   Typography,
   Button,
   Alert,
-  Badge,
-} from '../ui/macos';
-import {
-  Download,
-  X,
-  Smartphone,
-  WifiOff,
-  Bell,
-  RefreshCw,
-  CheckCircle,
-} from 'lucide-react';
+  Chip,
+  IconButton,
+  Slide,
+  Stack,
+} from '@mui/material';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
+import WifiOffIcon from '@mui/icons-material/WifiOff';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import GetAppIcon from '@mui/icons-material/GetApp';
+import UpdateIcon from '@mui/icons-material/Update';
+import CloseIcon from '@mui/icons-material/Close';
 import { usePWA } from '../../hooks/usePWA';
 
 import logger from '../../utils/logger';
@@ -79,14 +80,14 @@ const PWAInstallPrompt = ({ onClose }) => {
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
               <Box display="flex" alignItems="center" gap={1}>
-                <Smartphone color="primary" />
+                <SmartphoneIcon color="primary" />
                 <Typography variant="h6" component="div">
                   {updateAvailable ? 'Обновление доступно' : 'Установить приложение'}
                 </Typography>
               </Box>
               {onClose && (
                 <IconButton size="small" onClick={onClose}>
-                  <Close />
+                  <CloseIcon />
                 </IconButton>
               )}
             </Box>
@@ -98,7 +99,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                 </Typography>
                 <Button
                   variant="contained"
-                  startIcon={<Update />}
+                  startIcon={<UpdateIcon />}
                   onClick={handleUpdate}
                   fullWidth
                 >
@@ -114,14 +115,14 @@ const PWAInstallPrompt = ({ onClose }) => {
                 <Stack spacing={1} mb={2}>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Chip
-                      icon={isOnline ? <CheckCircle /> : <WifiOff />}
+                      icon={isOnline ? <CheckCircleIcon /> : <WifiOffIcon />}
                       label={isOnline ? 'Онлайн' : 'Офлайн режим'}
                       color={isOnline ? 'success' : 'warning'}
                       size="small"
                     />
                     {capabilities.notifications && (
                       <Chip
-                        icon={<Notifications />}
+                        icon={<NotificationsIcon />}
                         label="Push уведомления"
                         color={notificationPermission === 'granted' ? 'success' : 'default'}
                         size="small"
@@ -135,7 +136,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                 <Stack spacing={1}>
                   <Button
                     variant="contained"
-                    startIcon={<GetApp />}
+                    startIcon={<GetAppIcon />}
                     onClick={handleInstall}
                     disabled={isInstalling}
                     fullWidth
@@ -146,7 +147,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                   {capabilities.notifications && notificationPermission === 'default' && (
                     <Button
                       variant="outlined"
-                      startIcon={<Notifications />}
+                      startIcon={<NotificationsIcon />}
                       onClick={handleNotificationPermission}
                       size="small"
                     >

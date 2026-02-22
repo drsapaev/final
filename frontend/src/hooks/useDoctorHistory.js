@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
+import logger from '../utils/logger';
 
 /**
  * useDoctorHistory Hook
@@ -69,7 +70,7 @@ export function useDoctorHistory({
             setHistory(response.data.entries || []);
         } catch (err) {
             if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
-                console.error('[useDoctorHistory] Error:', err);
+                logger.error('[useDoctorHistory] Error:', err);
                 setError(err.message);
                 // Return empty on error - not critical
                 setHistory([]);

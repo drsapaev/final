@@ -5,7 +5,7 @@
  * ✅ С "Мой опыт" (без привязки к ICD)
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
 import VitalsWidget from '../../emr/VitalsWidget';

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 
@@ -6,15 +6,15 @@ import { api } from '../api/client.js';
  * Аудит: список последних действий пользователей.
  * Совместимо с GET /audit?limit=...&offset=...
  */
-export default function Audit() {
-  const [page, setPage] = useState('Audit');
+export default function Audit() {void
+  useState('Audit');
   const [rows, setRows] = useState([]);
   const [limit, setLimit] = useState(100);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setBusy(true);
     setErr('');
     try {
@@ -26,18 +26,18 @@ export default function Audit() {
     } finally {
       setBusy(false);
     }
-  }
+  }, [limit]);
 
-  useEffect(() => { load(); }, [limit]);
+  useEffect(() => {load();}, [load]);
 
   const filtered = useMemo(() => {
     if (!q) return rows;
     const qq = q.toLowerCase();
-    return rows.filter(a =>
-      String(a.user || a.username || '').toLowerCase().includes(qq) ||
-      String(a.action || '').toLowerCase().includes(qq) ||
-      String(a.entity || '').toLowerCase().includes(qq) ||
-      String(a.id || '').toLowerCase().includes(qq)
+    return rows.filter((a) =>
+    String(a.user || a.username || '').toLowerCase().includes(qq) ||
+    String(a.action || '').toLowerCase().includes(qq) ||
+    String(a.entity || '').toLowerCase().includes(qq) ||
+    String(a.id || '').toLowerCase().includes(qq)
     );
   }, [q, rows]);
 
@@ -50,9 +50,9 @@ export default function Audit() {
           <div style={panel}>
             <label>
               Порог:&nbsp;
-              <input type="number" min={10} max={1000} value={limit} onChange={(e)=>setLimit(Number(e.target.value)||100)} style={inp}/>
+              <input type="number" min={10} max={1000} value={limit} onChange={(e) => setLimit(Number(e.target.value) || 100)} style={inp} />
             </label>
-            <input placeholder="Поиск по пользователю/действию/сущности" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...inp, minWidth: 260 }}/>
+            <input placeholder="Поиск по пользователю/действию/сущности" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inp, minWidth: 260 }} />
             <button onClick={load} disabled={busy} style={btn}>{busy ? 'Загрузка' : 'Обновить'}</button>
           </div>
 
@@ -70,25 +70,25 @@ export default function Audit() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a, i) => (
-                  <tr key={a.id || i}>
+                {filtered.map((a, i) =>
+                <tr key={a.id || i}>
                     <td style={td}>{a.created_at || a.time || '—'}</td>
                     <td style={td}>{a.user || a.username || '—'}</td>
                     <td style={td}>{a.action || '—'}</td>
                     <td style={td}>{a.entity || a.table || '—'}</td>
                     <td style={td}><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : '—'}</code></td>
                   </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td style={td} colSpan={5}>Нет записей</td></tr>
                 )}
+                {filtered.length === 0 &&
+                <tr><td style={td} colSpan={5}>Нет записей</td></tr>
+                }
               </tbody>
             </table>
           </div>
         </div>
       </RoleGate>
-    </div>
-  );
+    </div>);
+
 }
 
 const panel = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #eee', borderRadius: 12, padding: 12, background: '#fff' };
@@ -97,4 +97,3 @@ const btn = { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', ba
 const th = { textAlign: 'left', padding: 10, borderBottom: '1px solid #eee', fontWeight: 700, whiteSpace: 'nowrap' };
 const td = { padding: 10, borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' };
 const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8 };
-

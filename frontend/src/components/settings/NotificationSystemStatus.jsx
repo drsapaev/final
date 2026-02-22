@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 
 export default function NotificationSystemStatus() {
     const [status, setStatus] = useState(null);
@@ -14,7 +15,7 @@ export default function NotificationSystemStatus() {
             const data = await api.get('/notifications/notification-status');
             setStatus(data);
         } catch (err) {
-            console.error(err);
+            logger.error('Failed to load notification system status', err);
         } finally {
             setLoading(false);
         }

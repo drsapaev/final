@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
   Typography,
   Button,
-  Input,
-  Alert,
+
+
   CircularProgress,
   Badge,
   Select,
   Toast,
-  ToastContainer
-} from '../ui/macos';
+  ToastContainer } from
+'../ui/macos';
 import {
   Plus,
   Edit,
@@ -22,23 +22,23 @@ import {
   Stethoscope,
   FileText,
   History,
-  ClipboardList,
-  Pill,
+
+
   Hospital,
   Brain,
   Eye,
   Download,
-  Printer,
-  Share,
-  ChevronDown,
-  CheckCircle,
+
+
+
+
   AlertTriangle,
-  XCircle,
-  Activity,
+
+
   MessageSquare,
-  Heart,
-  Delete
-} from 'lucide-react';
+
+  Delete } from
+'lucide-react';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
 
@@ -47,19 +47,20 @@ const EMRInterface = () => {
   const [patients, setPatients] = useState([]);
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(true);void
+  useState('');void
+  useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('info');
   const [showToast, setShowToast] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');void
+  useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [showRecordDialog, setShowRecordDialog] = useState(false);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showRecordDialog, setShowRecordDialog] = useState(false);void
+  useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState(null);
+  const loadEMRDataRef = useRef(null);
   const [recordForm, setRecordForm] = useState({
     patient_id: '',
     record_type: 'general',
@@ -74,16 +75,11 @@ const EMRInterface = () => {
   });
 
   const recordTypes = [
-    { value: 'general', label: 'Общий осмотр', icon: <Stethoscope /> },
-    { value: 'consultation', label: 'Консультация', icon: <MessageSquare /> },
-    { value: 'follow_up', label: 'Повторный прием', icon: <History /> },
-    { value: 'emergency', label: 'Неотложная помощь', icon: <Hospital /> },
-    { value: 'psychology', label: 'Психологическая помощь', icon: <Brain /> }
-  ];
-
-  useEffect(() => {
-    loadEMRData();
-  }, []);
+  { value: 'general', label: 'Общий осмотр', icon: <Stethoscope /> },
+  { value: 'consultation', label: 'Консультация', icon: <MessageSquare /> },
+  { value: 'follow_up', label: 'Повторный прием', icon: <History /> },
+  { value: 'emergency', label: 'Неотложная помощь', icon: <Hospital /> },
+  { value: 'psychology', label: 'Психологическая помощь', icon: <Brain /> }];
 
   const loadEMRData = async () => {
     try {
@@ -91,31 +87,31 @@ const EMRInterface = () => {
       const token = tokenManager.getAccessToken();
 
       const [patientsRes, recordsRes, templatesRes] = await Promise.all([
-        fetch('/api/v1/patients/', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/medical-records/', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/emr/templates', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      fetch('/api/v1/patients/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/v1/medical-records/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/v1/emr/templates', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })]
+      );
 
       if (patientsRes.ok) {
         const patientsData = await patientsRes.json();
         setPatients(patientsData.patients || patientsData || []);
       } else {
         // Fallback: пустой массив или тестовые данные только для разработки
-        const mockPatients = import.meta.env.MODE === 'development'
-          ? Array.from({ length: 3 }, (_, i) => ({
-            id: i + 1,
-            full_name: `Пациент ${i + 1}`,
-            phone: `+7 (900) ${String(i + 1).padStart(7, '0')}`,
-            email: `patient${i + 1}@test.local`,
-            date_of_birth: `198${i}-0${i + 1}-15`
-          }))
-          : [];
+        const mockPatients = import.meta.env.MODE === 'development' ?
+        Array.from({ length: 3 }, (_, i) => ({
+          id: i + 1,
+          full_name: `Пациент ${i + 1}`,
+          phone: `+7 (900) ${String(i + 1).padStart(7, '0')}`,
+          email: `patient${i + 1}@test.local`,
+          date_of_birth: `198${i}-0${i + 1}-15`
+        })) :
+        [];
         setPatients(mockPatients);
       }
 
@@ -124,26 +120,26 @@ const EMRInterface = () => {
         setMedicalRecords(recordsData.records || recordsData || []);
       } else {
         // Fallback: пустой массив или тестовые данные только для разработки
-        const mockRecords = import.meta.env.MODE === 'development'
-          ? [
-            {
-              id: 1,
-              patient_id: 1,
-              patient: { full_name: 'Пациент 1' },
-              record_type: 'general',
-              chief_complaint: 'Тестовая жалоба 1',
-              created_at: new Date().toISOString()
-            },
-            {
-              id: 2,
-              patient_id: 2,
-              patient: { full_name: 'Пациент 2' },
-              record_type: 'consultation',
-              chief_complaint: 'Тестовая жалоба 2',
-              created_at: new Date().toISOString()
-            }
-          ]
-          : [];
+        const mockRecords = import.meta.env.MODE === 'development' ?
+        [
+        {
+          id: 1,
+          patient_id: 1,
+          patient: { full_name: 'Пациент 1' },
+          record_type: 'general',
+          chief_complaint: 'Тестовая жалоба 1',
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 2,
+          patient_id: 2,
+          patient: { full_name: 'Пациент 2' },
+          record_type: 'consultation',
+          chief_complaint: 'Тестовая жалоба 2',
+          created_at: new Date().toISOString()
+        }] :
+
+        [];
         setMedicalRecords(mockRecords);
       }
 
@@ -153,10 +149,10 @@ const EMRInterface = () => {
       } else {
         // Fallback данные для демонстрации
         setTemplates([
-          { id: 1, name: 'Общий осмотр', description: 'Шаблон для общего медицинского осмотра', fields: ['chief_complaint', 'physical_examination', 'diagnosis'] },
-          { id: 2, name: 'Консультация', description: 'Шаблон для консультации специалиста', fields: ['chief_complaint', 'assessment', 'plan'] },
-          { id: 3, name: 'Повторный прием', description: 'Шаблон для повторного приема', fields: ['follow_up', 'treatment_notes'] }
-        ]);
+        { id: 1, name: 'Общий осмотр', description: 'Шаблон для общего медицинского осмотра', fields: ['chief_complaint', 'physical_examination', 'diagnosis'] },
+        { id: 2, name: 'Консультация', description: 'Шаблон для консультации специалиста', fields: ['chief_complaint', 'assessment', 'plan'] },
+        { id: 3, name: 'Повторный прием', description: 'Шаблон для повторного приема', fields: ['follow_up', 'treatment_notes'] }]
+        );
       }
     } catch (err) {
       showToastMessage(handleApiError(err), 'error');
@@ -164,6 +160,12 @@ const EMRInterface = () => {
       setLoading(false);
     }
   };
+
+  loadEMRDataRef.current = loadEMRData;
+
+  useEffect(() => {
+    loadEMRDataRef.current?.();
+  }, []);
 
   const handleCreateRecord = async () => {
     try {
@@ -290,7 +292,7 @@ const EMRInterface = () => {
 
   const openRecordDialog = (patient = null, record = null) => {
     if (patient) {
-      setRecordForm(prev => ({ ...prev, patient_id: patient.id }));
+      setRecordForm((prev) => ({ ...prev, patient_id: patient.id }));
     }
     if (record) {
       setSelectedRecord(record);
@@ -314,32 +316,32 @@ const EMRInterface = () => {
     setShowRecordDialog(true);
   };
 
-  const filteredPatients = patients.filter(patient =>
-    patient.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.phone?.includes(searchTerm) ||
-    patient.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPatients = patients.filter((patient) =>
+  patient.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  patient.phone?.includes(searchTerm) ||
+  patient.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getRecordTypeIcon = (type) => {
-    const recordType = recordTypes.find(rt => rt.value === type);
-    return recordType?.icon || <Stethoscope />;
-  };
+
+
+
+
 
   const getRecordTypeLabel = (type) => {
-    const recordType = recordTypes.find(rt => rt.value === type);
+    const recordType = recordTypes.find((rt) => rt.value === type);
     return recordType?.label || type;
   };
 
-  const getRecordTypeColor = (type) => {
-    const colors = {
-      general: 'primary',
-      consultation: 'info',
-      follow_up: 'success',
-      emergency: 'error',
-      psychology: 'secondary'
-    };
-    return colors[type] || 'default';
-  };
+
+
+
+
+
+
+
+
+
+
 
   const tabButtonStyle = (isActive) => ({
     padding: '12px 24px',
@@ -388,8 +390,8 @@ const EMRInterface = () => {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
         <CircularProgress />
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -400,8 +402,8 @@ const EMRInterface = () => {
         </Typography>
         <Button
           variant="primary"
-          onClick={() => openRecordDialog()}
-        >
+          onClick={() => openRecordDialog()}>
+          
           <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
           Новая запись
         </Button>
@@ -412,22 +414,22 @@ const EMRInterface = () => {
         <div style={{ display: 'flex', borderBottom: '1px solid var(--mac-border)' }}>
           <button
             style={tabButtonStyle(activeTab === 0)}
-            onClick={() => setActiveTab(0)}
-          >
+            onClick={() => setActiveTab(0)}>
+            
             <User style={{ width: 16, height: 16 }} />
             Пациенты
           </button>
           <button
             style={tabButtonStyle(activeTab === 1)}
-            onClick={() => setActiveTab(1)}
-          >
+            onClick={() => setActiveTab(1)}>
+            
             <FileText style={{ width: 16, height: 16 }} />
             Медицинские записи
           </button>
           <button
             style={tabButtonStyle(activeTab === 2)}
-            onClick={() => setActiveTab(2)}
-          >
+            onClick={() => setActiveTab(2)}>
+            
             <FileText style={{ width: 16, height: 16 }} />
             Шаблоны
           </button>
@@ -435,35 +437,35 @@ const EMRInterface = () => {
       </Card>
 
       {/* Контент табов */}
-      {activeTab === 0 && (
-        <Card>
+      {activeTab === 0 &&
+      <Card>
           <CardContent>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ position: 'relative', width: 300 }}>
                 <input
-                  type="text"
-                  placeholder="Поиск пациентов..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 12px 12px 40px',
-                    border: '1px solid var(--mac-border)',
-                    borderRadius: 8,
-                    backgroundColor: 'var(--mac-background)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 14
-                  }}
-                />
-                <Search style={{
-                  position: 'absolute',
-                  left: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 16,
-                  height: 16,
-                  color: 'var(--mac-text-secondary)'
+                type="text"
+                placeholder="Поиск пациентов..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 12px 12px 40px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 8,
+                  backgroundColor: 'var(--mac-background)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 14
                 }} />
+              
+                <Search style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 16,
+                height: 16,
+                color: 'var(--mac-text-secondary)'
+              }} />
               </div>
               <Button onClick={loadEMRData}>
                 <RefreshCw style={{ width: 16, height: 16, marginRight: 8 }} />
@@ -484,8 +486,8 @@ const EMRInterface = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPatients.map((patient) => (
-                    <tr key={patient.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                  {filteredPatients.map((patient) =>
+                <tr key={patient.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
                       <td style={{ padding: 12 }}>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
                           <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'var(--mac-accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
@@ -508,7 +510,7 @@ const EMRInterface = () => {
                       </td>
                       <td style={{ padding: 12 }}>
                         <Badge variant="primary">
-                          {medicalRecords.filter(r => r.patient_id === patient.id).length}
+                          {medicalRecords.filter((r) => r.patient_id === patient.id).length}
                         </Badge>
                       </td>
                       <td style={{ padding: 12, textAlign: 'right' }}>
@@ -520,16 +522,16 @@ const EMRInterface = () => {
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                )}
                 </tbody>
               </table>
             </div>
           </CardContent>
         </Card>
-      )}
+      }
 
-      {activeTab === 1 && (
-        <Card>
+      {activeTab === 1 &&
+      <Card>
           <CardContent>
             <div style={{ overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
@@ -545,9 +547,9 @@ const EMRInterface = () => {
                 </thead>
                 <tbody>
                   {medicalRecords.map((record) => {
-                    const patient = patients.find(p => p.id === record.patient_id);
-                    return (
-                      <tr key={record.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                  const patient = patients.find((p) => p.id === record.patient_id);
+                  return (
+                    <tr key={record.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
                         <td style={{ padding: 12 }}>
                           <div style={{ display: 'flex', alignItems: 'center' }}>
                             <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--mac-accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
@@ -592,25 +594,25 @@ const EMRInterface = () => {
                             <Trash2 style={{ width: 16, height: 16, color: 'var(--mac-accent-red)' }} />
                           </button>
                         </td>
-                      </tr>
-                    );
-                  })}
+                      </tr>);
+
+                })}
                 </tbody>
               </table>
             </div>
           </CardContent>
         </Card>
-      )}
+      }
 
-      {activeTab === 2 && (
-        <Card>
+      {activeTab === 2 &&
+      <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               Шаблоны медицинских записей
             </Typography>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-              {templates.map((template) => (
-                <div key={template.id} style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 16 }}>
+              {templates.map((template) =>
+            <div key={template.id} style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 16 }}>
                   <div style={{ marginBottom: 16 }}>
                     <Typography variant="h6" gutterBottom>
                       {template.name}
@@ -633,35 +635,35 @@ const EMRInterface = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+            )}
             </div>
           </CardContent>
         </Card>
-      )}
+      }
 
       {/* Диалог создания/редактирования записи */}
-      {showRecordDialog && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
+      {showRecordDialog &&
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}>
           <div style={{
-            backgroundColor: 'var(--mac-background)',
-            borderRadius: 12,
-            padding: 24,
-            width: '90%',
-            maxWidth: 600,
-            maxHeight: '90vh',
-            overflow: 'auto'
-          }}>
+          backgroundColor: 'var(--mac-background)',
+          borderRadius: 12,
+          padding: 24,
+          width: '90%',
+          maxWidth: 600,
+          maxHeight: '90vh',
+          overflow: 'auto'
+        }}>
             <div style={{ marginBottom: 24 }}>
               <Typography variant="h6">
                 {selectedRecord ? 'Редактировать медицинскую запись' : 'Новая медицинская запись'}
@@ -670,15 +672,15 @@ const EMRInterface = () => {
             {/* Основная информация */}
             <details open style={{ marginBottom: 16 }}>
               <summary style={{
-                cursor: 'pointer',
-                padding: '12px 16px',
-                backgroundColor: 'var(--mac-background-secondary)',
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: 16,
-                color: 'var(--mac-text-primary)',
-                border: '1px solid var(--mac-border)'
-              }}>
+              cursor: 'pointer',
+              padding: '12px 16px',
+              backgroundColor: 'var(--mac-background-secondary)',
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 16,
+              color: 'var(--mac-text-primary)',
+              border: '1px solid var(--mac-border)'
+            }}>
                 Основная информация
               </summary>
               <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
@@ -686,28 +688,28 @@ const EMRInterface = () => {
                   <div>
                     <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Пациент</label>
                     <Select
-                      options={patients.map((patient) => ({
-                        value: patient.id,
-                        label: patient.full_name || `ID: ${patient.id}`
-                      }))}
-                      value={recordForm.patient_id}
-                      onChange={(val) => setRecordForm({ ...recordForm, patient_id: val })}
-                      placeholder="Выберите пациента..."
-                      style={{ width: '100%' }}
-                    />
+                    options={patients.map((patient) => ({
+                      value: patient.id,
+                      label: patient.full_name || `ID: ${patient.id}`
+                    }))}
+                    value={recordForm.patient_id}
+                    onChange={(val) => setRecordForm({ ...recordForm, patient_id: val })}
+                    placeholder="Выберите пациента..."
+                    style={{ width: '100%' }} />
+                  
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Тип записи</label>
                     <Select
-                      options={recordTypes.map((type) => ({
-                        value: type.value,
-                        label: type.label
-                      }))}
-                      value={recordForm.record_type}
-                      onChange={(val) => setRecordForm({ ...recordForm, record_type: val })}
-                      placeholder="Выберите тип записи..."
-                      style={{ width: '100%' }}
-                    />
+                    options={recordTypes.map((type) => ({
+                      value: type.value,
+                      label: type.label
+                    }))}
+                    value={recordForm.record_type}
+                    onChange={(val) => setRecordForm({ ...recordForm, record_type: val })}
+                    placeholder="Выберите тип записи..."
+                    style={{ width: '100%' }} />
+                  
                   </div>
                 </div>
               </div>
@@ -715,123 +717,123 @@ const EMRInterface = () => {
             {/* Жалобы и анамнез */}
             <details open style={{ marginBottom: 16 }}>
               <summary style={{
-                cursor: 'pointer',
-                padding: '12px 16px',
-                backgroundColor: 'var(--mac-background-secondary)',
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: 16,
-                color: 'var(--mac-text-primary)',
-                border: '1px solid var(--mac-border)'
-              }}>
+              cursor: 'pointer',
+              padding: '12px 16px',
+              backgroundColor: 'var(--mac-background-secondary)',
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 16,
+              color: 'var(--mac-text-primary)',
+              border: '1px solid var(--mac-border)'
+            }}>
                 Жалобы и анамнез
               </summary>
               <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Жалобы пациента</label>
                   <textarea
-                    value={recordForm.chief_complaint}
-                    onChange={(e) => setRecordForm({ ...recordForm, chief_complaint: e.target.value })}
-                    style={{
-                      width: '100%',
-                      minHeight: 80,
-                      padding: 12,
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 8,
-                      backgroundColor: 'var(--mac-background)',
-                      color: 'var(--mac-text-primary)',
-                      resize: 'vertical'
-                    }}
-                    placeholder="Опишите жалобы пациента..."
-                  />
+                  value={recordForm.chief_complaint}
+                  onChange={(e) => setRecordForm({ ...recordForm, chief_complaint: e.target.value })}
+                  style={{
+                    width: '100%',
+                    minHeight: 80,
+                    padding: 12,
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--mac-background)',
+                    color: 'var(--mac-text-primary)',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Опишите жалобы пациента..." />
+                
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Анамнез настоящего заболевания</label>
                   <textarea
-                    value={recordForm.history_of_present_illness}
-                    onChange={(e) => setRecordForm({ ...recordForm, history_of_present_illness: e.target.value })}
-                    style={{
-                      width: '100%',
-                      minHeight: 80,
-                      padding: 12,
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 8,
-                      backgroundColor: 'var(--mac-background)',
-                      color: 'var(--mac-text-primary)',
-                      resize: 'vertical'
-                    }}
-                    placeholder="Анамнез заболевания..."
-                  />
+                  value={recordForm.history_of_present_illness}
+                  onChange={(e) => setRecordForm({ ...recordForm, history_of_present_illness: e.target.value })}
+                  style={{
+                    width: '100%',
+                    minHeight: 80,
+                    padding: 12,
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--mac-background)',
+                    color: 'var(--mac-text-primary)',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Анамнез заболевания..." />
+                
                 </div>
               </div>
             </details>
             {/* Осмотр и диагностика */}
             <details open style={{ marginBottom: 16 }}>
               <summary style={{
-                cursor: 'pointer',
-                padding: '12px 16px',
-                backgroundColor: 'var(--mac-background-secondary)',
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: 16,
-                color: 'var(--mac-text-primary)',
-                border: '1px solid var(--mac-border)'
-              }}>
+              cursor: 'pointer',
+              padding: '12px 16px',
+              backgroundColor: 'var(--mac-background-secondary)',
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 16,
+              color: 'var(--mac-text-primary)',
+              border: '1px solid var(--mac-border)'
+            }}>
                 Осмотр и диагностика
               </summary>
               <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Физикальное обследование</label>
                   <textarea
-                    value={recordForm.physical_examination}
-                    onChange={(e) => setRecordForm({ ...recordForm, physical_examination: e.target.value })}
-                    style={{
-                      width: '100%',
-                      minHeight: 80,
-                      padding: 12,
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 8,
-                      backgroundColor: 'var(--mac-background)',
-                      color: 'var(--mac-text-primary)',
-                      resize: 'vertical'
-                    }}
-                    placeholder="Результаты физикального обследования..."
-                  />
+                  value={recordForm.physical_examination}
+                  onChange={(e) => setRecordForm({ ...recordForm, physical_examination: e.target.value })}
+                  style={{
+                    width: '100%',
+                    minHeight: 80,
+                    padding: 12,
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--mac-background)',
+                    color: 'var(--mac-text-primary)',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Результаты физикального обследования..." />
+                
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Диагноз</label>
                     <input
-                      type="text"
-                      value={recordForm.diagnosis}
-                      onChange={(e) => setRecordForm({ ...recordForm, diagnosis: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: 12,
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 8,
-                        backgroundColor: 'var(--mac-background)',
-                        color: 'var(--mac-text-primary)'
-                      }}
-                      placeholder="Основной диагноз..."
-                    />
+                    type="text"
+                    value={recordForm.diagnosis}
+                    onChange={(e) => setRecordForm({ ...recordForm, diagnosis: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)'
+                    }}
+                    placeholder="Основной диагноз..." />
+                  
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>План лечения</label>
                     <input
-                      type="text"
-                      value={recordForm.plan}
-                      onChange={(e) => setRecordForm({ ...recordForm, plan: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: 12,
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 8,
-                        backgroundColor: 'var(--mac-background)',
-                        color: 'var(--mac-text-primary)'
-                      }}
-                      placeholder="План лечения..."
-                    />
+                    type="text"
+                    value={recordForm.plan}
+                    onChange={(e) => setRecordForm({ ...recordForm, plan: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)'
+                    }}
+                    placeholder="План лечения..." />
+                  
                   </div>
                 </div>
               </div>
@@ -839,53 +841,53 @@ const EMRInterface = () => {
             {/* План лечения */}
             <details open style={{ marginBottom: 16 }}>
               <summary style={{
-                cursor: 'pointer',
-                padding: '12px 16px',
-                backgroundColor: 'var(--mac-background-secondary)',
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: 16,
-                color: 'var(--mac-text-primary)',
-                border: '1px solid var(--mac-border)'
-              }}>
+              cursor: 'pointer',
+              padding: '12px 16px',
+              backgroundColor: 'var(--mac-background-secondary)',
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 16,
+              color: 'var(--mac-text-primary)',
+              border: '1px solid var(--mac-border)'
+            }}>
                 План лечения
               </summary>
               <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Лечебные назначения</label>
                   <textarea
-                    value={recordForm.treatment_notes}
-                    onChange={(e) => setRecordForm({ ...recordForm, treatment_notes: e.target.value })}
-                    style={{
-                      width: '100%',
-                      minHeight: 80,
-                      padding: 12,
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 8,
-                      backgroundColor: 'var(--mac-background)',
-                      color: 'var(--mac-text-primary)',
-                      resize: 'vertical'
-                    }}
-                    placeholder="Лечебные назначения..."
-                  />
+                  value={recordForm.treatment_notes}
+                  onChange={(e) => setRecordForm({ ...recordForm, treatment_notes: e.target.value })}
+                  style={{
+                    width: '100%',
+                    minHeight: 80,
+                    padding: 12,
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--mac-background)',
+                    color: 'var(--mac-text-primary)',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Лечебные назначения..." />
+                
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Рекомендации и дальнейшие действия</label>
                   <textarea
-                    value={recordForm.follow_up_instructions}
-                    onChange={(e) => setRecordForm({ ...recordForm, follow_up_instructions: e.target.value })}
-                    style={{
-                      width: '100%',
-                      minHeight: 60,
-                      padding: 12,
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 8,
-                      backgroundColor: 'var(--mac-background)',
-                      color: 'var(--mac-text-primary)',
-                      resize: 'vertical'
-                    }}
-                    placeholder="Рекомендации и дальнейшие действия..."
-                  />
+                  value={recordForm.follow_up_instructions}
+                  onChange={(e) => setRecordForm({ ...recordForm, follow_up_instructions: e.target.value })}
+                  style={{
+                    width: '100%',
+                    minHeight: 60,
+                    padding: 12,
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--mac-background)',
+                    color: 'var(--mac-text-primary)',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Рекомендации и дальнейшие действия..." />
+                
                 </div>
               </div>
             </details>
@@ -897,30 +899,30 @@ const EMRInterface = () => {
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Диалог подтверждения удаления */}
-      {showDeleteDialog && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
+      {showDeleteDialog &&
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}>
           <div style={{
-            backgroundColor: 'var(--mac-background)',
-            borderRadius: 12,
-            padding: 24,
-            width: '90%',
-            maxWidth: 400,
-            textAlign: 'center'
-          }}>
+          backgroundColor: 'var(--mac-background)',
+          borderRadius: 12,
+          padding: 24,
+          width: '90%',
+          maxWidth: 400,
+          textAlign: 'center'
+        }}>
             <div style={{ marginBottom: 16 }}>
               <AlertTriangle style={{ width: 48, height: 48, color: 'var(--mac-accent-orange)', margin: '0 auto 16px' }} />
               <Typography variant="h6" gutterBottom>
@@ -941,22 +943,21 @@ const EMRInterface = () => {
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Toast уведомления */}
-      {showToast && (
-        <ToastContainer>
+      {showToast &&
+      <ToastContainer>
           <Toast
-            type={toastType}
-            message={toastMessage}
-            duration={5000}
-            onClose={() => setShowToast(false)}
-          />
+          type={toastType}
+          message={toastMessage}
+          duration={5000}
+          onClose={() => setShowToast(false)} />
+        
         </ToastContainer>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default EMRInterface;
-

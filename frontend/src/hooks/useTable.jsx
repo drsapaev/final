@@ -3,20 +3,21 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAnimation } from './useAnimation';
+import { useState, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
+
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
 // Хук для управления таблицей
 export const useTable = (data = [], options = {}) => {
   const {
     pageSize = 10,
-    sortable = true,
+
     filterable = true,
     searchable = true,
-    selectable = false,
-    expandable = false,
-    pagination = true,
+
+
+
     defaultSort = null,
     defaultFilter = null
   } = options;
@@ -26,8 +27,8 @@ export const useTable = (data = [], options = {}) => {
   const [filterConfig, setFilterConfig] = useState(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());
-  const { prefersReducedMotion } = useReducedMotion();
+  const [expandedRows, setExpandedRows] = useState(new Set());void
+  useReducedMotion();
 
   // Сортировка данных
   const sortedData = useMemo(() => {
@@ -50,10 +51,10 @@ export const useTable = (data = [], options = {}) => {
 
     // Поиск
     if (searchTerm && searchable) {
-      filtered = filtered.filter(item =>
-        Object.values(item).some(value =>
-          String(value).toLowerCase().includes(searchTerm.toLowerCase())
-        )
+      filtered = filtered.filter((item) =>
+      Object.values(item).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      )
       );
     }
 
@@ -61,7 +62,7 @@ export const useTable = (data = [], options = {}) => {
     if (filterConfig && filterable) {
       Object.entries(filterConfig).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
-          filtered = filtered.filter(item => item[key] === value);
+          filtered = filtered.filter((item) => item[key] === value);
         }
       });
     }
@@ -76,7 +77,7 @@ export const useTable = (data = [], options = {}) => {
 
   // Сортировка
   const handleSort = useCallback((key) => {
-    setSortConfig(prevConfig => {
+    setSortConfig((prevConfig) => {
       if (prevConfig && prevConfig.key === key) {
         return {
           key,
@@ -89,7 +90,7 @@ export const useTable = (data = [], options = {}) => {
 
   // Фильтрация
   const handleFilter = useCallback((key, value) => {
-    setFilterConfig(prevConfig => ({
+    setFilterConfig((prevConfig) => ({
       ...prevConfig,
       [key]: value
     }));
@@ -104,7 +105,7 @@ export const useTable = (data = [], options = {}) => {
 
   // Выбор строк
   const handleRowSelect = useCallback((rowId, selected) => {
-    setSelectedRows(prev => {
+    setSelectedRows((prev) => {
       const newSet = new Set(prev);
       if (selected) {
         newSet.add(rowId);
@@ -118,7 +119,7 @@ export const useTable = (data = [], options = {}) => {
   // Выбор всех строк
   const handleSelectAll = useCallback((selected) => {
     if (selected) {
-      setSelectedRows(new Set(paginatedData.map(row => row.id)));
+      setSelectedRows(new Set(paginatedData.map((row) => row.id)));
     } else {
       setSelectedRows(new Set());
     }
@@ -126,7 +127,7 @@ export const useTable = (data = [], options = {}) => {
 
   // Разворачивание строк
   const handleRowExpand = useCallback((rowId, expanded) => {
-    setExpandedRows(prev => {
+    setExpandedRows((prev) => {
       const newSet = new Set(prev);
       if (expanded) {
         newSet.add(rowId);
@@ -204,47 +205,47 @@ export const TableHeader = ({
   return (
     <thead className={`table-header ${className}`} {...props}>
       <tr>
-        {columns.map((column) => (
-          <th
-            key={column.key}
-            className="table-header-cell"
-            style={{
-              padding: '12px 16px',
-              textAlign: column.align || 'left',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#374151',
-              backgroundColor: '#f9fafb',
-              borderBottom: '1px solid #e5e7eb',
-              cursor: sortable && column.sortable !== false ? 'pointer' : 'default',
-              userSelect: 'none',
-              transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
-            }}
-            onClick={() => sortable && column.sortable !== false && onSort(column.key)}
-            onMouseEnter={(e) => {
-              if (sortable && column.sortable !== false && !prefersReducedMotion) {
-                e.target.style.backgroundColor = '#f3f4f6';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!prefersReducedMotion) {
-                e.target.style.backgroundColor = '#f9fafb';
-              }
-            }}
-          >
+        {columns.map((column) =>
+        <th
+          key={column.key}
+          className="table-header-cell"
+          style={{
+            padding: '12px 16px',
+            textAlign: column.align || 'left',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#374151',
+            backgroundColor: '#f9fafb',
+            borderBottom: '1px solid #e5e7eb',
+            cursor: sortable && column.sortable !== false ? 'pointer' : 'default',
+            userSelect: 'none',
+            transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
+          }}
+          onClick={() => sortable && column.sortable !== false && onSort(column.key)}
+          onMouseEnter={(e) => {
+            if (sortable && column.sortable !== false && !prefersReducedMotion) {
+              e.target.style.backgroundColor = '#f3f4f6';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!prefersReducedMotion) {
+              e.target.style.backgroundColor = '#f9fafb';
+            }
+          }}>
+          
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {column.title || column.key}
-              {sortable && column.sortable !== false && sortConfig && sortConfig.key === column.key && (
-                <span style={{ fontSize: '12px' }}>
+              {sortable && column.sortable !== false && sortConfig && sortConfig.key === column.key &&
+            <span style={{ fontSize: '12px' }}>
                   {sortConfig.direction === 'asc' ? '↑' : '↓'}
                 </span>
-              )}
+            }
             </div>
           </th>
-        ))}
+        )}
       </tr>
-    </thead>
-  );
+    </thead>);
+
 };
 
 // Строка таблицы
@@ -303,73 +304,73 @@ export const TableRow = ({
           e.target.style.backgroundColor = selected ? '#eff6ff' : '#ffffff';
         }
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Чекбокс для выбора */}
-      {selectable && (
-        <td style={{ padding: '12px 16px', width: '40px' }}>
+      {selectable &&
+      <td style={{ padding: '12px 16px', width: '40px' }}>
           <input
-            type="checkbox"
-            checked={selected}
-            onChange={handleSelect}
-            style={{
-              width: '16px',
-              height: '16px',
-              cursor: 'pointer'
-            }}
-          />
+          type="checkbox"
+          checked={selected}
+          onChange={handleSelect}
+          style={{
+            width: '16px',
+            height: '16px',
+            cursor: 'pointer'
+          }} />
+        
         </td>
-      )}
+      }
 
       {/* Стрелка для разворачивания */}
-      {expandable && (
-        <td style={{ padding: '12px 16px', width: '40px' }}>
+      {expandable &&
+      <td style={{ padding: '12px 16px', width: '40px' }}>
           <button
-            onClick={handleExpand}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '16px',
-              cursor: 'pointer',
-              color: '#6b7280',
-              padding: '4px',
-              borderRadius: '4px',
-              transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              if (!prefersReducedMotion) {
-                e.target.style.backgroundColor = '#f3f4f6';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!prefersReducedMotion) {
-                e.target.style.backgroundColor = 'transparent';
-              }
-            }}
-          >
+          onClick={handleExpand}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '16px',
+            cursor: 'pointer',
+            color: '#6b7280',
+            padding: '4px',
+            borderRadius: '4px',
+            transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (!prefersReducedMotion) {
+              e.target.style.backgroundColor = '#f3f4f6';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!prefersReducedMotion) {
+              e.target.style.backgroundColor = 'transparent';
+            }
+          }}>
+          
             {expanded ? '▼' : '▶'}
           </button>
         </td>
-      )}
+      }
 
       {/* Ячейки данных */}
-      {columns.map((column) => (
-        <td
-          key={column.key}
-          className="table-cell"
-          style={{
-            padding: '12px 16px',
-            textAlign: column.align || 'left',
-            fontSize: '14px',
-            color: '#374151',
-            borderBottom: '1px solid #e5e7eb'
-          }}
-        >
+      {columns.map((column) =>
+      <td
+        key={column.key}
+        className="table-cell"
+        style={{
+          padding: '12px 16px',
+          textAlign: column.align || 'left',
+          fontSize: '14px',
+          color: '#374151',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+        
           {column.render ? column.render(row[column.key], row) : row[column.key]}
         </td>
-      ))}
-    </tr>
-  );
+      )}
+    </tr>);
+
 };
 
 // Тело таблицы
@@ -388,22 +389,22 @@ export const TableBody = ({
 }) => {
   return (
     <tbody className={`table-body ${className}`} {...props}>
-      {data.map((row) => (
-        <TableRow
-          key={row.id}
-          row={row}
-          columns={columns}
-          selected={selectedRows.has(row.id)}
-          expanded={expandedRows.has(row.id)}
-          expandable={expandable}
-          selectable={selectable}
-          onSelect={onRowSelect}
-          onExpand={onRowExpand}
-          onClick={onRowClick}
-        />
-      ))}
-    </tbody>
-  );
+      {data.map((row) =>
+      <TableRow
+        key={row.id}
+        row={row}
+        columns={columns}
+        selected={selectedRows.has(row.id)}
+        expanded={expandedRows.has(row.id)}
+        expandable={expandable}
+        selectable={selectable}
+        onSelect={onRowSelect}
+        onExpand={onRowExpand}
+        onClick={onRowClick} />
+
+      )}
+    </tbody>);
+
 };
 
 // Пагинация таблицы
@@ -419,6 +420,8 @@ export const TablePagination = ({
   ...props
 }) => {
   const { prefersReducedMotion } = useReducedMotion();
+  void showPageSize;
+  void pageSizeOptions;
 
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
@@ -434,8 +437,8 @@ export const TablePagination = ({
         backgroundColor: '#f9fafb',
         borderTop: '1px solid #e5e7eb'
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Информация о странице */}
       <div style={{ fontSize: '14px', color: '#6b7280' }}>
         Показано {startItem}-{endItem} из {totalItems} записей
@@ -466,8 +469,8 @@ export const TablePagination = ({
             if (currentPage !== 1 && !prefersReducedMotion) {
               e.target.style.backgroundColor = '#ffffff';
             }
-          }}
-        >
+          }}>
+          
           ← Назад
         </button>
 
@@ -500,11 +503,11 @@ export const TablePagination = ({
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
                     e.target.style.backgroundColor = pageNumber === currentPage ? '#3b82f6' : '#ffffff';
                   }
-                }}
-              >
+                }}>
+                
                 {pageNumber}
-              </button>
-            );
+              </button>);
+
           })}
         </div>
 
@@ -531,13 +534,13 @@ export const TablePagination = ({
             if (currentPage !== totalPages && !prefersReducedMotion) {
               e.target.style.backgroundColor = '#ffffff';
             }
-          }}
-        >
+          }}>
+          
           Далее →
         </button>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Поиск в таблице
@@ -561,8 +564,8 @@ export const TableSearch = ({
         alignItems: 'center',
         gap: '12px'
       }}
-      {...props}
-    >
+      {...props}>
+      
       <div style={{ fontSize: '16px', color: '#6b7280' }}>🔍</div>
       <input
         type="text"
@@ -589,10 +592,10 @@ export const TableSearch = ({
           if (!prefersReducedMotion) {
             e.target.style.borderColor = '#d1d5db';
           }
-        }}
-      />
-    </div>
-  );
+        }} />
+      
+    </div>);
+
 };
 
 // Полная таблица
@@ -635,8 +638,10 @@ export const Table = ({
   pageSizeOptions = [10, 25, 50, 100],
 
   ...props
-}) => {
-  const { prefersReducedMotion } = useReducedMotion();
+}) => {void
+  useReducedMotion();
+  void filterable;
+  void onSelectAll;
 
   return (
     <div
@@ -648,16 +653,16 @@ export const Table = ({
         overflow: 'hidden',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Поиск */}
-      {searchable && (
-        <TableSearch
-          searchTerm={searchTerm}
-          onSearch={onSearch}
-          placeholder="Поиск по таблице..."
-        />
-      )}
+      {searchable &&
+      <TableSearch
+        searchTerm={searchTerm}
+        onSearch={onSearch}
+        placeholder="Поиск по таблице..." />
+
+      }
 
       {/* Таблица */}
       <div style={{ overflow: 'auto' }}>
@@ -666,8 +671,8 @@ export const Table = ({
             columns={columns}
             sortConfig={sortConfig}
             onSort={onSort}
-            sortable={sortable}
-          />
+            sortable={sortable} />
+          
 
           <TableBody
             data={data}
@@ -678,64 +683,145 @@ export const Table = ({
             expandable={expandable}
             onRowSelect={onRowSelect}
             onRowExpand={onRowExpand}
-            onRowClick={onRowClick}
-          />
+            onRowClick={onRowClick} />
+          
         </table>
       </div>
 
       {/* Пагинация */}
-      {pagination && (
-        <TablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={onPageChange}
-          pageSize={pageSize}
-          totalItems={data.length}
-          pageSizeOptions={pageSizeOptions}
-        />
-      )}
+      {pagination &&
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        pageSize={pageSize}
+        totalItems={data.length}
+        pageSizeOptions={pageSizeOptions} />
+
+      }
 
       {/* Состояния загрузки и ошибки */}
-      {loading && (
-        <div
-          style={{
-            padding: '40px',
-            textAlign: 'center',
-            color: '#6b7280',
-            fontSize: '14px'
-          }}
-        >
+      {loading &&
+      <div
+        style={{
+          padding: '40px',
+          textAlign: 'center',
+          color: '#6b7280',
+          fontSize: '14px'
+        }}>
+        
           Загрузка данных...
         </div>
-      )}
+      }
 
-      {error && (
-        <div
-          style={{
-            padding: '40px',
-            textAlign: 'center',
-            color: '#ef4444',
-            fontSize: '14px'
-          }}
-        >
+      {error &&
+      <div
+        style={{
+          padding: '40px',
+          textAlign: 'center',
+          color: '#ef4444',
+          fontSize: '14px'
+        }}>
+        
           Ошибка загрузки данных: {error}
         </div>
-      )}
+      }
 
-      {!loading && !error && data.length === 0 && (
-        <div
-          style={{
-            padding: '40px',
-            textAlign: 'center',
-            color: '#6b7280',
-            fontSize: '14px'
-          }}
-        >
+      {!loading && !error && data.length === 0 &&
+      <div
+        style={{
+          padding: '40px',
+          textAlign: 'center',
+          color: '#6b7280',
+          fontSize: '14px'
+        }}>
+        
           {emptyMessage}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
+};
+
+TableHeader.propTypes = {
+  columns: PropTypes.array,
+  sortConfig: PropTypes.object,
+  onSort: PropTypes.func,
+  sortable: PropTypes.bool,
+  className: PropTypes.string
+};
+
+TableRow.propTypes = {
+  row: PropTypes.object,
+  columns: PropTypes.array,
+  selected: PropTypes.bool,
+  expanded: PropTypes.bool,
+  expandable: PropTypes.bool,
+  selectable: PropTypes.bool,
+  onSelect: PropTypes.func,
+  onExpand: PropTypes.func,
+  onClick: PropTypes.func,
+  className: PropTypes.string
+};
+
+TableBody.propTypes = {
+  data: PropTypes.array,
+  columns: PropTypes.array,
+  selectedRows: PropTypes.instanceOf(Set),
+  expandedRows: PropTypes.instanceOf(Set),
+  expandable: PropTypes.bool,
+  selectable: PropTypes.bool,
+  onRowSelect: PropTypes.func,
+  onRowExpand: PropTypes.func,
+  onRowClick: PropTypes.func,
+  className: PropTypes.string
+};
+
+TablePagination.propTypes = {
+  currentPage: PropTypes.number,
+  totalPages: PropTypes.number,
+  onPageChange: PropTypes.func,
+  pageSize: PropTypes.number,
+  totalItems: PropTypes.number,
+  showPageSize: PropTypes.bool,
+  pageSizeOptions: PropTypes.array,
+  className: PropTypes.string
+};
+
+TableSearch.propTypes = {
+  searchTerm: PropTypes.string,
+  onSearch: PropTypes.func,
+  placeholder: PropTypes.string,
+  className: PropTypes.string
+};
+
+Table.propTypes = {
+  data: PropTypes.array,
+  columns: PropTypes.array,
+  loading: PropTypes.bool,
+  error: PropTypes.any,
+  emptyMessage: PropTypes.string,
+  sortable: PropTypes.bool,
+  filterable: PropTypes.bool,
+  searchable: PropTypes.bool,
+  selectable: PropTypes.bool,
+  expandable: PropTypes.bool,
+  pagination: PropTypes.bool,
+  currentPage: PropTypes.number,
+  totalPages: PropTypes.number,
+  sortConfig: PropTypes.object,
+  searchTerm: PropTypes.string,
+  onPageChange: PropTypes.func,
+  onSort: PropTypes.func,
+  onSearch: PropTypes.func,
+  onRowSelect: PropTypes.func,
+  onRowExpand: PropTypes.func,
+  onRowClick: PropTypes.func,
+  onSelectAll: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  pageSize: PropTypes.number,
+  pageSizeOptions: PropTypes.array
 };
 
 export default useTable;

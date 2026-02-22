@@ -87,7 +87,7 @@ const MacOSCheckbox = React.forwardRef(({
     lineHeight: '1.4'
   };
 
-  const handleClick = (e) => {
+  const handleClick = () => {
     if (!disabled && onChange) {
       onChange(!checked);
     }
@@ -104,44 +104,44 @@ const MacOSCheckbox = React.forwardRef(({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <div 
+      <div
         style={{ display: 'flex', alignItems: 'flex-start' }}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         tabIndex={disabled ? -1 : 0}
         role="checkbox"
         aria-checked={checked}
-        aria-disabled={disabled}
-      >
+        aria-disabled={disabled}>
+        
         <div
           ref={ref}
           className={className}
           style={checkboxStyle}
-          {...props}
-        >
-          {checked && (
-            <Check 
-              size={iconSize} 
-              style={{ 
-                color: 'white',
-                strokeWidth: 2.5
-              }} 
-            />
-          )}
+          {...props}>
+          
+          {checked &&
+          <Check
+            size={iconSize}
+            style={{
+              color: 'white',
+              strokeWidth: 2.5
+            }} />
+
+          }
         </div>
-        {label && (
-          <label style={labelStyle}>
+        {label &&
+        <label style={labelStyle}>
             {label}
           </label>
-        )}
+        }
       </div>
-      {description && (
-        <div style={descriptionStyle}>
+      {description &&
+      <div style={descriptionStyle}>
           {description}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 });
 
 MacOSCheckbox.displayName = 'MacOSCheckbox';

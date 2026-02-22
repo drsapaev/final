@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-
+import { useState, useRef, useEffect } from 'react';
 /**
  * Современный компонент для ввода телефона с маской
  * Заменяет react-input-mask для избежания findDOMNode warnings
@@ -114,7 +113,7 @@ const PhoneInput = ({
     if (value !== displayValue) {
       setDisplayValue(formatPhoneNumber(value));
     }
-  }, [value]);
+  }, [value, displayValue]);
 
   // Обработка клавиш
   const handleKeyDown = (e) => {

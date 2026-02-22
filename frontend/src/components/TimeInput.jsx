@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * TimeInput — контрол ввода времени HH:MM с простейшей валидацией.
  * Props:

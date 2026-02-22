@@ -149,6 +149,7 @@ function validateExtensionMatch(filename, mimeType) {
 
   return expectedMime === mimeType;
 }
+void validateExtensionMatch;
 
 /**
  * Проверка magic number файла

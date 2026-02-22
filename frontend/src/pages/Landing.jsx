@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import {
   MacOSCard,
   MacOSButton,
-  MacOSSelect,
-  MacOSModal
-} from '../components/ui/macos';
+
+  MacOSModal } from
+'../components/ui/macos';
 import {
   Sun,
   Moon,
@@ -19,8 +19,8 @@ import {
   MessageSquare,
   Activity,
   Calendar,
-  Stethoscope
-} from 'lucide-react';
+  Stethoscope } from
+'lucide-react';
 import AppActivation from '../components/activation/AppActivation';
 
 import logger from '../utils/logger';
@@ -45,11 +45,19 @@ const FeatureCard = ({ icon, title, description, color, bgColor }) => {
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          logger.log(`Clicked on ${title}`);
+        }
+      }}
+      role="button"
+      tabIndex={0}
       onClick={() => {
         // Можно добавить логику для показа деталей или перехода
         logger.log(`Clicked on ${title}`);
-      }}
-    >
+      }}>
+
       <div style={{
         color: color,
         display: 'flex',
@@ -77,14 +85,14 @@ const FeatureCard = ({ icon, title, description, color, bgColor }) => {
           {description}
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default function Landing() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
-  const { language, setLanguage, t, availableLanguages } = useTranslation();
+  const { language, setLanguage, t } = useTranslation();
   const [showActivation, setShowActivation] = useState(false);
 
   const pageStyle = {
@@ -181,8 +189,8 @@ export default function Landing() {
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-          >
+            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}>
+
             {isDark ? <Sun style={{ width: '16px', height: '16px' }} /> : <Moon style={{ width: '16px', height: '16px' }} />}
           </MacOSButton>
 
@@ -203,13 +211,13 @@ export default function Landing() {
               fontSize: '12px',
               minWidth: '60px'
             }}
-            title={`Switch language - current: ${language.toUpperCase()}`}
-          >
+            title={`Switch language - current: ${language.toUpperCase()}`}>
+
             <span style={{ fontSize: '14px' }}>
               {language === 'ru' ? '🇷🇺' :
-               language === 'uz' ? '🇺🇿' :
-               language === 'en' ? '🇺🇸' :
-               language === 'kk' ? '🇰🇿' : '🌐'}
+              language === 'uz' ? '🇺🇿' :
+              language === 'en' ? '🇺🇸' :
+              language === 'kk' ? '🇰🇿' : '🌐'}
             </span>
             <span style={{ fontWeight: '600' }}>{language.toUpperCase()}</span>
           </MacOSButton>
@@ -277,16 +285,16 @@ export default function Landing() {
             title={t('appointments')}
             description="Запись и управление приемами"
             color="#10b981"
-            bgColor="rgba(16, 185, 129, 0.1)"
-          />
+            bgColor="rgba(16, 185, 129, 0.1)" />
+
 
           <FeatureCard
             icon={<Activity style={{ width: '20px', height: '20px' }} />}
             title={t('queue')}
             description="Онлайн-очереди с QR-регистрацией"
             color="#f59e0b"
-            bgColor="rgba(245, 158, 11, 0.1)"
-          />
+            bgColor="rgba(245, 158, 11, 0.1)" />
+
         </div>
 
         {/* Кнопки действий */}
@@ -309,8 +317,8 @@ export default function Landing() {
               fontSize: '16px',
               fontWeight: '600',
               minWidth: '160px'
-            }}
-          >
+            }}>
+
             <User style={{ width: '18px', height: '18px' }} />
             {t('loginButton')}
           </MacOSButton>
@@ -326,8 +334,8 @@ export default function Landing() {
               fontSize: '16px',
               fontWeight: '500',
               minWidth: '160px'
-            }}
-          >
+            }}>
+
             <Key style={{ width: '18px', height: '18px' }} />
             {t('activateButton')}
           </MacOSButton>
@@ -407,10 +415,10 @@ export default function Landing() {
         isOpen={showActivation}
         onClose={() => setShowActivation(false)}
         title="Активация лицензии"
-        size="md"
-      >
+        size="md">
+
         <AppActivation onClose={() => setShowActivation(false)} />
       </MacOSModal>
-    </div>
-  );
+    </div>);
+
 }

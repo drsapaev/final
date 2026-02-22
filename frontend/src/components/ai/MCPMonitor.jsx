@@ -1,26 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
-  Typography,
   Card,
   CardContent,
-  Progress,
-  Badge,
-  Alert,
-  Button,
+  Chip,
   CircularProgress,
-} from '../ui/macos';
-import {
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  RefreshCw,
-  Zap,
-  HardDrive,
-  Brain,
-  Clock,
-  Settings,
-} from 'lucide-react';
+  Divider,
+  Grid,
+  IconButton,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Paper,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Error from '@mui/icons-material/Error';
+import Psychology from '@mui/icons-material/Psychology';
+import Refresh from '@mui/icons-material/Refresh';
+import Speed from '@mui/icons-material/Speed';
+import Storage from '@mui/icons-material/Storage';
+import Timeline from '@mui/icons-material/Timeline';
+import Warning from '@mui/icons-material/Warning';
 import { mcpAPI } from '../../api/mcpClient';
 import { useSnackbar } from 'notistack';
 
@@ -33,7 +38,7 @@ const MCPMonitor = () => {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
 
-  const fetchMCPStatus = async () => {
+  const fetchMCPStatus = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -54,7 +59,7 @@ const MCPMonitor = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [enqueueSnackbar]);
 
   useEffect(() => {
     fetchMCPStatus();
@@ -64,16 +69,7 @@ const MCPMonitor = () => {
       const interval = setInterval(fetchMCPStatus, 30000);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh]);
-
-  const getHealthColor = (status) => {
-    switch (status) {
-      case 'healthy': return 'success';
-      case 'degraded': return 'warning';
-      case 'unhealthy': return 'error';
-      default: return 'default';
-    }
-  };
+  }, [autoRefresh, fetchMCPStatus]);
 
   const getHealthIcon = (status) => {
     switch (status) {
@@ -84,19 +80,11 @@ const MCPMonitor = () => {
     }
   };
 
-  const formatUptime = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    const diff = Date.now() - new Date(timestamp).getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}ч ${minutes}м`;
-  };
-
   const calculateSuccessRate = () => {
     if (!metrics) return 0;
     const total = metrics.requests_total || 0;
     const success = metrics.requests_success || 0;
-    return total > 0 ? ((success / total) * 100).toFixed(1) : 0;
+    return total > 0 ? Number(((success / total) * 100).toFixed(1)) : 0;
   };
 
   if (loading && !mcpStatus) {

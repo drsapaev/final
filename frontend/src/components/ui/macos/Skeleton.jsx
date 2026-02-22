@@ -1,5 +1,3 @@
-import React from 'react';
-
 // Simple macOS-style Skeleton placeholder
 const Skeleton = ({ width = '100%', height = 16, variant = 'rect', style = {}, ...props }) => {
   const radius = variant === 'circle' ? '50%' : 8;

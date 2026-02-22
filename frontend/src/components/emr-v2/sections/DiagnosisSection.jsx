@@ -7,7 +7,8 @@
  * to keep section independent from specific implementation
  */
 
-import React, { useMemo } from 'react';
+import PropTypes from 'prop-types';
+import { useMemo } from 'react';
 import EMRSection from './EMRSection';
 import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import EMRTextField from './EMRTextField';
@@ -121,5 +122,24 @@ export function DiagnosisSection({
         </EMRSection>
     );
 }
+
+DiagnosisSection.propTypes = {
+    diagnosis: PropTypes.string,
+    icd10Code: PropTypes.string,
+    onDiagnosisChange: PropTypes.func,
+    onIcd10Change: PropTypes.func,
+    disabled: PropTypes.bool,
+    defaultOpen: PropTypes.bool,
+    ICD10Component: PropTypes.elementType,
+    suggestions: PropTypes.arrayOf(PropTypes.object),
+    aiLoading: PropTypes.bool,
+    onApplySuggestion: PropTypes.func,
+    onDismissSuggestion: PropTypes.func,
+    onRequestAI: PropTypes.func,
+    doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    specialty: PropTypes.string,
+    experimentalGhostMode: PropTypes.bool,
+    onTelemetry: PropTypes.func,
+};
 
 export default DiagnosisSection;

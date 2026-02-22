@@ -1,6 +1,7 @@
 // Компонент для ролевых ограничений маршрутов
-import React from 'react';
+import PropTypes from 'prop-types';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useRoleAccess } from '../common/RoleGuard';
 import { Loading } from '../common/Loading';
 
@@ -210,6 +211,35 @@ export function UnauthorizedPage() {
   );
 }
 
-// Импорт useTheme для UnauthorizedPage
-import { useTheme } from '../../contexts/ThemeContext';
+RequireAuth.propTypes = {
+  children: PropTypes.node,
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  fallback: PropTypes.node,
+  redirectTo: PropTypes.string
+};
 
+RequireAuthOnly.propTypes = {
+  children: PropTypes.node,
+  redirectTo: PropTypes.string
+};
+
+RequireRoles.propTypes = {
+  children: PropTypes.node,
+  roles: PropTypes.arrayOf(PropTypes.string),
+  fallback: PropTypes.node
+};
+
+RequirePermissions.propTypes = {
+  children: PropTypes.node,
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  fallback: PropTypes.node
+};
+
+RoleBasedRender.propTypes = {
+  children: PropTypes.node,
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  fallback: PropTypes.node,
+  requireAll: PropTypes.bool
+};

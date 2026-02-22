@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/native';
+import { useState } from 'react';
+
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
 
@@ -14,6 +14,7 @@ const InteractiveButton = ({
   ...props
 }) => {
   const { getColor, getSpacing, getShadow } = useTheme();
+  void size;
   const { ref, isHovered } = useHover();
   const [isPressed, setIsPressed] = useState(false);
 
@@ -33,11 +34,11 @@ const InteractiveButton = ({
     if (variant === 'primary') {
       return {
         ...baseStyle,
-        backgroundColor: isPressed
-          ? getColor('primary', 700)
-          : isHovered
-          ? getColor('primary', 600)
-          : getColor('primary', 500),
+        backgroundColor: isPressed ?
+        getColor('primary', 700) :
+        isHovered ?
+        getColor('primary', 600) :
+        getColor('primary', 500),
         color: 'white',
         border: 'none'
       };
@@ -46,21 +47,21 @@ const InteractiveButton = ({
     if (variant === 'outline') {
       return {
         ...baseStyle,
-        backgroundColor: isPressed
-          ? getColor('primary', 50)
-          : isHovered
-          ? getColor('primary', 50)
-          : 'transparent',
-        color: isPressed
-          ? getColor('primary', 700)
-          : isHovered
-          ? getColor('primary', 600)
-          : getColor('primary', 500),
-        border: `1px solid ${isPressed
-          ? getColor('primary', 300)
-          : isHovered
-          ? getColor('primary', 400)
-          : getColor('primary', 200)}`
+        backgroundColor: isPressed ?
+        getColor('primary', 50) :
+        isHovered ?
+        getColor('primary', 50) :
+        'transparent',
+        color: isPressed ?
+        getColor('primary', 700) :
+        isHovered ?
+        getColor('primary', 600) :
+        getColor('primary', 500),
+        border: `1px solid ${isPressed ?
+        getColor('primary', 300) :
+        isHovered ?
+        getColor('primary', 400) :
+        getColor('primary', 200)}`
       };
     }
 
@@ -84,23 +85,23 @@ const InteractiveButton = ({
         ...getButtonStyle(),
         ...props.style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Эффект пульсации при нажатии */}
-      {isPressed && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: '100px',
-          height: '100px',
-          backgroundColor: 'rgba(255, 255, 255, 0.3)',
-          borderRadius: '50%',
-          transform: 'translate(-50%, -50%) scale(0)',
-          animation: 'ripple 0.6s linear',
-          pointerEvents: 'none'
-        }} />
-      )}
+      {isPressed &&
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: '100px',
+        height: '100px',
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        borderRadius: '50%',
+        transform: 'translate(-50%, -50%) scale(0)',
+        animation: 'ripple 0.6s linear',
+        pointerEvents: 'none'
+      }} />
+      }
 
       {/* Содержимое кнопки */}
       <span style={{ position: 'relative', zIndex: 1 }}>
@@ -117,8 +118,8 @@ const InteractiveButton = ({
           }
         `}
       </style>
-    </button>
-  );
+    </button>);
+
 };
 
 export default InteractiveButton;

@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api/client';
+import logger from '../utils/logger';
 
 /**
  * Hash user ID to consistent 0-99 value for rollout percentage
@@ -44,7 +45,7 @@ export function useEMRVersion(userId) {
                 const response = await apiClient.get('/v2/emr/feature-flags');
                 setConfig(response.data);
             } catch (error) {
-                console.error('Failed to load EMR feature flags:', error);
+                logger.error('Failed to load EMR feature flags:', error);
                 // Default to v1 on error
                 setConfig({
                     enabled: false,

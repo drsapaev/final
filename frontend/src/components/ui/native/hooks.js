@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-
+import { useState, useEffect } from 'react';
 /**
  * Нативные хуки для замены дизайн-системы
  * Совместимые с существующим API

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useTheme } from '../contexts/ThemeContext';
 import { MacOSSelect, MacOSButton } from './ui/macos';

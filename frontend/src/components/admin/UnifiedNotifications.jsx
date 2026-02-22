@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import FCMManager from './FCMManager';
@@ -27,30 +27,30 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
       border: `1px solid ${colors.border}`,
       marginBottom: '20px'
     }}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            background: activeTab === tab.id ? colors.active : 'transparent',
-            color: activeTab === tab.id ? colors.activeText : colors.text,
-            fontSize: '14px',
-            fontWeight: activeTab === tab.id ? '600' : '400',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
+      {tabs.map((tab) =>
+      <button
+        key={tab.id}
+        onClick={() => onTabChange(tab.id)}
+        style={{
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '6px',
+          background: activeTab === tab.id ? colors.active : 'transparent',
+          color: activeTab === tab.id ? colors.activeText : colors.text,
+          fontSize: '14px',
+          fontWeight: activeTab === tab.id ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+        
           {tab.label}
         </button>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 AdminTabs.propTypes = {
@@ -64,8 +64,8 @@ AdminTabs.propTypes = {
 
 const UnifiedNotifications = () => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'fcm';
-  const { isDark } = useTheme();
+  const section = searchParams.get('section') || 'fcm';void
+  useTheme();
 
   const getActiveTab = (section) => {
     return section === 'registrar-notifications' ? 'registrar' : 'fcm';
@@ -79,9 +79,9 @@ const UnifiedNotifications = () => {
   }, [section]);
 
   const tabs = [
-    { id: 'fcm', label: 'FCM Notifications', icon: 'Bell' },
-    { id: 'registrar', label: 'Registrar Notifications', icon: 'Users' }
-  ];
+  { id: 'fcm', label: 'FCM Notifications', icon: 'Bell' },
+  { id: 'registrar', label: 'Registrar Notifications', icon: 'Users' }];
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -99,13 +99,13 @@ const UnifiedNotifications = () => {
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+        onTabChange={setActiveTab} />
+      
       <div style={{ flex: 1, overflow: 'auto' }}>
         {renderContent()}
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default UnifiedNotifications;

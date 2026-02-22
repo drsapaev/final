@@ -1,4 +1,4 @@
-import React from 'react';
+import PropTypes from 'prop-types';
 import MedicalCard from './MedicalCard';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -188,6 +188,27 @@ const PatientCard = ({
       </div>
     </MedicalCard>
   );
+};
+
+PatientCard.propTypes = {
+  patient: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    name: PropTypes.string,
+    avatar: PropTypes.string,
+    patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    age: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    gender: PropTypes.string,
+    lastVisit: PropTypes.string,
+    department: PropTypes.string,
+    status: PropTypes.string,
+    is_deleted: PropTypes.bool
+  }),
+  onView: PropTypes.func,
+  onEdit: PropTypes.func,
+  onDelete: PropTypes.func,
+  onArchive: PropTypes.func,
+  onRestore: PropTypes.func,
+  className: PropTypes.string
 };
 
 export default PatientCard;

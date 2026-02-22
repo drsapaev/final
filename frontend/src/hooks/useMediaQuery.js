@@ -5,19 +5,17 @@ import { useState, useEffect } from 'react';
  * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлена SSR защита
  */
 export const useMediaQuery = (query) => {
-  // SSR protection
-  if (typeof window === 'undefined') {
-    return false;
-  }
-  
-  const [matches, setMatches] = useState(false);
+  const [matches, setMatches] = useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false
+  ));
 
   useEffect(() => {
-    const media = window.matchMedia(query);
-    
-    if (media.matches !== matches) {
-      setMatches(media.matches);
+    if (typeof window === 'undefined') {
+      return undefined;
     }
+
+    const media = window.matchMedia(query);
+    setMatches(media.matches);
 
     const listener = () => setMatches(media.matches);
     
@@ -30,7 +28,7 @@ export const useMediaQuery = (query) => {
       media.addListener(listener);
       return () => media.removeListener(listener);
     }
-  }, [matches, query]);
+  }, [query]);
 
   return matches;
 };

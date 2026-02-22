@@ -1,19 +1,20 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { 
-  Save, 
-  RotateCcw, 
-  ZoomIn, 
-  ZoomOut, 
-  Download, 
-  Upload,
+import { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import {
+  Save,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+
+
   Trash2,
-  Edit3,
-  CheckCircle,
-  AlertCircle,
-  XCircle,
-  Plus,
-  Minus
-} from 'lucide-react';
+
+
+
+
+  Plus } from
+
+'lucide-react';
 
 /**
  * Компонент схемы зубов для стоматологической панели
@@ -24,12 +25,11 @@ import {
  * - Сохранение и загрузку схем
  * - Масштабирование и навигацию
  */
-const DentalChart = ({ 
-  patientId, 
-  initialData = null, 
-  onSave, 
-  onTreatmentPlan,
-  readOnly = false 
+const DentalChart = ({
+  patientId,
+  initialData = null,
+  onSave,
+  readOnly = false
 }) => {
   const [teeth, setTeeth] = useState({});
   const [selectedTooth, setSelectedTooth] = useState(null);
@@ -40,7 +40,7 @@ const DentalChart = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [treatmentPlan, setTreatmentPlan] = useState([]);
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
-  
+
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -57,55 +57,55 @@ const DentalChart = ({
   // Инициализация зубов (32 зуба)
   const initializeTeeth = () => {
     const teethData = {};
-    
+
     // Верхняя челюсть (11-18, 21-28)
     for (let i = 11; i <= 18; i++) {
-      teethData[i] = { 
-        id: i, 
-        position: 'upper', 
-        status: 'healthy', 
-        condition: '', 
-        treatment: '', 
+      teethData[i] = {
+        id: i,
+        position: 'upper',
+        status: 'healthy',
+        condition: '',
+        treatment: '',
         notes: '',
         x: 0, y: 0
       };
     }
     for (let i = 21; i <= 28; i++) {
-      teethData[i] = { 
-        id: i, 
-        position: 'upper', 
-        status: 'healthy', 
-        condition: '', 
-        treatment: '', 
+      teethData[i] = {
+        id: i,
+        position: 'upper',
+        status: 'healthy',
+        condition: '',
+        treatment: '',
         notes: '',
         x: 0, y: 0
       };
     }
-    
+
     // Нижняя челюсть (31-38, 41-48)
     for (let i = 31; i <= 38; i++) {
-      teethData[i] = { 
-        id: i, 
-        position: 'lower', 
-        status: 'healthy', 
-        condition: '', 
-        treatment: '', 
+      teethData[i] = {
+        id: i,
+        position: 'lower',
+        status: 'healthy',
+        condition: '',
+        treatment: '',
         notes: '',
         x: 0, y: 0
       };
     }
     for (let i = 41; i <= 48; i++) {
-      teethData[i] = { 
-        id: i, 
-        position: 'lower', 
-        status: 'healthy', 
-        condition: '', 
-        treatment: '', 
+      teethData[i] = {
+        id: i,
+        position: 'lower',
+        status: 'healthy',
+        condition: '',
+        treatment: '',
         notes: '',
         x: 0, y: 0
       };
     }
-    
+
     setTeeth(teethData);
   };
 
@@ -126,14 +126,14 @@ const DentalChart = ({
   // Обработка клика по зубу
   const handleToothClick = (toothId) => {
     if (readOnly) return;
-    
+
     setSelectedTooth(toothId);
     setShowToothModal(true);
   };
 
   // Обновление состояния зуба
   const updateTooth = (toothId, updates) => {
-    setTeeth(prev => ({
+    setTeeth((prev) => ({
       ...prev,
       [toothId]: { ...prev[toothId], ...updates }
     }));
@@ -147,15 +147,15 @@ const DentalChart = ({
       patientId,
       timestamp: new Date().toISOString()
     };
-    
+
     if (onSave) {
       onSave(data);
     }
   };
 
   // Добавление в план лечения
-  const addToTreatmentPlan = (toothId, treatment) => {
-    const tooth = teeth[toothId];
+  const addToTreatmentPlan = (toothId, treatment) => {void
+    teeth[toothId];
     const newItem = {
       id: Date.now(),
       toothId,
@@ -167,9 +167,10 @@ const DentalChart = ({
       estimatedTime: 0,
       notes: ''
     };
-    
-    setTreatmentPlan(prev => [...prev, newItem]);
+
+    setTreatmentPlan((prev) => [...prev, newItem]);
   };
+  void addToTreatmentPlan;
 
   // Обработка масштабирования
   const handleZoom = (direction) => {
@@ -197,16 +198,24 @@ const DentalChart = ({
   const handleMouseUp = () => {
     setIsDragging(false);
   };
+  const handleActivationKeyDown = (event, onActivate) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onActivate();
+    }
+  };
 
   // Отрисовка зуба
   const renderTooth = (toothId, tooth) => {
     const status = toothStatuses[tooth.status] || toothStatuses.healthy;
     const isSelected = selectedTooth === toothId;
-    
+
     return (
       <div
         key={toothId}
         className={`tooth ${isSelected ? 'selected' : ''}`}
+        role={!readOnly ? 'button' : undefined}
+        tabIndex={!readOnly ? 0 : undefined}
         style={{
           position: 'absolute',
           left: tooth.x,
@@ -228,22 +237,23 @@ const DentalChart = ({
           transform: `scale(${zoom})`,
           zIndex: isSelected ? 10 : 1
         }}
-        onClick={() => handleToothClick(toothId)}
-        title={`Зуб ${toothId}: ${status.label}`}
-      >
+        onClick={!readOnly ? () => handleToothClick(toothId) : undefined}
+        onKeyDown={!readOnly ? (event) => handleActivationKeyDown(event, () => handleToothClick(toothId)) : undefined}
+        title={`Зуб ${toothId}: ${status.label}`}>
+        
         {toothId}
-      </div>
-    );
+      </div>);
+
   };
 
   // Отрисовка челюсти
   const renderJaw = (isUpper = true) => {
-    const jawTeeth = Object.values(teeth).filter(tooth => 
-      tooth.position === (isUpper ? 'upper' : 'lower')
+    const jawTeeth = Object.values(teeth).filter((tooth) =>
+    tooth.position === (isUpper ? 'upper' : 'lower')
     );
-    
+
     return (
-      <div 
+      <div
         className={`jaw ${isUpper ? 'upper' : 'lower'}`}
         style={{
           position: 'relative',
@@ -253,11 +263,11 @@ const DentalChart = ({
           border: '2px solid #e5e7eb',
           borderRadius: '8px',
           backgroundColor: '#f9fafb'
-        }}
-      >
-        {jawTeeth.map(tooth => renderTooth(tooth.id, tooth))}
-      </div>
-    );
+        }}>
+        
+        {jawTeeth.map((tooth) => renderTooth(tooth.id, tooth))}
+      </div>);
+
   };
 
   return (
@@ -276,22 +286,22 @@ const DentalChart = ({
           <button
             onClick={() => handleZoom('in')}
             className="btn btn-sm"
-            title="Увеличить"
-          >
+            title="Увеличить">
+            
             <ZoomIn size={16} />
           </button>
           <button
             onClick={() => handleZoom('out')}
             className="btn btn-sm"
-            title="Уменьшить"
-          >
+            title="Уменьшить">
+            
             <ZoomOut size={16} />
           </button>
           <button
             onClick={() => setZoom(1)}
             className="btn btn-sm"
-            title="Сбросить масштаб"
-          >
+            title="Сбросить масштаб">
+            
             <RotateCcw size={16} />
           </button>
         </div>
@@ -303,31 +313,31 @@ const DentalChart = ({
         </div>
 
         <div className="toolbar-right" style={{ display: 'flex', gap: '10px' }}>
-          {!readOnly && (
-            <>
+          {!readOnly &&
+          <>
               <button
-                onClick={() => setShowTreatmentModal(true)}
-                className="btn btn-primary btn-sm"
-                title="План лечения"
-              >
+              onClick={() => setShowTreatmentModal(true)}
+              className="btn btn-primary btn-sm"
+              title="План лечения">
+              
                 <Plus size={16} />
                 План лечения
               </button>
               <button
-                onClick={handleSave}
-                className="btn btn-success btn-sm"
-                title="Сохранить"
-              >
+              onClick={handleSave}
+              className="btn btn-success btn-sm"
+              title="Сохранить">
+              
                 <Save size={16} />
                 Сохранить
               </button>
             </>
-          )}
+          }
         </div>
       </div>
 
       {/* Схема зубов */}
-      <div 
+      <div
         ref={containerRef}
         className="dental-chart"
         style={{
@@ -341,11 +351,11 @@ const DentalChart = ({
           transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
           transformOrigin: 'top left'
         }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
+        onPointerDown={handleMouseDown}
+        onPointerMove={handleMouseMove}
+        onPointerUp={handleMouseUp}
+        onPointerLeave={handleMouseUp}>
+        
         {/* Верхняя челюсть */}
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
           <h3 style={{ margin: 0, fontSize: '16px', color: '#374151' }}>Верхняя челюсть</h3>
@@ -371,47 +381,46 @@ const DentalChart = ({
           Состояния зубов:
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
-          {Object.entries(toothStatuses).map(([key, status]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {Object.entries(toothStatuses).map(([key, status]) =>
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                backgroundColor: status.color,
-                border: '1px solid #d1d5db'
-              }} />
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              backgroundColor: status.color,
+              border: '1px solid #d1d5db'
+            }} />
               <span style={{ fontSize: '12px' }}>{status.label}</span>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
       {/* Модальное окно зуба */}
-      {showToothModal && selectedTooth && (
-        <ToothModal
-          tooth={teeth[selectedTooth]}
-          toothId={selectedTooth}
-          onUpdate={(updates) => updateTooth(selectedTooth, updates)}
-          onClose={() => setShowToothModal(false)}
-          onAddToTreatment={addToTreatmentPlan}
-        />
-      )}
+      {showToothModal && selectedTooth &&
+      <ToothModal
+        tooth={teeth[selectedTooth]}
+        toothId={selectedTooth}
+        onUpdate={(updates) => updateTooth(selectedTooth, updates)}
+        onClose={() => setShowToothModal(false)} />
+
+      }
 
       {/* Модальное окно плана лечения */}
-      {showTreatmentModal && (
-        <TreatmentPlanModal
-          treatmentPlan={treatmentPlan}
-          onUpdate={setTreatmentPlan}
-          onClose={() => setShowTreatmentModal(false)}
-          teeth={teeth}
-        />
-      )}
-    </div>
-  );
+      {showTreatmentModal &&
+      <TreatmentPlanModal
+        treatmentPlan={treatmentPlan}
+        onUpdate={setTreatmentPlan}
+        onClose={() => setShowTreatmentModal(false)}
+        teeth={teeth} />
+
+      }
+    </div>);
+
 };
 
 // Модальное окно для редактирования зуба
-const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => {
+const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
   const [formData, setFormData] = useState({
     status: tooth.status || 'healthy',
     condition: tooth.condition || '',
@@ -461,8 +470,8 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => 
                 padding: '8px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px'
-              }}
-            >
+              }}>
+              
               <option value="healthy">Здоровый</option>
               <option value="caries">Кариес</option>
               <option value="filling">Пломба</option>
@@ -490,8 +499,8 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => 
                 padding: '8px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div style={{ marginBottom: '15px' }}>
@@ -508,8 +517,8 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => 
                 padding: '8px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div style={{ marginBottom: '20px' }}>
@@ -527,8 +536,8 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => 
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
                 resize: 'vertical'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -541,8 +550,8 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => 
                 borderRadius: '4px',
                 backgroundColor: '#fff',
                 cursor: 'pointer'
-              }}
-            >
+              }}>
+              
               Отмена
             </button>
             <button
@@ -554,15 +563,15 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose, onAddToTreatment }) => 
                 backgroundColor: '#3b82f6',
                 color: '#fff',
                 cursor: 'pointer'
-              }}
-            >
+              }}>
+              
               Сохранить
             </button>
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Модальное окно плана лечения
@@ -596,7 +605,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
   };
 
   const removeItem = (id) => {
-    onUpdate(treatmentPlan.filter(item => item.id !== id));
+    onUpdate(treatmentPlan.filter((item) => item.id !== id));
   };
 
   return (
@@ -629,27 +638,27 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
             <select
               value={newItem.toothId}
               onChange={(e) => setNewItem({ ...newItem, toothId: e.target.value })}
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-            >
+              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}>
+              
               <option value="">Выберите зуб</option>
-              {Object.keys(teeth).map(toothId => (
-                <option key={toothId} value={toothId}>Зуб {toothId}</option>
-              ))}
+              {Object.keys(teeth).map((toothId) =>
+              <option key={toothId} value={toothId}>Зуб {toothId}</option>
+              )}
             </select>
             <input
               type="text"
               value={newItem.treatment}
               onChange={(e) => setNewItem({ ...newItem, treatment: e.target.value })}
               placeholder="Описание лечения"
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-            />
+              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
+            
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <select
               value={newItem.priority}
               onChange={(e) => setNewItem({ ...newItem, priority: e.target.value })}
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-            >
+              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}>
+              
               <option value="low">Низкий</option>
               <option value="medium">Средний</option>
               <option value="high">Высокий</option>
@@ -659,15 +668,15 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               value={newItem.estimatedCost}
               onChange={(e) => setNewItem({ ...newItem, estimatedCost: e.target.value })}
               placeholder="Стоимость"
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-            />
+              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
+            
             <input
               type="number"
               value={newItem.estimatedTime}
               onChange={(e) => setNewItem({ ...newItem, estimatedTime: e.target.value })}
               placeholder="Время (мин)"
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-            />
+              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
+            
           </div>
           <button
             onClick={addItem}
@@ -678,8 +687,8 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               backgroundColor: '#10b981',
               color: '#fff',
               cursor: 'pointer'
-            }}
-          >
+            }}>
+            
             Добавить
           </button>
         </div>
@@ -687,17 +696,17 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
         {/* Список планов лечения */}
         <div style={{ marginBottom: '20px' }}>
           <h4 style={{ margin: '0 0 15px 0' }}>Текущий план</h4>
-          {treatmentPlan.length === 0 ? (
-            <p style={{ color: '#6b7280', fontStyle: 'italic' }}>План лечения пуст</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {treatmentPlan.map(item => (
-                <div key={item.id} style={{
-                  padding: '15px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff'
-                }}>
+          {treatmentPlan.length === 0 ?
+          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>План лечения пуст</p> :
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {treatmentPlan.map((item) =>
+            <div key={item.id} style={{
+              padding: '15px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              backgroundColor: '#fff'
+            }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '600', marginBottom: '5px' }}>
@@ -706,31 +715,31 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
                       <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '5px' }}>
                         Приоритет: {item.priority} | Стоимость: {item.estimatedCost} | Время: {item.estimatedTime} мин
                       </div>
-                      {item.notes && (
-                        <div style={{ fontSize: '14px', color: '#374151' }}>
+                      {item.notes &&
+                  <div style={{ fontSize: '14px', color: '#374151' }}>
                           {item.notes}
                         </div>
-                      )}
+                  }
                     </div>
                     <button
-                      onClick={() => removeItem(item.id)}
-                      style={{
-                        padding: '4px 8px',
-                        border: 'none',
-                        borderRadius: '4px',
-                        backgroundColor: '#ef4444',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
+                  onClick={() => removeItem(item.id)}
+                  style={{
+                    padding: '4px 8px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    backgroundColor: '#ef4444',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}>
+                  
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
-              ))}
+            )}
             </div>
-          )}
+          }
         </div>
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -742,15 +751,60 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               borderRadius: '4px',
               backgroundColor: '#fff',
               cursor: 'pointer'
-            }}
-          >
+            }}>
+            
             Закрыть
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
+};
+
+const toothShape = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  position: PropTypes.string,
+  status: PropTypes.string,
+  condition: PropTypes.string,
+  treatment: PropTypes.string,
+  notes: PropTypes.string,
+  x: PropTypes.number,
+  y: PropTypes.number
+});
+
+const treatmentPlanItemShape = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  toothId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  treatment: PropTypes.string,
+  priority: PropTypes.string,
+  estimatedCost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  estimatedTime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  notes: PropTypes.string,
+  status: PropTypes.string
+});
+
+DentalChart.propTypes = {
+  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  initialData: PropTypes.shape({
+    teeth: PropTypes.objectOf(toothShape),
+    treatmentPlan: PropTypes.arrayOf(treatmentPlanItemShape)
+  }),
+  onSave: PropTypes.func,
+  readOnly: PropTypes.bool
+};
+
+ToothModal.propTypes = {
+  tooth: toothShape,
+  toothId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onUpdate: PropTypes.func,
+  onClose: PropTypes.func
+};
+
+TreatmentPlanModal.propTypes = {
+  treatmentPlan: PropTypes.arrayOf(treatmentPlanItemShape),
+  onUpdate: PropTypes.func,
+  onClose: PropTypes.func,
+  teeth: PropTypes.objectOf(toothShape)
 };
 
 export default DentalChart;
-

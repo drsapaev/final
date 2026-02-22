@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../api/client';
+import logger from '../../utils/logger';
 import './EMRDiffViewer.css';
 
 /**
@@ -116,7 +117,7 @@ export function EMRDiffViewer({
                 );
                 setDiff(response.data);
             } catch (err) {
-                console.error('Failed to load diff:', err);
+                logger.error('Failed to load diff:', err);
                 setError(err.message || 'Не удалось загрузить сравнение');
             } finally {
                 setLoading(false);

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { 
   CheckCircle, 
   AlertCircle, 
@@ -28,6 +29,14 @@ const ModernToast = ({
   const [isExiting, setIsExiting] = useState(false);
   const [progress, setProgress] = useState(100);
 
+  // Обработка закрытия
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose?.(id);
+    }, 300);
+  }, [id, onClose]);
+
   // Показать toast при монтировании
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 50);
@@ -53,15 +62,7 @@ const ModernToast = ({
       clearInterval(progressInterval);
       clearTimeout(closeTimer);
     };
-  }, [duration, persistent]);
-
-  // Обработка закрытия
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onClose?.(id);
-    }, 300);
-  };
+  }, [duration, persistent, handleClose]);
 
   // Получение иконки и цветов для типа
   const getTypeConfig = () => {
@@ -185,6 +186,23 @@ const ModernToast = ({
       )}
     </div>
   );
+};
+
+ModernToast.propTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  type: PropTypes.oneOf(['success', 'error', 'warning', 'info']),
+  title: PropTypes.node,
+  message: PropTypes.node,
+  duration: PropTypes.number,
+  persistent: PropTypes.bool,
+  position: PropTypes.string,
+  showProgress: PropTypes.bool,
+  onClose: PropTypes.func,
+  action: PropTypes.shape({
+    onClick: PropTypes.func,
+    label: PropTypes.node
+  }),
+  className: PropTypes.string
 };
 
 export default ModernToast;

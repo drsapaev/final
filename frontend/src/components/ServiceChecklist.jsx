@@ -1,5 +1,3 @@
-import React from 'react';
-
 const ServiceChecklist = ({ value = [], onChange, department }) => {
   const services = {
     cardio: [

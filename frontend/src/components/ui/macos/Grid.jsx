@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -22,8 +23,12 @@ const Grid = React.forwardRef(({
   alignItems = 'stretch',
   wrap = 'wrap',
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
+  void sm;
+  void md;
+  void lg;
+  void xl;
 
   const getGridStyles = () => {
     if (container) {
@@ -41,7 +46,7 @@ const Grid = React.forwardRef(({
     if (item) {
       const getFlexBasis = (size) => {
         if (typeof size === 'number') {
-          return `${(size / 12) * 100}%`;
+          return `${size / 12 * 100}%`;
         }
         if (typeof size === 'boolean') {
           return 'auto';
@@ -51,7 +56,7 @@ const Grid = React.forwardRef(({
 
       const getMaxWidth = (size) => {
         if (typeof size === 'number') {
-          return `${(size / 12) * 100}%`;
+          return `${size / 12 * 100}%`;
         }
         return 'none';
       };
@@ -75,11 +80,11 @@ const Grid = React.forwardRef(({
       ref={ref}
       className={`mac-grid ${container ? 'mac-grid--container' : ''} ${item ? 'mac-grid--item' : ''} ${className}`}
       style={gridStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 /**
@@ -107,11 +112,11 @@ const GridContainer = React.forwardRef(({
       wrap={wrap}
       className={className}
       style={style}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </Grid>
-  );
+    </Grid>);
+
 });
 
 /**
@@ -139,16 +144,56 @@ const GridItem = React.forwardRef(({
       xl={xl}
       className={className}
       style={style}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </Grid>
-  );
+    </Grid>);
+
 });
 
 Grid.displayName = 'Grid';
 GridContainer.displayName = 'GridContainer';
 GridItem.displayName = 'GridItem';
+
+Grid.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  container: PropTypes.bool,
+  item: PropTypes.bool,
+  xs: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  sm: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  md: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  lg: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  xl: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  spacing: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  direction: PropTypes.string,
+  justify: PropTypes.string,
+  alignItems: PropTypes.string,
+  wrap: PropTypes.string
+};
+
+GridContainer.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  spacing: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  direction: PropTypes.string,
+  justify: PropTypes.string,
+  alignItems: PropTypes.string,
+  wrap: PropTypes.string
+};
+
+GridItem.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  xs: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  sm: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  md: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  lg: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
+  xl: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string])
+};
 
 export default Grid;
 export { GridContainer, GridItem };

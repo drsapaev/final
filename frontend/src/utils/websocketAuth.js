@@ -52,7 +52,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
     logger.log('❌ Аутентифицированное WebSocket отключено', event.code, event.reason);
 
     // Обрабатываем ошибки аутентификации
-    if (event.code === 1008) { // WS_1008_POLICY_VIOLATION
+    if (event.code === 1008) {// WS_1008_POLICY_VIOLATION
       logger.error('❌ Ошибка аутентификации WebSocket:', event.reason);
       if (onAuthError) {
         onAuthError(event.reason || 'Authentication failed');
@@ -145,8 +145,8 @@ export function sendAuthenticatedMessage(ws, message) {
 export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = {}) {
   const {
     maxReconnectAttempts = 10,
-    initialReconnectDelay = 1000,  // Start with 1 second
-    maxReconnectDelay = 30000,     // Max 30 seconds
+    initialReconnectDelay = 1000, // Start with 1 second
+    maxReconnectDelay = 30000, // Max 30 seconds
     ...wsOptions
   } = options;
 
@@ -221,10 +221,10 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
             } else if (data.type === 'pong') {
               lastPongTime = Date.now();
             }
-          } catch (e) {
+          } catch {
+
             // Not JSON, ignore
           }
-
           if (wsOptions.onMessage) wsOptions.onMessage(event);
         }
       });
@@ -241,7 +241,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
   // ✅ SECURITY: Heartbeat monitoring
   const startHeartbeat = () => {
     const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-    const HEARTBEAT_TIMEOUT = 120000;  // 2 minutes
+    const HEARTBEAT_TIMEOUT = 120000; // 2 minutes
 
     heartbeatInterval = setInterval(() => {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -249,7 +249,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
       }
 
       // Check if we've received a pong recently
-      if (lastPongTime && (Date.now() - lastPongTime) > HEARTBEAT_TIMEOUT) {
+      if (lastPongTime && Date.now() - lastPongTime > HEARTBEAT_TIMEOUT) {
         logger.warn('⚠️ Heartbeat timeout, reconnecting...');
         ws.close();
         return;
@@ -305,5 +305,3 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
     }
   };
 }
-
-

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import {
@@ -12,7 +12,7 @@ import {
   Lock
 } from 'lucide-react';
 
-const AppActivation = ({ onClose }) => {
+const AppActivation = () => {
   const [activationKey, setActivationKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

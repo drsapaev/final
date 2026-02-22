@@ -3,7 +3,8 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
@@ -25,7 +26,7 @@ export const validators = {
 
   phone: (value) => {
     if (!value) return true;
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     return phoneRegex.test(value.replace(/\s/g, ''));
   },
 
@@ -86,7 +87,9 @@ export const useForm = (initialValues = {}, options = {}) => {
     validateOnChange = true,
     validateOnBlur = true,
     validateOnSubmit = true,
-    resetOnSubmit = false
+    resetOnSubmit = false,
+    validation = {},
+    onSubmit = null
   } = options;
 
   const [values, setValues] = useState(initialValues);
@@ -118,7 +121,7 @@ export const useForm = (initialValues = {}, options = {}) => {
     let formIsValid = true;
 
     Object.entries(values).forEach(([name, value]) => {
-      const fieldRules = options.validation?.[name] || {};
+      const fieldRules = validation?.[name] || {};
       const fieldErrors = validateField(name, value, fieldRules);
 
       if (fieldErrors.length > 0) {
@@ -130,18 +133,18 @@ export const useForm = (initialValues = {}, options = {}) => {
     setErrors(allErrors);
     setIsValid(formIsValid);
     return formIsValid;
-  }, [values, options.validation, validateField]);
+  }, [values, validation, validateField]);
 
   // Обработка изменения поля
   const handleChange = useCallback((name, value) => {
-    setValues(prev => ({
+    setValues((prev) => ({
       ...prev,
       [name]: value
     }));
 
-    if (validateOnChange && options.validation?.[name]) {
-      const fieldErrors = validateField(name, value, options.validation[name]);
-      setErrors(prev => ({
+    if (validateOnChange && validation?.[name]) {
+      const fieldErrors = validateField(name, value, validation[name]);
+      setErrors((prev) => ({
         ...prev,
         [name]: fieldErrors
       }));
@@ -149,36 +152,36 @@ export const useForm = (initialValues = {}, options = {}) => {
 
     // Очистка ошибок при изменении
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
         [name]: []
       }));
     }
-  }, [validateOnChange, options.validation, validateField, errors]);
+  }, [validateOnChange, validation, validateField, errors]);
 
   // Обработка потери фокуса
   const handleBlur = useCallback((name) => {
-    setTouched(prev => ({
+    setTouched((prev) => ({
       ...prev,
       [name]: true
     }));
 
-    if (validateOnBlur && options.validation?.[name]) {
+    if (validateOnBlur && validation?.[name]) {
       const value = values[name];
-      const fieldErrors = validateField(name, value, options.validation[name]);
-      setErrors(prev => ({
+      const fieldErrors = validateField(name, value, validation[name]);
+      setErrors((prev) => ({
         ...prev,
         [name]: fieldErrors
       }));
     }
-  }, [validateOnBlur, options.validation, validateField, values]);
+  }, [validateOnBlur, validation, validateField, values]);
 
   // Обработка фокуса
-  const handleFocus = useCallback((name) => {
-    // Можно добавить логику для фокуса
-  }, []);
+  const handleFocus = useCallback(() => {
 
-  // Сброс формы
+
+    // Можно добавить логику для фокуса
+  }, []); // Сброс формы
   const reset = useCallback(() => {
     setValues(initialValues);
     setErrors({});
@@ -201,8 +204,8 @@ export const useForm = (initialValues = {}, options = {}) => {
     setIsSubmitting(true);
 
     try {
-      if (options.onSubmit) {
-        await options.onSubmit(values);
+      if (onSubmit) {
+        await onSubmit(values);
       }
 
       if (resetOnSubmit) {
@@ -213,7 +216,7 @@ export const useForm = (initialValues = {}, options = {}) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [values, validateOnSubmit, validateForm, options.onSubmit, resetOnSubmit, reset]);
+  }, [values, validateOnSubmit, validateForm, onSubmit, resetOnSubmit, reset]);
 
   // Получение значения поля
   const getFieldProps = useCallback((name) => {
@@ -277,7 +280,6 @@ export const FormField = ({
   required = false,
   disabled = false,
   error,
-  touched,
   value,
   onChange,
   onBlur,
@@ -296,21 +298,21 @@ export const FormField = ({
 
   return (
     <div className={`form-field ${className}`} style={{ marginBottom: '16px' }}>
-      {label && (
-        <label
-          htmlFor={name}
-          style={{
-            display: 'block',
-            marginBottom: '4px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: error ? '#ef4444' : '#374151'
-          }}
-        >
+      {label &&
+      <label
+        htmlFor={name}
+        style={{
+          display: 'block',
+          marginBottom: '4px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: error ? '#ef4444' : '#374151'
+        }}>
+        
           {label}
           {required && <span style={{ color: '#ef4444' }}> *</span>}
         </label>
-      )}
+      }
 
       <input
         id={name}
@@ -345,23 +347,23 @@ export const FormField = ({
           }
           if (onBlur) onBlur(e);
         }}
-        {...props}
-      />
+        {...props} />
+      
 
-      {shouldRender && error && (
-        <div
-          className={`form-field-error ${animationClasses}`}
-          style={{
-            marginTop: '4px',
-            fontSize: '12px',
-            color: '#ef4444'
-          }}
-        >
+      {shouldRender && error &&
+      <div
+        className={`form-field-error ${animationClasses}`}
+        style={{
+          marginTop: '4px',
+          fontSize: '12px',
+          color: '#ef4444'
+        }}>
+        
           {error}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 // Текстовое поле формы
@@ -372,7 +374,6 @@ export const FormTextarea = ({
   required = false,
   disabled = false,
   error,
-  touched,
   value,
   onChange,
   onBlur,
@@ -390,21 +391,21 @@ export const FormTextarea = ({
 
   return (
     <div className={`form-textarea ${className}`} style={{ marginBottom: '16px' }}>
-      {label && (
-        <label
-          htmlFor={name}
-          style={{
-            display: 'block',
-            marginBottom: '4px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: error ? '#ef4444' : '#374151'
-          }}
-        >
+      {label &&
+      <label
+        htmlFor={name}
+        style={{
+          display: 'block',
+          marginBottom: '4px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: error ? '#ef4444' : '#374151'
+        }}>
+        
           {label}
           {required && <span style={{ color: '#ef4444' }}> *</span>}
         </label>
-      )}
+      }
 
       <textarea
         id={name}
@@ -441,22 +442,22 @@ export const FormTextarea = ({
           }
           if (onBlur) onBlur(e);
         }}
-        {...props}
-      />
+        {...props} />
+      
 
-      {error && (
-        <div
-          style={{
-            marginTop: '4px',
-            fontSize: '12px',
-            color: '#ef4444'
-          }}
-        >
+      {error &&
+      <div
+        style={{
+          marginTop: '4px',
+          fontSize: '12px',
+          color: '#ef4444'
+        }}>
+        
           {error}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 // Выпадающий список формы
@@ -467,7 +468,6 @@ export const FormSelect = ({
   required = false,
   disabled = false,
   error,
-  touched,
   value,
   onChange,
   onBlur,
@@ -485,21 +485,21 @@ export const FormSelect = ({
 
   return (
     <div className={`form-select ${className}`} style={{ marginBottom: '16px' }}>
-      {label && (
-        <label
-          htmlFor={name}
-          style={{
-            display: 'block',
-            marginBottom: '4px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: error ? '#ef4444' : '#374151'
-          }}
-        >
+      {label &&
+      <label
+        htmlFor={name}
+        style={{
+          display: 'block',
+          marginBottom: '4px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: error ? '#ef4444' : '#374151'
+        }}>
+        
           {label}
           {required && <span style={{ color: '#ef4444' }}> *</span>}
         </label>
-      )}
+      }
 
       <select
         id={name}
@@ -533,33 +533,33 @@ export const FormSelect = ({
           }
           if (onBlur) onBlur(e);
         }}
-        {...props}
-      >
-        {placeholder && (
-          <option value="" disabled>
+        {...props}>
+        
+        {placeholder &&
+        <option value="" disabled>
             {placeholder}
           </option>
-        )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
+        }
+        {options.map((option) =>
+        <option key={option.value} value={option.value}>
             {option.label}
           </option>
-        ))}
+        )}
       </select>
 
-      {error && (
-        <div
-          style={{
-            marginTop: '4px',
-            fontSize: '12px',
-            color: '#ef4444'
-          }}
-        >
+      {error &&
+      <div
+        style={{
+          marginTop: '4px',
+          fontSize: '12px',
+          color: '#ef4444'
+        }}>
+        
           {error}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 // Компонент формы
@@ -587,11 +587,60 @@ export const Form = ({
         gap: '16px',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </form>
-  );
+    </form>);
+
+};
+
+FormField.propTypes = {
+  name: PropTypes.string,
+  label: PropTypes.node,
+  type: PropTypes.string,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  disabled: PropTypes.bool,
+  error: PropTypes.node,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  onBlur: PropTypes.func,
+  className: PropTypes.string
+};
+
+FormTextarea.propTypes = {
+  name: PropTypes.string,
+  label: PropTypes.node,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  disabled: PropTypes.bool,
+  error: PropTypes.node,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  onBlur: PropTypes.func,
+  rows: PropTypes.number,
+  className: PropTypes.string
+};
+
+FormSelect.propTypes = {
+  name: PropTypes.string,
+  label: PropTypes.node,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  disabled: PropTypes.bool,
+  error: PropTypes.node,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  onBlur: PropTypes.func,
+  options: PropTypes.array,
+  className: PropTypes.string
+};
+
+Form.propTypes = {
+  children: PropTypes.node,
+  onSubmit: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default useForm;

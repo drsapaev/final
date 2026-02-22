@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Box, Card, CardContent, Typography, Button, Alert } from '../components/ui/macos';
 import { XCircle as CancelIcon, Home as HomeIcon, RefreshCw as RetryIcon, Headset as SupportIcon } from 'lucide-react';
@@ -6,7 +6,7 @@ import { XCircle as CancelIcon, Home as HomeIcon, RefreshCw as RetryIcon, Headse
 const PaymentCancel = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   // Получаем параметры из URL
   const paymentId = searchParams.get('payment_id');
   const reason = searchParams.get('reason');
@@ -35,7 +35,7 @@ const PaymentCancel = () => {
       'technical_error': 'Техническая ошибка',
       'provider_error': 'Ошибка платежной системы'
     };
-    
+
     return reasons[reason] || 'Платеж был отменен';
   };
 
@@ -55,8 +55,8 @@ const PaymentCancel = () => {
       </Card>
 
       {/* Информация об ошибке */}
-      {error && (
-        <Alert severity="error" style={{ marginBottom: 12 }}>
+      {error &&
+      <Alert severity="error" style={{ marginBottom: 12 }}>
           <Typography variant="body1" style={{ fontWeight: 600 }}>
             Детали ошибки:
           </Typography>
@@ -64,11 +64,11 @@ const PaymentCancel = () => {
             {error}
           </Typography>
         </Alert>
-      )}
+      }
 
       {/* Информация о платеже */}
-      {paymentId && (
-        <Card style={{ marginBottom: 16 }}>
+      {paymentId &&
+      <Card style={{ marginBottom: 16 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               Информация о платеже
@@ -85,7 +85,7 @@ const PaymentCancel = () => {
             </div>
           </CardContent>
         </Card>
-      )}
+      }
 
       {/* Рекомендации */}
       <Card style={{ marginBottom: 16 }}>
@@ -134,8 +134,8 @@ const PaymentCancel = () => {
           Email: support@clinic.uz
         </Typography>
       </Box>
-    </Box>
-  );
+    </Box>);
+
 };
 
 export default PaymentCancel;

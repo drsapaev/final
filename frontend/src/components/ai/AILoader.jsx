@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Typography, Progress, CircularProgress } from '../../components/ui/macos';
 import { Brain, Sparkles } from 'lucide-react';
 

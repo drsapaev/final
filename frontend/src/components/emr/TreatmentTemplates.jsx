@@ -9,7 +9,7 @@
  * Используется в секции "План" в SingleSheetEMR
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import './TreatmentTemplates.css';
 
 // ============================================
@@ -327,9 +327,13 @@ const TreatmentTemplates = ({
 
             {/* Backdrop */}
             {isOpen && (
-                <div
+                <button
+                    type="button"
                     className="treatment-templates__backdrop"
                     onClick={() => setIsOpen(false)}
+                    tabIndex={-1}
+                    style={{ border: 'none', margin: 0, padding: 0 }}
+                    aria-label="Закрыть шаблоны лечения"
                 />
             )}
         </div>

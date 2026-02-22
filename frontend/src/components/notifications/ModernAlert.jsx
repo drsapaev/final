@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   CheckCircle, 
   AlertCircle, 
@@ -117,18 +117,29 @@ const ModernAlert = ({
 
         {/* Заголовок и кнопка сворачивания */}
         <div className="alert-title-section">
-          {title && (
-            <div 
-              className={`alert-title ${collapsible ? 'clickable' : ''}`}
-              onClick={collapsible ? toggleExpanded : undefined}
+          {title && collapsible && (
+            <div
+              className="alert-title clickable"
+              onClick={toggleExpanded}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  toggleExpanded();
+                }
+              }}
               style={{ color: getColor('textPrimary') }}
             >
               {title}
-              {collapsible && (
-                <span className="alert-toggle">
-                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </span>
-              )}
+              <span className="alert-toggle">
+                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </span>
+            </div>
+          )}
+          {title && !collapsible && (
+            <div className="alert-title" style={{ color: getColor('textPrimary') }}>
+              {title}
             </div>
           )}
         </div>

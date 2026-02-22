@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -21,8 +22,10 @@ const Input = React.forwardRef(({
   label,
   hint,
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
+  void variant;
+  void size;
   const [isFocused, setIsFocused] = useState(false);
 
   // macOS input styles based on variant and state
@@ -83,22 +86,22 @@ const Input = React.forwardRef(({
   return (
     <div className={`mac-input-wrapper ${className}`} style={{ position: 'relative' }}>
       {/* Label */}
-      {label && (
-        <label
-          className="mac-input-label"
-          style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: error ? '#ff3b30' : 'var(--mac-text-secondary)',
-            marginBottom: '4px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-          }}
-        >
+      {label &&
+      <label
+        className="mac-input-label"
+        style={{
+          display: 'block',
+          fontSize: '13px',
+          fontWeight: '500',
+          color: error ? '#ff3b30' : 'var(--mac-text-secondary)',
+          marginBottom: '4px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
+        }}>
+
           {label}
           {props.required && <span style={{ color: '#ff3b30', marginLeft: '2px' }}>*</span>}
         </label>
-      )}
+      }
 
       {/* Input field */}
       <input
@@ -112,61 +115,78 @@ const Input = React.forwardRef(({
         placeholder={placeholder}
         className="mac-input"
         style={inputStyles}
-        {...props}
-      />
+        {...props} />
+
 
       {/* Hint text */}
-      {hint && (
-        <div
-          className="mac-input-hint"
-          style={{
-            fontSize: '11px',
-            color: 'var(--mac-text-tertiary)',
-            marginTop: '4px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-          }}
-        >
+      {hint &&
+      <div
+        className="mac-input-hint"
+        style={{
+          fontSize: '11px',
+          color: 'var(--mac-text-tertiary)',
+          marginTop: '4px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
+        }}>
+
           {hint}
         </div>
-      )}
+      }
 
       {/* Error message */}
-      {error && (
-        <div
-          className="mac-input-error"
-          style={{
-            fontSize: '11px',
-            color: '#ff3b30',
-            marginTop: '4px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-          }}
-        >
+      {error &&
+      <div
+        className="mac-input-error"
+        style={{
+          fontSize: '11px',
+          color: '#ff3b30',
+          marginTop: '4px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
+        }}>
+
           {error}
         </div>
-      )}
+      }
 
       {/* Focus indicator */}
-      {isFocused && !error && (
-        <div
-          className="mac-input-focus-indicator"
-          style={{
-            position: 'absolute',
-            top: '-1px',
-            left: '-1px',
-            right: '-1px',
-            bottom: '-1px',
-            border: '2px solid #007aff',
-            borderRadius: '7px',
-            pointerEvents: 'none',
-            zIndex: 1
-          }}
-        />
-      )}
-    </div>
-  );
+      {isFocused && !error &&
+      <div
+        className="mac-input-focus-indicator"
+        style={{
+          position: 'absolute',
+          top: '-1px',
+          left: '-1px',
+          right: '-1px',
+          bottom: '-1px',
+          border: '2px solid #007aff',
+          borderRadius: '7px',
+          pointerEvents: 'none',
+          zIndex: 1
+        }} />
+
+      }
+    </div>);
+
 });
 
 Input.displayName = 'macOS Input';
 
-export default Input;
+Input.propTypes = {
+  type: PropTypes.string,
+  variant: PropTypes.string,
+  size: PropTypes.string,
+  error: PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
+  disabled: PropTypes.bool,
+  placeholder: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  label: PropTypes.node,
+  hint: PropTypes.node,
+  required: PropTypes.bool
+};
 
+export default Input;

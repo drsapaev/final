@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  CreditCard, 
-  ExternalLink, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
+import { useState, useEffect, useRef } from 'react';
+import {
+  CreditCard,
+  ExternalLink,
+  CheckCircle,
+  XCircle,
+  Clock,
   AlertCircle,
   RefreshCw,
-  Printer
-} from 'lucide-react';
+  Printer } from
+'lucide-react';
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
@@ -16,11 +16,11 @@ import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import './PaymentPayMe.css';
 
-const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
+const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
-const PaymentPayMe = ({ 
-  isOpen, 
-  onClose, 
+const PaymentPayMe = ({
+  isOpen,
+  onClose,
   invoiceId,
   totalAmount,
   currency = 'UZS',
@@ -28,23 +28,23 @@ const PaymentPayMe = ({
   onError
 }) => {
   const { executeAction, loading } = useAsyncAction();
-  
+
   const [paymentState, setPaymentState] = useState('init'); // init|processing|polling|success|failed
   const [paymentUrl, setPaymentUrl] = useState(null);
-  const [providerPaymentId, setProviderPaymentId] = useState(null);
-  const [error, setError] = useState(null);
-  const [pollingInterval, setPollingInterval] = useState(null);
+  const [, setProviderPaymentId] = useState(null);
+  const [error, setError] = useState(null);void
+  useState(null);
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [printTickets, setPrintTickets] = useState([]);
   const [showTicketPrinter, setShowTicketPrinter] = useState(false);
-  
+
   const maxPollingAttempts = 60; // 5 минут при интервале 5 сек
   const pollingIntervalMs = 5000; // 5 секунд
-  
+
   // Refs для управления polling
   const pollingRef = useRef(null);
   const attemptsRef = useRef(0);
-  
+
   // Очистка при закрытии
   useEffect(() => {
     if (!isOpen) {
@@ -52,19 +52,19 @@ const PaymentPayMe = ({
       resetState();
     }
   }, [isOpen]);
-  
+
   // Очистка polling при размонтировании
   useEffect(() => {
     return () => clearPolling();
   }, []);
-  
+
   const clearPolling = () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
   };
-  
+
   const resetState = () => {
     setPaymentState('init');
     setPaymentUrl(null);
@@ -74,15 +74,15 @@ const PaymentPayMe = ({
     setPrintTickets([]);
     attemptsRef.current = 0;
   };
-  
+
   // ===================== ИНИЦИАЦИЯ ПЛАТЕЖА =====================
-  
+
   const initPayment = async () => {
     if (!invoiceId) {
       setError('ID invoice не указан');
       return;
     }
-    
+
     await executeAction(
       async () => {
         const response = await fetch(`${API_BASE}/registrar/invoice/init-payment`, {
@@ -95,23 +95,23 @@ const PaymentPayMe = ({
             cancel_url: `${window.location.origin}/payment/cancel`
           })
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.detail || 'Ошибка инициации платежа');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
           setPaymentUrl(data.payment_url);
           setProviderPaymentId(data.provider_payment_id);
           setPaymentState('processing');
-          
+
           // Автоматически открываем ссылку на оплату
           if (data.payment_url) {
             window.open(data.payment_url, '_blank');
-            
+
             // Начинаем polling через 10 секунд
             setTimeout(() => {
               startPolling();
@@ -120,7 +120,7 @@ const PaymentPayMe = ({
         } else {
           throw new Error(data.error_message || 'Не удалось создать платёж');
         }
-        
+
         return data;
       },
       {
@@ -134,23 +134,23 @@ const PaymentPayMe = ({
       }
     );
   };
-  
+
   // ===================== POLLING СТАТУСА =====================
-  
+
   const startPolling = () => {
     setPaymentState('polling');
     attemptsRef.current = 0;
-    
+
     pollingRef.current = setInterval(async () => {
       attemptsRef.current += 1;
       setPollingAttempts(attemptsRef.current);
-      
+
       try {
         await checkPaymentStatus();
       } catch (error) {
         logger.error('Polling error:', error);
       }
-      
+
       // Останавливаем polling после максимального количества попыток
       if (attemptsRef.current >= maxPollingAttempts) {
         clearPolling();
@@ -160,27 +160,27 @@ const PaymentPayMe = ({
       }
     }, pollingIntervalMs);
   };
-  
+
   const checkPaymentStatus = async () => {
     const response = await fetch(`${API_BASE}/registrar/invoice/${invoiceId}/status`);
-    
+
     if (response.ok) {
       const data = await response.json();
-      
+
       if (data.status === 'paid') {
         clearPolling();
         setPaymentState('success');
-        
+
         // Получаем данные для печати талонов
         await loadPrintTickets();
-        
+
         toast.success('Платёж успешно завершён!');
-        
+
         // Показываем принтер талонов если есть талоны для печати
         if (printTickets.length > 0) {
           setShowTicketPrinter(true);
         }
-        
+
         if (onSuccess) {
           onSuccess(data);
         }
@@ -188,7 +188,7 @@ const PaymentPayMe = ({
         clearPolling();
         setPaymentState('failed');
         setError(`Платёж ${data.status === 'failed' ? 'не прошёл' : 'отменён'}`);
-        
+
         if (onError) {
           onError(new Error(`Payment ${data.status}`));
         }
@@ -198,49 +198,49 @@ const PaymentPayMe = ({
       logger.error('Error checking payment status:', response.statusText);
     }
   };
-  
+
   // ===================== ПЕЧАТЬ ТАЛОНОВ =====================
-  
+
   const loadPrintTickets = async () => {
     try {
       // Получаем данные о талонах из последнего ответа API
       // Данные должны приходить в onSuccess callback
       // Пока оставляем mock данные для тестирования множественных талонов
       const mockTickets = [
-        {
-          visit_id: 1,
-          queue_tag: 'cardiology_common',
-          queue_name: 'Кардиолог',
-          queue_number: 15,
-          queue_id: 1,
-          patient_id: 1,
-          patient_name: 'Юля Михайловна',
-          doctor_name: 'Д-р Петров',
-          department: 'Кардиология',
-          visit_date: new Date().toISOString().split('T')[0],
-          visit_time: '10:30'
-        },
-        {
-          visit_id: 1,
-          queue_tag: 'dermatology',
-          queue_name: 'Дерматолог',
-          queue_number: 8,
-          queue_id: 2,
-          patient_id: 1,
-          patient_name: 'Юля Михайловна',
-          doctor_name: 'Д-р Смирнова',
-          department: 'Дерматология',
-          visit_date: new Date().toISOString().split('T')[0],
-          visit_time: '10:30'
-        }
-      ];
-      
+      {
+        visit_id: 1,
+        queue_tag: 'cardiology_common',
+        queue_name: 'Кардиолог',
+        queue_number: 15,
+        queue_id: 1,
+        patient_id: 1,
+        patient_name: 'Юля Михайловна',
+        doctor_name: 'Д-р Петров',
+        department: 'Кардиология',
+        visit_date: new Date().toISOString().split('T')[0],
+        visit_time: '10:30'
+      },
+      {
+        visit_id: 1,
+        queue_tag: 'dermatology',
+        queue_name: 'Дерматолог',
+        queue_number: 8,
+        queue_id: 2,
+        patient_id: 1,
+        patient_name: 'Юля Михайловна',
+        doctor_name: 'Д-р Смирнова',
+        department: 'Дерматология',
+        visit_date: new Date().toISOString().split('T')[0],
+        visit_time: '10:30'
+      }];
+
+
       setPrintTickets(mockTickets);
     } catch (error) {
       logger.error('Error loading print tickets:', error);
     }
   };
-  
+
   const printTicket = (ticket) => {
     // В реальной реализации здесь будет вызов принтера
     const printContent = `
@@ -263,7 +263,7 @@ const PaymentPayMe = ({
       Время печати: ${new Date().toLocaleString()}
 
     `;
-    
+
     // Открываем окно печати
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
@@ -285,15 +285,15 @@ const PaymentPayMe = ({
     `);
     printWindow.document.close();
   };
-  
+
   const printAllTickets = () => {
-    printTickets.forEach(ticket => {
+    printTickets.forEach((ticket) => {
       setTimeout(() => printTicket(ticket), 500); // Небольшая задержка между печатью
     });
   };
-  
+
   // ===================== РУЧНАЯ ПРОВЕРКА =====================
-  
+
   const manualCheck = async () => {
     await executeAction(
       () => checkPaymentStatus(),
@@ -303,121 +303,121 @@ const PaymentPayMe = ({
       }
     );
   };
-  
+
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
-  
+
   const getActions = () => {
     switch (paymentState) {
       case 'init':
         return [
-          {
-            label: 'Отмена',
-            onClick: onClose,
-            variant: 'secondary'
-          },
-          {
-            label: 'Оплатить через PayMe',
-            onClick: initPayment,
-            variant: 'primary',
-            icon: <CreditCard size={16} />,
-            disabled: loading || !invoiceId
-          }
-        ];
-        
+        {
+          label: 'Отмена',
+          onClick: onClose,
+          variant: 'secondary'
+        },
+        {
+          label: 'Оплатить через PayMe',
+          onClick: initPayment,
+          variant: 'primary',
+          icon: <CreditCard size={16} />,
+          disabled: loading || !invoiceId
+        }];
+
+
       case 'processing':
         return [
-          {
-            label: 'Отмена',
-            onClick: onClose,
-            variant: 'secondary'
-          },
-          {
-            label: 'Открыть ссылку повторно',
-            onClick: () => paymentUrl && window.open(paymentUrl, '_blank'),
-            variant: 'primary',
-            icon: <ExternalLink size={16} />,
-            disabled: !paymentUrl
-          },
-          {
-            label: 'Начать отслеживание',
-            onClick: startPolling,
-            variant: 'primary',
-            icon: <Clock size={16} />
-          }
-        ];
-        
+        {
+          label: 'Отмена',
+          onClick: onClose,
+          variant: 'secondary'
+        },
+        {
+          label: 'Открыть ссылку повторно',
+          onClick: () => paymentUrl && window.open(paymentUrl, '_blank'),
+          variant: 'primary',
+          icon: <ExternalLink size={16} />,
+          disabled: !paymentUrl
+        },
+        {
+          label: 'Начать отслеживание',
+          onClick: startPolling,
+          variant: 'primary',
+          icon: <Clock size={16} />
+        }];
+
+
       case 'polling':
         return [
-          {
-            label: 'Остановить отслеживание',
-            onClick: () => {
-              clearPolling();
-              setPaymentState('processing');
-            },
-            variant: 'secondary'
+        {
+          label: 'Остановить отслеживание',
+          onClick: () => {
+            clearPolling();
+            setPaymentState('processing');
           },
-          {
-            label: 'Проверить сейчас',
-            onClick: manualCheck,
-            variant: 'primary',
-            icon: <RefreshCw size={16} />,
-            disabled: loading
-          }
-        ];
-        
+          variant: 'secondary'
+        },
+        {
+          label: 'Проверить сейчас',
+          onClick: manualCheck,
+          variant: 'primary',
+          icon: <RefreshCw size={16} />,
+          disabled: loading
+        }];
+
+
       case 'success':
         return [
-          {
-            label: 'Закрыть',
-            onClick: onClose,
-            variant: 'secondary'
-          },
-          printTickets.length > 0 && {
-            label: 'Печать талонов',
-            onClick: printAllTickets,
-            variant: 'primary',
-            icon: <Printer size={16} />
-          }
-        ].filter(Boolean);
-        
+        {
+          label: 'Закрыть',
+          onClick: onClose,
+          variant: 'secondary'
+        },
+        printTickets.length > 0 && {
+          label: 'Печать талонов',
+          onClick: printAllTickets,
+          variant: 'primary',
+          icon: <Printer size={16} />
+        }].
+        filter(Boolean);
+
       case 'failed':
         return [
-          {
-            label: 'Закрыть',
-            onClick: onClose,
-            variant: 'secondary'
+        {
+          label: 'Закрыть',
+          onClick: onClose,
+          variant: 'secondary'
+        },
+        {
+          label: 'Попробовать снова',
+          onClick: () => {
+            resetState();
+            initPayment();
           },
-          {
-            label: 'Попробовать снова',
-            onClick: () => {
-              resetState();
-              initPayment();
-            },
-            variant: 'primary',
-            icon: <RefreshCw size={16} />
-          },
-          {
-            label: 'Проверить статус',
-            onClick: manualCheck,
-            variant: 'outline',
-            icon: <RefreshCw size={16} />,
-            disabled: loading
-          }
-        ];
-        
+          variant: 'primary',
+          icon: <RefreshCw size={16} />
+        },
+        {
+          label: 'Проверить статус',
+          onClick: manualCheck,
+          variant: 'outline',
+          icon: <RefreshCw size={16} />,
+          disabled: loading
+        }];
+
+
       default:
         return [
-          {
-            label: 'Закрыть',
-            onClick: onClose,
-            variant: 'secondary'
-          }
-        ];
+        {
+          label: 'Закрыть',
+          onClick: onClose,
+          variant: 'secondary'
+        }];
+
     }
   };
-  
+
   // ===================== РЕНДЕР КОНТЕНТА =====================
-  
+
   const renderContent = () => {
     switch (paymentState) {
       case 'init':
@@ -442,12 +442,12 @@ const PaymentPayMe = ({
             </div>
             
             <div className="payment-info">
-              <p>После нажатия кнопки "Оплатить" откроется страница PayMe для завершения платежа.</p>
+              <p>После нажатия кнопки «Оплатить» откроется страница PayMe для завершения платежа.</p>
               <p>Не закрывайте это окно до завершения оплаты.</p>
             </div>
-          </div>
-        );
-        
+          </div>);
+
+
       case 'processing':
         return (
           <div className="payment-processing">
@@ -461,29 +461,29 @@ const PaymentPayMe = ({
               <p>Если окно не открылось, нажмите кнопку ниже.</p>
             </div>
             
-            {paymentUrl && (
-              <div className="payment-link">
-                <a 
-                  href={paymentUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="payment-url"
-                >
+            {paymentUrl &&
+            <div className="payment-link">
+                <a
+                href={paymentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="payment-url">
+                
                   Открыть страницу оплаты
                 </a>
               </div>
-            )}
+            }
             
             <div className="payment-instructions">
               <p><strong>После завершения оплаты:</strong></p>
               <ul>
-                <li>Нажмите "Начать отслеживание" для автоматической проверки</li>
+                <li>Нажмите «Начать отслеживание» для автоматической проверки</li>
                 <li>Или закройте окно PayMe и вернитесь сюда</li>
               </ul>
             </div>
-          </div>
-        );
-        
+          </div>);
+
+
       case 'polling':
         return (
           <div className="payment-polling">
@@ -508,9 +508,9 @@ const PaymentPayMe = ({
               <p>Система автоматически проверяет статус вашего платежа.</p>
               <p>Вы можете закрыть окно PayMe и дождаться подтверждения здесь.</p>
             </div>
-          </div>
-        );
-        
+          </div>);
+
+
       case 'success':
         return (
           <div className="payment-success">
@@ -524,32 +524,32 @@ const PaymentPayMe = ({
               <p>Визиты созданы и добавлены в очередь.</p>
             </div>
             
-            {printTickets.length > 0 && (
-              <div className="print-tickets">
+            {printTickets.length > 0 &&
+            <div className="print-tickets">
                 <h4>Талоны для печати:</h4>
                 <div className="tickets-list">
-                  {printTickets.map((ticket, index) => (
-                    <div key={index} className="ticket-item">
+                  {printTickets.map((ticket, index) =>
+                <div key={index} className="ticket-item">
                       <div className="ticket-info">
                         <div className="ticket-patient">{ticket.patient_name}</div>
                         <div className="ticket-details">
                           {ticket.doctor_name} • Очередь #{ticket.queue_number}
                         </div>
                       </div>
-                      <button 
-                        className="print-ticket-btn"
-                        onClick={() => printTicket(ticket)}
-                      >
+                      <button
+                    className="print-ticket-btn"
+                    onClick={() => printTicket(ticket)}>
+                    
                         <Printer size={16} />
                       </button>
                     </div>
-                  ))}
+                )}
                 </div>
               </div>
-            )}
-          </div>
-        );
-        
+            }
+          </div>);
+
+
       case 'failed':
         return (
           <div className="payment-failed">
@@ -558,12 +558,12 @@ const PaymentPayMe = ({
               <h3>Ошибка оплаты</h3>
             </div>
             
-            {error && (
-              <div className="error-info">
+            {error &&
+            <div className="error-info">
                 <AlertCircle size={20} />
                 <span>{error}</span>
               </div>
-            )}
+            }
             
             <div className="failure-info">
               <p>Платёж не был завершён успешно.</p>
@@ -574,54 +574,53 @@ const PaymentPayMe = ({
                 <li>Обратиться к администратору</li>
               </ul>
             </div>
-          </div>
-        );
-        
+          </div>);
+
+
       default:
         return null;
     }
   };
-  
+
   return (
     <>
     <ModernDialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Оплата через PayMe"
-      actions={getActions()}
-      maxWidth="32rem"
-      closeOnBackdrop={false}
-      closeOnEscape={paymentState === 'init' || paymentState === 'success' || paymentState === 'failed'}
-      className="payment-payme-dialog"
-    >
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Оплата через PayMe"
+        actions={getActions()}
+        maxWidth="32rem"
+        closeOnBackdrop={false}
+        closeOnEscape={paymentState === 'init' || paymentState === 'success' || paymentState === 'failed'}
+        className="payment-payme-dialog">
+        
       <div className="payment-payme-container">
         {renderContent()}
       </div>
     </ModernDialog>
 
     {/* Принтер множественных талонов */}
-    {showTicketPrinter && printTickets.length > 0 && (
+    {showTicketPrinter && printTickets.length > 0 &&
       <ModernDialog
         isOpen={showTicketPrinter}
         onClose={() => setShowTicketPrinter(false)}
         title="Печать талонов"
         maxWidth="50rem"
         closeOnBackdrop={false}
-        className="ticket-printer-dialog"
-      >
+        className="ticket-printer-dialog">
+        
         <MultipleTicketsPrinter
           tickets={printTickets}
           onClose={() => setShowTicketPrinter(false)}
           onAllPrinted={() => {
             setShowTicketPrinter(false);
             toast.success('Все талоны напечатаны!');
-          }}
-        />
+          }} />
+        
       </ModernDialog>
-    )}
-  </>
-  );
+      }
+  </>);
+
 };
 
 export default PaymentPayMe;
-

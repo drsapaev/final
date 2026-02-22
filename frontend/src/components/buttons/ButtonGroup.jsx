@@ -11,7 +11,7 @@ const ButtonGroup = ({
   className = '',
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  const { getColor } = useTheme();
 
   // Клонирование дочерних кнопок с передачей общих пропсов
   const cloneChildren = () => {
@@ -26,8 +26,8 @@ const ButtonGroup = ({
         size: child.props.size || size,
         variant: child.props.variant || variant,
         className: `${child.props.className || ''} button-group-item ${
-          isFirst ? 'first' : ''
-        } ${isLast ? 'last' : ''} ${isMiddle ? 'middle' : ''}`.trim(),
+        isFirst ? 'first' : ''} ${
+        isLast ? 'last' : ''} ${isMiddle ? 'middle' : ''}`.trim(),
         ...child.props
       });
     });
@@ -40,13 +40,11 @@ const ButtonGroup = ({
       style={{
         backgroundColor: spacing === 'none' ? getColor('cardBg') : 'transparent'
       }}
-      {...props}
-    >
+      {...props}>
+      
       {cloneChildren()}
-    </div>
-  );
+    </div>);
+
 };
 
 export default ButtonGroup;
-
-

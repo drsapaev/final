@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { CreditCard, DollarSign, Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -320,6 +321,24 @@ const PaymentDialog = ({
       )}
     </ModernDialog>
   );
+};
+
+PaymentDialog.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  appointment: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    patient_fio: PropTypes.string,
+    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    payment_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    payment_type: PropTypes.string,
+    services: PropTypes.oneOfType([
+      PropTypes.arrayOf(PropTypes.string),
+      PropTypes.string
+    ])
+  }),
+  onPaymentSuccess: PropTypes.func,
+  onPrintTicket: PropTypes.func
 };
 
 export default PaymentDialog;

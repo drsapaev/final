@@ -7,7 +7,7 @@
 export const USER_ROLES = {
   ADMIN: 'Admin',
   REGISTRAR: 'Registrar',
-  RECEPTIONIST: 'Receptionist',  // Alias for REGISTRAR - same role
+  RECEPTIONIST: 'Receptionist', // Alias for REGISTRAR - same role
   DOCTOR: 'Doctor',
   LAB: 'Lab',
   CASHIER: 'Cashier',
@@ -318,7 +318,7 @@ export function validateDTO(data, dto) {
 export function createDTO(data, dto) {
   const validated = {};
 
-  for (const [key, expectedType] of Object.entries(dto)) {
+  for (const [key] of Object.entries(dto)) {
     if (key in data) {
       validated[key] = data[key];
     }

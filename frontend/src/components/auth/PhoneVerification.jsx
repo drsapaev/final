@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardHeader,
@@ -39,12 +39,6 @@ const PhoneVerification = ({
   const [verificationStatus, setVerificationStatus] = useState(null);
 
   useEffect(() => {
-    if (phone && !showPhoneInput) {
-      checkVerificationStatus();
-    }
-  }, [phone, purpose]);
-
-  useEffect(() => {
     let timer;
     if (timeLeft > 0) {
       timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -74,7 +68,7 @@ const PhoneVerification = ({
     return phoneRegex.test(phone);
   };
 
-  const checkVerificationStatus = async () => {
+  const checkVerificationStatus = useCallback(async () => {
     if (!currentPhone || !validatePhone(currentPhone)) return;
 
     try {
@@ -92,7 +86,13 @@ const PhoneVerification = ({
     } catch (error) {
       logger.error('Error checking verification status:', error);
     }
-  };
+  }, [currentPhone, purpose]);
+
+  useEffect(() => {
+    if (phone && !showPhoneInput) {
+      checkVerificationStatus();
+    }
+  }, [phone, showPhoneInput, checkVerificationStatus]);
 
   const sendVerificationCode = async () => {
     if (!currentPhone || !validatePhone(currentPhone)) {

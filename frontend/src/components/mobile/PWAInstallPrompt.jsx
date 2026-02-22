@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 import { Button, Card } from '../ui/native';
 

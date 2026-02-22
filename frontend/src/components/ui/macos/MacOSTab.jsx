@@ -1,8 +1,6 @@
-import React from 'react';
-
-const MacOSTab = ({ 
-  tabs, 
-  activeTab, 
+const MacOSTab = ({
+  tabs,
+  activeTab,
   onTabChange,
   size = 'md',
   variant = 'default',
@@ -10,6 +8,7 @@ const MacOSTab = ({
   className,
   style
 }) => {
+  void orientation;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -64,7 +63,7 @@ const MacOSTab = ({
     fontSize: currentSize.fontSize,
     fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
     color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-    background: variant === 'filled' ? (isActive ? 'var(--mac-bg-primary)' : 'transparent') : 'transparent',
+    background: variant === 'filled' ? isActive ? 'var(--mac-bg-primary)' : 'transparent' : 'transparent',
     cursor: 'pointer',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
@@ -107,21 +106,21 @@ const MacOSTab = ({
     }
   };
 
-  const handleFocus = (e) => {
+  const handleFocus = () => {
+
     // Ничего не делаем - убираем все эффекты фокуса
   };
+  const handleBlur = () => {
 
-  const handleBlur = (e) => {
     // Ничего не делаем - убираем все эффекты фокуса
   };
-
   return (
     <div className={className} style={containerStyle}>
       <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const IconComponent = tab.icon;
-          
+
           return (
             <button
               key={tab.id}
@@ -135,57 +134,57 @@ const MacOSTab = ({
               style={tabButtonStyle(isActive)}
               role="tab"
               aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-            >
-              {IconComponent && (
-                <IconComponent 
-                  style={{ 
-                    width: size === 'sm' ? '14px' : size === 'md' ? '16px' : '18px', 
-                    height: size === 'sm' ? '14px' : size === 'md' ? '16px' : '18px', 
-                    marginRight: '8px',
-                    color: 'inherit'
-                  }} 
-                />
-              )}
+              tabIndex={isActive ? 0 : -1}>
+
+              {IconComponent &&
+              <IconComponent
+                style={{
+                  width: size === 'sm' ? '14px' : size === 'md' ? '16px' : '18px',
+                  height: size === 'sm' ? '14px' : size === 'md' ? '16px' : '18px',
+                  marginRight: '8px',
+                  color: 'inherit'
+                }} />
+
+              }
               {tab.label}
-              {tab.badge && (
-                <span style={{
-                  marginLeft: '8px',
-                  padding: '2px 6px',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  fontSize: 'var(--mac-font-size-xs)',
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  background: 'var(--mac-accent-blue)',
-                  color: 'white',
-                  minWidth: '18px',
-                  textAlign: 'center'
-                }}>
+              {tab.badge &&
+              <span style={{
+                marginLeft: '8px',
+                padding: '2px 6px',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: 'var(--mac-font-size-xs)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                background: 'var(--mac-accent-blue)',
+                color: 'white',
+                minWidth: '18px',
+                textAlign: 'center'
+              }}>
                   {tab.badge}
                 </span>
-              )}
-              {isActive && variant === 'default' && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  height: '3px',
-                  backgroundColor: 'var(--mac-accent-blue)',
-                  borderRadius: '2px 2px 0 0'
-                }} />
-              )}
-            </button>
-          );
+              }
+              {isActive && variant === 'default' &&
+              <div style={{
+                position: 'absolute',
+                bottom: '0',
+                left: '0',
+                right: '0',
+                height: '3px',
+                backgroundColor: 'var(--mac-accent-blue)',
+                borderRadius: '2px 2px 0 0'
+              }} />
+              }
+            </button>);
+
         })}
       </div>
-      {variant === 'default' && (
-        <div style={{ 
-          borderBottom: '1px solid var(--mac-border)',
-          marginTop: '0px'
-        }} />
-      )}
-    </div>
-  );
+      {variant === 'default' &&
+      <div style={{
+        borderBottom: '1px solid var(--mac-border)',
+        marginTop: '0px'
+      }} />
+      }
+    </div>);
+
 };
 
 export default MacOSTab;

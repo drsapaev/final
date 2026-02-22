@@ -11,6 +11,7 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { emrReducer, initialState, emrActions } from '../reducers/emrReducer';
 import { apiClient } from '../api/client';
+import logger from '../utils/logger';
 
 // Generate client session ID for smart conflict resolution
 const generateSessionId = () => {
@@ -59,7 +60,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
                 return null;
             }
 
-            console.error('Failed to load EMR:', error);
+            logger.error('Failed to load EMR:', error);
             dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
             throw error;
         }

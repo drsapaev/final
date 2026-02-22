@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   ModernButton,
   MedicalButton,
@@ -10,13 +10,13 @@ import {
   CardiologyButton,
   LabButton,
   IconButton,
-  FloatingActionButton,
-  BUTTON_VARIANTS,
-  MEDICAL_PRIORITIES,
-  MEDICAL_STATUSES,
-  MEDICAL_ACTIONS,
-  MEDICAL_DEPARTMENTS
-} from './index';
+  FloatingActionButton } from
+
+
+
+
+
+'./index';
 import {
   Heart,
   Activity,
@@ -24,13 +24,13 @@ import {
   Pill,
   AlertTriangle,
   CheckCircle,
-  XCircle,
+
   TestTube,
   Plus,
   Settings,
-  Save,
-  Trash2
-} from 'lucide-react';
+  Save } from
+
+'lucide-react';
 
 /**
  * ButtonShowcase - демонстрация всех возможностей системы кнопок
@@ -66,23 +66,23 @@ const ButtonShowcase = () => {
           <ModernButton
             variant="primary"
             onClick={toggleTheme}
-            style={{ minWidth: '120px' }}
-          >
+            style={{ minWidth: '120px' }}>
+            
             {theme === 'light' ? '🌙 Темная' : '☀️ Светлая'}
           </ModernButton>
 
           <ModernButton
             variant="secondary"
             onClick={() => setShowMedical(!showMedical)}
-            style={{ minWidth: '120px' }}
-          >
+            style={{ minWidth: '120px' }}>
+            
             {showMedical ? '🔄 Modern' : '⚕️ Medical'}
           </ModernButton>
         </div>
       </div>
 
-      {showMedical ? (
-        <>
+      {showMedical ?
+      <>
           {/* Медицинские кнопки */}
           <section style={{ marginBottom: '3rem' }}>
             <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>
@@ -96,25 +96,25 @@ const ButtonShowcase = () => {
               </h3>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <EmergencyButton
-                  priority="critical"
-                  onClick={() => alert('Экстренный вызов!')}
-                >
+                priority="critical"
+                onClick={() => alert('Экстренный вызов!')}>
+                
                   Экстренный вызов
                 </EmergencyButton>
 
                 <MedicalButton
-                  action="emergency"
-                  priority="urgent"
-                  icon={AlertTriangle}
-                >
+                action="emergency"
+                priority="urgent"
+                icon={AlertTriangle}>
+                
                   Срочно
                 </MedicalButton>
 
                 <MedicalButton
-                  action="emergency"
-                  priority="high"
-                  status="active"
-                >
+                action="emergency"
+                priority="high"
+                status="active">
+                
                   Высокий приоритет
                 </MedicalButton>
               </div>
@@ -127,24 +127,24 @@ const ButtonShowcase = () => {
               </h3>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <DiagnoseButton
-                  onClick={() => alert('Начать диагностику')}
-                >
+                onClick={() => alert('Начать диагностику')}>
+                
                   Диагностировать
                 </DiagnoseButton>
 
                 <TreatButton
-                  icon={Pill}
-                  onClick={() => alert('Назначить лечение')}
-                >
+                icon={Pill}
+                onClick={() => alert('Назначить лечение')}>
+                
                   Лечение
                 </TreatButton>
 
                 <MedicalButton
-                  action="monitor"
-                  priority="normal"
-                  icon={Activity}
-                  status="active"
-                >
+                action="monitor"
+                priority="normal"
+                icon={Activity}
+                status="active">
+                
                   Мониторинг
                 </MedicalButton>
               </div>
@@ -157,24 +157,24 @@ const ButtonShowcase = () => {
               </h3>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <ApproveButton
-                  onClick={() => alert('Одобрено')}
-                  status="success"
-                >
+                onClick={() => alert('Одобрено')}
+                status="success">
+                
                   Одобрить
                 </ApproveButton>
 
                 <RejectButton
-                  onClick={() => alert('Отклонено')}
-                  status="error"
-                >
+                onClick={() => alert('Отклонено')}
+                status="error">
+                
                   Отклонить
                 </RejectButton>
 
                 <MedicalButton
-                  action="prescribe"
-                  icon={CheckCircle}
-                  status="success"
-                >
+                action="prescribe"
+                icon={CheckCircle}
+                status="success">
+                
                   Выписать рецепт
                 </MedicalButton>
               </div>
@@ -187,30 +187,30 @@ const ButtonShowcase = () => {
               </h3>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <CardiologyButton
-                  icon={Heart}
-                  onClick={() => alert('Кардиология')}
-                >
+                icon={Heart}
+                onClick={() => alert('Кардиология')}>
+                
                   Кардиология
                 </CardiologyButton>
 
                 <MedicalButton
-                  department="dermatology"
-                  icon={Activity}
-                >
+                department="dermatology"
+                icon={Activity}>
+                
                   Дерматология
                 </MedicalButton>
 
                 <MedicalButton
-                  department="dentistry"
-                  icon={Stethoscope}
-                >
+                department="dentistry"
+                icon={Stethoscope}>
+                
                   Стоматология
                 </MedicalButton>
 
                 <LabButton
-                  icon={TestTube}
-                  onClick={() => alert('Лаборатория')}
-                >
+                icon={TestTube}
+                onClick={() => alert('Лаборатория')}>
+                
                   Анализы
                 </LabButton>
               </div>
@@ -253,9 +253,9 @@ const ButtonShowcase = () => {
               </div>
             </div>
           </section>
-        </>
-      ) : (
-        <>
+        </> :
+
+      <>
           {/* Modern Button showcase */}
           <section style={{ marginBottom: '3rem' }}>
             <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>
@@ -338,44 +338,44 @@ const ButtonShowcase = () => {
             </h2>
 
             <div style={{
-              position: 'relative',
-              height: '200px',
-              border: '2px dashed var(--border)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--surface)'
-            }}>
+            position: 'relative',
+            height: '200px',
+            border: '2px dashed var(--border)',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--surface)'
+          }}>
               <FloatingActionButton
-                position="bottom-right"
-                actions={[
-                  {
-                    icon: Plus,
-                    label: 'Добавить пациента',
-                    onClick: () => alert('Добавить пациента'),
-                    variant: 'primary'
-                  },
-                  {
-                    icon: Heart,
-                    label: 'ЭКГ',
-                    onClick: () => alert('ЭКГ'),
-                    variant: 'cardiology'
-                  },
-                  {
-                    icon: TestTube,
-                    label: 'Анализы',
-                    onClick: () => alert('Анализы'),
-                    variant: 'laboratory'
-                  }
-                ]}
-                tooltip="Быстрые действия"
-                style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  right: '20px'
-                }}
-              />
+              position="bottom-right"
+              actions={[
+              {
+                icon: Plus,
+                label: 'Добавить пациента',
+                onClick: () => alert('Добавить пациента'),
+                variant: 'primary'
+              },
+              {
+                icon: Heart,
+                label: 'ЭКГ',
+                onClick: () => alert('ЭКГ'),
+                variant: 'cardiology'
+              },
+              {
+                icon: TestTube,
+                label: 'Анализы',
+                onClick: () => alert('Анализы'),
+                variant: 'laboratory'
+              }]
+              }
+              tooltip="Быстрые действия"
+              style={{
+                position: 'absolute',
+                bottom: '20px',
+                right: '20px'
+              }} />
+            
 
               <p style={{ color: 'var(--text-secondary)' }}>
                 FAB с действиями в правом нижнем углу
@@ -383,7 +383,7 @@ const ButtonShowcase = () => {
             </div>
           </section>
         </>
-      )}
+      }
 
       {/* Footer */}
       <div style={{
@@ -399,8 +399,8 @@ const ButtonShowcase = () => {
           Современный дизайн • Медицинская семантика • Полная доступность
         </p>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default ButtonShowcase;

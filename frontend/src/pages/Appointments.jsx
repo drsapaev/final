@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import AppointmentFlow from '../components/AppointmentFlow.jsx';
@@ -29,7 +29,7 @@ export default function Appointments() {
   const [useAdvancedTable, setUseAdvancedTable] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState(new Set());
 
-  async function load() {
+  const load = useCallback(async () => {
     setBusy(true);
     setErr('');
     try {
@@ -45,9 +45,9 @@ export default function Appointments() {
     } finally {
       setBusy(false);
     }
-  }
+  }, [date]);
 
-  useEffect(() => { load(); }, [date]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     if (!q) return rows;

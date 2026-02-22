@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { colors } from '../../theme/tokens';
@@ -21,8 +22,8 @@ const ModernButton = ({
   className = '',
   type = 'button',
   ...props
-}) => {
-  const { theme, getColor } = useTheme();
+}) => {void
+  useTheme();
   const [rippleEffect, setRippleEffect] = useState([]);
   const buttonRef = useRef(null);
 
@@ -43,18 +44,18 @@ const ModernButton = ({
       id: Date.now()
     };
 
-    setRippleEffect(prev => [...prev, newRipple]);
+    setRippleEffect((prev) => [...prev, newRipple]);
 
     // Удаление эффекта через 600мс
     setTimeout(() => {
-      setRippleEffect(prev => prev.filter(r => r.id !== newRipple.id));
+      setRippleEffect((prev) => prev.filter((r) => r.id !== newRipple.id));
     }, 600);
   };
 
   // Обработка клика
   const handleClick = (event) => {
     if (disabled || loading) return;
-    
+
     createRipple(event);
     onClick?.(event);
   };
@@ -182,40 +183,40 @@ const ModernButton = ({
 
   // Стили кнопки (используем токены цветов)
   const buttonStyles = {
-    backgroundColor: ghost
-      ? 'transparent'
-      : outlined
-        ? 'transparent'
-        : disabled
-          ? colors.gray[300]  // Отключенное состояние
-          : variantColors.bg,
-    color: ghost
-      ? variantColors.bg
-      : outlined
-        ? variantColors.bg
-        : disabled
-          ? colors.gray[500]  // Отключенный текст
-          : variantColors.text,
-    borderColor: outlined || ghost
-      ? variantColors.border
-      : 'transparent',
+    backgroundColor: ghost ?
+    'transparent' :
+    outlined ?
+    'transparent' :
+    disabled ?
+    colors.gray[300] // Отключенное состояние
+    : variantColors.bg,
+    color: ghost ?
+    variantColors.bg :
+    outlined ?
+    variantColors.bg :
+    disabled ?
+    colors.gray[500] // Отключенный текст
+    : variantColors.text,
+    borderColor: outlined || ghost ?
+    variantColors.border :
+    'transparent',
     opacity: disabled ? 0.6 : 1,
     cursor: disabled || loading ? 'not-allowed' : 'pointer'
   };
 
   // Классы CSS
   const cssClasses = [
-    'modern-button',
-    `variant-${variant}`,
-    `size-${size}`,
-    outlined && 'outlined',
-    ghost && 'ghost',
-    fullWidth && 'full-width',
-    rounded && 'rounded',
-    disabled && 'disabled',
-    loading && 'loading',
-    className
-  ].filter(Boolean).join(' ');
+  'modern-button',
+  `variant-${variant}`,
+  `size-${size}`,
+  outlined && 'outlined',
+  ghost && 'ghost',
+  fullWidth && 'full-width',
+  rounded && 'rounded',
+  disabled && 'disabled',
+  loading && 'loading',
+  className].
+  filter(Boolean).join(' ');
 
   return (
     <button
@@ -225,21 +226,21 @@ const ModernButton = ({
       style={buttonStyles}
       onClick={handleClick}
       disabled={disabled || loading}
-      {...props}
-    >
+      {...props}>
+      
       {/* Иконка слева */}
-      {icon && iconPosition === 'left' && !loading && (
-        <span className="button-icon left">
+      {icon && iconPosition === 'left' && !loading &&
+      <span className="button-icon left">
           {React.isValidElement(icon) ? icon : <icon size={size === 'small' ? 14 : size === 'large' ? 20 : 16} />}
         </span>
-      )}
+      }
 
       {/* Индикатор загрузки */}
-      {loading && (
-        <span className="button-loader">
+      {loading &&
+      <span className="button-loader">
           <Loader size={size === 'small' ? 14 : size === 'large' ? 20 : 16} className="spinning" />
         </span>
-      )}
+      }
 
       {/* Текст кнопки */}
       <span className={`button-text ${loading ? 'loading' : ''}`}>
@@ -247,33 +248,49 @@ const ModernButton = ({
       </span>
 
       {/* Иконка справа */}
-      {icon && iconPosition === 'right' && !loading && (
-        <span className="button-icon right">
+      {icon && iconPosition === 'right' && !loading &&
+      <span className="button-icon right">
           {React.isValidElement(icon) ? icon : <icon size={size === 'small' ? 14 : size === 'large' ? 20 : 16} />}
         </span>
-      )}
+      }
 
       {/* Эффект ripple */}
-      {ripple && (
-        <span className="button-ripple-container">
-          {rippleEffect.map(ripple => (
-            <span
-              key={ripple.id}
-              className="button-ripple"
-              style={{
-                left: ripple.x,
-                top: ripple.y,
-                width: ripple.size,
-                height: ripple.size
-              }}
-            />
-          ))}
+      {ripple &&
+      <span className="button-ripple-container">
+          {rippleEffect.map((ripple) =>
+        <span
+          key={ripple.id}
+          className="button-ripple"
+          style={{
+            left: ripple.x,
+            top: ripple.y,
+            width: ripple.size,
+            height: ripple.size
+          }} />
+
+        )}
         </span>
-      )}
-    </button>
-  );
+      }
+    </button>);
+
+};
+
+ModernButton.propTypes = {
+  children: PropTypes.node,
+  variant: PropTypes.string,
+  size: PropTypes.oneOf(['small', 'medium', 'large']),
+  disabled: PropTypes.bool,
+  loading: PropTypes.bool,
+  icon: PropTypes.oneOfType([PropTypes.node, PropTypes.elementType]),
+  iconPosition: PropTypes.oneOf(['left', 'right']),
+  fullWidth: PropTypes.bool,
+  rounded: PropTypes.bool,
+  outlined: PropTypes.bool,
+  ghost: PropTypes.bool,
+  ripple: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string,
+  type: PropTypes.oneOf(['button', 'submit', 'reset'])
 };
 
 export default ModernButton;
-
-

@@ -36,8 +36,8 @@ export const tokenManager = {
     try {
       if (token) {
         const trimmed = typeof token === 'string' ? token.trim() : token;
-        if (trimmed) localStorage.setItem(TOKEN_KEY, trimmed);
-        else localStorage.removeItem(TOKEN_KEY);
+        if (trimmed) localStorage.setItem(TOKEN_KEY, trimmed);else
+        localStorage.removeItem(TOKEN_KEY);
       } else {
         localStorage.removeItem(TOKEN_KEY);
       }
@@ -146,7 +146,7 @@ export const tokenManager = {
         return Date.now() < expirationTime;
       }
       return true; // Если нет exp, считаем валидным
-    } catch (error) {
+    } catch {
       // Не JWT или ошибка парсинга - считаем валидным
       return true;
     }

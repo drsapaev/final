@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import UserManagement from './UserManagement';
@@ -29,30 +29,30 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
       border: `1px solid ${colors.border}`,
       marginBottom: '20px'
     }}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            background: activeTab === tab.id ? colors.active : 'transparent',
-            color: activeTab === tab.id ? colors.activeText : colors.text,
-            fontSize: '14px',
-            fontWeight: activeTab === tab.id ? '600' : '400',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
+      {tabs.map((tab) =>
+      <button
+        key={tab.id}
+        onClick={() => onTabChange(tab.id)}
+        style={{
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '6px',
+          background: activeTab === tab.id ? colors.active : 'transparent',
+          color: activeTab === tab.id ? colors.activeText : colors.text,
+          fontSize: '14px',
+          fontWeight: activeTab === tab.id ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+        
           {tab.label}
         </button>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 AdminTabs.propTypes = {
@@ -66,16 +66,16 @@ AdminTabs.propTypes = {
 
 const UnifiedUserManagement = () => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'users';
-  const { isDark } = useTheme();
+  const section = searchParams.get('section') || 'users';void
+  useTheme();
 
   const getActiveTab = (section) => {
     switch (section) {
-      case 'users': return 'management';
-      case 'user-data-transfer': return 'transfer';
-      case 'user-export': return 'export';
-      case 'group-permissions': return 'permissions';
-      default: return 'management';
+      case 'users':return 'management';
+      case 'user-data-transfer':return 'transfer';
+      case 'user-export':return 'export';
+      case 'group-permissions':return 'permissions';
+      default:return 'management';
     }
   };
 
@@ -87,11 +87,11 @@ const UnifiedUserManagement = () => {
   }, [section]);
 
   const tabs = [
-    { id: 'management', label: 'User Management', icon: 'Users' },
-    { id: 'transfer', label: 'Data Transfer', icon: 'Database' },
-    { id: 'export', label: 'Export Users', icon: 'Download' },
-    { id: 'permissions', label: 'Group Permissions', icon: 'Shield' }
-  ];
+  { id: 'management', label: 'User Management', icon: 'Users' },
+  { id: 'transfer', label: 'Data Transfer', icon: 'Database' },
+  { id: 'export', label: 'Export Users', icon: 'Download' },
+  { id: 'permissions', label: 'Group Permissions', icon: 'Shield' }];
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -113,13 +113,13 @@ const UnifiedUserManagement = () => {
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+        onTabChange={setActiveTab} />
+      
       <div style={{ flex: 1, overflow: 'auto' }}>
         {renderContent()}
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 UnifiedUserManagement.propTypes = {};

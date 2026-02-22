@@ -14,24 +14,24 @@ import logger from './logger';
  */
 const MEDICAL_CONFIG = {
   ALLOWED_TAGS: [
-    // Текстовое форматирование
-    'p', 'br', 'span', 'div', 'strong', 'em', 'b', 'i', 'u', 's',
-    // Заголовки
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    // Списки
-    'ul', 'ol', 'li',
-    // Таблицы (для медицинских данных)
-    'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    // Цитаты и код (для заметок врача)
-    'blockquote', 'pre', 'code',
-    // Ссылки (только безопасные)
-    'a'
-  ],
+  // Текстовое форматирование
+  'p', 'br', 'span', 'div', 'strong', 'em', 'b', 'i', 'u', 's',
+  // Заголовки
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  // Списки
+  'ul', 'ol', 'li',
+  // Таблицы (для медицинских данных)
+  'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  // Цитаты и код (для заметок врача)
+  'blockquote', 'pre', 'code',
+  // Ссылки (только безопасные)
+  'a'],
+
   ALLOWED_ATTR: [
-    'class', 'id', 'style', // Стилизация
-    'href', 'target', // Ссылки (только http/https)
-    'colspan', 'rowspan', // Таблицы
-    'alt', 'title' // Accessibility
+  'class', 'id', 'style', // Стилизация
+  'href', 'target', // Ссылки (только http/https)
+  'colspan', 'rowspan', // Таблицы
+  'alt', 'title' // Accessibility
   ],
   ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   ALLOW_DATA_ATTR: false, // Блокируем data-* атрибуты
@@ -127,16 +127,16 @@ export function sanitizeAIContent(aiContent) {
 
   // Дополнительная проверка на подозрительные паттерны в AI контенте
   const suspiciousPatterns = [
-    /<script/i,
-    /javascript:/i,
-    /on\w+\s*=/i, // onclick, onerror и т.д.
-    /data:text\/html/i,
-    /<iframe/i,
-    /<object/i,
-    /<embed/i
-  ];
+  /<script/i,
+  /javascript:/i,
+  /on\w+\s*=/i, // onclick, onerror и т.д.
+  /data:text\/html/i,
+  /<iframe/i,
+  /<object/i,
+  /<embed/i];
 
-  const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(aiContent));
+
+  const hasSuspiciousContent = suspiciousPatterns.some((pattern) => pattern.test(aiContent));
 
   if (hasSuspiciousContent) {
     logger.warn('AI content содержит подозрительные паттерны, применена строгая санитизация');
@@ -171,7 +171,7 @@ export function escapeHTML(str) {
     '/': '&#x2F;'
   };
 
-  return str.replace(/[&<>"'/]/g, char => htmlEscapeMap[char]);
+  return str.replace(/[&<>"'/]/g, (char) => htmlEscapeMap[char]);
 }
 
 /**
@@ -207,7 +207,7 @@ export function sanitizeURL(url) {
     }
 
     return urlObj.href;
-  } catch (error) {
+  } catch {
     // Если URL невалиден, проверяем относительные пути
     if (trimmed.startsWith('/')) {
       return trimmed; // Относительный путь - безопасен
@@ -232,8 +232,8 @@ export function sanitizeURL(url) {
 export function sanitizeInput(input, options = {}) {
   const {
     maxLength = 10000,
-    allowNewlines = true,
-    allowSpecialChars = true
+    allowNewlines = true
+
   } = options;
 
   if (!input || typeof input !== 'string') {

@@ -2,9 +2,10 @@
  * Компонент воспроизведения голосового сообщения
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import auth from '../../stores/auth';
+import logger from '../../utils/logger';
 
 const VoiceMessage = ({ message, fileUrl }) => {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -17,6 +18,8 @@ const VoiceMessage = ({ message, fileUrl }) => {
 
     // Загружаем аудио с авторизацией
     useEffect(() => {
+        let objectUrl = null;
+
         const loadAudio = async () => {
             if (!fileUrl) return;
 
@@ -33,10 +36,10 @@ const VoiceMessage = ({ message, fileUrl }) => {
                 }
 
                 const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                setAudioSrc(url);
+                objectUrl = URL.createObjectURL(blob);
+                setAudioSrc(objectUrl);
             } catch (error) {
-                console.error('Failed to load audio:', error);
+                logger.error('Failed to load audio:', error);
                 setIsLoading(false);
             }
         };
@@ -45,8 +48,8 @@ const VoiceMessage = ({ message, fileUrl }) => {
 
         // Cleanup
         return () => {
-            if (audioSrc) {
-                URL.revokeObjectURL(audioSrc);
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
             }
         };
     }, [fileUrl]);
@@ -63,10 +66,10 @@ const VoiceMessage = ({ message, fileUrl }) => {
         };
         const handleCanPlay = () => setIsLoading(false);
         const handleError = (e) => {
-            console.error('Audio playback error:', e);
-            console.error('Audio src:', audio.src);
-            console.error('Audio error code:', audio.error?.code);
-            console.error('Audio error message:', audio.error?.message);
+            logger.error('Audio playback error:', e);
+            logger.error('Audio src:', audio.src);
+            logger.error('Audio error code:', audio.error?.code);
+            logger.error('Audio error message:', audio.error?.message);
             setIsLoading(false);
         };
 
@@ -98,7 +101,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
                 setIsPlaying(true);
             }
         } catch (error) {
-            console.error('Playback error:', error);
+            logger.error('Playback error:', error);
             alert('Ошибка воспроизведения: ' + error.message);
             setIsPlaying(false);
         }
@@ -115,6 +118,32 @@ const VoiceMessage = ({ message, fileUrl }) => {
 
         audio.currentTime = newTime;
         setCurrentTime(newTime);
+    };
+    const handleSeekKeyDown = (e) => {
+        const audio = audioRef.current;
+        if (!audio || !duration) return;
+
+        const step = Math.max(duration * 0.05, 1);
+        let nextTime = audio.currentTime;
+
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            nextTime = Math.max(0, audio.currentTime - step);
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            nextTime = Math.min(duration, audio.currentTime + step);
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            nextTime = 0;
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            nextTime = duration;
+        } else {
+            return;
+        }
+
+        audio.currentTime = nextTime;
+        setCurrentTime(nextTime);
     };
 
     const formatTime = (seconds) => {
@@ -151,7 +180,12 @@ const VoiceMessage = ({ message, fileUrl }) => {
                     className="fake-waveform"
                     onClick={handleSeek}
                     role="slider"
+                    tabIndex={0}
                     aria-label="Прогресс воспроизведения"
+                    aria-valuemin={0}
+                    aria-valuemax={Math.round(duration || 0)}
+                    aria-valuenow={Math.round(currentTime || 0)}
+                    onKeyDown={handleSeekKeyDown}
                 >
                     {[30, 50, 35, 70, 50, 80, 60, 40, 70, 45, 80, 55, 30, 60, 40, 70, 50, 30, 60, 40, 50, 70, 45, 30, 60, 80, 40, 20, 50, 35].map((height, i, arr) => {
                         const barProgress = (i / arr.length) * 100;

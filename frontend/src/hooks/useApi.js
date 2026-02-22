@@ -3,7 +3,7 @@
  * Заменяют прямые fetch запросы унифицированным подходом
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api, apiRequest } from '../api/client';
 import { toast } from 'react-toastify';
 import { tokenManager } from '../utils/tokenManager';
@@ -99,11 +99,16 @@ export function useApiData(endpoint, options = {}) {
     }
   }, [endpoint, params, fallbackData, silent]);
 
+  const dependenciesKey = useMemo(
+    () => JSON.stringify(dependencies ?? []),
+    [dependencies]
+  );
+
   useEffect(() => {
     if (autoLoad) {
       loadData();
     }
-  }, [loadData, autoLoad, ...dependencies]);
+  }, [loadData, autoLoad, dependenciesKey]);
 
   const refresh = useCallback(() => loadData(), [loadData]);
   const silentRefresh = useCallback(() => loadData({ silent: true }), [loadData]);
@@ -289,11 +294,9 @@ export function useWebSocket(url, options = {}) {
     }
 
     return () => {
-      if (socket) {
-        socket.close();
-      }
+      disconnect();
     };
-  }, [connect, autoConnect]);
+  }, [connect, autoConnect, disconnect]);
 
   return { connect, disconnect, sendMessage, connected, lastMessage };
 }

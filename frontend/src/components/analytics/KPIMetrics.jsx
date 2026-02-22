@@ -1,31 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/native';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
-  Calendar, 
-  DollarSign, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Calendar,
+  DollarSign,
   Activity,
   Target,
   Award,
   Clock,
   CheckCircle,
-  AlertCircle,
-  BarChart3,
-  PieChart,
-  Eye,
+
+
+
+
   Download,
-  RefreshCw
-} from 'lucide-react';
+  RefreshCw } from
+'lucide-react';
 
 /**
  * Компонент для отображения KPI метрик
  * Включает анимированные карточки, тренды, сравнения
  */
-const KPIMetrics = ({ 
-  data, 
-  loading = false, 
+const KPIMetrics = ({
+  data,
+  loading = false,
   onRefresh,
   onExport,
   showTrends = true,
@@ -34,17 +35,11 @@ const KPIMetrics = ({
   const [animatedValues, setAnimatedValues] = useState({});
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
 
-  useEffect(() => {
-    if (data?.metrics) {
-      animateValues();
-    }
-  }, [data]);
-
-  const animateValues = () => {
+  const animateValues = useCallback(() => {
     const metrics = data.metrics;
     const animated = {};
-    
-    Object.keys(metrics).forEach(key => {
+
+    Object.keys(metrics).forEach((key) => {
       const metric = metrics[key];
       animated[key] = {
         current: 0,
@@ -52,46 +47,52 @@ const KPIMetrics = ({
         trend: metric.trend || 0
       };
     });
-    
+
     setAnimatedValues(animated);
-    
+
     // Анимация значений
-    Object.keys(animated).forEach(key => {
+    Object.keys(animated).forEach((key) => {
       const metric = metrics[key];
       const duration = 2000;
       const steps = 60;
       const stepValue = metric.value / steps;
       const stepDuration = duration / steps;
-      
+
       let currentStep = 0;
       const interval = setInterval(() => {
         currentStep++;
-        setAnimatedValues(prev => ({
+        setAnimatedValues((prev) => ({
           ...prev,
           [key]: {
             ...prev[key],
             current: Math.min(stepValue * currentStep, metric.value)
           }
         }));
-        
+
         if (currentStep >= steps) {
           clearInterval(interval);
         }
       }, stepDuration);
     });
-  };
+  }, [data]);
+
+  useEffect(() => {
+    if (data?.metrics) {
+      animateValues();
+    }
+  }, [data, animateValues]);
 
   const getMetricIcon = (type) => {
     const iconStyle = { width: '20px', height: '20px' };
     switch (type) {
-      case 'revenue': return <DollarSign style={iconStyle} />;
-      case 'patients': return <Users style={iconStyle} />;
-      case 'appointments': return <Calendar style={iconStyle} />;
-      case 'doctors': return <Award style={iconStyle} />;
-      case 'efficiency': return <Target style={iconStyle} />;
-      case 'satisfaction': return <CheckCircle style={iconStyle} />;
-      case 'wait_time': return <Clock style={iconStyle} />;
-      default: return <Activity style={iconStyle} />;
+      case 'revenue':return <DollarSign style={iconStyle} />;
+      case 'patients':return <Users style={iconStyle} />;
+      case 'appointments':return <Calendar style={iconStyle} />;
+      case 'doctors':return <Award style={iconStyle} />;
+      case 'efficiency':return <Target style={iconStyle} />;
+      case 'satisfaction':return <CheckCircle style={iconStyle} />;
+      case 'wait_time':return <Clock style={iconStyle} />;
+      default:return <Activity style={iconStyle} />;
     }
   };
 
@@ -134,9 +135,9 @@ const KPIMetrics = ({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className={`p-2 rounded-lg ${
-                isPositive ? 'bg-green-100' : 
-                isNegative ? 'bg-red-100' : 'bg-gray-100'
-              }`}>
+              isPositive ? 'bg-green-100' :
+              isNegative ? 'bg-red-100' : 'bg-gray-100'}`
+              }>
                 {getMetricIcon(metric.type)}
               </div>
               <div>
@@ -161,33 +162,33 @@ const KPIMetrics = ({
               <span className="text-3xl font-bold text-gray-900">
                 {formatValue(animated.current, metric.format)}
               </span>
-              {metric.target && (
-                <span className="text-sm text-gray-500">
+              {metric.target &&
+              <span className="text-sm text-gray-500">
                   / {formatValue(metric.target, metric.format)}
                 </span>
-              )}
+              }
             </div>
 
-            {showTrends && trend !== 0 && (
-              <div className="flex items-center space-x-2">
+            {showTrends && trend !== 0 &&
+            <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500">vs предыдущий период</span>
                 <div className={`flex items-center space-x-1 ${
-                  isPositive ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {isPositive ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
+              isPositive ? 'text-green-600' : 'text-red-600'}`
+              }>
+                  {isPositive ?
+                <TrendingUp className="w-3 h-3" /> :
+
+                <TrendingDown className="w-3 h-3" />
+                }
                   <span className="text-xs font-medium">
                     {Math.abs(trend).toFixed(1)}%
                   </span>
                 </div>
               </div>
-            )}
+            }
 
-            {showComparisons && metric.comparison && (
-              <div className="pt-2 border-t border-gray-100">
+            {showComparisons && metric.comparison &&
+            <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-500">Среднее по отрасли</span>
                   <span className="font-medium">
@@ -196,21 +197,21 @@ const KPIMetrics = ({
                 </div>
                 <div className="mt-1">
                   <div className="w-full bg-gray-200 rounded-full h-1">
-                    <div 
-                      className={`h-1 rounded-full ${
-                        animated.current > metric.comparison ? 'bg-green-500' : 'bg-yellow-500'
-                      }`}
-                      style={{ 
-                        width: `${Math.min((animated.current / metric.comparison) * 100, 100)}%` 
-                      }}
-                    ></div>
+                    <div
+                    className={`h-1 rounded-full ${
+                    animated.current > metric.comparison ? 'bg-green-500' : 'bg-yellow-500'}`
+                    }
+                    style={{
+                      width: `${Math.min(animated.current / metric.comparison * 100, 100)}%`
+                    }}>
+                  </div>
                   </div>
                 </div>
               </div>
-            )}
+            }
 
-            {metric.goal && (
-              <div className="pt-2 border-t border-gray-100">
+            {metric.goal &&
+            <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-500">Цель</span>
                   <span className="font-medium">
@@ -219,28 +220,28 @@ const KPIMetrics = ({
                 </div>
                 <div className="mt-1">
                   <div className="w-full bg-gray-200 rounded-full h-1">
-                    <div 
-                      className="h-1 rounded-full bg-blue-500"
-                      style={{ 
-                        width: `${Math.min((animated.current / metric.goal) * 100, 100)}%` 
-                      }}
-                    ></div>
+                    <div
+                    className="h-1 rounded-full bg-blue-500"
+                    style={{
+                      width: `${Math.min(animated.current / metric.goal * 100, 100)}%`
+                    }}>
+                  </div>
                   </div>
                 </div>
               </div>
-            )}
+            }
           </div>
         </div>
 
         {/* Декоративный элемент */}
         <div className={`absolute top-0 right-0 w-20 h-20 opacity-5 ${
-          isPositive ? 'bg-green-500' : 
-          isNegative ? 'bg-red-500' : 'bg-gray-500'
-        }`} style={{
+        isPositive ? 'bg-green-500' :
+        isNegative ? 'bg-red-500' : 'bg-gray-500'}`
+        } style={{
           clipPath: 'polygon(100% 0, 0 0, 100% 100%)'
         }}></div>
-      </Card>
-    );
+      </Card>);
+
   };
 
   const renderSummary = () => {
@@ -254,16 +255,16 @@ const KPIMetrics = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onExport?.('summary')}
-            >
+              onClick={() => onExport?.('summary')}>
+              
               <Download className="w-4 h-4 mr-2" />
               Экспорт
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onRefresh?.()}
-            >
+              onClick={() => onRefresh?.()}>
+              
               <RefreshCw className="w-4 h-4 mr-2" />
               Обновить
             </Button>
@@ -290,15 +291,15 @@ const KPIMetrics = ({
             <div className="text-sm text-gray-600">Достигнутые цели</div>
           </div>
         </div>
-      </Card>
-    );
+      </Card>);
+
   };
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {[...Array(8)].map((_, i) => (
-          <Card key={i} className="p-6">
+        {[...Array(8)].map((_, i) =>
+        <Card key={i} className="p-6">
             <div className="animate-pulse">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
@@ -314,9 +315,9 @@ const KPIMetrics = ({
               </div>
             </div>
           </Card>
-        ))}
-      </div>
-    );
+        )}
+      </div>);
+
   }
 
   if (!data || !data.metrics) {
@@ -333,8 +334,8 @@ const KPIMetrics = ({
           <RefreshCw className="w-4 h-4 mr-2" />
           Загрузить данные
         </Button>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
@@ -349,8 +350,8 @@ const KPIMetrics = ({
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
+            className="px-3 py-1 border border-gray-300 rounded-md text-sm">
+            
             <option value="7d">7 дней</option>
             <option value="30d">30 дней</option>
             <option value="90d">90 дней</option>
@@ -361,13 +362,21 @@ const KPIMetrics = ({
 
       {/* Метрики */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {Object.entries(data.metrics).map(([key, metric]) => 
-          renderMetricCard(key, metric)
+        {Object.entries(data.metrics).map(([key, metric]) =>
+        renderMetricCard(key, metric)
         )}
       </div>
-    </div>
-  );
+    </div>);
+
+};
+
+KPIMetrics.propTypes = {
+  data: PropTypes.object,
+  loading: PropTypes.bool,
+  onRefresh: PropTypes.func,
+  onExport: PropTypes.func,
+  showTrends: PropTypes.bool,
+  showComparisons: PropTypes.bool
 };
 
 export default KPIMetrics;
-

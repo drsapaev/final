@@ -15,7 +15,8 @@
  * Nothing happens without a conscious click by the doctor
  */
 
-import React, { useState } from 'react';
+import PropTypes from 'prop-types';
+import { useState } from 'react';
 import './EMRConflictDialog.css';
 
 /**
@@ -186,5 +187,20 @@ export function EMRConflictDialog({
         </div>
     );
 }
+
+EMRConflictDialog.propTypes = {
+    conflict: PropTypes.shape({
+        serverVersion: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        yourVersion: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        lastEditedBy: PropTypes.number,
+        lastEditedAt: PropTypes.string,
+    }),
+    isSigned: PropTypes.bool,
+    onReload: PropTypes.func,
+    onCompare: PropTypes.func,
+    onAmend: PropTypes.func,
+    onForceOverwrite: PropTypes.func,
+    loading: PropTypes.bool,
+};
 
 export default EMRConflictDialog;

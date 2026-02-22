@@ -1,4 +1,3 @@
-import React from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import MedicalCard from './MedicalCard';
 import Icon from '../Icon';

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client.js';
 
 /**
@@ -62,6 +62,12 @@ export default function ServicePicker({
       onChange([...arr, item]);
     }
   }
+  function handleActivationKeyDown(event, onActivate) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onActivate();
+    }
+  }
 
   const selectedIds = new Set(
     multi ? (Array.isArray(value) ? value.map((v) => v.id) : []) : value?.id ? [value.id] : []
@@ -85,7 +91,10 @@ export default function ServicePicker({
           return (
             <div
               key={s.id}
+              role="button"
+              tabIndex={0}
               onClick={() => toggle(s)}
+              onKeyDown={(event) => handleActivationKeyDown(event, () => toggle(s))}
               style={{
                 ...row,
                 background: active ? '#eef2ff' : '#fff',

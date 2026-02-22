@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../utils/cn';
@@ -50,16 +51,31 @@ const Modal = React.forwardRef(({
 
   if (!isOpen) return null;
 
+  const handleOverlayClick = () => {
+    if (closeOnOverlayClick) {
+      onClose?.();
+    }
+  };
+
   const modalContent = (
     <div 
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center p-4',
         overlayClassName
       )}
-      onClick={closeOnOverlayClick ? onClose : undefined}
     >
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" />
+      {closeOnOverlayClick ? (
+        <button
+          type="button"
+          className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+          onClick={handleOverlayClick}
+          aria-label="Закрыть модальное окно"
+          style={{ border: 0, margin: 0, padding: 0 }}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" />
+      )}
       
       {/* Modal */}
       <div
@@ -71,7 +87,6 @@ const Modal = React.forwardRef(({
           'animate-in fade-in-0 zoom-in-95 duration-200',
           className
         )}
-        onClick={(e) => e.stopPropagation()}
         {...props}
       >
         {/* Header */}
@@ -107,6 +122,19 @@ const Modal = React.forwardRef(({
 
 Modal.displayName = 'Modal';
 
+Modal.propTypes = {
+  children: PropTypes.node,
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  title: PropTypes.node,
+  size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl', 'full']),
+  showCloseButton: PropTypes.bool,
+  closeOnOverlayClick: PropTypes.bool,
+  closeOnEscape: PropTypes.bool,
+  className: PropTypes.string,
+  overlayClassName: PropTypes.string
+};
+
 const ModalHeader = React.forwardRef(({ 
   children, 
   className = '', 
@@ -122,6 +150,11 @@ const ModalHeader = React.forwardRef(({
 ));
 
 ModalHeader.displayName = 'ModalHeader';
+
+ModalHeader.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
 
 const ModalTitle = React.forwardRef(({ 
   children, 
@@ -139,6 +172,11 @@ const ModalTitle = React.forwardRef(({
 
 ModalTitle.displayName = 'ModalTitle';
 
+ModalTitle.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
+
 const ModalContent = React.forwardRef(({ 
   children, 
   className = '', 
@@ -155,6 +193,11 @@ const ModalContent = React.forwardRef(({
 
 ModalContent.displayName = 'ModalContent';
 
+ModalContent.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
+
 const ModalFooter = React.forwardRef(({ 
   children, 
   className = '', 
@@ -170,6 +213,11 @@ const ModalFooter = React.forwardRef(({
 ));
 
 ModalFooter.displayName = 'ModalFooter';
+
+ModalFooter.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
 
 export default Modal;
 export { ModalHeader, ModalTitle, ModalContent, ModalFooter };

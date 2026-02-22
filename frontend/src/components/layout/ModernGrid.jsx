@@ -1,5 +1,5 @@
-import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 import './ModernGrid.css';
 
 const ModernGrid = ({
@@ -12,8 +12,8 @@ const ModernGrid = ({
   minColumnWidth = '250px',
   className = '',
   ...props
-}) => {
-  const { theme } = useTheme();
+}) => {void
+  useTheme();
 
   const getGridColumns = () => {
     if (typeof columns === 'number') {
@@ -45,11 +45,11 @@ const ModernGrid = ({
     <div
       className={`modern-grid ${responsive ? 'responsive' : ''} ${className}`}
       style={gridStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент элемента сетки
@@ -73,13 +73,31 @@ export const GridItem = ({
     <div
       className={`grid-item ${className}`}
       style={itemStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
+};
+
+ModernGrid.propTypes = {
+  children: PropTypes.node,
+  columns: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  gap: PropTypes.oneOfType([PropTypes.oneOf(['none', 'small', 'medium', 'large', 'xl']), PropTypes.string, PropTypes.number]),
+  alignItems: PropTypes.string,
+  justifyContent: PropTypes.string,
+  responsive: PropTypes.bool,
+  minColumnWidth: PropTypes.string,
+  className: PropTypes.string
+};
+
+GridItem.propTypes = {
+  children: PropTypes.node,
+  colSpan: PropTypes.number,
+  rowSpan: PropTypes.number,
+  alignSelf: PropTypes.string,
+  justifySelf: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default ModernGrid;
-
-

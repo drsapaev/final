@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 
 const Textarea = React.forwardRef(({ 
   value: valueProp,
@@ -22,6 +23,7 @@ const Textarea = React.forwardRef(({
   id,
   ...props
 }, ref) => {
+  void variant;
   const [value, setValue] = useState(valueProp ?? defaultValue);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef(null);
@@ -202,5 +204,29 @@ const Textarea = React.forwardRef(({
     </div>
   );
 });
+
+Textarea.displayName = 'Textarea';
+
+Textarea.propTypes = {
+  value: PropTypes.string,
+  defaultValue: PropTypes.string,
+  onChange: PropTypes.func,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
+  placeholder: PropTypes.string,
+  disabled: PropTypes.bool,
+  error: PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
+  size: PropTypes.oneOf(['small', 'default', 'large']),
+  variant: PropTypes.string,
+  label: PropTypes.node,
+  hint: PropTypes.node,
+  maxLength: PropTypes.number,
+  minRows: PropTypes.number,
+  maxRows: PropTypes.number,
+  autoResize: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  id: PropTypes.string
+};
 
 export default Textarea;

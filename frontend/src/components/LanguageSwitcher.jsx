@@ -2,7 +2,7 @@
  * Language Switcher Component
  * Компактный переключатель языка для хедера
  */
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from '../hooks/useTranslation';
 import { Button, Icon } from './ui/macos';
 

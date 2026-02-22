@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Printer, Download, FileText, Receipt, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { useState } from 'react';
+import { Printer, FileText, Receipt, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { Button } from '../ui/native';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
@@ -43,7 +43,7 @@ const PrintButton = ({
   const IconComponent = documentIcons[documentType] || Printer;
   const documentName = documentNames[documentType] || 'Документ';
 
-  const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+  const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
   const handlePrint = async () => {
     try {
@@ -102,16 +102,16 @@ const PrintButton = ({
     }
   };
 
-  const buttonContent = children || (
-    <>
-      {printing ? (
-        <Loader size={16} className="animate-spin mr-1" />
-      ) : (
-        <IconComponent size={16} className="mr-1" />
-      )}
+  const buttonContent = children ||
+  <>
+      {printing ?
+    <Loader size={16} className="animate-spin mr-1" /> :
+
+    <IconComponent size={16} className="mr-1" />
+    }
       {printing ? 'Печать...' : `Печать ${documentName.toLowerCase()}`}
-    </>
-  );
+    </>;
+
 
   return (
     <div className={`relative ${className}`}>
@@ -120,32 +120,31 @@ const PrintButton = ({
         size={size}
         onClick={handlePrint}
         disabled={printing || !documentData}
-        className="relative"
-      >
+        className="relative">
+
         {buttonContent}
       </Button>
 
       {/* Результат печати */}
-      {lastResult && (
-        <div
-          className={`absolute top-full left-0 right-0 mt-2 p-2 rounded text-xs z-50 ${lastResult.type === 'success'
-              ? 'bg-green-100 text-green-700 border border-green-200'
-              : 'bg-red-100 text-red-700 border border-red-200'
-            }`}
-        >
+      {lastResult &&
+      <div
+        className={`absolute top-full left-0 right-0 mt-2 p-2 rounded text-xs z-50 ${lastResult.type === 'success' ?
+        'bg-green-100 text-green-700 border border-green-200' :
+        'bg-red-100 text-red-700 border border-red-200'}`
+        }>
+
           <div className="flex items-center">
-            {lastResult.type === 'success' ? (
-              <CheckCircle size={12} className="mr-1" />
-            ) : (
-              <AlertCircle size={12} className="mr-1" />
-            )}
+            {lastResult.type === 'success' ?
+          <CheckCircle size={12} className="mr-1" /> :
+
+          <AlertCircle size={12} className="mr-1" />
+          }
             {lastResult.message}
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default PrintButton;
-

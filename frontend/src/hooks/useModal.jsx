@@ -3,11 +3,12 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
 // Hook for managing animations
 const useAnimation = (isActive, type = 'fade', duration = 300) => {
+  void type;
   const [shouldRender, setShouldRender] = useState(isActive);
   const [animationClasses, setAnimationClasses] = useState('');
 
@@ -193,7 +194,7 @@ export const Modal = ({
         justifyContent: 'center',
         padding: '20px'
       }}
-      onClick={handleMaskClick}
+      onMouseDown={handleMaskClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
@@ -211,7 +212,7 @@ export const Modal = ({
           flexDirection: 'column',
           width: '100%'
         }}
-        onClick={(e) => e.stopPropagation()}
+        onMouseDownCapture={(e) => e.stopPropagation()}
         {...props}
       >
         {title && (

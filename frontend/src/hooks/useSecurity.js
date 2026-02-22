@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 const useSecurity = () => {
   const [securityData, setSecurityData] = useState({});
@@ -10,7 +10,7 @@ const useSecurity = () => {
   const [filterDateRange, setFilterDateRange] = useState('');
 
   // Моковые данные для демонстрации
-  const mockSecurityData = {
+  const mockSecurityDataRef = useRef({
     overview: {
       totalThreats: 23,
       criticalThreats: 3,
@@ -210,7 +210,7 @@ const useSecurity = () => {
         isp: 'Unknown'
       }
     ]
-  };
+  });
 
   // Загрузка данных безопасности
   const loadSecurityData = useCallback(async () => {
@@ -220,7 +220,7 @@ const useSecurity = () => {
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
-      setSecurityData(mockSecurityData);
+      setSecurityData(mockSecurityDataRef.current);
     } catch (err) {
       setError(err);
     } finally {
@@ -368,7 +368,7 @@ const useSecurity = () => {
   }, []);
 
   // Фильтрация данных
-  const filteredThreats = securityData.threats?.filter(threat => {
+  const filteredThreats = useMemo(() => (securityData.threats?.filter(threat => {
     const matchesSearch = !searchTerm || 
       threat.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
       threat.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -385,21 +385,23 @@ const useSecurity = () => {
       switch (filterDateRange) {
         case 'today':
           return threatDate.toDateString() === today.toDateString();
-        case 'week':
+        case 'week': {
           const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
           return threatDate >= weekAgo;
-        case 'month':
+        }
+        case 'month': {
           const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
           return threatDate >= monthAgo;
+        }
         default:
           return true;
       }
     })();
     
     return matchesSearch && matchesStatus && matchesSeverity && matchesDateRange;
-  }) || [];
+  }) || []), [securityData.threats, searchTerm, filterStatus, filterSeverity, filterDateRange]);
 
-  const filteredLogs = securityData.logs?.filter(log => {
+  const filteredLogs = useMemo(() => (securityData.logs?.filter(log => {
     const matchesSearch = !searchTerm || 
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -415,19 +417,21 @@ const useSecurity = () => {
       switch (filterDateRange) {
         case 'today':
           return logDate.toDateString() === today.toDateString();
-        case 'week':
+        case 'week': {
           const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
           return logDate >= weekAgo;
-        case 'month':
+        }
+        case 'month': {
           const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
           return logDate >= monthAgo;
+        }
         default:
           return true;
       }
     })();
     
     return matchesSearch && matchesStatus && matchesDateRange;
-  }) || [];
+  }) || []), [securityData.logs, searchTerm, filterStatus, filterDateRange]);
 
   // Получение статистики безопасности
   const getSecurityStats = () => {

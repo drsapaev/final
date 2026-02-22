@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, CreditCard, DollarSign, Calendar, User, AlertCircle, Receipt, Building } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 

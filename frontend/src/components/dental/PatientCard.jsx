@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
-import { 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Calendar, 
-  CreditCard, 
-  Shield, 
+import {
+  User,
+  Phone,
+  Mail,
+  MapPin,
+
+  CreditCard,
+  Shield,
   AlertTriangle,
   Edit,
   Save,
   X,
   Plus,
-  Camera,
+
   FileText,
-  Heart,
-  Pill,
-  Activity
-} from 'lucide-react';
+  Heart } from
+
+
+'lucide-react';
 
 /**
  * Расширенная карточка пациента для стоматологической ЭМК
  * Включает все необходимые поля согласно медицинским стандартам
  */
-const PatientCard = ({ 
-  patient, 
-  onSave, 
-  onClose, 
-  isEditMode = false 
+const PatientCard = ({
+  patient,
+  onSave,
+  onClose,
+  isEditMode = false
 }) => {
   const [formData, setFormData] = useState({
     // Основные данные
@@ -41,7 +41,7 @@ const PatientCard = ({
     phone: '',
     email: '',
     address: '',
-    
+
     // Документы
     passport: {
       series: '',
@@ -50,7 +50,7 @@ const PatientCard = ({
       issueDate: '',
       departmentCode: ''
     },
-    
+
     // Страхование
     insurance: {
       policyNumber: '',
@@ -58,7 +58,7 @@ const PatientCard = ({
       validUntil: '',
       type: 'voluntary' // voluntary, mandatory
     },
-    
+
     // Экстренные контакты
     emergencyContact: {
       name: '',
@@ -66,7 +66,7 @@ const PatientCard = ({
       phone: '',
       address: ''
     },
-    
+
     // Медицинский анамнез
     medicalHistory: {
       complaints: '',
@@ -77,7 +77,7 @@ const PatientCard = ({
       bloodType: '',
       rhFactor: ''
     },
-    
+
     // Дополнительная информация
     notes: '',
     createdAt: '',
@@ -91,26 +91,26 @@ const PatientCard = ({
   // Инициализация данных
   useEffect(() => {
     if (patient) {
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         ...patient,
         medicalHistory: {
-          ...formData.medicalHistory,
+          ...prev.medicalHistory,
           ...patient.medicalHistory
         },
         passport: {
-          ...formData.passport,
+          ...prev.passport,
           ...patient.passport
         },
         insurance: {
-          ...formData.insurance,
+          ...prev.insurance,
           ...patient.insurance
         },
         emergencyContact: {
-          ...formData.emergencyContact,
+          ...prev.emergencyContact,
           ...patient.emergencyContact
         }
-      });
+      }));
     }
   }, [patient]);
 
@@ -118,7 +118,7 @@ const PatientCard = ({
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         [parent]: {
           ...prev[parent],
@@ -126,7 +126,7 @@ const PatientCard = ({
         }
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         [field]: value
       }));
@@ -134,14 +134,14 @@ const PatientCard = ({
   };
 
   const handleArrayAdd = (field, item) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: [...prev[field], item]
     }));
   };
 
   const handleArrayRemove = (field, index) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
     }));
@@ -154,11 +154,11 @@ const PatientCard = ({
         ...formData,
         updatedAt: new Date().toISOString()
       };
-      
+
       if (onSave) {
         await onSave(updatedData);
       }
-      
+
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
@@ -176,15 +176,15 @@ const PatientCard = ({
 
   // Вкладки
   const tabs = [
-    { id: 'basic', label: 'Основные данные', icon: User },
-    { id: 'documents', label: 'Документы', icon: FileText },
-    { id: 'medical', label: 'Мед. анамнез', icon: Heart },
-    { id: 'emergency', label: 'Экстренные контакты', icon: AlertTriangle }
-  ];
+  { id: 'basic', label: 'Основные данные', icon: User },
+  { id: 'documents', label: 'Документы', icon: FileText },
+  { id: 'medical', label: 'Мед. анамнез', icon: Heart },
+  { id: 'emergency', label: 'Экстренные контакты', icon: AlertTriangle }];
+
 
   // Рендер основных данных
-  const renderBasicData = () => (
-    <div className="space-y-6">
+  const renderBasicData = () =>
+  <div className="space-y-6">
       {/* Личная информация */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
@@ -192,13 +192,13 @@ const PatientCard = ({
             Фамилия *
           </label>
           <input
-            type="text"
-            value={formData.surname || ''}
-            onChange={(e) => handleInputChange('surname', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            required
-          />
+          type="text"
+          value={formData.surname || ''}
+          onChange={(e) => handleInputChange('surname', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          required />
+        
         </div>
         
         <div>
@@ -206,13 +206,13 @@ const PatientCard = ({
             Имя *
           </label>
           <input
-            type="text"
-            value={formData.name || ''}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            required
-          />
+          type="text"
+          value={formData.name || ''}
+          onChange={(e) => handleInputChange('name', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          required />
+        
         </div>
         
         <div>
@@ -220,12 +220,12 @@ const PatientCard = ({
             Отчество
           </label>
           <input
-            type="text"
-            value={formData.patronymic || ''}
-            onChange={(e) => handleInputChange('patronymic', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          />
+          type="text"
+          value={formData.patronymic || ''}
+          onChange={(e) => handleInputChange('patronymic', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
+        
         </div>
         
         <div>
@@ -233,13 +233,13 @@ const PatientCard = ({
             Дата рождения *
           </label>
           <input
-            type="date"
-            value={formData.birthDate || ''}
-            onChange={(e) => handleInputChange('birthDate', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            required
-          />
+          type="date"
+          value={formData.birthDate || ''}
+          onChange={(e) => handleInputChange('birthDate', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          required />
+        
         </div>
         
         <div>
@@ -247,12 +247,12 @@ const PatientCard = ({
             Пол *
           </label>
           <select
-            value={formData.gender || ''}
-            onChange={(e) => handleInputChange('gender', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            required
-          >
+          value={formData.gender || ''}
+          onChange={(e) => handleInputChange('gender', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          required>
+          
             <option value="">Выберите пол</option>
             <option value="male">Мужской</option>
             <option value="female">Женский</option>
@@ -264,13 +264,13 @@ const PatientCard = ({
             Возраст
           </label>
           <input
-            type="text"
-            value={formData.birthDate ? 
-              Math.floor((new Date() - new Date(formData.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : ''
-            }
-            disabled
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-          />
+          type="text"
+          value={formData.birthDate ?
+          Math.floor((new Date() - new Date(formData.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : ''
+          }
+          disabled
+          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" />
+        
         </div>
       </div>
 
@@ -285,13 +285,13 @@ const PatientCard = ({
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
-                type="tel"
-                value={formData.phone || ''}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                disabled={!isEditing}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                required
-              />
+              type="tel"
+              value={formData.phone || ''}
+              onChange={(e) => handleInputChange('phone', e.target.value)}
+              disabled={!isEditing}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+              required />
+            
             </div>
           </div>
           
@@ -302,12 +302,12 @@ const PatientCard = ({
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
-                type="email"
-                value={formData.email || ''}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                disabled={!isEditing}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              />
+              type="email"
+              value={formData.email || ''}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              disabled={!isEditing}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
+            
             </div>
           </div>
           
@@ -318,23 +318,23 @@ const PatientCard = ({
             <div className="relative">
               <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <textarea
-                value={formData.address || ''}
-                onChange={(e) => handleInputChange('address', e.target.value)}
-                disabled={!isEditing}
-                rows={2}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                placeholder="Полный адрес проживания"
-              />
+              value={formData.address || ''}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+              disabled={!isEditing}
+              rows={2}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+              placeholder="Полный адрес проживания" />
+            
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Рендер документов
-  const renderDocuments = () => (
-    <div className="space-y-6">
+  const renderDocuments = () =>
+  <div className="space-y-6">
       {/* Паспортные данные */}
       <div className="border rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -347,13 +347,13 @@ const PatientCard = ({
               Серия
             </label>
             <input
-              type="text"
-              value={formData.passport.series || ''}
-              onChange={(e) => handleInputChange('passport.series', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="1234"
-            />
+            type="text"
+            value={formData.passport.series || ''}
+            onChange={(e) => handleInputChange('passport.series', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="1234" />
+          
           </div>
           
           <div>
@@ -361,13 +361,13 @@ const PatientCard = ({
               Номер
             </label>
             <input
-              type="text"
-              value={formData.passport.number || ''}
-              onChange={(e) => handleInputChange('passport.number', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="123456"
-            />
+            type="text"
+            value={formData.passport.number || ''}
+            onChange={(e) => handleInputChange('passport.number', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="123456" />
+          
           </div>
           
           <div>
@@ -375,13 +375,13 @@ const PatientCard = ({
               Выдан
             </label>
             <input
-              type="text"
-              value={formData.passport.issuedBy || ''}
-              onChange={(e) => handleInputChange('passport.issuedBy', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Орган выдачи"
-            />
+            type="text"
+            value={formData.passport.issuedBy || ''}
+            onChange={(e) => handleInputChange('passport.issuedBy', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Орган выдачи" />
+          
           </div>
           
           <div>
@@ -389,12 +389,12 @@ const PatientCard = ({
               Дата выдачи
             </label>
             <input
-              type="date"
-              value={formData.passport.issueDate || ''}
-              onChange={(e) => handleInputChange('passport.issueDate', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            />
+            type="date"
+            value={formData.passport.issueDate || ''}
+            onChange={(e) => handleInputChange('passport.issueDate', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
+          
           </div>
         </div>
       </div>
@@ -411,13 +411,13 @@ const PatientCard = ({
               Номер полиса
             </label>
             <input
-              type="text"
-              value={formData.insurance.policyNumber || ''}
-              onChange={(e) => handleInputChange('insurance.policyNumber', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="1234567890123456"
-            />
+            type="text"
+            value={formData.insurance.policyNumber || ''}
+            onChange={(e) => handleInputChange('insurance.policyNumber', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="1234567890123456" />
+          
           </div>
           
           <div>
@@ -425,13 +425,13 @@ const PatientCard = ({
               Страховая компания
             </label>
             <input
-              type="text"
-              value={formData.insurance.company || ''}
-              onChange={(e) => handleInputChange('insurance.company', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Название страховой компании"
-            />
+            type="text"
+            value={formData.insurance.company || ''}
+            onChange={(e) => handleInputChange('insurance.company', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Название страховой компании" />
+          
           </div>
           
           <div>
@@ -439,12 +439,12 @@ const PatientCard = ({
               Действует до
             </label>
             <input
-              type="date"
-              value={formData.insurance.validUntil || ''}
-              onChange={(e) => handleInputChange('insurance.validUntil', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            />
+            type="date"
+            value={formData.insurance.validUntil || ''}
+            onChange={(e) => handleInputChange('insurance.validUntil', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
+          
           </div>
           
           <div>
@@ -452,36 +452,36 @@ const PatientCard = ({
               Тип страхования
             </label>
             <select
-              value={formData.insurance.type || ''}
-              onChange={(e) => handleInputChange('insurance.type', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            >
+            value={formData.insurance.type || ''}
+            onChange={(e) => handleInputChange('insurance.type', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
+            
               <option value="voluntary">Добровольное</option>
               <option value="mandatory">Обязательное</option>
             </select>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Рендер медицинского анамнеза
-  const renderMedicalHistory = () => (
-    <div className="space-y-6">
+  const renderMedicalHistory = () =>
+  <div className="space-y-6">
       {/* Жалобы */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Жалобы на момент обращения
         </label>
         <textarea
-          value={formData.medicalHistory.complaints || ''}
-          onChange={(e) => handleInputChange('medicalHistory.complaints', e.target.value)}
-          disabled={!isEditing}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Опишите жалобы пациента"
-        />
+        value={formData.medicalHistory.complaints || ''}
+        onChange={(e) => handleInputChange('medicalHistory.complaints', e.target.value)}
+        disabled={!isEditing}
+        rows={3}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+        placeholder="Опишите жалобы пациента" />
+      
       </div>
 
       {/* Соматические заболевания */}
@@ -490,41 +490,41 @@ const PatientCard = ({
           Соматические заболевания
         </label>
         <div className="space-y-2">
-          {formData.medicalHistory.somaticDiseases.map((disease, index) => (
-            <div key={index} className="flex items-center gap-2">
+          {formData.medicalHistory.somaticDiseases.map((disease, index) =>
+        <div key={index} className="flex items-center gap-2">
               <input
-                type="text"
-                value={disease}
-                onChange={(e) => {
-                  const newDiseases = [...formData.medicalHistory.somaticDiseases];
-                  newDiseases[index] = e.target.value;
-                  handleInputChange('medicalHistory.somaticDiseases', newDiseases);
-                }}
-                disabled={!isEditing}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                placeholder="Название заболевания"
-              />
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={() => handleArrayRemove('medicalHistory.somaticDiseases', index)}
-                  className="text-red-500 hover:text-red-700"
-                >
+            type="text"
+            value={disease}
+            onChange={(e) => {
+              const newDiseases = [...formData.medicalHistory.somaticDiseases];
+              newDiseases[index] = e.target.value;
+              handleInputChange('medicalHistory.somaticDiseases', newDiseases);
+            }}
+            disabled={!isEditing}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Название заболевания" />
+          
+              {isEditing &&
+          <button
+            type="button"
+            onClick={() => handleArrayRemove('medicalHistory.somaticDiseases', index)}
+            className="text-red-500 hover:text-red-700">
+            
                   <X className="h-4 w-4" />
                 </button>
-              )}
+          }
             </div>
-          ))}
-          {isEditing && (
-            <button
-              type="button"
-              onClick={() => handleArrayAdd('medicalHistory.somaticDiseases', '')}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-            >
+        )}
+          {isEditing &&
+        <button
+          type="button"
+          onClick={() => handleArrayAdd('medicalHistory.somaticDiseases', '')}
+          className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
+          
               <Plus className="h-4 w-4" />
               Добавить заболевание
             </button>
-          )}
+        }
         </div>
       </div>
 
@@ -534,41 +534,41 @@ const PatientCard = ({
           Аллергии
         </label>
         <div className="space-y-2">
-          {formData.medicalHistory.allergies.map((allergy, index) => (
-            <div key={index} className="flex items-center gap-2">
+          {formData.medicalHistory.allergies.map((allergy, index) =>
+        <div key={index} className="flex items-center gap-2">
               <input
-                type="text"
-                value={allergy}
-                onChange={(e) => {
-                  const newAllergies = [...formData.medicalHistory.allergies];
-                  newAllergies[index] = e.target.value;
-                  handleInputChange('medicalHistory.allergies', newAllergies);
-                }}
-                disabled={!isEditing}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                placeholder="Аллерген (например: лидокаин, пенициллин)"
-              />
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={() => handleArrayRemove('medicalHistory.allergies', index)}
-                  className="text-red-500 hover:text-red-700"
-                >
+            type="text"
+            value={allergy}
+            onChange={(e) => {
+              const newAllergies = [...formData.medicalHistory.allergies];
+              newAllergies[index] = e.target.value;
+              handleInputChange('medicalHistory.allergies', newAllergies);
+            }}
+            disabled={!isEditing}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Аллерген (например: лидокаин, пенициллин)" />
+          
+              {isEditing &&
+          <button
+            type="button"
+            onClick={() => handleArrayRemove('medicalHistory.allergies', index)}
+            className="text-red-500 hover:text-red-700">
+            
                   <X className="h-4 w-4" />
                 </button>
-              )}
+          }
             </div>
-          ))}
-          {isEditing && (
-            <button
-              type="button"
-              onClick={() => handleArrayAdd('medicalHistory.allergies', '')}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-            >
+        )}
+          {isEditing &&
+        <button
+          type="button"
+          onClick={() => handleArrayAdd('medicalHistory.allergies', '')}
+          className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
+          
               <Plus className="h-4 w-4" />
               Добавить аллергию
             </button>
-          )}
+        }
         </div>
       </div>
 
@@ -578,41 +578,41 @@ const PatientCard = ({
           Текущие лекарства
         </label>
         <div className="space-y-2">
-          {formData.medicalHistory.currentMedications.map((medication, index) => (
-            <div key={index} className="flex items-center gap-2">
+          {formData.medicalHistory.currentMedications.map((medication, index) =>
+        <div key={index} className="flex items-center gap-2">
               <input
-                type="text"
-                value={medication}
-                onChange={(e) => {
-                  const newMedications = [...formData.medicalHistory.currentMedications];
-                  newMedications[index] = e.target.value;
-                  handleInputChange('medicalHistory.currentMedications', newMedications);
-                }}
-                disabled={!isEditing}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                placeholder="Название лекарства и дозировка"
-              />
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={() => handleArrayRemove('medicalHistory.currentMedications', index)}
-                  className="text-red-500 hover:text-red-700"
-                >
+            type="text"
+            value={medication}
+            onChange={(e) => {
+              const newMedications = [...formData.medicalHistory.currentMedications];
+              newMedications[index] = e.target.value;
+              handleInputChange('medicalHistory.currentMedications', newMedications);
+            }}
+            disabled={!isEditing}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Название лекарства и дозировка" />
+          
+              {isEditing &&
+          <button
+            type="button"
+            onClick={() => handleArrayRemove('medicalHistory.currentMedications', index)}
+            className="text-red-500 hover:text-red-700">
+            
                   <X className="h-4 w-4" />
                 </button>
-              )}
+          }
             </div>
-          ))}
-          {isEditing && (
-            <button
-              type="button"
-              onClick={() => handleArrayAdd('medicalHistory.currentMedications', '')}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-            >
+        )}
+          {isEditing &&
+        <button
+          type="button"
+          onClick={() => handleArrayAdd('medicalHistory.currentMedications', '')}
+          className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
+          
               <Plus className="h-4 w-4" />
               Добавить лекарство
             </button>
-          )}
+        }
         </div>
       </div>
 
@@ -623,11 +623,11 @@ const PatientCard = ({
             Группа крови
           </label>
           <select
-            value={formData.medicalHistory.bloodType || ''}
-            onChange={(e) => handleInputChange('medicalHistory.bloodType', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          >
+          value={formData.medicalHistory.bloodType || ''}
+          onChange={(e) => handleInputChange('medicalHistory.bloodType', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
+          
             <option value="">Не указана</option>
             <option value="A+">A+</option>
             <option value="A-">A-</option>
@@ -645,11 +645,11 @@ const PatientCard = ({
             Резус-фактор
           </label>
           <select
-            value={formData.medicalHistory.rhFactor || ''}
-            onChange={(e) => handleInputChange('medicalHistory.rhFactor', e.target.value)}
-            disabled={!isEditing}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          >
+          value={formData.medicalHistory.rhFactor || ''}
+          onChange={(e) => handleInputChange('medicalHistory.rhFactor', e.target.value)}
+          disabled={!isEditing}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
+          
             <option value="">Не указан</option>
             <option value="positive">Положительный (+)</option>
             <option value="negative">Отрицательный (-)</option>
@@ -663,20 +663,20 @@ const PatientCard = ({
           Стоматологический анамнез
         </label>
         <textarea
-          value={formData.medicalHistory.dentalHistory || ''}
-          onChange={(e) => handleInputChange('medicalHistory.dentalHistory', e.target.value)}
-          disabled={!isEditing}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Предыдущее стоматологическое лечение, импланты, протезы, ортодонтия"
-        />
+        value={formData.medicalHistory.dentalHistory || ''}
+        onChange={(e) => handleInputChange('medicalHistory.dentalHistory', e.target.value)}
+        disabled={!isEditing}
+        rows={3}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+        placeholder="Предыдущее стоматологическое лечение, импланты, протезы, ортодонтия" />
+      
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Рендер экстренных контактов
-  const renderEmergencyContacts = () => (
-    <div className="space-y-6">
+  const renderEmergencyContacts = () =>
+  <div className="space-y-6">
       <div className="border rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-orange-500" />
@@ -688,13 +688,13 @@ const PatientCard = ({
               ФИО контактного лица
             </label>
             <input
-              type="text"
-              value={formData.emergencyContact.name || ''}
-              onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Фамилия Имя Отчество"
-            />
+            type="text"
+            value={formData.emergencyContact.name || ''}
+            onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Фамилия Имя Отчество" />
+          
           </div>
           
           <div>
@@ -702,11 +702,11 @@ const PatientCard = ({
               Родство
             </label>
             <select
-              value={formData.emergencyContact.relationship || ''}
-              onChange={(e) => handleInputChange('emergencyContact.relationship', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            >
+            value={formData.emergencyContact.relationship || ''}
+            onChange={(e) => handleInputChange('emergencyContact.relationship', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
+            
               <option value="">Выберите родство</option>
               <option value="spouse">Супруг/супруга</option>
               <option value="parent">Родитель</option>
@@ -723,13 +723,13 @@ const PatientCard = ({
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
-                type="tel"
-                value={formData.emergencyContact.phone || ''}
-                onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
-                disabled={!isEditing}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                placeholder="+7 (999) 123-45-67"
-              />
+              type="tel"
+              value={formData.emergencyContact.phone || ''}
+              onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
+              disabled={!isEditing}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+              placeholder="+7 (999) 123-45-67" />
+            
             </div>
           </div>
           
@@ -738,18 +738,18 @@ const PatientCard = ({
               Адрес
             </label>
             <input
-              type="text"
-              value={formData.emergencyContact.address || ''}
-              onChange={(e) => handleInputChange('emergencyContact.address', e.target.value)}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Адрес проживания"
-            />
+            type="text"
+            value={formData.emergencyContact.address || ''}
+            onChange={(e) => handleInputChange('emergencyContact.address', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            placeholder="Адрес проживания" />
+          
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Рендер контента по вкладкам
   const renderTabContent = () => {
@@ -782,37 +782,37 @@ const PatientCard = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {!isEditing ? (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
+            {!isEditing ?
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+              
                 <Edit className="h-4 w-4" />
                 Редактировать
-              </button>
-            ) : (
-              <>
+              </button> :
+
+            <>
                 <button
-                  onClick={handleCancel}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
+                onClick={handleCancel}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                
                   <X className="h-4 w-4" />
                   Отмена
                 </button>
                 <button
-                  onClick={handleSave}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
+                onClick={handleSave}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">
+                
                   <Save className="h-4 w-4" />
                   {loading ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </>
-            )}
+            }
             <button
               onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-700"
-            >
+              className="p-2 text-gray-500 hover:text-gray-700">
+              
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -821,20 +821,20 @@ const PatientCard = ({
         {/* Вкладки */}
         <div className="border-b">
           <nav className="flex space-x-8 px-6">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
+            {tabs.map((tab) =>
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === tab.id ?
+              'border-blue-500 text-blue-600' :
+              'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
+              }>
+              
                 <tab.icon className="h-4 w-4" />
                 {tab.label}
               </button>
-            ))}
+            )}
           </nav>
         </div>
 
@@ -843,9 +843,8 @@ const PatientCard = ({
           {renderTabContent()}
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default PatientCard;
-

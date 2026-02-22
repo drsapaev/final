@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar,
-  Clock,
+
   User,
   Bell,
   Activity,
   Phone,
   MapPin,
-  Heart,
+
   Stethoscope,
-  TestTube,
-  CreditCard,
-  Settings
-} from 'lucide-react';
+
+
+  Settings } from
+'lucide-react';
 import { Card, Button, Badge } from '../components/ui/macos';
 import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
@@ -29,9 +29,9 @@ const MobilePatientDashboard = () => {
   const [patientData, setPatientData] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('dashboard');void
 
-  const { isOnline, getConnectionDetails } = usePWA();
+  usePWA();
 
   useEffect(() => {
     loadPatientData();
@@ -74,17 +74,17 @@ const MobilePatientDashboard = () => {
 
   const getUpcomingAppointments = () => {
     const now = new Date();
-    return appointments.filter(apt =>
-      new Date(apt.appointment_date) > now && apt.status === 'scheduled'
+    return appointments.filter((apt) =>
+    new Date(apt.appointment_date) > now && apt.status === 'scheduled'
     ).slice(0, 3);
   };
 
-  const getRecentAppointments = () => {
-    const now = new Date();
-    return appointments.filter(apt =>
-      new Date(apt.appointment_date) < now
-    ).slice(0, 3);
-  };
+
+
+
+
+
+
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -98,26 +98,26 @@ const MobilePatientDashboard = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'scheduled': return 'blue';
-      case 'completed': return 'green';
-      case 'cancelled': return 'red';
-      default: return 'gray';
+      case 'scheduled':return 'blue';
+      case 'completed':return 'green';
+      case 'cancelled':return 'red';
+      default:return 'gray';
     }
   };
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'scheduled': return 'Запланировано';
-      case 'completed': return 'Завершено';
-      case 'cancelled': return 'Отменено';
-      default: return status;
+      case 'scheduled':return 'Запланировано';
+      case 'completed':return 'Завершено';
+      case 'cancelled':return 'Отменено';
+      default:return status;
     }
   };
 
   // Найти первую активную запись в очереди (на сегодня)
-  const activeQueueEntry = appointments.find(a =>
-    (a.status === 'waiting' || a.status === 'called') &&
-    new Date(a.appointment_date).toDateString() === new Date().toDateString()
+  const activeQueueEntry = appointments.find((a) =>
+  (a.status === 'waiting' || a.status === 'called') &&
+  new Date(a.appointment_date).toDateString() === new Date().toDateString()
   );
 
   if (loading) {
@@ -128,8 +128,8 @@ const MobilePatientDashboard = () => {
           <div className="h-32 bg-gray-200 rounded"></div>
           <div className="h-24 bg-gray-200 rounded"></div>
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -158,48 +158,48 @@ const MobilePatientDashboard = () => {
       <div className="bg-white border-b">
         <div className="flex space-x-1 p-2">
           {[
-            { id: 'dashboard', label: 'Главная', icon: Activity },
-            { id: 'appointments', label: 'Записи', icon: Calendar },
-            { id: 'notifications', label: 'Уведомления', icon: Bell },
-            { id: 'profile', label: 'Профиль', icon: User }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${activeTab === tab.id
-                ? 'bg-blue-50 text-blue-600'
-                : 'text-gray-600 hover:bg-gray-50'
-                }`}
-            >
+          { id: 'dashboard', label: 'Главная', icon: Activity },
+          { id: 'appointments', label: 'Записи', icon: Calendar },
+          { id: 'notifications', label: 'Уведомления', icon: Bell },
+          { id: 'profile', label: 'Профиль', icon: User }].
+          map((tab) =>
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${activeTab === tab.id ?
+            'bg-blue-50 text-blue-600' :
+            'text-gray-600 hover:bg-gray-50'}`
+            }>
+            
               <tab.icon className="w-5 h-5 mb-1" />
               <span className="text-xs font-medium">{tab.label}</span>
             </button>
-          ))}
+          )}
         </div>
       </div>
 
       {/* Контент */}
       <div className="p-4 space-y-4">
-        {activeTab === 'dashboard' && (
-          <>
+        {activeTab === 'dashboard' &&
+        <>
             {/* ✅ Карточка позиции в очереди */}
-            {activeQueueEntry && (
-              <div className="mb-2">
+            {activeQueueEntry &&
+          <div className="mb-2">
                 <QueuePositionCard
-                  queueEntry={{
-                    id: activeQueueEntry.id,
-                    number: activeQueueEntry.queue_number || activeQueueEntry.id,
-                    status: activeQueueEntry.status,
-                    peopleBefore: activeQueueEntry.people_before,
-                    estimatedWaitTime: activeQueueEntry.estimated_wait_time,
-                    doctorName: activeQueueEntry.doctor_name,
-                    specialty: activeQueueEntry.specialty || 'Приём врача',
-                    cabinet: activeQueueEntry.cabinet
-                  }}
-                  onRefresh={loadPatientData}
-                />
+              queueEntry={{
+                id: activeQueueEntry.id,
+                number: activeQueueEntry.queue_number || activeQueueEntry.id,
+                status: activeQueueEntry.status,
+                peopleBefore: activeQueueEntry.people_before,
+                estimatedWaitTime: activeQueueEntry.estimated_wait_time,
+                doctorName: activeQueueEntry.doctor_name,
+                specialty: activeQueueEntry.specialty || 'Приём врача',
+                cabinet: activeQueueEntry.cabinet
+              }}
+              onRefresh={loadPatientData} />
+            
               </div>
-            )}
+          }
 
             {/* Быстрые действия */}
             <Card className="p-4">
@@ -219,10 +219,10 @@ const MobilePatientDashboard = () => {
             {/* Ближайшие записи */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Ближайшие записи</h3>
-              {getUpcomingAppointments().length > 0 ? (
-                <div className="space-y-3">
-                  {getUpcomingAppointments().map(appointment => (
-                    <div key={appointment.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+              {getUpcomingAppointments().length > 0 ?
+            <div className="space-y-3">
+                  {getUpcomingAppointments().map((appointment) =>
+              <div key={appointment.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                           <Stethoscope className="w-5 h-5 text-blue-600" />
@@ -236,13 +236,13 @@ const MobilePatientDashboard = () => {
                         {getStatusLabel(appointment.status)}
                       </Badge>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm text-center py-4">
+              )}
+                </div> :
+
+            <p className="text-gray-500 text-sm text-center py-4">
                   Нет предстоящих записей
                 </p>
-              )}
+            }
             </Card>
 
             {/* Статистика */}
@@ -251,7 +251,7 @@ const MobilePatientDashboard = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {appointments.filter(a => a.status === 'completed').length}
+                    {appointments.filter((a) => a.status === 'completed').length}
                   </div>
                   <div className="text-xs text-gray-600">Визитов</div>
                 </div>
@@ -270,16 +270,16 @@ const MobilePatientDashboard = () => {
               </div>
             </Card>
           </>
-        )}
+        }
 
-        {activeTab === 'appointments' && (
-          <div className="space-y-4">
+        {activeTab === 'appointments' &&
+        <div className="space-y-4">
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Все записи</h3>
-              {appointments.length > 0 ? (
-                <div className="space-y-3">
-                  {appointments.map(appointment => (
-                    <div key={appointment.id} className="border rounded-lg p-3">
+              {appointments.length > 0 ?
+            <div className="space-y-3">
+                  {appointments.map((appointment) =>
+              <div key={appointment.id} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <Stethoscope className="w-4 h-4 text-gray-400" />
@@ -299,29 +299,29 @@ const MobilePatientDashboard = () => {
                           <span>{appointment.location || 'Клиника'}</span>
                         </div>
                       </div>
-                      {appointment.complaint && (
-                        <p className="text-xs text-gray-500 mt-2">
+                      {appointment.complaint &&
+                <p className="text-xs text-gray-500 mt-2">
                           {appointment.complaint}
                         </p>
-                      )}
+                }
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm text-center py-4">
+              )}
+                </div> :
+
+            <p className="text-gray-500 text-sm text-center py-4">
                   Нет записей
                 </p>
-              )}
+            }
             </Card>
           </div>
-        )}
+        }
 
-        {activeTab === 'notifications' && (
-          <MobileNotifications />
-        )}
+        {activeTab === 'notifications' &&
+        <MobileNotifications />
+        }
 
-        {activeTab === 'profile' && (
-          <div className="space-y-4">
+        {activeTab === 'profile' &&
+        <div className="space-y-4">
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Личная информация</h3>
               <div className="space-y-3">
@@ -356,13 +356,13 @@ const MobilePatientDashboard = () => {
               </div>
             </Card>
           </div>
-        )}
+        }
       </div>
 
       {/* Индикатор подключения */}
       <OfflineIndicator />
-    </div>
-  );
+    </div>);
+
 };
 
 export default MobilePatientDashboard;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '../ui/macos';
 
@@ -175,6 +176,21 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
             </div>
         </div>
     );
+};
+
+CashPaymentModal.propTypes = {
+    appointment: PropTypes.shape({
+        total_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        remaining_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        payment_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        patient_name: PropTypes.string,
+        patient_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        department: PropTypes.string,
+        appointment_date: PropTypes.string,
+        appointment_time: PropTypes.string
+    }),
+    onProcessPayment: PropTypes.func,
+    onClose: PropTypes.func
 };
 
 export default CashPaymentModal;

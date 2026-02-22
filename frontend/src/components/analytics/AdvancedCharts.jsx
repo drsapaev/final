@@ -1,20 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { Chart, registerables } from 'chart.js';
 import { Card, Button } from '../ui/native';
-import { 
-  Download, 
-  RefreshCw, 
-  BarChart3, 
-  PieChart, 
-  TrendingUp, 
+import {
+  Download,
+  RefreshCw,
+  BarChart3,
+  PieChart,
+  TrendingUp,
   Activity,
   Target,
   Users,
   DollarSign,
   Calendar,
   Eye,
-  Filter
-} from 'lucide-react';
+  Filter } from
+'lucide-react';
 
 // Регистрируем все компоненты Chart.js
 Chart.register(...registerables);
@@ -23,31 +24,26 @@ Chart.register(...registerables);
  * Продвинутые графики для аналитики
  * Включает интерактивные диаграммы, анимации, фильтры
  */
-const AdvancedCharts = ({ 
-  data, 
-  loading = false, 
+const AdvancedCharts = ({
+  data,
+  loading = false,
   onRefresh,
   onExport,
   title = 'Продвинутая аналитика',
   showFilters = true
 }) => {
+  void title;
   const chartRefs = useRef({});
   const [activeTab, setActiveTab] = useState('overview');
   const [chartType, setChartType] = useState('line');
   const [timeRange, setTimeRange] = useState('30d');
   const [selectedMetrics, setSelectedMetrics] = useState(['revenue', 'visits', 'patients']);
 
-  useEffect(() => {
-    if (data?.charts) {
-      renderAdvancedCharts();
-    }
-  }, [data, activeTab, chartType, timeRange, selectedMetrics]);
-
-  const renderAdvancedCharts = () => {
+  const renderAdvancedCharts = useCallback(() => {
     if (!data?.charts) return;
 
     // Уничтожаем существующие графики
-    Object.values(chartRefs.current).forEach(chart => {
+    Object.values(chartRefs.current).forEach((chart) => {
       if (chart) chart.destroy();
     });
     chartRefs.current = {};
@@ -56,10 +52,10 @@ const AdvancedCharts = ({
     for (const [chartName, chartConfig] of Object.entries(data.charts)) {
       const canvasId = `advanced-chart-${chartName}`;
       const canvas = document.getElementById(canvasId);
-      
+
       if (canvas) {
         const ctx = canvas.getContext('2d');
-        
+
         // Добавляем продвинутые настройки
         const advancedConfig = {
           ...chartConfig,
@@ -93,10 +89,10 @@ const AdvancedCharts = ({
                 cornerRadius: 8,
                 displayColors: true,
                 callbacks: {
-                  title: function(context) {
+                  title: function (context) {
                     return context[0].label;
                   },
-                  label: function(context) {
+                  label: function (context) {
                     const label = context.dataset.label || '';
                     const value = context.parsed.y || context.parsed;
                     return `${label}: ${value.toLocaleString()}`;
@@ -110,23 +106,29 @@ const AdvancedCharts = ({
         chartRefs.current[chartName] = new Chart(ctx, advancedConfig);
       }
     }
-  };
+  }, [data]);
+
+  useEffect(() => {
+    if (data?.charts) {
+      renderAdvancedCharts();
+    }
+  }, [data, activeTab, chartType, timeRange, selectedMetrics, renderAdvancedCharts]);
 
   const getChartIcon = (chartType) => {
     const iconStyle = { width: '16px', height: '16px' };
     switch (chartType) {
-      case 'line': return <TrendingUp style={iconStyle} />;
-      case 'bar': return <BarChart3 style={iconStyle} />;
-      case 'doughnut': return <PieChart style={iconStyle} />;
-      case 'radar': return <Activity style={iconStyle} />;
-      case 'scatter': return <Target style={iconStyle} />;
-      default: return <BarChart3 style={iconStyle} />;
+      case 'line':return <TrendingUp style={iconStyle} />;
+      case 'bar':return <BarChart3 style={iconStyle} />;
+      case 'doughnut':return <PieChart style={iconStyle} />;
+      case 'radar':return <Activity style={iconStyle} />;
+      case 'scatter':return <Target style={iconStyle} />;
+      default:return <BarChart3 style={iconStyle} />;
     }
   };
 
   const renderChartCard = (chartName, chartConfig) => {
     const canvasId = `advanced-chart-${chartName}`;
-    
+
     return (
       <Card key={chartName} className="w-full">
         <div className="p-4 border-b border-gray-200">
@@ -141,15 +143,15 @@ const AdvancedCharts = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onExport?.(chartName)}
-              >
+                onClick={() => onExport?.(chartName)}>
+                
                 <Download className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onRefresh?.(chartName)}
-              >
+                onClick={() => onRefresh?.(chartName)}>
+                
                 <RefreshCw className="w-4 h-4" />
               </Button>
             </div>
@@ -160,8 +162,8 @@ const AdvancedCharts = ({
             <canvas id={canvasId}></canvas>
           </div>
         </div>
-      </Card>
-    );
+      </Card>);
+
   };
 
   const renderFilters = () => {
@@ -178,8 +180,8 @@ const AdvancedCharts = ({
           <select
             value={chartType}
             onChange={(e) => setChartType(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
+            className="px-3 py-1 border border-gray-300 rounded-md text-sm">
+            
             <option value="line">Линейный</option>
             <option value="bar">Столбчатый</option>
             <option value="doughnut">Круговая</option>
@@ -190,8 +192,8 @@ const AdvancedCharts = ({
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
+            className="px-3 py-1 border border-gray-300 rounded-md text-sm">
+            
             <option value="7d">7 дней</option>
             <option value="30d">30 дней</option>
             <option value="90d">90 дней</option>
@@ -200,41 +202,41 @@ const AdvancedCharts = ({
 
           <div className="flex items-center space-x-2">
             <span className="text-sm">Метрики:</span>
-            {['revenue', 'visits', 'patients', 'doctors'].map(metric => (
-              <label key={metric} className="flex items-center space-x-1">
+            {['revenue', 'visits', 'patients', 'doctors'].map((metric) =>
+            <label key={metric} className="flex items-center space-x-1">
                 <input
-                  type="checkbox"
-                  checked={selectedMetrics.includes(metric)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedMetrics([...selectedMetrics, metric]);
-                    } else {
-                      setSelectedMetrics(selectedMetrics.filter(m => m !== metric));
-                    }
-                  }}
-                  className="rounded"
-                />
+                type="checkbox"
+                checked={selectedMetrics.includes(metric)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedMetrics([...selectedMetrics, metric]);
+                  } else {
+                    setSelectedMetrics(selectedMetrics.filter((m) => m !== metric));
+                  }
+                }}
+                className="rounded" />
+              
                 <span className="text-sm capitalize">{metric}</span>
               </label>
-            ))}
+            )}
           </div>
         </div>
-      </Card>
-    );
+      </Card>);
+
   };
 
-  const renderTabContent = (tabData, tabName) => {
+  const renderTabContent = (tabData) => {
     if (!tabData || !tabData.charts) return null;
 
     const charts = Object.entries(tabData.charts);
-    
+
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {charts.map(([chartName, chartConfig]) => 
-          renderChartCard(chartName, chartConfig)
+        {charts.map(([chartName, chartConfig]) =>
+        renderChartCard(chartName, chartConfig)
         )}
-      </div>
-    );
+      </div>);
+
   };
 
   if (loading) {
@@ -246,8 +248,8 @@ const AdvancedCharts = ({
             <span>Загрузка продвинутых графиков...</span>
           </div>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   if (!data || !data.charts) {
@@ -266,8 +268,8 @@ const AdvancedCharts = ({
             Загрузить данные
           </Button>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
@@ -276,32 +278,32 @@ const AdvancedCharts = ({
       {renderFilters()}
 
       {/* Навигация по вкладкам */}
-      {Object.keys(data.charts).length > 1 && (
-        <div className="border-b border-gray-200">
+      {Object.keys(data.charts).length > 1 &&
+      <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
             {[
-              { id: 'overview', label: 'Обзор', icon: Eye },
-              { id: 'kpi', label: 'KPI', icon: Target },
-              { id: 'doctors', label: 'Врачи', icon: Users },
-              { id: 'revenue', label: 'Доходы', icon: DollarSign },
-              { id: 'appointments', label: 'Записи', icon: Calendar }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
+          { id: 'overview', label: 'Обзор', icon: Eye },
+          { id: 'kpi', label: 'KPI', icon: Target },
+          { id: 'doctors', label: 'Врачи', icon: Users },
+          { id: 'revenue', label: 'Доходы', icon: DollarSign },
+          { id: 'appointments', label: 'Записи', icon: Calendar }].
+          map((tab) =>
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+            activeTab === tab.id ?
+            'border-blue-500 text-blue-600' :
+            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
+            }>
+            
                 <tab.icon className="w-4 h-4" />
                 <span>{tab.label}</span>
               </button>
-            ))}
+          )}
           </nav>
         </div>
-      )}
+      }
 
       {/* Контент вкладок */}
       <div className="space-y-6">
@@ -311,9 +313,17 @@ const AdvancedCharts = ({
         {activeTab === 'revenue' && renderTabContent(data.charts.revenue, 'revenue')}
         {activeTab === 'appointments' && renderTabContent(data.charts.appointments, 'appointments')}
       </div>
-    </div>
-  );
+    </div>);
+
+};
+
+AdvancedCharts.propTypes = {
+  data: PropTypes.object,
+  loading: PropTypes.bool,
+  onRefresh: PropTypes.func,
+  onExport: PropTypes.func,
+  title: PropTypes.node,
+  showFilters: PropTypes.bool
 };
 
 export default AdvancedCharts;
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import MedicalImageAnalyzer from '../ai/MedicalImageAnalyzer';
@@ -32,30 +32,30 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
       border: `1px solid ${colors.border}`,
       marginBottom: '20px'
     }}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            background: activeTab === tab.id ? colors.active : 'transparent',
-            color: activeTab === tab.id ? colors.activeText : colors.text,
-            fontSize: '14px',
-            fontWeight: activeTab === tab.id ? '600' : '400',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
+      {tabs.map((tab) =>
+      <button
+        key={tab.id}
+        onClick={() => onTabChange(tab.id)}
+        style={{
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '6px',
+          background: activeTab === tab.id ? colors.active : 'transparent',
+          color: activeTab === tab.id ? colors.activeText : colors.text,
+          fontSize: '14px',
+          fontWeight: activeTab === tab.id ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+        
           {tab.label}
         </button>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 AdminTabs.propTypes = {
@@ -69,19 +69,19 @@ AdminTabs.propTypes = {
 
 const UnifiedAITools = () => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'ai-imaging';
-  const { isDark } = useTheme();
+  const section = searchParams.get('section') || 'ai-imaging';void
+  useTheme();
 
   const getActiveTab = (section) => {
     switch (section) {
-      case 'ai-imaging': return 'imaging';
-      case 'treatment-recommendations': return 'treatment';
-      case 'drug-interactions': return 'drugs';
-      case 'risk-assessment': return 'risk';
-      case 'voice-to-text': return 'voice';
-      case 'smart-scheduling': return 'scheduling';
-      case 'quality-control': return 'quality';
-      default: return 'imaging';
+      case 'ai-imaging':return 'imaging';
+      case 'treatment-recommendations':return 'treatment';
+      case 'drug-interactions':return 'drugs';
+      case 'risk-assessment':return 'risk';
+      case 'voice-to-text':return 'voice';
+      case 'smart-scheduling':return 'scheduling';
+      case 'quality-control':return 'quality';
+      default:return 'imaging';
     }
   };
 
@@ -93,14 +93,14 @@ const UnifiedAITools = () => {
   }, [section]);
 
   const tabs = [
-    { id: 'imaging', label: 'Medical Imaging', icon: 'Image' },
-    { id: 'treatment', label: 'Treatment Recs', icon: 'Heart' },
-    { id: 'drugs', label: 'Drug Interactions', icon: 'Pill' },
-    { id: 'risk', label: 'Risk Assessment', icon: 'AlertTriangle' },
-    { id: 'voice', label: 'Voice to Text', icon: 'Mic' },
-    { id: 'scheduling', label: 'Smart Scheduling', icon: 'Calendar' },
-    { id: 'quality', label: 'Quality Control', icon: 'CheckCircle' }
-  ];
+  { id: 'imaging', label: 'Medical Imaging', icon: 'Image' },
+  { id: 'treatment', label: 'Treatment Recs', icon: 'Heart' },
+  { id: 'drugs', label: 'Drug Interactions', icon: 'Pill' },
+  { id: 'risk', label: 'Risk Assessment', icon: 'AlertTriangle' },
+  { id: 'voice', label: 'Voice to Text', icon: 'Mic' },
+  { id: 'scheduling', label: 'Smart Scheduling', icon: 'Calendar' },
+  { id: 'quality', label: 'Quality Control', icon: 'CheckCircle' }];
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -128,13 +128,13 @@ const UnifiedAITools = () => {
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+        onTabChange={setActiveTab} />
+      
       <div style={{ flex: 1, overflow: 'auto' }}>
         {renderContent()}
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default UnifiedAITools;

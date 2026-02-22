@@ -3,7 +3,8 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
@@ -41,13 +42,18 @@ export const notificationConfig = {
 export const useNotifications = (options = {}) => {
   const {
     maxNotifications = notificationConfig.maxNotifications,
-    defaultDuration = notificationConfig.defaultDuration,
-    position = 'top-right'
+    defaultDuration = notificationConfig.defaultDuration
+
   } = options;
 
   const [notifications, setNotifications] = useState([]);
-  const [isPaused, setIsPaused] = useState(false);
-  const { prefersReducedMotion } = useReducedMotion();
+  const [isPaused, setIsPaused] = useState(false);void
+  useReducedMotion();
+
+  // Удаление уведомления
+  const removeNotification = useCallback((id) => {
+    setNotifications((prev) => prev.filter((notification) => notification.id !== id));
+  }, []);
 
   // Добавление уведомления
   const addNotification = useCallback((notification) => {
@@ -66,7 +72,7 @@ export const useNotifications = (options = {}) => {
       ...notification
     };
 
-    setNotifications(prev => {
+    setNotifications((prev) => {
       const updated = [newNotification, ...prev];
       return updated.slice(0, maxNotifications);
     });
@@ -79,12 +85,7 @@ export const useNotifications = (options = {}) => {
     }
 
     return id;
-  }, [maxNotifications, defaultDuration]);
-
-  // Удаление уведомления
-  const removeNotification = useCallback((id) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  }, []);
+  }, [maxNotifications, defaultDuration, removeNotification]);
 
   // Очистка всех уведомлений
   const clearAll = useCallback(() => {
@@ -202,6 +203,7 @@ export const Notification = ({
     if (action.onClick) {
       action.onClick(notification);
     }
+    onAction?.(action, notification);
     if (action.closeOnClick !== false) {
       onRemove(notification.id);
     }
@@ -238,8 +240,8 @@ export const Notification = ({
         zIndex: 1000,
         ...notificationConfig.positions[position]
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Кнопка закрытия */}
       <button
         onClick={() => onRemove(notification.id)}
@@ -266,8 +268,8 @@ export const Notification = ({
             e.target.style.backgroundColor = 'transparent';
           }
         }}
-        aria-label="Закрыть уведомление"
-      >
+        aria-label="Закрыть уведомление">
+        
         ×
       </button>
 
@@ -278,103 +280,103 @@ export const Notification = ({
             fontSize: '20px',
             flexShrink: 0,
             marginTop: '2px'
-          }}
-        >
+          }}>
+          
           {config.icon}
         </div>
 
         <div style={{ flex: 1 }}>
-          {notification.title && (
-            <div
-              style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: config.color,
-                marginBottom: '4px'
-              }}
-            >
+          {notification.title &&
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              color: config.color,
+              marginBottom: '4px'
+            }}>
+            
               {notification.title}
             </div>
-          )}
+          }
 
           <div
             style={{
               fontSize: '14px',
               color: '#374151',
               lineHeight: '1.4'
-            }}
-          >
+            }}>
+            
             {notification.message}
           </div>
 
           {/* Действия */}
-          {notification.actions && notification.actions.length > 0 && (
-            <div
+          {notification.actions && notification.actions.length > 0 &&
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginTop: '12px',
+              flexWrap: 'wrap'
+            }}>
+            
+              {notification.actions.map((action, index) =>
+            <button
+              key={index}
+              onClick={() => handleAction(action)}
               style={{
-                display: 'flex',
-                gap: '8px',
-                marginTop: '12px',
-                flexWrap: 'wrap'
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '500',
+                border: `1px solid ${config.color}`,
+                borderRadius: '6px',
+                backgroundColor: config.color,
+                color: '#ffffff',
+                cursor: 'pointer',
+                transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
               }}
-            >
-              {notification.actions.map((action, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleAction(action)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    border: `1px solid ${config.color}`,
-                    borderRadius: '6px',
-                    backgroundColor: config.color,
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!prefersReducedMotion) {
-                      e.target.style.opacity = '0.9';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!prefersReducedMotion) {
-                      e.target.style.opacity = '1';
-                    }
-                  }}
-                >
+              onMouseEnter={(e) => {
+                if (!prefersReducedMotion) {
+                  e.target.style.opacity = '0.9';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!prefersReducedMotion) {
+                  e.target.style.opacity = '1';
+                }
+              }}>
+              
                   {action.label}
                 </button>
-              ))}
+            )}
             </div>
-          )}
+          }
         </div>
       </div>
 
       {/* Прогресс бар для автоскрытия */}
-      {!notification.persistent && notification.duration > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            backgroundColor: `${config.color}30`,
-            borderRadius: '0 0 8px 8px'
-          }}
-        >
+      {!notification.persistent && notification.duration > 0 &&
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '3px',
+          backgroundColor: `${config.color}30`,
+          borderRadius: '0 0 8px 8px'
+        }}>
+        
           <div
-            style={{
-              height: '100%',
-              backgroundColor: config.color,
-              borderRadius: '0 0 8px 8px',
-              animation: `notificationProgress ${notification.duration}ms linear`,
-              transformOrigin: 'left'
-            }}
-          />
+          style={{
+            height: '100%',
+            backgroundColor: config.color,
+            borderRadius: '0 0 8px 8px',
+            animation: `notificationProgress ${notification.duration}ms linear`,
+            transformOrigin: 'left'
+          }} />
+        
         </div>
-      )}
+      }
 
       <style>
         {`
@@ -406,8 +408,8 @@ export const Notification = ({
           }
         `}
       </style>
-    </div>
-  );
+    </div>);
+
 };
 
 // Контейнер уведомлений
@@ -429,19 +431,19 @@ export const NotificationContainer = ({
         pointerEvents: 'none',
         ...notificationConfig.positions[position]
       }}
-      {...props}
-    >
-      {notifications.map((notification) => (
-        <Notification
-          key={notification.id}
-          notification={notification}
-          onRemove={onRemove}
-          position={position}
-          style={{ pointerEvents: 'auto' }}
-        />
-      ))}
-    </div>
-  );
+      {...props}>
+      
+      {notifications.map((notification) =>
+      <Notification
+        key={notification.id}
+        notification={notification}
+        onRemove={onRemove}
+        position={position}
+        style={{ pointerEvents: 'auto' }} />
+
+      )}
+    </div>);
+
 };
 
 // Провайдер уведомлений
@@ -458,10 +460,10 @@ export const NotificationProvider = ({
       <NotificationContainer
         notifications={notificationHook.notifications}
         onRemove={notificationHook.removeNotification}
-        position={options.position || 'top-right'}
-      />
-    </NotificationContext.Provider>
-  );
+        position={options.position || 'top-right'} />
+      
+    </NotificationContext.Provider>);
+
 };
 
 // Контекст уведомлений
@@ -474,6 +476,26 @@ export const useNotificationContext = () => {
     throw new Error('useNotificationContext must be used within a NotificationProvider');
   }
   return context;
+};
+
+Notification.propTypes = {
+  notification: PropTypes.object,
+  onRemove: PropTypes.func,
+  onAction: PropTypes.func,
+  position: PropTypes.string,
+  className: PropTypes.string
+};
+
+NotificationContainer.propTypes = {
+  notifications: PropTypes.array,
+  onRemove: PropTypes.func,
+  position: PropTypes.string,
+  className: PropTypes.string
+};
+
+NotificationProvider.propTypes = {
+  children: PropTypes.node,
+  options: PropTypes.object
 };
 
 export default useNotifications;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import ModernButton from './ModernButton';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -14,7 +14,7 @@ const FloatingActionButton = ({
   className = '',
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  const { getColor } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleExpanded = () => {
@@ -24,6 +24,12 @@ const FloatingActionButton = ({
   const handleActionClick = (action) => {
     action.onClick?.();
     setIsExpanded(false);
+  };
+  const handleActivationKeyDown = (event, action) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      action();
+    }
   };
 
   const positionClasses = {
@@ -36,51 +42,54 @@ const FloatingActionButton = ({
   return (
     <>
       {/* Backdrop */}
-      {isExpanded && actions.length > 0 && (
-        <div 
-          className="fab-backdrop"
-          onClick={() => setIsExpanded(false)}
-        />
-      )}
+      {isExpanded && actions.length > 0 &&
+      <div
+        className="fab-backdrop"
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsExpanded(false)}
+        onKeyDown={(event) => handleActivationKeyDown(event, () => setIsExpanded(false))} />
+
+      }
 
       {/* FAB Container */}
       <div className={`fab-container ${positionClasses[position]} ${className}`}>
         {/* Действия */}
-        {actions.length > 0 && (
-          <div className={`fab-actions ${isExpanded ? 'expanded' : ''}`}>
-            {actions.map((action, index) => (
-              <div
-                key={index}
-                className="fab-action-item"
-                style={{
-                  animationDelay: `${index * 50}ms`
-                }}
-              >
-                {action.label && (
-                  <span 
-                    className="fab-action-label"
-                    style={{
-                      backgroundColor: getColor('cardBg'),
-                      color: getColor('textPrimary'),
-                      borderColor: getColor('border')
-                    }}
-                  >
+        {actions.length > 0 &&
+        <div className={`fab-actions ${isExpanded ? 'expanded' : ''}`}>
+            {actions.map((action, index) =>
+          <div
+            key={index}
+            className="fab-action-item"
+            style={{
+              animationDelay: `${index * 50}ms`
+            }}>
+            
+                {action.label &&
+            <span
+              className="fab-action-label"
+              style={{
+                backgroundColor: getColor('cardBg'),
+                color: getColor('textPrimary'),
+                borderColor: getColor('border')
+              }}>
+              
                     {action.label}
                   </span>
-                )}
+            }
                 <ModernButton
-                  icon={action.icon}
-                  size="medium"
-                  variant={action.variant || 'secondary'}
-                  rounded
-                  className="fab-action-button"
-                  onClick={() => handleActionClick(action)}
-                  title={action.tooltip}
-                />
+              icon={action.icon}
+              size="medium"
+              variant={action.variant || 'secondary'}
+              rounded
+              className="fab-action-button"
+              onClick={() => handleActionClick(action)}
+              title={action.tooltip} />
+            
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
 
         {/* Основная кнопка */}
         <ModernButton
@@ -91,13 +100,11 @@ const FloatingActionButton = ({
           className={`fab-main ${isExpanded ? 'expanded' : ''}`}
           onClick={actions.length > 0 ? toggleExpanded : props.onClick}
           title={tooltip}
-          {...props}
-        />
+          {...props} />
+        
       </div>
-    </>
-  );
+    </>);
+
 };
 
 export default FloatingActionButton;
-
-

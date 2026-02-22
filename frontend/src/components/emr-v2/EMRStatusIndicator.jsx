@@ -13,7 +13,8 @@
  * - Shows "Last autosave at..." with tooltip
  */
 
-import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useEffect } from 'react';
 import './EMRStatusIndicator.css';
 
 /**
@@ -196,5 +197,30 @@ export function EMRStatusIndicator({
         </div>
     );
 }
+
+EMRStatusIndicator.propTypes = {
+    status: PropTypes.oneOf(['idle', 'saving', 'conflict', 'error']),
+    isDirty: PropTypes.bool,
+    isSigned: PropTypes.bool,
+    isAmended: PropTypes.bool,
+    lastSaved: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
+    lastAutosave: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
+    error: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.shape({
+            message: PropTypes.string,
+            status: PropTypes.number,
+        }),
+    ]),
+    conflict: PropTypes.shape({
+        yourVersion: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        serverVersion: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    }),
+    version: PropTypes.number,
+    autosaveConfig: PropTypes.shape({
+        debounceMs: PropTypes.number,
+        enabled: PropTypes.bool,
+    }),
+};
 
 export default EMRStatusIndicator;

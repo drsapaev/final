@@ -7,7 +7,7 @@
  * v2.1: Добавлена поддержка переключения темы через ThemeContext
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SingleSheetEMR } from '../components/emr';
 import { useTheme } from '../contexts/ThemeContext';
 import logger from '../utils/logger';

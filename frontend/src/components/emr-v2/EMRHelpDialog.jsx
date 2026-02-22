@@ -1,14 +1,22 @@
 /**
  * EMRHelpDialog - Справка и безопасность
- */
-import React from 'react';
-
-const EMRHelpDialog = ({ isOpen, onClose }) => {
+ */const EMRHelpDialog = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
+    const handleActivationKeyDown = (event, action) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            action();
+        }
+    };
 
     return (
-        <div className="emr-v2-modal-overlay" onClick={onClose}>
-            <div className="emr-v2-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: '12px' }}>
+        <div
+            className="emr-v2-modal-overlay"
+            role="button"
+            tabIndex={0}
+            onClick={onClose}
+            onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
+            <div className="emr-v2-modal-content" onClickCapture={e => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: '12px' }}>
                 <header className="emr-v2-modal-header" style={{ borderBottom: '1px solid #eee', paddingBottom: '16px', marginBottom: '16px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1a73e8' }}>
                         🛡️ AI-ассистент: Важная информация
@@ -47,7 +55,7 @@ const EMRHelpDialog = ({ isOpen, onClose }) => {
 
                     <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #eee', fontSize: '0.9rem', color: '#666' }}>
                         <em>
-                            Для включения экспериментального режима "Ghost Mode" (ввод серым текстом)
+                            Для включения экспериментального режима «Ghost Mode» (ввод серым текстом)
                             нажмите кнопку 👻 в панели инструментов. Этот режим работает только в неподписанных картах.
                         </em>
                     </div>

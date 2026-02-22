@@ -1,5 +1,6 @@
 // Система форм с валидацией
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
@@ -14,7 +15,7 @@ export function FormProvider({ children }) {
   const [forms, setForms] = useState({});
 
   const registerForm = useCallback((formId, initialValues = {}) => {
-    setForms(prev => ({
+    setForms((prev) => ({
       ...prev,
       [formId]: {
         values: initialValues,
@@ -26,7 +27,7 @@ export function FormProvider({ children }) {
   }, []);
 
   const updateForm = useCallback((formId, updates) => {
-    setForms(prev => ({
+    setForms((prev) => ({
       ...prev,
       [formId]: {
         ...prev[formId],
@@ -49,8 +50,8 @@ export function FormProvider({ children }) {
   return (
     <FormContext.Provider value={value}>
       {children}
-    </FormContext.Provider>
-  );
+    </FormContext.Provider>);
+
 }
 
 /**
@@ -117,7 +118,7 @@ export function useForm(formId, initialValues = {}) {
 
     Object.entries(validationRules).forEach(([name, rules]) => {
       const value = values[name];
-      
+
       if (rules.required && (!value || value.toString().trim() === '')) {
         errors[name] = rules.required;
         return;
@@ -143,7 +144,7 @@ export function useForm(formId, initialValues = {}) {
         return;
       }
 
-      if (value && rules.phone && !/^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/\s/g, ''))) {
+      if (value && rules.phone && !/^[+]?[1-9][\d]{0,15}$/.test(value.replace(/\s/g, ''))) {
         errors[name] = rules.phone;
         return;
       }
@@ -172,19 +173,19 @@ export function useForm(formId, initialValues = {}) {
 /**
  * Компонент формы
  */
-export function Form({ 
-  formId, 
-  initialValues = {}, 
-  onSubmit, 
+export function Form({
+  formId,
+  initialValues = {},
+  onSubmit,
   validationRules = {},
   children,
-  ...props 
+  ...props
 }) {
   const { form, setSubmitting, validateForm } = useForm(formId, initialValues);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    
+
     if (Object.keys(validationRules).length > 0) {
       const isValid = validateForm(validationRules);
       if (!isValid) return;
@@ -196,27 +197,27 @@ export function Form({
     } finally {
       setSubmitting(false);
     }
-  }, [form, onSubmit, validateForm, setSubmitting]);
+  }, [form, onSubmit, validateForm, setSubmitting, validationRules]);
 
   return (
     <form onSubmit={handleSubmit} {...props}>
       {children}
-    </form>
-  );
+    </form>);
+
 }
 
 /**
  * Компонент поля ввода
  */
-export function FormField({ 
-  name, 
-  label, 
+export function FormField({
+  name,
+  label,
   type = 'text',
   placeholder,
   required = false,
   validationRules = {},
   formId,
-  ...props 
+  ...props
 }) {
   const { form, setValue, setTouched, setError } = useForm(formId);
   const theme = useTheme();
@@ -229,7 +230,7 @@ export function FormField({
   const handleChange = useCallback((e) => {
     const newValue = e.target.value;
     setValue(name, newValue);
-    
+
     // Очищаем ошибку при изменении
     if (error) {
       setError(name, null);
@@ -238,11 +239,11 @@ export function FormField({
 
   const handleBlur = useCallback(() => {
     setTouched(name, true);
-    
+
     // Валидация при потере фокуса
     if (Object.keys(validationRules).length > 0) {
       const rules = validationRules;
-      
+
       if (rules.required && (!value || value.toString().trim() === '')) {
         setError(name, rules.required);
         return;
@@ -268,7 +269,7 @@ export function FormField({
         return;
       }
 
-      if (value && rules.phone && !/^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/\s/g, ''))) {
+      if (value && rules.phone && !/^[+]?[1-9][\d]{0,15}$/.test(value.replace(/\s/g, ''))) {
         setError(name, rules.phone);
         return;
       }
@@ -316,12 +317,12 @@ export function FormField({
 
   return (
     <div style={containerStyle}>
-      {label && (
-        <label style={labelStyle}>
+      {label &&
+      <label style={labelStyle}>
           {label}
           {required && <span style={requiredStyle}> *</span>}
         </label>
-      )}
+      }
       
       <input
         type={type}
@@ -331,28 +332,28 @@ export function FormField({
         onChange={handleChange}
         onBlur={handleBlur}
         style={inputStyle}
-        {...props}
-      />
+        {...props} />
       
-      {error && touched && (
-        <div style={errorStyle}>{error}</div>
-      )}
-    </div>
-  );
+      
+      {error && touched &&
+      <div style={errorStyle}>{error}</div>
+      }
+    </div>);
+
 }
 
 /**
  * Компонент текстовой области
  */
-export function FormTextArea({ 
-  name, 
-  label, 
+export function FormTextArea({
+  name,
+  label,
   placeholder,
   required = false,
   validationRules = {},
   formId,
   rows = 4,
-  ...props 
+  ...props
 }) {
   const { form, setValue, setTouched, setError } = useForm(formId);
   const theme = useTheme();
@@ -365,7 +366,7 @@ export function FormTextArea({
   const handleChange = useCallback((e) => {
     const newValue = e.target.value;
     setValue(name, newValue);
-    
+
     if (error) {
       setError(name, null);
     }
@@ -373,10 +374,10 @@ export function FormTextArea({
 
   const handleBlur = useCallback(() => {
     setTouched(name, true);
-    
+
     if (Object.keys(validationRules).length > 0) {
       const rules = validationRules;
-      
+
       if (rules.required && (!value || value.toString().trim() === '')) {
         setError(name, rules.required);
         return;
@@ -432,12 +433,12 @@ export function FormTextArea({
 
   return (
     <div style={containerStyle}>
-      {label && (
-        <label style={labelStyle}>
+      {label &&
+      <label style={labelStyle}>
           {label}
           {required && <span style={requiredStyle}> *</span>}
         </label>
-      )}
+      }
       
       <textarea
         name={name}
@@ -447,28 +448,28 @@ export function FormTextArea({
         onBlur={handleBlur}
         rows={rows}
         style={textareaStyle}
-        {...props}
-      />
+        {...props} />
       
-      {error && touched && (
-        <div style={errorStyle}>{error}</div>
-      )}
-    </div>
-  );
+      
+      {error && touched &&
+      <div style={errorStyle}>{error}</div>
+      }
+    </div>);
+
 }
 
 /**
  * Компонент селекта
  */
-export function FormSelect({ 
-  name, 
-  label, 
+export function FormSelect({
+  name,
+  label,
   options = [],
   placeholder = 'Выберите...',
   required = false,
   validationRules = {},
   formId,
-  ...props 
+  ...props
 }) {
   const { form, setValue, setTouched, setError } = useForm(formId);
   const theme = useTheme();
@@ -481,7 +482,7 @@ export function FormSelect({
   const handleChange = useCallback((e) => {
     const newValue = e.target.value;
     setValue(name, newValue);
-    
+
     if (error) {
       setError(name, null);
     }
@@ -489,10 +490,10 @@ export function FormSelect({
 
   const handleBlur = useCallback(() => {
     setTouched(name, true);
-    
+
     if (Object.keys(validationRules).length > 0) {
       const rules = validationRules;
-      
+
       if (rules.required && (!value || value === '')) {
         setError(name, rules.required);
         return;
@@ -536,12 +537,12 @@ export function FormSelect({
 
   return (
     <div style={containerStyle}>
-      {label && (
-        <label style={labelStyle}>
+      {label &&
+      <label style={labelStyle}>
           {label}
           {required && <span style={requiredStyle}> *</span>}
         </label>
-      )}
+      }
       
       <select
         name={name}
@@ -549,30 +550,30 @@ export function FormSelect({
         onChange={handleChange}
         onBlur={handleBlur}
         style={selectStyle}
-        {...props}
-      >
+        {...props}>
+        
         <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
+        {options.map((option) =>
+        <option key={option.value} value={option.value}>
             {option.label}
           </option>
-        ))}
+        )}
       </select>
       
-      {error && touched && (
-        <div style={errorStyle}>{error}</div>
-      )}
-    </div>
-  );
+      {error && touched &&
+      <div style={errorStyle}>{error}</div>
+      }
+    </div>);
+
 }
 
 /**
  * Компонент кнопки отправки
  */
-export function SubmitButton({ 
-  children = 'Отправить', 
+export function SubmitButton({
+  children = 'Отправить',
   formId,
-  ...props 
+  ...props
 }) {
   const { form } = useForm(formId);
   const theme = useTheme();
@@ -597,10 +598,60 @@ export function SubmitButton({
       type="submit"
       disabled={form?.isSubmitting}
       style={buttonStyle}
-      {...props}
-    >
+      {...props}>
+      
       {form?.isSubmitting ? 'Отправка...' : children}
-    </button>
-  );
+    </button>);
+
 }
 
+FormProvider.propTypes = {
+  children: PropTypes.node
+};
+
+Form.propTypes = {
+  formId: PropTypes.string,
+  initialValues: PropTypes.object,
+  onSubmit: PropTypes.func,
+  validationRules: PropTypes.object,
+  children: PropTypes.node
+};
+
+FormField.propTypes = {
+  name: PropTypes.string,
+  label: PropTypes.node,
+  type: PropTypes.string,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  validationRules: PropTypes.object,
+  formId: PropTypes.string,
+  style: PropTypes.object
+};
+
+FormTextArea.propTypes = {
+  name: PropTypes.string,
+  label: PropTypes.node,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  validationRules: PropTypes.object,
+  formId: PropTypes.string,
+  rows: PropTypes.number,
+  style: PropTypes.object
+};
+
+FormSelect.propTypes = {
+  name: PropTypes.string,
+  label: PropTypes.node,
+  options: PropTypes.array,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  validationRules: PropTypes.object,
+  formId: PropTypes.string,
+  style: PropTypes.object
+};
+
+SubmitButton.propTypes = {
+  children: PropTypes.node,
+  formId: PropTypes.string,
+  style: PropTypes.object
+};

@@ -1,33 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Typography,
   Button,
-  Badge,
+
   Alert,
-  CircularProgress,
-  Progress,
-} from '../ui/macos';
+  CircularProgress } from
+
+'../ui/macos';
 import {
-  Users,
-  Calendar,
-  DollarSign,
+  Avatar,
+  Chip,
+  Grid,
+  IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText } from
+'@mui/material';
+import AttachMoney from '@mui/icons-material/AttachMoney';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import Email from '@mui/icons-material/Email';
+import Event from '@mui/icons-material/Event';
+import FileUpload from '@mui/icons-material/FileUpload';
+import MoreVert from '@mui/icons-material/MoreVert';
+import Notifications from '@mui/icons-material/Notifications';
+import People from '@mui/icons-material/People';
+import Security from '@mui/icons-material/Security';
+import Telegram from '@mui/icons-material/Telegram';
+import {
+
+
+
   TrendingUp,
-  Bell,
-  Shield,
-  Upload,
-  MessageSquare,
-  Mail,
-  Phone,
-  LayoutDashboard,
-  RefreshCw,
-  MoreVertical,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-} from 'lucide-react';
+
+
+
+
+
+
+
+  RefreshCw } from
+
+
+
+
+'lucide-react';
 import tokenManager from '../../utils/tokenManager';
 // import AdvancedCharts from './AdvancedCharts';
 
@@ -50,19 +70,19 @@ const Dashboard = ({ user }) => {
       const token = tokenManager.getAccessToken();
 
       const [analyticsRes, notificationsRes, filesRes, telegramRes] = await Promise.all([
-        fetch('/api/v1/analytics/dashboard', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/notifications/history/stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/files/stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/telegram/bot-status', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      fetch('/api/v1/analytics/dashboard', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/v1/notifications/history/stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/v1/files/stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/v1/telegram/bot-status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })]
+      );
 
       const analyticsData = analyticsRes.ok ? await analyticsRes.json() : null;
       const notificationsData = notificationsRes.ok ? await notificationsRes.json() : null;
@@ -76,7 +96,7 @@ const Dashboard = ({ user }) => {
         telegram: telegramData
       });
       setLastUpdate(new Date());
-    } catch (err) {
+    } catch {
       setError('Ошибка загрузки данных дашборда');
     } finally {
       setLoading(false);
@@ -90,42 +110,42 @@ const Dashboard = ({ user }) => {
     return 'Добрый вечер';
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'success';
-      case 'warning': return 'warning';
-      case 'error': return 'error';
-      default: return 'default';
-    }
-  };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'active': return <CheckCircle />;
-      case 'warning': return <AlertTriangle />;
-      case 'error': return <XCircle />;
-      default: return <Bell />;
-    }
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
         <CircularProgress />
-      </div>
-    );
+      </div>);
+
   }
 
   if (error) {
     return (
       <Alert severity="error" action={
-        <Button variant="outline" onClick={loadDashboardData}>
+      <Button variant="outline" onClick={loadDashboardData}>
           Повторить
         </Button>
       }>
         {error}
-      </Alert>
-    );
+      </Alert>);
+
   }
 
   return (
@@ -143,8 +163,8 @@ const Dashboard = ({ user }) => {
         <Button
           variant="outline"
           onClick={loadDashboardData}
-          disabled={loading}
-        >
+          disabled={loading}>
+          
           <RefreshCw style={{ width: 16, height: 16, marginRight: 8 }} />
           Обновить
         </Button>
@@ -263,23 +283,23 @@ const Dashboard = ({ user }) => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Основная система"
-                    secondary="Работает нормально"
-                  />
+                    secondary="Работает нормально" />
+                  
                   <Chip label="Активна" color="success" size="small" />
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
-                    <Telegram color={dashboardData?.telegram?.bot_active ? "success" : "warning"} />
+                    <Telegram color={dashboardData?.telegram?.bot_active ? 'success' : 'warning'} />
                   </ListItemIcon>
                   <ListItemText
                     primary="Telegram бот"
-                    secondary={dashboardData?.telegram?.bot_active ? "Активен" : "Неактивен"}
-                  />
+                    secondary={dashboardData?.telegram?.bot_active ? 'Активен' : 'Неактивен'} />
+                  
                   <Chip
-                    label={dashboardData?.telegram?.bot_active ? "Активен" : "Неактивен"}
-                    color={dashboardData?.telegram?.bot_active ? "success" : "warning"}
-                    size="small"
-                  />
+                    label={dashboardData?.telegram?.bot_active ? 'Активен' : 'Неактивен'}
+                    color={dashboardData?.telegram?.bot_active ? 'success' : 'warning'}
+                    size="small" />
+                  
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
@@ -287,8 +307,8 @@ const Dashboard = ({ user }) => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Email уведомления"
-                    secondary="Работают"
-                  />
+                    secondary="Работают" />
+                  
                   <Chip label="Активны" color="success" size="small" />
                 </ListItem>
                 <ListItem>
@@ -297,8 +317,8 @@ const Dashboard = ({ user }) => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Файловая система"
-                    secondary="Доступна"
-                  />
+                    secondary="Доступна" />
+                  
                   <Chip label="Активна" color="success" size="small" />
                 </ListItem>
               </List>
@@ -327,8 +347,8 @@ const Dashboard = ({ user }) => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Система обновлена"
-                    secondary="2 минуты назад"
-                  />
+                    secondary="2 минуты назад" />
+                  
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
@@ -336,8 +356,8 @@ const Dashboard = ({ user }) => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Новый пользователь зарегистрирован"
-                    secondary="15 минут назад"
-                  />
+                    secondary="15 минут назад" />
+                  
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
@@ -345,8 +365,8 @@ const Dashboard = ({ user }) => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Запись на прием создана"
-                    secondary="1 час назад"
-                  />
+                    secondary="1 час назад" />
+                  
                 </ListItem>
               </List>
             </CardContent>
@@ -365,8 +385,8 @@ const Dashboard = ({ user }) => {
                     fullWidth
                     variant="outlined"
                     startIcon={<People />}
-                    sx={{ py: 1.5 }}
-                  >
+                    sx={{ py: 1.5 }}>
+                    
                     Пациенты
                   </Button>
                 </Grid>
@@ -375,8 +395,8 @@ const Dashboard = ({ user }) => {
                     fullWidth
                     variant="outlined"
                     startIcon={<Event />}
-                    sx={{ py: 1.5 }}
-                  >
+                    sx={{ py: 1.5 }}>
+                    
                     Записи
                   </Button>
                 </Grid>
@@ -385,8 +405,8 @@ const Dashboard = ({ user }) => {
                     fullWidth
                     variant="outlined"
                     startIcon={<FileUpload />}
-                    sx={{ py: 1.5 }}
-                  >
+                    sx={{ py: 1.5 }}>
+                    
                     Файлы
                   </Button>
                 </Grid>
@@ -395,8 +415,8 @@ const Dashboard = ({ user }) => {
                     fullWidth
                     variant="outlined"
                     startIcon={<Telegram />}
-                    sx={{ py: 1.5 }}
-                  >
+                    sx={{ py: 1.5 }}>
+                    
                     Telegram
                   </Button>
                 </Grid>
@@ -405,9 +425,8 @@ const Dashboard = ({ user }) => {
           </Card>
         </Grid>
       </Grid>
-    </Box>
-  );
+    </div>);
+
 };
 
 export default Dashboard;
-

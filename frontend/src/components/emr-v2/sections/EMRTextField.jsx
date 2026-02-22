@@ -5,10 +5,7 @@
  * - No internal state (controlled only)
  * - No AI logic here (passed via props if needed)
  * - Just a styled input that calls onChange
- */
-
-import React from 'react';
-import './EMRTextField.css';
+ */import './EMRTextField.css';
 
 /**
  * EMRTextField Component

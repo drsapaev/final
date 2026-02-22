@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const useReports = () => {
   const [reports, setReports] = useState([]);
@@ -10,7 +10,7 @@ const useReports = () => {
   const [filterDateRange, setFilterDateRange] = useState('');
 
   // Моковые данные для демонстрации
-  const mockReports = [
+  const mockReports = useMemo(() => [
     {
       id: 1,
       name: 'Финансовый отчет за январь 2024',
@@ -96,7 +96,7 @@ const useReports = () => {
       downloadCount: 12,
       description: 'Анализ производительности и KPI врачей'
     }
-  ];
+  ], []);
 
   // Загрузка отчетов
   const loadReports = useCallback(async () => {
@@ -112,7 +112,7 @@ const useReports = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mockReports]);
 
   // Генерация отчета
   const generateReport = useCallback(async (reportConfig) => {
@@ -265,12 +265,14 @@ const useReports = () => {
       switch (filterDateRange) {
         case 'today':
           return reportDate.toDateString() === today.toDateString();
-        case 'week':
+        case 'week': {
           const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
           return reportDate >= weekAgo;
-        case 'month':
+        }
+        case 'month': {
           const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
           return reportDate >= monthAgo;
+        }
         default:
           return true;
       }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const useFinance = () => {
   const [transactions, setTransactions] = useState([]);
@@ -11,7 +11,7 @@ const useFinance = () => {
   const [filterStatus, setFilterStatus] = useState('');
 
   // Моковые данные для демонстрации
-  const mockTransactions = [
+  const mockTransactions = useMemo(() => [
     {
       id: 1,
       type: 'income',
@@ -148,7 +148,7 @@ const useFinance = () => {
       reference: '****9012',
       createdAt: '2024-02-03T15:20:00Z'
     }
-  ];
+  ], []);
 
   // Загрузка транзакций
   const loadTransactions = useCallback(async () => {
@@ -164,7 +164,7 @@ const useFinance = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mockTransactions]);
 
   // Создание транзакции
   const createTransaction = useCallback(async (transactionData) => {
@@ -253,15 +253,18 @@ const useFinance = () => {
       switch (filterDateRange) {
         case 'today':
           return transactionDate.toDateString() === today.toDateString();
-        case 'week':
+        case 'week': {
           const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
           return transactionDate >= weekAgo;
-        case 'month':
+        }
+        case 'month': {
           const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
           return transactionDate >= monthAgo;
-        case 'year':
+        }
+        case 'year': {
           const yearAgo = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
           return transactionDate >= yearAgo;
+        }
         default:
           return true;
       }

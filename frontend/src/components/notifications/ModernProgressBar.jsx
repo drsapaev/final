@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernProgressBar.css';
 
@@ -30,18 +31,16 @@ const ModernProgressBar = ({
 
     const duration = 1000;
     const steps = 60;
-    const stepValue = (value - animatedValue) / steps;
     let currentStep = 0;
 
     const timer = setInterval(() => {
       currentStep++;
       setAnimatedValue(prev => {
-        const newValue = prev + stepValue;
         if (currentStep >= steps) {
           clearInterval(timer);
           return value;
         }
-        return newValue;
+        return prev + (value - prev) / (steps - currentStep + 1);
       });
     }, duration / steps);
 
@@ -158,18 +157,16 @@ export const CircularProgressBar = ({
 
     const duration = 1000;
     const steps = 60;
-    const stepValue = (value - animatedValue) / steps;
     let currentStep = 0;
 
     const timer = setInterval(() => {
       currentStep++;
       setAnimatedValue(prev => {
-        const newValue = prev + stepValue;
         if (currentStep >= steps) {
           clearInterval(timer);
           return value;
         }
-        return newValue;
+        return prev + (value - prev) / (steps - currentStep + 1);
       });
     }, duration / steps);
 
@@ -262,6 +259,37 @@ export const CircularProgressBar = ({
       </div>
     </div>
   );
+};
+
+ModernProgressBar.propTypes = {
+  value: PropTypes.number,
+  max: PropTypes.number,
+  variant: PropTypes.string,
+  size: PropTypes.string,
+  animated: PropTypes.bool,
+  striped: PropTypes.bool,
+  showLabel: PropTypes.bool,
+  showPercentage: PropTypes.bool,
+  label: PropTypes.node,
+  indeterminate: PropTypes.bool,
+  color: PropTypes.string,
+  backgroundColor: PropTypes.string,
+  className: PropTypes.string
+};
+
+CircularProgressBar.propTypes = {
+  value: PropTypes.number,
+  max: PropTypes.number,
+  size: PropTypes.number,
+  strokeWidth: PropTypes.number,
+  variant: PropTypes.string,
+  showLabel: PropTypes.bool,
+  showPercentage: PropTypes.bool,
+  label: PropTypes.node,
+  animated: PropTypes.bool,
+  color: PropTypes.string,
+  backgroundColor: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default ModernProgressBar;

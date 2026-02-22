@@ -9,7 +9,7 @@
  * - Рентгенограммы
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
 import TeethChart from '../../../dental/TeethChart';

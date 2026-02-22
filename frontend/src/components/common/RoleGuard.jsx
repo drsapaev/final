@@ -1,7 +1,7 @@
 // Компонент для ролевых ограничений доступа
-import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
-import { hasRouteAccess } from '../../constants/routes';
+import { hasRouteAccess as hasRouteAccessByRole } from '../../constants/routes';
 
 /**
  * Компонент для проверки ролевого доступа
@@ -14,27 +14,27 @@ export function RoleGuard({
   profile = null,
   route = null
 }) {
-  const theme = useTheme();
-  const { getColor, getSpacing, getFontSize } = theme;
+  const theme = useTheme();void
+  theme;
 
   // Получаем профиль из контекста или пропсов
   const userProfile = profile || (typeof window !== 'undefined' ?
-    JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
+  JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
 
   if (!userProfile) {
     return fallback || <AccessDenied message="Необходима авторизация" theme={theme} />;
   }
 
   // Проверяем доступ по маршруту
-  if (route && !hasRouteAccess(userProfile, route)) {
+  if (route && !hasRouteAccessByRole(userProfile, route)) {
     return fallback || <AccessDenied message="Недостаточно прав для доступа к этому разделу" theme={theme} />;
   }
 
   // Проверяем роли
   if (allowedRoles.length > 0) {
     const userRoles = getUserRoles(userProfile);
-    const hasRole = allowedRoles.some(role =>
-      userRoles.includes(role.toLowerCase())
+    const hasRole = allowedRoles.some((role) =>
+    userRoles.includes(role.toLowerCase())
     );
 
     if (!hasRole) {
@@ -45,8 +45,8 @@ export function RoleGuard({
   // Проверяем разрешения
   if (requiredPermissions.length > 0) {
     const userPermissions = getUserPermissions(userProfile);
-    const hasPermission = requiredPermissions.every(permission =>
-      userPermissions.includes(permission)
+    const hasPermission = requiredPermissions.every((permission) =>
+    userPermissions.includes(permission)
     );
 
     if (!hasPermission) {
@@ -65,8 +65,8 @@ export function withRoleGuard(WrappedComponent, guardProps = {}) {
     return (
       <RoleGuard {...guardProps}>
         <WrappedComponent {...props} />
-      </RoleGuard>
-    );
+      </RoleGuard>);
+
   };
 }
 
@@ -75,23 +75,23 @@ export function withRoleGuard(WrappedComponent, guardProps = {}) {
  */
 export function useRoleAccess(profile = null) {
   const userProfile = profile || (typeof window !== 'undefined' ?
-    JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
+  JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
 
   const hasRole = (roles) => {
     if (!userProfile || !Array.isArray(roles)) return false;
     const userRoles = getUserRoles(userProfile);
-    return roles.some(role => userRoles.includes(role.toLowerCase()));
+    return roles.some((role) => userRoles.includes(role.toLowerCase()));
   };
 
   const hasPermission = (permissions) => {
     if (!userProfile || !Array.isArray(permissions)) return false;
     const userPermissions = getUserPermissions(userProfile);
-    return permissions.every(permission => userPermissions.includes(permission));
+    return permissions.every((permission) => userPermissions.includes(permission));
   };
 
   const hasRouteAccess = (route) => {
     if (!userProfile || !route) return false;
-    return hasRouteAccess(userProfile, route);
+    return hasRouteAccessByRole(userProfile, route);
   };
 
   const isAdmin = () => {
@@ -150,8 +150,8 @@ export function RoleConditionalRender({
 }) {
   const { hasRole, hasPermission } = useRoleAccess(profile);
 
-  const hasAccess = (roles.length === 0 || hasRole(roles)) &&
-    (permissions.length === 0 || hasPermission(permissions));
+  const hasAccess = (roles.length === 0 || hasRole(roles)) && (
+  permissions.length === 0 || hasPermission(permissions));
 
   return hasAccess ? children : fallback;
 }
@@ -196,8 +196,8 @@ function AccessDenied({ message, theme }) {
       <div style={iconStyle}>🚫</div>
       <div style={titleStyle}>Доступ запрещен</div>
       <div style={messageStyle}>{message}</div>
-    </div>
-  );
+    </div>);
+
 }
 
 /**
@@ -209,7 +209,7 @@ function getUserRoles(profile) {
   if (profile.role) roles.push(String(profile.role).toLowerCase());
   if (profile.role_name) roles.push(String(profile.role_name).toLowerCase());
   if (Array.isArray(profile.roles)) {
-    profile.roles.forEach(r => roles.push(String(r).toLowerCase()));
+    profile.roles.forEach((r) => roles.push(String(r).toLowerCase()));
   }
   if (profile.is_superuser || profile.is_admin || profile.admin) {
     roles.push('admin');
@@ -290,18 +290,69 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
       <div style={infoStyle}>Имя: {userProfile.username || 'Не указано'}</div>
       <div style={infoStyle}>Email: {userProfile.email || 'Не указано'}</div>
 
-      {showRoles && (
-        <div style={infoStyle}>
+      {showRoles &&
+      <div style={infoStyle}>
           Роли: {roles.join(', ')}
         </div>
-      )}
+      }
 
-      {showPermissions && (
-        <div style={infoStyle}>
+      {showPermissions &&
+      <div style={infoStyle}>
           Разрешения: {permissions.join(', ')}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
+const profileShape = PropTypes.shape({
+  username: PropTypes.string,
+  email: PropTypes.string,
+  role: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  role_name: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  roles: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  is_superuser: PropTypes.bool,
+  is_admin: PropTypes.bool,
+  admin: PropTypes.bool
+});
+
+const themeShape = PropTypes.shape({
+  getColor: PropTypes.func,
+  getSpacing: PropTypes.func,
+  getFontSize: PropTypes.func
+});
+
+RoleGuard.propTypes = {
+  children: PropTypes.node,
+  allowedRoles: PropTypes.arrayOf(PropTypes.string),
+  requiredPermissions: PropTypes.arrayOf(PropTypes.string),
+  fallback: PropTypes.node,
+  profile: profileShape,
+  route: PropTypes.string
+};
+
+ConditionalRender.propTypes = {
+  condition: PropTypes.bool,
+  children: PropTypes.node,
+  fallback: PropTypes.node
+};
+
+RoleConditionalRender.propTypes = {
+  roles: PropTypes.arrayOf(PropTypes.string),
+  permissions: PropTypes.arrayOf(PropTypes.string),
+  children: PropTypes.node,
+  fallback: PropTypes.node,
+  profile: profileShape
+};
+
+AccessDenied.propTypes = {
+  message: PropTypes.string,
+  theme: themeShape
+};
+
+UserInfo.propTypes = {
+  profile: profileShape,
+  showRoles: PropTypes.bool,
+  showPermissions: PropTypes.bool
+};

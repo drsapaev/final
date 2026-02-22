@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Printer, Settings, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
 import { tokenManager } from '../utils/tokenManager';
@@ -96,12 +96,12 @@ const PrintSystem = () => {
       status: 'printing'
     };
 
-    setPrintQueue(prev => [newItem, ...prev.slice(0, 9)]);
+    setPrintQueue((prev) => [newItem, ...prev.slice(0, 9)]);
 
     // Имитация завершения печати через 2 секунды
     setTimeout(() => {
-      setPrintQueue(prev => prev.map(item =>
-        item.id === newItem.id ? { ...item, status: 'completed' } : item
+      setPrintQueue((prev) => prev.map((item) =>
+      item.id === newItem.id ? { ...item, status: 'completed' } : item
       ));
     }, 2000);
   };
@@ -171,46 +171,46 @@ const PrintSystem = () => {
             <select
               value={printerSettings.type}
               onChange={(e) => setPrinterSettings({ ...printerSettings, type: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            >
+              className="w-full p-2 border border-gray-300 rounded-lg">
+              
               <option value="network">Сетевой</option>
               <option value="usb">USB</option>
               <option value="none">Отключен</option>
             </select>
           </div>
 
-          {printerSettings.type === 'network' && (
-            <>
+          {printerSettings.type === 'network' &&
+          <>
               <div>
                 <label className="block text-sm font-medium mb-1">IP адрес</label>
                 <input
-                  type="text"
-                  value={printerSettings.networkHost}
-                  onChange={(e) => setPrinterSettings({ ...printerSettings, networkHost: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                  placeholder="192.168.1.100"
-                />
+                type="text"
+                value={printerSettings.networkHost}
+                onChange={(e) => setPrinterSettings({ ...printerSettings, networkHost: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                placeholder="192.168.1.100" />
+              
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Порт</label>
                 <input
-                  type="text"
-                  value={printerSettings.networkPort}
-                  onChange={(e) => setPrinterSettings({ ...printerSettings, networkPort: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                  placeholder="9100"
-                />
+                type="text"
+                value={printerSettings.networkPort}
+                onChange={(e) => setPrinterSettings({ ...printerSettings, networkPort: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                placeholder="9100" />
+              
               </div>
             </>
-          )}
+          }
 
           <div>
             <label className="block text-sm font-medium mb-1">Ширина бумаги</label>
             <select
               value={printerSettings.paperWidth}
               onChange={(e) => setPrinterSettings({ ...printerSettings, paperWidth: parseInt(e.target.value) })}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            >
+              className="w-full p-2 border border-gray-300 rounded-lg">
+              
               <option value={58}>58 мм</option>
               <option value={80}>80 мм</option>
             </select>
@@ -233,8 +233,8 @@ const PrintSystem = () => {
               room: '101',
               date: new Date().toLocaleDateString('ru-RU'),
               time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            })}
-          >
+            })}>
+            
             Тестовый талон
           </Button>
 
@@ -247,8 +247,8 @@ const PrintSystem = () => {
               total: 50000,
               date: new Date().toLocaleDateString('ru-RU'),
               time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            })}
-          >
+            })}>
+            
             Тестовый чек
           </Button>
         </div>
@@ -264,17 +264,17 @@ const PrintSystem = () => {
           <Badge variant="info">{printQueue.length}</Badge>
         </div>
 
-        {printQueue.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+        {printQueue.length === 0 ?
+        <div className="text-center py-8 text-gray-500">
             Очередь печати пуста
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {printQueue.map(item => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-              >
+          </div> :
+
+        <div className="space-y-3">
+            {printQueue.map((item) =>
+          <div
+            key={item.id}
+            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+            
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{getQueueItemIcon(item.type)}</span>
                   <div>
@@ -292,9 +292,9 @@ const PrintSystem = () => {
                   </Badge>
                 </div>
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
       </Card>
 
       {/* Шаблон талона */}
@@ -322,10 +322,8 @@ const PrintSystem = () => {
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default PrintSystem;
-
-

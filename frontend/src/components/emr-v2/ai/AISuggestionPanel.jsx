@@ -2,10 +2,7 @@
  * AISuggestionPanel - Sidebar panel for AI suggestions
  * 
  * Shows all suggestions grouped by field
- */
-
-import React from 'react';
-import AISuggestionCard from './AISuggestionCard';
+ */import AISuggestionCard from './AISuggestionCard';
 import './AISuggestionPanel.css';
 
 /**

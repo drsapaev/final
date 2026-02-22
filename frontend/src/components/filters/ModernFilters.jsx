@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Search, 
-  Calendar, 
-  Filter, 
-  X, 
+import { useState, useEffect, useRef } from 'react';
+import {
+  Search,
+  Calendar,
+  Filter,
+  X,
   ChevronDown,
   Clock,
-  User,
-  Phone,
-  Stethoscope,
-  RefreshCw
-} from 'lucide-react';
+
+
+
+  RefreshCw } from
+'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
@@ -24,12 +24,12 @@ const ModernFilters = ({
   className = '',
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  const { getColor } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchValue, setSearchValue] = useState(searchParams.get('q') || '');
   const [dateValue, setDateValue] = useState(searchParams.get('date') || '');
   const [statusValue, setStatusValue] = useState(searchParams.get('status') || '');
-  
+
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
@@ -43,11 +43,11 @@ const ModernFilters = ({
   // Debounced search
   const handleSearchChange = (value) => {
     setSearchValue(value);
-    
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    
+
     searchTimeoutRef.current = setTimeout(() => {
       updateParam('q', value);
     }, 300);
@@ -73,14 +73,14 @@ const ModernFilters = ({
   const hasActiveFilters = searchValue || dateValue || statusValue;
 
   const statusOptions = [
-    { value: '', label: 'Все статусы', icon: null },
-    { value: 'confirmed', label: 'Подтверждено', icon: '✓' },
-    { value: 'queued', label: 'В очереди', icon: '⏳' },
-    { value: 'paid_pending', label: 'Ожидает оплаты', icon: '💳' },
-    { value: 'paid', label: 'Оплачено', icon: '✅' },
-    { value: 'canceled', label: 'Отменено', icon: '❌' },
-    { value: 'completed', label: 'Завершено', icon: '🏁' }
-  ];
+  { value: '', label: 'Все статусы', icon: null },
+  { value: 'confirmed', label: 'Подтверждено', icon: '✓' },
+  { value: 'queued', label: 'В очереди', icon: '⏳' },
+  { value: 'paid_pending', label: 'Ожидает оплаты', icon: '💳' },
+  { value: 'paid', label: 'Оплачено', icon: '✅' },
+  { value: 'canceled', label: 'Отменено', icon: '❌' },
+  { value: 'completed', label: 'Завершено', icon: '🏁' }];
+
 
   return (
     <div className={`modern-filters ${className}`} {...props}>
@@ -99,18 +99,18 @@ const ModernFilters = ({
               backgroundColor: getColor('cardBg'),
               color: getColor('textPrimary'),
               borderColor: getColor('border')
-            }}
-          />
-          {searchValue && (
-            <button
-              type="button"
-              className="search-clear"
-              onClick={() => handleSearchChange('')}
-              aria-label="Очистить поиск"
-            >
+            }} />
+          
+          {searchValue &&
+          <button
+            type="button"
+            className="search-clear"
+            onClick={() => handleSearchChange('')}
+            aria-label="Очистить поиск">
+            
               <X size={16} />
             </button>
-          )}
+          }
         </div>
 
         <div className="filters-actions">
@@ -129,8 +129,8 @@ const ModernFilters = ({
                 backgroundColor: getColor('cardBg'),
                 color: getColor('textPrimary'),
                 borderColor: getColor('border')
-              }}
-            />
+              }} />
+            
           </div>
 
           {/* Кнопка расширенных фильтров */}
@@ -142,8 +142,8 @@ const ModernFilters = ({
               backgroundColor: hasActiveFilters ? getColor('primary') : getColor('cardBg'),
               color: hasActiveFilters ? 'white' : getColor('textPrimary'),
               borderColor: hasActiveFilters ? getColor('primary') : getColor('border')
-            }}
-          >
+            }}>
+            
             <Filter size={18} />
             <span>Фильтры</span>
             {hasActiveFilters && <span className="filters-count">•</span>}
@@ -153,8 +153,8 @@ const ModernFilters = ({
       </div>
 
       {/* Расширенная панель фильтров */}
-      {isExpanded && (
-        <div className="filters-expanded-panel">
+      {isExpanded &&
+      <div className="filters-expanded-panel">
           <div className="filters-grid">
             {/* Статус */}
             <div className="filter-group">
@@ -163,23 +163,23 @@ const ModernFilters = ({
                 Статус записи
               </label>
               <select
-                value={statusValue}
-                onChange={(e) => {
-                  setStatusValue(e.target.value);
-                  updateParam('status', e.target.value);
-                }}
-                className="filter-select"
-                style={{
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  borderColor: getColor('border')
-                }}
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
+              value={statusValue}
+              onChange={(e) => {
+                setStatusValue(e.target.value);
+                updateParam('status', e.target.value);
+              }}
+              className="filter-select"
+              style={{
+                backgroundColor: getColor('cardBg'),
+                color: getColor('textPrimary'),
+                borderColor: getColor('border')
+              }}>
+              
+                {statusOptions.map((option) =>
+              <option key={option.value} value={option.value}>
                     {option.icon && `${option.icon} `}{option.label}
                   </option>
-                ))}
+              )}
               </select>
             </div>
 
@@ -191,54 +191,54 @@ const ModernFilters = ({
               </label>
               <div className="quick-date-buttons">
                 <button
-                  type="button"
-                  className="quick-date-btn"
-                  onClick={() => {
-                    const today = getLocalDateString();
-                    setDateValue(today);
-                    updateParam('date', today);
-                  }}
-                  style={{
-                    backgroundColor: dateValue === getLocalDateString() 
-                      ? getColor('primary') 
-                      : getColor('cardBg'),
-                    color: dateValue === getLocalDateString() 
-                      ? 'white' 
-                      : getColor('textPrimary'),
-                    borderColor: getColor('border')
-                  }}
-                >
+                type="button"
+                className="quick-date-btn"
+                onClick={() => {
+                  const today = getLocalDateString();
+                  setDateValue(today);
+                  updateParam('date', today);
+                }}
+                style={{
+                  backgroundColor: dateValue === getLocalDateString() ?
+                  getColor('primary') :
+                  getColor('cardBg'),
+                  color: dateValue === getLocalDateString() ?
+                  'white' :
+                  getColor('textPrimary'),
+                  borderColor: getColor('border')
+                }}>
+                
                   Сегодня
                 </button>
                 <button
-                  type="button"
-                  className="quick-date-btn"
-                  onClick={() => {
-                    const tomorrowStr = getTomorrowDateString();
-                    setDateValue(tomorrowStr);
-                    updateParam('date', tomorrowStr);
-                  }}
-                  style={{
-                    backgroundColor: getColor('cardBg'),
-                    color: getColor('textPrimary'),
-                    borderColor: getColor('border')
-                  }}
-                >
+                type="button"
+                className="quick-date-btn"
+                onClick={() => {
+                  const tomorrowStr = getTomorrowDateString();
+                  setDateValue(tomorrowStr);
+                  updateParam('date', tomorrowStr);
+                }}
+                style={{
+                  backgroundColor: getColor('cardBg'),
+                  color: getColor('textPrimary'),
+                  borderColor: getColor('border')
+                }}>
+                
                   Завтра
                 </button>
                 <button
-                  type="button"
-                  className="quick-date-btn"
-                  onClick={() => {
-                    setDateValue('');
-                    updateParam('date', '');
-                  }}
-                  style={{
-                    backgroundColor: !dateValue ? getColor('primary') : getColor('cardBg'),
-                    color: !dateValue ? 'white' : getColor('textPrimary'),
-                    borderColor: getColor('border')
-                  }}
-                >
+                type="button"
+                className="quick-date-btn"
+                onClick={() => {
+                  setDateValue('');
+                  updateParam('date', '');
+                }}
+                style={{
+                  backgroundColor: !dateValue ? getColor('primary') : getColor('cardBg'),
+                  color: !dateValue ? 'white' : getColor('textPrimary'),
+                  borderColor: getColor('border')
+                }}>
+                
                   Все даты
                 </button>
               </div>
@@ -257,37 +257,35 @@ const ModernFilters = ({
               {/* Автообновление */}
               <label className="auto-refresh-toggle">
                 <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => onAutoRefreshChange(e.target.checked)}
-                />
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => onAutoRefreshChange(e.target.checked)} />
+              
                 <RefreshCw size={16} className={autoRefresh ? 'spinning' : ''} />
                 <span>Автообновление</span>
               </label>
 
               {/* Очистить фильтры */}
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  className="clear-filters-btn"
-                  onClick={clearAllFilters}
-                  style={{
-                    backgroundColor: getColor('danger'),
-                    color: 'white'
-                  }}
-                >
+              {hasActiveFilters &&
+            <button
+              type="button"
+              className="clear-filters-btn"
+              onClick={clearAllFilters}
+              style={{
+                backgroundColor: getColor('danger'),
+                color: 'white'
+              }}>
+              
                   <X size={16} />
                   Очистить все
                 </button>
-              )}
+            }
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default ModernFilters;
-
-

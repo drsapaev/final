@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Volume2, 
-  VolumeX, 
-  Settings, 
-  Wifi, 
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Volume2,
+  VolumeX,
+
+  Wifi,
   WifiOff,
   Monitor,
   Clock,
-  Users,
-  Activity,
+
+
   Maximize2,
   Minimize2,
   Globe,
   Eye,
-  EyeOff
-} from 'lucide-react';
+  EyeOff } from
+'lucide-react';
 import { api } from '../api/client';
-import { openQueueWS, openDisplayBoardWS } from '../api/ws';
+import { openDisplayBoardWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
@@ -48,9 +48,9 @@ export default function DisplayBoardUnified({
   contrast = false,
   fontScale = 1,
   boardId = 'main_board'
-}) {
-  const { isDark, isLight, getColor, getSpacing, getFontSize } = useTheme();
-  
+}) {void
+  useTheme();
+
   // Параметры из URL или пропсов
   const qs = useMemo(
     () => ({ department: String(department).trim(), d: String(dateStr).trim() }),
@@ -67,7 +67,7 @@ export default function DisplayBoardUnified({
   const [stats, setStats] = useState({ last_ticket: 0, waiting: 0, serving: 0, done: 0 });
   const [err, setErr] = useState('');
   const [nowStr, setNowStr] = useState(timeNow());
-  const [lastUpdatedAt, setLastUpdatedAt] = useState('');
+  const [, setLastUpdatedAt] = useState('');
 
   // Состояние табло (старое)
   const [board, setBoard] = useState({
@@ -84,12 +84,12 @@ export default function DisplayBoardUnified({
     text_color: '',
     contrast_default: false,
     kiosk_default: false,
-    sound_default: true,
+    sound_default: true
   });
 
   // Окна/кабинеты (старое)
   const [windows, setWindows] = useState([]);
-  
+
   // Настройки (объединенные)
   const [boardSettings, setBoardSettings] = useState({
     theme: 'light',
@@ -104,8 +104,12 @@ export default function DisplayBoardUnified({
   });
 
   // Рефы
-  const wsRef = useRef(null);
-  const audioRef = useRef(null);
+  const wsRef = useRef(null);void
+  useRef(null);
+  const loadStatsRef = useRef(() => {});
+  const loadBoardStateRef = useRef(() => {});
+  const loadWindowsRef = useRef(() => {});
+  const connectWebSocketRef = useRef(() => {});
   const lastTicketRef = useRef(0);
   const [online, setOnline] = useState(true);
 
@@ -121,29 +125,29 @@ export default function DisplayBoardUnified({
       setLastUpdatedAt(timeNow());
       try {
         localStorage.setItem(`board.stats.${qs.department}`, JSON.stringify(s || {}));
-      } catch (_) {
-        // Игнорируем ошибки localStorage
-      }
-    } catch (e) {
-      setErr(e?.message || 'Ошибка загрузки');
-      // fallback из кэша
-      try {
-        const raw = localStorage.getItem(`board.stats.${qs.department}`);
-        if (raw) {
-          const cached = JSON.parse(raw);
-          if (cached && typeof cached === 'object') setStats({ ...stats, ...cached });
-        }
-      } catch (_) {
-        // Игнорируем ошибки localStorage
-      }
-    }
-  }
+      } catch {
 
-  // Загрузка состояния табло (старое)
-  async function loadBoardState() {
-    try {
-      const st = await api.get('/board/state');
-      if (st && typeof st === 'object') {
+
+
+
+
+
+
+        // Игнорируем ошибки localStorage
+      }} catch (e) {setErr(e?.message || 'Ошибка загрузки'); // fallback из кэша
+      try {const raw = localStorage.getItem(`board.stats.${qs.department}`);if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') setStats({ ...stats, ...cached });
+        }
+      } catch {
+
+
+
+
+
+
+
+        // Игнорируем ошибки localStorage
+      }}} // Загрузка состояния табло (старое)
+  async function loadBoardState() {try {const st = await api.get('/board/state');if (st && typeof st === 'object') {
         setBoard({
           brand: st.brand || st.title || 'Clinic',
           logo: st.logo || st.logo_url || '',
@@ -156,24 +160,24 @@ export default function DisplayBoardUnified({
           primary_color: st.primary_color || '',
           bg_color: st.bg_color || '',
           text_color: st.text_color || '',
-          contrast_default: !!(st.contrast_default),
-          kiosk_default: !!(st.kiosk_default),
-          sound_default: st.sound_default !== false,
+          contrast_default: !!st.contrast_default,
+          kiosk_default: !!st.kiosk_default,
+          sound_default: st.sound_default !== false
         });
         if (soundInitial === undefined && typeof st.sound_default !== 'undefined') {
-          setBoardSettings(prev => ({ ...prev, soundEnabled: st.sound_default !== false }));
+          setBoardSettings((prev) => ({ ...prev, soundEnabled: st.sound_default !== false }));
         }
-        try { localStorage.setItem('board.state', JSON.stringify(st)); } catch(_){
+        try {localStorage.setItem('board.state', JSON.stringify(st));} catch {
+
+
+
+
+
+
+
           // Игнорируем ошибки localStorage
-        }
-      }
-    } catch (_) {
-      // fallback из кэша
-      try {
-        const raw = localStorage.getItem('board.state');
-        if (raw) {
-          const cached = JSON.parse(raw);
-          if (cached && typeof cached === 'object') {
+        }}} catch {// fallback из кэша
+      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') {
             setBoard({
               brand: cached.brand || cached.title || 'Clinic',
               logo: cached.logo || cached.logo_url || '',
@@ -186,33 +190,33 @@ export default function DisplayBoardUnified({
               primary_color: cached.primary_color || '',
               bg_color: cached.bg_color || '',
               text_color: cached.text_color || '',
-              contrast_default: !!(cached.contrast_default),
-              kiosk_default: !!(cached.kiosk_default),
-              sound_default: cached.sound_default !== false,
+              contrast_default: !!cached.contrast_default,
+              kiosk_default: !!cached.kiosk_default,
+              sound_default: cached.sound_default !== false
             });
           }
         }
-      } catch (_) {
-        // Игнорируем ошибки localStorage
-      }
-    }
-  }
+      } catch {
 
-  // Загрузка окон/кабинетов (старое)
-  async function loadWindows() {
-    try {
-      const st = await api.get('/queue/queue/status');
-      let arr = [];
-      if (Array.isArray(st?.windows)) arr = st.windows;
-      else if (Array.isArray(st)) arr = st;
-      else if (st && typeof st === 'object' && Array.isArray(st.items)) arr = st.items;
+
+
+
+
+
+
+        // Игнорируем ошибки localStorage
+      }}} // Загрузка окон/кабинетов (старое)
+  async function loadWindows() {try {const st = await api.get('/queue/queue/status');let arr = [];
+      if (Array.isArray(st?.windows)) arr = st.windows;else
+      if (Array.isArray(st)) arr = st;else
+      if (st && typeof st === 'object' && Array.isArray(st.items)) arr = st.items;
       const norm = arr.map((x) => ({
         window: x.window || x.win || x.cabinet || x.room || '',
         ticket: x.ticket || x.number || x.last_ticket || 0,
-        label: x.label || '',
+        label: x.label || ''
       })).filter((x) => x.window);
       setWindows(norm);
-    } catch (_) {
+    } catch {
       setWindows([]);
     }
   }
@@ -225,7 +229,7 @@ export default function DisplayBoardUnified({
         wsRef.current();
         wsRef.current = null;
       }
-      
+
       // Создаем новое соединение
       const closeWS = openDisplayBoardWS(
         currentBoardId,
@@ -233,9 +237,9 @@ export default function DisplayBoardUnified({
         () => setConnected(true),
         () => setConnected(false)
       );
-      
+
       wsRef.current = closeWS;
-      
+
     } catch (error) {
       logger.error('Ошибка создания WebSocket:', error);
       setConnected(false);
@@ -245,48 +249,48 @@ export default function DisplayBoardUnified({
   // Обработка WebSocket сообщений (новое)
   const handleWebSocketMessage = (message) => {
     logger.log('Получено WebSocket сообщение:', message);
-    
+
     switch (message.type) {
       case 'initial_state':
         setQueueData(message.data.queue_entries || []);
         setCurrentCall(message.data.current_call || null);
         setAnnouncements(message.data.announcements || []);
         break;
-        
+
       case 'patient_call':
         setCurrentCall(message.data);
         if (boardSettings.soundEnabled) {
           playCallSound(message);
         }
         break;
-        
+
       case 'call_completed':
         setCurrentCall(null);
         break;
-        
+
       case 'queue_update':
         // Обновляем очередь при добавлении/изменении записей
         if (message.event_type === 'queue.created') {
           // Добавляем новую запись в очередь
-          setQueueData(prev => [...prev, message.data]);
+          setQueueData((prev) => [...prev, message.data]);
           logger.log(`➕ Новая запись в очереди: №${message.data.number}`);
         } else {
           // Обновляем всю очередь
           setQueueData(message.data.queue_entries || []);
         }
         break;
-        
+
       case 'announcement':
-        setAnnouncements(prev => [message.data, ...prev.slice(0, 4)]);
+        setAnnouncements((prev) => [message.data, ...prev.slice(0, 4)]);
         if (boardSettings.soundEnabled) {
           playAnnouncementSound(message);
         }
         break;
-        
+
       case 'announcement_removed':
-        setAnnouncements(prev => prev.filter(a => a.created_at !== message.data.created_at));
+        setAnnouncements((prev) => prev.filter((a) => a.created_at !== message.data.created_at));
         break;
-        
+
       default:
         logger.log('Неизвестный тип сообщения:', message.type);
     }
@@ -295,32 +299,32 @@ export default function DisplayBoardUnified({
   // Звуковые эффекты (новое)
   const playCallSound = (message) => {
     if (!boardSettings.soundEnabled) return;
-    
+
     try {
       // Создаем звуковой сигнал с помощью Web Audio API
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
       // Настройки звука вызова (приятный двойной сигнал)
       oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
       oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
       oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
-      
+
       gainNode.gain.setValueAtTime(0, audioContext.currentTime);
       gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.05);
       gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.15);
       gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.2);
       gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
-      
+
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.4);
-      
+
       logger.log(`🔊 Звуковой сигнал для пациента №${message.data.number}`);
-      
+
       // Голосовое объявление
       if (boardSettings.voiceEnabled) {
         const text = `Пациент номер ${message.data.number}, ${message.data.patient_name}, пройдите к врачу ${message.data.doctor_name}`;
@@ -333,20 +337,20 @@ export default function DisplayBoardUnified({
 
   const playAnnouncementSound = (message) => {
     if (!boardSettings.soundEnabled) return;
-    
+
     try {
       let soundFile = '/sounds/announcement.mp3';
-      
+
       if (message.data.announcement_type === 'warning') {
         soundFile = '/sounds/warning-beep.mp3';
       } else if (message.data.announcement_type === 'emergency') {
         soundFile = '/sounds/emergency-beep.mp3';
       }
-      
+
       const audio = new Audio(soundFile);
       audio.volume = 0.8;
-      audio.play().catch(console.error);
-      
+      audio.play().catch((playError) => logger.error('Ошибка воспроизведения звука объявления:', playError));
+
       // Голосовое объявление
       if (boardSettings.voiceEnabled && message.voice_text) {
         playVoiceAnnouncement(message.voice_text);
@@ -358,19 +362,24 @@ export default function DisplayBoardUnified({
 
   const playVoiceAnnouncement = (text) => {
     if (!boardSettings.voiceEnabled || !('speechSynthesis' in window)) return;
-    
+
     try {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'ru-RU';
       utterance.rate = 0.9;
       utterance.pitch = 1.0;
       utterance.volume = 0.8;
-      
+
       speechSynthesis.speak(utterance);
     } catch (error) {
       logger.error('Ошибка голосового объявления:', error);
     }
   };
+
+  loadStatsRef.current = loadStats;
+  loadBoardStateRef.current = loadBoardState;
+  loadWindowsRef.current = loadWindows;
+  connectWebSocketRef.current = connectWebSocket;
 
   // Звук при смене номера (старое)
   useEffect(() => {
@@ -382,16 +391,16 @@ export default function DisplayBoardUnified({
 
   // Инициализация
   useEffect(() => {
-    loadStats();
-    loadBoardState();
-    loadWindows();
-    connectWebSocket();
-    
-    const t = setInterval(loadStats, Math.max(5000, Number(refreshMs || 0)));
-    const tb = setInterval(loadBoardState, Math.max(15000, Number(refreshMs || 0)));
-    const tw = setInterval(loadWindows, Math.max(5000, Number(refreshMs || 0)));
+    loadStatsRef.current();
+    loadBoardStateRef.current();
+    loadWindowsRef.current();
+    connectWebSocketRef.current();
+
+    const t = setInterval(() => loadStatsRef.current(), Math.max(5000, Number(refreshMs || 0)));
+    const tb = setInterval(() => loadBoardStateRef.current(), Math.max(15000, Number(refreshMs || 0)));
+    const tw = setInterval(() => loadWindowsRef.current(), Math.max(5000, Number(refreshMs || 0)));
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
-    
+
     return () => {
       clearInterval(t);
       clearInterval(tb);
@@ -427,25 +436,25 @@ export default function DisplayBoardUnified({
 
   // Переключение звука (объединенное)
   const toggleSound = () => {
-    setBoardSettings(prev => ({ ...prev, soundEnabled: !prev.soundEnabled }));
+    setBoardSettings((prev) => ({ ...prev, soundEnabled: !prev.soundEnabled }));
   };
 
   // Переключение контрастного режима (старое)
   const toggleContrast = () => {
-    setBoardSettings(prev => ({ ...prev, contrastMode: !prev.contrastMode }));
+    setBoardSettings((prev) => ({ ...prev, contrastMode: !prev.contrastMode }));
   };
 
   // Переключение киоск режима (старое)
-  const toggleKiosk = () => {
-    setBoardSettings(prev => ({ ...prev, kioskMode: !prev.kioskMode }));
-  };
+
+
+
 
   // Переключение языка (старое)
   const toggleLanguage = () => {
     const languages = ['ru', 'uz', 'en'];
     const currentIndex = languages.indexOf(boardSettings.language);
     const nextIndex = (currentIndex + 1) % languages.length;
-    setBoardSettings(prev => ({ ...prev, language: languages[nextIndex] }));
+    setBoardSettings((prev) => ({ ...prev, language: languages[nextIndex] }));
   };
 
   // Получение объявления по языку (старое)
@@ -457,20 +466,20 @@ export default function DisplayBoardUnified({
   };
 
   // Получение следующего номера (старое)
-  const getNextNumbers = (last, count) => {
-    const nums = [];
-    for (let i = 1; i <= count; i++) {
-      nums.push(last + i);
-    }
-    return nums;
-  };
+
+
+
+
+
+
+
 
   // Воспроизведение звука (старое)
   function playBeep() {
     try {
       const audio = new Audio('/sounds/beep.mp3');
       audio.volume = 0.5;
-      audio.play().catch(console.error);
+      audio.play().catch((playError) => logger.error('Ошибка воспроизведения сигнала:', playError));
     } catch (error) {
       logger.error('Ошибка воспроизведения звука:', error);
     }
@@ -503,9 +512,9 @@ export default function DisplayBoardUnified({
   // Форматирование времени (новое)
   const formatTime = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleTimeString('ru-RU', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(dateString).toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -629,11 +638,11 @@ export default function DisplayBoardUnified({
       {/* Заголовок */}
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          {board.logo ? (
-            <img src={board.logo} alt={board.brand} style={{ height: '50px' }} />
-          ) : (
-            <div style={{ fontSize: '2rem' }}>🏥</div>
-          )}
+          {board.logo ?
+          <img src={board.logo} alt={board.brand} style={{ height: '50px' }} /> :
+
+          <div style={{ fontSize: '2rem' }}>🏥</div>
+          }
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0, color: currentTheme.textPrimary }}>
               {board.brand}
@@ -648,9 +657,9 @@ export default function DisplayBoardUnified({
           {/* Статус соединения */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {connected ? <Wifi size={20} color="#10b981" /> : <WifiOff size={20} color="#dc3545" />}
-            <span style={{ 
+            <span style={{
               fontSize: '0.9rem',
-              color: currentTheme.textSecondary,
+              color: currentTheme.textSecondary
             }}>
               {connected ? 'Подключено' : 'Отключено'}
             </span>
@@ -659,7 +668,7 @@ export default function DisplayBoardUnified({
           {/* Время */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clock size={20} color={currentTheme.textSecondary} />
-            <span style={{ 
+            <span style={{
               fontSize: '1.2rem',
               fontWeight: 'bold',
               color: currentTheme.textPrimary
@@ -683,8 +692,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Полноэкранный режим"
-            >
+              title="Полноэкранный режим">
+              
               {document.fullscreenElement ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
 
@@ -701,8 +710,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}
-            >
+              title={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}>
+              
               {boardSettings.soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
 
@@ -719,8 +728,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Контрастный режим"
-            >
+              title="Контрастный режим">
+              
               {boardSettings.contrastMode ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
 
@@ -737,8 +746,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Переключить язык"
-            >
+              title="Переключить язык">
+              
               <Globe size={16} />
               {boardSettings.language.toUpperCase()}
             </button>
@@ -747,52 +756,52 @@ export default function DisplayBoardUnified({
       </div>
 
       {/* Статусные баннеры */}
-      {!online && (
-        <div style={{
-          background: 'rgba(59,130,246,0.25)',
-          border: '1px solid rgba(59,130,246,0.5)',
-          padding: '15px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          textAlign: 'center',
-          color: '#1e40af'
-        }}>
+      {!online &&
+      <div style={{
+        background: 'rgba(59,130,246,0.25)',
+        border: '1px solid rgba(59,130,246,0.5)',
+        padding: '15px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        textAlign: 'center',
+        color: '#1e40af'
+      }}>
           Нет соединения. Показаны данные из кэша.
         </div>
-      )}
+      }
 
-      {board.is_closed && (
-        <div style={{
-          background: 'rgba(239,68,68,0.25)',
-          border: '1px solid rgba(239,68,68,0.5)',
-          padding: '15px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          textAlign: 'center',
-          color: '#dc2626'
-        }}>
+      {board.is_closed &&
+      <div style={{
+        background: 'rgba(239,68,68,0.25)',
+        border: '1px solid rgba(239,68,68,0.5)',
+        padding: '15px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        textAlign: 'center',
+        color: '#dc2626'
+      }}>
           {t('closed', boardSettings.language)}
         </div>
-      )}
+      }
 
-      {!board.is_closed && board.is_paused && (
-        <div style={{
-          background: 'rgba(245,158,11,0.25)',
-          border: '1px solid rgba(245,158,11,0.5)',
-          padding: '15px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          textAlign: 'center',
-          color: '#d97706'
-        }}>
+      {!board.is_closed && board.is_paused &&
+      <div style={{
+        background: 'rgba(245,158,11,0.25)',
+        border: '1px solid rgba(245,158,11,0.5)',
+        padding: '15px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        textAlign: 'center',
+        color: '#d97706'
+      }}>
           {t('paused', boardSettings.language)}
         </div>
-      )}
+      }
 
       {/* Текущий вызов */}
       <div style={currentCallStyle}>
-        {currentCall ? (
-          <div>
+        {currentCall ?
+        <div>
             <div style={{ fontSize: '4rem', fontWeight: 'bold', marginBottom: '20px' }}>
               № {currentCall.queue_number}
             </div>
@@ -802,14 +811,14 @@ export default function DisplayBoardUnified({
             <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
               👨‍⚕️ {currentCall.doctor_name}
             </div>
-            {currentCall.cabinet && (
-              <div style={{ fontSize: '1.1rem' }}>
+            {currentCall.cabinet &&
+          <div style={{ fontSize: '1.1rem' }}>
                 🚪 {currentCall.cabinet}
               </div>
-            )}
-          </div>
-        ) : (
-          <div>
+          }
+          </div> :
+
+        <div>
             <Monitor size={64} style={{ color: currentTheme.textSecondary, marginBottom: '20px' }} />
             <div style={{ fontSize: '1.5rem', color: currentTheme.textSecondary }}>
               {t('now_serving', boardSettings.language)}
@@ -818,139 +827,139 @@ export default function DisplayBoardUnified({
               {stats.last_ticket || 0}
             </div>
           </div>
-        )}
+        }
       </div>
 
       {/* Объявления */}
-      {announcements.length > 0 && (
-        <div style={{ marginBottom: '30px' }}>
-          {announcements.map((announcement, index) => (
-            <div
-              key={announcement.created_at}
-              style={{
-                ...announcementStyle,
-                background: announcement.announcement_type === 'emergency' 
-                  ? 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'
-                  : announcement.announcement_type === 'warning'
-                  ? 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)'
-                  : 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
-                marginBottom: '10px',
-                padding: '15px',
-                borderRadius: '8px',
-                textAlign: 'center',
-                animation: 'slideIn 0.5s ease'
-              }}
-            >
+      {announcements.length > 0 &&
+      <div style={{ marginBottom: '30px' }}>
+          {announcements.map((announcement) =>
+        <div
+          key={announcement.created_at}
+          style={{
+            ...announcementStyle,
+            background: announcement.announcement_type === 'emergency' ?
+            'linear-gradient(135deg, #dc3545 0%, #c82333 100%)' :
+            announcement.announcement_type === 'warning' ?
+            'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)' :
+            'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
+            marginBottom: '10px',
+            padding: '15px',
+            borderRadius: '8px',
+            textAlign: 'center',
+            animation: 'slideIn 0.5s ease'
+          }}>
+          
               📢 {announcement.text}
             </div>
-          ))}
+        )}
         </div>
-      )}
+      }
 
       {/* Очередь */}
       <div style={queueGridStyle}>
-        {queueData.slice(0, boardSettings.displayCount).map(entry => (
-          <div
-            key={entry.number}
-            style={{
-              ...queueCardStyle,
-              borderColor: getStatusColor(entry.status),
-              background: entry.status === 'called' ? 'rgba(220, 53, 69, 0.1)' : currentTheme.cardBg
-            }}
-          >
+        {queueData.slice(0, boardSettings.displayCount).map((entry) =>
+        <div
+          key={entry.number}
+          style={{
+            ...queueCardStyle,
+            borderColor: getStatusColor(entry.status),
+            background: entry.status === 'called' ? 'rgba(220, 53, 69, 0.1)' : currentTheme.cardBg
+          }}>
+          
             <div style={{
-              fontSize: '2rem',
-              fontWeight: 'bold',
-              color: getStatusColor(entry.status),
-              marginBottom: '10px'
-            }}>
+            fontSize: '2rem',
+            fontWeight: 'bold',
+            color: getStatusColor(entry.status),
+            marginBottom: '10px'
+          }}>
               {entry.number}
             </div>
             
-            {boardSettings.showPatientNames !== 'none' && (
-              <div style={{
-                fontSize: '1rem',
-                color: currentTheme.textPrimary,
-                marginBottom: '10px'
-              }}>
+            {boardSettings.showPatientNames !== 'none' &&
+          <div style={{
+            fontSize: '1rem',
+            color: currentTheme.textPrimary,
+            marginBottom: '10px'
+          }}>
                 {entry.patient_name}
               </div>
-            )}
+          }
 
             <div style={{
-              background: getStatusColor(entry.status),
-              color: '#ffffff',
-              padding: '5px 10px',
-              borderRadius: '20px',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              marginBottom: '10px'
-            }}>
+            background: getStatusColor(entry.status),
+            color: '#ffffff',
+            padding: '5px 10px',
+            borderRadius: '20px',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            marginBottom: '10px'
+          }}>
               {getStatusText(entry.status)}
             </div>
 
             <div style={{
-              fontSize: '0.8rem',
-              color: currentTheme.textSecondary,
-              marginBottom: '5px'
-            }}>
-              {entry.status === 'called' && entry.called_at ? (
-                `Вызван: ${formatTime(entry.called_at)}`
-              ) : (
-                `Записан: ${formatTime(entry.created_at)}`
-              )}
+            fontSize: '0.8rem',
+            color: currentTheme.textSecondary,
+            marginBottom: '5px'
+          }}>
+              {entry.status === 'called' && entry.called_at ?
+            `Вызван: ${formatTime(entry.called_at)}` :
+
+            `Записан: ${formatTime(entry.created_at)}`
+            }
             </div>
 
             <div style={{
-              fontSize: '0.8rem',
-              color: currentTheme.textSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px'
-            }}>
+            fontSize: '0.8rem',
+            color: currentTheme.textSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '5px'
+          }}>
               {entry.source === 'online' ? '📱 Онлайн' : '🏥 Регистратура'}
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Окна/кабинеты */}
-      {windows && windows.length > 0 && (
-        <div style={{ marginBottom: '30px' }}>
+      {windows && windows.length > 0 &&
+      <div style={{ marginBottom: '30px' }}>
           <h3 style={{ fontSize: '1.5rem', marginBottom: '20px', color: currentTheme.textPrimary }}>
             Окна
           </h3>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '15px'
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '15px'
+        }}>
+            {windows.map((w, i) =>
+          <div key={i} style={{
+            background: currentTheme.cardBg,
+            padding: '20px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            border: `1px solid ${currentTheme.border}`,
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
           }}>
-            {windows.map((w, i) => (
-              <div key={i} style={{
-                background: currentTheme.cardBg,
-                padding: '20px',
-                borderRadius: '12px',
-                textAlign: 'center',
-                border: `1px solid ${currentTheme.border}`,
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-              }}>
                 <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '10px', color: currentTheme.textPrimary }}>
                   Окно {w.window}
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: getStatusColor('serving') }}>
                   {w.ticket || '—'}
                 </div>
-                {w.label && (
-                  <div style={{ fontSize: '0.9rem', color: currentTheme.textSecondary, marginTop: '5px' }}>
+                {w.label &&
+            <div style={{ fontSize: '0.9rem', color: currentTheme.textSecondary, marginTop: '5px' }}>
                     {w.label}
                   </div>
-                )}
+            }
               </div>
-            ))}
+          )}
           </div>
         </div>
-      )}
+      }
 
       {/* Статистика */}
       <div style={statsGridStyle}>
@@ -963,7 +972,7 @@ export default function DisplayBoardUnified({
 
         <div style={statCardStyle}>
           <div style={{ fontSize: '2rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
-            {queueData.filter(e => e.status === 'waiting').length}
+            {queueData.filter((e) => e.status === 'waiting').length}
           </div>
           <div style={{ color: currentTheme.textSecondary }}>Ожидают</div>
         </div>
@@ -998,39 +1007,39 @@ export default function DisplayBoardUnified({
       </div>
 
       {/* Объявление внизу */}
-      {(getAnnouncement(board, boardSettings.language) || announcement) && (
-        <div style={{
-          background: currentTheme.cardBg,
-          padding: '20px',
-          borderRadius: '12px',
-          textAlign: 'center',
-          border: `1px solid ${currentTheme.border}`,
-          marginTop: '30px'
-        }}>
+      {(getAnnouncement(board, boardSettings.language) || announcement) &&
+      <div style={{
+        background: currentTheme.cardBg,
+        padding: '20px',
+        borderRadius: '12px',
+        textAlign: 'center',
+        border: `1px solid ${currentTheme.border}`,
+        marginTop: '30px'
+      }}>
           <div style={{
-            fontSize: '1.1rem',
-            color: currentTheme.textPrimary,
-            animation: 'scroll 20s linear infinite'
-          }}>
+          fontSize: '1.1rem',
+          color: currentTheme.textPrimary,
+          animation: 'scroll 20s linear infinite'
+        }}>
             {getAnnouncement(board, boardSettings.language) || announcement || 'Добро пожаловать! Пожалуйста, ожидайте своей очереди.'}
           </div>
         </div>
-      )}
+      }
 
       {/* Ошибки */}
-      {err && (
-        <div style={{
-          background: 'rgba(239,68,68,0.1)',
-          border: '1px solid rgba(239,68,68,0.3)',
-          color: '#dc2626',
-          padding: '15px',
-          borderRadius: '8px',
-          marginTop: '20px',
-          textAlign: 'center'
-        }}>
+      {err &&
+      <div style={{
+        background: 'rgba(239,68,68,0.1)',
+        border: '1px solid rgba(239,68,68,0.3)',
+        color: '#dc2626',
+        padding: '15px',
+        borderRadius: '8px',
+        marginTop: '20px',
+        textAlign: 'center'
+      }}>
           {err}
         </div>
-      )}
+      }
 
       {/* CSS анимации */}
       <style>{`
@@ -1049,23 +1058,23 @@ export default function DisplayBoardUnified({
           100% { transform: translateX(-100%); }
         }
       `}</style>
-    </div>
-  );
+    </div>);
+
 }
 
 // Вспомогательные функции (старые)
 function todayStr() {
   const d = new Date();
-  return d.getFullYear() + '-' + 
-    String(d.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' +
+  String(d.getMonth() + 1).padStart(2, '0') + '-' +
+  String(d.getDate()).padStart(2, '0');
 }
 
 function timeNow() {
   const d = new Date();
-  return String(d.getHours()).padStart(2, '0') + ':' + 
-    String(d.getMinutes()).padStart(2, '0') + ':' + 
-    String(d.getSeconds()).padStart(2, '0');
+  return String(d.getHours()).padStart(2, '0') + ':' +
+  String(d.getMinutes()).padStart(2, '0') + ':' +
+  String(d.getSeconds()).padStart(2, '0');
 }
 
 function t(key, lang = 'ru') {
@@ -1089,6 +1098,6 @@ function t(key, lang = 'ru') {
       'updated': 'Updated'
     }
   };
-  
-  return (translations[lang] && translations[lang][key]) || translations.ru[key] || key;
+
+  return translations[lang] && translations[lang][key] || translations.ru[key] || key;
 }

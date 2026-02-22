@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  DollarSign, 
-  User, 
+import { useState, useEffect, useCallback } from 'react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  DollarSign,
+  User,
   Calendar,
   AlertCircle,
-  FileText,
+
   Filter,
   RefreshCw,
   Phone,
   Stethoscope,
   Package,
-  Bell
-} from 'lucide-react';
+  Bell } from
+'lucide-react';
 import { Card, Badge, Button } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -24,8 +24,8 @@ import logger from '../../utils/logger';
 /**
  * Компонент для одобрения/отклонения заявок All Free в админке
  */
-const AllFreeApproval = () => {
-  const { theme, getColor } = useTheme();
+const AllFreeApproval = () => {void
+  useTheme();
   const [allFreeRequests, setAllFreeRequests] = useState([]);
   const [allRequestsForStats, setAllRequestsForStats] = useState([]); // ✅ Для статистики - все заявки
   const [loading, setLoading] = useState(true);
@@ -35,14 +35,8 @@ const AllFreeApproval = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    loadAllFreeRequests();
-    // ✅ Загружаем все заявки для статистики
-    loadAllRequestsForStats();
-  }, [statusFilter]);
-
   // ✅ Отдельная функция для загрузки всех заявок для статистики
-  const loadAllRequestsForStats = async () => {
+  const loadAllRequestsForStats = useCallback(async () => {
     try {
       // ✅ ИСПРАВЛЕНО: Используем лимит 100 (максимум на бэкенде)
       // Если заявок больше 100, можно сделать несколько запросов, но обычно этого достаточно
@@ -52,9 +46,9 @@ const AllFreeApproval = () => {
     } catch (error) {
       logger.error('[AllFreeApproval] Ошибка загрузки всех заявок для статистики:', error);
     }
-  };
+  }, []);
 
-  const loadAllFreeRequests = async () => {
+  const loadAllFreeRequests = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get(`/admin/all-free-requests?status_filter=${statusFilter}&limit=100`);
@@ -67,7 +61,13 @@ const AllFreeApproval = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
+
+  useEffect(() => {
+    loadAllFreeRequests();
+    // ✅ Загружаем все заявки для статистики
+    loadAllRequestsForStats();
+  }, [loadAllFreeRequests, loadAllRequestsForStats]);
 
   const handleApproval = async (visitId, action, rejectionReason = null) => {
     setIsProcessing(true);
@@ -79,11 +79,11 @@ const AllFreeApproval = () => {
       });
 
       toast.success(response.data?.message || 'Заявка обработана');
-      
+
       // ✅ ИСПРАВЛЕНО: Обновляем все заявки для статистики и список с текущим фильтром
       await loadAllRequestsForStats();
       loadAllFreeRequests();
-      
+
       // Закрываем модальное окно
       setShowApprovalModal(false);
       setSelectedRequest(null);
@@ -102,78 +102,78 @@ const AllFreeApproval = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'var(--mac-warning)';
-      case 'approved': return 'var(--mac-success)';
-      case 'rejected': return 'var(--mac-error)';
-      default: return 'var(--mac-text-tertiary)';
+      case 'pending':return 'var(--mac-warning)';
+      case 'approved':return 'var(--mac-success)';
+      case 'rejected':return 'var(--mac-error)';
+      default:return 'var(--mac-text-tertiary)';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending': return <Clock size={16} />;
-      case 'approved': return <CheckCircle size={16} />;
-      case 'rejected': return <XCircle size={16} />;
-      default: return <AlertCircle size={16} />;
+      case 'pending':return <Clock size={16} />;
+      case 'approved':return <CheckCircle size={16} />;
+      case 'rejected':return <XCircle size={16} />;
+      default:return <AlertCircle size={16} />;
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending': return 'Ожидает одобрения';
-      case 'approved': return 'Одобрено';
-      case 'rejected': return 'Отклонено';
-      default: return status;
+      case 'pending':return 'Ожидает одобрения';
+      case 'approved':return 'Одобрено';
+      case 'rejected':return 'Отклонено';
+      default:return status;
     }
   };
 
   const getSpecialtyText = (specialty) => {
     switch (specialty) {
-      case 'dermatology': return 'Дерматология';
-      case 'cosmetology': return 'Косметология';
-      case 'stomatology': return 'Стоматология';
-      case 'dental': return 'Стоматология';
-      case 'cardiology': return 'Кардиология';
-      default: return specialty;
+      case 'dermatology':return 'Дерматология';
+      case 'cosmetology':return 'Косметология';
+      case 'stomatology':return 'Стоматология';
+      case 'dental':return 'Стоматология';
+      case 'cardiology':return 'Кардиология';
+      default:return specialty;
     }
   };
 
   // ✅ Используем allRequestsForStats для статистики, чтобы она была точной независимо от фильтра
-  const pendingCount = allRequestsForStats.filter(req => req.approval_status === 'pending').length;
-  const approvedCount = allRequestsForStats.filter(req => req.approval_status === 'approved').length;
-  const rejectedCount = allRequestsForStats.filter(req => req.approval_status === 'rejected').length;
-  const totalAmount = allRequestsForStats
-    .filter(req => req.approval_status === 'approved')
-    .reduce((sum, req) => sum + Number(req.total_original_amount || 0), 0);
+  const pendingCount = allRequestsForStats.filter((req) => req.approval_status === 'pending').length;
+  const approvedCount = allRequestsForStats.filter((req) => req.approval_status === 'approved').length;
+  const rejectedCount = allRequestsForStats.filter((req) => req.approval_status === 'rejected').length;
+  const totalAmount = allRequestsForStats.
+  filter((req) => req.approval_status === 'approved').
+  reduce((sum, req) => sum + Number(req.total_original_amount || 0), 0);
 
   return (
-    <Card 
+    <Card
       variant="default"
-      padding="default"
-    >
+      padding="default">
+      
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 style={{ 
-              fontSize: '24px', 
-              fontWeight: '700', 
-              color: 'var(--mac-text-primary)', 
-              display: 'flex', 
-              alignItems: 'center', 
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: 'var(--mac-text-primary)',
+              display: 'flex',
+              alignItems: 'center',
               gap: '8px',
               margin: 0
             }}>
               <Bell size={24} style={{ color: 'var(--mac-warning)' }} />
               Заявки All Free
-              {pendingCount > 0 && (
-                <Badge variant="warning" style={{ marginLeft: '8px' }}>
+              {pendingCount > 0 &&
+              <Badge variant="warning" style={{ marginLeft: '8px' }}>
                   {pendingCount} новых
                 </Badge>
-              )}
+              }
             </h2>
-            <p style={{ 
-              color: 'var(--mac-text-secondary)', 
+            <p style={{
+              color: 'var(--mac-text-secondary)',
               marginTop: '4px',
               margin: '4px 0 0 0'
             }}>
@@ -196,8 +196,8 @@ const AllFreeApproval = () => {
                   color: 'var(--mac-text-primary)',
                   fontSize: '14px',
                   outline: 'none'
-                }}
-              >
+                }}>
+                
                 <option value="pending">Ожидают одобрения</option>
                 <option value="approved">Одобренные</option>
                 <option value="rejected">Отклоненные</option>
@@ -209,9 +209,9 @@ const AllFreeApproval = () => {
             <Button
               onClick={loadAllFreeRequests}
               disabled={loading}
-              variant="outline"
-            >
-              <RefreshCw size={16} style={{ 
+              variant="outline">
+              
+              <RefreshCw size={16} style={{
                 animation: loading ? 'spin 1s linear infinite' : 'none',
                 marginRight: '8px'
               }} />
@@ -221,33 +221,33 @@ const AllFreeApproval = () => {
         </div>
 
         {/* Статистика */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
         }}>
-          <Card 
+          <Card
             variant="default"
-            padding="default"
-          >
+            padding="default">
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ 
-                padding: '8px', 
-                backgroundColor: 'var(--mac-warning-bg)', 
-                borderRadius: 'var(--mac-radius-md)' 
+              <div style={{
+                padding: '8px',
+                backgroundColor: 'var(--mac-warning-bg)',
+                borderRadius: 'var(--mac-radius-md)'
               }}>
                 <Clock size={20} style={{ color: 'var(--mac-warning)' }} />
               </div>
               <div>
-                <p style={{ 
-                  fontSize: '14px', 
+                <p style={{
+                  fontSize: '14px',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>
                   Ожидают
                 </p>
-                <p style={{ 
-                  fontSize: '20px', 
+                <p style={{
+                  fontSize: '20px',
                   fontWeight: '600',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
@@ -258,28 +258,28 @@ const AllFreeApproval = () => {
             </div>
           </Card>
           
-          <Card 
+          <Card
             variant="default"
-            padding="default"
-          >
+            padding="default">
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ 
-                padding: '8px', 
-                backgroundColor: 'var(--mac-success-bg)', 
-                borderRadius: 'var(--mac-radius-md)' 
+              <div style={{
+                padding: '8px',
+                backgroundColor: 'var(--mac-success-bg)',
+                borderRadius: 'var(--mac-radius-md)'
               }}>
                 <CheckCircle size={20} style={{ color: 'var(--mac-success)' }} />
               </div>
               <div>
-                <p style={{ 
-                  fontSize: '14px', 
+                <p style={{
+                  fontSize: '14px',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>
                   Одобрено
                 </p>
-                <p style={{ 
-                  fontSize: '20px', 
+                <p style={{
+                  fontSize: '20px',
                   fontWeight: '600',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
@@ -290,28 +290,28 @@ const AllFreeApproval = () => {
             </div>
           </Card>
           
-          <Card 
+          <Card
             variant="default"
-            padding="default"
-          >
+            padding="default">
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ 
-                padding: '8px', 
-                backgroundColor: 'var(--mac-error-bg)', 
-                borderRadius: 'var(--mac-radius-md)' 
+              <div style={{
+                padding: '8px',
+                backgroundColor: 'var(--mac-error-bg)',
+                borderRadius: 'var(--mac-radius-md)'
               }}>
                 <XCircle size={20} style={{ color: 'var(--mac-error)' }} />
               </div>
               <div>
-                <p style={{ 
-                  fontSize: '14px', 
+                <p style={{
+                  fontSize: '14px',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>
                   Отклонено
                 </p>
-                <p style={{ 
-                  fontSize: '20px', 
+                <p style={{
+                  fontSize: '20px',
                   fontWeight: '600',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
@@ -322,28 +322,28 @@ const AllFreeApproval = () => {
             </div>
           </Card>
           
-          <Card 
+          <Card
             variant="default"
-            padding="default"
-          >
+            padding="default">
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ 
-                padding: '8px', 
-                backgroundColor: 'var(--mac-info-bg)', 
-                borderRadius: 'var(--mac-radius-md)' 
+              <div style={{
+                padding: '8px',
+                backgroundColor: 'var(--mac-info-bg)',
+                borderRadius: 'var(--mac-radius-md)'
               }}>
                 <DollarSign size={20} style={{ color: 'var(--mac-info)' }} />
               </div>
               <div>
-                <p style={{ 
-                  fontSize: '14px', 
+                <p style={{
+                  fontSize: '14px',
                   color: 'var(--mac-text-secondary)',
                   margin: 0
                 }}>
                   Общая сумма
                 </p>
-                <p style={{ 
-                  fontSize: '20px', 
+                <p style={{
+                  fontSize: '20px',
                   fontWeight: '600',
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
@@ -356,23 +356,23 @@ const AllFreeApproval = () => {
         </div>
 
         {/* Список заявок */}
-        {loading ? (
-          <div className="text-center py-8">
+        {loading ?
+        <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto" />
             <p className="text-gray-500 mt-2">Загрузка...</p>
-          </div>
-        ) : allFreeRequests.length === 0 ? (
-          <div className="text-center py-8">
+          </div> :
+        allFreeRequests.length === 0 ?
+        <div className="text-center py-8">
             <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">Заявок All Free не найдено</p>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {allFreeRequests.map((request) => (
-              <Card
-                key={request.id}
-                className="p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
-              >
+          </div> :
+
+        <div className="grid gap-4">
+            {allFreeRequests.map((request) =>
+          <Card
+            key={request.id}
+            className="p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+            
                 {/* Header карточки */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -402,18 +402,18 @@ const AllFreeApproval = () => {
                       <User size={16} className="text-gray-400" />
                       <div>
                         <div className="text-sm">{request.patient_name || 'Не указан'}</div>
-                        {request.patient_phone && (
-                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                        {request.patient_phone &&
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
                             <Phone size={12} />
                             {request.patient_phone}
                           </div>
-                        )}
+                    }
                       </div>
                     </div>
                   </div>
                   
-                  {request.doctor_name && (
-                    <div>
+                  {request.doctor_name &&
+              <div>
                       <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                         Врач
                       </label>
@@ -427,7 +427,7 @@ const AllFreeApproval = () => {
                         </div>
                       </div>
                     </div>
-                  )}
+              }
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -448,11 +448,11 @@ const AllFreeApproval = () => {
                   <div className="flex items-center gap-2 mb-2">
                     <Package size={16} className="text-gray-400" />
                     <div className="flex flex-wrap gap-2">
-                      {request.services.map((service, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
+                      {request.services.map((service, index) =>
+                  <Badge key={index} variant="secondary" className="text-xs">
                           {service}
                         </Badge>
-                      ))}
+                  )}
                     </div>
                   </div>
                   
@@ -466,8 +466,8 @@ const AllFreeApproval = () => {
                 </div>
 
                 {/* Примечания */}
-                {request.notes && (
-                  <div className="mb-4">
+                {request.notes &&
+            <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                       Примечания
                     </label>
@@ -475,42 +475,42 @@ const AllFreeApproval = () => {
                       {request.notes}
                     </div>
                   </div>
-                )}
+            }
 
                 {/* Действия */}
-                {request.approval_status === 'pending' && (
-                  <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                {request.approval_status === 'pending' &&
+            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <Button
-                      onClick={() => handleApproval(request.id, 'approve')}
-                      disabled={isProcessing}
-                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-                    >
+                onClick={() => handleApproval(request.id, 'approve')}
+                disabled={isProcessing}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
+                
                       <CheckCircle size={16} />
                       Одобрить
                     </Button>
                     
                     <Button
-                      onClick={() => {
-                        setSelectedRequest(request);
-                        setShowApprovalModal(true);
-                      }}
-                      disabled={isProcessing}
-                      variant="outline"
-                      className="flex items-center gap-2 text-red-600 border-red-600 hover:bg-red-50"
-                    >
+                onClick={() => {
+                  setSelectedRequest(request);
+                  setShowApprovalModal(true);
+                }}
+                disabled={isProcessing}
+                variant="outline"
+                className="flex items-center gap-2 text-red-600 border-red-600 hover:bg-red-50">
+                
                       <XCircle size={16} />
                       Отклонить
                     </Button>
                   </div>
-                )}
+            }
               </Card>
-            ))}
+          )}
           </div>
-        )}
+        }
 
         {/* Модальное окно для отклонения */}
-        {showApprovalModal && selectedRequest && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        {showApprovalModal && selectedRequest &&
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -531,49 +531,48 @@ const AllFreeApproval = () => {
                     Причина отклонения
                   </label>
                   <textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    placeholder="Укажите причину отклонения..."
-                  />
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  placeholder="Укажите причину отклонения..." />
+                
                 </div>
                 
                 <div className="flex gap-3">
                   <Button
-                    onClick={() => handleApproval(selectedRequest.id, 'reject', rejectionReason)}
-                    disabled={isProcessing || !rejectionReason.trim()}
-                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700"
-                  >
-                    {isProcessing ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    ) : (
-                      <XCircle size={16} />
-                    )}
+                  onClick={() => handleApproval(selectedRequest.id, 'reject', rejectionReason)}
+                  disabled={isProcessing || !rejectionReason.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700">
+                  
+                    {isProcessing ?
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> :
+
+                  <XCircle size={16} />
+                  }
                     Отклонить
                   </Button>
                   
                   <Button
-                    onClick={() => {
-                      setShowApprovalModal(false);
-                      setSelectedRequest(null);
-                      setRejectionReason('');
-                    }}
-                    disabled={isProcessing}
-                    variant="outline"
-                    className="flex-1"
-                  >
+                  onClick={() => {
+                    setShowApprovalModal(false);
+                    setSelectedRequest(null);
+                    setRejectionReason('');
+                  }}
+                  disabled={isProcessing}
+                  variant="outline"
+                  className="flex-1">
+                  
                     Отмена
                   </Button>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        }
       </div>
-    </Card>
-  );
+    </Card>);
+
 };
 
 export default AllFreeApproval;
-

@@ -11,33 +11,33 @@
  * Эти данные никогда не должны попадать в логи
  */
 const PHI_FIELDS = [
-  // Идентификаторы пациента
-  'patient_id', 'patientId', 'patient_name', 'patientName',
-  'full_name', 'fullName', 'firstName', 'lastName', 'middleName',
-  'first_name', 'last_name', 'middle_name',
-  'name', 'surname', 'patronymic',
+// Идентификаторы пациента
+'patient_id', 'patientId', 'patient_name', 'patientName',
+'full_name', 'fullName', 'firstName', 'lastName', 'middleName',
+'first_name', 'last_name', 'middle_name',
+'name', 'surname', 'patronymic',
 
-  // Контактная информация
-  'phone', 'phone_number', 'phoneNumber', 'mobile', 'email',
-  'address', 'street', 'city', 'postal_code', 'postalCode',
+// Контактная информация
+'phone', 'phone_number', 'phoneNumber', 'mobile', 'email',
+'address', 'street', 'city', 'postal_code', 'postalCode',
 
-  // Медицинские данные
-  'diagnosis', 'symptoms', 'complaint', 'complaints',
-  'medical_history', 'medicalHistory', 'treatment', 'prescription',
-  'lab_results', 'labResults', 'test_results', 'testResults',
-  'blood_type', 'bloodType', 'allergies', 'medications',
+// Медицинские данные
+'diagnosis', 'symptoms', 'complaint', 'complaints',
+'medical_history', 'medicalHistory', 'treatment', 'prescription',
+'lab_results', 'labResults', 'test_results', 'testResults',
+'blood_type', 'bloodType', 'allergies', 'medications',
 
-  // Биометрические данные
-  'date_of_birth', 'dateOfBirth', 'birth_date', 'birthDate', 'dob',
-  'ssn', 'passport', 'insurance_number', 'insuranceNumber',
+// Биометрические данные
+'date_of_birth', 'dateOfBirth', 'birth_date', 'birthDate', 'dob',
+'ssn', 'passport', 'insurance_number', 'insuranceNumber',
 
-  // Финансовые данные
-  'card_number', 'cardNumber', 'cvv', 'payment_method', 'paymentMethod',
+// Финансовые данные
+'card_number', 'cardNumber', 'cvv', 'payment_method', 'paymentMethod',
 
-  // Аутентификация
-  'password', 'token', 'access_token', 'refresh_token',
-  'secret', 'api_key', 'apiKey'
-];
+// Аутентификация
+'password', 'token', 'access_token', 'refresh_token',
+'secret', 'api_key', 'apiKey'];
+
 
 /**
  * Проверка, является ли окружение development
@@ -84,10 +84,10 @@ function sanitize(data, depth = 0, seen = new WeakSet()) {
   }
 
   // Защита от больших объектов - пропускаем без обработки
-  if (data.constructor && data.constructor.name &&
-      (data.constructor.name.includes('Fiber') ||
-       data.constructor.name.includes('Synthetic') ||
-       data.constructor.name.includes('Event'))) {
+  if (data.constructor && data.constructor.name && (
+  data.constructor.name.includes('Fiber') ||
+  data.constructor.name.includes('Synthetic') ||
+  data.constructor.name.includes('Event'))) {
     return `[${data.constructor.name}]`;
   }
 
@@ -100,7 +100,7 @@ function sanitize(data, depth = 0, seen = new WeakSet()) {
       if (data.length > 5) {
         return `[Array(${data.length}) - showing first 5]`;
       }
-      return data.map(item => sanitize(item, depth + 1, seen));
+      return data.map((item) => sanitize(item, depth + 1, seen));
     }
 
     // Объекты - быстрая проверка размера
@@ -143,7 +143,7 @@ function sanitize(data, depth = 0, seen = new WeakSet()) {
     }
 
     return sanitized;
-  } catch (error) {
+  } catch {
     return '[SANITIZATION_ERROR]';
   }
 }
@@ -160,7 +160,7 @@ function formatArgs(args) {
   }
 
   try {
-    return args.map(arg => {
+    return args.map((arg) => {
       // Пропускаем примитивы как есть
       if (arg === null || arg === undefined || typeof arg !== 'object') {
         return arg;
@@ -178,11 +178,11 @@ function formatArgs(args) {
       // Для объектов применяем санитизацию
       try {
         return sanitize(arg);
-      } catch (error) {
+      } catch {
         return '[OBJECT - SANITIZATION FAILED]';
       }
     });
-  } catch (error) {
+  } catch {
     // Если даже formatArgs упал, возвращаем безопасное значение
     return ['[LOGGING ERROR]'];
   }
@@ -295,8 +295,8 @@ export { sanitize };
  */
 export function isPHIField(fieldName) {
   const lowerField = fieldName.toLowerCase();
-  return PHI_FIELDS.some(phiField =>
-    lowerField.includes(phiField.toLowerCase())
+  return PHI_FIELDS.some((phiField) =>
+  lowerField.includes(phiField.toLowerCase())
   );
 }
 

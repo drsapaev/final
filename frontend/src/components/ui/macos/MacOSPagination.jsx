@@ -1,5 +1,4 @@
-import React from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 const MacOSPagination = ({
   currentPage = 1,
@@ -13,6 +12,7 @@ const MacOSPagination = ({
   className,
   style
 }) => {
+  void showPrevNext;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -70,7 +70,7 @@ const MacOSPagination = ({
     borderRadius: 'var(--mac-radius-md)',
     border: currentVariant.border,
     background: isActive ? 'var(--mac-accent-blue)' : currentVariant.background,
-    color: isActive ? 'white' : (isDisabled ? 'var(--mac-text-tertiary)' : currentVariant.color),
+    color: isActive ? 'white' : isDisabled ? 'var(--mac-text-tertiary)' : currentVariant.color,
     cursor: isDisabled ? 'not-allowed' : 'pointer',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
@@ -120,18 +120,18 @@ const MacOSPagination = ({
   const getVisiblePages = () => {
     const pages = [];
     const halfVisible = Math.floor(maxVisiblePages / 2);
-    
+
     let startPage = Math.max(1, currentPage - halfVisible);
     const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
+
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-    
+
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
-    
+
     return pages;
   };
 
@@ -145,68 +145,68 @@ const MacOSPagination = ({
 
   return (
     <div className={className} style={containerStyle}>
-      {showFirstLast && (
-        <button
-          onClick={() => handlePageClick(1)}
-          onKeyDown={(e) => handleKeyDown(e, 1)}
-          onMouseEnter={(e) => handleMouseEnter(e, false, currentPage === 1)}
-          onMouseLeave={(e) => handleMouseLeave(e, false)}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          style={buttonStyle(false, currentPage === 1)}
-          disabled={currentPage === 1}
-          aria-label="Первая страница"
-        >
+      {showFirstLast &&
+      <button
+        onClick={() => handlePageClick(1)}
+        onKeyDown={(e) => handleKeyDown(e, 1)}
+        onMouseEnter={(e) => handleMouseEnter(e, false, currentPage === 1)}
+        onMouseLeave={(e) => handleMouseLeave(e, false)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        style={buttonStyle(false, currentPage === 1)}
+        disabled={currentPage === 1}
+        aria-label="Первая страница">
+        
           1
         </button>
-      )}
+      }
 
-      {showStartEllipsis && (
-        <span style={{ padding: '0 8px', color: 'var(--mac-text-tertiary)' }}>
+      {showStartEllipsis &&
+      <span style={{ padding: '0 8px', color: 'var(--mac-text-tertiary)' }}>
           <MoreHorizontal size={16} />
         </span>
-      )}
+      }
 
-      {visiblePages.map((page) => (
-        <button
-          key={page}
-          onClick={() => handlePageClick(page)}
-          onKeyDown={(e) => handleKeyDown(e, page)}
-          onMouseEnter={(e) => handleMouseEnter(e, page === currentPage, false)}
-          onMouseLeave={(e) => handleMouseLeave(e, page === currentPage)}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          style={buttonStyle(page === currentPage)}
-          aria-label={`Страница ${page}`}
-          aria-current={page === currentPage ? 'page' : undefined}
-        >
+      {visiblePages.map((page) =>
+      <button
+        key={page}
+        onClick={() => handlePageClick(page)}
+        onKeyDown={(e) => handleKeyDown(e, page)}
+        onMouseEnter={(e) => handleMouseEnter(e, page === currentPage, false)}
+        onMouseLeave={(e) => handleMouseLeave(e, page === currentPage)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        style={buttonStyle(page === currentPage)}
+        aria-label={`Страница ${page}`}
+        aria-current={page === currentPage ? 'page' : undefined}>
+        
           {page}
         </button>
-      ))}
+      )}
 
-      {showEndEllipsis && (
-        <span style={{ padding: '0 8px', color: 'var(--mac-text-tertiary)' }}>
+      {showEndEllipsis &&
+      <span style={{ padding: '0 8px', color: 'var(--mac-text-tertiary)' }}>
           <MoreHorizontal size={16} />
         </span>
-      )}
+      }
 
-      {showFirstLast && totalPages > 1 && (
-        <button
-          onClick={() => handlePageClick(totalPages)}
-          onKeyDown={(e) => handleKeyDown(e, totalPages)}
-          onMouseEnter={(e) => handleMouseEnter(e, false, currentPage === totalPages)}
-          onMouseLeave={(e) => handleMouseLeave(e, false)}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          style={buttonStyle(false, currentPage === totalPages)}
-          disabled={currentPage === totalPages}
-          aria-label="Последняя страница"
-        >
+      {showFirstLast && totalPages > 1 &&
+      <button
+        onClick={() => handlePageClick(totalPages)}
+        onKeyDown={(e) => handleKeyDown(e, totalPages)}
+        onMouseEnter={(e) => handleMouseEnter(e, false, currentPage === totalPages)}
+        onMouseLeave={(e) => handleMouseLeave(e, false)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        style={buttonStyle(false, currentPage === totalPages)}
+        disabled={currentPage === totalPages}
+        aria-label="Последняя страница">
+        
           {totalPages}
         </button>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default MacOSPagination;

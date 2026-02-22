@@ -1,4 +1,4 @@
-import React from 'react';
+import PropTypes from 'prop-types';
 
 const MacOSList = ({
   items = [],
@@ -107,32 +107,32 @@ const MacOSList = ({
     }
   };
 
-  const renderDefaultItem = (item, index) => {
+  const renderDefaultItem = (item) => {
     if (typeof item === 'string') {
       return <span>{item}</span>;
     }
-    
+
     if (typeof item === 'object' && item.label) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {item.icon && <item.icon size={16} style={{ color: 'var(--mac-text-tertiary)' }} />}
           <span>{item.label}</span>
-          {item.badge && (
-            <span style={{
-              padding: '2px 6px',
-              borderRadius: 'var(--mac-radius-sm)',
-              fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              background: 'var(--mac-accent-blue)',
-              color: 'white'
-            }}>
+          {item.badge &&
+          <span style={{
+            padding: '2px 6px',
+            borderRadius: 'var(--mac-radius-sm)',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            background: 'var(--mac-accent-blue)',
+            color: 'white'
+          }}>
               {item.badge}
             </span>
-          )}
-        </div>
-      );
+          }
+        </div>);
+
     }
-    
+
     return <span>{JSON.stringify(item)}</span>;
   };
 
@@ -140,7 +140,7 @@ const MacOSList = ({
     if (emptyState) {
       return emptyState;
     }
-    
+
     return (
       <div style={{
         padding: '48px 16px',
@@ -149,8 +149,8 @@ const MacOSList = ({
         fontSize: 'var(--mac-font-size-base)'
       }}>
         Нет элементов для отображения
-      </div>
-    );
+      </div>);
+
   };
 
   const renderLoadingState = () => {
@@ -162,49 +162,90 @@ const MacOSList = ({
         fontSize: 'var(--mac-font-size-base)'
       }}>
         Загрузка...
-      </div>
-    );
+      </div>);
+
   };
 
   if (loading) {
     return (
       <div className={className} style={listStyle}>
         {renderLoadingState()}
-      </div>
-    );
+      </div>);
+
   }
 
   if (!items || items.length === 0) {
     return (
       <div className={className} style={listStyle}>
         {renderEmptyState()}
-      </div>
-    );
+      </div>);
+
   }
 
   return (
     <div className={className} style={listStyle}>
       {items.map((item, index) => {
         const isSelected = selectedIndex === index;
-        
+        const isInteractive = selectable || Boolean(onItemClick);
+
+        if (isInteractive) {
+          return (
+            <div
+              key={index}
+              style={itemStyle(index, isSelected)}
+              onClick={() => handleItemClick(item, index)}
+              onPointerEnter={(e) => handleMouseEnter(e, isSelected)}
+              onPointerLeave={(e) => handleMouseLeave(e, isSelected)}
+              onKeyDown={(e) => handleKeyDown(e, item, index)}
+              tabIndex={0}
+              role="button"
+              aria-selected={selectable ? isSelected : undefined}>
+              
+              {renderItem ? renderItem(item, index) : renderDefaultItem(item, index)}
+            </div>);
+        }
+
         return (
           <div
             key={index}
             style={itemStyle(index, isSelected)}
-            onClick={() => handleItemClick(item, index)}
-            onMouseEnter={(e) => handleMouseEnter(e, isSelected)}
-            onMouseLeave={(e) => handleMouseLeave(e, isSelected)}
-            onKeyDown={(e) => handleKeyDown(e, item, index)}
-            tabIndex={selectable ? 0 : -1}
-            role={selectable ? 'option' : 'listitem'}
-            aria-selected={selectable ? isSelected : undefined}
-          >
+            onPointerEnter={(e) => handleMouseEnter(e, isSelected)}
+            onPointerLeave={(e) => handleMouseLeave(e, isSelected)}
+            role="listitem">
+            
             {renderItem ? renderItem(item, index) : renderDefaultItem(item, index)}
-          </div>
-        );
+          </div>);
+
       })}
-    </div>
-  );
+    </div>);
+
+};
+
+MacOSList.propTypes = {
+  items: PropTypes.arrayOf(
+    PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        label: PropTypes.node,
+        icon: PropTypes.elementType,
+        badge: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+      }),
+      PropTypes.object
+    ])
+  ),
+  renderItem: PropTypes.func,
+  loading: PropTypes.bool,
+  emptyState: PropTypes.node,
+  size: PropTypes.oneOf(['sm', 'md', 'lg']),
+  variant: PropTypes.oneOf(['default', 'filled', 'minimal']),
+  dividers: PropTypes.bool,
+  hoverable: PropTypes.bool,
+  selectable: PropTypes.bool,
+  selectedIndex: PropTypes.number,
+  onItemClick: PropTypes.func,
+  onItemSelect: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default MacOSList;

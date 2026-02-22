@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernContainer.css';
 
@@ -11,8 +10,8 @@ const ModernContainer = ({
   centered = false,
   className = '',
   ...props
-}) => {
-  const { theme, getColor } = useTheme();
+}) => {void
+  useTheme();
 
   const maxWidthValues = {
     xs: '480px',
@@ -48,13 +47,11 @@ const ModernContainer = ({
     <div
       className={`modern-container ${fluid ? 'fluid' : ''} ${centered ? 'centered' : ''} ${className}`}
       style={containerStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 export default ModernContainer;
-
-

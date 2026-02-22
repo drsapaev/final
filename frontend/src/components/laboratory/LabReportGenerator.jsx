@@ -3,7 +3,12 @@
  * Генератор отчетов лабораторных исследований
  * Согласно MASTER_TODO_LIST строка 288
  */
-import React, { useState } from 'react';
+import { useState } from 'react';
+import {
+  Divider,
+  Grid,
+  Paper } from
+'@mui/material';
 import {
   Box,
   Card,
@@ -11,38 +16,38 @@ import {
   Typography,
   Button,
   Alert,
-  Badge,
-  List,
-} from '../ui/macos';
+
+  List } from
+'../ui/macos';
 import {
   FileText,
   Printer,
   Mail,
   CheckCircle,
   AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  TestTube,
-  Hospital,
-} from 'lucide-react';
+
+
+  TestTube } from
+
+'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-const LabReportGenerator = ({ 
-  results = [], 
-  patient = {}, 
-  doctor = {}, 
+const LabReportGenerator = ({
+  results = [],
+  patient = {},
+  doctor = {},
   clinic = {},
-  visitId 
+  visitId
 }) => {
   const [generating, setGenerating] = useState(false);
 
   // Группировка результатов по категориям
   const groupResultsByCategory = () => {
     const grouped = {};
-    results.forEach(result => {
+    results.forEach((result) => {
       if (!grouped[result.category]) {
         grouped[result.category] = [];
       }
@@ -54,50 +59,50 @@ const LabReportGenerator = ({
   // Генерация PDF
   const generatePDF = async () => {
     setGenerating(true);
-    
+
     try {
       const doc = new jsPDF();
-      
+
       // Заголовок
       doc.setFontSize(20);
       doc.text(clinic.name || 'Медицинская клиника', 105, 20, { align: 'center' });
-      
+
       doc.setFontSize(16);
       doc.text('Результаты лабораторных исследований', 105, 30, { align: 'center' });
-      
+
       // Информация о пациенте
       doc.setFontSize(12);
       doc.text(`Пациент: ${patient.name || 'Не указан'}`, 20, 50);
       doc.text(`Дата рождения: ${patient.birthDate || 'Не указана'}`, 20, 57);
       doc.text(`Телефон: ${patient.phone || 'Не указан'}`, 20, 64);
-      
+
       // Информация о враче
       doc.text(`Врач: ${doctor.name || 'Не указан'}`, 120, 50);
       doc.text(`Специальность: ${doctor.specialty || 'Не указана'}`, 120, 57);
       doc.text(`Дата: ${new Date().toLocaleDateString()}`, 120, 64);
-      
+
       // Линия
       doc.line(20, 70, 190, 70);
-      
+
       // Результаты по категориям
       let yPosition = 80;
       const groupedResults = groupResultsByCategory();
-      
+
       Object.entries(groupedResults).forEach(([category, categoryResults]) => {
         // Заголовок категории
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
         doc.text(getCategoryName(category), 20, yPosition);
         yPosition += 10;
-        
+
         // Таблица результатов
-        const tableData = categoryResults.map(result => [
-          result.test_name,
-          `${result.value} ${result.unit}`,
-          `${result.reference_min}-${result.reference_max} ${result.unit}`,
-          getStatusText(result.status),
-        ]);
-        
+        const tableData = categoryResults.map((result) => [
+        result.test_name,
+        `${result.value} ${result.unit}`,
+        `${result.reference_min}-${result.reference_max} ${result.unit}`,
+        getStatusText(result.status)]
+        );
+
         doc.autoTable({
           startY: yPosition,
           head: [['Исследование', 'Результат', 'Норма', 'Статус']],
@@ -108,50 +113,50 @@ const LabReportGenerator = ({
             0: { cellWidth: 70 },
             1: { cellWidth: 40 },
             2: { cellWidth: 40 },
-            3: { cellWidth: 30 },
+            3: { cellWidth: 30 }
           },
           didDrawCell: (data) => {
             // Выделение отклонений красным
             if (data.column.index === 3 && data.cell.raw === 'Отклонение') {
               doc.setTextColor(255, 0, 0);
             }
-          },
+          }
         });
-        
+
         yPosition = doc.lastAutoTable.finalY + 10;
         doc.setFont(undefined, 'normal');
-        
+
         // Проверка на новую страницу
         if (yPosition > 250) {
           doc.addPage();
           yPosition = 20;
         }
       });
-      
+
       // Заключение
-      const abnormalResults = results.filter(r => r.status === 'abnormal');
+      const abnormalResults = results.filter((r) => r.status === 'abnormal');
       if (abnormalResults.length > 0) {
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
         doc.text('Внимание! Обнаружены отклонения:', 20, yPosition);
         yPosition += 10;
-        
+
         doc.setFontSize(11);
         doc.setFont(undefined, 'normal');
-        abnormalResults.forEach(result => {
+        abnormalResults.forEach((result) => {
           doc.text(`• ${result.test_name}: ${result.value} ${result.unit}`, 25, yPosition);
           yPosition += 6;
         });
       }
-      
+
       // Подпись
       doc.setFontSize(10);
       doc.text('Результаты действительны на момент исследования.', 20, 270);
       doc.text('Интерпретацию результатов проводит лечащий врач.', 20, 275);
-      
+
       // Сохранение
       doc.save(`lab_results_${patient.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-      
+
     } catch (error) {
       logger.error('Ошибка генерации PDF:', error);
     } finally {
@@ -168,7 +173,7 @@ const LabReportGenerator = ({
   const sendByEmail = async () => {
     try {
       await api.post(`/visits/${visitId}/lab-results/email`, {
-        patient_email: patient.email,
+        patient_email: patient.email
       });
       alert('Отчет отправлен на email пациента');
     } catch (error) {
@@ -183,7 +188,7 @@ const LabReportGenerator = ({
       urine: 'Анализы мочи',
       biochemistry: 'Биохимия',
       hormones: 'Гормоны',
-      other: 'Другие исследования',
+      other: 'Другие исследования'
     };
     return names[category] || category;
   };
@@ -194,7 +199,7 @@ const LabReportGenerator = ({
       pending: 'Ожидается',
       in_progress: 'В работе',
       completed: 'Норма',
-      abnormal: 'Отклонение',
+      abnormal: 'Отклонение'
     };
     return texts[status] || status;
   };
@@ -202,10 +207,10 @@ const LabReportGenerator = ({
   // Статистика результатов
   const getStatistics = () => {
     const total = results.length;
-    const normal = results.filter(r => r.status === 'completed').length;
-    const abnormal = results.filter(r => r.status === 'abnormal').length;
-    const pending = results.filter(r => r.status === 'pending' || r.status === 'in_progress').length;
-    
+    const normal = results.filter((r) => r.status === 'completed').length;
+    const abnormal = results.filter((r) => r.status === 'abnormal').length;
+    const pending = results.filter((r) => r.status === 'pending' || r.status === 'in_progress').length;
+
     return { total, normal, abnormal, pending };
   };
 
@@ -226,24 +231,24 @@ const LabReportGenerator = ({
               <Button
                 variant="primary"
                 onClick={generatePDF}
-                disabled={generating || results.length === 0}
-              >
+                disabled={generating || results.length === 0}>
+                
                 <FileText style={{ width: 16, height: 16, marginRight: 8 }} />
                 Скачать PDF
               </Button>
               <Button
                 variant="outline"
                 onClick={printReport}
-                disabled={results.length === 0}
-              >
-                <Print style={{ width: 16, height: 16, marginRight: 8 }} />
+                disabled={results.length === 0}>
+
+                <Printer style={{ width: 16, height: 16, marginRight: 8 }} />
                 Печать
               </Button>
               <Button
                 variant="outline"
                 onClick={sendByEmail}
-                disabled={!patient.email || results.length === 0}
-              >
+                disabled={!patient.email || results.length === 0}>
+                
                 <Mail style={{ width: 16, height: 16, marginRight: 8 }} />
                 Email
               </Button>
@@ -303,8 +308,8 @@ const LabReportGenerator = ({
             
             <Divider sx={{ my: 2 }} />
             
-            {Object.entries(groupedResults).map(([category, categoryResults]) => (
-              <Box key={category} sx={{ mb: 3 }}>
+            {Object.entries(groupedResults).map(([category, categoryResults]) =>
+            <Box key={category} sx={{ mb: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   {getCategoryName(category)}
                 </Typography>
@@ -327,8 +332,8 @@ const LabReportGenerator = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {categoryResults.map((result, index) => (
-                      <tr key={index}>
+                    {categoryResults.map((result, index) =>
+                  <tr key={index}>
                         <td style={{ border: '1px solid #ddd', padding: '8px' }}>
                           {result.test_name}
                         </td>
@@ -338,19 +343,19 @@ const LabReportGenerator = ({
                         <td style={{ border: '1px solid #ddd', padding: '8px' }}>
                           {result.reference_min}-{result.reference_max} {result.unit}
                         </td>
-                        <td style={{ 
-                          border: '1px solid #ddd', 
-                          padding: '8px',
-                          color: result.status === 'abnormal' ? 'red' : 'inherit'
-                        }}>
+                        <td style={{
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      color: result.status === 'abnormal' ? 'red' : 'inherit'
+                    }}>
                           {getStatusText(result.status)}
                         </td>
                       </tr>
-                    ))}
+                  )}
                   </tbody>
                 </table>
               </Box>
-            ))}
+            )}
           </Paper>
 
           {/* Предпросмотр на экране */}
@@ -359,35 +364,34 @@ const LabReportGenerator = ({
               Предпросмотр отчета
             </Typography>
             
-            {Object.entries(groupedResults).map(([category, categoryResults]) => (
-              <Box key={category} sx={{ mb: 2 }}>
+            {Object.entries(groupedResults).map(([category, categoryResults]) =>
+            <Box key={category} sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" color="primary" gutterBottom>
                   {getCategoryName(category)}
                 </Typography>
                 
-                <List 
-                  items={categoryResults.map(result => ({
-                    label: result.test_name,
-                    icon: result.status === 'abnormal' ? Warning : CheckCircle,
-                    badge: `${result.value} ${result.unit}`
-                  }))}
-                  size="sm"
-                />
+                <List
+                items={categoryResults.map((result) => ({
+                  label: result.test_name,
+                  icon: result.status === 'abnormal' ? AlertTriangle : CheckCircle,
+                  badge: `${result.value} ${result.unit}`
+                }))}
+                size="sm" />
+              
               </Box>
-            ))}
+            )}
             
-            {stats.abnormal > 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
+            {stats.abnormal > 0 &&
+            <Alert severity="warning" sx={{ mt: 2 }}>
                 Обнаружено {stats.abnormal} отклонений от нормы. 
                 Рекомендуется консультация специалиста.
               </Alert>
-            )}
+            }
           </Paper>
         </CardContent>
       </Card>
-    </Box>
-  );
+    </Box>);
+
 };
 
 export default LabReportGenerator;
-

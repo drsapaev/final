@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Button, Badge } from '../ui/native';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';

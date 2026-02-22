@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '../../api/client';
+
 import logger from '../../utils/logger';
 import BenefitSettings from './BenefitSettings';
 import PaymentProviderSettings from './PaymentProviderSettings';
@@ -61,9 +61,9 @@ const UnifiedSettings = () => {
           <SecuritySettings
             settings={securitySettings}
             onSave={handleSaveSecuritySettings}
-            loading={securityLoading}
-          />
-        );
+            loading={securityLoading} />);
+
+
       case 'settings':
       default:
         return <ClinicSettings />;
@@ -73,8 +73,8 @@ const UnifiedSettings = () => {
   return (
     <div style={{ height: '100%', overflow: 'auto' }}>
       {renderSettings()}
-    </div>
-  );
+    </div>);
+
 };
 
 export default UnifiedSettings;

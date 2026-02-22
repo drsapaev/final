@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
-
+import { createContext, useContext, useReducer, useCallback } from 'react';
 /**
  * Контекст для управления глобальным состоянием приложения
  * Оптимизирует передачу данных между компонентами

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { rescheduleVisit, rescheduleTomorrow } from '../api/visits';
 
 /**
@@ -33,6 +33,14 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
   }, [open, visit]);
 
   if (!open) return null;
+
+  const handleBackdropKeyDown = (e) => {
+    if (busy) return;
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClose?.();
+    }
+  };
 
   async function doReschedule() {
     if (!visit?.id) return;
@@ -77,7 +85,14 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
   };
 
   return (
-    <div style={backdrop} onClick={(e) => e.target === e.currentTarget && !busy && onClose?.()}>
+    <div
+      style={backdrop}
+      onClick={(e) => e.target === e.currentTarget && !busy && onClose?.()}
+      onKeyDown={handleBackdropKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label="Закрыть диалог переноса визита"
+    >
       <div style={modal}>
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Перенос визита</h3>
 

@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const ControlCenter = ({ onActivate, onLogin }) => {
   return (
     <div className="control-center spotlight-card">

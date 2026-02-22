@@ -3,41 +3,46 @@
  * План лечения с этапами
  * Согласно MASTER_TODO_LIST строка 286
  */
-import React, { useState, useEffect } from 'react';
+import { Fragment, useState } from 'react';
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Button,
-  Input,
-  Alert,
-  Badge,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemSecondaryAction,
+  ListItemText,
+  MenuItem,
   Select,
-  Option,
-  Textarea,
-} from '../ui/macos';
-import {
-  Calendar,
-  Plus,
-  Edit,
-  Trash2,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  Hospital,
-  Printer,
-  Share,
-  FileText,
-} from 'lucide-react';
+  Paper,
+  TextField,
+  Typography,
+  Chip,
+} from '@mui/material';
+import Add from '@mui/icons-material/Add';
+import Assignment from '@mui/icons-material/Assignment';
+import AttachMoney from '@mui/icons-material/AttachMoney';
+import CalendarToday from '@mui/icons-material/CalendarToday';
+import Delete from '@mui/icons-material/Delete';
+import LocalHospital from '@mui/icons-material/LocalHospital';
+import Print from '@mui/icons-material/Print';
+import Schedule from '@mui/icons-material/Schedule';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
+const TreatmentPlanner = ({ visitId, onUpdate }) => {
   const [treatmentPlan, setTreatmentPlan] = useState({
     name: '',
     stages: [],
@@ -166,11 +171,11 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
           {treatmentPlan.stages.length > 0 ? (
             <List>
               {treatmentPlan.stages.map((stage, index) => (
-                <React.Fragment key={stage.id}>
+                <Fragment key={stage.id}>
                   {index > 0 && <Divider />}
                   <ListItem>
-                    <ListItemIcon>
-                      <Hospital color="primary" />
+                      <ListItemIcon>
+                      <LocalHospital color="primary" />
                     </ListItemIcon>
                     <ListItemText
                       primary={stage.name}
@@ -179,7 +184,7 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
                           <Typography variant="body2">{stage.description}</Typography>
                           <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
                             <Chip size="small" icon={<CalendarToday />} label={stage.date || 'Не назначено'} />
-                            <Chip size="small" icon={<Clock />} label={`${stage.duration} визит`} />
+                            <Chip size="small" icon={<Schedule />} label={`${stage.duration} визит`} />
                             <Chip size="small" icon={<AttachMoney />} label={`${(stage.cost / 1000).toFixed(0)}k`} />
                             <Chip size="small" label={PRIORITIES[stage.priority].label} color={PRIORITIES[stage.priority].color} />
                           </Box>
@@ -192,7 +197,7 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
                       </IconButton>
                     </ListItemSecondaryAction>
                   </ListItem>
-                </React.Fragment>
+                </Fragment>
               ))}
             </List>
           ) : (

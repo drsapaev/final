@@ -15,8 +15,9 @@
  * 6. ОШИБКА - при попытке подписать пустое
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './ComplaintsField.css';
+import logger from '../../utils/logger';
 
 // Debounce hook
 const useDebounce = (value, delay) => {
@@ -98,14 +99,14 @@ const ComplaintsField = ({
                     setSelectedIndex(0);
                 }
             } catch (e) {
-                console.error('AI suggestion error:', e);
+                logger.error('AI suggestion error:', e);
             } finally {
                 setIsLoadingAI(false);
             }
         };
 
         requestSuggestions();
-    }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI]);
+    }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI, aiSuggestions.length]);
 
     // Clear AI suggestions when value changes
     useEffect(() => {

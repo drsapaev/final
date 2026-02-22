@@ -1,6 +1,6 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
 import { createBadgeStyles } from './utils';
-import { SIZES, VARIANTS } from './types';
+import { SIZES } from './types';
 
 const Badge = forwardRef(({
   children,
@@ -11,7 +11,7 @@ const Badge = forwardRef(({
   ...props
 }, ref) => {
   const badgeStyles = createBadgeStyles(variant, size);
-  
+
   const finalStyles = {
     ...badgeStyles,
     ...style
@@ -22,11 +22,11 @@ const Badge = forwardRef(({
       ref={ref}
       className={`design-system-badge ${className}`}
       style={finalStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </span>
-  );
+    </span>);
+
 });
 
 Badge.displayName = 'Badge';

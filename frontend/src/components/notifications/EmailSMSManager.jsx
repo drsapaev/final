@@ -1,39 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
 import {
   Mail,
   MessageSquare,
-  Send,
+
   Users,
   BarChart3,
   Settings,
-  TestTube,
-  CreditCard,
-  Calendar,
+
+
+
   FileText,
   AlertCircle,
   CheckCircle,
-  Clock,
-  RefreshCw,
-  Download,
-  Upload,
+
+
+
+
   Eye,
-  Edit,
-  Trash2,
-  Plus,
-  Search,
-  Filter,
-  MoreVertical
-} from 'lucide-react';
+  Edit } from
+
+
+
+
+
+'lucide-react';
 
 /**
  * Менеджер Email/SMS уведомлений
  * Управление массовыми рассылками, шаблонами и статистикой
  */
-const EmailSMSManager = () => {
-  const { isDark, isLight, getColor, getSpacing } = useTheme();
+const EmailSMSManager = () => {void
+  useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState(null);
@@ -200,19 +200,19 @@ const EmailSMSManager = () => {
   };
 
   const tabs = [
-    { id: 'overview', label: 'Обзор', icon: BarChart3 },
-    { id: 'email', label: 'Email', icon: Mail },
-    { id: 'sms', label: 'SMS', icon: MessageSquare },
-    { id: 'bulk', label: 'Массовые рассылки', icon: Users },
-    { id: 'templates', label: 'Шаблоны', icon: FileText },
-    { id: 'settings', label: 'Настройки', icon: Settings }
-  ];
+  { id: 'overview', label: 'Обзор', icon: BarChart3 },
+  { id: 'email', label: 'Email', icon: Mail },
+  { id: 'sms', label: 'SMS', icon: MessageSquare },
+  { id: 'bulk', label: 'Массовые рассылки', icon: Users },
+  { id: 'templates', label: 'Шаблоны', icon: FileText },
+  { id: 'settings', label: 'Настройки', icon: Settings }];
 
-  const renderOverview = () => (
-    <div className="space-y-6">
+
+  const renderOverview = () =>
+  <div className="space-y-6">
       {/* Статистика */}
-      {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {statistics &&
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -263,7 +263,7 @@ const EmailSMSManager = () => {
             </div>
           </div>
         </div>
-      )}
+    }
 
       {/* Быстрые действия */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -274,9 +274,9 @@ const EmailSMSManager = () => {
           </div>
           <p className="text-gray-600 mb-4">Отправить тестовое письмо</p>
           <button
-            onClick={() => setActiveTab('email')}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          onClick={() => setActiveTab('email')}
+          className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          
             Перейти к тестированию
           </button>
         </div>
@@ -288,9 +288,9 @@ const EmailSMSManager = () => {
           </div>
           <p className="text-gray-600 mb-4">Отправить тестовое SMS</p>
           <button
-            onClick={() => setActiveTab('sms')}
-            className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-          >
+          onClick={() => setActiveTab('sms')}
+          className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+          
             Перейти к тестированию
           </button>
         </div>
@@ -302,43 +302,43 @@ const EmailSMSManager = () => {
           </div>
           <p className="text-gray-600 mb-4">Отправить уведомления группе</p>
           <button
-            onClick={() => setActiveTab('bulk')}
-            className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-          >
+          onClick={() => setActiveTab('bulk')}
+          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+          
             Перейти к рассылкам
           </button>
         </div>
       </div>
 
       {/* Результаты тестов */}
-      {testResults && (
-        <div className={`p-4 rounded-lg ${testResults.success
-          ? 'bg-green-50 border border-green-200'
-          : 'bg-red-50 border border-red-200'
-          }`}>
+      {testResults &&
+    <div className={`p-4 rounded-lg ${testResults.success ?
+    'bg-green-50 border border-green-200' :
+    'bg-red-50 border border-red-200'}`
+    }>
           <div className="flex items-center space-x-2">
-            {testResults.success ? (
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            )}
-            <span className={`font-medium ${testResults.success ? 'text-green-800' : 'text-red-800'
-              }`}>
+            {testResults.success ?
+        <CheckCircle className="w-5 h-5 text-green-600" /> :
+
+        <AlertCircle className="w-5 h-5 text-red-600" />
+        }
+            <span className={`font-medium ${testResults.success ? 'text-green-800' : 'text-red-800'}`
+        }>
               {testResults.type === 'email' ? 'Email' :
-                testResults.type === 'sms' ? 'SMS' : 'Массовая рассылка'}
+          testResults.type === 'sms' ? 'SMS' : 'Массовая рассылка'}
             </span>
           </div>
-          <p className={`mt-1 ${testResults.success ? 'text-green-700' : 'text-red-700'
-            }`}>
+          <p className={`mt-1 ${testResults.success ? 'text-green-700' : 'text-red-700'}`
+      }>
             {testResults.message}
           </p>
         </div>
-      )}
-    </div>
-  );
+    }
+    </div>;
 
-  const renderEmailForm = () => (
-    <div className="space-y-6">
+
+  const renderEmailForm = () =>
+  <div className="space-y-6">
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Отправка Email</h3>
 
@@ -348,12 +348,12 @@ const EmailSMSManager = () => {
               Получатель
             </label>
             <input
-              type="email"
-              value={emailForm.to}
-              onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="example@email.com"
-            />
+            type="email"
+            value={emailForm.to}
+            onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="example@email.com" />
+          
           </div>
 
           <div>
@@ -361,12 +361,12 @@ const EmailSMSManager = () => {
               Тема
             </label>
             <input
-              type="text"
-              value={emailForm.subject}
-              onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Тема письма"
-            />
+            type="text"
+            value={emailForm.subject}
+            onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Тема письма" />
+          
           </div>
 
           <div>
@@ -374,16 +374,16 @@ const EmailSMSManager = () => {
               Шаблон
             </label>
             <select
-              value={emailForm.template}
-              onChange={(e) => setEmailForm({ ...emailForm, template: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
+            value={emailForm.template}
+            onChange={(e) => setEmailForm({ ...emailForm, template: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            
               <option value="">Выберите шаблон</option>
-              {templates.email.map(template => (
-                <option key={template.name} value={template.name}>
+              {templates.email.map((template) =>
+            <option key={template.name} value={template.name}>
                   {template.title}
                 </option>
-              ))}
+            )}
             </select>
           </div>
 
@@ -392,10 +392,10 @@ const EmailSMSManager = () => {
               Приоритет
             </label>
             <select
-              value={emailForm.priority}
-              onChange={(e) => setEmailForm({ ...emailForm, priority: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
+            value={emailForm.priority}
+            onChange={(e) => setEmailForm({ ...emailForm, priority: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            
               <option value="normal">Обычный</option>
               <option value="high">Высокий</option>
             </select>
@@ -407,38 +407,38 @@ const EmailSMSManager = () => {
             Сообщение
           </label>
           <textarea
-            value={emailForm.message}
-            onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Текст сообщения"
-          />
+          value={emailForm.message}
+          onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Текст сообщения" />
+        
         </div>
 
         <div className="mt-6 flex space-x-4">
           <button
-            onClick={sendTestEmail}
-            disabled={loading || !emailForm.to}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          onClick={sendTestEmail}
+          disabled={loading || !emailForm.to}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          
             {loading ? 'Отправка...' : 'Отправить тест'}
           </button>
 
           <button
-            onClick={() => setEmailForm({
-              to: '', subject: '', template: '', message: '', priority: 'normal'
-            })}
-            className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-          >
+          onClick={() => setEmailForm({
+            to: '', subject: '', template: '', message: '', priority: 'normal'
+          })}
+          className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+          
             Очистить
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderSMSForm = () => (
-    <div className="space-y-6">
+
+  const renderSMSForm = () =>
+  <div className="space-y-6">
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Отправка SMS</h3>
 
@@ -448,12 +448,12 @@ const EmailSMSManager = () => {
               Номер телефона
             </label>
             <input
-              type="tel"
-              value={smsForm.phone}
-              onChange={(e) => setSmsForm({ ...smsForm, phone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="+998901234567"
-            />
+            type="tel"
+            value={smsForm.phone}
+            onChange={(e) => setSmsForm({ ...smsForm, phone: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            placeholder="+998901234567" />
+          
           </div>
 
           <div>
@@ -461,12 +461,12 @@ const EmailSMSManager = () => {
               Отправитель
             </label>
             <input
-              type="text"
-              value={smsForm.sender}
-              onChange={(e) => setSmsForm({ ...smsForm, sender: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="Clinic"
-            />
+            type="text"
+            value={smsForm.sender}
+            onChange={(e) => setSmsForm({ ...smsForm, sender: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            placeholder="Clinic" />
+          
           </div>
 
           <div>
@@ -474,16 +474,16 @@ const EmailSMSManager = () => {
               Шаблон
             </label>
             <select
-              value={smsForm.template}
-              onChange={(e) => setSmsForm({ ...smsForm, template: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            >
+            value={smsForm.template}
+            onChange={(e) => setSmsForm({ ...smsForm, template: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            
               <option value="">Выберите шаблон</option>
-              {templates.sms.map(template => (
-                <option key={template.name} value={template.name}>
+              {templates.sms.map((template) =>
+            <option key={template.name} value={template.name}>
                   {template.title}
                 </option>
-              ))}
+            )}
             </select>
           </div>
 
@@ -492,10 +492,10 @@ const EmailSMSManager = () => {
               Приоритет
             </label>
             <select
-              value={smsForm.priority}
-              onChange={(e) => setSmsForm({ ...smsForm, priority: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            >
+            value={smsForm.priority}
+            onChange={(e) => setSmsForm({ ...smsForm, priority: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            
               <option value="normal">Обычный</option>
               <option value="high">Высокий</option>
             </select>
@@ -507,38 +507,38 @@ const EmailSMSManager = () => {
             Сообщение
           </label>
           <textarea
-            value={smsForm.message}
-            onChange={(e) => setSmsForm({ ...smsForm, message: e.target.value })}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="Текст SMS сообщения"
-          />
+          value={smsForm.message}
+          onChange={(e) => setSmsForm({ ...smsForm, message: e.target.value })}
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          placeholder="Текст SMS сообщения" />
+        
         </div>
 
         <div className="mt-6 flex space-x-4">
           <button
-            onClick={sendTestSMS}
-            disabled={loading || !smsForm.phone}
-            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          onClick={sendTestSMS}
+          disabled={loading || !smsForm.phone}
+          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          
             {loading ? 'Отправка...' : 'Отправить тест'}
           </button>
 
           <button
-            onClick={() => setSmsForm({
-              phone: '', message: '', template: '', sender: '', priority: 'normal'
-            })}
-            className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-          >
+          onClick={() => setSmsForm({
+            phone: '', message: '', template: '', sender: '', priority: 'normal'
+          })}
+          className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+          
             Очистить
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderBulkForm = () => (
-    <div className="space-y-6">
+
+  const renderBulkForm = () =>
+  <div className="space-y-6">
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Массовые рассылки</h3>
 
@@ -548,10 +548,10 @@ const EmailSMSManager = () => {
               Тип рассылки
             </label>
             <select
-              value={bulkForm.type}
-              onChange={(e) => setBulkForm({ ...bulkForm, type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            >
+            value={bulkForm.type}
+            onChange={(e) => setBulkForm({ ...bulkForm, type: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            
               <option value="email">Email</option>
               <option value="sms">SMS</option>
             </select>
@@ -562,13 +562,13 @@ const EmailSMSManager = () => {
               Размер батча
             </label>
             <input
-              type="number"
-              value={bulkForm.batchSize}
-              onChange={(e) => setBulkForm({ ...bulkForm, batchSize: parseInt(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-              min="1"
-              max="1000"
-            />
+            type="number"
+            value={bulkForm.batchSize}
+            onChange={(e) => setBulkForm({ ...bulkForm, batchSize: parseInt(e.target.value) })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            min="1"
+            max="1000" />
+          
           </div>
 
           <div>
@@ -576,14 +576,14 @@ const EmailSMSManager = () => {
               Задержка между батчами (сек)
             </label>
             <input
-              type="number"
-              step="0.1"
-              value={bulkForm.delay}
-              onChange={(e) => setBulkForm({ ...bulkForm, delay: parseFloat(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-              min="0"
-              max="10"
-            />
+            type="number"
+            step="0.1"
+            value={bulkForm.delay}
+            onChange={(e) => setBulkForm({ ...bulkForm, delay: parseFloat(e.target.value) })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            min="0"
+            max="10" />
+          
           </div>
 
           <div>
@@ -591,72 +591,72 @@ const EmailSMSManager = () => {
               Шаблон
             </label>
             <select
-              value={bulkForm.template}
-              onChange={(e) => setBulkForm({ ...bulkForm, template: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            >
+            value={bulkForm.template}
+            onChange={(e) => setBulkForm({ ...bulkForm, template: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            
               <option value="">Выберите шаблон</option>
-              {(bulkForm.type === 'email' ? templates.email : templates.sms).map(template => (
-                <option key={template.name} value={template.name}>
+              {(bulkForm.type === 'email' ? templates.email : templates.sms).map((template) =>
+            <option key={template.name} value={template.name}>
                   {template.title}
                 </option>
-              ))}
+            )}
             </select>
           </div>
         </div>
 
-        {bulkForm.type === 'email' && (
-          <div className="mt-4">
+        {bulkForm.type === 'email' &&
+      <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Тема письма
             </label>
             <input
-              type="text"
-              value={bulkForm.subject}
-              onChange={(e) => setBulkForm({ ...bulkForm, subject: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-              placeholder="Тема письма"
-            />
+          type="text"
+          value={bulkForm.subject}
+          onChange={(e) => setBulkForm({ ...bulkForm, subject: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          placeholder="Тема письма" />
+        
           </div>
-        )}
+      }
 
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Сообщение
           </label>
           <textarea
-            value={bulkForm.message}
-            onChange={(e) => setBulkForm({ ...bulkForm, message: e.target.value })}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            placeholder="Текст сообщения"
-          />
+          value={bulkForm.message}
+          onChange={(e) => setBulkForm({ ...bulkForm, message: e.target.value })}
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          placeholder="Текст сообщения" />
+        
         </div>
 
         <div className="mt-6 flex space-x-4">
           <button
-            onClick={sendBulkNotification}
-            disabled={loading || bulkForm.recipients.length === 0}
-            className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          onClick={sendBulkNotification}
+          disabled={loading || bulkForm.recipients.length === 0}
+          className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          
             {loading ? 'Отправка...' : 'Запустить рассылку'}
           </button>
 
           <button
-            onClick={() => setBulkForm({
-              type: 'email', recipients: [], subject: '', template: '', message: '', batchSize: 50, delay: 1.0
-            })}
-            className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-          >
+          onClick={() => setBulkForm({
+            type: 'email', recipients: [], subject: '', template: '', message: '', batchSize: 50, delay: 1.0
+          })}
+          className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+          
             Очистить
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderTemplates = () => (
-    <div className="space-y-6">
+
+  const renderTemplates = () =>
+  <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Email шаблоны */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -665,8 +665,8 @@ const EmailSMSManager = () => {
             Email шаблоны
           </h3>
           <div className="space-y-3">
-            {templates.email.map(template => (
-              <div key={template.name} className="border border-gray-200 rounded-lg p-4">
+            {templates.email.map((template) =>
+          <div key={template.name} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">{template.title}</h4>
@@ -687,7 +687,7 @@ const EmailSMSManager = () => {
                   </span>
                 </div>
               </div>
-            ))}
+          )}
           </div>
         </div>
 
@@ -698,8 +698,8 @@ const EmailSMSManager = () => {
             SMS шаблоны
           </h3>
           <div className="space-y-3">
-            {templates.sms.map(template => (
-              <div key={template.name} className="border border-gray-200 rounded-lg p-4">
+            {templates.sms.map((template) =>
+          <div key={template.name} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">{template.title}</h4>
@@ -720,15 +720,15 @@ const EmailSMSManager = () => {
                   </span>
                 </div>
               </div>
-            ))}
+          )}
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderSettings = () => (
-    <div className="space-y-6">
+
+  const renderSettings = () =>
+  <div className="space-y-6">
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Настройки Email/SMS</h3>
 
@@ -741,30 +741,30 @@ const EmailSMSManager = () => {
                   SMTP сервер
                 </label>
                 <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="smtp.gmail.com"
-                />
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="smtp.gmail.com" />
+              
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Порт
                 </label>
                 <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="587"
-                />
+                type="number"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="587" />
+              
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email
                 </label>
                 <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="clinic@example.com"
-                />
+                type="email"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="clinic@example.com" />
+              
               </div>
             </div>
           </div>
@@ -777,30 +777,30 @@ const EmailSMSManager = () => {
                   API URL
                 </label>
                 <input
-                  type="url"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="https://api.sms-provider.com"
-                />
+                type="url"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="https://api.sms-provider.com" />
+              
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   API ключ
                 </label>
                 <input
-                  type="password"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="••••••••••••••••"
-                />
+                type="password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="••••••••••••••••" />
+              
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Отправитель
                 </label>
                 <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="Clinic"
-                />
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Clinic" />
+              
               </div>
             </div>
           </div>
@@ -812,15 +812,15 @@ const EmailSMSManager = () => {
           </button>
 
           <button
-            onClick={resetStatistics}
-            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
-          >
+          onClick={resetStatistics}
+          className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
+          
             Сбросить статистику
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
+
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -846,27 +846,26 @@ const EmailSMSManager = () => {
       {/* Навигация */}
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
+          {tabs.map((tab) =>
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ?
+            'border-blue-500 text-blue-600' :
+            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
+            }>
+            
               <tab.icon className="w-4 h-4" />
               <span>{tab.label}</span>
             </button>
-          ))}
+          )}
         </nav>
       </div>
 
       {/* Контент */}
       {renderTabContent()}
-    </div>
-  );
+    </div>);
+
 };
 
 export default EmailSMSManager;
-

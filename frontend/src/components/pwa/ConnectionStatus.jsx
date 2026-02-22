@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
-  Badge,
   Alert,
+  Chip,
+  LinearProgress,
+  Snackbar,
   Typography,
-  Progress,
-} from '../ui/macos';
-import {
-  Wifi,
-  WifiOff,
-  Cloud,
-  CloudOff,
-  RefreshCw,
-  RefreshCwOff,
-} from 'lucide-react';
+} from '@mui/material';
+import WifiIcon from '@mui/icons-material/Wifi';
+import WifiOffIcon from '@mui/icons-material/WifiOff';
+import SyncIcon from '@mui/icons-material/Sync';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import { usePWA } from '../../hooks/usePWA';
 
 const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
@@ -57,10 +54,10 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   }, []);
 
   const getConnectionIcon = () => {
-    if (!isOnline) return <WifiOff />;
-    if (isSyncing) return <Sync className="animate-spin" />;
-    if (isServiceWorkerReady) return <CloudDone />;
-    return <Wifi />;
+    if (!isOnline) return <WifiOffIcon />;
+    if (isSyncing) return <SyncIcon />;
+    if (isServiceWorkerReady) return <CloudDoneIcon />;
+    return <WifiIcon />;
   };
 
   const getConnectionColor = () => {
@@ -132,7 +129,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         <Alert 
           severity="warning" 
           onClose={() => setShowOfflineSnackbar(false)}
-          icon={<WifiOff />}
+          icon={<WifiOffIcon />}
         >
           <Typography variant="body2" fontWeight="medium">
             Нет подключения к интернету
@@ -156,7 +153,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         <Alert 
           severity="success" 
           onClose={() => setShowOnlineSnackbar(false)}
-          icon={<CloudDone />}
+          icon={<CloudDoneIcon />}
         >
           <Typography variant="body2" fontWeight="medium">
             Подключение восстановлено
@@ -184,7 +181,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
           }}
         >
           <Typography variant="caption" display="flex" alignItems="center" justifyContent="center" gap={1}>
-            <WifiOff fontSize="small" />
+            <WifiOffIcon fontSize="small" />
             Офлайн режим - данные будут синхронизированы при подключении
           </Typography>
         </Box>

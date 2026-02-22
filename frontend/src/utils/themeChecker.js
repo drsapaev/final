@@ -6,16 +6,16 @@ import { useTheme } from '../contexts/ThemeContext';
  */
 export function checkHardcodedColors(styles) {
   const hardcodedColors = [
-    '#000000', '#ffffff', '#000', '#fff',
-    'rgb(0, 0, 0)', 'rgb(255, 255, 255)',
-    'rgba(0, 0, 0, 0)', 'rgba(255, 255, 255, 1)',
-    'black', 'white', 'red', 'blue', 'green', 'yellow'
-  ];
+  '#000000', '#ffffff', '#000', '#fff',
+  'rgb(0, 0, 0)', 'rgb(255, 255, 255)',
+  'rgba(0, 0, 0, 0)', 'rgba(255, 255, 255, 1)',
+  'black', 'white', 'red', 'blue', 'green', 'yellow'];
+
 
   const issues = [];
-  
+
   if (typeof styles === 'string') {
-    hardcodedColors.forEach(color => {
+    hardcodedColors.forEach((color) => {
       if (styles.includes(color)) {
         issues.push({
           type: 'hardcoded_color',
@@ -27,7 +27,7 @@ export function checkHardcodedColors(styles) {
   } else if (typeof styles === 'object') {
     Object.entries(styles).forEach(([key, value]) => {
       if (typeof value === 'string') {
-        hardcodedColors.forEach(color => {
+        hardcodedColors.forEach((color) => {
           if (value.includes(color)) {
             issues.push({
               type: 'hardcoded_color',
@@ -48,12 +48,12 @@ export function checkHardcodedColors(styles) {
  * Проверяет использование хардкодированных размеров
  */
 export function checkHardcodedSizes(styles) {
-  const hardcodedSizes = [
-    'px', 'em', 'rem', '%', 'vh', 'vw'
-  ];
+
+
+
 
   const issues = [];
-  
+
   if (typeof styles === 'string') {
     const sizeRegex = /(\d+(?:\.\d+)?)(px|em|rem|%|vh|vw)/g;
     let match;
@@ -90,7 +90,7 @@ export function checkHardcodedSizes(styles) {
 export function checkCSSVariables(styles) {
   const cssVarRegex = /var\(--[^)]+\)/g;
   const issues = [];
-  
+
   if (typeof styles === 'string') {
     let match;
     while ((match = cssVarRegex.exec(styles)) !== null) {
@@ -126,7 +126,7 @@ export function checkThemeIssues(styles) {
   const colorIssues = checkHardcodedColors(styles);
   const sizeIssues = checkHardcodedSizes(styles);
   const cssVarIssues = checkCSSVariables(styles);
-  
+
   return {
     colors: colorIssues,
     sizes: sizeIssues,
@@ -139,47 +139,47 @@ export function checkThemeIssues(styles) {
  * Создает исправленные стили с использованием темы
  */
 export function createThemedStyles(styles, theme) {
-  const { getColor, getSpacing, getFontSize } = theme;
-  
+  const { getColor, getSpacing } = theme;
+
   if (typeof styles === 'function') {
     return styles(theme);
   }
-  
+
   if (typeof styles === 'object') {
     const themedStyles = {};
-    
+
     Object.entries(styles).forEach(([key, value]) => {
       if (typeof value === 'string') {
         // Заменяем хардкодированные цвета
-        let themedValue = value
-          .replace(/#000000|#000|black/gi, getColor('text', 'primary'))
-          .replace(/#ffffff|#fff|white/gi, getColor('background', 'primary'))
-          .replace(/#ff0000|red/gi, getColor('error', 'main'))
-          .replace(/#0000ff|blue/gi, getColor('primary', 'main'))
-          .replace(/#00ff00|green/gi, getColor('success', 'main'))
-          .replace(/#ffff00|yellow/gi, getColor('warning', 'main'));
-        
+        let themedValue = value.
+        replace(/#000000|#000|black/gi, getColor('text', 'primary')).
+        replace(/#ffffff|#fff|white/gi, getColor('background', 'primary')).
+        replace(/#ff0000|red/gi, getColor('error', 'main')).
+        replace(/#0000ff|blue/gi, getColor('primary', 'main')).
+        replace(/#00ff00|green/gi, getColor('success', 'main')).
+        replace(/#ffff00|yellow/gi, getColor('warning', 'main'));
+
         // Заменяем хардкодированные размеры
-        themedValue = themedValue
-          .replace(/(\d+)px/g, (match, num) => {
-            const size = parseInt(num);
-            if (size <= 4) return getSpacing('xs');
-            if (size <= 8) return getSpacing('sm');
-            if (size <= 12) return getSpacing('md');
-            if (size <= 16) return getSpacing('lg');
-            if (size <= 24) return getSpacing('xl');
-            return getSpacing('xxl');
-          });
-        
+        themedValue = themedValue.
+        replace(/(\d+)px/g, (match, num) => {
+          const size = parseInt(num);
+          if (size <= 4) return getSpacing('xs');
+          if (size <= 8) return getSpacing('sm');
+          if (size <= 12) return getSpacing('md');
+          if (size <= 16) return getSpacing('lg');
+          if (size <= 24) return getSpacing('xl');
+          return getSpacing('xxl');
+        });
+
         themedStyles[key] = themedValue;
       } else {
         themedStyles[key] = value;
       }
     });
-    
+
     return themedStyles;
   }
-  
+
   return styles;
 }
 
@@ -243,75 +243,75 @@ export function ThemeIssuesDisplay({ issues, onFix }) {
         Найдено {issues.total} проблем с темой
       </div>
       
-      {issues.colors.map((issue, index) => (
-        <div key={`color-${index}`} style={issueStyle}>
+      {issues.colors.map((issue, index) =>
+      <div key={`color-${index}`} style={issueStyle}>
           <strong>Цвет:</strong> {issue.value} → {issue.suggestion}
         </div>
-      ))}
+      )}
       
-      {issues.sizes.map((issue, index) => (
-        <div key={`size-${index}`} style={issueStyle}>
+      {issues.sizes.map((issue, index) =>
+      <div key={`size-${index}`} style={issueStyle}>
           <strong>Размер:</strong> {issue.value} → {issue.suggestion}
         </div>
-      ))}
+      )}
       
-      {issues.cssVariables.map((issue, index) => (
-        <div key={`css-${index}`} style={issueStyle}>
+      {issues.cssVariables.map((issue, index) =>
+      <div key={`css-${index}`} style={issueStyle}>
           <strong>CSS переменная:</strong> {issue.value} → {issue.suggestion}
         </div>
-      ))}
+      )}
       
-      {onFix && (
-        <button style={fixButtonStyle} onClick={onFix}>
+      {onFix &&
+      <button style={fixButtonStyle} onClick={onFix}>
           Исправить автоматически
         </button>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
 /**
  * Утилита для автоматического исправления стилей
  */
 export function autoFixStyles(styles, theme) {
-  const { getColor, getSpacing, getFontSize } = theme;
-  
+  const { getColor, getSpacing } = theme;
+
   if (typeof styles === 'object') {
     const fixedStyles = {};
-    
+
     Object.entries(styles).forEach(([key, value]) => {
       if (typeof value === 'string') {
         let fixedValue = value;
-        
+
         // Заменяем хардкодированные цвета
-        fixedValue = fixedValue
-          .replace(/#000000|#000|black/gi, getColor('text', 'primary'))
-          .replace(/#ffffff|#fff|white/gi, getColor('background', 'primary'))
-          .replace(/#ff0000|red/gi, getColor('error', 'main'))
-          .replace(/#0000ff|blue/gi, getColor('primary', 'main'))
-          .replace(/#00ff00|green/gi, getColor('success', 'main'))
-          .replace(/#ffff00|yellow/gi, getColor('warning', 'main'));
-        
+        fixedValue = fixedValue.
+        replace(/#000000|#000|black/gi, getColor('text', 'primary')).
+        replace(/#ffffff|#fff|white/gi, getColor('background', 'primary')).
+        replace(/#ff0000|red/gi, getColor('error', 'main')).
+        replace(/#0000ff|blue/gi, getColor('primary', 'main')).
+        replace(/#00ff00|green/gi, getColor('success', 'main')).
+        replace(/#ffff00|yellow/gi, getColor('warning', 'main'));
+
         // Заменяем хардкодированные размеры
-        fixedValue = fixedValue
-          .replace(/(\d+)px/g, (match, num) => {
-            const size = parseInt(num);
-            if (size <= 4) return getSpacing('xs');
-            if (size <= 8) return getSpacing('sm');
-            if (size <= 12) return getSpacing('md');
-            if (size <= 16) return getSpacing('lg');
-            if (size <= 24) return getSpacing('xl');
-            return getSpacing('xxl');
-          });
-        
+        fixedValue = fixedValue.
+        replace(/(\d+)px/g, (match, num) => {
+          const size = parseInt(num);
+          if (size <= 4) return getSpacing('xs');
+          if (size <= 8) return getSpacing('sm');
+          if (size <= 12) return getSpacing('md');
+          if (size <= 16) return getSpacing('lg');
+          if (size <= 24) return getSpacing('xl');
+          return getSpacing('xxl');
+        });
+
         fixedStyles[key] = fixedValue;
       } else {
         fixedStyles[key] = value;
       }
     });
-    
+
     return fixedStyles;
   }
-  
+
   return styles;
 }

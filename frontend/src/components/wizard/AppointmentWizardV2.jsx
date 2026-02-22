@@ -1,27 +1,28 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import {
   Search,
   Phone,
-  Plus,
-  Minus,
+
+
   X,
-  Stethoscope,
+
   Check,
   ArrowLeft,
   ArrowRight,
   Trash2,
   AlertCircle,
-  ShoppingCart,
-  Grid,
-  List,
-  ChevronDown,
+
+
+
+
   Calendar,
-  User,
-  RefreshCw
-} from 'lucide-react';
+
+  RefreshCw } from
+'lucide-react';
 import { toast } from 'react-toastify';
 import ModernDialog from '../dialogs/ModernDialog';
-import { MacOSInput, MacOSButton, MacOSSelect, MacOSCheckbox } from '../ui/macos';
+import { MacOSInput, MacOSButton } from '../ui/macos';
 import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { formatDateDisplay } from '../../utils/dateUtils';
@@ -37,11 +38,11 @@ const API_BASE = '/api/v1';
 
 // Категории услуг
 const categories = [
-  { id: 'specialists', label: 'Специалисты', icon: '👨‍⚕️' },
-  { id: 'laboratory', label: 'Лаборатория', icon: '🧪' },
-  { id: 'procedures', label: 'Процедуры', icon: '💉' }, // Объединяем косметологию и процедуры
-  { id: 'other', label: 'Прочее', icon: '📋' }
-];
+{ id: 'specialists', label: 'Специалисты', icon: '👨‍⚕️' },
+{ id: 'laboratory', label: 'Лаборатория', icon: '🧪' },
+{ id: 'procedures', label: 'Процедуры', icon: '💉' }, // Объединяем косметологию и процедуры
+{ id: 'other', label: 'Прочее', icon: '📋' }];
+
 
 // CSS Keyframes for animations
 const wizardKeyframes = `
@@ -79,7 +80,7 @@ const AppointmentWizardV2 = ({
   onClose,
   onComplete,
   isProcessing = false,
-  setIsProcessing = () => { }, // Дефолтная функция-заглушка
+  setIsProcessing = () => {}, // Дефолтная функция-заглушка
   activeTab = null, // ✅ ДОБАВЛЯЕМ activeTab для фильтрации услуг по отделению
   editMode = false, // ✨ НОВОЕ: Режим редактирования
   initialData = null // ✨ НОВОЕ: Данные для редактирования
@@ -119,7 +120,7 @@ const AppointmentWizardV2 = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState(null); // ✅ Timeout для проверки телефона
-  const [phoneError, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
+  const [, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
   const [servicesData, setServicesData] = useState([]);
   const [doctorsData, setDoctorsData] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
@@ -143,8 +144,8 @@ const AppointmentWizardV2 = ({
         // В реальном приложении может потребоваться маппинг
 
         // ✅ ИСПРАВЛЕНО: Правильная инициализация даты рождения
-        const birthDate = initialData.patient_birth_date ||
-          (initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
+        const birthDate = initialData.patient_birth_date || (
+        initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
 
         setWizardData({
           patient: {
@@ -156,11 +157,11 @@ const AppointmentWizardV2 = ({
             gender: (() => {
               // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
               const genderValue = initialData.patient_gender ||
-                initialData.gender ||
-                initialData.patient?.gender ||
-                initialData.patient?.sex ||
-                initialData.sex ||
-                '';
+              initialData.gender ||
+              initialData.patient?.gender ||
+              initialData.patient?.sex ||
+              initialData.sex ||
+              '';
               if (genderValue === 'M' || genderValue === 'm' || genderValue === 'male') return 'male';
               if (genderValue === 'F' || genderValue === 'f' || genderValue === 'female') return 'female';
               return genderValue; // Если уже в формате male/female, оставляем как есть
@@ -204,10 +205,10 @@ const AppointmentWizardV2 = ({
             const draft = JSON.parse(savedDraft);
             const now = Date.now();
 
-            if (draft.timestamp && (now - draft.timestamp) < DRAFT_TTL) {
+            if (draft.timestamp && now - draft.timestamp < DRAFT_TTL) {
               // Черновик актуален
               logger.log('📂 AppointmentWizardV2: Loaded DRAFT');
-              setWizardData(prev => ({
+              setWizardData((prev) => ({
                 ...prev,
                 ...draft.data
               }));
@@ -227,7 +228,7 @@ const AppointmentWizardV2 = ({
         }
       }
     }
-  }, [isOpen, editMode, initialData]);
+  }, [isOpen, editMode, initialData, DRAFT_KEY, DRAFT_TTL]);
 
   // ✅ ИСПРАВЛЕНО: Сброс состояния мастера при закрытии
   useEffect(() => {
@@ -247,13 +248,13 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     if (!wizardData.patient) {
       logger.warn('⚠️ Wizard data corrupted (missing patient), resetting...');
-      setWizardData(prev => ({
+      setWizardData((prev) => ({
         ...prev,
         patient: { id: null, fio: '', birth_date: '', phone: '', address: '', gender: '' }
       }));
     }
     if (!wizardData.cart) {
-      setWizardData(prev => ({
+      setWizardData((prev) => ({
         ...prev,
         cart: { items: [], discount_mode: 'none', all_free: false, notes: '' }
       }));
@@ -270,6 +271,8 @@ const AppointmentWizardV2 = ({
   // Refs
   const fioRef = useRef(null);
   const phoneRef = useRef(null);
+  const nextStepRef = useRef(() => {});
+  const handleCompleteRef = useRef(async () => {});
 
   // Общее количество шагов
   const totalSteps = 2;
@@ -299,7 +302,7 @@ const AppointmentWizardV2 = ({
         // В мастере мы всегда предполагаем, что если ID не выбран, то это новый.
         // Если ID выбран, то мы не проверяем (или проверяем, не занят ли другим).
 
-        const existingPatient = data.find(p => {
+        const existingPatient = data.find((p) => {
           // Сравниваем телефоны (очищенные)
           const pPhone = (p.phone || '').replace(/\D/g, '');
           return pPhone === cleanPhone;
@@ -321,7 +324,7 @@ const AppointmentWizardV2 = ({
 
   const handlePhoneChange = (value) => {
     const formatted = formatPhoneNumber(value);
-    setWizardData(prev => ({
+    setWizardData((prev) => ({
       ...prev,
       patient: { ...prev.patient, phone: formatted }
     }));
@@ -436,13 +439,13 @@ const AppointmentWizardV2 = ({
         const data = await response.json();
 
         // ✅ Формируем fio из отдельных полей, если его нет
-        const patientsWithFio = data.map(patient => {
+        const patientsWithFio = data.map((patient) => {
           if (!patient.fio && (patient.last_name || patient.first_name)) {
             const parts = [
-              patient.last_name || '',
-              patient.first_name || '',
-              patient.middle_name || ''
-            ].filter(p => p);
+            patient.last_name || '',
+            patient.first_name || '',
+            patient.middle_name || ''].
+            filter((p) => p);
             patient.fio = parts.join(' ').trim() || 'Без имени';
           } else if (!patient.fio) {
             patient.fio = 'Без имени';
@@ -487,7 +490,7 @@ const AppointmentWizardV2 = ({
   const handlePatientSearch = (value) => {
     // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
     // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее
-    setWizardData(prev => ({
+    setWizardData((prev) => ({
       ...prev,
       patient: {
         ...prev.patient,
@@ -508,17 +511,17 @@ const AppointmentWizardV2 = ({
     let patientFio = patient.fio;
     if (!patientFio && (patient.last_name || patient.first_name)) {
       const parts = [
-        patient.last_name || '',
-        patient.first_name || '',
-        patient.middle_name || ''
-      ].filter(p => p);
+      patient.last_name || '',
+      patient.first_name || '',
+      patient.middle_name || ''].
+      filter((p) => p);
       patientFio = parts.join(' ').trim() || 'Без имени';
     } else if (!patientFio) {
       patientFio = 'Без имени';
     }
 
     // Сохраняем данные пациента (без парсинга ФИО - backend сделает это при создании)
-    setWizardData(prev => ({
+    setWizardData((prev) => ({
       ...prev,
       patient: {
         id: patient.id,
@@ -543,7 +546,7 @@ const AppointmentWizardV2 = ({
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date));
     setShowSuggestions(false);
-    setErrors(prev => ({ ...prev, fio: null }));
+    setErrors((prev) => ({ ...prev, fio: null }));
   };
 
 
@@ -554,7 +557,7 @@ const AppointmentWizardV2 = ({
 
     // Конвертируем в ISO формат для сохранения
     const isoDate = convertDateToISO(formatted);
-    setWizardData(prev => ({
+    setWizardData((prev) => ({
       ...prev,
       patient: { ...prev.patient, birth_date: isoDate }
     }));
@@ -562,14 +565,7 @@ const AppointmentWizardV2 = ({
 
   // ===================== ЗАГРУЗКА ДАННЫХ =====================
 
-  useEffect(() => {
-    if (isOpen) {
-      loadServices();
-      loadDoctors();
-    }
-  }, [isOpen, activeTab]); // ✅ Обновляем услуги при смене вкладки
-
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/registrar/services`, {
         headers: {
@@ -583,7 +579,7 @@ const AppointmentWizardV2 = ({
         // Извлекаем все услуги из групп
         let allServices = [];
         if (data.services_by_group) {
-          Object.values(data.services_by_group).forEach(groupServices => {
+          Object.values(data.services_by_group).forEach((groupServices) => {
             if (Array.isArray(groupServices)) {
               allServices = allServices.concat(groupServices);
             }
@@ -594,20 +590,20 @@ const AppointmentWizardV2 = ({
         // Также показываем услуги без department_key (общие услуги)
 
 
-        if (activeTab && activeTab !== 'all') {
-          const beforeFilter = allServices.length;
-          allServices = allServices.filter(service =>
-            service.department_key === activeTab || !service.department_key
+        if (activeTab && activeTab !== 'all') {void
+          allServices.length;
+          allServices = allServices.filter((service) =>
+          service.department_key === activeTab || !service.department_key
           );
         }
 
         setServicesData(allServices);
-        filterServices(allServices, wizardData.cart.items);
+        setFilteredServices(allServices);
       }
     } catch (error) {
       logger.error('Ошибка загрузки услуг:', error);
     }
-  };
+  }, [activeTab]);
 
   // ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================
 
@@ -617,7 +613,7 @@ const AppointmentWizardV2 = ({
 
     // Приоритет 1: Если есть service_id, ищем в servicesData
     if (item.service_id) {
-      const service = servicesData.find(s => s.id === item.service_id);
+      const service = servicesData.find((s) => s.id === item.service_id);
       if (service?.name) return service.name;
     }
 
@@ -632,7 +628,7 @@ const AppointmentWizardV2 = ({
 
     if (serviceName && typeof serviceName === 'string' && serviceName.length > 3 && !/^[A-Z]\d+$/i.test(serviceName)) {
       // Если это не код (не формат "K01", "p09" и т.д.), а реальное название
-      const foundByName = servicesData.find(s => s.name === serviceName);
+      const foundByName = servicesData.find((s) => s.name === serviceName);
       if (foundByName) return foundByName.name;
     }
 
@@ -648,7 +644,7 @@ const AppointmentWizardV2 = ({
       const searchNameUpper = String(searchName).toUpperCase().trim();
       const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
 
-      const foundService = servicesData.find(s => {
+      const foundService = servicesData.find((s) => {
         if (!s.service_code) return false;
         const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
         const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
@@ -662,7 +658,7 @@ const AppointmentWizardV2 = ({
       if (foundService?.name) return foundService.name;
 
       // ✅ УЛУЧШЕНО: Поиск по частичному совпадению названия
-      const foundByNamePartial = servicesData.find(s => {
+      const foundByNamePartial = servicesData.find((s) => {
         if (!s.name) return false;
         const serviceNameLower = s.name.toLowerCase();
         const searchNameLower = String(searchName).toLowerCase();
@@ -675,19 +671,19 @@ const AppointmentWizardV2 = ({
     // Fallback: возвращаем service_name (если это название) или код
     // ⭐ FINAL DEFENSIVE: Убеждаемся, что возвращаем строку
     const fallback = serviceName || searchName || 'Неизвестная услуга';
-    return (typeof fallback === 'string') ? fallback : JSON.stringify(fallback);
+    return typeof fallback === 'string' ? fallback : JSON.stringify(fallback);
   }, [servicesData]);
 
   // Эффект для обогащения данных корзины реальными ID и ценами после загрузки servicesData
   useEffect(() => {
     // ✅ ИСПРАВЛЕНО: Разрешаем услуги не только в editMode, но и когда servicesData загружены
     if (servicesData.length > 0 && wizardData.cart.items.length > 0) {
-      const unresolvedCount = wizardData.cart.items.filter(i => !i.service_id).length;
+      const unresolvedCount = wizardData.cart.items.filter((i) => !i.service_id).length;
 
       // ✅ НОВОЕ: Проверяем также элементы с service_id, у которых имя не совпадает с SSOT
-      const hasNameMismatches = wizardData.cart.items.some(item => {
+      const hasNameMismatches = wizardData.cart.items.some((item) => {
         if (!item.service_id) return false;
-        const service = servicesData.find(s => s.id === item.service_id);
+        const service = servicesData.find((s) => s.id === item.service_id);
         return service && service.name && service.name !== item.service_name;
       });
 
@@ -700,14 +696,14 @@ const AppointmentWizardV2 = ({
         unresolvedItems: unresolvedCount
       });
 
-      const updatedItems = wizardData.cart.items.map(item => {
+      const updatedItems = wizardData.cart.items.map((item) => {
         // ✅ Сначала синхронизируем элементы, у которых уже есть service_id, с SSOT (servicesData)
         if (item.service_id) {
-          const service = servicesData.find(s => s.id === item.service_id);
+          const service = servicesData.find((s) => s.id === item.service_id);
 
           if (service) {
             const nextName = service.name || item.service_name;
-            const nextPrice = service.price != null ? service.price : (item.service_price || 0);
+            const nextPrice = service.price != null ? service.price : item.service_price || 0;
 
             // Если название или цена отличаются от SSOT — обновляем элемент
             if (nextName !== item.service_name || nextPrice !== item.service_price) {
@@ -742,7 +738,7 @@ const AppointmentWizardV2 = ({
         // Убираем ведущие нули для сравнения (p09 = p9)
         const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
 
-        const foundService = servicesData.find(s => {
+        const foundService = servicesData.find((s) => {
           if (!s.service_code) return false;
           const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
           const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
@@ -769,7 +765,7 @@ const AppointmentWizardV2 = ({
           };
         } else {
           // ✅ УЛУЧШЕНО: Пробуем найти по частичному совпадению названия
-          const foundByName = servicesData.find(s => {
+          const foundByName = servicesData.find((s) => {
             if (!s.name) return false;
             const serviceNameLower = s.name.toLowerCase();
             const searchNameLower = String(searchName).toLowerCase();
@@ -790,7 +786,7 @@ const AppointmentWizardV2 = ({
           }
 
           logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`,
-            servicesData.slice(0, 20).map(s => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter(s => s !== 'N/A: N/A'));
+          servicesData.slice(0, 20).map((s) => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter((s) => s !== 'N/A: N/A'));
         }
 
         return item;
@@ -800,8 +796,8 @@ const AppointmentWizardV2 = ({
       const hasChanges = updatedItems.some((item, index) => {
         const prevItem = wizardData.cart.items[index];
         return item.service_id !== prevItem.service_id ||
-          item.service_price !== prevItem.service_price ||
-          item.service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
+        item.service_price !== prevItem.service_price ||
+        item.service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
       });
 
       if (hasChanges) {
@@ -812,10 +808,10 @@ const AppointmentWizardV2 = ({
           return item.service_id !== prevItem.service_id;
         });
         if (resolved.length > 0) {
-          logger.log('📋 Resolved services:', resolved.map(item => `${item._temp_name || item.service_name} -> ${item.service_name} (ID: ${item.service_id})`));
+          logger.log('📋 Resolved services:', resolved.map((item) => `${item._temp_name || item.service_name} -> ${item.service_name} (ID: ${item.service_id})`));
         }
 
-        setWizardData(prev => ({
+        setWizardData((prev) => ({
           ...prev,
           cart: {
             ...prev.cart,
@@ -826,7 +822,7 @@ const AppointmentWizardV2 = ({
     }
   }, [servicesData, wizardData.cart.items]); // ✅ ИСПРАВЛЕНО: Триггерим при изменении servicesData или корзины
 
-  const loadDoctors = async () => {
+  const loadDoctors = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/registrar/doctors`, {
         headers: {
@@ -841,10 +837,17 @@ const AppointmentWizardV2 = ({
     } catch (error) {
       logger.error('Ошибка загрузки врачей:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadServices();
+      loadDoctors();
+    }
+  }, [isOpen, loadServices, loadDoctors]); // ✅ Обновляем услуги при смене вкладки
 
   // 🔧 УПРОЩЕННАЯ ФИЛЬТРАЦИЯ: Показываем все услуги без привязки к врачам
-  const filterServices = (allServices, cartItems) => {
+  const filterServices = (allServices) => {
 
     // Если нет услуг, показываем пустой массив
     if (!Array.isArray(allServices) || allServices.length === 0) {
@@ -857,21 +860,21 @@ const AppointmentWizardV2 = ({
     setFilteredServices(allServices);
   };
 
-  const getDoctorCategoryCode = (specialty) => {
-    const mapping = {
-      'Кардиолог': 'K',
-      'Стоматолог': 'D',
-      'Дерматолог': 'C',
-      'Дерматолог-косметолог': 'C'
-    };
-    return mapping[specialty] || 'O';
-  };
+
+
+
+
+
+
+
+
+
 
   // ===================== КОРЗИНА =====================
 
   const addToCart = (service) => {
     // ✅ SSOT: Всегда используем данные из servicesData
-    const serviceFromData = servicesData.find(s => s.id === service.id) || service;
+    const serviceFromData = servicesData.find((s) => s.id === service.id) || service;
 
     const newItem = {
       id: Date.now(), // Временный ID для React keys
@@ -891,7 +894,7 @@ const AppointmentWizardV2 = ({
       visit_time: null
     };
 
-    setWizardData(prev => ({
+    setWizardData((prev) => ({
       ...prev,
       cart: {
         ...prev.cart,
@@ -904,8 +907,8 @@ const AppointmentWizardV2 = ({
   };
 
   const removeFromCart = (itemId) => {
-    const newItems = wizardData.cart.items.filter(item => item.id !== itemId);
-    setWizardData(prev => ({
+    const newItems = wizardData.cart.items.filter((item) => item.id !== itemId);
+    setWizardData((prev) => ({
       ...prev,
       cart: {
         ...prev.cart,
@@ -917,11 +920,11 @@ const AppointmentWizardV2 = ({
   };
 
   const updateCartItem = (itemId, field, value) => {
-    const newItems = wizardData.cart.items.map(item =>
-      item.id === itemId ? { ...item, [field]: value } : item
+    const newItems = wizardData.cart.items.map((item) =>
+    item.id === itemId ? { ...item, [field]: value } : item
     );
 
-    setWizardData(prev => ({
+    setWizardData((prev) => ({
       ...prev,
       cart: {
         ...prev.cart,
@@ -935,11 +938,11 @@ const AppointmentWizardV2 = ({
   const calculateTotal = () => {
     let total = 0;
 
-    wizardData.cart.items.forEach(item => {
+    wizardData.cart.items.forEach((item) => {
       let itemPrice = item.service_price * item.quantity;
 
       // Применяем скидки
-      const service = servicesData.find(s => s.id === item.service_id);
+      const service = servicesData.find((s) => s.id === item.service_id);
       if (service) {
         if (wizardData.cart.discount_mode === 'repeat' && service.is_consultation) {
           itemPrice = 0; // Повторная консультация бесплатна
@@ -970,7 +973,7 @@ const AppointmentWizardV2 = ({
       if (wizardData.patient.phone.trim() && !/^\+?[\d\s\-()]+$/.test(wizardData.patient.phone.trim())) {
         newErrors.phone = 'Неверный формат телефона';
       }
-      if (!wizardData.patient.gender) { // ✅ Валидация пола
+      if (!wizardData.patient.gender) {// ✅ Валидация пола
         newErrors.gender = 'Выберите пол';
       }
       // Валидация даты рождения
@@ -981,9 +984,9 @@ const AppointmentWizardV2 = ({
         const yearNum = parseInt(year);
 
         if (!day || !month || !year ||
-          dayNum < 1 || dayNum > 31 ||
-          monthNum < 1 || monthNum > 12 ||
-          yearNum < 1900 || yearNum > new Date().getFullYear()) {
+        dayNum < 1 || dayNum > 31 ||
+        monthNum < 1 || monthNum > 12 ||
+        yearNum < 1900 || yearNum > new Date().getFullYear()) {
           newErrors.birth_date = 'Введите корректную дату рождения (ДД.ММ.ГГГГ)';
         }
       }
@@ -992,8 +995,8 @@ const AppointmentWizardV2 = ({
         newErrors.cart = 'Добавьте хотя бы одну услугу';
       }
       // Проверяем, что для услуг, требующих врача, врач выбран
-      const missingDoctors = wizardData.cart.items.filter(item => {
-        const service = servicesData.find(s => s.id === item.service_id);
+      const missingDoctors = wizardData.cart.items.filter((item) => {
+        const service = servicesData.find((s) => s.id === item.service_id);
         return service?.requires_doctor && !item.doctor_id;
       });
       if (missingDoctors.length > 0) {
@@ -1008,19 +1011,20 @@ const AppointmentWizardV2 = ({
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+      setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
     }
   };
+  nextStepRef.current = nextStep;
 
   const prevStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const goToStep = (step) => {
-    if (step <= currentStep || validateStep(currentStep)) {
-      setCurrentStep(step);
-    }
-  };
+
+
+
+
+
 
   // ===================== ГОРЯЧИЕ КЛАВИШИ =====================
 
@@ -1032,16 +1036,16 @@ const AppointmentWizardV2 = ({
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
         if (currentStep < totalSteps) {
-          nextStep();
+          nextStepRef.current();
         } else {
-          handleComplete();
+          handleCompleteRef.current();
         }
       }
 
       // Ctrl+Enter - завершить
       if (e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
-        handleComplete();
+        handleCompleteRef.current();
       }
 
       // Shift+Enter в textarea - перенос строки (по умолчанию)
@@ -1049,7 +1053,7 @@ const AppointmentWizardV2 = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentStep]);
+  }, [isOpen, currentStep, totalSteps]);
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
@@ -1093,7 +1097,7 @@ const AppointmentWizardV2 = ({
       }
 
       // Проверяем, что все элементы корзины имеют service_id
-      const itemsWithoutServiceId = wizardData.cart.items.filter(item => !item.service_id);
+      const itemsWithoutServiceId = wizardData.cart.items.filter((item) => !item.service_id);
       if (itemsWithoutServiceId.length > 0) {
         logger.error('❌ Найдены элементы корзины без service_id:', itemsWithoutServiceId);
         toast.error('Некоторые услуги не могут быть обработаны. Пожалуйста, удалите их из корзины и добавьте заново.');
@@ -1108,10 +1112,10 @@ const AppointmentWizardV2 = ({
       }
 
       // Проверяем, что все визиты имеют хотя бы одну услугу с service_id
-      const invalidVisits = visits.filter(visit =>
-        !visit.services ||
-        visit.services.length === 0 ||
-        visit.services.some(s => !s.service_id)
+      const invalidVisits = visits.filter((visit) =>
+      !visit.services ||
+      visit.services.length === 0 ||
+      visit.services.some((s) => !s.service_id)
       );
 
       if (invalidVisits.length > 0) {
@@ -1151,7 +1155,7 @@ const AppointmentWizardV2 = ({
           logger.log('📋 Found patients (by phone):', patients.length);
         }
 
-        let foundPatient = patients.find(p => (p.phone || '').replace(/\D/g, '') === cleanPhone);
+        let foundPatient = patients.find((p) => (p.phone || '').replace(/\D/g, '') === cleanPhone);
 
         // Попытка 2: Если не нашли, пробуем по очищенному номеру
         if (!foundPatient && cleanPhone.length >= 9) {
@@ -1165,14 +1169,14 @@ const AppointmentWizardV2 = ({
 
           if (searchResponse.ok) {
             patients = await searchResponse.json();
-            foundPatient = patients.find(p => (p.phone || '').replace(/\D/g, '') === cleanPhone);
+            foundPatient = patients.find((p) => (p.phone || '').replace(/\D/g, '') === cleanPhone);
           }
         }
 
         if (foundPatient) {
           // Обновляем локальный patientId и wizardData
           patientId = foundPatient.id;
-          setWizardData(prev => ({
+          setWizardData((prev) => ({
             ...prev,
             patient: { ...prev.patient, id: foundPatient.id }
           }));
@@ -1180,9 +1184,9 @@ const AppointmentWizardV2 = ({
 
           // Обновляем данные пациента если нужно
           const needsUpdate =
-            (wizardData.patient.birth_date && wizardData.patient.birth_date !== foundPatient.birth_date) ||
-            (wizardData.patient.address && wizardData.patient.address !== foundPatient.address) ||
-            (wizardData.patient.gender && wizardData.patient.gender !== foundPatient.sex);
+          wizardData.patient.birth_date && wizardData.patient.birth_date !== foundPatient.birth_date ||
+          wizardData.patient.address && wizardData.patient.address !== foundPatient.address ||
+          wizardData.patient.gender && wizardData.patient.gender !== foundPatient.sex;
 
           if (needsUpdate) {
             logger.log('🔄 Updating patient data...');
@@ -1241,7 +1245,7 @@ const AppointmentWizardV2 = ({
           if (createResponse.ok) {
             const newPatient = await createResponse.json();
             patientId = newPatient.id;
-            setWizardData(prev => ({
+            setWizardData((prev) => ({
               ...prev,
               patient: { ...prev.patient, id: newPatient.id }
             }));
@@ -1297,7 +1301,7 @@ const AppointmentWizardV2 = ({
           const patient = await patientResponse.json();
           // Обновляем локальный patientId и wizardData с созданным patient_id
           patientId = patient.id;
-          setWizardData(prev => ({
+          setWizardData((prev) => ({
             ...prev,
             patient: { ...prev.patient, id: patient.id }
           }));
@@ -1309,7 +1313,7 @@ const AppointmentWizardV2 = ({
             const errorData = await patientResponse.json();
             errorDetail = errorData.detail || errorDetail;
             logger.log('⚠️ Ошибка 400 при создании пациента:', errorDetail);
-          } catch (e) {
+          } catch {
             const errorText = await patientResponse.text();
             logger.log('⚠️ Текст ошибки создания пациента:', errorText);
             errorDetail = errorText || errorDetail;
@@ -1332,12 +1336,12 @@ const AppointmentWizardV2 = ({
             if (searchResponse.ok) {
               const patients = await searchResponse.json();
               // Ищем точное совпадение по очищенному номеру
-              const foundPatient = patients.find(p => (p.phone || '').replace(/\D/g, '') === cleanPhone);
+              const foundPatient = patients.find((p) => (p.phone || '').replace(/\D/g, '') === cleanPhone);
 
               if (foundPatient) {
                 // Обновляем локальный patientId и wizardData с найденным patient_id
                 patientId = foundPatient.id;
-                setWizardData(prev => ({
+                setWizardData((prev) => ({
                   ...prev,
                   patient: { ...prev.patient, id: foundPatient.id }
                 }));
@@ -1374,21 +1378,21 @@ const AppointmentWizardV2 = ({
       // Расширено для поддержки всех типов записей: online, desk, visit, appointment
       // ✅ ИСПРАВЛЕНО Bug 1: Добавлены явные скобки для правильного приоритета операторов
       const hasQueueEntries = editMode && initialData && (
-        (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) ||
-        initialData.source === 'online' ||
-        initialData.source === 'desk' ||
-        initialData.record_type === 'online_queue' ||
-        initialData.record_type === 'visit' ||
-        initialData.record_type === 'appointment'
-      );
+      Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0 ||
+      initialData.source === 'online' ||
+      initialData.source === 'desk' ||
+      initialData.record_type === 'online_queue' ||
+      initialData.record_type === 'visit' ||
+      initialData.record_type === 'appointment');
+
 
       const originalServiceIds = new Set();
       const originalQueueIds = new Set(); // ✅ Moved here for availability in handleComplete
 
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
-        const effectiveSource = initialData.source ||
-          (initialData.record_type === 'visit' || initialData.record_type === 'appointment' ? 'desk' : 'online');
+        const effectiveSource = initialData.source || (
+        initialData.record_type === 'visit' || initialData.record_type === 'appointment' ? 'desk' : 'online');
 
         // ✅ Сценарий 3: Редактирование записи в очереди (QR или desk) с добавлением новых услуг
         const recordType = effectiveSource === 'online' ? 'QR-запись' : 'ручная запись';
@@ -1397,7 +1401,7 @@ const AppointmentWizardV2 = ({
           effectiveSource,
           record_type: initialData.record_type,
           queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length :
-            (initialData.queue_numbers ? 1 : 0),
+          initialData.queue_numbers ? 1 : 0,
           service_codes: Array.isArray(initialData.service_codes) ? initialData.service_codes.length : 0,
           services: Array.isArray(initialData.services) ? initialData.services.length : 0
         });
@@ -1415,21 +1419,21 @@ const AppointmentWizardV2 = ({
             const patientData = {
               patient_name: wizardData.patient.fio || wizardData.patient.name,
               phone: wizardData.patient.phone,
-              birth_year: wizardData.patient.birth_date
-                ? parseInt(wizardData.patient.birth_date.split('-')[0])
-                : null,
+              birth_year: wizardData.patient.birth_date ?
+              parseInt(wizardData.patient.birth_date.split('-')[0]) :
+              null,
               address: wizardData.patient.address || null
             };
 
             // Подготавливаем услуги из корзины
-            const cartServices = wizardData.cart.items.map(item => ({
+            const cartServices = wizardData.cart.items.map((item) => ({
               service_id: item.service_id,
               quantity: item.quantity || 1
-            })).filter(s => s.service_id);
+            })).filter((s) => s.service_id);
 
             // Определяем visit_type и discount_mode
             const visitType = wizardData.cart.discount_mode === 'repeat' ? 'repeat' :
-              wizardData.cart.discount_mode === 'benefit' ? 'benefit' : 'paid';
+            wizardData.cart.discount_mode === 'benefit' ? 'benefit' : 'paid';
             const discountMode = wizardData.cart.discount_mode || 'none';
             const allFree = discountMode === 'all_free';
 
@@ -1437,7 +1441,7 @@ const AppointmentWizardV2 = ({
 
             // ⭐ FIX: Собираем все ID из объединённой строки для проверки дубликатов
             const aggregatedIds = initialData.aggregated_ids ||
-              (initialData.queue_numbers || []).map(qn => qn.id).filter(Boolean);
+            (initialData.queue_numbers || []).map((qn) => qn.id).filter(Boolean);
 
             const updateResult = await updateOnlineQueueEntry({
               entryId: queueEntryId,
@@ -1446,7 +1450,7 @@ const AppointmentWizardV2 = ({
               discountMode,
               services: cartServices,
               allFree,
-              aggregatedIds  // ⭐ FIX: Передаём все ID для проверки дубликатов
+              aggregatedIds // ⭐ FIX: Передаём все ID для проверки дубликатов
             });
 
             logger.log('✅ QR-запись успешно обновлена:', updateResult);
@@ -1477,12 +1481,12 @@ const AppointmentWizardV2 = ({
         // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
         if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
           logger.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
-          initialData.service_codes.forEach(code => {
+          initialData.service_codes.forEach((code) => {
             if (code) {
               const normalizedCode = code.toUpperCase().trim();
               originalServiceCodes.add(normalizedCode);
               // Находим service_id по service_code
-              const service = servicesData.find(s => {
+              const service = servicesData.find((s) => {
                 if (!s.service_code) return false;
                 const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
                 const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
@@ -1504,13 +1508,13 @@ const AppointmentWizardV2 = ({
         // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
         if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
           logger.log('📋 service_codes пуст, используем services как коды:', initialData.services);
-          initialData.services.forEach(serviceValue => {
+          initialData.services.forEach((serviceValue) => {
             if (serviceValue) {
               const normalizedValue = serviceValue.toUpperCase().trim();
 
               // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
               // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
-              let service = servicesData.find(s => {
+              let service = servicesData.find((s) => {
                 if (!s.service_code) return false;
                 const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
                 // Убираем ведущие нули для сравнения (k01 = k1)
@@ -1532,8 +1536,8 @@ const AppointmentWizardV2 = ({
               // Если не нашли по коду, пробуем по имени (fallback)
               if (!service) {
                 const normalizedName = serviceValue.toLowerCase().trim();
-                service = servicesData.find(s =>
-                  s.name && s.name.toLowerCase().trim() === normalizedName
+                service = servicesData.find((s) =>
+                s.name && s.name.toLowerCase().trim() === normalizedName
                 );
               }
 
@@ -1546,11 +1550,11 @@ const AppointmentWizardV2 = ({
                 logger.log(`  ✅ Найден service_id=${service.id} для "${serviceValue}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
               } else {
                 // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
-                const exampleCodes = servicesData
-                  .filter(s => s.service_code)
-                  .slice(0, 10)
-                  .map(s => `${s.service_code}: ${s.name}`)
-                  .join(', ');
+                const exampleCodes = servicesData.
+                filter((s) => s.service_code).
+                slice(0, 10).
+                map((s) => `${s.service_code}: ${s.name}`).
+                join(', ');
                 logger.warn(`  ⚠️ Услуга "${serviceValue}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
               }
             }
@@ -1560,12 +1564,12 @@ const AppointmentWizardV2 = ({
         // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
         if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
           logger.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
-          initialData.queue_numbers.forEach(q => {
+          initialData.queue_numbers.forEach((q) => {
             if (q && q.service_id) {
               originalServiceIds.add(q.service_id);
               if (q.id) originalQueueIds.add(q.id); // ✅ Сохраняем ID записи очереди
               // Находим service_code и name по service_id
-              const service = servicesData.find(s => s.id === q.service_id);
+              const service = servicesData.find((s) => s.id === q.service_id);
               if (service) {
                 if (service.service_code) {
                   originalServiceCodes.add(service.service_code.toUpperCase().trim());
@@ -1576,8 +1580,8 @@ const AppointmentWizardV2 = ({
             if (q && q.service_code) {
               const normalizedCode = q.service_code.toUpperCase().trim();
               originalServiceCodes.add(normalizedCode);
-              const service = servicesData.find(s =>
-                s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
+              const service = servicesData.find((s) =>
+              s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
               );
               if (service) {
                 originalServiceIds.add(service.id);
@@ -1587,8 +1591,8 @@ const AppointmentWizardV2 = ({
             if (q && q.service_name) {
               const normalizedName = q.service_name.toLowerCase().trim();
               originalServiceNames.add(normalizedName);
-              const service = servicesData.find(s =>
-                s.name && s.name.toLowerCase().trim() === normalizedName
+              const service = servicesData.find((s) =>
+              s.name && s.name.toLowerCase().trim() === normalizedName
               );
               if (service) {
                 originalServiceIds.add(service.id);
@@ -1603,13 +1607,13 @@ const AppointmentWizardV2 = ({
         // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
         if (Array.isArray(initialData.services) && initialData.services.length > 0) {
           logger.log('📋 Извлечение услуг из services:', initialData.services);
-          initialData.services.forEach(serviceValue => {
+          initialData.services.forEach((serviceValue) => {
             if (serviceValue) {
               const normalizedValue = serviceValue.toUpperCase().trim();
               const normalizedName = serviceValue.toLowerCase().trim();
 
               // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
-              let service = servicesData.find(s => {
+              let service = servicesData.find((s) => {
                 if (!s.service_code) return false;
                 const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
                 // Убираем ведущие нули для сравнения (k01 = k1)
@@ -1620,8 +1624,8 @@ const AppointmentWizardV2 = ({
 
               // Если не нашли по коду, пробуем по имени
               if (!service) {
-                service = servicesData.find(s =>
-                  s.name && s.name.toLowerCase().trim() === normalizedName
+                service = servicesData.find((s) =>
+                s.name && s.name.toLowerCase().trim() === normalizedName
                 );
               }
 
@@ -1654,7 +1658,7 @@ const AppointmentWizardV2 = ({
         for (const visit of visits) {
           logger.log(`🔍 Проверка визита: doctor_id=${visit.doctor_id}, services count=${visit.services.length}`);
           for (const serviceItem of visit.services) {
-            const service = servicesData.find(s => s.id === serviceItem.service_id);
+            const service = servicesData.find((s) => s.id === serviceItem.service_id);
             if (!service) {
               logger.warn('⚠️ Услуга не найдена в servicesData:', serviceItem.service_id);
               continue;
@@ -1662,8 +1666,8 @@ const AppointmentWizardV2 = ({
 
             // Проверяем, является ли услуга новой
             const isNewService = !originalServiceIds.has(serviceItem.service_id) &&
-              !originalServiceCodes.has((service.service_code || '').toUpperCase().trim()) &&
-              !originalServiceNames.has((service.name || '').toLowerCase().trim());
+            !originalServiceCodes.has((service.service_code || '').toUpperCase().trim()) &&
+            !originalServiceNames.has((service.name || '').toLowerCase().trim());
 
             logger.log(`  🔍 Услуга "${service.name}" (ID: ${serviceItem.service_id}, код: ${service.service_code}):`, {
               isNewService,
@@ -1737,14 +1741,14 @@ const AppointmentWizardV2 = ({
           const conversionResults = await Promise.all(conversionPromises);
 
           // Добавляем успешно конвертированные услуги
-          conversionResults.forEach(result => {
+          conversionResults.forEach((result) => {
             if (result.success && result.service) {
               newServices.push(result.service);
             }
           });
 
           // ✅ ИСПРАВЛЕНО Bug 1: Добавляем услуги с ошибкой конвертации в newServicesWithoutDoctor для fallback
-          conversionResults.forEach(result => {
+          conversionResults.forEach((result) => {
             if (!result.success && result.failedItem) {
               newServicesWithoutDoctor.push(result.failedItem);
               logger.log(`📋 Услуга service_id=${result.failedItem.service_id} добавлена в fallback для cart endpoint`);
@@ -1762,7 +1766,7 @@ const AppointmentWizardV2 = ({
           });
 
           // Фильтруем услуги, которые требуют специалиста (имеют specialist_id)
-          const servicesWithSpecialist = newServices.filter(s => s.specialist_id);
+          const servicesWithSpecialist = newServices.filter((s) => s.specialist_id);
 
           if (servicesWithSpecialist.length > 0) {
             // Используем batch endpoint для добавления новых услуг с специалистами
@@ -1792,7 +1796,7 @@ const AppointmentWizardV2 = ({
 
                 // Если нужно обновить личные данные пациента, вызываем cart endpoint с существующими услугами
                 // Иначе просто завершаем
-                if (existingServices.length > 0 || Object.keys(wizardData.patient).some(key => {
+                if (existingServices.length > 0 || Object.keys(wizardData.patient).some((key) => {
                   const initialValue = initialData[`patient_${key}`] || initialData[key];
                   const currentValue = wizardData.patient[key];
                   return initialValue !== currentValue;
@@ -1811,23 +1815,23 @@ const AppointmentWizardV2 = ({
                   // ✅ НОВОЕ: Обработка удаленных записей очереди
                   // Находим записи, которых больше нет в корзине
                   const currentQueueIds = new Set(
-                    wizardData.cart.items
-                      .map(item => item.original_queue_id)
-                      .filter(id => id)
+                    wizardData.cart.items.
+                    map((item) => item.original_queue_id).
+                    filter((id) => id)
                   );
 
-                  const removedQueueIds = Array.from(originalQueueIds).filter(id => !currentQueueIds.has(id));
+                  const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
                   if (removedQueueIds.length > 0) {
                     logger.log(`🗑️ Найдены удаленные записи очереди: ${removedQueueIds.join(', ')}. Отменяем их...`);
                     try {
                       // Параллельная отмена всех удаленных записей
-                      await Promise.all(removedQueueIds.map(id =>
-                        api.post(`/online-queue/entries/${id}/cancel`)
-                          .catch(err => {
-                            logger.error(`❌ Ошибка отмены записи очереди ${id}:`, err);
-                            // Не прерываем процесс, если одна отмена не удалась
-                          })
+                      await Promise.all(removedQueueIds.map((id) =>
+                      api.post(`/online-queue/entries/${id}/cancel`).
+                      catch((err) => {
+                        logger.error(`❌ Ошибка отмены записи очереди ${id}:`, err);
+                        // Не прерываем процесс, если одна отмена не удалась
+                      })
                       ));
                       logger.log('✅ Все удаленные записи очереди успешно отменены');
                     } catch (error) {
@@ -1863,7 +1867,7 @@ const AppointmentWizardV2 = ({
 
               // Группируем только новые услуги по визитам
               const newServiceVisits = {};
-              newServicesWithoutDoctor.forEach(item => {
+              newServicesWithoutDoctor.forEach((item) => {
                 const department = getDepartmentByService(item.service_id);
                 const key = `${department}_no_doctor_${new Date().toISOString().split('T')[0]}_no_time`;
 
@@ -1918,8 +1922,8 @@ const AppointmentWizardV2 = ({
         };
 
         // Удаляем undefined значения
-        Object.keys(patientUpdateData).forEach(key =>
-          patientUpdateData[key] === undefined && delete patientUpdateData[key]
+        Object.keys(patientUpdateData).forEach((key) =>
+        patientUpdateData[key] === undefined && delete patientUpdateData[key]
         );
 
         try {
@@ -1941,18 +1945,18 @@ const AppointmentWizardV2 = ({
 
             // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
             const currentQueueIds = new Set(
-              wizardData.cart.items
-                .map(item => item.original_queue_id)
-                .filter(id => id)
+              wizardData.cart.items.
+              map((item) => item.original_queue_id).
+              filter((id) => id)
             );
 
-            const removedQueueIds = Array.from(originalQueueIds).filter(id => !currentQueueIds.has(id));
+            const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
             if (removedQueueIds.length > 0) {
               logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
               // Non-blocking cleanup
-              Promise.all(removedQueueIds.map(id => api.post(`/online-queue/entries/${id}/cancel`)))
-                .catch(e => logger.error('❌ Ошибка отмены записей:', e));
+              Promise.all(removedQueueIds.map((id) => api.post(`/online-queue/entries/${id}/cancel`))).
+              catch((e) => logger.error('❌ Ошибка отмены записей:', e));
             }
 
             onComplete?.({ success: true, message: 'Данные пациента обновлены' });
@@ -2018,18 +2022,18 @@ const AppointmentWizardV2 = ({
 
         // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
         const currentQueueIds = new Set(
-          wizardData.cart.items
-            .map(item => item.original_queue_id)
-            .filter(id => id)
+          wizardData.cart.items.
+          map((item) => item.original_queue_id).
+          filter((id) => id)
         );
 
-        const removedQueueIds = Array.from(originalQueueIds).filter(id => !currentQueueIds.has(id));
+        const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
         if (removedQueueIds.length > 0) {
           logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
           // Non-blocking cleanup
-          Promise.all(removedQueueIds.map(id => api.post(`/online-queue/entries/${id}/cancel`)))
-            .catch(e => logger.error('❌ Ошибка отмены записей:', e));
+          Promise.all(removedQueueIds.map((id) => api.post(`/online-queue/entries/${id}/cancel`))).
+          catch((e) => logger.error('❌ Ошибка отмены записей:', e));
         }
 
         onComplete?.(result);
@@ -2051,7 +2055,7 @@ const AppointmentWizardV2 = ({
               errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
             }
           }
-        } catch (parseError) {
+        } catch {
           logger.error('❌ Не удалось прочитать ошибку как JSON');
 
           if (cartResponse.status === 403) {
@@ -2081,13 +2085,14 @@ const AppointmentWizardV2 = ({
       setIsProcessing(false);
     }
   };
+  handleCompleteRef.current = handleComplete;
 
   // Группировка элементов корзины по визитам
   const groupCartItemsByVisit = () => {
     const visits = {};
 
     // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
-    const validItems = wizardData.cart.items.filter(item => {
+    const validItems = wizardData.cart.items.filter((item) => {
       if (!item.service_id) {
         logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
         return false;
@@ -2100,7 +2105,7 @@ const AppointmentWizardV2 = ({
       return {};
     }
 
-    validItems.forEach(item => {
+    validItems.forEach((item) => {
       // Определяем отделение для услуги
       const department = getDepartmentByService(item.service_id);
 
@@ -2141,7 +2146,7 @@ const AppointmentWizardV2 = ({
       return 'general';
     }
 
-    const service = servicesData.find(s => s.id === serviceId);
+    const service = servicesData.find((s) => s.id === serviceId);
 
     if (!service) {
       logger.warn(`⚠️ Услуга ${serviceId} не найдена в servicesData`);
@@ -2153,19 +2158,19 @@ const AppointmentWizardV2 = ({
     // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
     if (service.queue_tag === 'ecg') {
       logger.log('✅ ЭКГ обнаружено! Возвращаем department=\'echokg\'');
-      return 'echokg';  // ЭКГ в отдельном кабинете (соответствует вкладке 'echokg')
+      return 'echokg'; // ЭКГ в отдельном кабинете (соответствует вкладке 'echokg')
     }
 
     // ✅ ИСПРАВЛЕННЫЙ МАППИНГ - соответствует вкладкам RegistrarPanel
     const mapping = {
-      'K': 'cardiology',    // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
-      'D': 'dermatology',   // Дерматология → вкладка derma (только консультации)
-      'S': 'dentistry',     // Стоматология → вкладка dental
-      'L': 'laboratory',    // Лаборатория → вкладка lab
-      'P': 'procedures',    // Физиотерапия → вкладка procedures
-      'C': 'procedures',    // Косметология → вкладка procedures
+      'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
+      'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
+      'S': 'dentistry', // Стоматология → вкладка dental
+      'L': 'laboratory', // Лаборатория → вкладка lab
+      'P': 'procedures', // Физиотерапия → вкладка procedures
+      'C': 'procedures', // Косметология → вкладка procedures
       'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
-      'O': 'procedures'     // Прочие процедуры → вкладка procedures
+      'O': 'procedures' // Прочие процедуры → вкладка procedures
     };
 
     // ✅ ИСПРАВЛЕНО Bug 2: Сначала проверяем оригинальный category_code для точного маппинга
@@ -2181,10 +2186,10 @@ const AppointmentWizardV2 = ({
 
     // ✅ ИСПРАВЛЕНИЕ: Маппинг для нормализованных кодов (только для случаев, когда нет прямого маппинга)
     const normalizedMapping = {
-      'specialists': 'cardiology',    // Консультации специалистов (только если не 'D' или 'S') -> cardiology
-      'laboratory': 'lab',            // ✅ ИСПРАВЛЕНИЕ: Лаборатория -> lab (для соответствия вкладке)
-      'procedures': 'procedures',     // Процедуры -> procedures
-      'other': 'general'              // Прочее -> general
+      'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
+      'laboratory': 'lab', // ✅ ИСПРАВЛЕНИЕ: Лаборатория -> lab (для соответствия вкладке)
+      'procedures': 'procedures', // Процедуры -> procedures
+      'other': 'general' // Прочее -> general
     };
 
     const result = normalizedMapping[normalizedCategoryCode] || mapping[service.category_code] || 'general';
@@ -2195,29 +2200,29 @@ const AppointmentWizardV2 = ({
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
 
   const actions = [
-    {
-      label: 'Очистить черновик',
-      onClick: clearDraft,
-      variant: 'secondary',
-      icon: <Trash2 size={16} />,
-      disabled: isProcessing
-    },
-    currentStep > 1 && {
-      label: 'Назад',
-      onClick: prevStep,
-      variant: 'secondary',
-      icon: <ArrowLeft size={16} />,
-      disabled: isProcessing
-    },
-    {
-      label: currentStep === totalSteps ? 'Завершить' : 'Далее',
-      onClick: currentStep === totalSteps ? handleComplete : nextStep,
-      variant: 'primary',
-      icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
-      disabled: isProcessing,
-      loading: isProcessing
-    }
-  ].filter(Boolean);
+  {
+    label: 'Очистить черновик',
+    onClick: clearDraft,
+    variant: 'secondary',
+    icon: <Trash2 size={16} />,
+    disabled: isProcessing
+  },
+  currentStep > 1 && {
+    label: 'Назад',
+    onClick: prevStep,
+    variant: 'secondary',
+    icon: <ArrowLeft size={16} />,
+    disabled: isProcessing
+  },
+  {
+    label: currentStep === totalSteps ? 'Завершить' : 'Далее',
+    onClick: currentStep === totalSteps ? handleComplete : nextStep,
+    variant: 'primary',
+    icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
+    disabled: isProcessing,
+    loading: isProcessing
+  }].
+  filter(Boolean);
 
   // ===================== ОБРАБОТЧИКИ ОНЛАЙН ОПЛАТЫ УБРАНЫ =====================
 
@@ -2236,214 +2241,214 @@ const AppointmentWizardV2 = ({
   };
 
   // Кастомный заголовок для Шага 1
-  const Step1Header = (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      padding: '4px 32px 12px 32px',
-      borderBottom: '1px solid var(--mac-border)'
-    }}>
+  const Step1Header =
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: '4px 32px 12px 32px',
+    borderBottom: '1px solid var(--mac-border)'
+  }}>
       {/* Заголовок */}
       <h3 style={{
-        fontSize: '17px',
-        fontWeight: '600',
-        color: 'var(--mac-text-primary)',
-        margin: 0,
-        letterSpacing: '-0.02em'
-      }}>
+      fontSize: '17px',
+      fontWeight: '600',
+      color: 'var(--mac-text-primary)',
+      margin: 0,
+      letterSpacing: '-0.02em'
+    }}>
         Регистрация пациента
       </h3>
 
       {/* Кнопка закрытия */}
       <button
-        onClick={onClose}
-        title="Закрыть"
-        style={{
-          width: '32px',
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: 'none',
-          background: 'transparent',
-          color: 'var(--mac-text-secondary)',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          transition: 'all 0.2s'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--mac-danger)';
-          e.currentTarget.style.color = 'white';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
-          e.currentTarget.style.color = 'var(--mac-text-secondary)';
-        }}
-      >
+      onClick={onClose}
+      title="Закрыть"
+      style={{
+        width: '32px',
+        height: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: 'none',
+        background: 'transparent',
+        color: 'var(--mac-text-secondary)',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        transition: 'all 0.2s'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--mac-danger)';
+        e.currentTarget.style.color = 'white';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent';
+        e.currentTarget.style.color = 'var(--mac-text-secondary)';
+      }}>
+
         <X size={18} />
       </button>
-    </div>
-  );
+    </div>;
+
 
   // Улучшенный заголовок для Шага 2
-  const Step2Header = (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      width: '100%',
-      gap: '20px',
-      padding: '8px 32px 12px 32px',
-      borderBottom: '1px solid var(--mac-border)'
-    }}>
+  const Step2Header =
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    gap: '20px',
+    padding: '8px 32px 12px 32px',
+    borderBottom: '1px solid var(--mac-border)'
+  }}>
       {/* 1. Поиск (Слева) */}
       <div style={{ flex: '0 0 280px' }}>
         <MacOSInput
-          placeholder="Поиск услуги (название или код)..."
-          value={serviceSearchQuery}
-          onChange={(e) => setServiceSearchQuery(e.target.value)}
-          icon={Search}
-          clearable
-          onClear={() => setServiceSearchQuery('')}
-          autoFocus
-          size="sm"
-          style={{ height: '36px', fontSize: '13px' }}
-        />
+        placeholder="Поиск услуги (название или код)..."
+        value={serviceSearchQuery}
+        onChange={(e) => setServiceSearchQuery(e.target.value)}
+        icon={Search}
+        clearable
+        onClear={() => setServiceSearchQuery('')}
+        autoFocus
+        size="sm"
+        style={{ height: '36px', fontSize: '13px' }} />
+
       </div>
 
       {/* 2. Категории (Центр) */}
       <div style={{
-        flex: 1,
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '12px',
-        padding: '0 12px'
-      }}>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveServiceCategory(cat.id)}
-            style={{
-              padding: '7px 16px',
-              borderRadius: 'var(--mac-radius-full)',
-              border: activeServiceCategory === cat.id
-                ? '1px solid var(--mac-primary)'
-                : '1px solid transparent',
-              background: activeServiceCategory === cat.id
-                ? 'linear-gradient(135deg, var(--mac-primary) 0%, #005bb5 100%)'
-                : 'var(--mac-bg-secondary)',
-              color: activeServiceCategory === cat.id
-                ? 'white'
-                : 'var(--mac-text-primary)',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: activeServiceCategory === cat.id ? '600' : '500',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: activeServiceCategory === cat.id
-                ? '0 4px 12px rgba(0, 122, 255, 0.3), 0 2px 4px rgba(0, 122, 255, 0.2)'
-                : '0 1px 2px rgba(0, 0, 0, 0.05)',
-              transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)'
-            }}
-            onMouseEnter={(e) => {
-              if (activeServiceCategory !== cat.id) {
-                e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeServiceCategory !== cat.id) {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-              }
-            }}
-          >
+      flex: 1,
+      display: 'flex',
+      justifyContent: 'center',
+      gap: '12px',
+      padding: '0 12px'
+    }}>
+        {categories.map((cat) =>
+      <button
+        key={cat.id}
+        onClick={() => setActiveServiceCategory(cat.id)}
+        style={{
+          padding: '7px 16px',
+          borderRadius: 'var(--mac-radius-full)',
+          border: activeServiceCategory === cat.id ?
+          '1px solid var(--mac-primary)' :
+          '1px solid transparent',
+          background: activeServiceCategory === cat.id ?
+          'linear-gradient(135deg, var(--mac-primary) 0%, #005bb5 100%)' :
+          'var(--mac-bg-secondary)',
+          color: activeServiceCategory === cat.id ?
+          'white' :
+          'var(--mac-text-primary)',
+          cursor: 'pointer',
+          fontSize: '13px',
+          fontWeight: activeServiceCategory === cat.id ? '600' : '500',
+          whiteSpace: 'nowrap',
+          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          boxShadow: activeServiceCategory === cat.id ?
+          '0 4px 12px rgba(0, 122, 255, 0.3), 0 2px 4px rgba(0, 122, 255, 0.2)' :
+          '0 1px 2px rgba(0, 0, 0, 0.05)',
+          transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)'
+        }}
+        onMouseEnter={(e) => {
+          if (activeServiceCategory !== cat.id) {
+            e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (activeServiceCategory !== cat.id) {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+          }
+        }}>
+
             <span style={{ fontSize: '15px' }}>{cat.icon}</span>
             {cat.label}
           </button>
-        ))}
+      )}
       </div>
 
       {/* 3. Действия (Справа) */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        flex: '0 0 auto'
-      }}>
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      flex: '0 0 auto'
+    }}>
         {/* Кнопка обновления */}
         <button
-          onClick={handleReloadServices}
-          disabled={isReloadingServices}
-          title="Обновить список услуг"
-          style={{
-            width: '36px',
-            height: '36px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
-            color: 'var(--mac-text-secondary)',
-            borderRadius: '8px',
-            cursor: isReloadingServices ? 'wait' : 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            if (!isReloadingServices) {
-              e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
-              e.currentTarget.style.borderColor = 'var(--mac-primary)';
-              e.currentTarget.style.color = 'var(--mac-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
-            e.currentTarget.style.borderColor = 'var(--mac-border)';
-            e.currentTarget.style.color = 'var(--mac-text-secondary)';
-          }}
-        >
+        onClick={handleReloadServices}
+        disabled={isReloadingServices}
+        title="Обновить список услуг"
+        style={{
+          width: '36px',
+          height: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid var(--mac-border)',
+          background: 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-secondary)',
+          borderRadius: '8px',
+          cursor: isReloadingServices ? 'wait' : 'pointer',
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={(e) => {
+          if (!isReloadingServices) {
+            e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
+            e.currentTarget.style.borderColor = 'var(--mac-primary)';
+            e.currentTarget.style.color = 'var(--mac-primary)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
+          e.currentTarget.style.borderColor = 'var(--mac-border)';
+          e.currentTarget.style.color = 'var(--mac-text-secondary)';
+        }}>
+
           <RefreshCw size={16} className={isReloadingServices ? 'spin' : ''} />
         </button>
 
         {/* Кнопка закрытия */}
         <button
-          onClick={onClose}
-          title="Закрыть"
-          style={{
-            width: '36px',
-            height: '36px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
-            color: 'var(--mac-text-secondary)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--mac-danger)';
-            e.currentTarget.style.borderColor = 'var(--mac-danger)';
-            e.currentTarget.style.color = 'white';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
-            e.currentTarget.style.borderColor = 'var(--mac-border)';
-            e.currentTarget.style.color = 'var(--mac-text-secondary)';
-          }}
-        >
+        onClick={onClose}
+        title="Закрыть"
+        style={{
+          width: '36px',
+          height: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid var(--mac-border)',
+          background: 'var(--mac-bg-primary)',
+          color: 'var(--mac-text-secondary)',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--mac-danger)';
+          e.currentTarget.style.borderColor = 'var(--mac-danger)';
+          e.currentTarget.style.color = 'white';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
+          e.currentTarget.style.borderColor = 'var(--mac-border)';
+          e.currentTarget.style.color = 'var(--mac-text-secondary)';
+        }}>
+
           <X size={18} />
         </button>
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Проверка прав доступа перед рендерингом
   if (!hasRegistrarAccess) {
@@ -2452,8 +2457,8 @@ const AppointmentWizardV2 = ({
         isOpen={isOpen}
         onClose={onClose}
         title="Доступ запрещен"
-        maxWidth="40rem"
-      >
+        maxWidth="40rem">
+
         <div style={{
           padding: 'var(--mac-spacing-6)',
           textAlign: 'center'
@@ -2463,8 +2468,8 @@ const AppointmentWizardV2 = ({
             style={{
               color: 'var(--mac-danger)',
               marginBottom: 'var(--mac-spacing-4)'
-            }}
-          />
+            }} />
+
           <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
@@ -2484,13 +2489,13 @@ const AppointmentWizardV2 = ({
           <MacOSButton
             onClick={onClose}
             variant="primary"
-            style={{ marginTop: 'var(--mac-spacing-4)' }}
-          >
+            style={{ marginTop: 'var(--mac-spacing-4)' }}>
+
             Закрыть
           </MacOSButton>
         </div>
-      </ModernDialog>
-    );
+      </ModernDialog>);
+
   }
 
   return (
@@ -2503,77 +2508,77 @@ const AppointmentWizardV2 = ({
         maxWidth="70rem"
         closeOnBackdrop={false}
         closeOnEscape={false}
-        className="appointment-wizard-v2"
-      >
+        className="appointment-wizard-v2">
+
         <div className="wizard-container-v2">
           {/* Контент шагов */}
           <div className="wizard-content-v2">
-            {currentStep === 1 && (
-              <PatientStepV2
-                data={wizardData.patient}
-                errors={errors}
-                suggestions={patientSuggestions}
-                showSuggestions={showSuggestions}
-                onSearch={handlePatientSearch}
-                onSelectPatient={selectPatient}
-                onUpdate={(field, value) =>
-                  setWizardData(prev => ({
-                    ...prev,
-                    patient: { ...prev.patient, [field]: value }
-                  }))
-                }
-                onPhoneChange={handlePhoneChange}
-                onBirthDateChange={handleBirthDateChange}
-                formattedBirthDate={formattedBirthDate}
-                fioRef={fioRef}
-                phoneRef={phoneRef}
-                cart={wizardData.cart}
-                onUpdateCart={(field, value) =>
-                  setWizardData(prev => ({
-                    ...prev,
-                    cart: { ...prev.cart, [field]: value }
-                  }))
-                }
-                phoneError={errors.phone}
-              />
-            )}
+            {currentStep === 1 &&
+            <PatientStepV2
+              data={wizardData.patient}
+              errors={errors}
+              suggestions={patientSuggestions}
+              showSuggestions={showSuggestions}
+              onSearch={handlePatientSearch}
+              onSelectPatient={selectPatient}
+              onUpdate={(field, value) =>
+              setWizardData((prev) => ({
+                ...prev,
+                patient: { ...prev.patient, [field]: value }
+              }))
+              }
+              onPhoneChange={handlePhoneChange}
+              onBirthDateChange={handleBirthDateChange}
+              formattedBirthDate={formattedBirthDate}
+              fioRef={fioRef}
+              phoneRef={phoneRef}
+              cart={wizardData.cart}
+              onUpdateCart={(field, value) =>
+              setWizardData((prev) => ({
+                ...prev,
+                cart: { ...prev.cart, [field]: value }
+              }))
+              }
+              phoneError={errors.phone} />
 
-            {currentStep === 2 && (
-              <CartStepV2
-                cart={wizardData.cart}
-                services={filteredServices}
-                doctors={doctorsData}
-                showAllServices={showAllServices}
-                onToggleAllServices={() => setShowAllServices(!showAllServices)}
-                onAddToCart={addToCart}
-                onRemoveFromCart={removeFromCart}
-                onUpdateItem={updateCartItem}
-                onUpdateCart={(field, value) =>
-                  setWizardData(prev => ({
-                    ...prev,
-                    cart: { ...prev.cart, [field]: value }
-                  }))
-                }
-                calculateTotal={calculateTotal}
-                servicesData={servicesData}
-                errors={errors}
-                onReloadServices={loadServices}
-                getServiceName={getServiceName} // ✅ SSOT: Передаем функцию для получения названий услуг
-                activeCategory={activeServiceCategory}
-                setActiveCategory={setActiveServiceCategory}
-                searchQuery={serviceSearchQuery}
-                setSearchQuery={setServiceSearchQuery}
-                isReloading={isReloadingServices}
-              />
-            )}
+            }
+
+            {currentStep === 2 &&
+            <CartStepV2
+              cart={wizardData.cart}
+              services={filteredServices}
+              doctors={doctorsData}
+              showAllServices={showAllServices}
+              onToggleAllServices={() => setShowAllServices(!showAllServices)}
+              onAddToCart={addToCart}
+              onRemoveFromCart={removeFromCart}
+              onUpdateItem={updateCartItem}
+              onUpdateCart={(field, value) =>
+              setWizardData((prev) => ({
+                ...prev,
+                cart: { ...prev.cart, [field]: value }
+              }))
+              }
+              calculateTotal={calculateTotal}
+              servicesData={servicesData}
+              errors={errors}
+              onReloadServices={loadServices}
+              getServiceName={getServiceName} // ✅ SSOT: Передаем функцию для получения названий услуг
+              activeCategory={activeServiceCategory}
+              setActiveCategory={setActiveServiceCategory}
+              searchQuery={serviceSearchQuery}
+              setSearchQuery={setServiceSearchQuery}
+              isReloading={isReloadingServices} />
+
+            }
 
           </div>
         </div>
       </ModernDialog>
 
       {/* Диалоги онлайн оплаты удалены из UI */}
-    </>
-  );
+    </>);
+
 };
 
 // ===================== КОМПОНЕНТЫ ШАГОВ =====================
@@ -2640,8 +2645,8 @@ const PatientStepV2 = ({
               icon={Search}
               iconPosition="left"
               size="md"
-              autoFocus
-            />
+              autoFocus />
+
 
             {/* Индикатор Новый/Существующий */}
             <div style={{
@@ -2655,64 +2660,69 @@ const PatientStepV2 = ({
               fontSize: 'var(--mac-font-size-xs)',
               pointerEvents: 'none'
             }}>
-              {safeData.id ? (
-                <>
+              {safeData.id ?
+              <>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-primary)' }} />
                   <span style={{ color: 'var(--mac-primary)', fontWeight: '500' }}>Существующий</span>
-                </>
-              ) : (
-                (safeData.fio || '').length > 0 && (
-                  <>
+                </> :
+
+              (safeData.fio || '').length > 0 &&
+              <>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--mac-success)' }} />
                     <span style={{ color: 'var(--mac-success)', fontWeight: '500' }}>Новый</span>
                   </>
-                )
-              )}
+
+              }
             </div>
           </div>
 
-          {errors.fio && (
-            <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-danger)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
+          {errors.fio &&
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
               <AlertCircle size={14} />
               {errors.fio}
             </span>
-          )}
+          }
 
           {/* Саджесты */}
-          {showSuggestions && suggestions.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 100,
-              marginTop: '4px',
-              background: 'var(--mac-bg-primary)',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-md)',
-              boxShadow: 'var(--mac-shadow-lg)',
-              maxHeight: '200px',
-              overflowY: 'auto'
-            }}>
-              {suggestions.map(patient => (
-                <div
-                  key={patient.id}
-                  onClick={() => onSelectPatient(patient)}
-                  style={{
-                    padding: 'var(--mac-spacing-3)',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--mac-border)',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
+          {showSuggestions && suggestions.length > 0 &&
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: '4px',
+            background: 'var(--mac-bg-primary)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            boxShadow: 'var(--mac-shadow-lg)',
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}>
+              {suggestions.map((patient) =>
+            <button
+              type="button"
+              key={patient.id}
+              onClick={() => onSelectPatient(patient)}
+              style={{
+                padding: 'var(--mac-spacing-3)',
+                cursor: 'pointer',
+                width: '100%',
+                textAlign: 'left',
+                border: 'none',
+                background: 'transparent',
+                borderBottom: '1px solid var(--mac-border)',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+
                   <div style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
@@ -2720,10 +2730,10 @@ const PatientStepV2 = ({
                     <span>📱 {patient.phone}</span>
                     <span>🎂 {formatDateDisplay(patient.birth_date)}</span>
                   </div>
-                </div>
-              ))}
+                </button>
+            )}
             </div>
-          )}
+          }
         </div>
 
         {/* Пол (рядом с ФИО) */}
@@ -2747,40 +2757,40 @@ const PatientStepV2 = ({
             border: '1px solid var(--mac-border)',
             height: '36px'
           }}>
-            {['male', 'female'].map((gender) => (
-              <button
-                key={gender}
-                onClick={() => onUpdate('gender', gender)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  border: 'none',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  background: safeData.gender === gender ? 'var(--mac-bg-primary)' : 'transparent',
-                  color: safeData.gender === gender ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
-                  boxShadow: safeData.gender === gender ? 'var(--mac-shadow-sm)' : 'none',
-                  cursor: 'pointer',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  fontWeight: safeData.gender === gender ? '600' : '400',
-                  transition: 'all 0.2s ease'
-                }}
-              >
+            {['male', 'female'].map((gender) =>
+            <button
+              key={gender}
+              onClick={() => onUpdate('gender', gender)}
+              style={{
+                flex: 1,
+                padding: '8px',
+                border: 'none',
+                borderRadius: 'var(--mac-radius-sm)',
+                background: safeData.gender === gender ? 'var(--mac-bg-primary)' : 'transparent',
+                color: safeData.gender === gender ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
+                boxShadow: safeData.gender === gender ? 'var(--mac-shadow-sm)' : 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: safeData.gender === gender ? '600' : '400',
+                transition: 'all 0.2s ease'
+              }}>
+
                 {gender === 'male' ? 'Мужской' : 'Женский'}
               </button>
-            ))}
+            )}
           </div>
-          {errors.gender && (
-            <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-danger)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
+          {errors.gender &&
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
               <AlertCircle size={14} />
               {errors.gender}
             </span>
-          )}
+          }
         </div>
 
         {/* Телефон */}
@@ -2805,68 +2815,68 @@ const PatientStepV2 = ({
             error={!!errors.phone || !!phoneError}
             icon={Phone}
             iconPosition="left"
-            size="md"
-          />
-          {!data.phone && !errors.phone && (
-            <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-text-tertiary)',
-              fontStyle: 'italic'
-            }}>
+            size="md" />
+
+          {!data.phone && !errors.phone &&
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-text-tertiary)',
+            fontStyle: 'italic'
+          }}>
               Для детей и пожилых можно не указывать
             </span>
-          )}
-          {errors.phone && (
-            <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-danger)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
+          }
+          {errors.phone &&
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
               <AlertCircle size={14} />
               {errors.phone}
             </span>
-          )}
-          {phoneError && (
-            <div style={{
-              marginTop: '4px',
-              padding: '8px',
-              background: '#fee2e2',
-              border: '1px solid #fecaca',
-              borderRadius: 'var(--mac-radius-sm)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px'
-            }}>
+          }
+          {phoneError &&
+          <div style={{
+            marginTop: '4px',
+            padding: '8px',
+            background: '#fee2e2',
+            border: '1px solid #fecaca',
+            borderRadius: 'var(--mac-radius-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
               <span style={{
-                fontSize: 'var(--mac-font-size-xs)',
-                color: '#991b1b',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: '500'
-              }}>
+              fontSize: 'var(--mac-font-size-xs)',
+              color: '#991b1b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: '500'
+            }}>
                 <AlertCircle size={14} />
                 {phoneError.message}
               </span>
               <button
-                onClick={() => onSelectPatient(phoneError.patient)}
-                style={{
-                  background: '#991b1b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  alignSelf: 'flex-start'
-                }}
-              >
+              onClick={() => onSelectPatient(phoneError.patient)}
+              style={{
+                background: '#991b1b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                alignSelf: 'flex-start'
+              }}>
+
                 Выбрать {phoneError?.patient?.fio || 'этого пациента'}
               </button>
             </div>
-          )}
+          }
         </div>
 
         {/* Дата рождения */}
@@ -2891,20 +2901,20 @@ const PatientStepV2 = ({
             error={!!errors.birth_date}
             icon={Calendar}
             iconPosition="left"
-            size="md"
-          />
-          {errors.birth_date && (
-            <span style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-danger)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
+            size="md" />
+
+          {errors.birth_date &&
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
               <AlertCircle size={14} />
               {errors.birth_date}
             </span>
-          )}
+          }
         </div>
 
         {/* Адрес */}
@@ -2926,8 +2936,8 @@ const PatientStepV2 = ({
             value={data.address}
             onChange={(e) => onUpdate('address', e.target.value)}
             placeholder="Адрес проживания"
-            size="md"
-          />
+            size="md" />
+
         </div>
 
       </div>
@@ -2962,17 +2972,17 @@ const PatientStepV2 = ({
             transition: 'all var(--mac-duration-normal) var(--mac-ease)',
             background: 'var(--mac-bg-primary)'
           }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
-          >
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+
             <input
               type="radio"
               name="discount_mode"
               value="none"
               checked={cart?.discount_mode === 'none'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              style={{ margin: 0 }}
-            />
+              style={{ margin: 0 }} />
+
             <span style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-primary)'
@@ -2992,17 +3002,17 @@ const PatientStepV2 = ({
             transition: 'all var(--mac-duration-normal) var(--mac-ease)',
             background: 'var(--mac-bg-primary)'
           }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
-          >
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+
             <input
               type="radio"
               name="discount_mode"
               value="repeat"
               checked={cart?.discount_mode === 'repeat'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              style={{ margin: 0 }}
-            />
+              style={{ margin: 0 }} />
+
             <span style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-primary)'
@@ -3022,17 +3032,17 @@ const PatientStepV2 = ({
             transition: 'all var(--mac-duration-normal) var(--mac-ease)',
             background: 'var(--mac-bg-primary)'
           }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
-          >
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+
             <input
               type="radio"
               name="discount_mode"
               value="benefit"
               checked={cart?.discount_mode === 'benefit'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
-              style={{ margin: 0 }}
-            />
+              style={{ margin: 0 }} />
+
             <span style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-primary)'
@@ -3054,15 +3064,15 @@ const PatientStepV2 = ({
             transition: 'all var(--mac-duration-normal) var(--mac-ease)',
             background: 'var(--mac-bg-primary)'
           }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
-          >
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}>
+
             <input
               type="checkbox"
               checked={cart?.all_free}
               onChange={(e) => onUpdateCart('all_free', e.target.checked)}
-              style={{ margin: 0 }}
-            />
+              style={{ margin: 0 }} />
+
             <span style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-primary)'
@@ -3070,50 +3080,39 @@ const PatientStepV2 = ({
               All Free (требует одобрения администратора)
             </span>
           </label>
-          {cart?.all_free && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--mac-spacing-2)',
-              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-              background: 'var(--mac-warning)',
-              border: '1px solid var(--mac-warning-hover)',
-              borderRadius: 'var(--mac-radius-sm)',
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-xs)',
-              marginTop: 'var(--mac-spacing-2)'
-            }}>
+          {cart?.all_free &&
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            background: 'var(--mac-warning)',
+            border: '1px solid var(--mac-warning-hover)',
+            borderRadius: 'var(--mac-radius-sm)',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-xs)',
+            marginTop: 'var(--mac-spacing-2)'
+          }}>
               <AlertCircle size={16} />
               Заявка будет отправлена на одобрение администратору
             </div>
-          )}
+          }
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Шаг 2: Корзина - Split View (Категории + Список)
 const CartStepV2 = ({
   cart,
-  services,
-  doctors,
-  showAllServices,
-  onToggleAllServices,
   onAddToCart,
   onRemoveFromCart,
-  onUpdateItem,
-  onUpdateCart,
-  calculateTotal,
   servicesData,
   errors,
-  onReloadServices,
   // New props from parent
   activeCategory,
-  setActiveCategory,
   searchQuery,
-  setSearchQuery,
-  isReloading,
   getServiceName // ✅ SSOT: Функция для получения названий услуг
 }) => {
   // Local state removed - lifted to AppointmentWizardV2
@@ -3130,14 +3129,14 @@ const CartStepV2 = ({
     // 1. Фильтрация по поиску (Глобальный поиск)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      return filtered.filter(service =>
-        service.name.toLowerCase().includes(query) ||
-        (service.code && service.code.toLowerCase().includes(query))
+      return filtered.filter((service) =>
+      service.name.toLowerCase().includes(query) ||
+      service.code && service.code.toLowerCase().includes(query)
       );
     }
 
     // 2. Фильтрация по категории (если нет поиска)
-    return filtered.filter(service => {
+    return filtered.filter((service) => {
       const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
       const isConsultation = service.name.toLowerCase().includes('консультация');
 
@@ -3146,17 +3145,17 @@ const CartStepV2 = ({
       const serviceName = service.name ? service.name.toLowerCase() : '';
 
       const isECG = serviceCode === 'K10' ||
-        serviceCode.includes('ECG') ||
-        serviceName.includes('экг');
+      serviceCode.includes('ECG') ||
+      serviceName.includes('экг');
 
       const isEchoCG = serviceCode === 'K11' ||
-        serviceCode.includes('ECHO') ||
-        serviceName.includes('эхокг') ||
-        serviceName.includes('эхо-кг');
+      serviceCode.includes('ECHO') ||
+      serviceName.includes('эхокг') ||
+      serviceName.includes('эхо-кг');
 
       // ✅ Рентгенография зубов: S-коды (стоматология) + название содержит "рентген"
-      const isDentalXRay = (serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/)) &&
-        (serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes('рентгенография'));
+      const isDentalXRay = serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/) && (
+      serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes('рентгенография'));
 
       switch (activeCategory) {
         case 'specialists':
@@ -3181,10 +3180,10 @@ const CartStepV2 = ({
 
   // Обработка выбора услуги
   const handleServiceToggle = (service) => {
-    const isInCart = cart?.items?.some(item => item.service_id === service.id);
+    const isInCart = cart?.items?.some((item) => item.service_id === service.id);
 
     if (isInCart) {
-      const cartItem = cart.items.find(item => item.service_id === service.id);
+      const cartItem = cart.items.find((item) => item.service_id === service.id);
       onRemoveFromCart(cartItem.id);
     } else {
       onAddToCart(service);
@@ -3195,9 +3194,9 @@ const CartStepV2 = ({
   const cartTotal = useMemo(() => {
     if (!Array.isArray(cart?.items)) return 0;
     let total = 0;
-    cart.items.forEach(item => {
+    cart.items.forEach((item) => {
       let itemPrice = (item.service_price || 0) * (item.quantity || 1);
-      const service = servicesData?.find(s => s.id === item.service_id);
+      const service = servicesData?.find((s) => s.id === item.service_id);
       if (service && service.is_consultation) {
         if (cart.discount_mode === 'repeat' || cart.discount_mode === 'benefit') {
           itemPrice = 0;
@@ -3234,15 +3233,15 @@ const CartStepV2 = ({
         padding: 'var(--mac-spacing-4)', // 16px internal padding
         background: 'var(--mac-bg-primary)'
       }}>
-        {searchQuery && (
-          <div style={{
-            marginBottom: 'var(--mac-spacing-3)',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+        {searchQuery &&
+        <div style={{
+          marginBottom: 'var(--mac-spacing-3)',
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
             Результаты поиска: {displayedServices.length}
           </div>
-        )}
+        }
 
         <div style={{
           display: 'grid',
@@ -3250,9 +3249,9 @@ const CartStepV2 = ({
           gap: 'var(--mac-spacing-2)', // Compact gap
           alignContent: 'start'
         }}>
-          {displayedServices.map(service => {
+          {displayedServices.map((service) => {
             // ✅ ИСПРАВЛЕНО: Проверяем также по service_code для edit режима (когда service_id еще null)
-            const isInCart = cart?.items?.some(item => {
+            const isInCart = cart?.items?.some((item) => {
               if (item.service_id === service.id) return true;
               // Если service_id еще не разрешен, проверяем по коду (включая варианты с нулями: p09, P09, P9)
               if (!item.service_id && service.service_code) {
@@ -3270,14 +3269,14 @@ const CartStepV2 = ({
             return (
               <label
                 key={service.id}
-                className={`compact-service-card ${isInCart ? 'selected' : ''}`}
-              >
+                className={`compact-service-card ${isInCart ? 'selected' : ''}`}>
+
                 <input
                   type="checkbox"
                   checked={isInCart}
                   onChange={() => handleServiceToggle(service)}
-                  style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }}
-                />
+                  style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }} />
+
                 <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0px' }}>
                   <div className="service-name-text" title={service.name}>
                     {service.name}
@@ -3286,20 +3285,20 @@ const CartStepV2 = ({
                     {service.price?.toLocaleString()} сум
                   </div>
                 </div>
-              </label>
-            );
+              </label>);
+
           })}
 
-          {displayedServices.length === 0 && (
-            <div style={{
-              gridColumn: '1 / -1',
-              textAlign: 'center',
-              padding: 'var(--mac-spacing-8)',
-              color: 'var(--mac-text-tertiary)'
-            }}>
+          {displayedServices.length === 0 &&
+          <div style={{
+            gridColumn: '1 / -1',
+            textAlign: 'center',
+            padding: 'var(--mac-spacing-8)',
+            color: 'var(--mac-text-tertiary)'
+          }}>
               Услуги не найдены
             </div>
-          )}
+          }
         </div>
       </div>
 
@@ -3326,89 +3325,128 @@ const CartStepV2 = ({
         </div>
 
         {/* Горизонтальный скролл корзины */}
-        {cart?.items?.length > 0 ? (
-          <div style={{
-            display: 'flex',
-            gap: 'var(--mac-spacing-2)',
-            overflowX: 'auto',
-            paddingBottom: '4px'
-          }}>
-            {cart.items.map(item => {
-              // ✅ SSOT: Используем единую функцию для получения названия услуги
-              const displayName = getServiceName ? getServiceName(item) : (item.service_name || 'Неизвестная услуга');
+        {cart?.items?.length > 0 ?
+        <div style={{
+          display: 'flex',
+          gap: 'var(--mac-spacing-2)',
+          overflowX: 'auto',
+          paddingBottom: '4px'
+        }}>
+            {cart.items.map((item) => {
+            // ✅ SSOT: Используем единую функцию для получения названия услуги
+            const displayName = getServiceName ? getServiceName(item) : item.service_name || 'Неизвестная услуга';
 
-              return (
-                <div key={item.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 8px',
-                  background: 'var(--mac-bg-secondary)',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  fontSize: 'var(--mac-font-size-xs)',
-                  whiteSpace: 'nowrap'
-                }}>
+            return (
+              <div key={item.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 8px',
+                background: 'var(--mac-bg-secondary)',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: 'var(--mac-font-size-xs)',
+                whiteSpace: 'nowrap'
+              }}>
                   <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
                     {displayName}
                   </span>
                   <button
-                    onClick={() => onRemoveFromCart(item.id)}
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'var(--mac-danger)',
-                      cursor: 'pointer',
-                      padding: 0,
-                      display: 'flex'
-                    }}
-                  >
+                  onClick={() => onRemoveFromCart(item.id)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--mac-danger)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex'
+                  }}>
+
                     <X size={14} />
                   </button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                </div>);
+
+          })}
+          </div> :
+
+        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
             Корзина пуста
           </div>
-        )}
+        }
 
         {/* Ошибки валидации */}
-        {(errors.cart || errors.doctors) && (
-          <div style={{
-            padding: '8px',
-            background: '#fee2e2',
-            border: '1px solid #fecaca',
-            borderRadius: 'var(--mac-radius-sm)',
-            color: '#991b1b',
-            fontSize: 'var(--mac-font-size-xs)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-2)'
-          }}>
+        {(errors.cart || errors.doctors) &&
+        <div style={{
+          padding: '8px',
+          background: '#fee2e2',
+          border: '1px solid #fecaca',
+          borderRadius: 'var(--mac-radius-sm)',
+          color: '#991b1b',
+          fontSize: 'var(--mac-font-size-xs)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-2)'
+        }}>
             <AlertCircle size={14} />
             {errors.cart || errors.doctors}
           </div>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Функция для получения кода категории врача
-const getDoctorCategoryCode = (specialty) => {
-  const mapping = {
-    'Кардиолог': 'K',
-    'Стоматолог': 'S',
-    'Дерматолог': 'D',
-    'Дерматолог-косметолог': 'C'
-  };
-  return mapping[specialty] || 'O';
+
+AppointmentWizardV2.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  onComplete: PropTypes.func,
+  isProcessing: PropTypes.bool,
+  setIsProcessing: PropTypes.func,
+  activeTab: PropTypes.any,
+  editMode: PropTypes.bool,
+  initialData: PropTypes.any
 };
+
+PatientStepV2.propTypes = {
+  data: PropTypes.object,
+  errors: PropTypes.object,
+  suggestions: PropTypes.array,
+  showSuggestions: PropTypes.bool,
+  onSearch: PropTypes.func,
+  onSelectPatient: PropTypes.func,
+  onUpdate: PropTypes.func,
+  onPhoneChange: PropTypes.func,
+  onBirthDateChange: PropTypes.func,
+  formattedBirthDate: PropTypes.string,
+  fioRef: PropTypes.any,
+  phoneRef: PropTypes.any,
+  cart: PropTypes.object,
+  onUpdateCart: PropTypes.func,
+  phoneError: PropTypes.object
+};
+
+CartStepV2.propTypes = {
+  cart: PropTypes.object,
+  onAddToCart: PropTypes.func,
+  onRemoveFromCart: PropTypes.func,
+  servicesData: PropTypes.array,
+  errors: PropTypes.object,
+  activeCategory: PropTypes.string,
+  searchQuery: PropTypes.string,
+  getServiceName: PropTypes.func
+};
+
+
+
+
+
+
+
+
+
 
 
 
 export default AppointmentWizardV2;
-

@@ -1,5 +1,3 @@
-import React from 'react';
-
 const MacOSButton = ({
   children,
   variant = 'default',
@@ -231,8 +229,10 @@ const MacOSButton = ({
           }}
         />
       )}
-      <span style={{ opacity: loading ? 0 : 1 }}>
+      <span style={{ opacity: loading ? 0 : 1, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        {startIcon}
         {children}
+        {endIcon}
       </span>
     </button>
   );

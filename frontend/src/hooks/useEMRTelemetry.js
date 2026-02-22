@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useRef, useEffect } from 'react';
+import logger from '../utils/logger';
 
 /**
  * Allowed event types (whitelist)
@@ -67,7 +68,7 @@ function validateEvent(event) {
 
     // Must be in whitelist
     if (!ALLOWED_EVENTS[event.event]) {
-        console.warn('[Telemetry] Blocked unknown event:', event.event);
+        logger.warn('[Telemetry] Blocked unknown event', event.event);
         return false;
     }
 
@@ -77,7 +78,7 @@ function validateEvent(event) {
             const value = event.meta[key];
             // Block any string longer than 50 chars (could be content)
             if (typeof value === 'string' && value.length > 50) {
-                console.warn('[Telemetry] Blocked: meta value too long (possible PHI)');
+                logger.warn('[Telemetry] Blocked: meta value too long (possible PHI)');
                 return false;
             }
         }
@@ -104,6 +105,7 @@ export function useEMRTelemetry({
     const queueRef = useRef([]);
     const flushTimeoutRef = useRef(null);
     const sessionStartRef = useRef(Date.now());
+    const flushRef = useRef(() => {});
 
     /**
      * Track an event
@@ -130,7 +132,7 @@ export function useEMRTelemetry({
 
         // Auto-flush if batch full
         if (queueRef.current.length >= batchSize) {
-            flush();
+            flushRef.current();
         }
     }, [enabled, sessionId, batchSize]);
 
@@ -154,9 +156,13 @@ export function useEMRTelemetry({
             });
         } catch (err) {
             // Telemetry errors are silent - don't break EMR
-            console.debug('[Telemetry] Flush failed:', err.message);
+            logger.debug('[Telemetry] Flush failed', err.message);
         }
     }, [enabled]);
+
+    useEffect(() => {
+        flushRef.current = flush;
+    }, [flush]);
 
     /**
      * Track with timing

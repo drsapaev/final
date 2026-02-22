@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   MacOSCard,
   MacOSButton,
-  MacOSInput,
-  MacOSSelect,
+
+
   MacOSTextarea,
-  MacOSBadge,
+
   MacOSAlert,
-  MacOSLoadingSkeleton
-} from '../ui/macos';
+  MacOSLoadingSkeleton } from
+'../ui/macos';
 import {
   Database,
   Play,
@@ -17,11 +17,11 @@ import {
   RefreshCw,
   Code,
   Search,
-  Filter,
+
   BookOpen,
   Zap,
-  Activity
-} from 'lucide-react';
+  Activity } from
+'lucide-react';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
@@ -284,7 +284,7 @@ const GraphQLExplorer = () => {
       const response = await fetch('/api/graphql', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           query: `
@@ -329,7 +329,7 @@ const GraphQLExplorer = () => {
       if (variables.trim()) {
         try {
           parsedVariables = JSON.parse(variables);
-        } catch (e) {
+        } catch {
           setError('Неверный формат переменных JSON');
           setLoading(false);
           return;
@@ -399,47 +399,47 @@ const GraphQLExplorer = () => {
     return JSON.stringify(obj, null, 2);
   };
 
-  const renderExplorerTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderExplorerTab = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Отображение ошибок */}
-      {error && (
-        <MacOSAlert
-          type="error"
-          title="Ошибка"
-          description={error}
-          onClose={() => setError(null)}
-        />
-      )}
+      {error &&
+    <MacOSAlert
+      type="error"
+      title="Ошибка"
+      description={error}
+      onClose={() => setError(null)} />
+
+    }
 
       {/* Примеры запросов */}
       <MacOSCard style={{ padding: '24px' }}>
         <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+        margin: '0 0 16px 0',
+        color: 'var(--mac-text-primary)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)'
+      }}>
           <BookOpen size={20} />
           Примеры запросов
         </h3>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-          {Object.entries(queryExamples).map(([key, example]) => (
-            <MacOSButton
-              key={key}
-              onClick={() => loadExample(key)}
-              variant={selectedExample === key ? 'primary' : 'outline'}
-              style={{
-                padding: '8px',
-                fontSize: 'var(--mac-font-size-sm)'
-              }}
-            >
+          {Object.entries(queryExamples).map(([key, example]) =>
+        <MacOSButton
+          key={key}
+          onClick={() => loadExample(key)}
+          variant={selectedExample === key ? 'primary' : 'outline'}
+          style={{
+            padding: '8px',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
+          
               {example.name}
             </MacOSButton>
-          ))}
+        )}
         </div>
       </MacOSCard>
 
@@ -447,50 +447,50 @@ const GraphQLExplorer = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <MacOSCard style={{ padding: '24px' }}>
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}>
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}>
             <h3 style={{
-              margin: 0,
-              color: 'var(--mac-text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+            margin: 0,
+            color: 'var(--mac-text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
               <Code size={20} />
               GraphQL Запрос
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
               <MacOSButton
-                onClick={copyQuery}
-                variant="outline"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  fontSize: 'var(--mac-font-size-xs)'
-                }}
-              >
+              onClick={copyQuery}
+              variant="outline"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                fontSize: 'var(--mac-font-size-xs)'
+              }}>
+              
                 <Copy size={14} />
                 Копировать
               </MacOSButton>
               <MacOSButton
-                onClick={executeQuery}
-                disabled={loading}
-                variant="primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  fontSize: 'var(--mac-font-size-xs)'
-                }}
-              >
+              onClick={executeQuery}
+              disabled={loading}
+              variant="primary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                fontSize: 'var(--mac-font-size-xs)'
+              }}>
+              
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
                 {loading ? 'Выполняется...' : 'Выполнить'}
               </MacOSButton>
@@ -498,182 +498,182 @@ const GraphQLExplorer = () => {
           </div>
 
           <MacOSTextarea
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Введите GraphQL запрос..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Введите GraphQL запрос..."
+          style={{
+            width: '100%',
+            height: '300px',
+            fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+            fontSize: 'var(--mac-font-size-sm)',
+            lineHeight: '1.5',
+            resize: 'vertical'
+          }} />
+        
+
+          <div style={{ marginTop: '16px' }}>
+            <label style={{
+            display: 'block',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '8px'
+          }}>Переменные (JSON)</label>
+            <MacOSTextarea
+            value={variables}
+            onChange={(e) => setVariables(e.target.value)}
+            placeholder='{"key": "value"}'
             style={{
               width: '100%',
-              height: '300px',
+              height: '100px',
               fontFamily: 'Monaco, Consolas, "Courier New", monospace',
               fontSize: 'var(--mac-font-size-sm)',
               lineHeight: '1.5',
               resize: 'vertical'
-            }}
-          />
-
-          <div style={{ marginTop: '16px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>Переменные (JSON)</label>
-            <MacOSTextarea
-              value={variables}
-              onChange={(e) => setVariables(e.target.value)}
-              placeholder='{"key": "value"}'
-              style={{
-                width: '100%',
-                height: '100px',
-                fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                fontSize: 'var(--mac-font-size-sm)',
-                lineHeight: '1.5',
-                resize: 'vertical'
-              }}
-            />
+            }} />
+          
           </div>
         </MacOSCard>
 
         <MacOSCard style={{ padding: '24px' }}>
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}>
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}>
             <h3 style={{
-              margin: 0,
-              color: 'var(--mac-text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+            margin: 0,
+            color: 'var(--mac-text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
               <Activity size={20} />
               Результат
             </h3>
-            {result && (
-              <MacOSButton
-                onClick={downloadResult}
-                variant="outline"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  fontSize: 'var(--mac-font-size-xs)'
-                }}
-              >
+            {result &&
+          <MacOSButton
+            onClick={downloadResult}
+            variant="outline"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              fontSize: 'var(--mac-font-size-xs)'
+            }}>
+            
                 <Download size={14} />
                 Скачать
               </MacOSButton>
-            )}
+          }
           </div>
 
           <div style={{
-            height: '400px',
-            padding: '16px',
-            backgroundColor: 'var(--mac-bg-secondary)',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)',
-            overflow: 'auto',
-            fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-            fontSize: 'var(--mac-font-size-sm)',
-            lineHeight: '1.5'
+          height: '400px',
+          padding: '16px',
+          backgroundColor: 'var(--mac-bg-secondary)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-md)',
+          overflow: 'auto',
+          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+          fontSize: 'var(--mac-font-size-sm)',
+          lineHeight: '1.5'
+        }}>
+            {loading ?
+          <MacOSLoadingSkeleton
+            type="text"
+            count={8}
+            style={{ height: '100%' }} /> :
+
+          result ?
+          <pre style={{
+            margin: 0,
+            whiteSpace: 'pre-wrap',
+            color: result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)'
           }}>
-            {loading ? (
-              <MacOSLoadingSkeleton
-                type="text"
-                count={8}
-                style={{ height: '100%' }}
-              />
-            ) : result ? (
-              <pre style={{
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-                color: result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)'
-              }}>
                 {formatJSON(result)}
-              </pre>
-            ) : (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: 'var(--mac-text-tertiary)'
-              }}>
+              </pre> :
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--mac-text-tertiary)'
+          }}>
                 Результат появится здесь после выполнения запроса
               </div>
-            )}
+          }
           </div>
         </MacOSCard>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderSchemaTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderSchemaTab = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <MacOSCard style={{ padding: '24px' }}>
         <h3 style={{
-          margin: '0 0 16px 0',
-          color: 'var(--mac-text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+        margin: '0 0 16px 0',
+        color: 'var(--mac-text-primary)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)'
+      }}>
           <Database size={20} />
           GraphQL Схема
         </h3>
 
-        {schema ? (
-          <div style={{ display: 'grid', gap: '16px' }}>
-            {schema.types
-              .filter(type => !type.name.startsWith('__') && type.fields)
-              .map((type, index) => (
-                <div
-                  key={index}
-                  style={{
-                    padding: '16px',
-                    border: '1px solid var(--mac-border)',
-                    borderRadius: 'var(--mac-radius-md)',
-                    backgroundColor: 'var(--mac-bg-secondary)'
-                  }}
-                >
+        {schema ?
+      <div style={{ display: 'grid', gap: '16px' }}>
+            {schema.types.
+        filter((type) => !type.name.startsWith('__') && type.fields).
+        map((type, index) =>
+        <div
+          key={index}
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+          
                   <h4 style={{
-                    margin: '0 0 8px 0',
-                    color: 'var(--mac-accent)',
-                    fontSize: 'var(--mac-font-size-md)',
-                    fontWeight: 'var(--mac-font-weight-semibold)'
-                  }}>
+            margin: '0 0 8px 0',
+            color: 'var(--mac-accent)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
                     {type.name}
                   </h4>
-                  {type.description && (
-                    <p style={{
-                      margin: '0 0 8px 0',
-                      color: 'var(--mac-text-secondary)',
-                      fontSize: 'var(--mac-font-size-sm)'
-                    }}>
+                  {type.description &&
+          <p style={{
+            margin: '0 0 8px 0',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
                       {type.description}
                     </p>
-                  )}
+          }
                   <div style={{ display: 'grid', gap: '4px' }}>
-                    {type.fields?.slice(0, 10).map((field, fieldIndex) => (
-                      <div
-                        key={fieldIndex}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          padding: '4px 8px',
-                          backgroundColor: 'var(--mac-bg-primary)',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          fontSize: 'var(--mac-font-size-xs)'
-                        }}
-                      >
+                    {type.fields?.slice(0, 10).map((field, fieldIndex) =>
+            <div
+              key={fieldIndex}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '4px 8px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: 'var(--mac-font-size-xs)'
+              }}>
+              
                         <span style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                           {field.name}
                         </span>
@@ -681,36 +681,36 @@ const GraphQLExplorer = () => {
                           {field.type?.name || 'Unknown'}
                         </span>
                       </div>
-                    ))}
-                    {type.fields?.length > 10 && (
-                      <div style={{
-                        padding: '4px',
-                        textAlign: 'center',
-                        color: 'var(--mac-text-tertiary)',
-                        fontSize: 'var(--mac-font-size-xs)'
-                      }}>
+            )}
+                    {type.fields?.length > 10 &&
+            <div style={{
+              padding: '4px',
+              textAlign: 'center',
+              color: 'var(--mac-text-tertiary)',
+              fontSize: 'var(--mac-font-size-xs)'
+            }}>
                         ... и еще {type.fields.length - 10} полей
                       </div>
-                    )}
+            }
                   </div>
                 </div>
-              ))}
-          </div>
-        ) : (
-          <MacOSLoadingSkeleton
-            type="card"
-            count={3}
-            style={{ height: '200px' }}
-          />
         )}
+          </div> :
+
+      <MacOSLoadingSkeleton
+        type="card"
+        count={3}
+        style={{ height: '200px' }} />
+
+      }
       </MacOSCard>
-    </div>
-  );
+    </div>;
+
 
   const tabs = [
-    { id: 'explorer', label: 'Исследователь', icon: Search },
-    { id: 'schema', label: 'Схема', icon: Database }
-  ];
+  { id: 'explorer', label: 'Исследователь', icon: Search },
+  { id: 'schema', label: 'Схема', icon: Database }];
+
 
   return (
     <div style={{ padding: '24px' }}>
@@ -756,21 +756,20 @@ const GraphQLExplorer = () => {
                 fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                 fontSize: 'var(--mac-font-size-sm)',
                 transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-            >
+              }}>
+              
               <Icon size={16} />
               {tab.label}
-            </button>
-          );
+            </button>);
+
         })}
       </div>
 
       {/* Содержимое вкладок */}
       {activeTab === 'explorer' && renderExplorerTab()}
       {activeTab === 'schema' && renderSchemaTab()}
-    </div>
-  );
+    </div>);
+
 };
 
 export default GraphQLExplorer;
-

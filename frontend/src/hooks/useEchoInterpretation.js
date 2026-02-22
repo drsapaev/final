@@ -126,7 +126,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
   }, [visitId, patientId]);
 
   // Генерация структурированного отчета
-  const generateReport = useCallback(async (echoParameters, aiResult = null) => {
+  const generateReport = useCallback(async (echoParameters, aiAnalysis = null) => {
     setAnalyzing(true);
     setError(null);
     
@@ -135,7 +135,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
         visit_id: visitId,
         patient_id: patientId,
         parameters: echoParameters,
-        ai_analysis: aiResult || aiResult
+        ai_analysis: aiAnalysis || aiResult
       });
       
       return response.data;
@@ -175,6 +175,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
 
   // Получение интерпретации отдельного параметра
   const interpretParameter = useCallback((parameterName, value, context = {}) => {
+    void context;
     const interpretations = {
       ejectionFraction: (val) => {
         if (val >= 55) return { status: 'normal', message: 'Нормальная систолическая функция ЛЖ' };

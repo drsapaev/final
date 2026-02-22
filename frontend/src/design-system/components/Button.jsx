@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
 import { createButtonStyles } from './utils';
 import { SIZES, VARIANTS } from './types';
 

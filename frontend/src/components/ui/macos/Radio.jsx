@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 const Radio = React.forwardRef(({ 
   checked: checkedProp,
@@ -104,6 +105,23 @@ const Radio = React.forwardRef(({
     </label>
   );
 });
+
+Radio.displayName = 'Radio';
+
+Radio.propTypes = {
+  checked: PropTypes.bool,
+  defaultChecked: PropTypes.bool,
+  onChange: PropTypes.func,
+  name: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  disabled: PropTypes.bool,
+  label: PropTypes.node,
+  description: PropTypes.node,
+  size: PropTypes.oneOf(['small', 'default', 'large']),
+  className: PropTypes.string,
+  style: PropTypes.object,
+  id: PropTypes.string
+};
 
 export default Radio;
 

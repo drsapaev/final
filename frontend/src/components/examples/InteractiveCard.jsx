@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
@@ -90,27 +89,22 @@ export const InteractiveListItem = ({
   onClick,
   ...props
 }) => {
-  const { getColor, getSpacing, getFontSize } = useTheme();
+  const { getColor, getSpacing, getFontSize, getShadow } = useTheme();
   const { ref, isHovered } = useHover();
-
-  return (
-    <div
-      ref={ref}
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: getSpacing('md'),
-        borderRadius: '8px',
-        backgroundColor: isHovered ? getColor('primary', 50) : getColor('surface'),
-        border: `1px solid ${isHovered ? getColor('primary', 200) : getColor('border')}`,
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.2s ease',
-        transform: isHovered ? 'scale(1.02)' : 'scale(1)',
-        boxShadow: isHovered ? getShadow('sm') : 'none'
-      }}
-      {...props}
-    >
+  const itemStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    padding: getSpacing('md'),
+    borderRadius: '8px',
+    backgroundColor: isHovered ? getColor('primary', 50) : getColor('surface'),
+    border: `1px solid ${isHovered ? getColor('primary', 200) : getColor('border')}`,
+    cursor: onClick ? 'pointer' : 'default',
+    transition: 'all 0.2s ease',
+    transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+    boxShadow: isHovered ? getShadow('sm') : 'none'
+  };
+  const itemContent = (
+    <>
       {/* Иконка */}
       {icon && (
         <div style={{
@@ -156,6 +150,37 @@ export const InteractiveListItem = ({
       }}>
         →
       </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <div
+        ref={ref}
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick(event);
+          }
+        }}
+        style={itemStyle}
+        {...props}
+      >
+        {itemContent}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      style={itemStyle}
+      {...props}
+    >
+      {itemContent}
     </div>
   );
 };

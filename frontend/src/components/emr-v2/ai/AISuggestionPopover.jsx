@@ -14,7 +14,8 @@
  * Uses Portal to render outside EMR section DOM hierarchy to avoid z-index issues.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './AISuggestionPopover.css';
 
@@ -68,7 +69,7 @@ export function AISuggestionPopover({
             const viewportHeight = window.innerHeight;
             const viewportWidth = window.innerWidth;
 
-            let style = {
+            const style = {
                 position: 'fixed',
                 zIndex: 10000,
             };
@@ -187,7 +188,16 @@ export function AISuggestionPopover({
                         <div
                             key={suggestion.id}
                             className={`ai-popover__item ${isSelected ? 'ai-popover__item--selected' : ''}`}
+                            role="button"
+                            tabIndex={disabled ? -1 : 0}
+                            aria-disabled={disabled}
                             onClick={() => !disabled && onApply?.(suggestion)}
+                            onKeyDown={(event) => {
+                                if ((event.key === 'Enter' || event.key === ' ') && !disabled) {
+                                    event.preventDefault();
+                                    onApply?.(suggestion);
+                                }
+                            }}
                             onMouseEnter={() => setSelectedIndex(index)}
                         >
                             <div className="ai-popover__item-content">
@@ -244,5 +254,29 @@ export function AISuggestionPopover({
     // Use portal to render at document.body level
     return createPortal(popoverContent, document.body);
 }
+
+const suggestionShape = PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    content: PropTypes.string,
+    explanation: PropTypes.string,
+    source: PropTypes.string,
+    confidence: PropTypes.number,
+});
+
+AISuggestionPopover.propTypes = {
+    suggestions: PropTypes.arrayOf(suggestionShape),
+    onApply: PropTypes.func,
+    onDismiss: PropTypes.func,
+    disabled: PropTypes.bool,
+    position: PropTypes.oneOf(['top', 'bottom', 'right']),
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func,
+    anchorRef: PropTypes.shape({
+        current: PropTypes.shape({
+            getBoundingClientRect: PropTypes.func,
+            contains: PropTypes.func,
+        }),
+    }),
+};
 
 export default AISuggestionPopover;

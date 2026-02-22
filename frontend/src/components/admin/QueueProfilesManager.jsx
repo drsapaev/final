@@ -11,7 +11,8 @@
  * - Bulk operations (delete, activate/deactivate)
  * - CRUD for individual profiles
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Plus,
     Edit2,
@@ -898,6 +899,12 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             display_order: parseInt(formData.display_order, 10) || 0,
         });
     };
+    const handleActivationKeyDown = (event, action) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            action();
+        }
+    };
 
     const styles = {
         overlay: {
@@ -1034,8 +1041,13 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
     };
 
     return (
-        <div style={styles.overlay} onClick={onCancel}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+        <div
+            style={styles.overlay}
+            role="button"
+            tabIndex={0}
+            onClick={onCancel}
+            onKeyDown={(event) => handleActivationKeyDown(event, onCancel)}>
+            <div style={styles.modal} onClickCapture={e => e.stopPropagation()}>
                 <div style={styles.header}>
                     <h3 style={styles.title}>
                         {isEdit ? 'Редактирование вкладки' : 'Новая вкладка'}
@@ -1210,6 +1222,36 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             </div>
         </div>
     );
+};
+
+const queueProfileShape = PropTypes.shape({
+    key: PropTypes.string,
+    title: PropTypes.string,
+    title_ru: PropTypes.string,
+    queue_tags: PropTypes.oneOfType([
+        PropTypes.arrayOf(PropTypes.string),
+        PropTypes.string
+    ]),
+    department_key: PropTypes.string,
+    order: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    display_order: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    is_active: PropTypes.bool,
+    show_on_qr_page: PropTypes.bool,
+    icon: PropTypes.string,
+    color: PropTypes.string
+});
+
+QueueProfilesManager.propTypes = {
+    theme: PropTypes.oneOf(['light', 'dark'])
+};
+
+ProfileForm.propTypes = {
+    profile: queueProfileShape,
+    onSubmit: PropTypes.func,
+    onCancel: PropTypes.func,
+    saving: PropTypes.bool,
+    isDark: PropTypes.bool,
+    isEdit: PropTypes.bool
 };
 
 export default QueueProfilesManager;

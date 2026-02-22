@@ -1,3 +1,5 @@
+import React from 'react';
+
 // Экспорт всех компонентов уведомлений
 export { default as ModernToast } from './ModernToast';
 export { default as ModernAlert } from './ModernAlert';

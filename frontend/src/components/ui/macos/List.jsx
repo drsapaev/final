@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -12,8 +13,8 @@ const List = React.forwardRef(({
   variant = 'default',
   dense = false,
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
   const listStyles = {
     backgroundColor: 'var(--mac-bg-primary)',
@@ -29,11 +30,11 @@ const List = React.forwardRef(({
       ref={ref}
       className={`mac-list mac-list--${variant} ${dense ? 'mac-list--dense' : ''} ${className}`}
       style={listStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </ul>
-  );
+    </ul>);
+
 });
 
 /**
@@ -85,11 +86,11 @@ const ListItem = React.forwardRef(({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       disabled={disabled}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </Component>
-  );
+    </Component>);
+
 });
 
 /**
@@ -114,30 +115,30 @@ const ListItemText = React.forwardRef(({
       ref={ref}
       className={`mac-list-item-text ${className}`}
       style={textStyles}
-      {...props}
-    >
-      {primary && (
-        <div style={{
-          fontSize: '14px',
-          fontWeight: '500',
-          color: 'var(--mac-text-primary)',
-          marginBottom: secondary ? '2px' : '0'
-        }}>
+      {...props}>
+      
+      {primary &&
+      <div style={{
+        fontSize: '14px',
+        fontWeight: '500',
+        color: 'var(--mac-text-primary)',
+        marginBottom: secondary ? '2px' : '0'
+      }}>
           {primary}
         </div>
-      )}
-      {secondary && (
-        <div style={{
-          fontSize: '12px',
-          color: 'var(--mac-text-secondary)',
-          lineHeight: '1.3'
-        }}>
+      }
+      {secondary &&
+      <div style={{
+        fontSize: '12px',
+        color: 'var(--mac-text-secondary)',
+        lineHeight: '1.3'
+      }}>
           {secondary}
         </div>
-      )}
+      }
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 /**
@@ -163,11 +164,11 @@ const ListItemIcon = React.forwardRef(({
       ref={ref}
       className={`mac-list-item-icon ${className}`}
       style={iconStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 /**
@@ -191,11 +192,11 @@ const ListItemSecondaryAction = React.forwardRef(({
       ref={ref}
       className={`mac-list-item-secondary-action ${className}`}
       style={actionStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 /**
@@ -228,9 +229,9 @@ const Divider = React.forwardRef(({
       ref={ref}
       className={`mac-divider mac-divider--${orientation} mac-divider--${variant} ${className}`}
       style={dividerStyles}
-      {...props}
-    />
-  );
+      {...props} />);
+
+
 });
 
 List.displayName = 'List';
@@ -239,6 +240,51 @@ ListItemText.displayName = 'ListItemText';
 ListItemIcon.displayName = 'ListItemIcon';
 ListItemSecondaryAction.displayName = 'ListItemSecondaryAction';
 Divider.displayName = 'Divider';
+
+List.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  variant: PropTypes.string,
+  dense: PropTypes.bool
+};
+
+ListItem.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  button: PropTypes.bool,
+  selected: PropTypes.bool,
+  disabled: PropTypes.bool,
+  onClick: PropTypes.func
+};
+
+ListItemText.propTypes = {
+  primary: PropTypes.node,
+  secondary: PropTypes.node,
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+ListItemIcon.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+ListItemSecondaryAction.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+Divider.propTypes = {
+  className: PropTypes.string,
+  style: PropTypes.object,
+  variant: PropTypes.string,
+  orientation: PropTypes.string
+};
 
 export default List;
 export { ListItem, ListItemText, ListItemIcon, ListItemSecondaryAction, Divider };

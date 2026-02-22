@@ -274,7 +274,7 @@ export const validators = {
 
   phone: (value) => {
     if (!value) return null;
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     if (!phoneRegex.test(value)) {
       return 'Некорректный номер телефона';
     }

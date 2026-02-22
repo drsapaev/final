@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 // Simple macOS-style Box (container) that maps common MUI Box props
 const Box = React.forwardRef(({ children, style = {}, sx = {}, display, alignItems, justifyContent, gap, mt, mb, mx, my, px, py, p, m, maxWidth, textAlign, ...props }, ref) => {
@@ -48,6 +49,28 @@ const Box = React.forwardRef(({ children, style = {}, sx = {}, display, alignIte
 
 
 Box.displayName = 'macOS Box';
+
+const spacingPropType = PropTypes.oneOfType([PropTypes.number, PropTypes.string]);
+
+Box.propTypes = {
+  children: PropTypes.node,
+  style: PropTypes.object,
+  sx: PropTypes.object,
+  display: PropTypes.string,
+  alignItems: PropTypes.string,
+  justifyContent: PropTypes.string,
+  gap: spacingPropType,
+  mt: spacingPropType,
+  mb: spacingPropType,
+  mx: spacingPropType,
+  my: spacingPropType,
+  px: spacingPropType,
+  py: spacingPropType,
+  p: spacingPropType,
+  m: spacingPropType,
+  maxWidth: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  textAlign: PropTypes.string
+};
 
 export default Box;
 

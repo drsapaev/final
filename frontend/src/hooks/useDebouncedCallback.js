@@ -49,6 +49,7 @@ export function useDebouncedCallback(callback, delay, deps = []) {
     }, []);
 
     const debouncedCallback = useCallback((...args) => {
+        void deps;
         // Отменяем предыдущий таймаут
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
@@ -58,7 +59,7 @@ export function useDebouncedCallback(callback, delay, deps = []) {
         timeoutRef.current = setTimeout(() => {
             callbackRef.current(...args);
         }, resolvedDelay);
-    }, [resolvedDelay, ...deps]);
+    }, [resolvedDelay, deps]);
 
     // Метод для немедленного вызова (flush)
     debouncedCallback.flush = useCallback((...args) => {

@@ -1,3 +1,5 @@
+import React from 'react';
+
 // Экспорт всех компонентов кнопок
 export { default as ModernButton } from './ModernButton';
 export { default as ButtonGroup } from './ButtonGroup';

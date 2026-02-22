@@ -3,7 +3,8 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useCallback } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { mcpAPI } from '../utils/mcp';
 import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
@@ -31,11 +32,12 @@ export const useAIAssistant = (options = {}) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isListening, setIsListening] = useState(false);
-  const { prefersReducedMotion } = useReducedMotion();
+  const [isListening, setIsListening] = useState(false);void
+  useReducedMotion();
 
   // Отправка сообщения
   const sendMessage = useCallback(async (message, options = {}) => {
+    void options;
     if (!message || message.trim() === '') return;
 
     // Detect prompt injection attempts
@@ -56,7 +58,7 @@ export const useAIAssistant = (options = {}) => {
       type: 'text'
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
 
     try {
       const response = await mcpAPI.chat({
@@ -84,7 +86,7 @@ export const useAIAssistant = (options = {}) => {
           throw new Error('AI response validation failed');
         }
 
-        setMessages(prev => [...prev, validatedMessage]);
+        setMessages((prev) => [...prev, validatedMessage]);
         return validatedMessage;
       } else {
         throw new Error(response.error || 'AI request failed');
@@ -101,7 +103,7 @@ export const useAIAssistant = (options = {}) => {
         type: 'error'
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
@@ -196,7 +198,7 @@ export const useAISuggestions = (options = {}) => {
         }));
 
         setSuggestions(newSuggestions);
-        setHistory(prev => [...prev, { context, suggestions: newSuggestions, timestamp: new Date() }]);
+        setHistory((prev) => [...prev, { context, suggestions: newSuggestions, timestamp: new Date() }]);
         return newSuggestions;
       } else {
         throw new Error(response.error || 'Failed to generate suggestions');
@@ -211,7 +213,7 @@ export const useAISuggestions = (options = {}) => {
 
   // Фильтрация по уверенности
   const filterByConfidence = useCallback((minConfidence = 0.5) => {
-    return suggestions.filter(suggestion => suggestion.confidence >= minConfidence);
+    return suggestions.filter((suggestion) => suggestion.confidence >= minConfidence);
   }, [suggestions]);
 
   // Группировка по категориям
@@ -288,7 +290,7 @@ export const useAITranslation = (options = {}) => {
           timestamp: new Date()
         };
 
-        setTranslations(prev => [...prev, translation]);
+        setTranslations((prev) => [...prev, translation]);
         return response.data.translation;
       } else {
         throw new Error(response.error || 'Translation failed');
@@ -338,7 +340,7 @@ export const useAITranslation = (options = {}) => {
 export const useAIImageAnalysis = (options = {}) => {
   const {
     provider = AI_CONFIG.defaultProvider,
-    model = 'vision',
+
     useMCP = true
   } = options;
 
@@ -440,8 +442,8 @@ export const AIAssistant = ({
         borderRadius: '8px',
         overflow: 'hidden'
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Заголовок */}
       <div
         className="ai-assistant-header"
@@ -452,8 +454,8 @@ export const AIAssistant = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
-        }}
-      >
+        }}>
+        
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ fontSize: '20px' }}>🤖</div>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#374151' }}>
@@ -485,8 +487,8 @@ export const AIAssistant = ({
               if (!loading && !isListening && !prefersReducedMotion) {
                 e.target.style.backgroundColor = '#ffffff';
               }
-            }}
-          >
+            }}>
+            
             {isListening ? '🎤 Слушаю...' : '🎤 Голос'}
           </button>
 
@@ -515,8 +517,8 @@ export const AIAssistant = ({
                 e.target.style.backgroundColor = '#ffffff';
                 e.target.style.borderColor = '#d1d5db';
               }
-            }}
-          >
+            }}>
+            
             🗑️ Очистить
           </button>
         </div>
@@ -529,59 +531,59 @@ export const AIAssistant = ({
           flex: 1,
           overflow: 'auto',
           padding: '16px'
-        }}
-      >
-        {messages.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              color: '#6b7280',
-              fontSize: '14px',
-              marginTop: '40px'
-            }}
-          >
+        }}>
+        
+        {messages.length === 0 ?
+        <div
+          style={{
+            textAlign: 'center',
+            color: '#6b7280',
+            fontSize: '14px',
+            marginTop: '40px'
+          }}>
+          
             Начните разговор с ИИ помощником
-          </div>
-        ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={`message ${message.role}`}
-              style={{
-                marginBottom: '16px',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                maxWidth: '80%',
-                ...(message.role === 'user'
-                  ? {
-                      backgroundColor: '#3b82f6',
-                      color: '#ffffff',
-                      marginLeft: 'auto',
-                      borderBottomRightRadius: '4px'
-                    }
-                  : {
-                      backgroundColor: '#f3f4f6',
-                      color: '#374151',
-                      borderBottomLeftRadius: '4px'
-                    }
-                )
-              }}
-            >
+          </div> :
+
+        messages.map((message) =>
+        <div
+          key={message.id}
+          className={`message ${message.role}`}
+          style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            maxWidth: '80%',
+            ...(message.role === 'user' ?
+            {
+              backgroundColor: '#3b82f6',
+              color: '#ffffff',
+              marginLeft: 'auto',
+              borderBottomRightRadius: '4px'
+            } :
+            {
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              borderBottomLeftRadius: '4px'
+            })
+
+          }}>
+          
               <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
                 {message.content}
               </div>
               <div
-                style={{
-                  fontSize: '11px',
-                  opacity: 0.7,
-                  marginTop: '4px'
-                }}
-              >
+            style={{
+              fontSize: '11px',
+              opacity: 0.7,
+              marginTop: '4px'
+            }}>
+            
                 {message.timestamp.toLocaleTimeString()}
               </div>
             </div>
-          ))
-        )}
+        )
+        }
       </div>
 
       {/* Поле ввода */}
@@ -591,23 +593,23 @@ export const AIAssistant = ({
           padding: '16px 20px',
           borderTop: '1px solid #e5e7eb',
           backgroundColor: '#f8fafc'
-        }}
-      >
-        {error && (
-          <div
-            style={{
-              color: '#ef4444',
-              fontSize: '12px',
-              marginBottom: '8px',
-              padding: '4px 8px',
-              backgroundColor: '#fef2f2',
-              borderRadius: '4px',
-              border: '1px solid #fecaca'
-            }}
-          >
+        }}>
+        
+        {error &&
+        <div
+          style={{
+            color: '#ef4444',
+            fontSize: '12px',
+            marginBottom: '8px',
+            padding: '4px 8px',
+            backgroundColor: '#fef2f2',
+            borderRadius: '4px',
+            border: '1px solid #fecaca'
+          }}>
+          
             {error}
           </div>
-        )}
+        }
 
         <form
           onSubmit={(e) => {
@@ -618,8 +620,8 @@ export const AIAssistant = ({
               input.value = '';
             }
           }}
-          style={{ display: 'flex', gap: '8px' }}
-        >
+          style={{ display: 'flex', gap: '8px' }}>
+          
           <input
             type="text"
             name="message"
@@ -645,8 +647,8 @@ export const AIAssistant = ({
               if (!prefersReducedMotion) {
                 e.target.style.borderColor = '#d1d5db';
               }
-            }}
-          />
+            }} />
+          
 
           <button
             type="submit"
@@ -675,27 +677,27 @@ export const AIAssistant = ({
               if (!loading && !prefersReducedMotion) {
                 e.target.style.backgroundColor = '#3b82f6';
               }
-            }}
-          >
-            {loading ? (
-              <>
+            }}>
+            
+            {loading ?
+            <>
                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
                 Отправка...
-              </>
-            ) : (
-              <>
+              </> :
+
+            <>
                 <span>Отправить</span>
                 <span>📤</span>
               </>
-            )}
+            }
           </button>
         </form>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент ИИ предложений
@@ -719,8 +721,8 @@ export const AISuggestions = ({
         borderRadius: '8px',
         overflow: 'hidden'
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Заголовок */}
       <div
         style={{
@@ -730,8 +732,8 @@ export const AISuggestions = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
-        }}
-      >
+        }}>
+        
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ fontSize: '18px' }}>💡</div>
           <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#374151' }}>
@@ -762,100 +764,135 @@ export const AISuggestions = ({
             if (!loading && !prefersReducedMotion) {
               e.target.style.backgroundColor = '#ffffff';
             }
-          }}
-        >
+          }}>
+          
           {loading ? 'Генерация...' : '🔄 Ещё'}
         </button>
       </div>
 
       {/* Предложения */}
       <div style={{ padding: '16px' }}>
-        {error && (
-          <div
-            style={{
-              color: '#ef4444',
-              fontSize: '12px',
-              marginBottom: '12px',
-              padding: '8px',
-              backgroundColor: '#fef2f2',
-              borderRadius: '4px',
-              border: '1px solid #fecaca'
-            }}
-          >
+        {error &&
+        <div
+          style={{
+            color: '#ef4444',
+            fontSize: '12px',
+            marginBottom: '12px',
+            padding: '8px',
+            backgroundColor: '#fef2f2',
+            borderRadius: '4px',
+            border: '1px solid #fecaca'
+          }}>
+          
             {error}
           </div>
-        )}
+        }
 
-        {suggestions.length === 0 && !loading && !error ? (
-          <div
-            style={{
-              textAlign: 'center',
-              color: '#6b7280',
-              fontSize: '14px',
-              padding: '20px'
-            }}
-          >
+        {suggestions.length === 0 && !loading && !error ?
+        <div
+          style={{
+            textAlign: 'center',
+            color: '#6b7280',
+            fontSize: '14px',
+            padding: '20px'
+          }}>
+          
             Предложений пока нет
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion.id}
-                onClick={() => onSelectSuggestion && onSelectSuggestion(suggestion)}
-                style={{
-                  padding: '12px 16px',
-                  textAlign: 'left',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: '#ffffff',
-                  color: '#374151',
-                  cursor: 'pointer',
-                  transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
-                  fontSize: '14px',
-                  lineHeight: '1.4'
-                }}
-                onMouseEnter={(e) => {
-                  if (!prefersReducedMotion) {
-                    e.target.style.backgroundColor = '#f8fafc';
-                    e.target.style.borderColor = '#d1d5db';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!prefersReducedMotion) {
-                    e.target.style.backgroundColor = '#ffffff';
-                    e.target.style.borderColor = '#e5e7eb';
-                  }
-                }}
-              >
+          </div> :
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {suggestions.map((suggestion) =>
+          <button
+            key={suggestion.id}
+            onClick={() => onSelectSuggestion && onSelectSuggestion(suggestion)}
+            style={{
+              padding: '12px 16px',
+              textAlign: 'left',
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              backgroundColor: '#ffffff',
+              color: '#374151',
+              cursor: 'pointer',
+              transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
+              fontSize: '14px',
+              lineHeight: '1.4'
+            }}
+            onMouseEnter={(e) => {
+              if (!prefersReducedMotion) {
+                e.target.style.backgroundColor = '#f8fafc';
+                e.target.style.borderColor = '#d1d5db';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!prefersReducedMotion) {
+                e.target.style.backgroundColor = '#ffffff';
+                e.target.style.borderColor = '#e5e7eb';
+              }
+            }}>
+            
                 <div style={{ fontWeight: '500', marginBottom: '4px' }}>
                   {suggestion.text}
                 </div>
-                {suggestion.confidence && (
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: '#6b7280',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
+                {suggestion.confidence &&
+            <div
+              style={{
+                fontSize: '11px',
+                color: '#6b7280',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+              
                     <span>Уверенность: {Math.round(suggestion.confidence * 100)}%</span>
-                    {suggestion.category && (
-                      <span style={{ backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '10px' }}>
+                    {suggestion.category &&
+              <span style={{ backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '10px' }}>
                         {suggestion.category}
                       </span>
-                    )}
+              }
                   </div>
-                )}
+            }
               </button>
-            ))}
+          )}
           </div>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
+};
+
+const aiMessageShape = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  role: PropTypes.string,
+  content: PropTypes.string,
+  timestamp: PropTypes.oneOfType([PropTypes.instanceOf(Date), PropTypes.string]),
+  type: PropTypes.string
+});
+
+const aiSuggestionShape = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  text: PropTypes.string,
+  confidence: PropTypes.number,
+  category: PropTypes.string
+});
+
+AIAssistant.propTypes = {
+  messages: PropTypes.arrayOf(aiMessageShape),
+  loading: PropTypes.bool,
+  error: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  onSendMessage: PropTypes.func,
+  onClearMessages: PropTypes.func,
+  onStartListening: PropTypes.func,
+  isListening: PropTypes.bool,
+  className: PropTypes.string
+};
+
+AISuggestions.propTypes = {
+  suggestions: PropTypes.arrayOf(aiSuggestionShape),
+  loading: PropTypes.bool,
+  error: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  onSelectSuggestion: PropTypes.func,
+  onGenerateMore: PropTypes.func,
+  className: PropTypes.string
 };
 
 export default useAIAssistant;

@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../api/client';
+import logger from '../utils/logger';
 
 /**
  * @typedef {Object} SectionTemplate
@@ -98,7 +99,7 @@ export function useDoctorSectionTemplates({
             setTemplates(response.data.templates || []);
         } catch (err) {
             if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
-                console.error('[useDoctorSectionTemplates] Fetch error:', err);
+                logger.error('[useDoctorSectionTemplates] Fetch error:', err);
                 setError(err.message || 'Failed to load templates');
                 setTemplates([]);
             }
@@ -128,7 +129,7 @@ export function useDoctorSectionTemplates({
             await fetchTemplates(); // Refresh list
             return { success: true };
         } catch (err) {
-            console.error('[useDoctorSectionTemplates] Pin error:', err);
+            logger.error('[useDoctorSectionTemplates] Pin error:', err);
             return { success: false, error: err.message };
         }
     }, [section, fetchTemplates]);
@@ -143,7 +144,7 @@ export function useDoctorSectionTemplates({
             await fetchTemplates();
             return { success: true };
         } catch (err) {
-            console.error('[useDoctorSectionTemplates] Unpin error:', err);
+            logger.error('[useDoctorSectionTemplates] Unpin error:', err);
             return { success: false, error: err.message };
         }
     }, [section, fetchTemplates]);
@@ -163,7 +164,7 @@ export function useDoctorSectionTemplates({
             await fetchTemplates();
             return { success: true, template: response.data };
         } catch (err) {
-            console.error('[useDoctorSectionTemplates] Update error:', err);
+            logger.error('[useDoctorSectionTemplates] Update error:', err);
             return { success: false, error: err.message };
         }
     }, [section, fetchTemplates]);
@@ -178,7 +179,7 @@ export function useDoctorSectionTemplates({
             await fetchTemplates();
             return { success: true };
         } catch (err) {
-            console.error('[useDoctorSectionTemplates] Delete error:', err);
+            logger.error('[useDoctorSectionTemplates] Delete error:', err);
             return { success: false, error: err.message };
         }
     }, [section, fetchTemplates]);

@@ -9,12 +9,13 @@
  * - No internal state for EMR data
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import EMRSection from './EMRSection';
 import ComplaintsField from '../../emr/ComplaintsField';
 import { api } from '../../../api/client';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
+import logger from '../../../utils/logger';
 
 /**
  * ComplaintsSection Component
@@ -72,7 +73,7 @@ export function ComplaintsSection({
             return historyItems;
 
         } catch (e) {
-            console.error('Failed to fetch complaints history:', e);
+            logger.error('Failed to fetch complaints history:', e);
             return [];
         }
     }, [doctorId, specialty]);

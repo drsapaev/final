@@ -1,5 +1,4 @@
-import React, { Suspense, lazy } from 'react';
-
+import { Suspense, lazy } from 'react';
 // Динамический импорт для уменьшения размера основного бандла
 const MacOSDemo = lazy(() => import('../components/examples/MacOSDemo'));
 

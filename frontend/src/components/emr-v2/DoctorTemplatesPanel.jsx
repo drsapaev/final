@@ -12,7 +12,7 @@
  * - Stale warning (давно не использовал)
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { History, Pin, Edit2, Trash2, X, Save, Plus } from 'lucide-react';
 import { useDoctorSectionTemplates, SECTION_LABELS } from '../../hooks/useDoctorSectionTemplates';
 import './DoctorTemplatesPanel.css';
@@ -97,11 +97,19 @@ export function DoctorTemplatesPanel({
     if (!isOpen) return null;
 
     const sectionLabel = SECTION_LABELS[section] || section;
+    const backdropStyle = { border: 'none', margin: 0, padding: 0 };
 
     return (
         <div className="doctor-templates-overlay">
             {/* Backdrop */}
-            <div className="doctor-templates-backdrop" onClick={handleClose} />
+            <button
+                type="button"
+                className="doctor-templates-backdrop"
+                onClick={handleClose}
+                tabIndex={-1}
+                style={backdropStyle}
+                aria-label="Закрыть панель шаблонов"
+            />
 
             {/* Panel */}
             <div className="doctor-templates-panel">

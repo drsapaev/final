@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
   MacOSButton,
@@ -7,9 +7,9 @@ import {
   MacOSSelect,
   MacOSTextarea,
   MacOSLoadingSkeleton,
-  MacOSEmptyState,
-  MacOSAlert
-} from '../ui/macos';
+  MacOSEmptyState } from
+
+'../ui/macos';
 import {
   Plus,
   Edit,
@@ -25,17 +25,17 @@ import {
   Settings,
   Save,
   X,
-  Eye,
+
   Play,
-  Pause
-} from 'lucide-react';
+  Pause } from
+'lucide-react';
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 
 // API base URL with fallback for development
-const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+void (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:8000');
 
 const DynamicPricingManager = () => {
   const [activeTab, setActiveTab] = useState('rules');
@@ -46,8 +46,8 @@ const DynamicPricingManager = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
   const [showCreatePackage, setShowCreatePackage] = useState(false);
-  const [editingRule, setEditingRule] = useState(null);
-  const [editingPackage, setEditingPackage] = useState(null);
+  const [, setEditingRule] = useState(null);
+  const [, setEditingPackage] = useState(null);
 
   // Форма для правила ценообразования
   const [ruleForm, setRuleForm] = useState({
@@ -81,11 +81,7 @@ const DynamicPricingManager = () => {
     per_patient_limit: ''
   });
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Загружаем услуги
@@ -131,7 +127,11 @@ const DynamicPricingManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleCreateRule = async () => {
     try {
@@ -232,52 +232,52 @@ const DynamicPricingManager = () => {
     }
   };
 
-  const renderRulesTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderRulesTab = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок и кнопки */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }}>
         <div>
           <h3 style={{
-            margin: '0 0 4px 0',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+          margin: '0 0 4px 0',
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
             Правила ценообразования
           </h3>
           <p style={{
-            margin: 0,
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          margin: 0,
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
             Управление автоматическими скидками и правилами
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <MacOSButton
-            onClick={handleUpdateDynamicPrices}
-            variant="outline"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
+          onClick={handleUpdateDynamicPrices}
+          variant="outline"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+          
             <TrendingUp size={16} />
             Обновить цены
           </MacOSButton>
           <MacOSButton
-            onClick={() => setShowCreateRule(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
+          onClick={() => setShowCreateRule(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+          
             <Plus size={16} />
             Создать правило
           </MacOSButton>
@@ -286,39 +286,39 @@ const DynamicPricingManager = () => {
 
       {/* Список правил */}
       <div style={{ display: 'grid', gap: '16px' }}>
-        {pricingRules.length === 0 ? (
-          <MacOSEmptyState
-            type="rule"
-            title="Правила не найдены"
-            description="В системе пока нет созданных правил ценообразования"
-            action={
-              <MacOSButton onClick={() => setShowCreateRule(true)}>
+        {pricingRules.length === 0 ?
+      <MacOSEmptyState
+        type="rule"
+        title="Правила не найдены"
+        description="В системе пока нет созданных правил ценообразования"
+        action={
+        <MacOSButton onClick={() => setShowCreateRule(true)}>
                 <Plus size={16} style={{ marginRight: '8px' }} />
                 Создать первое правило
               </MacOSButton>
-            }
-          />
-        ) : (
-          pricingRules.map(rule => (
-            <MacOSCard key={rule.id} style={{ padding: 0 }}>
+        } /> :
+
+
+      pricingRules.map((rule) =>
+      <MacOSCard key={rule.id} style={{ padding: 0 }}>
               <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start'
-              }}>
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}>
                 <div style={{ flex: 1 }}>
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '12px'
-                  }}>
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
                     <h4 style={{
-                      margin: 0,
-                      color: 'var(--mac-text-primary)',
-                      fontSize: 'var(--mac-font-size-md)',
-                      fontWeight: 'var(--mac-font-weight-semibold)'
-                    }}>
+                margin: 0,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-md)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
+              }}>
                       {rule.name}
                     </h4>
                     <MacOSBadge variant={rule.is_active ? 'success' : 'secondary'}>
@@ -335,20 +335,20 @@ const DynamicPricingManager = () => {
                   </div>
 
                   <p style={{
-                    margin: '0 0 12px 0',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-sm)'
-                  }}>
+              margin: '0 0 12px 0',
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
                     {rule.description}
                   </p>
 
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '16px',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Percent size={12} />
                       {rule.discount_type === 'PERCENTAGE' ? `${rule.discount_value}%` : `${rule.discount_value} ₽`}
@@ -364,92 +364,92 @@ const DynamicPricingManager = () => {
                     </span>
                   </div>
 
-                  {(rule.start_time || rule.end_time) && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)',
-                      marginTop: '8px'
-                    }}>
+                  {(rule.start_time || rule.end_time) &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)',
+              marginTop: '8px'
+            }}>
                       <Clock size={12} />
                       {rule.start_time} - {rule.end_time}
                     </div>
-                  )}
+            }
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => handleToggleRule(rule.id, rule.is_active)}
-                    style={{
-                      padding: '6px',
-                      minWidth: 'auto',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title={rule.is_active ? 'Приостановить' : 'Активировать'}
-                  >
+              variant="outline"
+              onClick={() => handleToggleRule(rule.id, rule.is_active)}
+              style={{
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title={rule.is_active ? 'Приостановить' : 'Активировать'}>
+              
                     {rule.is_active ? <Pause size={16} /> : <Play size={16} />}
                   </MacOSButton>
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => setEditingRule(rule)}
-                    style={{
-                      padding: '6px',
-                      minWidth: 'auto',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Редактировать"
-                  >
+              variant="outline"
+              onClick={() => setEditingRule(rule)}
+              style={{
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Редактировать">
+              
                     <Edit size={16} />
                   </MacOSButton>
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => handleDeleteRule(rule.id)}
-                    style={{
-                      padding: '6px',
-                      minWidth: 'auto',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Удалить"
-                  >
+              variant="outline"
+              onClick={() => handleDeleteRule(rule.id)}
+              style={{
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Удалить">
+              
                     <Trash2 size={16} />
                   </MacOSButton>
                 </div>
               </div>
             </MacOSCard>
-          ))
-        )}
+      )
+      }
       </div>
 
       {/* Форма создания правила */}
-      {showCreateRule && (
-        <MacOSCard style={{ padding: '24px' }}>
+      {showCreateRule &&
+    <MacOSCard style={{ padding: '24px' }}>
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}>
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px'
+      }}>
             <h4 style={{
-              margin: 0,
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+          margin: 0,
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
               Создать правило ценообразования
             </h4>
             <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
@@ -458,41 +458,41 @@ const DynamicPricingManager = () => {
           </div>
 
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '16px'
-          }}>
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px'
+      }}>
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Название
               </label>
               <MacOSInput
-                value={ruleForm.name}
-                onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
-                placeholder="Название правила"
-              />
+            value={ruleForm.name}
+            onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
+            placeholder="Название правила" />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Тип правила
               </label>
               <MacOSSelect
-                value={ruleForm.rule_type}
-                onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })}
-              >
+            value={ruleForm.rule_type}
+            onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })}>
+            
                 <option value="TIME_BASED">По времени</option>
                 <option value="VOLUME_BASED">По объему</option>
                 <option value="SEASONAL">Сезонное</option>
@@ -504,18 +504,18 @@ const DynamicPricingManager = () => {
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Тип скидки
               </label>
               <MacOSSelect
-                value={ruleForm.discount_type}
-                onChange={(e) => setRuleForm({ ...ruleForm, discount_type: e.target.value })}
-              >
+            value={ruleForm.discount_type}
+            onChange={(e) => setRuleForm({ ...ruleForm, discount_type: e.target.value })}>
+            
                 <option value="PERCENTAGE">Процентная</option>
                 <option value="FIXED_AMOUNT">Фиксированная сумма</option>
                 <option value="BUY_X_GET_Y">Купи X получи Y</option>
@@ -525,142 +525,142 @@ const DynamicPricingManager = () => {
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Размер скидки
               </label>
               <MacOSInput
-                type="number"
-                value={ruleForm.discount_value}
-                onChange={(e) => setRuleForm({ ...ruleForm, discount_value: parseFloat(e.target.value) })}
-                placeholder="10"
-              />
+            type="number"
+            value={ruleForm.discount_value}
+            onChange={(e) => setRuleForm({ ...ruleForm, discount_value: parseFloat(e.target.value) })}
+            placeholder="10" />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Время начала
               </label>
               <MacOSInput
-                type="time"
-                value={ruleForm.start_time}
-                onChange={(e) => setRuleForm({ ...ruleForm, start_time: e.target.value + ':00' })}
-              />
+            type="time"
+            value={ruleForm.start_time}
+            onChange={(e) => setRuleForm({ ...ruleForm, start_time: e.target.value + ':00' })} />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Время окончания
               </label>
               <MacOSInput
-                type="time"
-                value={ruleForm.end_time}
-                onChange={(e) => setRuleForm({ ...ruleForm, end_time: e.target.value + ':00' })}
-              />
+            type="time"
+            value={ruleForm.end_time}
+            onChange={(e) => setRuleForm({ ...ruleForm, end_time: e.target.value + ':00' })} />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Минимальное количество
               </label>
               <MacOSInput
-                type="number"
-                value={ruleForm.min_quantity}
-                onChange={(e) => setRuleForm({ ...ruleForm, min_quantity: parseInt(e.target.value) })}
-                placeholder="1"
-              />
+            type="number"
+            value={ruleForm.min_quantity}
+            onChange={(e) => setRuleForm({ ...ruleForm, min_quantity: parseInt(e.target.value) })}
+            placeholder="1" />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Приоритет
               </label>
               <MacOSInput
-                type="number"
-                value={ruleForm.priority}
-                onChange={(e) => setRuleForm({ ...ruleForm, priority: parseInt(e.target.value) })}
-                placeholder="0"
-              />
+            type="number"
+            value={ruleForm.priority}
+            onChange={(e) => setRuleForm({ ...ruleForm, priority: parseInt(e.target.value) })}
+            placeholder="0" />
+          
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Описание
               </label>
               <MacOSTextarea
-                value={ruleForm.description}
-                onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
-                placeholder="Описание правила"
-              />
+            value={ruleForm.description}
+            onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
+            placeholder="Описание правила" />
+          
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Услуги
               </label>
               <MacOSSelect
-                multiple
-                value={ruleForm.service_ids}
-                onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-                  setRuleForm({ ...ruleForm, service_ids: values });
-                }}
-              >
-                {services.map(service => (
-                  <option key={service.id} value={service.id}>
+            multiple
+            value={ruleForm.service_ids}
+            onChange={(e) => {
+              const values = Array.from(e.target.selectedOptions, (option) => parseInt(option.value));
+              setRuleForm({ ...ruleForm, service_ids: values });
+            }}>
+            
+                {services.map((service) =>
+            <option key={service.id} value={service.id}>
                     {service.name} - {service.price} ₽
                   </option>
-                ))}
+            )}
               </MacOSSelect>
             </div>
           </div>
 
           <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            marginTop: '16px'
-          }}>
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '8px',
+        marginTop: '16px'
+      }}>
             <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
               Отмена
             </MacOSButton>
@@ -670,43 +670,43 @@ const DynamicPricingManager = () => {
             </MacOSButton>
           </div>
         </MacOSCard>
-      )}
-    </div>
-  );
+    }
+    </div>;
 
-  const renderPackagesTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderPackagesTab = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок и кнопки */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }}>
         <div>
           <h3 style={{
-            margin: '0 0 4px 0',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+          margin: '0 0 4px 0',
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
             Пакеты услуг
           </h3>
           <p style={{
-            margin: 0,
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-sm)'
-          }}>
+          margin: 0,
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
             Управление комплексными предложениями
           </p>
         </div>
         <MacOSButton
-          onClick={() => setShowCreatePackage(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
+        onClick={() => setShowCreatePackage(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+        
           <Plus size={16} />
           Создать пакет
         </MacOSButton>
@@ -714,39 +714,39 @@ const DynamicPricingManager = () => {
 
       {/* Список пакетов */}
       <div style={{ display: 'grid', gap: '16px' }}>
-        {servicePackages.length === 0 ? (
-          <MacOSEmptyState
-            type="package"
-            title="Пакеты не найдены"
-            description="В системе пока нет созданных пакетов услуг"
-            action={
-              <MacOSButton onClick={() => setShowCreatePackage(true)}>
+        {servicePackages.length === 0 ?
+      <MacOSEmptyState
+        type="package"
+        title="Пакеты не найдены"
+        description="В системе пока нет созданных пакетов услуг"
+        action={
+        <MacOSButton onClick={() => setShowCreatePackage(true)}>
                 <Plus size={16} style={{ marginRight: '8px' }} />
                 Создать первый пакет
               </MacOSButton>
-            }
-          />
-        ) : (
-          servicePackages.map(pkg => (
-            <MacOSCard key={pkg.id} style={{ padding: 0 }}>
+        } /> :
+
+
+      servicePackages.map((pkg) =>
+      <MacOSCard key={pkg.id} style={{ padding: 0 }}>
               <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start'
-              }}>
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}>
                 <div style={{ flex: 1 }}>
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '12px'
-                  }}>
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
                     <h4 style={{
-                      margin: 0,
-                      color: 'var(--mac-text-primary)',
-                      fontSize: 'var(--mac-font-size-md)',
-                      fontWeight: 'var(--mac-font-weight-semibold)'
-                    }}>
+                margin: 0,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-md)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
+              }}>
                       {pkg.name}
                     </h4>
                     <MacOSBadge variant={pkg.is_active ? 'success' : 'secondary'}>
@@ -755,119 +755,119 @@ const DynamicPricingManager = () => {
                   </div>
 
                   <p style={{
-                    margin: '0 0 12px 0',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-sm)'
-                  }}>
+              margin: '0 0 12px 0',
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
                     {pkg.description}
                   </p>
 
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '16px',
-                    fontSize: 'var(--mac-font-size-sm)'
-                  }}>
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
                     <span style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      color: 'var(--mac-success)',
-                      fontWeight: 'var(--mac-font-weight-semibold)'
-                    }}>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: 'var(--mac-success)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
+              }}>
                       <DollarSign size={12} />
                       {pkg.package_price} ₽
                     </span>
-                    {pkg.original_price && (
-                      <span style={{
-                        color: 'var(--mac-text-tertiary)',
-                        textDecoration: 'line-through'
-                      }}>
+                    {pkg.original_price &&
+              <span style={{
+                color: 'var(--mac-text-tertiary)',
+                textDecoration: 'line-through'
+              }}>
                         {pkg.original_price} ₽
                       </span>
-                    )}
-                    {pkg.savings_percentage && (
-                      <MacOSBadge variant="success">
+              }
+                    {pkg.savings_percentage &&
+              <MacOSBadge variant="success">
                         Экономия {pkg.savings_percentage.toFixed(0)}%
                       </MacOSBadge>
-                    )}
+              }
                     <span style={{ color: 'var(--mac-text-secondary)' }}>
                       Покупок: {pkg.current_purchases || 0}
                       {pkg.max_purchases && ` / ${pkg.max_purchases}`}
                     </span>
                   </div>
 
-                  {(pkg.valid_from || pkg.valid_to) && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)',
-                      marginTop: '8px'
-                    }}>
+                  {(pkg.valid_from || pkg.valid_to) &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)',
+              marginTop: '8px'
+            }}>
                       <Calendar size={12} />
                       {pkg.valid_from && new Date(pkg.valid_from).toLocaleDateString()} -
                       {pkg.valid_to && new Date(pkg.valid_to).toLocaleDateString()}
                     </div>
-                  )}
+            }
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => setEditingPackage(pkg)}
-                    style={{
-                      padding: '6px',
-                      minWidth: 'auto',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Редактировать"
-                  >
+              variant="outline"
+              onClick={() => setEditingPackage(pkg)}
+              style={{
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Редактировать">
+              
                     <Edit size={16} />
                   </MacOSButton>
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => handleDeletePackage(pkg.id)}
-                    style={{
-                      padding: '6px',
-                      minWidth: 'auto',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Удалить"
-                  >
+              variant="outline"
+              onClick={() => handleDeletePackage(pkg.id)}
+              style={{
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Удалить">
+              
                     <Trash2 size={16} />
                   </MacOSButton>
                 </div>
               </div>
             </MacOSCard>
-          ))
-        )}
+      )
+      }
       </div>
 
       {/* Форма создания пакета */}
-      {showCreatePackage && (
-        <MacOSCard style={{ padding: '24px' }}>
+      {showCreatePackage &&
+    <MacOSCard style={{ padding: '24px' }}>
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}>
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px'
+      }}>
             <h4 style={{
-              margin: 0,
-              color: 'var(--mac-text-primary)',
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)'
-            }}>
+          margin: 0,
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
               Создать пакет услуг
             </h4>
             <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
@@ -876,129 +876,129 @@ const DynamicPricingManager = () => {
           </div>
 
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '16px'
-          }}>
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px'
+      }}>
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Название
               </label>
               <MacOSInput
-                value={packageForm.name}
-                onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
-                placeholder="Название пакета"
-              />
+            value={packageForm.name}
+            onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
+            placeholder="Название пакета" />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Цена пакета
               </label>
               <MacOSInput
-                type="number"
-                value={packageForm.package_price}
-                onChange={(e) => setPackageForm({ ...packageForm, package_price: parseFloat(e.target.value) })}
-                placeholder="0"
-              />
+            type="number"
+            value={packageForm.package_price}
+            onChange={(e) => setPackageForm({ ...packageForm, package_price: parseFloat(e.target.value) })}
+            placeholder="0" />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Действует с
               </label>
               <MacOSInput
-                type="datetime-local"
-                value={packageForm.valid_from}
-                onChange={(e) => setPackageForm({ ...packageForm, valid_from: e.target.value })}
-              />
+            type="datetime-local"
+            value={packageForm.valid_from}
+            onChange={(e) => setPackageForm({ ...packageForm, valid_from: e.target.value })} />
+          
             </div>
 
             <div>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Действует до
               </label>
               <MacOSInput
-                type="datetime-local"
-                value={packageForm.valid_to}
-                onChange={(e) => setPackageForm({ ...packageForm, valid_to: e.target.value })}
-              />
+            type="datetime-local"
+            value={packageForm.valid_to}
+            onChange={(e) => setPackageForm({ ...packageForm, valid_to: e.target.value })} />
+          
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Описание
               </label>
               <MacOSTextarea
-                value={packageForm.description}
-                onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
-                placeholder="Описание пакета"
-              />
+            value={packageForm.description}
+            onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
+            placeholder="Описание пакета" />
+          
             </div>
 
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)'
-              }}>
+            display: 'block',
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}>
                 Услуги в пакете
               </label>
               <MacOSSelect
-                multiple
-                value={packageForm.service_ids}
-                onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-                  setPackageForm({ ...packageForm, service_ids: values });
-                }}
-              >
-                {services.map(service => (
-                  <option key={service.id} value={service.id}>
+            multiple
+            value={packageForm.service_ids}
+            onChange={(e) => {
+              const values = Array.from(e.target.selectedOptions, (option) => parseInt(option.value));
+              setPackageForm({ ...packageForm, service_ids: values });
+            }}>
+            
+                {services.map((service) =>
+            <option key={service.id} value={service.id}>
                     {service.name} - {service.price} ₽
                   </option>
-                ))}
+            )}
               </MacOSSelect>
             </div>
           </div>
 
           <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            marginTop: '16px'
-          }}>
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '8px',
+        marginTop: '16px'
+      }}>
             <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
               Отмена
             </MacOSButton>
@@ -1008,62 +1008,62 @@ const DynamicPricingManager = () => {
             </MacOSButton>
           </div>
         </MacOSCard>
-      )}
-    </div>
-  );
+    }
+    </div>;
 
-  const renderAnalyticsTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderAnalyticsTab = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div>
         <h3 style={{
-          margin: '0 0 4px 0',
-          color: 'var(--mac-text-primary)',
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)'
-        }}>
+        margin: '0 0 4px 0',
+        color: 'var(--mac-text-primary)',
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)'
+      }}>
           Аналитика ценообразования
         </h3>
         <p style={{
-          margin: 0,
-          color: 'var(--mac-text-secondary)',
-          fontSize: 'var(--mac-font-size-sm)'
-        }}>
+        margin: 0,
+        color: 'var(--mac-text-secondary)',
+        fontSize: 'var(--mac-font-size-sm)'
+      }}>
           Статистика применения правил и пакетов
         </p>
       </div>
 
-      {analytics ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+      {analytics ?
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <MacOSCard style={{ padding: 0 }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '12px'
+        }}>
               <TrendingUp size={20} color="var(--mac-accent)" />
               <h4 style={{
-                margin: 0,
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-md)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
+            margin: 0,
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
                 Общая экономия
               </h4>
             </div>
             <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-success)',
-              marginBottom: '8px'
-            }}>
+          fontSize: 'var(--mac-font-size-2xl)',
+          fontWeight: 'var(--mac-font-weight-bold)',
+          color: 'var(--mac-success)',
+          marginBottom: '8px'
+        }}>
               {analytics.summary?.total_savings?.toLocaleString() || 0} ₽
             </div>
             <p style={{
-              margin: 0,
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+          margin: 0,
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)'
+        }}>
               За период {analytics.period?.start_date && new Date(analytics.period.start_date).toLocaleDateString()} -
               {analytics.period?.end_date && new Date(analytics.period.end_date).toLocaleDateString()}
             </p>
@@ -1071,104 +1071,104 @@ const DynamicPricingManager = () => {
 
           <MacOSCard style={{ padding: 0 }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '12px'
+        }}>
               <Settings size={20} color="var(--mac-purple)" />
               <h4 style={{
-                margin: 0,
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-md)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
+            margin: 0,
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
                 Активные правила
               </h4>
             </div>
             <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
+          fontSize: 'var(--mac-font-size-2xl)',
+          fontWeight: 'var(--mac-font-weight-bold)',
+          color: 'var(--mac-text-primary)',
+          marginBottom: '8px'
+        }}>
               {analytics.summary?.active_rules_count || 0}
             </div>
             <p style={{
-              margin: 0,
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
+          margin: 0,
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)'
+        }}>
               Правил ценообразования
             </p>
           </MacOSCard>
 
           <MacOSCard style={{ padding: 0 }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px'
-            }}>
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '12px'
+        }}>
               <Package size={20} color="var(--mac-orange)" />
               <h4 style={{
-                margin: 0,
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-md)',
-                fontWeight: 'var(--mac-font-weight-semibold)'
-              }}>
-                Активные пакеты
-              </h4>
-            </div>
-            <div style={{
-              fontSize: 'var(--mac-font-size-2xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '8px'
-            }}>
-              {analytics.summary?.active_packages_count || 0}
-            </div>
-            <p style={{
-              margin: 0,
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>
-              Пакетов услуг
-            </p>
-          </MacOSCard>
-        </div>
-      ) : (
-        <MacOSEmptyState
-          type="analytics"
-          title="Аналитика недоступна"
-          description="Данные аналитики еще не загружены или отсутствуют"
-        />
-      )}
-
-      {analytics?.rules_statistics && (
-        <MacOSCard style={{ padding: '16px' }}>
-          <h4 style={{
-            margin: '0 0 16px 0',
+            margin: 0,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
             fontWeight: 'var(--mac-font-weight-semibold)'
           }}>
+                Активные пакеты
+              </h4>
+            </div>
+            <div style={{
+          fontSize: 'var(--mac-font-size-2xl)',
+          fontWeight: 'var(--mac-font-weight-bold)',
+          color: 'var(--mac-text-primary)',
+          marginBottom: '8px'
+        }}>
+              {analytics.summary?.active_packages_count || 0}
+            </div>
+            <p style={{
+          margin: 0,
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)'
+        }}>
+              Пакетов услуг
+            </p>
+          </MacOSCard>
+        </div> :
+
+    <MacOSEmptyState
+      type="analytics"
+      title="Аналитика недоступна"
+      description="Данные аналитики еще не загружены или отсутствуют" />
+
+    }
+
+      {analytics?.rules_statistics &&
+    <MacOSCard style={{ padding: '16px' }}>
+          <h4 style={{
+        margin: '0 0 16px 0',
+        color: 'var(--mac-text-primary)',
+        fontSize: 'var(--mac-font-size-md)',
+        fontWeight: 'var(--mac-font-weight-semibold)'
+      }}>
             Статистика правил
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {analytics.rules_statistics.map((rule, index) => (
-              <div key={index} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '8px',
-                backgroundColor: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
+            {analytics.rules_statistics.map((rule, index) =>
+        <div key={index} style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px',
+          backgroundColor: 'var(--mac-bg-secondary)',
+          borderRadius: 'var(--mac-radius-md)'
+        }}>
                 <span style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-primary)'
+          }}>
                   {rule.name}
                 </span>
                 <div style={{ display: 'flex', gap: '16px', fontSize: 'var(--mac-font-size-sm)' }}>
@@ -1180,35 +1180,35 @@ const DynamicPricingManager = () => {
                   </span>
                 </div>
               </div>
-            ))}
+        )}
           </div>
         </MacOSCard>
-      )}
+    }
 
-      {analytics?.packages_statistics && (
-        <MacOSCard style={{ padding: '16px' }}>
+      {analytics?.packages_statistics &&
+    <MacOSCard style={{ padding: '16px' }}>
           <h4 style={{
-            margin: '0 0 16px 0',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-md)',
-            fontWeight: 'var(--mac-font-weight-semibold)'
-          }}>
+        margin: '0 0 16px 0',
+        color: 'var(--mac-text-primary)',
+        fontSize: 'var(--mac-font-size-md)',
+        fontWeight: 'var(--mac-font-weight-semibold)'
+      }}>
             Статистика пакетов
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {analytics.packages_statistics.map((pkg, index) => (
-              <div key={index} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '8px',
-                backgroundColor: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
+            {analytics.packages_statistics.map((pkg, index) =>
+        <div key={index} style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px',
+          backgroundColor: 'var(--mac-bg-secondary)',
+          borderRadius: 'var(--mac-radius-md)'
+        }}>
                 <span style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)'
-                }}>
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-primary)'
+          }}>
                   {pkg.name}
                 </span>
                 <div style={{ display: 'flex', gap: '16px', fontSize: 'var(--mac-font-size-sm)' }}>
@@ -1220,18 +1220,18 @@ const DynamicPricingManager = () => {
                   </span>
                 </div>
               </div>
-            ))}
+        )}
           </div>
         </MacOSCard>
-      )}
-    </div>
-  );
+    }
+    </div>;
+
 
   const tabs = [
-    { id: 'rules', label: 'Правила', icon: Settings },
-    { id: 'packages', label: 'Пакеты', icon: Package },
-    { id: 'analytics', label: 'Аналитика', icon: BarChart3 }
-  ];
+  { id: 'rules', label: 'Правила', icon: Settings },
+  { id: 'packages', label: 'Пакеты', icon: Package },
+  { id: 'analytics', label: 'Аналитика', icon: BarChart3 }];
+
 
   return (
     <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
@@ -1267,7 +1267,7 @@ const DynamicPricingManager = () => {
         borderBottom: '1px solid var(--mac-border)',
         marginBottom: '24px'
       }}>
-        {tabs.map(tab => {
+        {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -1286,28 +1286,27 @@ const DynamicPricingManager = () => {
                 fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                 fontSize: 'var(--mac-font-size-sm)',
                 transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-            >
+              }}>
+              
               <Icon size={16} />
               {tab.label}
-            </button>
-          );
+            </button>);
+
         })}
       </div>
 
       {/* Контент */}
-      {loading ? (
-        <MacOSLoadingSkeleton type="card" count={3} />
-      ) : (
-        <>
+      {loading ?
+      <MacOSLoadingSkeleton type="card" count={3} /> :
+
+      <>
           {activeTab === 'rules' && renderRulesTab()}
           {activeTab === 'packages' && renderPackagesTab()}
           {activeTab === 'analytics' && renderAnalyticsTab()}
         </>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default DynamicPricingManager;
-

@@ -12,13 +12,6 @@ import logger from '../utils/logger';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Маппинг неправильных путей на правильные
-const PATH_FIXES = {
-  'from \'../components/ui/native\'': 'from \'../components/ui/native\'',
-  'from \'../components/ui/native\'': 'from \'../components/ui/native\'',
-  'from \'../components/ui/native\'': 'from \'../components/ui/native\'',
-};
-
 // Функция для рекурсивного поиска файлов
 function findFiles(dir, extension = '.jsx') {
   let results = [];

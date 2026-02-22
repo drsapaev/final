@@ -50,12 +50,12 @@ export function setupInterceptors() {
     },
     async (error) => {
       const originalRequest = error.config;
-      
+
       // Импортируем обработчик ошибок
       const { handleError } = await import('../utils/errorHandler');
-      
+
       // Обрабатываем ошибку централизованно
-      const errorInfo = handleError(error, {
+      void handleError(error, {
         context: `API ${originalRequest.method?.toUpperCase()} ${originalRequest.url}`,
         showToast: !originalRequest.silent, // Поддержка silent режима
         logError: true
@@ -96,25 +96,25 @@ export function setupInterceptors() {
 
         // Проверяем, есть ли токен ДО удаления
         const hadToken = tokenManager.hasToken();
-        
+
         // Перенаправляем на страницу входа только если запрос не помечен как некритичный
         // или если это не некритичный эндпоинт (например, /clinic/stats, /clinic/health)
         const requestUrl = originalRequest?.url || originalRequest?.baseURL + originalRequest?.url || '';
-        const isNonCriticalEndpoint = requestUrl.includes('/clinic/stats') || 
-                                      requestUrl.includes('/clinic/health') ||
-                                      originalRequest?.skipAuthRedirect;
-        
+        const isNonCriticalEndpoint = requestUrl.includes('/clinic/stats') ||
+        requestUrl.includes('/clinic/health') ||
+        originalRequest?.skipAuthRedirect;
+
         // Проверяем, не происходит ли это при начальной загрузке страницы
         // Если мы на защищенной странице и токен есть, не редиректим сразу
         const isProtectedRoute = !['/login', '/', '/health'].includes(window.location.pathname);
         // Проверяем, является ли это начальной загрузкой (нет referrer или referrer совпадает с текущим URL)
-        const isInitialLoad = !document.referrer || document.referrer === window.location.href || 
-                             (performance.navigation && performance.navigation.type === 0);
-        
+        const isInitialLoad = !document.referrer || document.referrer === window.location.href ||
+        performance.navigation && performance.navigation.type === 0;
+
         // Логируем для отладки
         if (process.env.NODE_ENV === 'development') {
-          logger.log('🔍 401 Error:', { 
-            url: requestUrl, 
+          logger.log('🔍 401 Error:', {
+            url: requestUrl,
             isNonCritical: isNonCriticalEndpoint,
             hadToken,
             isProtectedRoute,
@@ -123,13 +123,13 @@ export function setupInterceptors() {
             willRedirect: !isNonCriticalEndpoint && hadToken && !isInitialLoad && window.location.pathname !== '/login'
           });
         }
-        
+
         // Не очищаем токен при начальной загрузке (после логина), чтобы не терять только что выданный токен
         if (!isInitialLoad) {
           tokenManager.clearAll();
           delete api.defaults.headers.common['Authorization'];
         }
-        
+
         // Перенаправляем только если:
         // 1. Это не некритичный эндпоинт
         // 2. Был токен (значит пользователь был авторизован, но токен истек)
@@ -155,7 +155,7 @@ export function setupInterceptors() {
           method: originalRequest?.method,
           role: error.response?.data?.role
         });
-        
+
         // Показываем понятное сообщение пользователю
         if (window.showToast) {
           window.showToast(errorMessage, 'error');
@@ -171,7 +171,7 @@ export function setupInterceptors() {
           url: originalRequest?.url,
           method: originalRequest?.method
         });
-        
+
         if (window.showToast) {
           window.showToast(errorMessage, 'warning');
         } else {
@@ -182,7 +182,7 @@ export function setupInterceptors() {
       // Обработка 500 ошибок (серверные ошибки)
       if (error.response?.status >= 500) {
         logger.error('Серверная ошибка');
-        
+
         if (window.showToast) {
           window.showToast('Серверная ошибка. Попробуйте позже.', 'error');
         }
@@ -191,7 +191,7 @@ export function setupInterceptors() {
       // Обработка сетевых ошибок
       if (!error.response) {
         logger.error('Сетевая ошибка');
-        
+
         if (window.showToast) {
           window.showToast('Проблемы с подключением к серверу', 'error');
         }

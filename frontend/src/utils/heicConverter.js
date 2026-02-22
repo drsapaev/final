@@ -12,12 +12,12 @@ import logger from '../utils/logger';
  */
 export function isHEICFile(file) {
   if (!file) return false;
-  
+
   // Проверяем по MIME типу
   if (file.type === 'image/heic' || file.type === 'image/heif') {
     return true;
   }
-  
+
   // Проверяем по расширению
   const fileName = file.name.toLowerCase();
   return fileName.endsWith('.heic') || fileName.endsWith('.heif');
@@ -35,38 +35,38 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
     if (!('serviceWorker' in navigator)) {
       throw new Error('Service Worker не поддерживается');
     }
-    
+
     const registration = await navigator.serviceWorker.ready;
-    
+
     if (!registration.active) {
       throw new Error('Service Worker не активен');
     }
-    
+
     // Создаем MessageChannel для двусторонней связи
     const messageChannel = new MessageChannel();
-    
+
     return new Promise((resolve, reject) => {
       // Настраиваем обработчик ответа
       messageChannel.port1.onmessage = (event) => {
         const { success, convertedFile, error } = event.data;
-        
+
         if (success) {
           // Создаем новый File объект из Blob
           const jpegFile = new File(
-            [convertedFile], 
+            [convertedFile],
             heicFile.name.replace(/\.(heic|heif)$/i, '.jpg'),
-            { 
+            {
               type: 'image/jpeg',
               lastModified: Date.now()
             }
           );
-          
+
           resolve(jpegFile);
         } else {
           reject(new Error(error || 'Ошибка конвертации'));
         }
       };
-      
+
       // Отправляем файл в Service Worker
       registration.active.postMessage({
         type: 'CONVERT_HEIC',
@@ -74,10 +74,10 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
         quality
       }, [messageChannel.port2]);
     });
-    
+
   } catch (error) {
     logger.error('HEIC conversion error:', error);
-    
+
     // Fallback: используем heic2any библиотеку напрямую
     return await convertHEICFallback(heicFile, quality);
   }
@@ -93,25 +93,25 @@ async function convertHEICFallback(heicFile, quality = 0.8) {
   try {
     // Динамически импортируем heic2any
     const heic2any = (await import('heic2any')).default;
-    
+
     const jpegBlob = await heic2any({
       blob: heicFile,
       toType: 'image/jpeg',
       quality
     });
-    
+
     // Создаем File из Blob
     const jpegFile = new File(
-      [jpegBlob], 
+      [jpegBlob],
       heicFile.name.replace(/\.(heic|heif)$/i, '.jpg'),
-      { 
+      {
         type: 'image/jpeg',
         lastModified: Date.now()
       }
     );
-    
+
     return jpegFile;
-    
+
   } catch (error) {
     logger.error('HEIC fallback conversion failed:', error);
     throw new Error('Не удалось конвертировать HEIC файл');
@@ -127,7 +127,7 @@ async function convertHEICFallback(heicFile, quality = 0.8) {
 export async function convertMultipleFiles(files, quality = 0.8) {
   const fileArray = Array.from(files);
   const convertedFiles = [];
-  
+
   for (const file of fileArray) {
     try {
       if (isHEICFile(file)) {
@@ -144,7 +144,7 @@ export async function convertMultipleFiles(files, quality = 0.8) {
       convertedFiles.push(file);
     }
   }
-  
+
   return convertedFiles;
 }
 
@@ -159,10 +159,10 @@ export async function getImageInfo(file) {
       reject(new Error('Файл не является изображением'));
       return;
     }
-    
+
     const img = new Image();
     const url = URL.createObjectURL(file);
-    
+
     img.onload = () => {
       const info = {
         width: img.naturalWidth,
@@ -173,16 +173,16 @@ export async function getImageInfo(file) {
         aspectRatio: img.naturalWidth / img.naturalHeight,
         megapixels: (img.naturalWidth * img.naturalHeight / 1000000).toFixed(1)
       };
-      
+
       URL.revokeObjectURL(url);
       resolve(info);
     };
-    
+
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('Не удалось загрузить изображение'));
     };
-    
+
     img.src = url;
   });
 }
@@ -200,16 +200,16 @@ export async function createImagePreview(file, maxWidth = 300, maxHeight = 300) 
       reject(new Error('Файл не является изображением'));
       return;
     }
-    
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
     const url = URL.createObjectURL(file);
-    
+
     img.onload = () => {
       // Вычисляем размеры превью с сохранением пропорций
       let { width, height } = img;
-      
+
       if (width > height) {
         if (width > maxWidth) {
           height = height * (maxWidth / width);
@@ -221,25 +221,25 @@ export async function createImagePreview(file, maxWidth = 300, maxHeight = 300) 
           height = maxHeight;
         }
       }
-      
+
       canvas.width = width;
       canvas.height = height;
-      
+
       // Рисуем изображение на canvas
       ctx.drawImage(img, 0, 0, width, height);
-      
+
       // Получаем data URL
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      
+
       URL.revokeObjectURL(url);
       resolve(dataUrl);
     };
-    
+
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('Не удалось создать превью'));
     };
-    
+
     img.src = url;
   });
 }
@@ -252,17 +252,17 @@ export async function checkHEICSupport() {
   try {
     // Создаем тестовый HEIC data URL (минимальный)
     const testHEIC = 'data:image/heic;base64,AAAAFGZ0eXBoZWljAAAAAG1pZjFoZWljbWlhZgAAABhtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyAAAAAAAAAAAAAAAAAAAAAAA=';
-    
+
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => resolve(true);
       img.onerror = () => resolve(false);
       img.src = testHEIC;
-      
+
       // Timeout через 1 секунду
       setTimeout(() => resolve(false), 1000);
     });
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -275,14 +275,14 @@ export async function checkHEICSupport() {
 export async function handleFileInputWithHEICConversion(event, callback) {
   const files = event.target.files;
   if (!files || files.length === 0) return;
-  
+
   try {
     logger.log('Processing files with HEIC conversion...');
     const convertedFiles = await convertMultipleFiles(files);
-    
+
     // Вызываем callback с конвертированными файлами
     callback(convertedFiles);
-    
+
   } catch (error) {
     logger.error('File processing error:', error);
     // В случае ошибки возвращаем оригинальные файлы

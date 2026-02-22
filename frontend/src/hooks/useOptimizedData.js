@@ -90,10 +90,12 @@ export const useOptimizedData = (url, options = {}) => {
     }, debounceTime);
   }, [fetchData, debounceTime]);
 
+  const dependenciesKey = JSON.stringify(dependencies);
+
   // Эффект для автозагрузки
   useEffect(() => {
     fetchData();
-  }, [fetchData, ...dependencies]);
+  }, [fetchData, dependenciesKey]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -196,7 +198,7 @@ export const usePaginatedData = (url, options = {}) => {
  */
 export const useVirtualList = (items, itemHeight = 50, containerHeight = 400) => {
   const [scrollTop, setScrollTop] = useState(0);
-  const [containerRef, setContainerRef] = useState(null);
+  const [, setContainerRef] = useState(null);
 
   const startIndex = Math.floor(scrollTop / itemHeight);
   const endIndex = Math.min(

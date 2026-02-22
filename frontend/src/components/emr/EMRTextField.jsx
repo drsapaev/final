@@ -15,8 +15,10 @@
  * - Повторное появление только после нового ввода
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './EMRTextField.css';
+import logger from '../../utils/logger';
 
 // Debounce hook
 const useDebounce = (value, delay) => {
@@ -107,14 +109,14 @@ const EMRTextField = ({
                     setSelectedIndex(0);
                 }
             } catch (e) {
-                console.error('AI suggestion error:', e);
+                logger.error('AI suggestion error:', e);
             } finally {
                 setIsLoadingAI(false);
             }
         };
 
         requestSuggestions();
-    }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI, fieldName, suggestionsDismissed]);
+    }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI, fieldName, suggestionsDismissed, aiSuggestions.length]);
 
     // Сброс при изменении значения пользователем
     useEffect(() => {
@@ -302,6 +304,23 @@ const EMRTextField = ({
             </div>
         </div>
     );
+};
+
+EMRTextField.propTypes = {
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    isEditable: PropTypes.bool,
+    aiEnabled: PropTypes.bool,
+    onRequestAI: PropTypes.func,
+    error: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+    autoFocus: PropTypes.bool,
+    onFieldTouch: PropTypes.func,
+    onBlur: PropTypes.func,
+    label: PropTypes.node,
+    placeholder: PropTypes.string,
+    fieldName: PropTypes.string,
+    multiline: PropTypes.bool,
+    rows: PropTypes.number
 };
 
 export default EMRTextField;

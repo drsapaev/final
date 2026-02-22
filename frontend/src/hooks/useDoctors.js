@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doctorsService } from '../api/services';
+
 import { api } from '../api/client';
 
 import logger from '../utils/logger';
@@ -166,18 +166,18 @@ const useDoctors = () => {
   }, [loadDoctors]);
 
   // Фильтрация врачей
-  const filteredDoctors = doctors.filter(doctor => {
+  const filteredDoctors = doctors.filter((doctor) => {
     const doctorName = doctor.user?.full_name || doctor.name || '';
     const doctorEmail = doctor.user?.email || doctor.email || '';
     const doctorSpecialty = doctor.specialty || doctor.specialization || '';
 
     const matchesSearch = !searchTerm ||
-      doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctorEmail.toLowerCase().includes(searchTerm.toLowerCase());
+    doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    doctorEmail.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesSpecialization = !filterSpecialization ||
-      doctorSpecialty.toLowerCase().includes(filterSpecialization.toLowerCase());
+    doctorSpecialty.toLowerCase().includes(filterSpecialization.toLowerCase());
 
     const matchesDepartment = !filterDepartment || doctorSpecialty === filterDepartment;
     const matchesStatus = !filterStatus || (doctor.active ? 'active' : 'inactive') === filterStatus;

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Copy, Reply, Trash, Forward } from 'lucide-react';
 import './MessageContextMenu.css';
 

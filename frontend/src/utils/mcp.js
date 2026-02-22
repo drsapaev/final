@@ -44,7 +44,7 @@ export const mcpAPI = {
     }
   },
 
-  async analyzeImage(_file, imageType = 'general', _options = {}) {
+  async analyzeImage(_file, imageType = 'general') {
     try {
       await delay(50);
       return success({

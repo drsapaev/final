@@ -1,15 +1,16 @@
 // Компоненты для отображения состояния загрузки
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import AnimatedLoader from '../AnimatedLoader.jsx';
 
 /**
  * Основной компонент загрузки
  */
-export function Loading({ 
-  size = 'medium', 
-  variant = 'spinner', 
-  text = 'Загрузка...', 
+export function Loading({
+  size = 'medium',
+  variant = 'spinner',
+  text = 'Загрузка...',
   overlay = false,
   fullScreen = false,
   color = 'primary'
@@ -98,21 +99,21 @@ export function Loading({
       case 'dots':
         return (
           <div style={dotsStyle}>
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                style={{
-                  ...dotStyle,
-                  animationDelay: `${i * 0.16}s`
-                }}
-              />
-            ))}
-          </div>
-        );
-      
+            {[0, 1, 2].map((i) =>
+            <div
+              key={i}
+              style={{
+                ...dotStyle,
+                animationDelay: `${i * 0.16}s`
+              }} />
+
+            )}
+          </div>);
+
+
       case 'pulse':
         return <div style={pulseStyle} />;
-      
+
       case 'spinner':
       default:
         return <div style={spinnerStyle} />;
@@ -123,16 +124,16 @@ export function Loading({
     <div style={containerStyle}>
       {renderLoader()}
       {text && <div style={textStyle}>{text}</div>}
-    </div>
-  );
+    </div>);
+
 }
 
 /**
  * Компонент для загрузки кнопки
  */
-export function ButtonLoading({ loading, children, ...props }) {
+export function ButtonLoading({ loading, children, style = {}, disabled = false, ...props }) {
   const theme = useTheme();
-  const { getColor, getSpacing } = theme;
+  const { getSpacing } = theme;
 
   const buttonStyle = {
     position: 'relative',
@@ -140,7 +141,7 @@ export function ButtonLoading({ loading, children, ...props }) {
     alignItems: 'center',
     justifyContent: 'center',
     gap: getSpacing('sm'),
-    ...props.style
+    ...style
   };
 
   const spinnerStyle = {
@@ -153,11 +154,11 @@ export function ButtonLoading({ loading, children, ...props }) {
   };
 
   return (
-    <button {...props} style={buttonStyle} disabled={loading || props.disabled}>
+    <button {...props} style={buttonStyle} disabled={loading || disabled}>
       {loading && <div style={spinnerStyle} />}
       {children}
-    </button>
-  );
+    </button>);
+
 }
 
 /**
@@ -196,26 +197,26 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
     <table style={tableStyle}>
       <thead>
         <tr>
-          {Array.from({ length: columns }).map((_, i) => (
-            <th key={i} style={cellStyle}>
+          {Array.from({ length: columns }).map((_, i) =>
+          <th key={i} style={cellStyle}>
               <div style={skeletonStyle} />
             </th>
-          ))}
+          )}
         </tr>
       </thead>
       <tbody>
-        {Array.from({ length: rows }).map((_, rowIndex) => (
-          <tr key={rowIndex}>
-            {Array.from({ length: columns }).map((_, colIndex) => (
-              <td key={colIndex} style={cellStyle}>
+        {Array.from({ length: rows }).map((_, rowIndex) =>
+        <tr key={rowIndex}>
+            {Array.from({ length: columns }).map((_, colIndex) =>
+          <td key={colIndex} style={cellStyle}>
                 <div style={skeletonStyle} />
               </td>
-            ))}
+          )}
           </tr>
-        ))}
+        )}
       </tbody>
-    </table>
-  );
+    </table>);
+
 }
 
 /**
@@ -224,11 +225,11 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
 export function CardLoading({ count = 3 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <AnimatedLoader.CardSkeleton key={i} />
-      ))}
-    </div>
-  );
+      {Array.from({ length: count }).map((_, i) =>
+      <AnimatedLoader.CardSkeleton key={i} />
+      )}
+    </div>);
+
 }
 
 /**
@@ -261,16 +262,16 @@ export function CardLoadingOld({ count = 3 }) {
 
   return (
     <div style={containerStyle}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={cardStyle}>
+      {Array.from({ length: count }).map((_, i) =>
+      <div key={i} style={cardStyle}>
           <div style={{ ...skeletonStyle, height: '24px', marginBottom: getSpacing('md') }} />
           <div style={{ ...skeletonStyle, width: '80%' }} />
           <div style={{ ...skeletonStyle, width: '60%' }} />
           <div style={{ ...skeletonStyle, width: '40%' }} />
         </div>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 }
 
 /**
@@ -319,17 +320,17 @@ export function ListLoading({ count = 5 }) {
 
   return (
     <div style={containerStyle}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={itemStyle}>
+      {Array.from({ length: count }).map((_, i) =>
+      <div key={i} style={itemStyle}>
           <div style={avatarStyle} />
           <div style={contentStyle}>
             <div style={{ ...skeletonStyle, width: '60%' }} />
             <div style={{ ...skeletonStyle, width: '40%' }} />
           </div>
         </div>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 }
 
 /**
@@ -364,6 +365,44 @@ export function useLoading(initialState = false) {
   };
 }
 
+Loading.propTypes = {
+  size: PropTypes.oneOf(['small', 'medium', 'large', 'xlarge']),
+  variant: PropTypes.oneOf(['spinner', 'dots', 'pulse']),
+  text: PropTypes.string,
+  overlay: PropTypes.bool,
+  fullScreen: PropTypes.bool,
+  color: PropTypes.string
+};
+
+ButtonLoading.propTypes = {
+  loading: PropTypes.bool,
+  children: PropTypes.node,
+  style: PropTypes.object,
+  disabled: PropTypes.bool
+};
+
+TableLoading.propTypes = {
+  columns: PropTypes.number,
+  rows: PropTypes.number
+};
+
+TableLoadingOld.propTypes = {
+  columns: PropTypes.number,
+  rows: PropTypes.number
+};
+
+CardLoading.propTypes = {
+  count: PropTypes.number
+};
+
+CardLoadingOld.propTypes = {
+  count: PropTypes.number
+};
+
+ListLoading.propTypes = {
+  count: PropTypes.number
+};
+
 // CSS анимации
 const style = document.createElement('style');
 style.textContent = `
@@ -390,4 +429,3 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
-

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import { X } from 'lucide-react';
@@ -12,7 +12,7 @@ const ResponsiveModal = ({
   className = '',
   style = {}
 }) => {
-  const { isMobile, isTablet } = useBreakpoint();
+  const { isMobile } = useBreakpoint();
 
   // Блокируем скролл страницы когда модал открыт
   useEffect(() => {
@@ -68,6 +68,10 @@ const ResponsiveModal = ({
     margin: '0'
   } : {};
 
+  const handleOverlayClick = () => {
+    onClose();
+  };
+
   return (
     <div
       style={{
@@ -83,13 +87,22 @@ const ResponsiveModal = ({
         justifyContent: 'center',
         zIndex: 1000,
         padding: isMobile ? '0' : '16px'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+      }}>
+      <button
+        type="button"
+        aria-label="Закрыть модальное окно"
+        onClick={handleOverlayClick}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          border: 'none',
+          margin: 0,
+          padding: 0,
+          background: 'transparent',
+          cursor: 'pointer'
+        }}
+      />
+      
       <div
         style={{
           backgroundColor: 'white',
@@ -103,46 +116,45 @@ const ResponsiveModal = ({
           ...mobileStyles,
           ...style
         }}
-        className={`responsive-modal ${className}`}
-        onClick={(e) => e.stopPropagation()}
-      >
+        className={`responsive-modal ${className}`}>
+        
         {/* Заголовок */}
-        {title && (
-          <div
-            style={{
-              padding: isMobile ? '16px' : '24px',
-              borderBottom: '1px solid #e5e7eb',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-              color: 'white'
-            }}
-          >
+        {title &&
+        <div
+          style={{
+            padding: isMobile ? '16px' : '24px',
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            color: 'white'
+          }}>
+          
             <h2
-              style={{
-                margin: 0,
-                fontSize: isMobile ? '18px' : '20px',
-                fontWeight: '600'
-              }}
-            >
+            style={{
+              margin: 0,
+              fontSize: isMobile ? '18px' : '20px',
+              fontWeight: '600'
+            }}>
+            
               {title}
             </h2>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              style={{
-                minWidth: 'auto',
-                padding: '8px',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
-              }}
-            >
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            style={{
+              minWidth: 'auto',
+              padding: '8px',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+            
               <X size={isMobile ? 18 : 20} />
             </Button>
           </div>
-        )}
+        }
 
         {/* Содержимое */}
         <div
@@ -150,34 +162,33 @@ const ResponsiveModal = ({
             flex: 1,
             overflow: 'auto',
             padding: isMobile ? '16px' : '24px'
-          }}
-        >
+          }}>
+          
           {children}
         </div>
 
         {/* Футер (если нужен) */}
-        {isMobile && (
-          <div
-            style={{
-              padding: '16px',
-              borderTop: '1px solid #e5e7eb',
-              background: '#f9fafb'
-            }}
-          >
+        {isMobile &&
+        <div
+          style={{
+            padding: '16px',
+            borderTop: '1px solid #e5e7eb',
+            background: '#f9fafb'
+          }}>
+          
             <Button
-              variant="primary"
-              size="lg"
-              onClick={onClose}
-              style={{ width: '100%' }}
-            >
+            variant="primary"
+            size="lg"
+            onClick={onClose}
+            style={{ width: '100%' }}>
+            
               Закрыть
             </Button>
           </div>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default ResponsiveModal;
-

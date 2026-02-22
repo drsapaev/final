@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import {
   Calendar,
   Clock,
   User,
-  Phone,
-  MessageCircle,
-  Smartphone,
+
+
+
   X,
   Plus,
   Trash2,
   CheckCircle,
-  AlertCircle
-} from 'lucide-react';
+  AlertCircle } from
+'lucide-react';
 
 /**
  * Универсальный компонент для назначения следующих визитов
@@ -26,7 +26,7 @@ const ScheduleNextModal = ({
   theme,
   specialtyFilter = null // Фильтр услуг по специальности
 }) => {
-  const { isDark, getColor, getSpacing, getFontSize } = theme;
+  const { getColor, getSpacing, getFontSize } = theme;
 
   // Состояния формы
   const [formData, setFormData] = useState({
@@ -54,7 +54,7 @@ const ScheduleNextModal = ({
 
       // Если передан пациент, устанавливаем его
       if (patient) {
-        setFormData(prev => ({ ...prev, patient_id: patient.id }));
+        setFormData((prev) => ({ ...prev, patient_id: patient.id }));
       }
     }
   }, [isOpen, patient]);
@@ -66,26 +66,26 @@ const ScheduleNextModal = ({
 
       // Применяем фильтр по специальности если указан
       if (specialtyFilter) {
-        filtered = services.filter(service => {
+        filtered = services.filter((service) => {
           const category = service.category?.toLowerCase();
           const name = service.name?.toLowerCase();
 
           switch (specialtyFilter) {
             case 'cardiology':
               return category?.includes('кардио') ||
-                name?.includes('кардио') ||
-                name?.includes('экг') ||
-                service.code?.startsWith('K');
+              name?.includes('кардио') ||
+              name?.includes('экг') ||
+              service.code?.startsWith('K');
             case 'dermatology':
               return category?.includes('дерма') ||
-                name?.includes('дерма') ||
-                name?.includes('кожа') ||
-                service.code?.startsWith('D');
+              name?.includes('дерма') ||
+              name?.includes('кожа') ||
+              service.code?.startsWith('D');
             case 'dentistry':
               return category?.includes('стомат') ||
-                name?.includes('зуб') ||
-                name?.includes('стомат') ||
-                service.code?.startsWith('S');
+              name?.includes('зуб') ||
+              name?.includes('стомат') ||
+              service.code?.startsWith('S');
             default:
               return true;
           }
@@ -135,18 +135,18 @@ const ScheduleNextModal = ({
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     setError('');
   };
 
   const handleServiceChange = (index, field, value) => {
     const newServices = [...formData.services];
     newServices[index] = { ...newServices[index], [field]: value };
-    setFormData(prev => ({ ...prev, services: newServices }));
+    setFormData((prev) => ({ ...prev, services: newServices }));
   };
 
   const addService = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       services: [...prev.services, { service_id: '', quantity: 1 }]
     }));
@@ -155,7 +155,7 @@ const ScheduleNextModal = ({
   const removeService = (index) => {
     if (formData.services.length > 1) {
       const newServices = formData.services.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, services: newServices }));
+      setFormData((prev) => ({ ...prev, services: newServices }));
     }
   };
 
@@ -173,7 +173,7 @@ const ScheduleNextModal = ({
       if (!formData.visit_date) {
         throw new Error('Выберите дату визита');
       }
-      if (formData.services.some(s => !s.service_id)) {
+      if (formData.services.some((s) => !s.service_id)) {
         throw new Error('Выберите все услуги');
       }
 
@@ -377,10 +377,21 @@ const ScheduleNextModal = ({
         return 'Назначить следующий визит';
     }
   };
+  const handleActivationKeyDown = (event, action) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      action();
+    }
+  };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+    <div
+      style={overlayStyle}
+      role="button"
+      tabIndex={0}
+      onClick={onClose}
+      onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
+      <div style={modalStyle} onClickCapture={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div style={headerStyle}>
           <h2 style={titleStyle}>{getModalTitle()}</h2>
@@ -390,19 +401,19 @@ const ScheduleNextModal = ({
         </div>
 
         {/* Сообщения об ошибках и успехе */}
-        {error && (
-          <div style={errorStyle}>
+        {error &&
+        <div style={errorStyle}>
             <AlertCircle size={16} />
             <span>{error}</span>
           </div>
-        )}
+        }
 
-        {success && (
-          <div style={successStyle}>
+        {success &&
+        <div style={successStyle}>
             <CheckCircle size={16} />
             <span>{success}</span>
           </div>
-        )}
+        }
 
         {/* Форма */}
         <form onSubmit={handleSubmit}>
@@ -416,14 +427,14 @@ const ScheduleNextModal = ({
               style={selectStyle}
               value={formData.patient_id}
               onChange={(e) => handleInputChange('patient_id', e.target.value)}
-              required
-            >
+              required>
+              
               <option value="">Выберите пациента</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>
+              {patients.map((p) =>
+              <option key={p.id} value={p.id}>
                   {p.first_name} {p.last_name} - {p.phone}
                 </option>
-              ))}
+              )}
             </select>
           </div>
 
@@ -440,8 +451,8 @@ const ScheduleNextModal = ({
                 value={formData.visit_date}
                 onChange={(e) => handleInputChange('visit_date', e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                required
-              />
+                required />
+              
             </div>
 
             <div style={{ ...formGroupStyle, flex: 1 }}>
@@ -454,8 +465,8 @@ const ScheduleNextModal = ({
                 style={inputStyle}
                 value={formData.visit_time}
                 onChange={(e) => handleInputChange('visit_time', e.target.value)}
-                required
-              />
+                required />
+              
             </div>
           </div>
 
@@ -463,51 +474,51 @@ const ScheduleNextModal = ({
           <div style={formGroupStyle}>
             <label style={labelStyle}>
               Услуги {specialtyFilter && `(${specialtyFilter === 'cardiology' ? 'Кардиология' :
-                specialtyFilter === 'dermatology' ? 'Дерматология' :
-                  specialtyFilter === 'dentistry' ? 'Стоматология' : ''})`}
+              specialtyFilter === 'dermatology' ? 'Дерматология' :
+              specialtyFilter === 'dentistry' ? 'Стоматология' : ''})`}
             </label>
-            {formData.services.map((service, index) => (
-              <div key={index} style={serviceRowStyle}>
+            {formData.services.map((service, index) =>
+            <div key={index} style={serviceRowStyle}>
                 <div style={{ flex: 2 }}>
                   <select
-                    style={selectStyle}
-                    value={service.service_id}
-                    onChange={(e) => handleServiceChange(index, 'service_id', e.target.value)}
-                    required
-                  >
+                  style={selectStyle}
+                  value={service.service_id}
+                  onChange={(e) => handleServiceChange(index, 'service_id', e.target.value)}
+                  required>
+                  
                     <option value="">Выберите услугу</option>
-                    {filteredServices.map(s => (
-                      <option key={s.id} value={s.id}>
+                    {filteredServices.map((s) =>
+                  <option key={s.id} value={s.id}>
                         {s.name} - {s.price} сум
                       </option>
-                    ))}
+                  )}
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <input
-                    type="number"
-                    style={inputStyle}
-                    value={service.quantity}
-                    onChange={(e) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
-                    min="1"
-                    placeholder="Кол-во"
-                  />
+                  type="number"
+                  style={inputStyle}
+                  value={service.quantity}
+                  onChange={(e) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
+                  min="1"
+                  placeholder="Кол-во" />
+                
                 </div>
                 <button
-                  type="button"
-                  style={dangerButtonStyle}
-                  onClick={() => removeService(index)}
-                  disabled={formData.services.length === 1}
-                >
+                type="button"
+                style={dangerButtonStyle}
+                onClick={() => removeService(index)}
+                disabled={formData.services.length === 1}>
+                
                   <Trash2 size={16} />
                 </button>
               </div>
-            ))}
+            )}
             <button
               type="button"
               style={secondaryButtonStyle}
-              onClick={addService}
-            >
+              onClick={addService}>
+              
               <Plus size={16} />
               Добавить услугу
             </button>
@@ -519,8 +530,8 @@ const ScheduleNextModal = ({
             <select
               style={selectStyle}
               value={formData.discount_mode}
-              onChange={(e) => handleInputChange('discount_mode', e.target.value)}
-            >
+              onChange={(e) => handleInputChange('discount_mode', e.target.value)}>
+              
               <option value="none">Платный</option>
               <option value="repeat">Повторный</option>
               <option value="benefit">Льготный</option>
@@ -533,8 +544,8 @@ const ScheduleNextModal = ({
             <select
               style={selectStyle}
               value={formData.confirmation_channel}
-              onChange={(e) => handleInputChange('confirmation_channel', e.target.value)}
-            >
+              onChange={(e) => handleInputChange('confirmation_channel', e.target.value)}>
+              
               <option value="telegram">
                 📱 Telegram
               </option>
@@ -553,23 +564,22 @@ const ScheduleNextModal = ({
               type="button"
               style={secondaryButtonStyle}
               onClick={onClose}
-              disabled={loading}
-            >
+              disabled={loading}>
+              
               Отмена
             </button>
             <button
               type="submit"
               style={primaryButtonStyle}
-              disabled={loading}
-            >
+              disabled={loading}>
+              
               {loading ? 'Создание...' : 'Назначить визит'}
             </button>
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default ScheduleNextModal;
-

@@ -1,6 +1,6 @@
 // Error Boundary для обработки ошибок React
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+
 import { Button } from '../ui/native';
 
 import logger from '../../utils/logger';
@@ -13,7 +13,7 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError() {
     // Обновляем состояние для отображения fallback UI
     return { hasError: true };
   }
@@ -21,7 +21,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     // Логируем ошибку
     logger.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
     this.setState({
       error: error,
       errorInfo: errorInfo
@@ -41,13 +41,13 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       // Fallback UI
       return (
-        <ErrorFallback 
+        <ErrorFallback
           error={this.state.error}
           errorInfo={this.state.errorInfo}
           onRetry={this.handleRetry}
-          theme={this.props.theme}
-        />
-      );
+          theme={this.props.theme} />);
+
+
     }
 
     return this.props.children;
@@ -96,9 +96,9 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
     color: getColor('text', 'secondary'),
     marginBottom: getSpacing('lg'),
     lineHeight: 1.6
-  };
+  };void
 
-  const buttonStyle = {
+  {
     padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
     backgroundColor: getColor('primary', 'main'),
     color: getColor('primary', 'contrast'),
@@ -130,15 +130,15 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
           Произошла неожиданная ошибка. Мы уже работаем над её исправлением.
         </p>
         
-        <Button 
+        <Button
           variant="primary"
-          onClick={onRetry}
-        >
+          onClick={onRetry}>
+          
           Попробовать снова
         </Button>
 
-        {process.env.NODE_ENV === 'development' && error && (
-          <details style={detailsStyle}>
+        {process.env.NODE_ENV === 'development' && error &&
+        <details style={detailsStyle}>
             <summary style={{ cursor: 'pointer', marginBottom: getSpacing('sm') }}>
               Детали ошибки (только для разработки)
             </summary>
@@ -147,10 +147,10 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
               {errorInfo && errorInfo.componentStack}
             </pre>
           </details>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 /**
@@ -161,8 +161,8 @@ export function withErrorBoundary(WrappedComponent, errorBoundaryProps = {}) {
     return (
       <ErrorBoundary {...errorBoundaryProps}>
         <WrappedComponent {...props} />
-      </ErrorBoundary>
-    );
+      </ErrorBoundary>);
+
   };
 }
 
@@ -192,4 +192,3 @@ export function useErrorHandler() {
 }
 
 export default ErrorBoundary;
-

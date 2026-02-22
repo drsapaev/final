@@ -1,18 +1,17 @@
-import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Базовая медицинская карточка в стиле MediLab
  */
-const MedicalCard = ({ 
-  children, 
-  className = '', 
-  hover = true, 
+const MedicalCard = ({
+  children,
+  className = '',
+  hover = true,
   padding = 'medium',
   shadow = 'medium',
-  ...props 
+  ...props
 }) => {
-  const { isDark, getColor } = useTheme();
+  const { isDark } = useTheme();
 
   const paddingClasses = {
     small: 'p-3',
@@ -38,23 +37,22 @@ const MedicalCard = ({
   const darkClasses = isDark ? 'bg-gray-800 border-gray-700' : '';
 
   return (
-    <div 
+    <div
       className={`${baseClasses} ${darkClasses}`}
       style={{
         backgroundColor: isDark ? '#1e293b' : '#ffffff',
         borderColor: isDark ? '#334155' : '#e2e8f0',
         backdropFilter: 'blur(10px)',
-        boxShadow: isDark 
-          ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)'
-          : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        boxShadow: isDark ?
+        '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' :
+        '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         ...props.style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 export default MedicalCard;
-

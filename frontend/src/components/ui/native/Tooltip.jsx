@@ -41,10 +41,10 @@ const Tooltip = React.forwardRef(({
     <span
       ref={ref}
       className={cn('relative inline-flex', className)}
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
+      onPointerEnter={show}
+      onPointerLeave={hide}
+      onFocusCapture={show}
+      onBlurCapture={hide}
       {...props}
     >
       <span ref={triggerRef} className="inline-flex">

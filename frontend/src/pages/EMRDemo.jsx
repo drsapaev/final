@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button, Typography } from '../components/ui/macos';
 import { FileText, ArrowRight, Users, ClipboardList, Stethoscope } from 'lucide-react';
@@ -93,7 +92,7 @@ const EMRDemo = () => {
               1. Навигация по вкладкам
             </Typography>
             <Typography variant="body2" style={{ color: 'var(--mac-text-secondary)' }}>
-              Переключайтесь между "Пациенты", "Медицинские записи" и "Шаблоны"
+              Переключайтесь между «Пациенты», «Медицинские записи» и «Шаблоны»
             </Typography>
           </div>
           <div>
@@ -101,7 +100,7 @@ const EMRDemo = () => {
               2. Создание записи
             </Typography>
             <Typography variant="body2" style={{ color: 'var(--mac-text-secondary)' }}>
-              Нажмите "Новая запись" и заполните структурированную форму
+              Нажмите «Новая запись» и заполните структурированную форму
             </Typography>
           </div>
           <div>

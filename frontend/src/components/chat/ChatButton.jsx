@@ -2,7 +2,7 @@
  * Кнопка чата для хедера (macOS стиль)
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatWindow from './ChatWindow';

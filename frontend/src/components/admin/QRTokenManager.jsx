@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   QrCode,
   Plus,
@@ -6,13 +6,13 @@ import {
   Trash2,
   Eye,
   Copy,
-  Users,
-  Calendar,
-  Clock,
+
+
+
   AlertCircle,
   CheckCircle,
-  Building2
-} from 'lucide-react';
+  Building2 } from
+'lucide-react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 
@@ -30,13 +30,13 @@ const QRTokenManager = () => {
     specialist_id: '',
     department: '',
     expires_hours: 24,
-    is_clinic_wide: false  // ⭐ NEW: Общий QR клиники
+    is_clinic_wide: false // ⭐ NEW: Общий QR клиники
   });
 
   // ⭐ SSOT: Динамическая загрузка специалистов и отделений
   const [specialists, setSpecialists] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [, setLoadingData] = useState(true);
 
   // Загрузка справочников из API
   const loadReferenceData = useCallback(async () => {
@@ -44,18 +44,18 @@ const QRTokenManager = () => {
       setLoadingData(true);
 
       const [doctorsRes, profilesRes] = await Promise.all([
-        fetch('/api/v1/admin/doctors', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        }).catch(() => ({ ok: false })),
-        fetch('/api/v1/queues/profiles?active_only=true', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        }).catch(() => ({ ok: false }))
-      ]);
+      fetch('/api/v1/admin/doctors', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      }).catch(() => ({ ok: false })),
+      fetch('/api/v1/queues/profiles?active_only=true', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      }).catch(() => ({ ok: false }))]
+      );
 
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
-        const docs = Array.isArray(doctorsData) ? doctorsData : (doctorsData.doctors || []);
-        setSpecialists(docs.map(d => ({
+        const docs = Array.isArray(doctorsData) ? doctorsData : doctorsData.doctors || [];
+        setSpecialists(docs.map((d) => ({
           id: d.id || d.user_id,
           name: d.user?.full_name || d.full_name || `Врач #${d.id}`,
           department: d.specialty
@@ -65,7 +65,7 @@ const QRTokenManager = () => {
       if (profilesRes.ok) {
         const profilesData = await profilesRes.json();
         const profiles = profilesData.profiles || [];
-        setDepartments(profiles.map(p => ({
+        setDepartments(profiles.map((p) => ({
           value: p.key,
           label: p.title_ru || p.title
         })));
@@ -126,7 +126,7 @@ const QRTokenManager = () => {
       }
 
       const newToken = await response.json();
-      setTokens(prev => [newToken, ...prev]);
+      setTokens((prev) => [newToken, ...prev]);
       setShowCreateModal(false);
       setCreateForm({ specialist_id: '', department: '', expires_hours: 24 });
       setSuccess('QR токен успешно создан');
@@ -157,7 +157,7 @@ const QRTokenManager = () => {
         throw new Error('Ошибка деактивации токена');
       }
 
-      setTokens(prev => prev.filter(t => t.token !== token));
+      setTokens((prev) => prev.filter((t) => t.token !== token));
       setSuccess('QR токен деактивирован');
     } catch (err) {
       setError(err.message);
@@ -181,12 +181,12 @@ const QRTokenManager = () => {
   };
 
   const getDepartmentName = (department) => {
-    const dept = departments.find(d => d.value === department);
+    const dept = departments.find((d) => d.value === department);
     return dept ? dept.label : department;
   };
 
   const getSpecialistName = (specialistId) => {
-    const specialist = specialists.find(s => s.id === specialistId);
+    const specialist = specialists.find((s) => s.id === specialistId);
     return specialist ? specialist.name : `ID: ${specialistId}`;
   };
 
@@ -194,8 +194,8 @@ const QRTokenManager = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -208,47 +208,47 @@ const QRTokenManager = () => {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-        >
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+          
           <Plus className="h-4 w-4 mr-2" />
           Создать QR токен
         </button>
       </div>
 
       {/* Уведомления */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center">
+      {error &&
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center">
           <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
           <span className="text-red-700">{error}</span>
           <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">×</button>
         </div>
-      )}
+      }
 
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center">
+      {success &&
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center">
           <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
           <span className="text-green-700">{success}</span>
           <button onClick={() => setSuccess(null)} className="ml-auto text-green-500 hover:text-green-700">×</button>
         </div>
-      )}
+      }
 
       {/* Список токенов */}
       <div className="grid gap-4">
-        {tokens.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
+        {tokens.length === 0 ?
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
             <QrCode className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Нет активных QR токенов</h3>
             <p className="text-gray-600 mb-4">Создайте первый QR токен для очереди</p>
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            
               Создать токен
             </button>
-          </div>
-        ) : (
-          tokens.map((token) => (
-            <div key={token.token} className="bg-white border border-gray-200 rounded-lg p-6">
+          </div> :
+
+        tokens.map((token) =>
+        <div key={token.token} className="bg-white border border-gray-200 rounded-lg p-6">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center mb-2">
@@ -291,49 +291,49 @@ const QRTokenManager = () => {
 
                 <div className="flex space-x-2 ml-4">
                   <button
-                    onClick={() => {
-                      setSelectedToken(token);
-                      setShowQRModal(true);
-                    }}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Показать QR код"
-                  >
+                onClick={() => {
+                  setSelectedToken(token);
+                  setShowQRModal(true);
+                }}
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Показать QR код">
+                
                     <Eye className="h-4 w-4" />
                   </button>
 
                   <button
-                    onClick={() => copyToClipboard(token.qr_url)}
-                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                    title="Копировать ссылку"
-                  >
+                onClick={() => copyToClipboard(token.qr_url)}
+                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                title="Копировать ссылку">
+                
                     <Copy className="h-4 w-4" />
                   </button>
 
                   <button
-                    onClick={() => downloadQR(token)}
-                    className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                    title="Скачать QR код"
-                  >
+                onClick={() => downloadQR(token)}
+                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                title="Скачать QR код">
+                
                     <Download className="h-4 w-4" />
                   </button>
 
                   <button
-                    onClick={() => deleteToken(token.token)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Деактивировать"
-                  >
+                onClick={() => deleteToken(token.token)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Деактивировать">
+                
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
             </div>
-          ))
-        )}
+        )
+        }
       </div>
 
       {/* Модальное окно создания токена */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {showCreateModal &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Создать QR токен</h3>
 
@@ -342,16 +342,16 @@ const QRTokenManager = () => {
               <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
-                    type="checkbox"
-                    checked={createForm.is_clinic_wide}
-                    onChange={(e) => setCreateForm(prev => ({
-                      ...prev,
-                      is_clinic_wide: e.target.checked,
-                      specialist_id: e.target.checked ? '' : prev.specialist_id,
-                      department: e.target.checked ? '' : prev.department
-                    }))}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                  />
+                  type="checkbox"
+                  checked={createForm.is_clinic_wide}
+                  onChange={(e) => setCreateForm((prev) => ({
+                    ...prev,
+                    is_clinic_wide: e.target.checked,
+                    specialist_id: e.target.checked ? '' : prev.specialist_id,
+                    department: e.target.checked ? '' : prev.department
+                  }))}
+                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                
                   <div>
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-blue-600" />
@@ -365,95 +365,95 @@ const QRTokenManager = () => {
               </div>
 
               {/* Specialist selector - hidden when clinic-wide */}
-              {!createForm.is_clinic_wide && (
-                <div>
+              {!createForm.is_clinic_wide &&
+            <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Специалист
                   </label>
                   <select
-                    value={createForm.specialist_id}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, specialist_id: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
+                value={createForm.specialist_id}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, specialist_id: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                
                     <option value="">Выберите специалиста</option>
-                    {specialists.map(specialist => (
-                      <option key={specialist.id} value={specialist.id}>
+                    {specialists.map((specialist) =>
+                <option key={specialist.id} value={specialist.id}>
                         {specialist.name}
                       </option>
-                    ))}
+                )}
                   </select>
                 </div>
-              )}
+            }
 
               {/* Department selector - hidden when clinic-wide */}
-              {!createForm.is_clinic_wide && (
-                <div>
+              {!createForm.is_clinic_wide &&
+            <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Отделение
                   </label>
                   <select
-                    value={createForm.department}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, department: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
+                value={createForm.department}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, department: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                
                     <option value="">Выберите отделение</option>
-                    {departments.map(dept => (
-                      <option key={dept.value} value={dept.value}>
+                    {departments.map((dept) =>
+                <option key={dept.value} value={dept.value}>
                         {dept.label}
                       </option>
-                    ))}
+                )}
                   </select>
                 </div>
-              )}
+            }
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Время жизни (часов)
                 </label>
                 <input
-                  type="number"
-                  min="1"
-                  max="168"
-                  value={createForm.expires_hours}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, expires_hours: parseInt(e.target.value) }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                type="number"
+                min="1"
+                max="168"
+                value={createForm.expires_hours}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, expires_hours: parseInt(e.target.value) }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              
               </div>
             </div>
 
             <div className="flex space-x-3 mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-              >
+              onClick={() => setShowCreateModal(false)}
+              className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+              
                 Отмена
               </button>
               <button
-                onClick={createToken}
-                disabled={!createForm.is_clinic_wide && (!createForm.specialist_id || !createForm.department)}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              onClick={createToken}
+              disabled={!createForm.is_clinic_wide && (!createForm.specialist_id || !createForm.department)}
+              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              
                 {createForm.is_clinic_wide ? 'Создать общий QR' : 'Создать'}
               </button>
             </div>
           </div>
         </div>
-      )}
+      }
 
 
       {/* Модальное окно QR кода */}
-      {showQRModal && selectedToken && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {showQRModal && selectedToken &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">QR код для очереди</h3>
 
             <div className="text-center mb-4">
               <img
-                src={selectedToken.qr_code_base64}
-                alt="QR Code"
-                className="mx-auto mb-4 border border-gray-200 rounded-lg"
-                style={{ maxWidth: '200px' }}
-              />
+              src={selectedToken.qr_code_base64}
+              alt="QR Code"
+              className="mx-auto mb-4 border border-gray-200 rounded-lg"
+              style={{ maxWidth: '200px' }} />
+            
 
               <p className="text-sm text-gray-600 mb-2">
                 {getDepartmentName(selectedToken.department)}
@@ -465,30 +465,29 @@ const QRTokenManager = () => {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setShowQRModal(false)}
-                className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-              >
+              onClick={() => setShowQRModal(false)}
+              className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+              
                 Закрыть
               </button>
               <button
-                onClick={() => copyToClipboard(selectedToken.qr_url)}
-                className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
-              >
+              onClick={() => copyToClipboard(selectedToken.qr_url)}
+              className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+              
                 Копировать ссылку
               </button>
               <button
-                onClick={() => downloadQR(selectedToken)}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              onClick={() => downloadQR(selectedToken)}
+              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+              
                 Скачать
               </button>
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default QRTokenManager;
-

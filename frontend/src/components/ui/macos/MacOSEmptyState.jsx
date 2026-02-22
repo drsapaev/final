@@ -1,5 +1,3 @@
-import React from 'react';
-
 const MacOSEmptyState = ({
   icon: Icon,
   title = 'Нет данных',
