@@ -579,7 +579,7 @@ const EMRSmartField = ({
                     <div className="emr-smart-history-controls">
                         <div
                             className="emr-smart-history-indicator"
-                            title={historyPaused ? "Подсказки приостановлены" : "Подсказки из ваших записей"}
+                            title={historyPaused ? 'Подсказки приостановлены' : 'Подсказки из ваших записей'}
                         >
                             {historyPaused ? '⏸️' : '📝'}
                         </div>
@@ -587,7 +587,7 @@ const EMRSmartField = ({
                             className={`emr-smart-pause-btn ${historyPaused ? 'emr-smart-pause-btn--active' : ''}`}
                             onClick={toggleHistoryPause}
                             tabIndex={-1}
-                            title={historyPaused ? "Возобновить подсказки" : "Приостановить подсказки"}
+                            title={historyPaused ? 'Возобновить подсказки' : 'Приостановить подсказки'}
                         >
                             {historyPaused ? '▶️' : '⏸️'}
                         </button>

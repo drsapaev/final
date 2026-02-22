@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
-import { Upload, X, File as FileIcon, Image as ImageIcon, AlertCircle, Loader } from 'lucide-react';
+import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
+import logger from '../../utils/logger';
 
 const FileUpload = ({
     onFilesSelected,
@@ -42,7 +44,7 @@ const FileUpload = ({
 
             return convertedFile;
         } catch (err) {
-            console.error('HEIC conversion error:', err);
+            logger.error('HEIC conversion error:', err);
             throw new Error('Failed to convert HEIC image');
         }
     };
@@ -78,7 +80,7 @@ const FileUpload = ({
                     try {
                         fileToProcess = await convertHEICtoJPEG(file);
                     } catch (e) {
-                        console.warn(`Could not convert ${file.name}, using original`);
+                        logger.warn(`Could not convert ${file.name}, using original`, e);
                     }
                 }
 
@@ -122,7 +124,7 @@ const FileUpload = ({
         }
     }, [maxSize, onFilesSelected, clearOnSelect]);
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
         onDrop: handleDrop,
         maxSize,
         accept,
@@ -152,7 +154,7 @@ const FileUpload = ({
 
     const containerStyle = {
         padding: '24px',
-        border: `2px dashed ${isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-border, #E5E5E5)'}`,
+        border: `2px dashed ${isDragActive || isFocused ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-border, #E5E5E5)'}`,
         borderRadius: '8px',
         backgroundColor: isDragActive ? 'var(--mac-bg-secondary, #F5F5F7)' : 'var(--mac-bg-primary, #FFFFFF)',
         cursor: disabled ? 'default' : 'pointer',
@@ -164,11 +166,18 @@ const FileUpload = ({
 
     return (
         <div className={className}>
-            <div {...getRootProps()} style={containerStyle}>
+            <div
+                {...getRootProps()}
+                style={containerStyle}
+                title="Drop files or click to upload"
+            >
                 <input {...getInputProps()} />
 
                 {converting ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <div
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
+                        aria-live="polite"
+                    >
                         <Loader className="animate-spin text-blue-500" size={32} />
                         <p style={{ color: 'var(--mac-text-secondary, #8E8E93)', margin: 0 }}>
                             Processing files...
@@ -194,17 +203,20 @@ const FileUpload = ({
             </div>
 
             {error && (
-                <div style={{
-                    marginTop: '12px',
-                    padding: '12px',
-                    backgroundColor: '#FFF2F2',
-                    color: '#D32F2F',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px'
-                }}>
+                <div
+                    role="alert"
+                    style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        backgroundColor: '#FFF2F2',
+                        color: '#D32F2F',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '14px'
+                    }}
+                >
                     <AlertCircle size={16} />
                     {error}
                 </div>
@@ -281,6 +293,7 @@ const FileUpload = ({
                                     padding: 0
                                 }}
                                 title="Remove"
+                                aria-label={`Remove ${preview.originalName}`}
                             >
                                 <X size={12} />
                             </button>
@@ -302,6 +315,18 @@ const FileUpload = ({
             )}
         </div>
     );
+};
+
+FileUpload.propTypes = {
+    onFilesSelected: PropTypes.func,
+    maxSize: PropTypes.number,
+    accept: PropTypes.object,
+    multiple: PropTypes.bool,
+    disabled: PropTypes.bool,
+    showPreviews: PropTypes.bool,
+    clearOnSelect: PropTypes.bool,
+    className: PropTypes.string,
+    style: PropTypes.object
 };
 
 export default FileUpload;

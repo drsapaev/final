@@ -68,7 +68,7 @@ export function AISuggestionPopover({
             const viewportHeight = window.innerHeight;
             const viewportWidth = window.innerWidth;
 
-            let style = {
+            const style = {
                 position: 'fixed',
                 zIndex: 10000,
             };

@@ -116,8 +116,8 @@ export function NotificationWebSocketProvider({ children }) {
         } else if (data.type === 'queue_update') {
             // Specific handling for queue updates if needed
             addToast({
-                title: "Обновление очереди",
-                message: `Ваш статус обновлен`,
+                title: 'Обновление очереди',
+                message: 'Ваш статус обновлен',
                 type: 'info'
             });
         }
