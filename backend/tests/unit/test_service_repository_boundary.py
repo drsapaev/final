@@ -261,6 +261,35 @@ def test_payment_webhooks_service_avoids_direct_session_calls() -> None:
     assert direct_db_call is None
 
 
+def test_payment_init_service_uses_queue_facade_for_billing_to_queue_flow() -> None:
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "payment_init_service.py"
+    )
+    logic = service_path.read_text(encoding="utf-8")
+    assert "QueueContextFacade" in logic, (
+        "broken contract: billing caller must use queue facade for queue timestamp access"
+    )
+    assert "timestamp_parity" in logic, (
+        "expected migration parity logging in payment_init service for billing->queue flow"
+    )
+
+
+def test_appointment_flow_service_uses_patient_emr_iam_facades() -> None:
+    logic = _service_logic_block("appointment_flow")
+    assert "PatientContextFacade" in logic, (
+        "broken contract: scheduling caller must use patient facade instead of direct patient data coupling"
+    )
+    assert "EmrContextFacade" in logic, (
+        "broken contract: scheduling caller must use emr facade for phrase indexing operations"
+    )
+    assert "IamContextFacade" in logic, (
+        "broken contract: emr write authorization must pass through iam facade checks"
+    )
+
+
 def test_patients_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("patients")
     direct_db_call = re.search(

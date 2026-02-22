@@ -528,12 +528,67 @@ jobs:
         path: backend/htmlcov/
         if-no-files-found: warn
 
+  # --- Архитектурные boundary тесты ---
+  architecture-boundary:
+    name: 🧱 Context Boundary Integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 🐍 Установка Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: 📦 Установка зависимостей
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: 🧱 Run context boundary tests
+      run: |
+        cd backend
+        START_TS=$(date +%s)
+        CONTEXTS=$(python - <<'PY'
+        from app.domain.context_registry import DomainContext
+        print(len(DomainContext))
+        PY
+        )
+
+        set +e
+        pytest -q tests/architecture/test_context_boundaries.py | tee /tmp/context-boundary.log
+        TEST_EXIT=${PIPESTATUS[0]}
+        set -e
+
+        END_TS=$(date +%s)
+        DURATION=$((END_TS - START_TS))
+        VIOLATIONS=$(grep -c " -> " /tmp/context-boundary.log || true)
+
+        echo "contexts checked: ${CONTEXTS}"
+        echo "violations: ${VIOLATIONS}"
+        echo "duration_seconds: ${DURATION}"
+
+        {
+          echo "## 🧱 Context Boundary Check"
+          echo "- contexts checked: ${CONTEXTS}"
+          echo "- violations: ${VIOLATIONS}"
+          echo "- duration: ${DURATION}s"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        exit $TEST_EXIT
+
   # --- Security сканирование ---
   security:
     name: 🔒 Security сканирование
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [code-quality, frontend-tests, backend-tests]
+    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary]
     
     steps:
     - uses: actions/checkout@v4
@@ -566,7 +621,7 @@ jobs:
     name: 🐳 Docker сборка
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [code-quality, frontend-tests, backend-tests]
+    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary]
     
     steps:
     - uses: actions/checkout@v4
@@ -617,7 +672,7 @@ jobs:
     name: 🔗 Интеграционные тесты
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [backend-tests, frontend-tests]
+    needs: [backend-tests, frontend-tests, architecture-boundary]
     if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
     services:
       postgres:

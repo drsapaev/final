@@ -27,6 +27,18 @@ from app.schemas.emr import (
     PrescriptionUpdate,
 )
 from app.repositories.appointment_flow_api_repository import AppointmentFlowApiRepository
+from app.services.context_facades.emr_facade import (
+    EmrContextFacade,
+    EmrServiceContractAdapter,
+)
+from app.services.context_facades.iam_facade import (
+    IamContextFacade,
+    IamServiceContractAdapter,
+)
+from app.services.context_facades.patient_facade import (
+    PatientContextFacade,
+    PatientServiceContractAdapter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,21 +136,57 @@ def create_or_update_emr(
         getattr(current_user, 'role', 'N/A'),
     )
 
+    # Migration window: keep role-based dependency guard and add IAM facade check.
+    iam_facade = IamContextFacade(IamServiceContractAdapter(current_user))
+    iam_decision = iam_facade.check_permission(
+        actor_user_id=current_user.id,
+        permission_code="emr.write",
+        correlation_id=None,
+    )
+    logger.debug(
+        "[create_or_update_emr] iam_parity actor=%s role=%s allowed=%s reason=%s",
+        current_user.id,
+        getattr(current_user, "role", None),
+        iam_decision.allowed,
+        iam_decision.reason,
+    )
+    if not iam_decision.allowed:
+        raise HTTPException(status_code=403, detail="Недостаточно прав для записи EMR")
+
     # ✅ SECURITY: Validate medical record data
     from fastapi import HTTPException, status
 
     from app.services.medical_validation import MedicalValidationService
 
     validation_service = MedicalValidationService()
+    patient_facade = PatientContextFacade(PatientServiceContractAdapter(db))
 
     # Get patient birth date for date validation
     appointment = crud_appointment.get(db, id=appointment_id)
     patient_birth_date = None
     if appointment and appointment.patient_id:
         from app.crud import patient as crud_patient
-        patient = crud_patient.get(db, id=appointment.patient_id)
-        if patient:
-            patient_birth_date = patient.birth_date
+
+        patient_summary = patient_facade.lookup_patient_summary(
+            patient_id=appointment.patient_id,
+            correlation_id=None,
+        )
+        legacy_patient = crud_patient.get(db, id=appointment.patient_id)
+        legacy_birth_date = (
+            getattr(legacy_patient, "birth_date", None) if legacy_patient else None
+        )
+        if patient_summary:
+            patient_birth_date = patient_summary.birth_date
+
+        logger.debug(
+            (
+                "[create_or_update_emr] patient_lookup_parity patient_id=%s "
+                "facade_birth_date=%s legacy_birth_date=%s"
+            ),
+            appointment.patient_id,
+            patient_summary.birth_date if patient_summary else None,
+            legacy_birth_date,
+        )
 
     # Convert Pydantic model to dict for validation
     emr_dict = emr_data.model_dump(exclude_unset=True)
@@ -453,12 +501,24 @@ def save_emr(
         from app.services.emr_phrase_indexer import get_emr_phrase_indexer
 
         indexer = get_emr_phrase_indexer(db)
+        emr_facade = EmrContextFacade(EmrServiceContractAdapter(db))
         specialty = getattr(current_user, 'specialty', None)
 
-        indexed_count = indexer.index_single_emr(
+        # Migration window: keep legacy path initialized for parity checks without
+        # executing duplicate indexing side effects.
+        _ = indexer
+        indexed_count = emr_facade.index_emr_phrases(
             emr_id=saved_emr.id,
             doctor_id=current_user.id,
-            specialty=specialty
+            specialty=specialty,
+            correlation_id=None,
+        )
+
+        logger.debug(
+            "[save_emr] phrase_index_parity emr_id=%d doctor_id=%d legacy=skipped facade=%d",
+            saved_emr.id,
+            current_user.id,
+            indexed_count,
         )
 
         logger.info(
