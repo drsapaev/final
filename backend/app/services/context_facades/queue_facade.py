@@ -10,7 +10,6 @@ from app.domain.contracts.queue_contracts import (
     QueueTokenSnapshot,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

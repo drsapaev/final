@@ -10,7 +10,6 @@ from app.domain.contracts.patient_contracts import (
     PatientSummary,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

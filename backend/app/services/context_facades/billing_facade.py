@@ -9,7 +9,6 @@ from app.domain.contracts.billing_contracts import (
     PaymentStatusSnapshot,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

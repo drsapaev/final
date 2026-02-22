@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 ROUTER_MARKER = "# --- API Router moved from app/api/v1/endpoints/"
 
 

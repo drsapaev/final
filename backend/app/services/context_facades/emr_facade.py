@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+
 from sqlalchemy.orm import Session
 
 from app.domain.contracts.emr_contracts import (
@@ -8,7 +9,6 @@ from app.domain.contracts.emr_contracts import (
     EmrContractFacade,
     VisitClinicalSnapshot,
 )
-
 
 logger = logging.getLogger(__name__)
 

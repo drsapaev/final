@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 from fastapi import Request
 
@@ -17,7 +17,6 @@ from app.services.context_facades.queue_facade import (
     QueueServiceContractAdapter,
 )
 from app.services.queue_service import queue_service
-
 
 logger = logging.getLogger(__name__)
 

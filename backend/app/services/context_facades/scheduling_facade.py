@@ -9,7 +9,6 @@ from app.domain.contracts.scheduling_contracts import (
     SchedulingContractFacade,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

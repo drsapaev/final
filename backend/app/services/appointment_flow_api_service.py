@@ -17,6 +17,9 @@ from app.crud.appointment import appointment as crud_appointment
 from app.models.appointment import Appointment as AppointmentModel
 from app.models.enums import AppointmentStatus
 from app.models.user import User
+from app.repositories.appointment_flow_api_repository import (
+    AppointmentFlowApiRepository,
+)
 from app.schemas.appointment import Appointment
 from app.schemas.emr import (
     EMR,
@@ -26,7 +29,6 @@ from app.schemas.emr import (
     PrescriptionCreate,
     PrescriptionUpdate,
 )
-from app.repositories.appointment_flow_api_repository import AppointmentFlowApiRepository
 from app.services.context_facades.emr_facade import (
     EmrContextFacade,
     EmrServiceContractAdapter,
@@ -154,7 +156,7 @@ def create_or_update_emr(
         raise HTTPException(status_code=403, detail="Недостаточно прав для записи EMR")
 
     # ✅ SECURITY: Validate medical record data
-    from fastapi import HTTPException, status
+    from fastapi import status
 
     from app.services.medical_validation import MedicalValidationService
 

@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 from app.domain.contracts.contract_logging import ContractMethodLogger
 
-
 logger = logging.getLogger(__name__)
 
 

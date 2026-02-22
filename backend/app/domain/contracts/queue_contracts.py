@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
 from app.domain.contracts.contract_logging import ContractMethodLogger
-
 
 logger = logging.getLogger(__name__)
 

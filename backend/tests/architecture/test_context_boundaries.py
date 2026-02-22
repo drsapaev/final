@@ -8,7 +8,6 @@ import pytest
 
 from app.domain.context_registry import DomainContext, detect_context
 
-
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = BACKEND_ROOT / "app"
 _SCANNED_DIRS = ("services", "repositories")

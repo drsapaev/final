@@ -8,7 +8,6 @@ from app.domain.contracts.iam_contracts import (
     IamContractFacade,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
