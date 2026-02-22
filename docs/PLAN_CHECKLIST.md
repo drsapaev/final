@@ -39,6 +39,8 @@
 
 ## STOP/GO Phase 2 → 3
 - [x] GO only if: DR test passes; alerts wired; E2E critical flows green; load metrics within targets.
+- [x] Evidence (2026-02-22): unified CI run `22278770795` is green; includes `Frontend`, `Integration`, `Security`, `DAST`, `Load Tests`.
+- [x] Load artifacts present: `k6-summary.json`, `load-regression-report.md` (`p95=4.07ms`, `error_rate=0.0000`).
 
 ## P2 Architecture Finish
 - [x] Controllers free of business logic.
