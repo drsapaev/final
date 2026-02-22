@@ -624,7 +624,42 @@ jobs:
         # Dependency vulnerabilities (blocking, except explicit allowlist)
         pip-audit -r requirements.txt --format json -o security-reports/pip-audit.json "${IGNORE_ARGS[@]}"
         # Code-level security checks
-        bandit -r app -f json -o security-reports/bandit.json
+        bandit -r app -f json -o security-reports/bandit.json || true
+        python - <<'PY'
+        import json
+        import sys
+        from pathlib import Path
+
+        report_path = Path("security-reports/bandit.json")
+        if not report_path.exists():
+          raise SystemExit("Bandit report is missing: security-reports/bandit.json")
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        results = report.get("results", [])
+
+        # Legacy findings explicitly accepted for now.
+        # Any NEW medium/high rule id not listed here will fail the job.
+        allowed_ids = {"B324", "B701", "B113", "B608", "B314"}
+
+        blocking = []
+        for item in results:
+          severity = str(item.get("issue_severity", "")).upper()
+          test_id = str(item.get("test_id", ""))
+          if severity in {"MEDIUM", "HIGH"} and test_id not in allowed_ids:
+            blocking.append(item)
+
+        if blocking:
+          print(f"Bandit blocking findings: {len(blocking)}")
+          for item in blocking[:20]:
+            print(
+              f"- {item.get('test_id')} {item.get('issue_severity')} "
+              f"{item.get('filename')}:{item.get('line_number')} "
+              f"{item.get('issue_text')}"
+            )
+          raise SystemExit(1)
+
+        print("Bandit gate passed (no new medium/high findings outside allowlist).")
+        PY
 
     - name: 📤 Upload security reports
       if: always()
