@@ -501,7 +501,7 @@ jobs:
         echo "🔍 Проверяем конфигурацию pytest:"
         cat pytest.ini
         echo "🧪 Запускаем тесты с покрытием:"
-        pytest tests/ --dead-fixtures
+        pytest tests/
         echo "📁 Проверяем созданные файлы:"
         ls -la htmlcov/ || echo "Папка htmlcov не найдена"
         if [ ! -d "htmlcov" ]; then
@@ -1240,7 +1240,7 @@ jobs:
         mkdir -p zap-report
         chmod -R a+rwx zap-report || true
         docker run --rm --network=host \
-          --user "$(id -u):$(id -g)" \
+          --user root \
           -v ${{ github.workspace }}/zap-report:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
