@@ -51,3 +51,9 @@
 - [x] A11y: WCAG contrast, focus, ARIA validated on key flows.
 - [x] UX polish: save states, clear errors/recovery, meaningful empty states.
 - [x] OpenAPI complete; contract tests; onboarding/runbooks current.
+
+## P4 Clinical Security Maturity (Phase 4)
+- [x] PHI retention inventory implemented for core PHI-bearing tables (`emr_revisions`, `emr_audit_logs`, `user_audit_logs`, `messages`).
+- [x] Encryption posture check implemented with runtime roundtrip smoke test.
+- [x] PHI access reporting implemented from EMR audit and user audit logs.
+- [x] Break-glass policy validator implemented (`BREAK_GLASS_*` config with compliance checks).

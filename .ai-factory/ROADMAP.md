@@ -14,7 +14,7 @@
 - [x] **QA Depth in CI** — critical E2E flows, load tests, and security checks wired into CI pipelines.
 - [x] **UX and A11y Baseline** — key flows cleaned for accessibility, OpenAPI contract checks, and onboarding/runbook docs updated.
 - [x] **Domain Modules (Phase 4)** — formalize bounded contexts (Patient, Scheduling, Queue, Billing, EMR, IAM) with explicit cross-module contracts. (Completed; CI evidence: run `22278770795`)
-- [ ] **Clinical Security Maturity** — add PHI data lifecycle controls (retention, encryption posture, access reporting, break-glass policy validation).
+- [x] **Clinical Security Maturity** — add PHI data lifecycle controls (retention, encryption posture, access reporting, break-glass policy validation). (Baseline service + tests implemented on 2026-02-22)
 - [ ] **SLO and Capacity Engineering** — automate regression budgets for latency/error rate and scale test profiles per critical endpoint group.
 - [ ] **Interoperability and Multi-Clinic Scale** — standardize adapter contracts for external systems and prepare tenant/branch isolation strategy.
 
@@ -32,3 +32,4 @@
 | QA Depth in CI | 2026-02-22 |
 | UX and A11y Baseline | 2026-02-22 |
 | Domain Modules (Phase 4) | 2026-02-22 |
+| Clinical Security Maturity | 2026-02-22 |

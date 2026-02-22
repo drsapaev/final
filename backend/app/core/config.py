@@ -107,6 +107,38 @@ class Settings(BaseSettings):
     AUTO_BACKUP_ENABLED: bool = Field(default=False, description="Enable automated daily backups")
     BACKUP_RETENTION_DAYS: int = Field(default=30, ge=1, le=365, description="Number of days to retain backups")
 
+    # --- Clinical Security Maturity ---
+    PHI_RETENTION_DAYS: int = Field(
+        default=365 * 7,
+        ge=30,
+        le=365 * 30,
+        description="Retention period for PHI-bearing records (days)"
+    )
+    BREAK_GLASS_ENABLED: bool = Field(
+        default=False,
+        description="Enable emergency break-glass access mode"
+    )
+    BREAK_GLASS_MAX_MINUTES: int = Field(
+        default=60,
+        ge=1,
+        le=720,
+        description="Maximum break-glass session duration in minutes"
+    )
+    BREAK_GLASS_REASON_MIN_LENGTH: int = Field(
+        default=20,
+        ge=5,
+        le=500,
+        description="Minimum justification length for break-glass reason"
+    )
+    BREAK_GLASS_REQUIRE_TICKET: bool = Field(
+        default=True,
+        description="Require incident/ticket reference for break-glass sessions"
+    )
+    BREAK_GLASS_ALLOWED_ROLES: str = Field(
+        default="Admin,ChiefDoctor",
+        description="Comma-separated list of roles allowed to use break-glass"
+    )
+
     # --- MCP Settings ---
     MCP_ENABLED: bool = True
     MCP_LOG_REQUESTS: bool = True

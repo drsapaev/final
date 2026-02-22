@@ -93,3 +93,38 @@ Formalize bounded contexts for `Patient`, `Scheduling`, `Queue`, `Billing`, `EMR
   - Boundary tests pass locally and in CI.
   - Pilot flows pass unit + integration tests.
   - Contracts become mandatory path for cross-context calls.
+
+---
+
+## Implementation Plan: Clinical Security Maturity (Phase 5)
+
+Created: 2026-02-22
+
+### Scope
+
+Add baseline PHI lifecycle controls required by roadmap milestone:
+- retention visibility for PHI-bearing tables,
+- encryption posture validation with runtime smoke-check,
+- access reporting from EMR/user audit logs,
+- break-glass policy validation.
+
+### Tasks
+
+- [x] Add `ClinicalSecurityMaturityService` with:
+  - retention inventory (`build_retention_inventory`),
+  - encryption posture checks (`evaluate_encryption_posture`),
+  - PHI access report (`build_phi_access_report`),
+  - break-glass policy validation (`validate_break_glass_policy`).
+- [x] Extend settings (`app/core/config.py`) with:
+  - `PHI_RETENTION_DAYS`,
+  - `BREAK_GLASS_*` controls.
+- [x] Add unit tests:
+  - `backend/tests/unit/test_clinical_security_maturity_service.py`.
+- [x] Validate locally:
+  - `ruff check backend/app/services/clinical_security_maturity_service.py backend/tests/unit/test_clinical_security_maturity_service.py`
+  - `pytest backend/tests/unit/test_clinical_security_maturity_service.py -q`
+
+### Evidence
+
+- Service: `backend/app/services/clinical_security_maturity_service.py`
+- Tests: `backend/tests/unit/test_clinical_security_maturity_service.py` (`5 passed`)
