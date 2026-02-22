@@ -605,17 +605,35 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install safety bandit semgrep
-    
+        pip install pip-audit bandit semgrep
+
     - name: 🔒 Проверка уязвимостей
       run: |
         cd backend
-        # Safety для проверки уязвимостей в зависимостях
-        safety check --json
-        # Bandit для анализа безопасности кода
-        bandit -r app -f json
-        # Semgrep для статического анализа безопасности
-        semgrep --config=auto app/
+        mkdir -p security-reports
+
+        # Explicit allowlist for dependencies with no available safe upstream version yet.
+        IGNORE_ARGS=()
+        while IFS= read -r vuln_id; do
+          vuln_id="$(echo "$vuln_id" | xargs)"
+          if [ -n "$vuln_id" ] && [[ ! "$vuln_id" =~ ^# ]]; then
+            IGNORE_ARGS+=("--ignore-vuln" "$vuln_id")
+          fi
+        done < ../.github/security/pip-audit.ignore
+
+        # Dependency vulnerabilities (blocking, except explicit allowlist)
+        pip-audit -r requirements.txt --format json -o security-reports/pip-audit.json "${IGNORE_ARGS[@]}"
+        # Code-level security checks
+        bandit -r app -f json -o security-reports/bandit.json
+        semgrep --config=auto --json --output security-reports/semgrep.json app/
+
+    - name: 📤 Upload security reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: backend/security-reports/
+        if-no-files-found: warn
 
   # --- Docker сборка ---
   docker:
@@ -1239,17 +1257,19 @@ jobs:
       run: |
         mkdir -p zap-report
         chmod -R a+rwx zap-report || true
+        set -o pipefail
         docker run --rm --network=host \
           --user root \
           -v ${{ github.workspace }}/zap-report:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
           -t http://127.0.0.1:8000 \
-          -J /zap/wrk/zap-report.json \
-          -r /zap/wrk/zap-report.html \
-          -w /zap/wrk/zap-warnings.md \
+          -J zap-report.json \
+          -r zap-report.html \
+          -w zap-warnings.md \
           -m 5 \
-          -I
+          -I | tee zap-report/zap-baseline.log
+        ls -la zap-report
 
     - name: 🚦 Enforce DAST policy
       run: |
@@ -1260,39 +1280,48 @@ jobs:
 
         report_path = Path("zap-report/zap-report.json")
         warnings_path = Path("zap-report/zap-warnings.md")
+        baseline_log_path = Path("zap-report/zap-baseline.log")
 
-        if not report_path.exists():
-          if not warnings_path.exists():
-            raise SystemExit("ZAP artifacts missing: neither zap-report.json nor zap-warnings.md found")
+        def parse_fail_counts(text: str):
+          match = re.search(r"FAIL-NEW:\s*(\d+)\s+FAIL-INPROG:\s*(\d+)", text)
+          if not match:
+            return None
+          return int(match.group(1)), int(match.group(2))
 
-          warnings_text = warnings_path.read_text(encoding="utf-8")
-          match = re.search(r"FAIL-NEW:\s*(\d+)\s+FAIL-INPROG:\s*(\d+)", warnings_text)
-          if match:
-            fail_new = int(match.group(1))
-            fail_inprog = int(match.group(2))
-            print(f"ZAP fallback summary: fail_new={fail_new}, fail_inprog={fail_inprog}")
-            if fail_new > 0 or fail_inprog > 0:
-              raise SystemExit(1)
-            raise SystemExit(0)
-
-          print("ZAP JSON report missing and fallback summary not found; proceeding as warning-only run")
+        if report_path.exists():
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          high = 0
+          medium = 0
+          for site in report.get("site", []):
+            for alert in site.get("alerts", []):
+              risk = str(alert.get("riskcode", "0"))
+              if risk == "3":
+                high += 1
+              elif risk == "2":
+                medium += 1
+          print(f"ZAP alerts (json): high={high}, medium={medium}")
+          if high > 0 or medium > 0:
+            raise SystemExit(1)
           raise SystemExit(0)
 
-        report = json.loads(report_path.read_text(encoding="utf-8"))
-        high = 0
-        medium = 0
+        for fallback_path in (warnings_path, baseline_log_path):
+          if not fallback_path.exists():
+            continue
+          summary = parse_fail_counts(fallback_path.read_text(encoding="utf-8"))
+          if summary is None:
+            continue
+          fail_new, fail_inprog = summary
+          print(
+            f"ZAP summary ({fallback_path.name}): "
+            f"fail_new={fail_new}, fail_inprog={fail_inprog}"
+          )
+          if fail_new > 0 or fail_inprog > 0:
+            raise SystemExit(1)
+          raise SystemExit(0)
 
-        for site in report.get("site", []):
-          for alert in site.get("alerts", []):
-            risk = str(alert.get("riskcode", "0"))
-            if risk == "3":
-              high += 1
-            elif risk == "2":
-              medium += 1
-
-        print(f"ZAP alerts: high={high}, medium={medium}")
-        if high > 0 or medium > 0:
-          raise SystemExit(1)
+        raise SystemExit(
+          "ZAP artifacts missing usable summary: zap-report.json, zap-warnings.md, zap-baseline.log"
+        )
         PY
 
     - name: 📤 Upload ZAP artifacts
