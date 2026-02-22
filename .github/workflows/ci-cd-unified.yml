@@ -467,7 +467,7 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-asyncio httpx
+        pip install pytest pytest-cov pytest-asyncio pytest-deadfixtures httpx
     
     - name: 🗄️ Подготовка базы данных
       run: |
@@ -1238,7 +1238,9 @@ jobs:
     - name: 🔎 Run ZAP baseline scan
       run: |
         mkdir -p zap-report
+        chmod -R a+rwx zap-report || true
         docker run --rm --network=host \
+          --user "$(id -u):$(id -g)" \
           -v ${{ github.workspace }}/zap-report:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \

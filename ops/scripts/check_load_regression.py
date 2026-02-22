@@ -19,9 +19,16 @@ class LoadMetrics:
 
 def _metric(summary: dict, metric_name: str, value_key: str, default: float = 0.0) -> float:
     metric = summary.get("metrics", {}).get(metric_name, {})
-    values = metric.get("values", {})
-    value = values.get(value_key, default)
-    return float(value)
+    values = metric.get("values")
+    if isinstance(values, dict) and value_key in values:
+        value = values.get(value_key, default)
+    else:
+        value = metric.get(value_key, default)
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def parse_k6_summary(path: Path) -> LoadMetrics:
@@ -29,8 +36,10 @@ def parse_k6_summary(path: Path) -> LoadMetrics:
     return LoadMetrics(
         rps=_metric(summary, "http_reqs", "rate"),
         p95_ms=_metric(summary, "http_req_duration", "p(95)"),
-        error_rate=_metric(summary, "http_req_failed", "rate"),
-        checks_rate=_metric(summary, "checks", "rate", 1.0),
+        error_rate=_metric(
+            summary, "http_req_failed", "rate", _metric(summary, "http_req_failed", "value")
+        ),
+        checks_rate=_metric(summary, "checks", "rate", _metric(summary, "checks", "value", 1.0)),
     )
 
 
