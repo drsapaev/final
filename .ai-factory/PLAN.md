@@ -74,13 +74,16 @@ Formalize bounded contexts for `Patient`, `Scheduling`, `Queue`, `Billing`, `EMR
   - Logging requirement: assertion messages must clearly identify broken contract and caller context.
   - Depends on: Task 7.
 
-- [ ] **Task 9: Update architecture docs and close milestone**
+- [x] **Task 9: Update architecture docs and close milestone**
   - Update:
   - `.ai-factory/ARCHITECTURE.md` (context table + dependency matrix),
   - `.ai-factory/ROADMAP.md` (mark milestone complete when tests/CI are green),
   - `docs/PLAN_CHECKLIST.md` only if checklist criteria are explicitly satisfied.
   - Logging requirement: record completion evidence links (test command outputs / CI run ID) in doc notes.
   - Depends on: Task 5, Task 8.
+  - Evidence:
+  - CI run: `https://github.com/drsapaev/final/actions/runs/22278770795` (all required jobs green).
+  - Artifacts confirmed: `load-test-report` includes `k6-summary.json` and `load-regression-report.md`.
 
 ## Execution Notes
 

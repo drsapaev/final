@@ -96,6 +96,12 @@ Direct imports between context internals are blocked by:
 - `backend/tests/architecture/test_context_boundaries.py`
 - CI job `architecture-boundary` in `.github/workflows/ci-cd-unified.yml`
 
+## Phase 4 Evidence (2026-02-22)
+
+- Boundary/contract enforcement is active in CI run: `https://github.com/drsapaev/final/actions/runs/22278770795`.
+- Required gates green in the same run: `architecture-boundary`, `backend-tests`, `integration`, `security`, `load-tests-nightly`, `dast-zap-nightly`.
+- Load gate artifacts confirmed: `k6-summary.json`, `load-regression-report.md`.
+
 ## Key Principles
 
 1. Postgres + Alembic are the data contract source of truth.
