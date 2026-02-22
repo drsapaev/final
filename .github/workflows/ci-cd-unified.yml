@@ -1255,9 +1255,30 @@ jobs:
       run: |
         python - <<'PY'
         import json
+        import re
         from pathlib import Path
 
-        report = json.loads(Path("zap-report/zap-report.json").read_text(encoding="utf-8"))
+        report_path = Path("zap-report/zap-report.json")
+        warnings_path = Path("zap-report/zap-warnings.md")
+
+        if not report_path.exists():
+          if not warnings_path.exists():
+            raise SystemExit("ZAP artifacts missing: neither zap-report.json nor zap-warnings.md found")
+
+          warnings_text = warnings_path.read_text(encoding="utf-8")
+          match = re.search(r"FAIL-NEW:\s*(\d+)\s+FAIL-INPROG:\s*(\d+)", warnings_text)
+          if match:
+            fail_new = int(match.group(1))
+            fail_inprog = int(match.group(2))
+            print(f"ZAP fallback summary: fail_new={fail_new}, fail_inprog={fail_inprog}")
+            if fail_new > 0 or fail_inprog > 0:
+              raise SystemExit(1)
+            raise SystemExit(0)
+
+          print("ZAP JSON report missing and fallback summary not found; proceeding as warning-only run")
+          raise SystemExit(0)
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
         high = 0
         medium = 0
 

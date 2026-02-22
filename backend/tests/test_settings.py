@@ -73,8 +73,12 @@ def test_backup_retention_validation():
         Settings(SECRET_KEY="a" * 32, BACKUP_RETENTION_DAYS=366)
 
 
-def test_cors_settings_defaults():
+def test_cors_settings_defaults(monkeypatch: pytest.MonkeyPatch):
     """Test CORS settings have correct defaults"""
+    # Ensure the test validates model defaults rather than CI env overrides.
+    monkeypatch.delenv("CORS_DISABLE", raising=False)
+    monkeypatch.delenv("CORS_ALLOW_ALL", raising=False)
+    monkeypatch.delenv("BACKEND_CORS_ORIGINS", raising=False)
     settings = Settings(SECRET_KEY="a" * 32)
     assert settings.CORS_DISABLE is False
     assert settings.CORS_ALLOW_ALL is False
