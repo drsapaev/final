@@ -17,7 +17,6 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import select
-from app.repositories.auth_api_repository import AuthApiRepository
 
 # helpers from deps
 from app.api.deps import create_access_token, get_current_user
@@ -31,6 +30,7 @@ from app.db.session import get_db
 
 # ORM user model
 from app.models.user import User
+from app.repositories.auth_api_repository import AuthApiRepository
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ router = APIRouter()
 
 
 
-def _repo(db: Session) -> AuthApiRepository:
+def _repo(db: Any) -> AuthApiRepository:
     return AuthApiRepository(db)
 
 @router.post("/login")

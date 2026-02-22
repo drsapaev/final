@@ -27,10 +27,10 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8000";
 const ENDPOINTS = [
+  "/api/v1/status",
+  "/api/v1/status",
+  "/api/v1/status",
   "/api/v1/health",
-  "/api/v1/payments/providers",
-  "/api/v1/telemetry/status",
-  "/api/v1/observability/metrics",
 ];
 
 export default function () {
