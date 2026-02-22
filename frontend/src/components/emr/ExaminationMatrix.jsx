@@ -127,7 +127,7 @@ const ExaminationMatrix = ({
                             <div className="ex-matrix__actions">
                                 {/* Button: Norm */}
                                 <button
-                                    className={`ex-matrix__action-btn ex-matrix__action-btn--norm`}
+                                    className={'ex-matrix__action-btn ex-matrix__action-btn--norm'}
                                     onClick={() => handleToggle(item, 'norm')}
                                     title="Норма"
                                 >
@@ -135,7 +135,7 @@ const ExaminationMatrix = ({
                                 </button>
                                 {/* Button: Path */}
                                 <button
-                                    className={`ex-matrix__action-btn ex-matrix__action-btn--path`}
+                                    className={'ex-matrix__action-btn ex-matrix__action-btn--path'}
                                     onClick={() => handleToggle(item, 'path')}
                                     title="Патология"
                                 >
