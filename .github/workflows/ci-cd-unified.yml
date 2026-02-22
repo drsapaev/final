@@ -1053,7 +1053,6 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
-      TARGET_RPS: '30'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
 
@@ -1118,53 +1117,30 @@ jobs:
         fi
         exit 0
 
-    - name: ⚡ Run k6 baseline scenario
+    - name: ⚡ Run k6 profile matrix
       run: |
         set +e
         mkdir -p artifacts/load
-        chmod -R a+rwx artifacts/load || true
-        if [ "${LOAD_API_READY:-0}" -ne 1 ]; then
-          echo "::warning::Skipping k6 execution because API was not ready."
-          K6_EXIT=1
-        else
-          docker run --rm --network=host \
-            --user "$(id -u):$(id -g)" \
-            -e BASE_URL=http://127.0.0.1:8000 \
-            -e TARGET_RPS=${TARGET_RPS} \
-            -v ${{ github.workspace }}/ops/load:/scripts \
-            -v ${{ github.workspace }}/artifacts/load:/artifacts \
-            grafana/k6:latest \
-            run /scripts/clinic_core.js \
-            --summary-export=/artifacts/k6-summary.json
-          K6_EXIT=$?
-        fi
-        echo "K6_EXIT_CODE=$K6_EXIT" >> $GITHUB_ENV
+        python ops/scripts/run_load_profiles.py \
+          --config ops/load/endpoint_profiles.json \
+          --workspace "${{ github.workspace }}" \
+          --artifacts-dir artifacts/load \
+          --base-url http://127.0.0.1:8000 \
+          --api-ready "${LOAD_API_READY:-0}"
+        LOAD_EXIT=$?
+        echo "LOAD_PROFILES_EXIT_CODE=$LOAD_EXIT" >> $GITHUB_ENV
         if [ ! -f artifacts/load/k6-summary.json ]; then
-          echo "::warning::k6 summary was not generated; writing fallback summary."
-          cat > artifacts/load/k6-summary.json <<'JSON'
-        {"error":"k6 summary was not generated","metrics":{}}
-        JSON
+          echo "::warning::aggregate k6 summary is missing"
           echo "K6_SUMMARY_MISSING=1" >> $GITHUB_ENV
         else
           echo "K6_SUMMARY_MISSING=0" >> $GITHUB_ENV
         fi
-        exit 0
-
-    - name: 🚦 Check load regression
-      run: |
-        set +e
-        python ops/scripts/check_load_regression.py \
-          --summary artifacts/load/k6-summary.json \
-          --baseline ops/load/baseline_targets.json \
-          --report artifacts/load/load-regression-report.md
-        REG_EXIT=$?
-        echo "LOAD_REGRESSION_EXIT_CODE=$REG_EXIT" >> $GITHUB_ENV
-        if [ $REG_EXIT -ne 0 ] && [ ! -f artifacts/load/load-regression-report.md ]; then
+        if [ ! -f artifacts/load/load-regression-report.md ]; then
           cat > artifacts/load/load-regression-report.md <<'MD'
         # Load Test Regression Report
 
         - Status: FAIL
-        - Reason: Regression check did not produce a report.
+        - Reason: aggregate load-regression-report.md missing.
         MD
         fi
         exit 0
@@ -1177,6 +1153,8 @@ jobs:
         path: |
           artifacts/load/k6-summary.json
           artifacts/load/load-regression-report.md
+          artifacts/load/load-regression-report.json
+          artifacts/load/profiles/**
         if-no-files-found: warn
 
     - name: 🛑 Stop API
@@ -1188,8 +1166,7 @@ jobs:
 
     - name: 🚨 Enforce load gate
       run: |
-        K6_EXIT=${K6_EXIT_CODE:-1}
-        REG_EXIT=${LOAD_REGRESSION_EXIT_CODE:-1}
+        LOAD_EXIT=${LOAD_PROFILES_EXIT_CODE:-1}
         SUMMARY_MISSING=${K6_SUMMARY_MISSING:-1}
 
         if [ ! -f artifacts/load/load-regression-report.md ]; then
@@ -1199,11 +1176,11 @@ jobs:
         - Status: FAIL
         - Reason: load-regression-report.md missing after checks.
         MD
-          REG_EXIT=1
+          LOAD_EXIT=1
         fi
 
-        echo "k6_exit=$K6_EXIT, regression_exit=$REG_EXIT, summary_missing=$SUMMARY_MISSING"
-        if [ "$K6_EXIT" -ne 0 ] || [ "$REG_EXIT" -ne 0 ] || [ "$SUMMARY_MISSING" -ne 0 ]; then
+        echo "load_exit=$LOAD_EXIT, summary_missing=$SUMMARY_MISSING"
+        if [ "$LOAD_EXIT" -ne 0 ] || [ "$SUMMARY_MISSING" -ne 0 ]; then
           echo "::error::Load gate failed."
           exit 1
         fi

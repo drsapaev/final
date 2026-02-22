@@ -57,3 +57,9 @@
 - [x] Encryption posture check implemented with runtime roundtrip smoke test.
 - [x] PHI access reporting implemented from EMR audit and user audit logs.
 - [x] Break-glass policy validator implemented (`BREAK_GLASS_*` config with compliance checks).
+
+## P5 SLO & Capacity Engineering (Phase 5)
+- [x] k6 load profiles introduced for critical endpoint groups (`core_readiness`, `queue_public`, `activation_public`).
+- [x] Regression budgets automated per profile (RPS drop/P95 growth guardrails in `ops/load/endpoint_profiles.json`).
+- [x] Unified CI load gate executes full profile matrix and blocks on budget breach.
+- [x] Aggregated artifacts produced: `k6-summary.json`, `load-regression-report.md`, `load-regression-report.json`, plus per-profile reports.

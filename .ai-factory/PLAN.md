@@ -128,3 +128,35 @@ Add baseline PHI lifecycle controls required by roadmap milestone:
 
 - Service: `backend/app/services/clinical_security_maturity_service.py`
 - Tests: `backend/tests/unit/test_clinical_security_maturity_service.py` (`5 passed`)
+
+---
+
+## Implementation Plan: SLO & Capacity Engineering (Phase 6)
+
+Created: 2026-02-22
+
+### Scope
+
+Scale load regression control from one baseline run to profile-based capacity budgets across critical endpoint groups.
+
+### Tasks
+
+- [x] Extend k6 scenario (`ops/load/clinic_core.js`) to accept:
+  - profile tag (`K6_PROFILE`),
+  - dynamic endpoint set (`K6_ENDPOINTS_JSON`).
+- [x] Add profile budget config:
+  - `ops/load/endpoint_profiles.json` with per-profile `targets`, `baseline`, `regression`.
+- [x] Extend regression checker:
+  - `ops/scripts/check_load_regression.py` now supports `--profile` and profile-aware configs.
+- [x] Add load profile orchestrator:
+  - `ops/scripts/run_load_profiles.py` runs all profiles, writes aggregated and per-profile artifacts.
+- [x] Update CI load job (`.github/workflows/ci-cd-unified.yml`) to run full profile matrix and enforce aggregated gate.
+- [x] Add unit tests:
+  - `backend/tests/unit/test_load_regression_profiles.py` (`4 passed`).
+- [x] Update runbook:
+  - `docs/runbooks/LOAD_TESTING_RUNBOOK.md`.
+
+### Local Validation
+
+- `ruff check ops/scripts/check_load_regression.py ops/scripts/run_load_profiles.py backend/tests/unit/test_load_regression_profiles.py`
+- `pytest backend/tests/unit/test_load_regression_profiles.py -q`

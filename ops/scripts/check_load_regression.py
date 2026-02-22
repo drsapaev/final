@@ -7,6 +7,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -43,10 +44,32 @@ def parse_k6_summary(path: Path) -> LoadMetrics:
     )
 
 
-def evaluate(metrics: LoadMetrics, baseline_cfg: dict) -> tuple[bool, list[str]]:
-    targets = baseline_cfg.get("targets", {})
-    baseline = baseline_cfg.get("baseline", {})
-    regression = baseline_cfg.get("regression", {})
+def _effective_config(cfg: dict[str, Any], profile: str | None) -> dict[str, Any]:
+    if profile and "profiles" in cfg:
+        profiles = cfg.get("profiles", {})
+        profile_cfg = profiles.get(profile)
+        if not isinstance(profile_cfg, dict):
+            available = ", ".join(sorted(profiles.keys()))
+            raise ValueError(
+                f"Profile '{profile}' is not defined. Available profiles: {available or 'none'}"
+            )
+        return profile_cfg
+
+    if not profile and "profiles" in cfg:
+        profiles = cfg.get("profiles", {})
+        available = ", ".join(sorted(profiles.keys()))
+        raise ValueError(
+            "Config contains multiple profiles. Pass --profile. "
+            f"Available profiles: {available or 'none'}"
+        )
+
+    return cfg
+
+
+def evaluate(metrics: LoadMetrics, effective_cfg: dict[str, Any]) -> tuple[bool, list[str]]:
+    targets = effective_cfg.get("targets", {})
+    baseline = effective_cfg.get("baseline", {})
+    regression = effective_cfg.get("regression", {})
     failures: list[str] = []
 
     target_rps_min = float(targets.get("rps_min", 0))
@@ -95,10 +118,17 @@ def evaluate(metrics: LoadMetrics, baseline_cfg: dict) -> tuple[bool, list[str]]
     return (len(failures) == 0), failures
 
 
-def write_report(path: Path, metrics: LoadMetrics, ok: bool, failures: list[str]) -> None:
+def write_report(
+    path: Path,
+    metrics: LoadMetrics,
+    ok: bool,
+    failures: list[str],
+    profile: str,
+) -> None:
     lines = [
         "# Load Test Regression Report",
         "",
+        f"- Profile: `{profile}`",
         f"- Status: {'PASS' if ok else 'FAIL'}",
         f"- RPS: {metrics.rps:.2f}",
         f"- P95 latency: {metrics.p95_ms:.2f} ms",
@@ -113,21 +143,48 @@ def write_report(path: Path, metrics: LoadMetrics, ok: bool, failures: list[str]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_json_report(
+    path: Path,
+    metrics: LoadMetrics,
+    ok: bool,
+    failures: list[str],
+    profile: str,
+) -> None:
+    payload = {
+        "profile": profile,
+        "status": "PASS" if ok else "FAIL",
+        "metrics": {
+            "rps": round(metrics.rps, 6),
+            "p95_ms": round(metrics.p95_ms, 6),
+            "error_rate": round(metrics.error_rate, 6),
+            "checks_rate": round(metrics.checks_rate, 6),
+        },
+        "failures": failures,
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--summary", required=True, type=Path)
     parser.add_argument("--baseline", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
+    parser.add_argument("--profile", default=None, help="Profile key for multi-profile config")
+    parser.add_argument("--report-json", type=Path, default=None)
     args = parser.parse_args()
 
     metrics = parse_k6_summary(args.summary)
     baseline_cfg = json.loads(args.baseline.read_text(encoding="utf-8"))
-    ok, failures = evaluate(metrics, baseline_cfg)
-    write_report(args.report, metrics, ok, failures)
+    profile = args.profile or "default"
+    effective_cfg = _effective_config(baseline_cfg, args.profile)
+    ok, failures = evaluate(metrics, effective_cfg)
+    write_report(args.report, metrics, ok, failures, profile=profile)
+    if args.report_json:
+        write_json_report(args.report_json, metrics, ok, failures, profile=profile)
 
     print(
         "Load test summary: "
-        f"rps={metrics.rps:.2f}, p95={metrics.p95_ms:.2f}ms, "
+        f"profile={profile}, rps={metrics.rps:.2f}, p95={metrics.p95_ms:.2f}ms, "
         f"error_rate={metrics.error_rate:.4f}, checks={metrics.checks_rate:.4f}"
     )
     if not ok:

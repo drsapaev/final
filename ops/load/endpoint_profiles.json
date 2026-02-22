@@ -1,0 +1,73 @@
+{
+  "profiles": {
+    "core_readiness": {
+      "target_rps": 30.0,
+      "endpoints": [
+        "/api/v1/status",
+        "/api/v1/status",
+        "/api/v1/status",
+        "/api/v1/health"
+      ],
+      "targets": {
+        "rps_min": 25.0,
+        "p95_ms_max": 500.0,
+        "error_rate_max": 0.01,
+        "checks_rate_min": 0.99
+      },
+      "baseline": {
+        "rps": 30.0,
+        "p95_ms": 450.0
+      },
+      "regression": {
+        "max_rps_drop_pct": 15.0,
+        "max_p95_increase_pct": 20.0
+      }
+    },
+    "queue_public": {
+      "target_rps": 20.0,
+      "endpoints": [
+        "/api/v1/queues/profiles/public",
+        "/api/v1/queues/profiles/public",
+        "/api/v1/status",
+        "/api/v1/health"
+      ],
+      "targets": {
+        "rps_min": 15.0,
+        "p95_ms_max": 700.0,
+        "error_rate_max": 0.01,
+        "checks_rate_min": 0.99
+      },
+      "baseline": {
+        "rps": 20.0,
+        "p95_ms": 600.0
+      },
+      "regression": {
+        "max_rps_drop_pct": 20.0,
+        "max_p95_increase_pct": 25.0
+      }
+    },
+    "activation_public": {
+      "target_rps": 20.0,
+      "endpoints": [
+        "/api/v1/activation/status",
+        "/api/v1/activation/status",
+        "/api/v1/status",
+        "/api/v1/health"
+      ],
+      "targets": {
+        "rps_min": 15.0,
+        "p95_ms_max": 700.0,
+        "error_rate_max": 0.01,
+        "checks_rate_min": 0.99
+      },
+      "baseline": {
+        "rps": 20.0,
+        "p95_ms": 600.0
+      },
+      "regression": {
+        "max_rps_drop_pct": 20.0,
+        "max_p95_increase_pct": 25.0
+      }
+    }
+  }
+}

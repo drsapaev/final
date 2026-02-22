@@ -3,6 +3,7 @@ import { check } from "k6";
 
 const targetRps = Number(__ENV.TARGET_RPS || 30);
 const minRps = Math.max(targetRps - 5, 1);
+const profileName = __ENV.K6_PROFILE || "core_readiness";
 
 export const options = {
   discardResponseBodies: true,
@@ -26,17 +27,44 @@ export const options = {
 };
 
 const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8000";
-const ENDPOINTS = [
+
+const DEFAULT_ENDPOINTS = [
   "/api/v1/status",
   "/api/v1/status",
   "/api/v1/status",
   "/api/v1/health",
 ];
 
+function parseEndpoints() {
+  const raw = __ENV.K6_ENDPOINTS_JSON;
+  if (!raw) {
+    return DEFAULT_ENDPOINTS;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const clean = parsed
+        .filter((endpoint) => typeof endpoint === "string")
+        .map((endpoint) => endpoint.trim())
+        .filter((endpoint) => endpoint.length > 0);
+      if (clean.length > 0) {
+        return clean;
+      }
+    }
+  } catch (error) {
+    console.error(`Invalid K6_ENDPOINTS_JSON for profile=${profileName}: ${error}`);
+  }
+
+  return DEFAULT_ENDPOINTS;
+}
+
+const ENDPOINTS = parseEndpoints();
+
 export default function () {
   const endpoint = ENDPOINTS[Math.floor(Math.random() * ENDPOINTS.length)];
   const response = http.get(`${BASE_URL}${endpoint}`, {
-    tags: { endpoint },
+    tags: { endpoint, profile: profileName },
   });
 
   check(response, {
