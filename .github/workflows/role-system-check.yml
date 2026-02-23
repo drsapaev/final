@@ -76,26 +76,12 @@ jobs:
           fi
 
           echo "::warning::Pytest exited with code 4 (usage/config issue in runner). Running deterministic fallback integrity checks."
-          python - <<'PY'
-          import sys
-          from fastapi.routing import APIRoute
-
-          from app.core.role_validation import validate_critical_user_roles
-          from app.main import app
-
-          routes = {route.path for route in app.routes if isinstance(route, APIRoute)}
-          required_routes = {
-              "/api/v1/auth/minimal-login",
-              "/api/v1/admin/permissions/roles",
-          }
-          missing = sorted(required_routes - routes)
-          if missing:
-              print(f"Missing critical role routes: {missing}")
-              raise SystemExit(1)
-
-          if not validate_critical_user_roles():
-              print("Role validation failed")
-              raise SystemExit(1)
-
-          print("Fallback role integrity checks passed")
-          PY
+          set +e
+          python scripts/ci/validate_role_integrity.py --verbose
+          FALLBACK_EXIT=$?
+          set -e
+          if [ "$FALLBACK_EXIT" -ne 0 ]; then
+            echo "❌ Fallback role integrity checks failed with exit code: $FALLBACK_EXIT"
+            exit "$FALLBACK_EXIT"
+          fi
+          echo "✅ Fallback role integrity checks passed"

@@ -242,7 +242,7 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
 - [x] Add deterministic fallback checker script for role integrity workflow:
   - file: `backend/scripts/ci/validate_role_integrity.py`,
   - checks required RBAC routes + `validate_critical_user_roles()` with clear exit codes.
-- [ ] Refactor `.github/workflows/role-system-check.yml`:
+- [x] Refactor `.github/workflows/role-system-check.yml`:
   - call new fallback script instead of inline heredoc Python,
   - keep blocking behavior and clearer failure logs.
 - [ ] Add CI evidence note updates:
