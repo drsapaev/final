@@ -440,7 +440,7 @@ def list_departments(
     return {"success": True, "data": data, "count": len(departments)}
 
 
-@router.get("/overview", response_model=dict)
+@router.get("/overview", response_model=dict, include_in_schema=False)
 def get_departments_overview(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -567,7 +567,7 @@ def update_department(
     }
 
 
-@router.post("/{department_id}/initialize", response_model=dict)
+@router.post("/{department_id}/initialize", response_model=dict, include_in_schema=False)
 def initialize_department(
     department_id: int,
     integration: Optional[DepartmentIntegrationOptions] = None,

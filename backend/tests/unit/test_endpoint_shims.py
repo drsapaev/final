@@ -15,12 +15,22 @@ def _endpoint_files() -> list[Path]:
     return sorted(p for p in root.glob("*.py") if p.name != "__init__.py")
 
 
-def test_all_endpoints_are_compatibility_shims() -> None:
-    app_root = Path(__file__).resolve().parents[2] / "app"
+def _shim_files() -> list[Path]:
+    files: list[Path] = []
     for endpoint_file in _endpoint_files():
         text = endpoint_file.read_text(encoding="utf-8")
-        assert "Compatibility shim for" in text, endpoint_file.name
+        if "Compatibility shim for" in text:
+            files.append(endpoint_file)
+    return files
 
+
+def test_all_endpoints_are_compatibility_shims() -> None:
+    app_root = Path(__file__).resolve().parents[2] / "app"
+    shim_files = _shim_files()
+    assert shim_files, "No compatibility shim endpoint modules found"
+
+    for endpoint_file in shim_files:
+        text = endpoint_file.read_text(encoding="utf-8")
         match = SHIM_IMPORT_RE.search(text)
         assert match is not None, endpoint_file.name
 
@@ -35,7 +45,10 @@ def test_all_endpoints_are_compatibility_shims() -> None:
 
 def test_endpoint_shims_do_not_contain_runtime_logic() -> None:
     """Endpoint modules must stay as pure re-export shims."""
-    for endpoint_file in _endpoint_files():
+    shim_files = _shim_files()
+    assert shim_files, "No compatibility shim endpoint modules found"
+
+    for endpoint_file in shim_files:
         tree = ast.parse(endpoint_file.read_text(encoding="utf-8"))
         nodes = [
             node

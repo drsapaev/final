@@ -641,7 +641,7 @@ async def get_current_session(
         )
 
 
-@router.get("/sessions")
+@router.get("/sessions", include_in_schema=False)
 async def get_user_sessions(
     active_only: bool = Query(True, description="Только активные сессии"),
     current_user: User = Depends(get_current_user),

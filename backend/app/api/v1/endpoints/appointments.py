@@ -204,7 +204,7 @@ def create_appointment(
     return appointment
 
 
-@router.get("/pending-payments")
+@router.get("/pending-payments", include_in_schema=False)
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
