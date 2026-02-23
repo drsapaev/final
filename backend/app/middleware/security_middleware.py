@@ -237,6 +237,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/health",
             "/api/v1/health",
             "/api/v1/status",
+            "/api/v1/queues/profiles/public",
+            "/api/v1/activation/status",
         ]
 
         path = request.url.path

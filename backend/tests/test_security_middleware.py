@@ -5,7 +5,6 @@
 import pytest
 from fastapi import FastAPI, status
 from fastapi.testclient import TestClient
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.middleware.security_middleware import SecurityMiddleware
 
@@ -32,6 +31,14 @@ def app_with_security():
     async def test_health():
         return {"status": "ok"}
 
+    @app.get("/api/v1/queues/profiles/public")
+    async def test_public_queue_profiles():
+        return {"profiles": []}
+
+    @app.get("/api/v1/activation/status")
+    async def test_activation_status():
+        return {"ready": True}
+
     @app.get("/api/v1/test")
     async def test_endpoint():
         return {"message": "Test"}
@@ -55,7 +62,7 @@ class TestRateLimiting:
         """Тест: превышение лимита на login endpoint"""
         client = TestClient(app_with_security)
         # Делаем 6 запросов (лимит: 5 за 5 минут)
-        for i in range(5):
+        for _ in range(5):
             response = client.post("/api/v1/authentication/login")
             assert response.status_code in [200, 400, 401]  # Может быть ошибка валидации
 
@@ -68,7 +75,7 @@ class TestRateLimiting:
         """Тест: превышение лимита на 2FA verify endpoint"""
         client = TestClient(app_with_security)
         # Делаем 11 запросов (лимит: 10 за 5 минут)
-        for i in range(10):
+        for _ in range(10):
             response = client.post("/api/v1/2fa/verify")
             assert response.status_code in [200, 400, 401]
 
@@ -80,7 +87,7 @@ class TestRateLimiting:
         """Тест: превышение лимита на password reset endpoint"""
         client = TestClient(app_with_security)
         # Делаем 4 запроса (лимит: 3 за час)
-        for i in range(3):
+        for _ in range(3):
             response = client.post("/api/v1/authentication/password-reset")
             assert response.status_code in [200, 400]
 
@@ -103,9 +110,19 @@ class TestRateLimiting:
 
     def test_rate_limit_public_endpoints(self, client: TestClient):
         """Тест: публичные эндпоинты не ограничиваются"""
+        high_volume_requests = 120
+
         # Делаем много запросов к health endpoint
-        for _ in range(20):
+        for _ in range(high_volume_requests):
             response = client.get("/api/v1/health")
+            assert response.status_code == 200
+
+        for _ in range(high_volume_requests):
+            response = client.get("/api/v1/queues/profiles/public")
+            assert response.status_code == 200
+
+        for _ in range(high_volume_requests):
+            response = client.get("/api/v1/activation/status")
             assert response.status_code == 200
 
 
@@ -129,7 +146,7 @@ class TestBruteForceProtection:
         test_client = TestClient(app)
 
         # Делаем 5 неудачных попыток (лимит: 5)
-        for i in range(5):
+        for _ in range(5):
             response = test_client.post("/api/v1/authentication/login")
             assert response.status_code == 401
 
@@ -151,7 +168,7 @@ class TestBruteForceProtection:
         test_client = TestClient(app)
 
         # Делаем 5 неудачных попыток
-        for i in range(5):
+        for _ in range(5):
             response = test_client.post("/api/v1/2fa/verify")
             assert response.status_code == 400
 
@@ -187,13 +204,19 @@ class TestSecurityMiddlewareIntegration:
 
     def test_middleware_does_not_block_public_endpoints(self, client: TestClient):
         """Тест: middleware не блокирует публичные эндпоинты"""
-        public_paths = ["/docs", "/redoc", "/openapi.json", "/health", "/"]
+        public_gets = [
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+            "/api/v1/health",
+            "/api/v1/queues/profiles/public",
+            "/api/v1/activation/status",
+            "/",
+        ]
 
-        for path in public_paths:
-            # Пропускаем, если путь не существует в тестовом приложении
-            if path == "/health":
-                response = client.get("/api/v1/health")
-                assert response.status_code == 200
+        for path in public_gets:
+            response = client.get(path)
+            assert response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
 
     def test_middleware_handles_exceptions_gracefully(self, client: TestClient):
         """Тест: middleware корректно обрабатывает исключения"""
