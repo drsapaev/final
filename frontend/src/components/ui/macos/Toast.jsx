@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
-const Toast = React.forwardRef(({ 
+const Toast = React.forwardRef(({
   message,
   type = 'info',
   duration = 4000,
@@ -13,6 +13,15 @@ const Toast = React.forwardRef(({
 }, ref) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
+  void autoClose;
+
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      onClose && onClose();
+    }, 200);
+  }, [onClose]);
 
   useEffect(() => {
     if (duration > 0) {
@@ -21,15 +30,7 @@ const Toast = React.forwardRef(({
       }, duration);
       return () => clearTimeout(timer);
     }
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      setIsVisible(false);
-      onClose && onClose();
-    }, 200);
-  };
+  }, [duration, handleClose]);
 
   const typeStyles = {
     success: {
@@ -97,8 +98,8 @@ const Toast = React.forwardRef(({
       style={toastStyles}
       role="alert"
       aria-live="polite"
-      {...props}
-    >
+      {...props}>
+      
       <span className="mac-toast-icon" style={{ fontSize: '16px', fontWeight: 'bold' }}>
         {typeStyles[type].icon}
       </span>
@@ -119,8 +120,8 @@ const Toast = React.forwardRef(({
           opacity: 0.7,
           transition: 'opacity var(--mac-duration-fast) var(--mac-ease)'
         }}
-        aria-label="Close notification"
-      >
+        aria-label="Close notification">
+        
         ✕
       </button>
       <style>{`
@@ -143,41 +144,44 @@ const Toast = React.forwardRef(({
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
+
 });
+
+Toast.displayName = 'Toast';
 
 // Toast Container Component
 export const ToastContainer = ({ children, position = 'top-right', maxToasts = 5 }) => {
   const [toasts, setToasts] = useState([]);
+  void maxToasts;
 
-  const addToast = (toastProps) => {
-    const id = Math.random().toString(36).slice(2);
-    const newToast = { ...toastProps, id };
-    
-    setToasts(prev => {
-      const updated = [...prev, newToast];
-      return updated.slice(-maxToasts);
-    });
-  };
+
+
+
+
+
+
+
+
+
 
   const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
 
   return (
     <div className="mac-toast-container" style={{ position: 'relative' }}>
       {children}
-      {toasts.map(toast => (
-        <Toast
-          key={toast.id}
-          {...toast}
-          position={position}
-          onClose={() => removeToast(toast.id)}
-        />
-      ))}
-    </div>
-  );
+      {toasts.map((toast) =>
+      <Toast
+        key={toast.id}
+        {...toast}
+        position={position}
+        onClose={() => removeToast(toast.id)} />
+
+      )}
+    </div>);
+
 };
 
 export default Toast;

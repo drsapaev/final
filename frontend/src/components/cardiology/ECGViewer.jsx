@@ -3,36 +3,41 @@
  * Просмотр и анализ ЭКГ файлов
  * Согласно MASTER_TODO_LIST строка 247
  */
-import React, { useState, useCallback } from 'react';
+import { Fragment, useState } from 'react';
 import {
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  Alert,
-  Badge,
-  Progress,
-} from '../ui/macos';
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Grid,
+  IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Paper,
+  Typography,
+} from '@mui/material';
 import {
-  CloudUpload,
-  Eye,
-  Download,
-  Trash2,
-  BarChart3,
-  Heart,
-  Clock,
-  Activity,
-  ZoomIn,
-  ZoomOut,
-  Maximize,
-  X,
+  Assessment,
+  Analytics,
+  CheckCircle as CheckCircleIcon,
+  Delete,
+  FavoriteBorder,
+  Visibility,
+} from '@mui/icons-material';
+import { Alert, Badge, Progress } from '../ui/macos';
+import {
   AlertTriangle,
-  CheckCircle,
+  Clock,
+  CloudUpload,
+  Download,
+  X,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { api } from '../../api/client';
@@ -58,7 +63,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   };
 
   // Загрузка файлов
-  const onDrop = useCallback(async (acceptedFiles) => {
+  const onDrop = async (acceptedFiles) => {
     for (const file of acceptedFiles) {
       setUploadProgress(0);
       
@@ -103,7 +108,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         setUploadProgress(0);
       }
     }
-  }, [visitId, onDataUpdate]);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -284,7 +289,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                   : [];
                 
                 return (
-                  <React.Fragment key={file.id}>
+                  <Fragment key={file.id}>
                     {index > 0 && <Divider />}
                     
                     <ListItem>
@@ -396,7 +401,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         </IconButton>
                       </Box>
                     </ListItem>
-                  </React.Fragment>
+                  </Fragment>
                 );
               })}
             </List>

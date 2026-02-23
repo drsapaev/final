@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { getApiBase } from '../api/client.js';
 import { getHealth, getActivationStatus } from '../api/index.js';

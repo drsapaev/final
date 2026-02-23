@@ -4,6 +4,7 @@
  * Minimal tracking for AI feature usage.
  * Only counters, no content.
  */
+import logger from './logger';
 
 /**
  * Track EMR-related events
@@ -13,7 +14,7 @@
 export function trackEMREvent(eventType, payload = {}) {
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-        console.log('[EMR Analytics]', eventType, payload);
+        logger.log('[EMR Analytics]', eventType, payload);
     }
 
     // In production, this would send to analytics backend

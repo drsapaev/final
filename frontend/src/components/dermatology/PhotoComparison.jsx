@@ -3,25 +3,25 @@
  * Сравнение фото до/после с слайдером
  * Согласно MASTER_TODO_LIST строка 266
  */
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Box,
+import { useState, useRef, useEffect } from 'react';
+import {
+
   Card,
   CardContent,
   Typography,
-  Button,
-  Badge,
-} from '../ui/macos';
+
+  Badge } from
+'../ui/macos';
 import {
   ArrowLeftRight,
-  RotateCcw,
+
   Fullscreen,
-  ZoomIn, 
+  ZoomIn,
   ZoomOut,
   RefreshCw,
   Columns,
-  Layout,
-} from 'lucide-react';
+  Layout } from
+'lucide-react';
 
 const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -64,39 +64,18 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const percentage = (x / rect.width) * 100;
-      setSliderPosition(Math.max(0, Math.min(100, percentage)));
-    }
-  };
-
-  // Обработка касаний для мобильных
-  const handleTouchStart = (e) => {
-    setIsDragging(true);
-    updateSliderPositionTouch(e);
-  };
-
-  const handleTouchMove = (e) => {
-    if (isDragging) {
-      updateSliderPositionTouch(e);
-    }
-  };
-
-  const updateSliderPositionTouch = (e) => {
-    if (containerRef.current && e.touches.length > 0) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.touches[0].clientX - rect.left;
-      const percentage = (x / rect.width) * 100;
+      const percentage = x / rect.width * 100;
       setSliderPosition(Math.max(0, Math.min(100, percentage)));
     }
   };
 
   // Зум функции
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 3));
+    setZoom((prev) => Math.min(prev + 0.25, 3));
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.25, 0.5));
+    setZoom((prev) => Math.max(prev - 0.25, 0.5));
   };
 
   const handleResetZoom = () => {
@@ -121,8 +100,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             Для сравнения необходимы фото до и после процедуры
           </Typography>
         </CardContent>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
@@ -149,8 +128,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('slider')}
-                title="Слайдер"
-              >
+                title="Слайдер">
+                
                 <ArrowLeftRight style={{ width: 16, height: 16 }} />
               </button>
               <button
@@ -165,8 +144,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('side-by-side')}
-                title="Рядом"
-              >
+                title="Рядом">
+                
                 <Columns style={{ width: 16, height: 16 }} />
               </button>
               <button
@@ -181,8 +160,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('overlay')}
-                title="Наложение"
-              >
+                title="Наложение">
+                
                 <Layout style={{ width: 16, height: 16 }} />
               </button>
             </div>
@@ -199,8 +178,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
-              }}
-            >
+              }}>
+              
               <ZoomOut style={{ width: 16, height: 16 }} />
             </button>
             <Badge variant="info">{Math.round(zoom * 100)}%</Badge>
@@ -215,8 +194,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
-              }}
-            >
+              }}>
+              
               <ZoomIn style={{ width: 16, height: 16 }} />
             </button>
             <button
@@ -230,8 +209,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
-              }}
-            >
+              }}>
+              
               <RefreshCw style={{ width: 16, height: 16 }} />
             </button>
             <button
@@ -245,16 +224,16 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
-              }}
-            >
+              }}>
+              
               <Fullscreen style={{ width: 16, height: 16 }} />
             </button>
           </div>
         </div>
 
         {/* Метаданные */}
-        {metadata.zone && (
-          <div style={{ marginBottom: 16 }}>
+        {metadata.zone &&
+        <div style={{ marginBottom: 16 }}>
             <Badge variant="info" style={{ marginRight: 8 }}>
               Зона: {metadata.zone}
             </Badge>
@@ -265,155 +244,153 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               Освещение: {metadata.lighting || 'natural'}
             </Badge>
           </div>
-        )}
+        }
 
         {/* Режим слайдера */}
-        {viewMode === 'slider' && (
-          <div
-            ref={containerRef}
-            style={{
-              position: 'relative',
-              width: '100%',
-              height: '500px',
-              overflow: 'hidden',
-              cursor: isDragging ? 'grabbing' : 'grab',
-              userSelect: 'none',
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleMouseUp}
-          >
+        {viewMode === 'slider' &&
+        <div
+          ref={containerRef}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '500px',
+            overflow: 'hidden',
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none'
+          }}
+          onPointerDown={handleMouseDown}
+          onPointerMove={handleMouseMove}
+          onPointerUp={handleMouseUp}
+          onPointerLeave={handleMouseUp}
+          onPointerCancel={handleMouseUp}>
+          
             {/* Фото ПОСЛЕ (нижний слой) */}
             <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              overflow: 'hidden'
+            }}>
+            
+              <img
+              src={afterPhoto}
+              alt="После"
               style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
                 width: '100%',
                 height: '100%',
-                overflow: 'hidden',
-              }}
-            >
-              <img
-                src={afterPhoto}
-                alt="После"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  transform: `scale(${zoom})`,
-                  transition: isDragging ? 'none' : 'transform 0.3s ease',
-                }}
-              />
+                objectFit: 'contain',
+                transform: `scale(${zoom})`,
+                transition: isDragging ? 'none' : 'transform 0.3s ease'
+              }} />
+            
             </div>
             
             {/* Фото ДО (верхний слой с обрезкой) */}
             <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: `${sliderPosition}%`,
-                height: '100%',
-                overflow: 'hidden',
-                borderRight: '2px solid white',
-              }}
-            >
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: `${sliderPosition}%`,
+              height: '100%',
+              overflow: 'hidden',
+              borderRight: '2px solid white'
+            }}>
+            
               <img
-                src={beforePhoto}
-                alt="До"
-                style={{
-                  width: containerWidth || '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  transform: `scale(${zoom})`,
-                  transition: isDragging ? 'none' : 'transform 0.3s ease',
-                }}
-              />
+              src={beforePhoto}
+              alt="До"
+              style={{
+                width: containerWidth || '100%',
+                height: '100%',
+                objectFit: 'contain',
+                transform: `scale(${zoom})`,
+                transition: isDragging ? 'none' : 'transform 0.3s ease'
+              }} />
+            
             </div>
             
             {/* Слайдер-разделитель */}
             <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: `${sliderPosition}%`,
+              width: '40px',
+              height: '100%',
+              marginLeft: '-20px',
+              cursor: 'ew-resize',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+            
+              <div
               style={{
-                position: 'absolute',
-                top: 0,
-                left: `${sliderPosition}%`,
                 width: '40px',
-                height: '100%',
-                marginLeft: '-20px',
-                cursor: 'ew-resize',
+                height: '40px',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-              }}
-            >
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'white',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                }}
-              >
+                backgroundColor: 'white',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }}>
+              
                 <ArrowLeftRight style={{ width: 20, height: 20 }} />
               </div>
             </div>
             
             {/* Метки */}
             <div style={{
-              position: 'absolute',
-              top: 10,
-              left: 10,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: 4,
-              fontSize: '14px',
-            }}>
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: 4,
+            fontSize: '14px'
+          }}>
               ДО
             </div>
             <div style={{
-              position: 'absolute',
-              top: 10,
-              right: 10,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: 4,
-              fontSize: '14px',
-            }}>
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: 4,
+            fontSize: '14px'
+          }}>
               ПОСЛЕ
             </div>
           </div>
-        )}
+        }
 
         {/* Режим рядом */}
-        {viewMode === 'side-by-side' && (
-          <div style={{ display: 'flex', gap: 16 }}>
+        {viewMode === 'side-by-side' &&
+        <div style={{ display: 'flex', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <Typography variant="subtitle2" style={{ textAlign: 'center', marginBottom: 8 }}>
                 ДО
               </Typography>
               <div style={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
-                  src={beforePhoto}
-                  alt="До"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    transform: `scale(${zoom})`,
-                    transition: 'transform 0.3s ease',
-                  }}
-                />
+                src={beforePhoto}
+                alt="До"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  transform: `scale(${zoom})`,
+                  transition: 'transform 0.3s ease'
+                }} />
+              
               </div>
             </div>
             
@@ -423,77 +400,76 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               </Typography>
               <div style={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
-                  src={afterPhoto}
-                  alt="После"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    transform: `scale(${zoom})`,
-                    transition: 'transform 0.3s ease',
-                  }}
-                />
+                src={afterPhoto}
+                alt="После"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  transform: `scale(${zoom})`,
+                  transition: 'transform 0.3s ease'
+                }} />
+              
               </div>
             </div>
           </div>
-        )}
+        }
 
         {/* Режим наложения */}
-        {viewMode === 'overlay' && (
-          <div style={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
+        {viewMode === 'overlay' &&
+        <div style={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
             <img
-              src={beforePhoto}
-                    alt="До"
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                opacity: 1 - sliderPosition / 100,
-                transform: `scale(${zoom})`,
-                transition: 'transform 0.3s ease',
-              }}
-            />
+            src={beforePhoto}
+            alt="До"
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              opacity: 1 - sliderPosition / 100,
+              transform: `scale(${zoom})`,
+              transition: 'transform 0.3s ease'
+            }} />
+          
             <img
-              src={afterPhoto}
-              alt="После"
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                opacity: sliderPosition / 100,
-                transform: `scale(${zoom})`,
-                transition: 'transform 0.3s ease',
-              }}
-            />
+            src={afterPhoto}
+            alt="После"
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              opacity: sliderPosition / 100,
+              transform: `scale(${zoom})`,
+              transition: 'transform 0.3s ease'
+            }} />
+          
             
             <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
               <Typography variant="caption" color="white" style={{ marginBottom: 8, display: 'block' }}>
                 Прозрачность
               </Typography>
               <input
-                type="range"
-                min="0"
-                max="100"
-                value={sliderPosition}
-                onChange={(e) => setSliderPosition(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  height: '4px',
-                  borderRadius: '2px',
-                  background: 'rgba(255,255,255,0.3)',
-                  outline: 'none',
-                  appearance: 'none',
-                }}
-              />
+              type="range"
+              min="0"
+              max="100"
+              value={sliderPosition}
+              onChange={(e) => setSliderPosition(Number(e.target.value))}
+              style={{
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                background: 'rgba(255,255,255,0.3)',
+                outline: 'none',
+                appearance: 'none'
+              }} />
+            
             </div>
           </div>
-        )}
+        }
       </CardContent>
-    </Card>
-  );
+    </Card>);
+
 };
 
 export default PhotoComparison;
-

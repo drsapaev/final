@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from fastapi import Request
@@ -11,7 +12,13 @@ from app.core.config import settings
 from app.models.enums import PaymentStatus
 from app.repositories.payment_init_repository import PaymentInitRepository
 from app.services.billing_service import BillingService
+from app.services.context_facades.queue_facade import (
+    QueueContextFacade,
+    QueueServiceContractAdapter,
+)
 from app.services.queue_service import queue_service
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,6 +33,7 @@ class PaymentInitService:
     def __init__(self, db, payment_manager):  # type: ignore[no-untyped-def]
         self.repository = PaymentInitRepository(db)
         self.payment_manager = payment_manager
+        self.queue_facade = QueueContextFacade(QueueServiceContractAdapter())
 
     def init_payment(
         self,
@@ -42,6 +50,7 @@ class PaymentInitService:
     ) -> dict:
         payment = None
         try:
+            correlation_id = getattr(getattr(request, "state", None), "request_id", None)
             visit = self.repository.get_visit(visit_id)
             if not visit:
                 raise PaymentInitDomainError(status_code=404, detail="Визит не найден")
@@ -82,7 +91,24 @@ class PaymentInitService:
                 ),
             )
 
-            now = queue_service.get_local_timestamp(self.repository.db)
+            # Migration window: compare legacy direct queue timestamp with facade path.
+            now_new = self.queue_facade.get_local_timestamp(
+                db=self.repository.db,
+                correlation_id=correlation_id,
+            )
+            now_legacy = queue_service.get_local_timestamp(self.repository.db)
+            delta_seconds = abs((now_new - now_legacy).total_seconds())
+            logger.debug(
+                (
+                    "payment_init_service.timestamp_parity correlation_id=%s "
+                    "delta_seconds=%s new=%s legacy=%s"
+                ),
+                correlation_id or "-",
+                delta_seconds,
+                now_new.isoformat(),
+                now_legacy.isoformat(),
+            )
+            now = now_new
             order_id = f"clinic_{payment.id}_{int(now.timestamp())}"
 
             base_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
@@ -148,4 +174,3 @@ class PaymentInitService:
                 "success": False,
                 "error_message": f"Ошибка инициализации платежа: {exc}",
             }
-

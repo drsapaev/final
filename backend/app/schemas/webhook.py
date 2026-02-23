@@ -4,11 +4,10 @@ Pydantic схемы для webhook'ов
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, HttpUrl, field_validator
-
-from app.models.webhook import WebhookCallStatus, WebhookEventType, WebhookStatus
+from pydantic import ConfigDict
 
 # ===================== БАЗОВЫЕ СХЕМЫ =====================
 
@@ -82,19 +81,19 @@ class WebhookBase(BaseModel):
     """Базовая схема webhook'а"""
 
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     url: HttpUrl
-    events: List[WebhookEventTypeEnum]
-    headers: Optional[Dict[str, str]] = {}
-    secret: Optional[str] = None
+    events: list[WebhookEventTypeEnum]
+    headers: dict[str, str] | None = {}
+    secret: str | None = None
     max_retries: int = 3
     retry_delay: int = 60
     timeout: int = 30
-    filters: Optional[Dict[str, Any]] = {}
+    filters: dict[str, Any] | None = {}
 
     @field_validator('events')
     @classmethod
-    def validate_events(cls, v: List) -> List:
+    def validate_events(cls, v: list) -> list:
         if not v:
             raise ValueError('Необходимо указать хотя бы одно событие')
         return v
@@ -130,18 +129,18 @@ class WebhookCreate(WebhookBase):
 class WebhookUpdate(BaseModel):
     """Схема для обновления webhook'а"""
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    url: Optional[HttpUrl] = None
-    events: Optional[List[WebhookEventTypeEnum]] = None
-    headers: Optional[Dict[str, str]] = None
-    secret: Optional[str] = None
-    max_retries: Optional[int] = None
-    retry_delay: Optional[int] = None
-    timeout: Optional[int] = None
-    filters: Optional[Dict[str, Any]] = None
-    status: Optional[WebhookStatusEnum] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    url: HttpUrl | None = None
+    events: list[WebhookEventTypeEnum] | None = None
+    headers: dict[str, str] | None = None
+    secret: str | None = None
+    max_retries: int | None = None
+    retry_delay: int | None = None
+    timeout: int | None = None
+    filters: dict[str, Any] | None = None
+    status: WebhookStatusEnum | None = None
+    is_active: bool | None = None
 
 
 class WebhookInDB(WebhookBase):
@@ -154,15 +153,14 @@ class WebhookInDB(WebhookBase):
     total_calls: int
     successful_calls: int
     failed_calls: int
-    last_call_at: Optional[datetime] = None
-    last_success_at: Optional[datetime] = None
-    last_failure_at: Optional[datetime] = None
-    created_by: Optional[int] = None
+    last_call_at: datetime | None = None
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+    created_by: int | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Webhook(WebhookInDB):
@@ -175,7 +173,7 @@ class WebhookWithStats(Webhook):
     """Webhook со статистикой"""
 
     success_rate: float
-    recent_24h: Dict[str, Any]
+    recent_24h: dict[str, Any]
 
 
 # ===================== WEBHOOK CALL СХЕМЫ =====================
@@ -186,11 +184,11 @@ class WebhookCallBase(BaseModel):
 
     webhook_id: int
     event_type: WebhookEventTypeEnum
-    event_data: Dict[str, Any]
+    event_data: dict[str, Any]
     url: HttpUrl
     method: str = "POST"
-    headers: Optional[Dict[str, str]] = {}
-    payload: Dict[str, Any]
+    headers: dict[str, str] | None = {}
+    payload: dict[str, Any]
 
 
 class WebhookCallCreate(WebhookCallBase):
@@ -205,20 +203,19 @@ class WebhookCallInDB(WebhookCallBase):
     id: int
     uuid: str
     status: WebhookCallStatusEnum
-    response_status_code: Optional[int] = None
-    response_headers: Optional[Dict[str, str]] = {}
-    response_body: Optional[str] = None
-    error_message: Optional[str] = None
+    response_status_code: int | None = None
+    response_headers: dict[str, str] | None = {}
+    response_body: str | None = None
+    error_message: str | None = None
     attempt_number: int
     max_attempts: int
-    next_retry_at: Optional[datetime] = None
-    duration_ms: Optional[int] = None
+    next_retry_at: datetime | None = None
+    duration_ms: int | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    updated_at: datetime | None = None
+    completed_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WebhookCall(WebhookCallInDB):
@@ -234,10 +231,10 @@ class WebhookEventBase(BaseModel):
     """Базовая схема события webhook'а"""
 
     event_type: WebhookEventTypeEnum
-    event_data: Dict[str, Any]
+    event_data: dict[str, Any]
     source: str = "api"
-    source_id: Optional[str] = None
-    correlation_id: Optional[str] = None
+    source_id: str | None = None
+    correlation_id: str | None = None
 
 
 class WebhookEventCreate(WebhookEventBase):
@@ -252,12 +249,11 @@ class WebhookEventInDB(WebhookEventBase):
     id: int
     uuid: str
     processed: bool
-    processed_at: Optional[datetime] = None
-    failed_webhooks: List[str] = []
+    processed_at: datetime | None = None
+    failed_webhooks: list[str] = []
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WebhookEvent(WebhookEventInDB):
@@ -279,10 +275,10 @@ class WebhookStats(BaseModel):
     successful_calls: int
     failed_calls: int
     success_rate: float
-    last_call_at: Optional[str] = None
-    last_success_at: Optional[str] = None
-    last_failure_at: Optional[str] = None
-    recent_24h: Dict[str, Any]
+    last_call_at: str | None = None
+    last_success_at: str | None = None
+    last_failure_at: str | None = None
+    recent_24h: dict[str, Any]
 
 
 class SystemWebhookStats(BaseModel):
@@ -291,7 +287,7 @@ class SystemWebhookStats(BaseModel):
     total_webhooks: int
     active_webhooks: int
     inactive_webhooks: int
-    recent_24h: Dict[str, Any]
+    recent_24h: dict[str, Any]
     pending_retries: int
     unprocessed_events: int
 
@@ -304,16 +300,16 @@ class WebhookTestRequest(BaseModel):
 
     webhook_id: int
     event_type: WebhookEventTypeEnum
-    test_data: Optional[Dict[str, Any]] = None
+    test_data: dict[str, Any] | None = None
 
 
 class WebhookTestResponse(BaseModel):
     """Ответ тестирования webhook'а"""
 
     success: bool
-    status_code: Optional[int] = None
-    response_time_ms: Optional[int] = None
-    error_message: Optional[str] = None
+    status_code: int | None = None
+    response_time_ms: int | None = None
+    error_message: str | None = None
     call_id: int
 
 
@@ -323,25 +319,25 @@ class WebhookTestResponse(BaseModel):
 class WebhookFilter(BaseModel):
     """Фильтры для поиска webhook'ов"""
 
-    status: Optional[WebhookStatusEnum] = None
-    event_type: Optional[WebhookEventTypeEnum] = None
-    created_by: Optional[int] = None
-    name_contains: Optional[str] = None
-    url_contains: Optional[str] = None
-    created_after: Optional[datetime] = None
-    created_before: Optional[datetime] = None
+    status: WebhookStatusEnum | None = None
+    event_type: WebhookEventTypeEnum | None = None
+    created_by: int | None = None
+    name_contains: str | None = None
+    url_contains: str | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
 
 
 class WebhookCallFilter(BaseModel):
     """Фильтры для поиска вызовов webhook'ов"""
 
-    webhook_id: Optional[int] = None
-    status: Optional[WebhookCallStatusEnum] = None
-    event_type: Optional[WebhookEventTypeEnum] = None
-    created_after: Optional[datetime] = None
-    created_before: Optional[datetime] = None
-    min_duration_ms: Optional[int] = None
-    max_duration_ms: Optional[int] = None
+    webhook_id: int | None = None
+    status: WebhookCallStatusEnum | None = None
+    event_type: WebhookEventTypeEnum | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
+    min_duration_ms: int | None = None
+    max_duration_ms: int | None = None
 
 
 # ===================== ПАГИНАЦИЯ =====================
@@ -350,7 +346,7 @@ class WebhookCallFilter(BaseModel):
 class WebhookListResponse(BaseModel):
     """Ответ со списком webhook'ов"""
 
-    items: List[Webhook]
+    items: list[Webhook]
     total: int
     page: int
     size: int
@@ -360,7 +356,7 @@ class WebhookListResponse(BaseModel):
 class WebhookCallListResponse(BaseModel):
     """Ответ со списком вызовов webhook'ов"""
 
-    items: List[WebhookCall]
+    items: list[WebhookCall]
     total: int
     page: int
     size: int
@@ -373,7 +369,7 @@ class WebhookCallListResponse(BaseModel):
 class WebhookBulkAction(BaseModel):
     """Массовое действие над webhook'ами"""
 
-    webhook_ids: List[int]
+    webhook_ids: list[int]
     action: str  # activate, deactivate, delete
 
     @field_validator('action')
@@ -392,4 +388,4 @@ class WebhookBulkActionResponse(BaseModel):
     success: bool
     processed: int
     failed: int
-    errors: List[str] = []
+    errors: list[str] = []

@@ -92,30 +92,48 @@ const MacOSBreadcrumb = ({
   const renderItem = (item, index) => {
     const isLast = index === items.length - 1;
     const isFirst = index === 0;
+    const isClickable = !isLast && !item.disabled && Boolean(onItemClick);
+    const itemContent = (
+      <>
+        {isFirst && item.showHome && (
+          <Home
+            size={size === 'sm' ? 12 : size === 'md' ? 14 : 16}
+            style={{ marginRight: '4px' }}
+          />
+        )}
+        {item.icon && !isFirst && (
+          <item.icon
+            size={size === 'sm' ? 12 : size === 'md' ? 14 : 16}
+            style={{ marginRight: '4px' }}
+          />
+        )}
+        {item.label}
+      </>
+    );
     
     return (
       <React.Fragment key={index}>
-        <span
-          onClick={() => handleItemClick(item, index)}
-          onMouseEnter={(e) => handleMouseEnter(e, isLast)}
-          onMouseLeave={(e) => handleMouseLeave(e, isLast)}
-          style={itemStyle(isLast)}
-          title={item.title}
-        >
-          {isFirst && item.showHome && (
-            <Home 
-              size={size === 'sm' ? 12 : size === 'md' ? 14 : 16} 
-              style={{ marginRight: '4px' }} 
-            />
-          )}
-          {item.icon && !isFirst && (
-            <item.icon 
-              size={size === 'sm' ? 12 : size === 'md' ? 14 : 16} 
-              style={{ marginRight: '4px' }} 
-            />
-          )}
-          {item.label}
-        </span>
+        {isClickable ? (
+          <button
+            type="button"
+            onClick={() => handleItemClick(item, index)}
+            onMouseEnter={(e) => handleMouseEnter(e, isLast)}
+            onMouseLeave={(e) => handleMouseLeave(e, isLast)}
+            style={{
+              ...itemStyle(isLast),
+              border: 'none',
+              background: 'transparent',
+              padding: 0
+            }}
+            title={item.title}
+          >
+            {itemContent}
+          </button>
+        ) : (
+          <span style={itemStyle(isLast)} title={item.title}>
+            {itemContent}
+          </span>
+        )}
         {!isLast && renderSeparator()}
       </React.Fragment>
     );

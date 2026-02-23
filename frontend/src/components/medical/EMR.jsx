@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, Save, Plus, X, Camera, Upload, AlertCircle, CheckCircle, Brain } from 'lucide-react';
-import { Card, Button, Badge, Box, Typography, Alert, CircularProgress } from '../ui/macos';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import PropTypes from 'prop-types';
+import { FileText, Save, Plus, X, Upload, AlertCircle, CheckCircle, Brain } from 'lucide-react';
+import { Card, Button, Badge, Typography, Alert, CircularProgress } from '../ui/macos';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../../constants/appointmentStatus';
-import { AI_ANALYSIS_TYPES, MCP_PROVIDERS, AI_ERROR_MESSAGES, ATTACHMENT_CATEGORIES } from '../../constants/ai';
+import { MCP_PROVIDERS, ATTACHMENT_CATEGORIES } from '../../constants/ai';
 import { AIButton, AISuggestions, AIAssistant } from '../ai';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useDebounce } from '../../utils/debounce';
 import { useBlobURL } from '../../hooks/useBlobURL';
-import { validateFile, validateFiles, getAllowedTypesDescription } from '../../utils/fileValidator';
+import { validateFiles, getAllowedTypesDescription } from '../../utils/fileValidator';
 import logger from '../../utils/logger';
 
 /**
@@ -26,8 +27,8 @@ const AttachmentImage = ({ file, alt, style }) => {
         backgroundColor: 'var(--mac-background-secondary)'
       }}>
         <CircularProgress size={24} />
-      </div>
-    );
+      </div>);
+
   }
 
   return <img src={blobURL} alt={alt} style={style} />;
@@ -48,32 +49,33 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   } = useEMRAI(true, MCP_PROVIDERS.DEEPSEEK); // Используем MCP с DeepSeek по умолчанию
 
   const [emrData, setEmrData] = useState({
-    complaints: '',           // Жалобы
-    anamnesis: '',           // Анамнез
-    examination: '',         // Объективный осмотр
-    diagnosis: '',           // Диагноз
-    icd10: '',              // Код МКБ-10
-    recommendations: '',     // Рекомендации
-    procedures: [],          // Выполненные процедуры
-    attachments: [],         // Прикрепленные файлы
-    isDraft: true           // Черновик
+    complaints: '', // Жалобы
+    anamnesis: '', // Анамнез
+    examination: '', // Объективный осмотр
+    diagnosis: '', // Диагноз
+    icd10: '', // Код МКБ-10
+    recommendations: '', // Рекомендации
+    procedures: [], // Выполненные процедуры
+    attachments: [], // Прикрепленные файлы
+    isDraft: true // Черновик
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [selectedImageForAI, setSelectedImageForAI] = useState(null);
-  const [imageAnalysisResult, setImageAnalysisResult] = useState(null);
+  const [, setImageAnalysisResult] = useState(null);
   const [complaintsAnalysisCache, setComplaintsAnalysisCache] = useState({});
   const [selectedCategory, setSelectedCategory] = useState(ATTACHMENT_CATEGORIES.EXAMINATION);
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState(null);
+  const attachmentInputRef = useRef(null);
 
   const canStartEMR = appointment?.status === APPOINTMENT_STATUS.PAID;
   const canSaveEMR = appointment?.status === APPOINTMENT_STATUS.IN_VISIT;
 
   const handleFieldChange = (field, value) => {
-    setEmrData(prev => ({
+    setEmrData((prev) => ({
       ...prev,
       [field]: value
     }));
@@ -84,7 +86,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   const debouncedAnalyzeComplaints = useDebounce(
     useCallback(async (complaints) => {
       if (!complaints || appointment?.status !== APPOINTMENT_STATUS.IN_VISIT) return;
-      
+
       // Проверяем кэш
       const cacheKey = complaints.trim().toLowerCase();
       if (complaintsAnalysisCache[cacheKey]) {
@@ -93,17 +95,17 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
           handleFieldChange('anamnesis', cachedResult.patient_history);
         }
         if (cachedResult.examinations) {
-          const examText = cachedResult.examinations.map(e => `${e.type}: ${e.name}`).join('\n');
+          const examText = cachedResult.examinations.map((e) => `${e.type}: ${e.name}`).join('\n');
           handleFieldChange('examination', examText);
         }
         if (cachedResult.lab_tests) {
           const recommendations = [
-            'Лабораторные исследования:',
-            ...cachedResult.lab_tests,
-            '',
-            'Дополнительное обследование:',
-            ...(cachedResult.imaging_studies || [])
-          ].join('\n');
+          'Лабораторные исследования:',
+          ...cachedResult.lab_tests,
+          '',
+          'Дополнительное обследование:',
+          ...(cachedResult.imaging_studies || [])].
+          join('\n');
           handleFieldChange('recommendations', recommendations);
         }
         return;
@@ -116,28 +118,28 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
           patient_age: appointment?.patient?.age,
           patient_gender: appointment?.patient?.gender
         });
-        
+
         if (result) {
-          setComplaintsAnalysisCache(prev => ({
+          setComplaintsAnalysisCache((prev) => ({
             ...prev,
             [cacheKey]: result
           }));
-          
+
           if (result.patient_history) {
             handleFieldChange('anamnesis', result.patient_history);
           }
           if (result.examinations) {
-            const examText = result.examinations.map(e => `${e.type}: ${e.name}`).join('\n');
+            const examText = result.examinations.map((e) => `${e.type}: ${e.name}`).join('\n');
             handleFieldChange('examination', examText);
           }
           if (result.lab_tests) {
             const recommendations = [
-              'Лабораторные исследования:',
-              ...result.lab_tests,
-              '',
-              'Дополнительное обследование:',
-              ...(result.imaging_studies || [])
-            ].join('\n');
+            'Лабораторные исследования:',
+            ...result.lab_tests,
+            '',
+            'Дополнительное обследование:',
+            ...(result.imaging_studies || [])].
+            join('\n');
             handleFieldChange('recommendations', recommendations);
           }
         }
@@ -148,9 +150,9 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     1000 // 1 секунда задержка
   );
 
-  const autoSaveDraft = async () => {
+  const autoSaveDraft = useCallback(async () => {
     if (!hasUnsavedChanges || !canSaveEMR) return;
-    
+
     try {
       const emrToSave = {
         ...emrData,
@@ -165,7 +167,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     } catch (error) {
       logger.error('EMR: Auto-save error:', error);
     }
-  };
+  }, [hasUnsavedChanges, canSaveEMR, emrData, appointment?.id, onSave]);
 
   useEffect(() => {
     // Загрузка существующего EMR
@@ -192,7 +194,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
@@ -201,7 +203,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   // Автосохранение черновиков каждые 30 секунд
   useEffect(() => {
     if (appointment?.status !== APPOINTMENT_STATUS.IN_VISIT) return;
-    
+
     const autoSaveInterval = setInterval(() => {
       autoSaveDraft();
     }, 30000); // 30 секунд
@@ -209,7 +211,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     return () => {
       clearInterval(autoSaveInterval);
     };
-  }, [hasUnsavedChanges, appointment?.status, emrData, canSaveEMR]);
+  }, [appointment?.status, autoSaveDraft]);
 
   const handleProcedureAdd = () => {
     const newProcedure = {
@@ -218,7 +220,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
       description: '',
       cost: 0
     };
-    setEmrData(prev => ({
+    setEmrData((prev) => ({
       ...prev,
       procedures: [...prev.procedures, newProcedure]
     }));
@@ -226,18 +228,18 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   };
 
   const handleProcedureRemove = (id) => {
-    setEmrData(prev => ({
+    setEmrData((prev) => ({
       ...prev,
-      procedures: prev.procedures.filter(p => p.id !== id)
+      procedures: prev.procedures.filter((p) => p.id !== id)
     }));
     setHasUnsavedChanges(true);
   };
 
   const handleProcedureChange = (id, field, value) => {
-    setEmrData(prev => ({
+    setEmrData((prev) => ({
       ...prev,
-      procedures: prev.procedures.map(p => 
-        p.id === id ? { ...p, [field]: value } : p
+      procedures: prev.procedures.map((p) =>
+      p.id === id ? { ...p, [field]: value } : p
       )
     }));
     setHasUnsavedChanges(true);
@@ -258,15 +260,15 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     const validationResult = await validateFiles(files, validationOptions);
 
     // Фильтруем только валидные файлы
-    const validFiles = validationResult.results
-      .filter(r => r.validation.valid)
-      .map(r => r.file);
+    const validFiles = validationResult.results.
+    filter((r) => r.validation.valid).
+    map((r) => r.file);
 
     // Показываем ошибки для невалидных файлов
-    const invalidResults = validationResult.results.filter(r => !r.validation.valid);
+    const invalidResults = validationResult.results.filter((r) => !r.validation.valid);
     if (invalidResults.length > 0) {
-      const errorMessages = invalidResults.map(r =>
-        `${r.file.name}: ${r.validation.errors.join(', ')}`
+      const errorMessages = invalidResults.map((r) =>
+      `${r.file.name}: ${r.validation.errors.join(', ')}`
       ).join('\n');
 
       alert(`Следующие файлы не прошли валидацию:\n\n${errorMessages}\n\nРазрешены: ${getAllowedTypesDescription(['images', 'documents', 'medical'])}`);
@@ -274,7 +276,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
     // Добавляем только валидные файлы
     if (validFiles.length > 0) {
-      const newAttachments = validFiles.map(file => ({
+      const newAttachments = validFiles.map((file) => ({
         id: Date.now() + Math.random(),
         name: file.name,
         type: file.type,
@@ -283,17 +285,17 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
         category: selectedCategory
       }));
 
-      setEmrData(prev => ({
+      setEmrData((prev) => ({
         ...prev,
         attachments: [...prev.attachments, ...newAttachments]
       }));
       setHasUnsavedChanges(true);
 
       // Показываем предупреждения если есть
-      const warnings = validationResult.results
-        .filter(r => r.validation.valid && r.validation.warnings.length > 0)
-        .map(r => `${r.file.name}: ${r.validation.warnings.join(', ')}`)
-        .join('\n');
+      const warnings = validationResult.results.
+      filter((r) => r.validation.valid && r.validation.warnings.length > 0).
+      map((r) => `${r.file.name}: ${r.validation.warnings.join(', ')}`).
+      join('\n');
 
       if (warnings) {
         logger.warn('Предупреждения валидации файлов:', warnings);
@@ -306,9 +308,9 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
   const handleRemoveAttachment = (attachmentId) => {
     if (window.confirm('Вы уверены, что хотите удалить этот файл?')) {
-      setEmrData(prev => ({
+      setEmrData((prev) => ({
         ...prev,
-        attachments: prev.attachments.filter(attachment => attachment.id !== attachmentId)
+        attachments: prev.attachments.filter((attachment) => attachment.id !== attachmentId)
       }));
       setHasUnsavedChanges(true);
     }
@@ -344,15 +346,15 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     const validationResult = await validateFiles(files, validationOptions);
 
     // Фильтруем только валидные файлы
-    const validFiles = validationResult.results
-      .filter(r => r.validation.valid)
-      .map(r => r.file);
+    const validFiles = validationResult.results.
+    filter((r) => r.validation.valid).
+    map((r) => r.file);
 
     // Показываем ошибки для невалидных файлов
-    const invalidResults = validationResult.results.filter(r => !r.validation.valid);
+    const invalidResults = validationResult.results.filter((r) => !r.validation.valid);
     if (invalidResults.length > 0) {
-      const errorMessages = invalidResults.map(r =>
-        `${r.file.name}: ${r.validation.errors.join(', ')}`
+      const errorMessages = invalidResults.map((r) =>
+      `${r.file.name}: ${r.validation.errors.join(', ')}`
       ).join('\n');
 
       alert(`Следующие файлы не прошли валидацию:\n\n${errorMessages}\n\nРазрешены: ${getAllowedTypesDescription(['images', 'documents', 'medical'])}`);
@@ -361,7 +363,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     // Добавляем только валидные файлы
     if (validFiles.length === 0) return;
 
-    const newAttachments = validFiles.map(file => ({
+    const newAttachments = validFiles.map((file) => ({
       id: Date.now() + Math.random(),
       name: file.name,
       type: file.type,
@@ -370,7 +372,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
       category: selectedCategory
     }));
 
-    setEmrData(prev => ({
+    setEmrData((prev) => ({
       ...prev,
       attachments: [...prev.attachments, ...newAttachments]
     }));
@@ -388,7 +390,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
       };
 
       await onSave(emrToSave);
-      setEmrData(prev => ({ ...prev, isDraft: false }));
+      setEmrData((prev) => ({ ...prev, isDraft: false }));
       setHasUnsavedChanges(false);
     } catch (error) {
       logger.error('EMR: Save error:', error);
@@ -400,7 +402,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   // Функция явного сохранения черновика
   const handleSaveDraft = async () => {
     if (!canSaveEMR) return;
-    
+
     try {
       const emrToSave = {
         ...emrData,
@@ -412,7 +414,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
       await onSave(emrToSave);
       setLastAutoSave(new Date());
       setHasUnsavedChanges(false);
-      
+
       // Показать уведомление об успешном сохранении
       if (window.showToast) {
         window.showToast('Черновик сохранен', 'success');
@@ -463,21 +465,21 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             {STATUS_LABELS[appointment?.status]}
           </Badge>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Отображение AI ошибок */}
-      {aiError && (
-        <Alert severity="error" style={{ marginBottom: 16 }} onClose={clearError}>
+      {aiError &&
+      <Alert severity="error" style={{ marginBottom: 16 }} onClose={clearError}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertCircle style={{ width: 16, height: 16 }} />
             <span>{aiError}</span>
           </div>
         </Alert>
-      )}
+      }
       
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -492,18 +494,18 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {emrData.isDraft ? (
-              <Badge variant="warning">Черновик</Badge>
-            ) : (
-              <Badge variant="success">
+            {emrData.isDraft ?
+            <Badge variant="warning">Черновик</Badge> :
+
+            <Badge variant="success">
                 <CheckCircle style={{ width: 16, height: 16, marginRight: 4 }} />
                 Сохранено
               </Badge>
-            )}
+            }
             
-            {hasUnsavedChanges && (
-              <Badge variant="info">Есть изменения</Badge>
-            )}
+            {hasUnsavedChanges &&
+            <Badge variant="info">Есть изменения</Badge>
+            }
           </div>
         </div>
       </Card>
@@ -517,16 +519,16 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               loading={aiLoading}
               variant="icon"
               tooltip="AI анализ жалоб"
-              disabled={!emrData.complaints || !canSaveEMR}
-            />
+              disabled={!emrData.complaints || !canSaveEMR} />
+            
           </div>
           <textarea
             value={emrData.complaints}
             onChange={(e) => handleFieldChange('complaints', e.target.value)}
             placeholder="Опишите жалобы пациента..."
             style={{ width: '100%', height: 128, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, resize: 'none' }}
-            disabled={!canSaveEMR}
-          />
+            disabled={!canSaveEMR} />
+          
         </Card>
 
         <Card>
@@ -548,16 +550,16 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               loading={aiLoading}
               variant="icon"
               tooltip="AI помощь с анамнезом"
-              disabled={!emrData.complaints || !canSaveEMR}
-            />
+              disabled={!emrData.complaints || !canSaveEMR} />
+            
           </div>
           <textarea
             value={emrData.anamnesis}
             onChange={(e) => handleFieldChange('anamnesis', e.target.value)}
             placeholder="Анамнез заболевания, жизни..."
             style={{ width: '100%', height: 128, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, resize: 'none' }}
-            disabled={!canSaveEMR}
-          />
+            disabled={!canSaveEMR} />
+          
         </Card>
 
         <Card>
@@ -572,7 +574,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
                     patient_gender: appointment?.patient?.gender
                   });
                   if (result && result.examinations) {
-                    const examText = result.examinations.map(e => `${e.type}: ${e.name}`).join('\n');
+                    const examText = result.examinations.map((e) => `${e.type}: ${e.name}`).join('\n');
                     handleFieldChange('examination', examText);
                   }
                 }
@@ -580,16 +582,16 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               loading={aiLoading}
               variant="icon"
               tooltip="AI рекомендации по осмотру"
-              disabled={!emrData.complaints || !canSaveEMR}
-            />
+              disabled={!emrData.complaints || !canSaveEMR} />
+            
           </div>
           <textarea
             value={emrData.examination}
             onChange={(e) => handleFieldChange('examination', e.target.value)}
             placeholder="Результаты осмотра..."
             style={{ width: '100%', height: 128, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, resize: 'none' }}
-            disabled={!canSaveEMR}
-          />
+            disabled={!canSaveEMR} />
+          
         </Card>
 
         <Card>
@@ -597,16 +599,16 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             <Typography variant="h6">Диагноз</Typography>
             <AIButton
               onClick={async () => {
-                if (emrData.complaints || emrData.diagnosis) {
-                  const suggestions = await getICD10Suggestions(emrData.complaints, emrData.diagnosis);
+                if (emrData.complaints || emrData.diagnosis) {void (
+                  await getICD10Suggestions(emrData.complaints, emrData.diagnosis));
                   // setIcd10Suggestions уже вызывается в хуке
                 }
               }}
               loading={aiLoading}
               variant="icon"
               tooltip="AI подсказки МКБ-10"
-              disabled={(!emrData.complaints && !emrData.diagnosis) || !canSaveEMR}
-            />
+              disabled={!emrData.complaints && !emrData.diagnosis || !canSaveEMR} />
+            
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <input
@@ -615,28 +617,28 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               onChange={(e) => handleDiagnosisChange(e.target.value)}
               placeholder="Клинический диагноз (автоподсказки МКБ-10)"
               style={{ width: '100%', padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8 }}
-              disabled={!canSaveEMR}
-            />
+              disabled={!canSaveEMR} />
+            
             <input
               type="text"
               value={emrData.icd10}
               onChange={(e) => handleFieldChange('icd10', e.target.value)}
               placeholder="Код МКБ-10 (например: L70.0)"
               style={{ width: '100%', padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8 }}
-              disabled={!canSaveEMR}
-            />
-            {(icd10Suggestions.length > 0 || clinicalRecommendations) && (
-              <AISuggestions
-                suggestions={icd10Suggestions}
-                clinicalRecommendations={clinicalRecommendations}
-                type="icd10"
-                onSelect={(item) => {
-                  handleFieldChange('icd10', item.code);
-                  handleFieldChange('diagnosis', item.name || item.description);
-                }}
-                title="AI подсказки МКБ-10"
-              />
-            )}
+              disabled={!canSaveEMR} />
+            
+            {(icd10Suggestions.length > 0 || clinicalRecommendations) &&
+            <AISuggestions
+              suggestions={icd10Suggestions}
+              clinicalRecommendations={clinicalRecommendations}
+              type="icd10"
+              onSelect={(item) => {
+                handleFieldChange('icd10', item.code);
+                handleFieldChange('diagnosis', item.name || item.description);
+              }}
+              title="AI подсказки МКБ-10" />
+
+            }
           </div>
         </Card>
       </div>
@@ -647,57 +649,57 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
           <Button
             size="small"
             onClick={handleProcedureAdd}
-            disabled={!canSaveEMR}
-          >
+            disabled={!canSaveEMR}>
+            
             <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
             Добавить процедуру
           </Button>
         </div>
 
-        {emrData.procedures.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 32, color: 'var(--mac-text-secondary)' }}>
+        {emrData.procedures.length === 0 ?
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--mac-text-secondary)' }}>
             Процедуры не добавлены
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {emrData.procedures.map(procedure => (
-              <div key={procedure.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+          </div> :
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {emrData.procedures.map((procedure) =>
+          <div key={procedure.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                 <input
-                  type="text"
-                  value={procedure.name}
-                  onChange={(e) => handleProcedureChange(procedure.id, 'name', e.target.value)}
-                  placeholder="Название процедуры"
-                  style={{ flex: 1, padding: 8, border: '1px solid var(--mac-border)', borderRadius: 4 }}
-                  disabled={!canSaveEMR}
-                />
+              type="text"
+              value={procedure.name}
+              onChange={(e) => handleProcedureChange(procedure.id, 'name', e.target.value)}
+              placeholder="Название процедуры"
+              style={{ flex: 1, padding: 8, border: '1px solid var(--mac-border)', borderRadius: 4 }}
+              disabled={!canSaveEMR} />
+            
                 <input
-                  type="text"
-                  value={procedure.description}
-                  onChange={(e) => handleProcedureChange(procedure.id, 'description', e.target.value)}
-                  placeholder="Описание"
-                  style={{ flex: 1, padding: 8, border: '1px solid var(--mac-border)', borderRadius: 4 }}
-                  disabled={!canSaveEMR}
-                />
+              type="text"
+              value={procedure.description}
+              onChange={(e) => handleProcedureChange(procedure.id, 'description', e.target.value)}
+              placeholder="Описание"
+              style={{ flex: 1, padding: 8, border: '1px solid var(--mac-border)', borderRadius: 4 }}
+              disabled={!canSaveEMR} />
+            
                 <input
-                  type="number"
-                  value={procedure.cost}
-                  onChange={(e) => handleProcedureChange(procedure.id, 'cost', parseFloat(e.target.value) || 0)}
-                  placeholder="Стоимость"
-                  style={{ width: 96, padding: 8, border: '1px solid var(--mac-border)', borderRadius: 4 }}
-                  disabled={!canSaveEMR}
-                />
+              type="number"
+              value={procedure.cost}
+              onChange={(e) => handleProcedureChange(procedure.id, 'cost', parseFloat(e.target.value) || 0)}
+              placeholder="Стоимость"
+              style={{ width: 96, padding: 8, border: '1px solid var(--mac-border)', borderRadius: 4 }}
+              disabled={!canSaveEMR} />
+            
                 <Button
-                  size="small"
-                  variant="danger"
-                  onClick={() => handleProcedureRemove(procedure.id)}
-                  disabled={!canSaveEMR}
-                >
+              size="small"
+              variant="danger"
+              onClick={() => handleProcedureRemove(procedure.id)}
+              disabled={!canSaveEMR}>
+              
                   <X style={{ width: 16, height: 16 }} />
                 </Button>
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
       </Card>
 
       <Card>
@@ -714,12 +716,12 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
                 });
                 if (result && result.lab_tests) {
                   const recommendations = [
-                    'Лабораторные исследования:',
-                    ...result.lab_tests,
-                    '',
-                    'Дополнительное обследование:',
-                    ...(result.imaging_studies || [])
-                  ].join('\n');
+                  'Лабораторные исследования:',
+                  ...result.lab_tests,
+                  '',
+                  'Дополнительное обследование:',
+                  ...(result.imaging_studies || [])].
+                  join('\n');
                   handleFieldChange('recommendations', recommendations);
                 }
               }
@@ -727,16 +729,16 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             loading={aiLoading}
             variant="icon"
             tooltip="AI рекомендации по лечению"
-            disabled={(!emrData.diagnosis && !emrData.complaints) || !canSaveEMR}
-          />
+            disabled={!emrData.diagnosis && !emrData.complaints || !canSaveEMR} />
+          
         </div>
         <textarea
           value={emrData.recommendations}
           onChange={(e) => handleFieldChange('recommendations', e.target.value)}
           placeholder="Рекомендации по лечению и наблюдению..."
           style={{ width: '100%', height: 96, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, resize: 'none' }}
-          disabled={!canSaveEMR}
-        />
+          disabled={!canSaveEMR} />
+        
       </Card>
 
       <Card>
@@ -758,8 +760,8 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
                   color: 'var(--mac-text-primary)',
                   fontSize: 14
                 }}
-                disabled={!canSaveEMR}
-              >
+                disabled={!canSaveEMR}>
+                
                 <option value={ATTACHMENT_CATEGORIES.EXAMINATION}>Обследование</option>
                 <option value={ATTACHMENT_CATEGORIES.DOCUMENTS}>Документы</option>
                 <option value={ATTACHMENT_CATEGORIES.BEFORE_AFTER}>До/После</option>
@@ -768,18 +770,19 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             </div>
             <label style={{ cursor: 'pointer' }}>
               <input
+                ref={attachmentInputRef}
                 type="file"
                 multiple
                 accept="image/*,.pdf,.doc,.docx"
                 onChange={handleFileUpload}
                 style={{ display: 'none' }}
+                disabled={!canSaveEMR} />
+              
+              <Button
+                size="small"
                 disabled={!canSaveEMR}
-              />
-              <Button 
-                size="small" 
-                disabled={!canSaveEMR}
-                onClick={(e) => e.preventDefault()}
-              >
+                onClick={(e) => e.preventDefault()}>
+                
                 <Upload style={{ width: 16, height: 16, marginRight: 8 }} />
                 Загрузить файлы
               </Button>
@@ -787,66 +790,82 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
           </div>
         </div>
 
-        {emrData.attachments.length === 0 ? (
-          <div 
-            style={{ 
-              textAlign: 'center', 
-              padding: 32, 
-              color: 'var(--mac-text-secondary)',
-              border: isDragOver ? '2px dashed var(--mac-accent-blue)' : '2px dashed var(--mac-border)',
-              borderRadius: 8,
-              backgroundColor: isDragOver ? 'var(--mac-accent-blue-light)' : 'transparent',
-              transition: 'all 0.2s ease'
-            }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isDragOver ? (
-              <div>
+        {emrData.attachments.length === 0 ?
+        <div
+          style={{
+            textAlign: 'center',
+            padding: 32,
+            color: 'var(--mac-text-secondary)',
+            border: isDragOver ? '2px dashed var(--mac-accent-blue)' : '2px dashed var(--mac-border)',
+            borderRadius: 8,
+            backgroundColor: isDragOver ? 'var(--mac-accent-blue-light)' : 'transparent',
+            transition: 'all 0.2s ease'
+          }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          role="button"
+          tabIndex={canSaveEMR ? 0 : -1}
+          aria-disabled={!canSaveEMR}
+          aria-label="Область загрузки вложений"
+          onClick={() => {
+            if (canSaveEMR) {
+              attachmentInputRef.current?.click();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (!canSaveEMR) return;
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              attachmentInputRef.current?.click();
+            }
+          }}>
+          
+            {isDragOver ?
+          <div>
                 <Upload style={{ width: 32, height: 32, margin: '0 auto 16px', color: 'var(--mac-accent-blue)' }} />
                 <div>Отпустите файлы для загрузки</div>
-              </div>
-            ) : (
-              <div>
+              </div> :
+
+          <div>
                 <Upload style={{ width: 32, height: 32, margin: '0 auto 16px', color: 'var(--mac-text-secondary)' }} />
                 <div>Перетащите файлы сюда или используйте кнопку загрузки</div>
               </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-            {emrData.attachments.map(attachment => (
-              <div key={attachment.id} style={{ padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, position: 'relative' }}>
+          }
+          </div> :
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+            {emrData.attachments.map((attachment) =>
+          <div key={attachment.id} style={{ padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, position: 'relative' }}>
                 {/* Миниатюра изображения */}
-                {attachment.type?.startsWith('image/') ? (
-                  <div style={{ marginBottom: 8 }}>
+                {attachment.type?.startsWith('image/') ?
+            <div style={{ marginBottom: 8 }}>
                     <AttachmentImage
-                      file={attachment.file}
-                      alt={attachment.name}
-                      style={{
-                        width: '100%',
-                        height: 120,
-                        objectFit: 'cover',
-                        borderRadius: 6,
-                        backgroundColor: 'var(--mac-background-secondary)'
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: 120,
-                    backgroundColor: 'var(--mac-background-secondary)',
-                    borderRadius: 6,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 8
-                  }}>
+                file={attachment.file}
+                alt={attachment.name}
+                style={{
+                  width: '100%',
+                  height: 120,
+                  objectFit: 'cover',
+                  borderRadius: 6,
+                  backgroundColor: 'var(--mac-background-secondary)'
+                }} />
+              
+                  </div> :
+
+            <div style={{
+              width: '100%',
+              height: 120,
+              backgroundColor: 'var(--mac-background-secondary)',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 8
+            }}>
                     <FileText style={{ width: 32, height: 32, color: 'var(--mac-text-secondary)' }} />
                   </div>
-                )}
+            }
                 
                 {/* Информация о файле */}
                 <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
@@ -857,93 +876,93 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
                 </div>
                 
                 {/* AI анализ для изображений */}
-                {attachment.type?.startsWith('image/') && (
-                  <AIButton
-                    onClick={async () => {
-                      setSelectedImageForAI(attachment);
-                      try {
-                        const result = attachment.category === ATTACHMENT_CATEGORIES.EXAMINATION 
-                          ? await analyzeSkinLesion(
-                              attachment.file,
-                              { location: 'Не указано', size: 'Не указано' },
-                              { complaints: emrData.complaints }
-                            )
-                          : await analyzeImage(
-                              attachment.file,
-                              'general',
-                              { clinicalContext: emrData.complaints }
-                            );
-                        
-                        setImageAnalysisResult(result);
-                        
-                        if (result && result.findings) {
-                          const aiAnalysis = `\n\nAI Анализ изображения "${attachment.name}":\n${result.findings}`;
-                          handleFieldChange('examination', emrData.examination + aiAnalysis);
-                        }
-                      } catch (err) {
-                        logger.error('Image AI analysis error:', err);
-                      }
-                    }}
-                    loading={aiLoading && selectedImageForAI?.id === attachment.id}
-                    variant="text"
-                    size="sm"
-                    tooltip="AI анализ изображения"
-                    disabled={!canSaveEMR}
-                  >
+                {attachment.type?.startsWith('image/') &&
+            <AIButton
+              onClick={async () => {
+                setSelectedImageForAI(attachment);
+                try {
+                  const result = attachment.category === ATTACHMENT_CATEGORIES.EXAMINATION ?
+                  await analyzeSkinLesion(
+                    attachment.file,
+                    { location: 'Не указано', size: 'Не указано' },
+                    { complaints: emrData.complaints }
+                  ) :
+                  await analyzeImage(
+                    attachment.file,
+                    'general',
+                    { clinicalContext: emrData.complaints }
+                  );
+
+                  setImageAnalysisResult(result);
+
+                  if (result && result.findings) {
+                    const aiAnalysis = `\n\nAI Анализ изображения "${attachment.name}":\n${result.findings}`;
+                    handleFieldChange('examination', emrData.examination + aiAnalysis);
+                  }
+                } catch (err) {
+                  logger.error('Image AI analysis error:', err);
+                }
+              }}
+              loading={aiLoading && selectedImageForAI?.id === attachment.id}
+              variant="text"
+              size="sm"
+              tooltip="AI анализ изображения"
+              disabled={!canSaveEMR}>
+              
                     <Brain style={{ width: 12, height: 12, marginRight: 4 }} />
                     AI
                   </AIButton>
-                )}
+            }
                 
                 {/* Кнопка удаления */}
                 <button
-                  onClick={() => handleRemoveAttachment(attachment.id)}
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--mac-accent-red)',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    opacity: 0.8,
-                    transition: 'opacity 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.opacity = '1'}
-                  onMouseLeave={(e) => e.target.style.opacity = '0.8'}
-                  disabled={!canSaveEMR}
-                >
+              onClick={() => handleRemoveAttachment(attachment.id)}
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: 'var(--mac-accent-red)',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                opacity: 0.8,
+                transition: 'opacity 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.opacity = '1'}
+              onMouseLeave={(e) => e.target.style.opacity = '0.8'}
+              disabled={!canSaveEMR}>
+              
                   <X style={{ width: 12, height: 12 }} />
                 </button>
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
       </Card>
 
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 14, color: 'var(--mac-text-secondary)' }}>
             {hasUnsavedChanges && 'Есть несохраненные изменения'}
-            {lastAutoSave && !hasUnsavedChanges && (
-              <span style={{ marginLeft: 8 }}>
+            {lastAutoSave && !hasUnsavedChanges &&
+            <span style={{ marginLeft: 8 }}>
                 Последнее автосохранение: {lastAutoSave.toLocaleTimeString()}
               </span>
-            )}
+            }
           </div>
           
           <div style={{ display: 'flex', gap: 12 }}>
             <Button
               onClick={handleSaveEMR}
-              disabled={!canSaveEMR || isSaving}
-            >
+              disabled={!canSaveEMR || isSaving}>
+              
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
               {isSaving ? 'Сохранение...' : 'Сохранить EMR'}
             </Button>
@@ -952,12 +971,12 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               variant="secondary"
               onClick={handleSaveDraft}
               disabled={!canSaveEMR}
-              style={{ 
-                backgroundColor: 'var(--mac-button-secondary)', 
+              style={{
+                backgroundColor: 'var(--mac-button-secondary)',
                 color: 'var(--mac-text-primary)',
                 border: '1px solid var(--mac-border)'
-              }}
-            >
+              }}>
+              
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
               Сохранить черновик
             </Button>
@@ -965,8 +984,8 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             <Button
               variant="success"
               onClick={handleCompleteVisit}
-              disabled={!canComplete}
-            >
+              disabled={!canComplete}>
+              
               <CheckCircle style={{ width: 16, height: 16, marginRight: 8 }} />
               Завершить прием
             </Button>
@@ -974,41 +993,52 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
         </div>
       </Card>
 
-      {showAIAssistant && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+      {showAIAssistant &&
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
           <div style={{ backgroundColor: 'white', borderRadius: 8, maxWidth: '64rem', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Typography variant="h4">AI Анализ жалоб</Typography>
                 <button
-                  onClick={() => setShowAIAssistant(false)}
-                  style={{ padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 4 }}
-                >
+                onClick={() => setShowAIAssistant(false)}
+                style={{ padding: 8, border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 4 }}>
+                
                   <X style={{ width: 20, height: 20 }} />
                 </button>
               </div>
               
               <AIAssistant
-                analysisType="complaint"
-                data={{
-                  complaint: emrData.complaints,
-                  patient_age: appointment?.patient?.age,
-                  patient_gender: appointment?.patient?.gender
-                }}
-                onResult={(result) => {
-                  if (result.recommendations) {
-                    const recommendations = result.lab_tests?.join('\n') || '';
-                    handleFieldChange('recommendations', recommendations);
-                  }
-                }}
-              />
+              analysisType="complaint"
+              data={{
+                complaint: emrData.complaints,
+                patient_age: appointment?.patient?.age,
+                patient_gender: appointment?.patient?.gender
+              }}
+              onResult={(result) => {
+                if (result.recommendations) {
+                  const recommendations = result.lab_tests?.join('\n') || '';
+                  handleFieldChange('recommendations', recommendations);
+                }
+              }} />
+            
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
+};
+
+AttachmentImage.propTypes = {
+  file: PropTypes.any,
+  alt: PropTypes.string,
+  style: PropTypes.object
+};
+
+EMRSystem.propTypes = {
+  appointment: PropTypes.object,
+  onSave: PropTypes.func,
+  onComplete: PropTypes.func
 };
 
 export default EMRSystem;
-

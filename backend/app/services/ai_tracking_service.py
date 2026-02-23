@@ -3,15 +3,13 @@
 """
 
 import hashlib
-import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from app.crud import ai_config as crud_ai
 from app.models.ai_config import AIProvider, AIUsageLog
 from app.schemas.ai_tracking import (
     AIModelInfo,
@@ -32,9 +30,9 @@ class AITrackingService:
         self,
         provider_id: int,
         task_type: str,
-        specialty: Optional[str] = None,
-        user_id: Optional[int] = None,
-        request_data: Optional[Dict[str, Any]] = None,
+        specialty: str | None = None,
+        user_id: int | None = None,
+        request_data: dict[str, Any] | None = None,
     ) -> AIRequestTracking:
         """Создать трекинг для AI запроса"""
 
@@ -83,10 +81,10 @@ class AITrackingService:
     def complete_request_tracking(
         self,
         tracking: AIRequestTracking,
-        response_data: Dict[str, Any],
+        response_data: dict[str, Any],
         tokens_used: int,
         success: bool = True,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> AIResponseWithTracking:
         """Завершить трекинг AI запроса"""
 
@@ -140,9 +138,9 @@ class AITrackingService:
     def get_model_stats(
         self,
         days_back: int = 30,
-        provider_id: Optional[int] = None,
-        specialty: Optional[str] = None,
-    ) -> List[AIModelStats]:
+        provider_id: int | None = None,
+        specialty: str | None = None,
+    ) -> list[AIModelStats]:
         """Получить статистику по AI моделям"""
 
         # Базовый запрос
@@ -201,7 +199,7 @@ class AITrackingService:
 
         return stats
 
-    def get_provider_stats(self, days_back: int = 30) -> List[AIProviderStats]:
+    def get_provider_stats(self, days_back: int = 30) -> list[AIProviderStats]:
         """Получить статистику по провайдерам AI"""
 
         # Получаем всех провайдеров
@@ -246,7 +244,7 @@ class AITrackingService:
 
         return stats
 
-    def get_request_tracking(self, request_id: str) -> Optional[AIRequestTracking]:
+    def get_request_tracking(self, request_id: str) -> AIRequestTracking | None:
         """Получить трекинг запроса по ID"""
         # Здесь можно реализовать кэширование или поиск в БД
         # Пока возвращаем None, так как трекинг хранится в памяти

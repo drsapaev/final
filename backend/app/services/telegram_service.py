@@ -3,10 +3,9 @@
 Основа: passport.md стр. 2064-2570, detail.md стр. 4283-4282
 """
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -16,8 +15,8 @@ try:
         Application,
         CallbackQueryHandler,
         CommandHandler,
-        filters,
         MessageHandler,
+        filters,
     )
 
     TELEGRAM_AVAILABLE = True
@@ -31,9 +30,6 @@ from app.crud import telegram_config as crud_telegram
 from app.db.session import SessionLocal
 from app.models.telegram_config import (
     TelegramConfig,
-    TelegramMessage,
-    TelegramTemplate,
-    TelegramUser,
 )
 
 # Настройка логирования для Telegram
@@ -47,10 +43,10 @@ class TelegramService:
     """Сервис для работы с Telegram ботом"""
 
     def __init__(self):
-        self.bot: Optional[Bot] = None
-        self.application: Optional[Application] = None
-        self.config: Optional[TelegramConfig] = None
-        self.db: Optional[Session] = None
+        self.bot: Bot | None = None
+        self.application: Application | None = None
+        self.config: TelegramConfig | None = None
+        self.db: Session | None = None
 
     async def initialize(self) -> bool:
         """Инициализация бота"""
@@ -214,7 +210,7 @@ class TelegramService:
     async def _handle_queue(self, update, context) -> None:
         """Обработчик команды /queue"""
         try:
-            chat_id = update.effective_chat.id
+            _chat_id = update.effective_chat.id
 
             # Получаем доступные специальности для QR
             specialties = await self._get_available_specialties()
@@ -259,7 +255,7 @@ class TelegramService:
             await query.answer()
 
             data = query.data
-            chat_id = query.message.chat_id
+            _chat_id = query.message.chat_id
 
             if data == "get_qr":
                 await self._handle_queue(update, context)
@@ -284,7 +280,7 @@ class TelegramService:
         """Обработчик текстовых сообщений"""
         try:
             message_text = update.message.text
-            chat_id = update.effective_chat.id
+            _chat_id = update.effective_chat.id
 
             # Простая логика обработки
             if "запись" in message_text.lower() or "записаться" in message_text.lower():
@@ -366,7 +362,7 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Ошибка регистрации пользователя: {e}")
 
-    async def _get_available_specialties(self) -> List[Dict[str, Any]]:
+    async def _get_available_specialties(self) -> list[dict[str, Any]]:
         """Получить доступные специальности для QR"""
         try:
             # Здесь будет интеграция с API онлайн-очереди
@@ -389,7 +385,6 @@ class TelegramService:
             # Интеграция с API онлайн-очереди
             from datetime import date
 
-            import requests
 
             tomorrow = (date.today() + timedelta(days=1)).isoformat()
 
@@ -447,7 +442,7 @@ class TelegramService:
         self,
         chat_id: int,
         template_key: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         language: str = "ru",
     ) -> bool:
         """Отправка уведомления пользователю"""
@@ -499,7 +494,7 @@ class TelegramService:
             logger.error(f"Ошибка отправки уведомления: {e}")
             return False
 
-    def _render_template(self, template_text: str, data: Dict[str, Any]) -> str:
+    def _render_template(self, template_text: str, data: dict[str, Any]) -> str:
         """Рендеринг шаблона сообщения"""
         try:
             from jinja2 import Environment
@@ -557,7 +552,7 @@ class TelegramService:
 
 
 # Глобальный экземпляр сервиса
-telegram_service: Optional[TelegramService] = None
+telegram_service: TelegramService | None = None
 
 
 def get_telegram_service() -> TelegramService:
@@ -569,7 +564,7 @@ def get_telegram_service() -> TelegramService:
 
 
 async def send_telegram_notification(
-    chat_id: int, template_key: str, data: Dict[str, Any], language: str = "ru"
+    chat_id: int, template_key: str, data: dict[str, Any], language: str = "ru"
 ) -> bool:
     """Быстрая отправка уведомления"""
     service = get_telegram_service()

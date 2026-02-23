@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -288,12 +289,24 @@ const CancelDialog = ({
             margin: '8px 0 0 0',
             fontStyle: 'italic'
           }}>
-            Примеры: "Пациент заболел", "Изменились планы", "Врач недоступен"
+            Примеры: «Пациент заболел», «Изменились планы», «Врач недоступен»
           </p>
         </div>
       </div>
     </ModernDialog>
   );
+};
+
+CancelDialog.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  appointment: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    patient_fio: PropTypes.string,
+    services: PropTypes.oneOfType([PropTypes.arrayOf(PropTypes.string), PropTypes.string]),
+    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  }),
+  onCancel: PropTypes.func
 };
 
 export default CancelDialog;

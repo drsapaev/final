@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -26,13 +26,13 @@ class FeatureFlag(Base):
     # Основная информация
     key: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     # Состояние флага
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Конфигурация
-    config: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)  # Дополнительные настройки флага
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # Дополнительные настройки флага
 
     # Метаданные
     category: Mapped[str] = mapped_column(String(50), default="general")  # Категория флага
@@ -41,16 +41,16 @@ class FeatureFlag(Base):
     )  # production, staging, development, all
 
     # Временные метки
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), onupdate=func.now()
     )
 
     # Аудит
-    created_by: Mapped[Optional[str]] = mapped_column(String(100))
-    updated_by: Mapped[Optional[str]] = mapped_column(String(100))
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    updated_by: Mapped[str | None] = mapped_column(String(100))
 
     def __repr__(self) -> str:
         return f"<FeatureFlag(key='{self.key}', enabled={self.enabled})>"
@@ -72,17 +72,17 @@ class FeatureFlagHistory(Base):
     action: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # created, enabled, disabled, updated, deleted
-    old_value: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    new_value: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    old_value: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    new_value: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # Метаданные изменения
-    changed_by: Mapped[Optional[str]] = mapped_column(String(100))
-    changed_at: Mapped[Optional[datetime]] = mapped_column(
+    changed_by: Mapped[str | None] = mapped_column(String(100))
+    changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45))  # IPv4/IPv6
-    user_agent: Mapped[Optional[str]] = mapped_column(String(500))
-    reason: Mapped[Optional[str]] = mapped_column(Text)  # Причина изменения
+    ip_address: Mapped[str | None] = mapped_column(String(45))  # IPv4/IPv6
+    user_agent: Mapped[str | None] = mapped_column(String(500))
+    reason: Mapped[str | None] = mapped_column(Text)  # Причина изменения
 
     def __repr__(self) -> str:
         return (

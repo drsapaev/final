@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
 import { Button } from '../ui';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const ResponsiveNavigation = ({
   items = [],
@@ -34,40 +34,49 @@ const ResponsiveNavigation = ({
             variant="ghost"
             size="sm"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            style={{ minWidth: 'auto', padding: '8px' }}
-          >
+            style={{ minWidth: 'auto', padding: '8px' }}>
+            
             {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </Button>
         </div>
 
         {/* Выпадающее меню */}
-        {isMenuOpen && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-            zIndex: 1000,
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
-            {items.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  padding: '16px',
-                  borderBottom: index < items.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-                  cursor: 'pointer',
-                  background: activeItem === item.key ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                  transition: 'background-color 0.2s ease'
-                }}
-                onClick={() => {
-                  onItemClick?.(item.key);
-                  setIsMenuOpen(false);
-                }}
-              >
+        {isMenuOpen &&
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          zIndex: 1000,
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+            {items.map((item, index) =>
+          <div
+            key={index}
+            role="button"
+            tabIndex={0}
+            style={{
+              padding: '16px',
+              borderBottom: index < items.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+              cursor: 'pointer',
+              background: activeItem === item.key ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+              transition: 'background-color 0.2s ease'
+            }}
+            onClick={() => {
+              onItemClick?.(item.key);
+              setIsMenuOpen(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onItemClick?.(item.key);
+                setIsMenuOpen(false);
+              }
+            }}>
+            
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {item.icon}
                   <span style={{ fontSize: '16px', fontWeight: '500' }}>
@@ -75,11 +84,11 @@ const ResponsiveNavigation = ({
                   </span>
                 </div>
               </div>
-            ))}
+          )}
           </div>
-        )}
-      </div>
-    );
+        }
+      </div>);
+
   }
 
   // Планшетная навигация - компактные кнопки
@@ -94,22 +103,22 @@ const ResponsiveNavigation = ({
         borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         ...style
       }}>
-        {items.map((item, index) => (
-          <Button
-            key={index}
-            variant={activeItem === item.key ? 'primary' : 'ghost'}
-            size="sm"
-            onClick={() => onItemClick?.(item.key)}
-            style={{ flex: 1, minWidth: 0 }}
-          >
+        {items.map((item, index) =>
+        <Button
+          key={index}
+          variant={activeItem === item.key ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => onItemClick?.(item.key)}
+          style={{ flex: 1, minWidth: 0 }}>
+          
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {item.icon}
               <span style={{ fontSize: '12px' }}>{item.label}</span>
             </div>
           </Button>
-        ))}
-      </div>
-    );
+        )}
+      </div>);
+
   }
 
   // Десктопная навигация - полные кнопки
@@ -123,22 +132,21 @@ const ResponsiveNavigation = ({
       borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
       ...style
     }}>
-      {items.map((item, index) => (
-        <Button
-          key={index}
-          variant={activeItem === item.key ? 'primary' : 'ghost'}
-          size="md"
-          onClick={() => onItemClick?.(item.key)}
-        >
+      {items.map((item, index) =>
+      <Button
+        key={index}
+        variant={activeItem === item.key ? 'primary' : 'ghost'}
+        size="md"
+        onClick={() => onItemClick?.(item.key)}>
+        
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {item.icon}
             <span>{item.label}</span>
           </div>
         </Button>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 export default ResponsiveNavigation;
-

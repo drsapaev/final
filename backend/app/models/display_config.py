@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -24,7 +24,7 @@ class DisplayBoard(Base):
         String(100), unique=True, nullable=False
     )  # main_board, waiting_room_1
     display_name: Mapped[str] = mapped_column(String(150), nullable=False)  # "Главное табло"
-    location: Mapped[Optional[str]] = mapped_column(
+    location: Mapped[str | None] = mapped_column(
         String(200), nullable=True
     )  # "Зона ожидания, 1 этаж"
 
@@ -53,23 +53,23 @@ class DisplayBoard(Base):
     volume_level: Mapped[int] = mapped_column(Integer, default=70, nullable=False)  # 0-100
 
     # Цветовая схема
-    colors: Mapped[Optional[Dict[str, str]]] = mapped_column(
+    colors: Mapped[dict[str, str] | None] = mapped_column(
         JSON, nullable=True
     )  # {"primary": "#0066cc", "secondary": "#f8f9fa"}
 
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # Relationships
-    banners: Mapped[List["DisplayBanner"]] = relationship(
+    banners: Mapped[list[DisplayBanner]] = relationship(
         "DisplayBanner", back_populates="board", cascade="all, delete-orphan"
     )
-    videos: Mapped[List["DisplayVideo"]] = relationship(
+    videos: Mapped[list[DisplayVideo]] = relationship(
         "DisplayVideo", back_populates="board", cascade="all, delete-orphan"
     )
 
@@ -85,28 +85,28 @@ class DisplayBanner(Base):
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    link_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    link_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Настройки показа
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     display_duration: Mapped[int] = mapped_column(Integer, default=10, nullable=False)  # Секунды
 
     # Планирование
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Языки
     language: Mapped[str] = mapped_column(String(5), default="ru", nullable=False)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Relationships
-    board: Mapped["DisplayBoard"] = relationship("DisplayBoard", back_populates="banners")
+    board: Mapped[DisplayBoard] = relationship("DisplayBoard", back_populates="banners")
 
 
 class DisplayVideo(Base):
@@ -120,30 +120,30 @@ class DisplayVideo(Base):
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_url: Mapped[str] = mapped_column(String(500), nullable=False)
-    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Метаданные видео
-    duration_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    file_size_mb: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    video_format: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # mp4, webm, avi
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_size_mb: Mapped[float | None] = mapped_column(Float, nullable=True)
+    video_format: Mapped[str | None] = mapped_column(String(20), nullable=True)  # mp4, webm, avi
 
     # Настройки показа
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     loop_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 0 = бесконечно
 
     # Планирование
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Relationships
-    board: Mapped["DisplayBoard"] = relationship("DisplayBoard", back_populates="videos")
+    board: Mapped[DisplayBoard] = relationship("DisplayBoard", back_populates="videos")
 
 
 class DisplayAnnouncement(Base):
@@ -152,7 +152,7 @@ class DisplayAnnouncement(Base):
     __tablename__ = "display_announcements"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    board_id: Mapped[Optional[int]] = mapped_column(
+    board_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("display_boards.id", ondelete="CASCADE"), nullable=True
     )
 
@@ -170,17 +170,17 @@ class DisplayAnnouncement(Base):
     )  # Скорость бегущей строки
 
     # Планирование
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Языки
     language: Mapped[str] = mapped_column(String(5), default="ru", nullable=False)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
@@ -197,24 +197,24 @@ class DisplayTheme(Base):
     display_name: Mapped[str] = mapped_column(String(150), nullable=False)  # "Светлая тема"
 
     # CSS переменные темы
-    css_variables: Mapped[Dict[str, str]] = mapped_column(
+    css_variables: Mapped[dict[str, str]] = mapped_column(
         JSON, nullable=False
     )  # {"--primary-color": "#0066cc"}
 
     # Настройки шрифтов
     font_family: Mapped[str] = mapped_column(String(100), default="system-ui", nullable=False)
-    font_sizes: Mapped[Optional[Dict[str, str]]] = mapped_column(
+    font_sizes: Mapped[dict[str, str] | None] = mapped_column(
         JSON, nullable=True
     )  # {"small": "14px", "medium": "18px", "large": "24px"}
 
     # Фоновые изображения/градиенты
-    background_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    background_config: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

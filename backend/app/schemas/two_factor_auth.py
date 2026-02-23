@@ -3,9 +3,8 @@ Pydantic схемы для двухфакторной аутентификаци
 """
 
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
 
@@ -15,8 +14,8 @@ class TwoFactorAuthBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     totp_enabled: bool = False
-    recovery_email: Optional[str] = Field(None, max_length=255)
-    recovery_phone: Optional[str] = Field(None, max_length=20)
+    recovery_email: str | None = Field(None, max_length=255)
+    recovery_phone: str | None = Field(None, max_length=20)
     recovery_enabled: bool = False
 
 
@@ -29,10 +28,10 @@ class TwoFactorAuthCreate(TwoFactorAuthBase):
 class TwoFactorAuthUpdate(TwoFactorAuthBase):
     """Схема для обновления 2FA"""
 
-    totp_secret: Optional[str] = None
-    totp_verified: Optional[bool] = None
-    backup_codes_generated: Optional[bool] = None
-    recovery_enabled: Optional[bool] = None
+    totp_secret: str | None = None
+    totp_verified: bool | None = None
+    backup_codes_generated: bool | None = None
+    recovery_enabled: bool | None = None
 
 
 class TwoFactorAuthOut(TwoFactorAuthBase):
@@ -44,11 +43,10 @@ class TwoFactorAuthOut(TwoFactorAuthBase):
     backup_codes_generated: bool
     backup_codes_count: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    last_used: Optional[datetime] = None
+    updated_at: datetime | None = None
+    last_used: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorBackupCodeBase(BaseModel):
@@ -71,11 +69,10 @@ class TwoFactorBackupCodeOut(TwoFactorBackupCodeBase):
 
     id: int
     two_factor_auth_id: int
-    used_at: Optional[datetime] = None
+    used_at: datetime | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorRecoveryBase(BaseModel):
@@ -85,15 +82,15 @@ class TwoFactorRecoveryBase(BaseModel):
 
     recovery_type: str = Field(..., pattern="^(email|phone|backup_code)$")
     recovery_value: str = Field(..., max_length=255)
-    recovery_token: Optional[str] = None
+    recovery_token: str | None = None
 
 
 class TwoFactorRecoveryCreate(TwoFactorRecoveryBase):
     """Схема для создания попытки восстановления"""
 
     two_factor_auth_id: int
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
 
 class TwoFactorRecoveryVerify(BaseModel):
@@ -109,14 +106,13 @@ class TwoFactorRecoveryOut(TwoFactorRecoveryBase):
     id: int
     two_factor_auth_id: int
     verified: bool
-    verified_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
+    verified_at: datetime | None = None
+    expires_at: datetime | None = None
     created_at: datetime
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorSessionBase(BaseModel):
@@ -125,9 +121,9 @@ class TwoFactorSessionBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     session_token: str = Field(..., min_length=32, max_length=64)
-    device_fingerprint: Optional[str] = None
+    device_fingerprint: str | None = None
     two_factor_verified: bool = False
-    two_factor_method: Optional[str] = Field(
+    two_factor_method: str | None = Field(
         None, pattern="^(totp|backup_code|recovery)$"
     )
 
@@ -137,9 +133,9 @@ class TwoFactorSessionCreate(TwoFactorSessionBase):
 
     user_id: int
     expires_at: datetime
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    device_name: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    device_name: str | None = None
 
 
 class TwoFactorSessionOut(TwoFactorSessionBase):
@@ -150,12 +146,11 @@ class TwoFactorSessionOut(TwoFactorSessionBase):
     created_at: datetime
     expires_at: datetime
     last_activity: datetime
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    device_name: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    device_name: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TwoFactorDeviceBase(BaseModel):
@@ -174,8 +169,8 @@ class TwoFactorDeviceCreate(TwoFactorDeviceBase):
     """Схема для создания устройства 2FA"""
 
     user_id: int
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
 
 class TwoFactorDeviceOut(TwoFactorDeviceBase):
@@ -184,12 +179,11 @@ class TwoFactorDeviceOut(TwoFactorDeviceBase):
     id: int
     user_id: int
     created_at: datetime
-    last_used: Optional[datetime] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    last_used: datetime | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схемы для API запросов
@@ -200,10 +194,10 @@ class TwoFactorSetupRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    recovery_email: Optional[str] = Field(None, max_length=255)
-    recovery_phone: Optional[str] = Field(None, max_length=20)
-    device_name: Optional[str] = Field(None, max_length=100)
-    device_type: Optional[str] = Field(None, pattern="^(mobile|desktop|tablet)$")
+    recovery_email: str | None = Field(None, max_length=255)
+    recovery_phone: str | None = Field(None, max_length=20)
+    device_name: str | None = Field(None, max_length=100)
+    device_type: str | None = Field(None, pattern="^(mobile|desktop|tablet)$")
 
 
 class TwoFactorVerifyRequest(BaseModel):
@@ -211,13 +205,13 @@ class TwoFactorVerifyRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    totp_code: Optional[str] = Field(None, min_length=6, max_length=6)
-    backup_code: Optional[str] = Field(None, min_length=8, max_length=10)
-    recovery_token: Optional[str] = Field(None, min_length=32, max_length=64)
-    device_fingerprint: Optional[str] = None
+    totp_code: str | None = Field(None, min_length=6, max_length=6)
+    backup_code: str | None = Field(None, min_length=8, max_length=10)
+    recovery_token: str | None = Field(None, min_length=32, max_length=64)
+    device_fingerprint: str | None = None
     remember_device: bool = False
     # Для блокирующего флоу входа (нет access токена до подтверждения)
-    pending_2fa_token: Optional[str] = None
+    pending_2fa_token: str | None = None
 
 
 class TwoFactorDisableRequest(BaseModel):
@@ -226,8 +220,8 @@ class TwoFactorDisableRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     password: str = Field(..., min_length=1)
-    totp_code: Optional[str] = Field(None, min_length=6, max_length=6)
-    backup_code: Optional[str] = Field(None, min_length=8, max_length=10)
+    totp_code: str | None = Field(None, min_length=6, max_length=6)
+    backup_code: str | None = Field(None, min_length=8, max_length=10)
 
 
 class TwoFactorRecoveryRequest(BaseModel):
@@ -237,7 +231,7 @@ class TwoFactorRecoveryRequest(BaseModel):
 
     recovery_type: str = Field(..., pattern="^(email|phone|backup_code)$")
     recovery_value: str = Field(..., max_length=255)
-    device_fingerprint: Optional[str] = None
+    device_fingerprint: str | None = None
 
 
 class TwoFactorStatusResponse(BaseModel):
@@ -251,10 +245,10 @@ class TwoFactorStatusResponse(BaseModel):
     backup_codes_generated: bool
     backup_codes_count: int
     recovery_enabled: bool
-    recovery_email: Optional[str] = None
-    recovery_phone: Optional[str] = None
+    recovery_email: str | None = None
+    recovery_phone: str | None = None
     trusted_devices_count: int
-    last_used: Optional[datetime] = None
+    last_used: datetime | None = None
 
 
 class TwoFactorSetupResponse(BaseModel):
@@ -264,7 +258,7 @@ class TwoFactorSetupResponse(BaseModel):
 
     qr_code_url: str
     secret_key: str
-    backup_codes: List[str]
+    backup_codes: list[str]
     recovery_token: str
     expires_at: datetime
 
@@ -276,14 +270,14 @@ class TwoFactorVerifyResponse(BaseModel):
 
     success: bool
     message: str
-    session_token: Optional[str] = None
+    session_token: str | None = None
     device_trusted: bool = False
-    backup_codes_remaining: Optional[int] = None
+    backup_codes_remaining: int | None = None
     # Для завершения логина, если сервер обменял pending_2fa_token на токены
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    token_type: Optional[str] = None
-    expires_in: Optional[int] = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str | None = None
+    expires_in: int | None = None
 
 
 class TwoFactorRecoveryResponse(BaseModel):
@@ -301,7 +295,7 @@ class TwoFactorDeviceListResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    devices: List[TwoFactorDeviceOut]
+    devices: list[TwoFactorDeviceOut]
     total: int
 
 
@@ -310,7 +304,7 @@ class TwoFactorBackupCodesResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    backup_codes: List[str]
+    backup_codes: list[str]
     total: int
     generated_at: datetime
 
@@ -326,7 +320,7 @@ class TwoFactorErrorResponse(BaseModel):
     error: str
     message: str
     code: str
-    details: Optional[dict] = None
+    details: dict | None = None
 
 
 class TwoFactorSuccessResponse(BaseModel):
@@ -336,4 +330,4 @@ class TwoFactorSuccessResponse(BaseModel):
 
     success: bool
     message: str
-    data: Optional[dict] = None
+    data: dict | None = None

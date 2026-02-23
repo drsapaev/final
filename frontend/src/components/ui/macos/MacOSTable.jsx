@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
 const MacOSTable = ({
@@ -95,7 +96,7 @@ const MacOSTable = ({
   });
 
   const rowStyle = (index, isSelected = false) => ({
-    background: striped && index % 2 === 1 ? 'var(--mac-bg-secondary)' : 'transparent',
+    background: isSelected ? 'var(--mac-bg-blue)' : (striped && index % 2 === 1 ? 'var(--mac-bg-secondary)' : 'transparent'),
     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
     cursor: hoverable ? 'pointer' : 'default'
   });
@@ -314,6 +315,32 @@ const MacOSTable = ({
       </table>
     </div>
   );
+};
+
+MacOSTable.propTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      key: PropTypes.string,
+      title: PropTypes.string,
+      sortable: PropTypes.bool,
+      render: PropTypes.func
+    })
+  ),
+  data: PropTypes.arrayOf(PropTypes.object),
+  loading: PropTypes.bool,
+  emptyState: PropTypes.node,
+  sortable: PropTypes.bool,
+  selectable: PropTypes.bool,
+  selectedRows: PropTypes.arrayOf(PropTypes.number),
+  onRowSelect: PropTypes.func,
+  onSort: PropTypes.func,
+  size: PropTypes.oneOf(['sm', 'md', 'lg']),
+  variant: PropTypes.oneOf(['default', 'filled', 'minimal']),
+  striped: PropTypes.bool,
+  hoverable: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  children: PropTypes.node
 };
 
 export default MacOSTable;

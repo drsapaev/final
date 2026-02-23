@@ -13,6 +13,8 @@ const MacOSInput = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
+  void clearable;
+  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',

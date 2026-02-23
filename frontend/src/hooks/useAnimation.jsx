@@ -3,8 +3,8 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-
+import PropTypes from 'prop-types';
+import { useState, useEffect, useRef } from 'react';
 // macOS-совместимые анимации
 export const animations = {
   // Простые переходы
@@ -217,10 +217,11 @@ export const useListAnimation = (items, animationType = 'tableRow') => {
 // Хук для анимации прогресса
 export const useProgressAnimation = (targetValue, duration = 1000) => {
   const [currentValue, setCurrentValue] = useState(0);
+  const currentValueRef = useRef(0);
 
   useEffect(() => {
     const startTime = Date.now();
-    const startValue = currentValue;
+    const startValue = currentValueRef.current;
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -231,6 +232,7 @@ export const useProgressAnimation = (targetValue, duration = 1000) => {
       const newValue = startValue + (targetValue - startValue) * easedProgress;
 
       setCurrentValue(newValue);
+      currentValueRef.current = newValue;
 
       if (progress < 1) {
         requestAnimationFrame(animate);
@@ -251,18 +253,20 @@ export const AnimatedTransition = ({
   duration = 300,
   delay = 0,
   className = '',
+  style = {},
   ...props
 }) => {
-  const { shouldRender, animationClasses } = useAnimation(isVisible, animationType, duration);
+  const { shouldRender, animationStyles } = useAnimation(isVisible, animationType, duration);
 
   if (!shouldRender) return null;
 
   return (
     <div
-      className={`animated-transition ${animationClasses} ${className}`}
+      className={`animated-transition ${className}`}
       style={{
+        ...animationStyles,
         transitionDelay: `${delay}ms`,
-        ...props.style
+        ...style
       }}
       {...props}
     >
@@ -362,6 +366,38 @@ export const AnimatedCounter = ({
       {format(Math.round(animatedValue))}
     </span>
   );
+};
+
+AnimatedTransition.propTypes = {
+  children: PropTypes.node,
+  isVisible: PropTypes.bool,
+  animationType: PropTypes.oneOf(Object.keys(animations)),
+  duration: PropTypes.number,
+  delay: PropTypes.number,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+AnimatedList.propTypes = {
+  items: PropTypes.arrayOf(PropTypes.object),
+  renderItem: PropTypes.func,
+  animationType: PropTypes.oneOf(Object.keys(animations)),
+  className: PropTypes.string
+};
+
+AnimatedProgress.propTypes = {
+  value: PropTypes.number,
+  max: PropTypes.number,
+  animationDuration: PropTypes.number,
+  showValue: PropTypes.bool,
+  className: PropTypes.string
+};
+
+AnimatedCounter.propTypes = {
+  value: PropTypes.number,
+  duration: PropTypes.number,
+  format: PropTypes.func,
+  className: PropTypes.string
 };
 
 // Утилита для создания кастомных анимаций

@@ -5,10 +5,10 @@ MCP Manager - централизованное управление MCP серв
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ...core.config import settings
-from .mcp_client import get_mcp_client, MedicalMCPClient, shutdown_mcp_client
+from .mcp_client import MedicalMCPClient, get_mcp_client, shutdown_mcp_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ class MCPManager:
     CIRCUIT_BREAKER_COOLDOWN = 300  # 5 minutes in seconds
 
     def __init__(self):
-        self.client: Optional[MedicalMCPClient] = None
-        self.metrics: Dict[str, Any] = {
+        self.client: MedicalMCPClient | None = None
+        self.metrics: dict[str, Any] = {
             "requests_total": 0,
             "requests_success": 0,
             "requests_failed": 0,
@@ -30,13 +30,13 @@ class MCPManager:
             "last_health_check": None,
         }
         self.config = self._load_config()
-        self._health_check_task: Optional[asyncio.Task] = None
-        
-        # Circuit breaker state
-        self._server_failures: Dict[str, int] = {}
-        self._server_disabled_until: Dict[str, datetime] = {}
+        self._health_check_task: asyncio.Task | None = None
 
-    def _load_config(self) -> Dict[str, Any]:
+        # Circuit breaker state
+        self._server_failures: dict[str, int] = {}
+        self._server_disabled_until: dict[str, datetime] = {}
+
+    def _load_config(self) -> dict[str, Any]:
         """Загрузка конфигурации MCP"""
         return {
             "enabled": getattr(settings, "MCP_ENABLED", True),
@@ -80,7 +80,7 @@ class MCPManager:
         if server in self._server_failures:
             self._server_failures[server] = 0
 
-    def get_circuit_breaker_status(self) -> Dict[str, Any]:
+    def get_circuit_breaker_status(self) -> dict[str, Any]:
         """Get current circuit breaker status for monitoring"""
         now = datetime.utcnow()
         status = {}
@@ -172,9 +172,9 @@ class MCPManager:
         self,
         server: str,
         method: str,
-        params: Dict[str, Any],
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Выполнение запроса через MCP
 
@@ -271,7 +271,7 @@ class MCPManager:
 
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             # ⚠️ КРИТИЧНО: Явный лог с указанием слоя и параметров
             logger.warning(
@@ -306,8 +306,8 @@ class MCPManager:
             }
 
     async def batch_execute(
-        self, requests: List[Dict[str, Any]], parallel: bool = True
-    ) -> List[Dict[str, Any]]:
+        self, requests: list[dict[str, Any]], parallel: bool = True
+    ) -> list[dict[str, Any]]:
         """
         Пакетное выполнение запросов
 
@@ -349,7 +349,7 @@ class MCPManager:
                 results.append(result)
             return results
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Получение метрик MCP"""
         return {
             **self.metrics,
@@ -357,7 +357,7 @@ class MCPManager:
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-    def get_server_metrics(self, server_name: Optional[str] = None) -> Dict[str, Any]:
+    def get_server_metrics(self, server_name: str | None = None) -> dict[str, Any]:
         """Получение метрик конкретного сервера"""
         if server_name:
             return self.metrics["server_stats"].get(
@@ -365,7 +365,7 @@ class MCPManager:
             )
         return self.metrics["server_stats"]
 
-    async def get_capabilities(self) -> Dict[str, Any]:
+    async def get_capabilities(self) -> dict[str, Any]:
         """Получение возможностей всех серверов"""
         if not self.client:
             return {"status": "error", "error": "MCP client not initialized"}
@@ -396,7 +396,7 @@ class MCPManager:
 
 
 # Глобальный экземпляр менеджера
-_mcp_manager: Optional[MCPManager] = None
+_mcp_manager: MCPManager | None = None
 
 
 async def get_mcp_manager() -> MCPManager:

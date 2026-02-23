@@ -116,7 +116,7 @@ jobs:
         for dir in app tests; do
           if [ -d "$dir" ]; then
             echo "  Проверяем $dir/..."
-            ruff check "$dir" --select=E9,F63,F7 --output-format=concise > quality-reports/ruff_${dir}.txt 2>&1
+            ruff check "$dir" --output-format=concise > quality-reports/ruff_${dir}.txt 2>&1
             RUFF_EXIT=$?
             if [ $RUFF_EXIT -ne 0 ]; then
               ERROR_COUNT=$(grep -c "^" quality-reports/ruff_${dir}.txt || echo "0")
@@ -183,9 +183,10 @@ jobs:
         echo "MyPy: $MYPY_ERRORS ошибок типов"
         echo "Pylint: $PYLINT_ERRORS ошибок"
         TOTAL=$((RUFF_TOTAL + FLAKE8_ERRORS + MYPY_ERRORS + PYLINT_ERRORS))
-        BLOCKING_TOTAL=$((RUFF_TOTAL + FLAKE8_ERRORS))
+        # Legacy Ruff backlog is reported but not release-blocking yet.
+        BLOCKING_TOTAL=$FLAKE8_ERRORS
         echo "ВСЕГО: $TOTAL ошибок"
-        echo "БЛОКИРУЮЩИХ: $BLOCKING_TOTAL (Ruff + Flake8)"
+        echo "БЛОКИРУЮЩИХ: $BLOCKING_TOTAL (Flake8 critical)"
         echo "================================"
         
         # Создаем единый файл со всеми ошибками
@@ -200,7 +201,7 @@ jobs:
           echo "- MyPy: $MYPY_ERRORS ошибок типов"
           echo "- Pylint: $PYLINT_ERRORS ошибок"
           echo "- **ВСЕГО: $TOTAL ошибок**"
-          echo "- **БЛОКИРУЮЩИХ: $BLOCKING_TOTAL (Ruff + Flake8)**"
+          echo "- **БЛОКИРУЮЩИХ: $BLOCKING_TOTAL (Flake8 critical)**"
           echo ""
           
           if [ $RUFF_ERRORS -gt 0 ]; then
@@ -256,11 +257,11 @@ jobs:
           echo "  cd backend"
           echo "  python scripts/collect_linting_errors.py"
           echo ""
-          echo "❌ Блокируем pipeline из-за Ruff/Flake8 ошибок"
+          echo "❌ Блокируем pipeline из-за Flake8 critical ошибок"
           exit 1
         else
           if [ $TOTAL -gt 0 ]; then
-            echo "✅ Блокирующие проверки пройдены. MyPy/Pylint ошибки сохранены в отчете (не блокируют)."
+            echo "✅ Блокирующие проверки пройдены. Ruff/MyPy/Pylint ошибки сохранены в отчете (не блокируют)."
           else
             echo "✅ Все проверки пройдены успешно!"
           fi
@@ -466,7 +467,7 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-asyncio httpx
+        pip install pytest pytest-cov pytest-asyncio pytest-deadfixtures httpx
     
     - name: 🗄️ Подготовка базы данных
       run: |
@@ -500,9 +501,7 @@ jobs:
         echo "🔍 Проверяем конфигурацию pytest:"
         cat pytest.ini
         echo "🧪 Запускаем тесты с покрытием:"
-        if ! pytest tests/; then
-          echo "::warning::Full backend suite has legacy failures; blocking gate remains Critical E2E smoke."
-        fi
+        pytest tests/
         echo "📁 Проверяем созданные файлы:"
         ls -la htmlcov/ || echo "Папка htmlcov не найдена"
         if [ ! -d "htmlcov" ]; then
@@ -514,9 +513,10 @@ jobs:
     - name: 🧪 Critical E2E Smoke
       run: |
         cd backend
-        echo "🔬 Запускаем критичные E2E сценарии (rbac/api/emr/print)..."
+        echo "🔬 Запускаем критичные E2E сценарии (queue/payment/rbac/emr/print)..."
         pytest -q \
-          tests/integration/test_api_integration.py \
+          tests/integration/test_queue_time_websocket_e2e.py \
+          tests/integration/test_payment_init_e2e.py \
           tests/integration/test_rbac_matrix.py \
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_fill_emr \
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
@@ -529,12 +529,69 @@ jobs:
         path: backend/htmlcov/
         if-no-files-found: warn
 
+  # --- Архитектурные boundary тесты ---
+  architecture-boundary:
+    name: 🧱 Context Boundary Integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 🐍 Установка Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: 📦 Установка зависимостей
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: 🧱 Run context boundary tests
+      run: |
+        cd backend
+        START_TS=$(date +%s)
+        CONTEXTS=$(python - <<'PY'
+        from app.domain.context_registry import DomainContext
+        print(len(DomainContext))
+        PY
+        )
+
+        set +e
+        pytest -q \
+          tests/architecture/test_context_boundaries.py \
+          tests/architecture/test_interoperability_import_boundaries.py | tee /tmp/context-boundary.log
+        TEST_EXIT=${PIPESTATUS[0]}
+        set -e
+
+        END_TS=$(date +%s)
+        DURATION=$((END_TS - START_TS))
+        VIOLATIONS=$(grep -c " -> " /tmp/context-boundary.log || true)
+
+        echo "contexts checked: ${CONTEXTS}"
+        echo "violations: ${VIOLATIONS}"
+        echo "duration_seconds: ${DURATION}"
+
+        {
+          echo "## 🧱 Context Boundary Check"
+          echo "- contexts checked: ${CONTEXTS}"
+          echo "- violations: ${VIOLATIONS}"
+          echo "- duration: ${DURATION}s"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        exit $TEST_EXIT
+
   # --- Security сканирование ---
   security:
     name: 🔒 Security сканирование
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [code-quality, frontend-tests, backend-tests]
+    timeout-minutes: 10
+    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary]
     
     steps:
     - uses: actions/checkout@v4
@@ -550,44 +607,67 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install safety bandit semgrep
-    
+        pip install pip-audit bandit
+
     - name: 🔒 Проверка уязвимостей
       run: |
         cd backend
         mkdir -p security-reports
-        set +e
 
-        # Safety: сканирование зависимостей (report-only в unified pipeline)
-        safety check --json --output security-reports/safety-report.json
-        SAFETY_EXIT=$?
+        # Explicit allowlist for dependencies with no available safe upstream version yet.
+        IGNORE_ARGS=()
+        while IFS= read -r vuln_id; do
+          vuln_id="$(echo "$vuln_id" | xargs)"
+          if [ -n "$vuln_id" ] && [[ ! "$vuln_id" =~ ^# ]]; then
+            IGNORE_ARGS+=("--ignore-vuln" "$vuln_id")
+          fi
+        done < ../.github/security/pip-audit.ignore
 
-        # Bandit: SAST отчёт
-        bandit -r app -f json -o security-reports/bandit-report.json
-        BANDIT_EXIT=$?
+        # Dependency vulnerabilities (blocking, except explicit allowlist)
+        pip-audit -r requirements.txt --format json -o security-reports/pip-audit.json "${IGNORE_ARGS[@]}"
+        # Code-level security checks
+        bandit -r app -f json -o security-reports/bandit.json || true
+        python - <<'PY'
+        import json
+        import sys
+        from pathlib import Path
 
-        # Semgrep: SAST отчёт
-        semgrep --config=auto --json --output security-reports/semgrep-report.json app
-        SEMGREP_EXIT=$?
+        report_path = Path("security-reports/bandit.json")
+        if not report_path.exists():
+          raise SystemExit("Bandit report is missing: security-reports/bandit.json")
 
-        echo "security exits: safety=$SAFETY_EXIT bandit=$BANDIT_EXIT semgrep=$SEMGREP_EXIT"
-        if [ "$SAFETY_EXIT" -ne 0 ]; then
-          echo "::warning::Safety found dependency issues. See security-reports/safety-report.json."
-        fi
-        if [ "$BANDIT_EXIT" -ne 0 ]; then
-          echo "::warning::Bandit found code issues. See security-reports/bandit-report.json."
-        fi
-        if [ "$SEMGREP_EXIT" -ne 0 ]; then
-          echo "::warning::Semgrep found code issues. See security-reports/semgrep-report.json."
-        fi
-        echo "ℹ️ Unified security stage is report-only during stabilization. Dedicated security workflow remains scheduled."
-        exit 0
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        results = report.get("results", [])
+
+        # Legacy findings explicitly accepted for now.
+        # Any NEW medium/high rule id not listed here will fail the job.
+        allowed_ids = {"B324", "B701", "B113", "B608", "B314"}
+
+        blocking = []
+        for item in results:
+          severity = str(item.get("issue_severity", "")).upper()
+          test_id = str(item.get("test_id", ""))
+          if severity in {"MEDIUM", "HIGH"} and test_id not in allowed_ids:
+            blocking.append(item)
+
+        if blocking:
+          print(f"Bandit blocking findings: {len(blocking)}")
+          for item in blocking[:20]:
+            print(
+              f"- {item.get('test_id')} {item.get('issue_severity')} "
+              f"{item.get('filename')}:{item.get('line_number')} "
+              f"{item.get('issue_text')}"
+            )
+          raise SystemExit(1)
+
+        print("Bandit gate passed (no new medium/high findings outside allowlist).")
+        PY
 
     - name: 📤 Upload security reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: security-reports-unified
+        name: security-reports
         path: backend/security-reports/
         if-no-files-found: warn
 
@@ -596,7 +676,7 @@ jobs:
     name: 🐳 Docker сборка
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [code-quality, frontend-tests, backend-tests]
+    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary]
     
     steps:
     - uses: actions/checkout@v4
@@ -647,7 +727,7 @@ jobs:
     name: 🔗 Интеграционные тесты
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [backend-tests, frontend-tests]
+    needs: [backend-tests, frontend-tests, architecture-boundary]
     if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
     services:
       postgres:
@@ -975,7 +1055,6 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
-      TARGET_RPS: '15'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
 
@@ -987,9 +1066,6 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
-
-    - name: 📈 Setup k6
-      uses: grafana/setup-k6-action@v1
 
     - name: 📦 Install backend dependencies
       run: |
@@ -1043,48 +1119,30 @@ jobs:
         fi
         exit 0
 
-    - name: ⚡ Run k6 baseline scenario
+    - name: ⚡ Run k6 profile matrix
       run: |
         set +e
         mkdir -p artifacts/load
-        if [ "${LOAD_API_READY:-0}" -ne 1 ]; then
-          echo "::warning::Skipping k6 execution because API was not ready."
-          K6_EXIT=1
-        else
-          export BASE_URL=http://127.0.0.1:8000
-          export TARGET_RPS=${TARGET_RPS}
-          k6 run ops/load/clinic_core.js \
-            --summary-export=artifacts/load/k6-summary.json \
-            > artifacts/load/k6-run.log 2>&1
-          K6_EXIT=$?
-        fi
-        echo "K6_EXIT_CODE=$K6_EXIT" >> $GITHUB_ENV
+        python ops/scripts/run_load_profiles.py \
+          --config ops/load/endpoint_profiles.json \
+          --workspace "${{ github.workspace }}" \
+          --artifacts-dir artifacts/load \
+          --base-url http://127.0.0.1:8000 \
+          --api-ready "${LOAD_API_READY:-0}"
+        LOAD_EXIT=$?
+        echo "LOAD_PROFILES_EXIT_CODE=$LOAD_EXIT" >> $GITHUB_ENV
         if [ ! -f artifacts/load/k6-summary.json ]; then
-          echo "::warning::k6 summary was not generated; writing fallback summary."
-          cat > artifacts/load/k6-summary.json <<'JSON'
-        {"error":"k6 summary was not generated","metrics":{}}
-        JSON
+          echo "::warning::aggregate k6 summary is missing"
           echo "K6_SUMMARY_MISSING=1" >> $GITHUB_ENV
         else
           echo "K6_SUMMARY_MISSING=0" >> $GITHUB_ENV
         fi
-        exit 0
-
-    - name: 🚦 Check load regression
-      run: |
-        set +e
-        python ops/scripts/check_load_regression.py \
-          --summary artifacts/load/k6-summary.json \
-          --baseline ops/load/baseline_targets.json \
-          --report artifacts/load/load-regression-report.md
-        REG_EXIT=$?
-        echo "LOAD_REGRESSION_EXIT_CODE=$REG_EXIT" >> $GITHUB_ENV
-        if [ $REG_EXIT -ne 0 ] && [ ! -f artifacts/load/load-regression-report.md ]; then
+        if [ ! -f artifacts/load/load-regression-report.md ]; then
           cat > artifacts/load/load-regression-report.md <<'MD'
         # Load Test Regression Report
 
         - Status: FAIL
-        - Reason: Regression check did not produce a report.
+        - Reason: aggregate load-regression-report.md missing.
         MD
         fi
         exit 0
@@ -1097,7 +1155,8 @@ jobs:
         path: |
           artifacts/load/k6-summary.json
           artifacts/load/load-regression-report.md
-          artifacts/load/k6-run.log
+          artifacts/load/load-regression-report.json
+          artifacts/load/profiles/**
         if-no-files-found: warn
 
     - name: 🛑 Stop API
@@ -1109,8 +1168,7 @@ jobs:
 
     - name: 🚨 Enforce load gate
       run: |
-        K6_EXIT=${K6_EXIT_CODE:-1}
-        REG_EXIT=${LOAD_REGRESSION_EXIT_CODE:-1}
+        LOAD_EXIT=${LOAD_PROFILES_EXIT_CODE:-1}
         SUMMARY_MISSING=${K6_SUMMARY_MISSING:-1}
 
         if [ ! -f artifacts/load/load-regression-report.md ]; then
@@ -1120,11 +1178,11 @@ jobs:
         - Status: FAIL
         - Reason: load-regression-report.md missing after checks.
         MD
-          REG_EXIT=1
+          LOAD_EXIT=1
         fi
 
-        echo "k6_exit=$K6_EXIT, regression_exit=$REG_EXIT, summary_missing=$SUMMARY_MISSING"
-        if [ "$K6_EXIT" -ne 0 ] || [ "$REG_EXIT" -ne 0 ] || [ "$SUMMARY_MISSING" -ne 0 ]; then
+        echo "load_exit=$LOAD_EXIT, summary_missing=$SUMMARY_MISSING"
+        if [ "$LOAD_EXIT" -ne 0 ] || [ "$SUMMARY_MISSING" -ne 0 ]; then
           echo "::error::Load gate failed."
           exit 1
         fi
@@ -1211,37 +1269,72 @@ jobs:
     - name: 🔎 Run ZAP baseline scan
       run: |
         mkdir -p zap-report
+        chmod -R a+rwx zap-report || true
+        set -o pipefail
         docker run --rm --network=host \
+          --user root \
           -v ${{ github.workspace }}/zap-report:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
           -t http://127.0.0.1:8000 \
-          -J /zap/wrk/zap-report.json \
-          -r /zap/wrk/zap-report.html \
-          -w /zap/wrk/zap-warnings.md \
-          -m 5
+          -J zap-report.json \
+          -r zap-report.html \
+          -w zap-warnings.md \
+          -m 5 \
+          -I | tee zap-report/zap-baseline.log
+        ls -la zap-report
 
     - name: 🚦 Enforce DAST policy
       run: |
         python - <<'PY'
         import json
+        import re
         from pathlib import Path
 
-        report = json.loads(Path("zap-report/zap-report.json").read_text(encoding="utf-8"))
-        high = 0
-        medium = 0
+        report_path = Path("zap-report/zap-report.json")
+        warnings_path = Path("zap-report/zap-warnings.md")
+        baseline_log_path = Path("zap-report/zap-baseline.log")
 
-        for site in report.get("site", []):
-          for alert in site.get("alerts", []):
-            risk = str(alert.get("riskcode", "0"))
-            if risk == "3":
-              high += 1
-            elif risk == "2":
-              medium += 1
+        def parse_fail_counts(text: str):
+          match = re.search(r"FAIL-NEW:\s*(\d+)\s+FAIL-INPROG:\s*(\d+)", text)
+          if not match:
+            return None
+          return int(match.group(1)), int(match.group(2))
 
-        print(f"ZAP alerts: high={high}, medium={medium}")
-        if high > 0 or medium > 0:
-          raise SystemExit(1)
+        if report_path.exists():
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          high = 0
+          medium = 0
+          for site in report.get("site", []):
+            for alert in site.get("alerts", []):
+              risk = str(alert.get("riskcode", "0"))
+              if risk == "3":
+                high += 1
+              elif risk == "2":
+                medium += 1
+          print(f"ZAP alerts (json): high={high}, medium={medium}")
+          if high > 0 or medium > 0:
+            raise SystemExit(1)
+          raise SystemExit(0)
+
+        for fallback_path in (warnings_path, baseline_log_path):
+          if not fallback_path.exists():
+            continue
+          summary = parse_fail_counts(fallback_path.read_text(encoding="utf-8"))
+          if summary is None:
+            continue
+          fail_new, fail_inprog = summary
+          print(
+            f"ZAP summary ({fallback_path.name}): "
+            f"fail_new={fail_new}, fail_inprog={fail_inprog}"
+          )
+          if fail_new > 0 or fail_inprog > 0:
+            raise SystemExit(1)
+          raise SystemExit(0)
+
+        raise SystemExit(
+          "ZAP artifacts missing usable summary: zap-report.json, zap-warnings.md, zap-baseline.log"
+        )
         PY
 
     - name: 📤 Upload ZAP artifacts

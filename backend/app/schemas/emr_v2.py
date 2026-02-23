@@ -3,12 +3,12 @@ EMR v2 Schemas - Pydantic models for API
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field
+from pydantic import ConfigDict
 
 from app.schemas.base import ORMModel
-
 
 # =============================================================================
 # EMR Data Structures
@@ -19,27 +19,27 @@ class DiagnosisData(ORMModel):
     """Diagnosis structure within EMR data"""
 
     main: str = Field(default="", max_length=500)
-    icd10_code: Optional[str] = Field(default=None, max_length=16)
-    secondary: List[Dict[str, str]] = Field(default_factory=list)
+    icd10_code: str | None = Field(default=None, max_length=16)
+    secondary: list[dict[str, str]] = Field(default_factory=list)
 
 
 class VitalsData(ORMModel):
     """Vital signs structure"""
 
-    blood_pressure: Optional[Dict[str, int]] = None  # {"systolic": 120, "diastolic": 80}
-    pulse: Optional[int] = Field(default=None, ge=0, le=300)
-    spo2: Optional[int] = Field(default=None, ge=0, le=100)
-    height: Optional[int] = Field(default=None, ge=0, le=300)
-    weight: Optional[float] = Field(default=None, ge=0, le=500)
-    temperature: Optional[float] = Field(default=None, ge=30, le=45)
+    blood_pressure: dict[str, int] | None = None  # {"systolic": 120, "diastolic": 80}
+    pulse: int | None = Field(default=None, ge=0, le=300)
+    spo2: int | None = Field(default=None, ge=0, le=100)
+    height: int | None = Field(default=None, ge=0, le=300)
+    weight: float | None = Field(default=None, ge=0, le=500)
+    temperature: float | None = Field(default=None, ge=30, le=45)
 
 
 class PlanData(ORMModel):
     """Treatment plan structure"""
 
-    examinations: List[str] = Field(default_factory=list)
+    examinations: list[str] = Field(default_factory=list)
     treatment: str = Field(default="", max_length=5000)
-    consultations: List[str] = Field(default_factory=list)
+    consultations: list[str] = Field(default_factory=list)
 
 
 class EMRDataSchema(ORMModel):
@@ -56,7 +56,7 @@ class EMRDataSchema(ORMModel):
     vitals: VitalsData = Field(default_factory=VitalsData)
     plan: PlanData = Field(default_factory=PlanData)
     recommendations: str = Field(default="", max_length=5000)
-    specialty_data: Dict[str, Any] = Field(
+    specialty_data: dict[str, Any] = Field(
         default_factory=dict, description="Specialty-specific fields"
     )
 
@@ -77,7 +77,7 @@ class EMRRecordCreate(EMRRecordBase):
 
     patient_id: int
     visit_id: int
-    data: Dict[str, Any] = Field(default_factory=dict)
+    data: dict[str, Any] = Field(default_factory=dict)
     created_by: int
 
 
@@ -87,11 +87,11 @@ class EMRSaveRequest(ORMModel):
     Includes optimistic locking fields.
     """
 
-    data: Dict[str, Any] = Field(..., description="Complete EMR clinical data")
+    data: dict[str, Any] = Field(..., description="Complete EMR clinical data")
     row_version: int = Field(
         default=0, description="Current row version for optimistic locking"
     )
-    client_session_id: Optional[str] = Field(
+    client_session_id: str | None = Field(
         default=None,
         max_length=64,
         description="Client session UUID for conflict resolution",
@@ -102,15 +102,15 @@ class EMRSaveRequest(ORMModel):
 class EMRSignRequest(ORMModel):
     """Schema for signing EMR"""
 
-    data: Dict[str, Any] = Field(..., description="Final EMR data")
+    data: dict[str, Any] = Field(..., description="Final EMR data")
     row_version: int = Field(..., description="Current row version")
-    client_session_id: Optional[str] = None
+    client_session_id: str | None = None
 
 
 class EMRAmendRequest(ORMModel):
     """Schema for amending signed EMR"""
 
-    data: Dict[str, Any] = Field(..., description="Amended EMR data")
+    data: dict[str, Any] = Field(..., description="Amended EMR data")
     reason: str = Field(
         ..., min_length=10, max_length=1000, description="Reason for amendment (required)"
     )
@@ -121,7 +121,7 @@ class EMRRestoreRequest(ORMModel):
     """Schema for restoring to specific version"""
 
     target_version: int = Field(..., ge=1, description="Version to restore to")
-    reason: Optional[str] = Field(
+    reason: str | None = Field(
         default=None, max_length=1000, description="Reason for restore"
     )
 
@@ -134,20 +134,19 @@ class EMRRecordOut(ORMModel):
     visit_id: int
     version: int
     row_version: int
-    data: Dict[str, Any]
-    diagnosis_main: Optional[str] = None
-    icd10_code: Optional[str] = None
+    data: dict[str, Any]
+    diagnosis_main: str | None = None
+    icd10_code: str | None = None
     status: str
     created_at: datetime
     created_by: int
-    updated_at: Optional[datetime] = None
-    updated_by: Optional[int] = None
-    signed_at: Optional[datetime] = None
-    signed_by: Optional[int] = None
+    updated_at: datetime | None = None
+    updated_by: int | None = None
+    signed_at: datetime | None = None
+    signed_by: int | None = None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRRecordSummary(ORMModel):
@@ -157,14 +156,13 @@ class EMRRecordSummary(ORMModel):
     visit_id: int
     version: int
     status: str
-    diagnosis_main: Optional[str] = None
-    icd10_code: Optional[str] = None
+    diagnosis_main: str | None = None
+    icd10_code: str | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    signed_at: Optional[datetime] = None
+    updated_at: datetime | None = None
+    signed_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================
@@ -178,15 +176,14 @@ class EMRRevisionOut(ORMModel):
     id: int
     emr_id: int
     version: int
-    data: Dict[str, Any]  # DB column name
+    data: dict[str, Any]  # DB column name
     change_type: str
-    change_summary: Optional[str] = None
+    change_summary: str | None = None
     created_by: int  # DB column name
     created_at: datetime  # DB column name
-    client_session_id: Optional[str] = None
+    client_session_id: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRRevisionSummary(ORMModel):
@@ -195,12 +192,11 @@ class EMRRevisionSummary(ORMModel):
     id: int
     version: int
     change_type: str
-    change_summary: Optional[str] = None
+    change_summary: str | None = None
     created_by: int  # DB column name
     created_at: datetime  # DB column name
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EMRHistoryOut(ORMModel):
@@ -208,7 +204,7 @@ class EMRHistoryOut(ORMModel):
 
     emr_id: int
     current_version: int
-    revisions: List[EMRRevisionSummary]
+    revisions: list[EMRRevisionSummary]
 
 
 # =============================================================================
@@ -221,8 +217,8 @@ class FieldChange(ORMModel):
 
     field: str
     change_type: str  # added | removed | modified
-    old_value: Optional[Any] = None
-    new_value: Optional[Any] = None
+    old_value: Any | None = None
+    new_value: Any | None = None
 
 
 class EMRDiffOut(ORMModel):
@@ -231,7 +227,7 @@ class EMRDiffOut(ORMModel):
     emr_id: int
     version_from: int
     version_to: int
-    changes: List[FieldChange]
+    changes: list[FieldChange]
     summary: str  # "3 fields changed"
 
 
@@ -266,9 +262,8 @@ class EMRAuditLogOut(ORMModel):
     action: str
     user_id: int
     user_role: str
-    ip_address: Optional[str] = None
-    extra_data: Optional[Dict[str, Any]] = None
+    ip_address: str | None = None
+    extra_data: dict[str, Any] | None = None
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

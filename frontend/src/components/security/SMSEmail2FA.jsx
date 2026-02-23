@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/native';
 import {
   Mail,
   Phone,
-  Clock,
+
   CheckCircle,
   AlertCircle,
   RefreshCw,
   Send,
-  Shield,
-  Key,
+
+
   Eye,
-  EyeOff
-} from 'lucide-react';
+  EyeOff } from
+'lucide-react';
 import { tokenManager } from '../../utils/tokenManager';
 
 /**
@@ -77,7 +77,7 @@ const SMSEmail2FA = ({
       } else {
         setError(data.detail || 'Ошибка отправки кода');
       }
-    } catch (err) {
+    } catch {
       setError('Ошибка отправки кода');
     } finally {
       setLoading(false);
@@ -117,14 +117,14 @@ const SMSEmail2FA = ({
         }
       } else {
         setError(data.detail || 'Неверный код');
-        setAttempts(prev => prev + 1);
+        setAttempts((prev) => prev + 1);
 
         if (attempts + 1 >= maxAttempts) {
           setError('Превышено количество попыток. Попробуйте позже.');
           setCanResend(false);
         }
       }
-    } catch (err) {
+    } catch {
       setError('Ошибка проверки кода');
     } finally {
       setLoading(false);
@@ -150,11 +150,11 @@ const SMSEmail2FA = ({
   };
 
   const getMethodIcon = () => {
-    return method === 'sms' ? (
-      <Phone className="w-6 h-6 text-blue-600" />
-    ) : (
-      <Mail className="w-6 h-6 text-green-600" />
-    );
+    return method === 'sms' ?
+    <Phone className="w-6 h-6 text-blue-600" /> :
+
+    <Mail className="w-6 h-6 text-green-600" />;
+
   };
 
   const getMethodLabel = () => {
@@ -208,18 +208,18 @@ const SMSEmail2FA = ({
                 placeholder="000000"
                 className="w-full px-4 py-3 text-center text-2xl font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 maxLength={codeLength}
-                disabled={loading}
-              />
+                disabled={loading} />
+              
               <button
                 type="button"
                 onClick={() => setShowCode(!showCode)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showCode ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                
+                {showCode ?
+                <EyeOff className="w-5 h-5" /> :
+
+                <Eye className="w-5 h-5" />
+                }
               </button>
             </div>
           </div>
@@ -229,13 +229,13 @@ const SMSEmail2FA = ({
             <Button
               onClick={verifyCode}
               disabled={loading || code.length !== codeLength || attempts >= maxAttempts}
-              className="w-full"
-            >
-              {loading ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4 mr-2" />
-              )}
+              className="w-full">
+              
+              {loading ?
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> :
+
+              <CheckCircle className="w-4 h-4 mr-2" />
+              }
               Подтвердить код
             </Button>
 
@@ -244,60 +244,60 @@ const SMSEmail2FA = ({
                 onClick={sendCode}
                 disabled={loading || !canResend}
                 variant="outline"
-                className="flex-1"
-              >
+                className="flex-1">
+                
                 <Send className="w-4 h-4 mr-2" />
                 {canResend ? 'Отправить код' : `Повторно через ${formatTime(timeLeft)}`}
               </Button>
 
-              {onCancel && (
-                <Button
-                  onClick={onCancel}
-                  variant="outline"
-                  className="flex-1"
-                >
+              {onCancel &&
+              <Button
+                onClick={onCancel}
+                variant="outline"
+                className="flex-1">
+                
                   Отмена
                 </Button>
-              )}
+              }
             </div>
           </div>
 
           {/* Статус попыток */}
-          {attempts > 0 && attempts < maxAttempts && (
-            <div className="text-center">
+          {attempts > 0 && attempts < maxAttempts &&
+          <div className="text-center">
               <p className="text-sm text-yellow-600">
                 Осталось попыток: {maxAttempts - attempts}
               </p>
             </div>
-          )}
+          }
 
-          {attempts >= maxAttempts && (
-            <div className="text-center">
+          {attempts >= maxAttempts &&
+          <div className="text-center">
               <p className="text-sm text-red-600">
                 Превышено количество попыток. Попробуйте позже.
               </p>
             </div>
-          )}
+          }
         </div>
 
         {/* Уведомления */}
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+        {error &&
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 text-red-600" />
               <span className="text-sm text-red-800">{error}</span>
             </div>
           </div>
-        )}
+        }
 
-        {success && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        {success &&
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center space-x-2">
               <CheckCircle className="w-4 h-4 text-green-600" />
               <span className="text-sm text-green-800">{success}</span>
             </div>
           </div>
-        )}
+        }
 
         {/* Дополнительная информация */}
         <div className="mt-6 pt-4 border-t border-gray-200">
@@ -308,9 +308,8 @@ const SMSEmail2FA = ({
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default SMSEmail2FA;
-

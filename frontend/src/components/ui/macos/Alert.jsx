@@ -1,5 +1,3 @@
-import React from 'react';
-
 const variantStyle = (severity) => {
   switch (severity) {
     case 'success':

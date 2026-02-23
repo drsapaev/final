@@ -6,30 +6,13 @@ import logger from '../utils/logger';
  * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлены SSR checks
  */
 export const usePWA = () => {
-  // SSR protection: возвращаем безопасные значения для серверного рендеринга
+  // SSR protection
   const isClient = typeof window !== 'undefined';
-  
-  if (!isClient) {
-    return {
-      isInstallable: false,
-      isInstalled: false,
-      isOnline: true,
-      isServiceWorkerReady: false,
-      updateAvailable: false,
-      installPWA: () => Promise.resolve(false),
-      updateServiceWorker: () => {},
-      requestNotificationPermission: () => Promise.resolve('not-supported'),
-      sendNotification: () => Promise.resolve(false),
-      cacheUrls: () => {},
-      shouldShowInstallPrompt: () => false,
-      capabilities: {}
-    };
-  }
 
   // ✅ ИСПРАВЛЕНИЕ: Всегда вызываем хуки первыми
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator?.onLine ?? true);
+  const [isOnline, setIsOnline] = useState(isClient ? window.navigator.onLine : true);
   const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);

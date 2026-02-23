@@ -6,16 +6,12 @@
 import logging
 from datetime import date, datetime, timedelta
 from statistics import mean, median
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import and_, asc, desc, func, or_, text
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.patient import Patient
-from app.models.service import Service
 from app.models.visit import Visit
 from app.services.doctor_info_service import get_doctor_info_service
 
@@ -35,9 +31,9 @@ class WaitTimeAnalyticsService:
         self,
         start_date: date,
         end_date: date,
-        department: Optional[str] = None,
-        doctor_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+        doctor_id: int | None = None,
+    ) -> dict[str, Any]:
         """Рассчитывает точное время ожидания за период"""
         try:
             # Получаем данные очередей за период
@@ -120,8 +116,8 @@ class WaitTimeAnalyticsService:
             return self._get_empty_wait_time_stats()
 
     def get_real_time_wait_estimates(
-        self, department: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, department: str | None = None
+    ) -> dict[str, Any]:
         """Получает текущие оценки времени ожидания в реальном времени"""
         try:
             today = date.today()
@@ -225,8 +221,8 @@ class WaitTimeAnalyticsService:
         self,
         start_date: date,
         end_date: date,
-        service_codes: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        service_codes: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Анализ времени ожидания по типам услуг"""
         try:
             # Получаем данные визитов с услугами
@@ -317,9 +313,9 @@ class WaitTimeAnalyticsService:
         self,
         start_date: date,
         end_date: date,
-        department: Optional[str] = None,
-        doctor_id: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        department: str | None = None,
+        doctor_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Получает записи очередей с временными метками"""
         try:
             query = (
@@ -382,7 +378,7 @@ class WaitTimeAnalyticsService:
             logger.error(f"Ошибка получения записей очередей: {e}")
             return []
 
-    def _calculate_entry_wait_time(self, entry: Dict[str, Any]) -> Optional[float]:
+    def _calculate_entry_wait_time(self, entry: dict[str, Any]) -> float | None:
         """Рассчитывает время ожидания для записи в очереди (в минутах)"""
         try:
             created_at = entry.get("created_at")
@@ -409,7 +405,7 @@ class WaitTimeAnalyticsService:
             logger.error(f"Ошибка расчета времени ожидания для записи: {e}")
             return None
 
-    def _calculate_wait_time_stats(self, wait_times: List[float]) -> Dict[str, Any]:
+    def _calculate_wait_time_stats(self, wait_times: list[float]) -> dict[str, Any]:
         """Рассчитывает статистические метрики времени ожидания"""
         if not wait_times:
             return {
@@ -450,7 +446,7 @@ class WaitTimeAnalyticsService:
             logger.error(f"Ошибка расчета статистики времени ожидания: {e}")
             return {"count": 0, "average_minutes": 0}
 
-    def _calculate_std_deviation(self, values: List[float]) -> float:
+    def _calculate_std_deviation(self, values: list[float]) -> float:
         """Рассчитывает стандартное отклонение"""
         if len(values) < 2:
             return 0
@@ -462,9 +458,9 @@ class WaitTimeAnalyticsService:
     def _estimate_current_wait_time(
         self,
         queue: DailyQueue,
-        current_entries: List[OnlineQueueEntry],
+        current_entries: list[OnlineQueueEntry],
         current_time: datetime,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Оценивает текущее время ожидания для очереди"""
         try:
             # Получаем историческое среднее время обслуживания для этого врача
@@ -503,14 +499,14 @@ class WaitTimeAnalyticsService:
                 "next_slot": (current_time + timedelta(minutes=30)).isoformat(),
             }
 
-    def _get_average_service_time(self, doctor_id: Optional[int]) -> float:
+    def _get_average_service_time(self, doctor_id: int | None) -> float:
         """Получает среднее время обслуживания для врача"""
         try:
             if not doctor_id:
                 return 15.0  # Значение по умолчанию
 
             # Получаем данные за последние 30 дней
-            thirty_days_ago = date.today() - timedelta(days=30)
+            _thirty_days_ago = date.today() - timedelta(days=30)
 
             # Здесь можно добавить более сложную логику расчета
             # на основе реальных данных о времени приема
@@ -547,7 +543,7 @@ class WaitTimeAnalyticsService:
             return 1.0
 
     def _calculate_estimate_confidence(
-        self, queue: DailyQueue, current_entries: List[OnlineQueueEntry]
+        self, queue: DailyQueue, current_entries: list[OnlineQueueEntry]
     ) -> float:
         """Рассчитывает уровень уверенности в оценке времени ожидания"""
         try:
@@ -575,7 +571,7 @@ class WaitTimeAnalyticsService:
             logger.error(f"Ошибка расчета уверенности оценки: {e}")
             return 0.5
 
-    def _calculate_service_wait_time(self, result) -> Optional[float]:
+    def _calculate_service_wait_time(self, result) -> float | None:
         """Рассчитывает время ожидания для конкретной услуги"""
         try:
             if result.queue_created and result.appointment_time:
@@ -593,8 +589,8 @@ class WaitTimeAnalyticsService:
             return None
 
     def _calculate_service_efficiency(
-        self, wait_times: List[float], total_visits: int
-    ) -> Dict[str, Any]:
+        self, wait_times: list[float], total_visits: int
+    ) -> dict[str, Any]:
         """Рассчитывает эффективность обслуживания для услуги"""
         if not wait_times or total_visits == 0:
             return {"efficiency_score": 0, "coverage": 0}
@@ -613,8 +609,8 @@ class WaitTimeAnalyticsService:
         }
 
     def _calculate_wait_time_trends(
-        self, daily_stats: Dict[date, List[float]]
-    ) -> Dict[str, Any]:
+        self, daily_stats: dict[date, list[float]]
+    ) -> dict[str, Any]:
         """Рассчитывает тренды времени ожидания"""
         try:
             if not daily_stats:
@@ -652,7 +648,7 @@ class WaitTimeAnalyticsService:
                 "change_percent": round(change_percent, 1),
                 "daily_averages": {
                     day.isoformat(): round(avg, 1)
-                    for day, avg in zip(sorted_days, daily_averages)
+                    for day, avg in zip(sorted_days, daily_averages, strict=False)
                 },
             }
 
@@ -662,10 +658,10 @@ class WaitTimeAnalyticsService:
 
     def _generate_wait_time_recommendations(
         self,
-        wait_times: List[float],
-        department_stats: Dict[str, List[float]],
-        doctor_stats: Dict[str, List[float]],
-    ) -> List[str]:
+        wait_times: list[float],
+        department_stats: dict[str, list[float]],
+        doctor_stats: dict[str, list[float]],
+    ) -> list[str]:
         """Генерирует рекомендации по улучшению времени ожидания"""
         recommendations = []
 
@@ -706,7 +702,7 @@ class WaitTimeAnalyticsService:
 
         return recommendations
 
-    def _find_best_service(self, analytics: Dict[str, Any]) -> Optional[str]:
+    def _find_best_service(self, analytics: dict[str, Any]) -> str | None:
         """Находит услугу с лучшими показателями времени ожидания"""
         try:
             best_service = None
@@ -722,7 +718,7 @@ class WaitTimeAnalyticsService:
         except Exception:
             return None
 
-    def _find_worst_service(self, analytics: Dict[str, Any]) -> Optional[str]:
+    def _find_worst_service(self, analytics: dict[str, Any]) -> str | None:
         """Находит услугу с худшими показателями времени ожидания"""
         try:
             worst_service = None
@@ -738,7 +734,7 @@ class WaitTimeAnalyticsService:
         except Exception:
             return None
 
-    def _generate_service_recommendations(self, analytics: Dict[str, Any]) -> List[str]:
+    def _generate_service_recommendations(self, analytics: dict[str, Any]) -> list[str]:
         """Генерирует рекомендации по улучшению времени ожидания для услуг"""
         recommendations = []
 
@@ -746,7 +742,7 @@ class WaitTimeAnalyticsService:
             return ["Недостаточно данных для анализа услуг"]
 
         # Анализируем каждую услугу
-        for service_code, data in analytics.items():
+        for _service_code, data in analytics.items():
             stats = data.get("wait_time_stats")
             if stats:
                 avg_wait = stats.get("average_minutes", 0)
@@ -761,7 +757,7 @@ class WaitTimeAnalyticsService:
             else ["Все услуги показывают приемлемое время ожидания"]
         )
 
-    def _get_empty_wait_time_stats(self) -> Dict[str, Any]:
+    def _get_empty_wait_time_stats(self) -> dict[str, Any]:
         """Возвращает пустую структуру статистики времени ожидания"""
         return {
             "period": {

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -12,31 +12,31 @@ class EMRBase(ORMModel):
     """Базовая схема EMR"""
 
     appointment_id: int
-    complaints: Optional[str] = Field(None, max_length=5000)
-    anamnesis: Optional[str] = Field(None, max_length=5000)
-    examination: Optional[str] = Field(None, max_length=5000)
-    diagnosis: Optional[str] = Field(None, max_length=1000)
-    icd10: Optional[str] = Field(None, max_length=16)
-    recommendations: Optional[str] = Field(None, max_length=5000)
-    procedures: Optional[List[Dict[str, Any]]] = None
-    attachments: Optional[List[Dict[str, Any]]] = None
+    complaints: str | None = Field(None, max_length=5000)
+    anamnesis: str | None = Field(None, max_length=5000)
+    examination: str | None = Field(None, max_length=5000)
+    diagnosis: str | None = Field(None, max_length=1000)
+    icd10: str | None = Field(None, max_length=16)
+    recommendations: str | None = Field(None, max_length=5000)
+    procedures: list[dict[str, Any]] | None = None
+    attachments: list[dict[str, Any]] | None = None
 
     # Расширенные поля для специализаций
-    vital_signs: Optional[Dict[str, Any]] = None  # Жизненные показатели
-    lab_results: Optional[Dict[str, Any]] = None  # Результаты анализов
-    imaging_results: Optional[Dict[str, Any]] = None  # Результаты исследований
-    medications: Optional[Dict[str, Any]] = None  # Назначенные препараты
-    allergies: Optional[Dict[str, Any]] = None  # Аллергии
-    family_history: Optional[Dict[str, Any]] = None  # Семейный анамнез
-    social_history: Optional[Dict[str, Any]] = None  # Социальный анамнез
+    vital_signs: dict[str, Any] | None = None  # Жизненные показатели
+    lab_results: dict[str, Any] | None = None  # Результаты анализов
+    imaging_results: dict[str, Any] | None = None  # Результаты исследований
+    medications: dict[str, Any] | None = None  # Назначенные препараты
+    allergies: dict[str, Any] | None = None  # Аллергии
+    family_history: dict[str, Any] | None = None  # Семейный анамнез
+    social_history: dict[str, Any] | None = None  # Социальный анамнез
 
     # AI поля
-    ai_suggestions: Optional[Dict[str, Any]] = None  # AI предложения
-    ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)  # Уверенность AI
+    ai_suggestions: dict[str, Any] | None = None  # AI предложения
+    ai_confidence: float | None = Field(None, ge=0.0, le=1.0)  # Уверенность AI
 
     # Шаблоны и специализация
-    template_id: Optional[int] = None  # ID шаблона
-    specialty: Optional[str] = Field(None, max_length=100)  # Специализация
+    template_id: int | None = None  # ID шаблона
+    specialty: str | None = Field(None, max_length=100)  # Специализация
 
     is_draft: bool = True
 
@@ -50,33 +50,33 @@ class EMRCreate(EMRBase):
 class EMRUpdate(ORMModel):
     """Схема обновления EMR"""
 
-    complaints: Optional[str] = Field(None, max_length=5000)
-    anamnesis: Optional[str] = Field(None, max_length=5000)
-    examination: Optional[str] = Field(None, max_length=5000)
-    diagnosis: Optional[str] = Field(None, max_length=1000)
-    icd10: Optional[str] = Field(None, max_length=16)
-    recommendations: Optional[str] = Field(None, max_length=5000)
-    procedures: Optional[List[Dict[str, Any]]] = None
-    attachments: Optional[List[Dict[str, Any]]] = None
+    complaints: str | None = Field(None, max_length=5000)
+    anamnesis: str | None = Field(None, max_length=5000)
+    examination: str | None = Field(None, max_length=5000)
+    diagnosis: str | None = Field(None, max_length=1000)
+    icd10: str | None = Field(None, max_length=16)
+    recommendations: str | None = Field(None, max_length=5000)
+    procedures: list[dict[str, Any]] | None = None
+    attachments: list[dict[str, Any]] | None = None
 
     # Расширенные поля для специализаций
-    vital_signs: Optional[Dict[str, Any]] = None
-    lab_results: Optional[Dict[str, Any]] = None
-    imaging_results: Optional[Dict[str, Any]] = None
-    medications: Optional[Dict[str, Any]] = None
-    allergies: Optional[Dict[str, Any]] = None
-    family_history: Optional[Dict[str, Any]] = None
-    social_history: Optional[Dict[str, Any]] = None
+    vital_signs: dict[str, Any] | None = None
+    lab_results: dict[str, Any] | None = None
+    imaging_results: dict[str, Any] | None = None
+    medications: dict[str, Any] | None = None
+    allergies: dict[str, Any] | None = None
+    family_history: dict[str, Any] | None = None
+    social_history: dict[str, Any] | None = None
 
     # AI поля
-    ai_suggestions: Optional[Dict[str, Any]] = None
-    ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    ai_suggestions: dict[str, Any] | None = None
+    ai_confidence: float | None = Field(None, ge=0.0, le=1.0)
 
     # Шаблоны и специализация
-    template_id: Optional[int] = None
-    specialty: Optional[str] = Field(None, max_length=100)
+    template_id: int | None = None
+    specialty: str | None = Field(None, max_length=100)
 
-    is_draft: Optional[bool] = None
+    is_draft: bool | None = None
 
 
 class EMR(EMRBase):
@@ -84,8 +84,8 @@ class EMR(EMRBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    saved_at: Optional[datetime] = None
+    updated_at: datetime | None = None
+    saved_at: datetime | None = None
 
 
 class MedicationItem(ORMModel):
@@ -95,7 +95,7 @@ class MedicationItem(ORMModel):
     dosage: str = Field(..., max_length=100)
     frequency: str = Field(..., max_length=100)
     duration: str = Field(..., max_length=100)
-    instructions: Optional[str] = Field(None, max_length=500)
+    instructions: str | None = Field(None, max_length=500)
     quantity: int = Field(default=1, ge=1)
 
 
@@ -104,9 +104,9 @@ class PrescriptionBase(ORMModel):
 
     appointment_id: int
     emr_id: int
-    medications: Optional[List[MedicationItem]] = None
-    instructions: Optional[str] = Field(None, max_length=2000)
-    doctor_notes: Optional[str] = Field(None, max_length=1000)
+    medications: list[MedicationItem] | None = None
+    instructions: str | None = Field(None, max_length=2000)
+    doctor_notes: str | None = Field(None, max_length=1000)
     is_draft: bool = True
 
 
@@ -119,10 +119,10 @@ class PrescriptionCreate(PrescriptionBase):
 class PrescriptionUpdate(ORMModel):
     """Схема обновления рецепта"""
 
-    medications: Optional[List[MedicationItem]] = None
-    instructions: Optional[str] = Field(None, max_length=2000)
-    doctor_notes: Optional[str] = Field(None, max_length=1000)
-    is_draft: Optional[bool] = None
+    medications: list[MedicationItem] | None = None
+    instructions: str | None = Field(None, max_length=2000)
+    doctor_notes: str | None = Field(None, max_length=1000)
+    is_draft: bool | None = None
 
 
 class Prescription(PrescriptionBase):
@@ -130,6 +130,6 @@ class Prescription(PrescriptionBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    saved_at: Optional[datetime] = None
-    printed_at: Optional[datetime] = None
+    updated_at: datetime | None = None
+    saved_at: datetime | None = None
+    printed_at: datetime | None = None

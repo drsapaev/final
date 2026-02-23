@@ -8,7 +8,7 @@ import os
 import socket
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import serial
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -62,11 +62,11 @@ class PrintService:
     async def print_document(
         self,
         document_type: str,
-        document_data: Dict[str, Any],
-        printer_name: Optional[str] = None,
-        template_id: Optional[int] = None,
-        user: Optional[User] = None,
-    ) -> Dict[str, Any]:
+        document_data: dict[str, Any],
+        printer_name: str | None = None,
+        template_id: int | None = None,
+        user: User | None = None,
+    ) -> dict[str, Any]:
         """
         Основной метод печати документа
         """
@@ -130,8 +130,8 @@ class PrintService:
             }
 
     def _get_printer(
-        self, printer_name: Optional[str], document_type: str
-    ) -> Optional[PrinterConfig]:
+        self, printer_name: str | None, document_type: str
+    ) -> PrinterConfig | None:
         """Найти принтер по имени или типу документа"""
         if printer_name:
             return crud_print.get_printer_by_name(self.db, printer_name)
@@ -140,8 +140,8 @@ class PrintService:
             return crud_print.get_default_printer_for_type(self.db, document_type)
 
     def _get_template(
-        self, template_id: Optional[int], document_type: str, printer_id: int
-    ) -> Optional[PrintTemplate]:
+        self, template_id: int | None, document_type: str, printer_id: int
+    ) -> PrintTemplate | None:
         """Найти шаблон по ID или типу документа"""
         if template_id:
             return crud_print.get_print_template(self.db, template_id)
@@ -150,7 +150,7 @@ class PrintService:
                 self.db, document_type, printer_id
             )
 
-    def _render_template(self, template: PrintTemplate, data: Dict[str, Any]) -> str:
+    def _render_template(self, template: PrintTemplate, data: dict[str, Any]) -> str:
         """Рендерить шаблон с данными"""
         try:
             jinja_template = self.jinja_env.from_string(template.template_content)
@@ -160,11 +160,11 @@ class PrintService:
 
     def _create_print_job(
         self,
-        user_id: Optional[int],
+        user_id: int | None,
         printer_id: int,
         template_id: int,
         document_type: str,
-        document_data: Dict[str, Any],
+        document_data: dict[str, Any],
     ) -> PrintJob:
         """Создать задание печати"""
         job_data = {
@@ -180,7 +180,7 @@ class PrintService:
         return crud_print.create_print_job(self.db, job_data)
 
     def _update_print_job(
-        self, job_id: int, status: str, error_message: Optional[str] = None
+        self, job_id: int, status: str, error_message: str | None = None
     ):
         """Обновить статус задания печати"""
         update_data = {
@@ -197,7 +197,7 @@ class PrintService:
 
     async def _print_escpos(
         self, printer: PrinterConfig, content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Печать на ESC/POS принтере (термопринтер)
         """
@@ -218,7 +218,7 @@ class PrintService:
 
     async def _print_network_escpos(
         self, printer: PrinterConfig, content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Печать через сеть (TCP/IP)"""
         try:
             # Кодируем контент
@@ -250,7 +250,7 @@ class PrintService:
 
     async def _print_usb_escpos(
         self, printer: PrinterConfig, content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Печать через USB"""
         try:
             if not printer.device_path:
@@ -281,7 +281,7 @@ class PrintService:
 
     async def _print_serial_escpos(
         self, printer: PrinterConfig, content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Печать через последовательный порт"""
         try:
             if not printer.device_path:
@@ -312,12 +312,11 @@ class PrintService:
 
     async def _print_pdf(
         self, printer: PrinterConfig, content: str, paper_size: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Печать PDF документов (A4/A5)
         """
         try:
-            import subprocess
             import tempfile
 
             from app.services.pdf_service import get_pdf_service
@@ -372,7 +371,7 @@ class PrintService:
 
     async def _print_pdf_network(
         self, printer: PrinterConfig, file_path: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Печать PDF через сеть"""
         try:
             # Валидация пути к файлу (только безопасные символы)
@@ -426,17 +425,16 @@ class PrintService:
             else:
                 raise Exception(f"Ошибка lp команды: {stderr.decode()}")
 
-        except Exception as e:
+        except Exception:
             # Fallback: копируем файл в сетевую папку принтера
             return await self._print_pdf_fallback(printer, file_path)
 
     async def _print_pdf_local(
         self, printer: PrinterConfig, file_path: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Печать PDF на локальном принтере"""
         try:
             import platform
-            import shlex
 
             # Валидация пути к файлу (только безопасные символы)
             if not all(
@@ -484,7 +482,7 @@ class PrintService:
 
     async def _print_pdf_fallback(
         self, printer: PrinterConfig, file_path: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fallback метод для PDF печати"""
         return {
             "status": "queued",
@@ -494,7 +492,7 @@ class PrintService:
 
     # ===================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====================
 
-    def get_printer_status(self, printer_name: str) -> Dict[str, Any]:
+    def get_printer_status(self, printer_name: str) -> dict[str, Any]:
         """Получить статус принтера"""
         printer = crud_print.get_printer_by_name(self.db, printer_name)
 
@@ -528,12 +526,12 @@ class PrintService:
 
     async def generate_receipt(
         self,
-        payment_id: Optional[int] = None,
-        visit_id: Optional[int] = None,
-        payment_data: Optional[Dict[str, Any]] = None,
-        printer_name: Optional[str] = None,
-        user: Optional[User] = None,
-    ) -> Dict[str, Any]:
+        payment_id: int | None = None,
+        visit_id: int | None = None,
+        payment_data: dict[str, Any] | None = None,
+        printer_name: str | None = None,
+        user: User | None = None,
+    ) -> dict[str, Any]:
         """
         Генерация чека (SSOT).
 
@@ -627,12 +625,12 @@ class PrintService:
 
     async def generate_ticket(
         self,
-        queue_entry_id: Optional[int] = None,
-        visit_id: Optional[int] = None,
-        ticket_data: Optional[Dict[str, Any]] = None,
-        printer_name: Optional[str] = None,
-        user: Optional[User] = None,
-    ) -> Dict[str, Any]:
+        queue_entry_id: int | None = None,
+        visit_id: int | None = None,
+        ticket_data: dict[str, Any] | None = None,
+        printer_name: str | None = None,
+        user: User | None = None,
+    ) -> dict[str, Any]:
         """
         Генерация талона очереди (SSOT).
 
@@ -722,10 +720,10 @@ class PrintService:
     def get_print_template(
         self,
         document_type: str,
-        printer_id: Optional[int] = None,
-        template_id: Optional[int] = None,
+        printer_id: int | None = None,
+        template_id: int | None = None,
         language: str = "ru",
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Получить шаблон печати (SSOT).
 
@@ -760,7 +758,7 @@ class PrintService:
             ),
         }
 
-    def test_print(self, printer_name: str) -> Dict[str, Any]:
+    def test_print(self, printer_name: str) -> dict[str, Any]:
         """Тестовая печать"""
         test_data = {
             "clinic_name": "ТЕСТОВАЯ КЛИНИКА",
@@ -782,7 +780,7 @@ class PrintService:
 
 
 # Глобальный экземпляр сервиса (будет инициализирован в зависимостях)
-print_service: Optional[PrintService] = None
+print_service: PrintService | None = None
 
 
 def get_print_service() -> PrintService:

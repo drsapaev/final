@@ -1,5 +1,5 @@
-import React from 'react';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
+import PropTypes from 'prop-types';
 import { Card, Badge } from './ui/native';
 import { 
   APPOINTMENT_STATUS, 
@@ -183,6 +183,12 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
       )}
     </Card>
   );
+};
+
+VisitTimeline.propTypes = {
+  appointment: PropTypes.object,
+  emr: PropTypes.object,
+  prescription: PropTypes.object
 };
 
 export default VisitTimeline;

@@ -5,7 +5,7 @@ MCP сервер для анализа медицинских изображен
 import base64
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..ai.ai_manager import AIProviderType, get_ai_manager
 from .base_server import BaseMCPServer, MCPResource, MCPTool
@@ -31,7 +31,7 @@ class MedicalImagingMCPServer(BaseMCPServer):
         """Завершение работы сервера"""
         logger.info("Medical Imaging MCP Server shutting down")
 
-    def _load_imaging_types(self) -> Dict[str, Dict[str, Any]]:
+    def _load_imaging_types(self) -> dict[str, dict[str, Any]]:
         """Загрузка типов медицинских изображений"""
         return {
             "xray": {
@@ -83,7 +83,7 @@ class MedicalImagingMCPServer(BaseMCPServer):
             },
         }
 
-    def _load_analysis_templates(self) -> Dict[str, Dict[str, Any]]:
+    def _load_analysis_templates(self) -> dict[str, dict[str, Any]]:
         """Загрузка шаблонов анализа"""
         return {
             "chest_xray": {
@@ -140,11 +140,11 @@ class MedicalImagingMCPServer(BaseMCPServer):
         self,
         image_data: str,  # Base64 encoded
         image_type: str,
-        modality: Optional[str] = None,
-        clinical_context: Optional[str] = None,
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        modality: str | None = None,
+        clinical_context: str | None = None,
+        patient_info: dict[str, Any] | None = None,
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """
         Анализ медицинского изображения
 
@@ -243,10 +243,10 @@ class MedicalImagingMCPServer(BaseMCPServer):
     async def analyze_skin_lesion(
         self,
         image_data: str,
-        lesion_info: Optional[Dict[str, Any]] = None,
-        patient_history: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        lesion_info: dict[str, Any] | None = None,
+        patient_history: dict[str, Any] | None = None,
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """
         Анализ кожных образований
 
@@ -307,8 +307,8 @@ class MedicalImagingMCPServer(BaseMCPServer):
         image1_data: str,
         image2_data: str,
         comparison_type: str,  # "progression", "before_after", "bilateral"
-        time_interval: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        time_interval: str | None = None,
+    ) -> dict[str, Any]:
         """
         Сравнение двух медицинских изображений
 
@@ -323,8 +323,8 @@ class MedicalImagingMCPServer(BaseMCPServer):
         """
         try:
             # Декодируем изображения
-            image1_bytes = base64.b64decode(image1_data)
-            image2_bytes = base64.b64decode(image2_data)
+            _image1_bytes = base64.b64decode(image1_data)
+            _image2_bytes = base64.b64decode(image2_data)
 
             # Базовое сравнение
             comparison = {
@@ -372,7 +372,7 @@ class MedicalImagingMCPServer(BaseMCPServer):
             return {"status": "error", "error": f"Comparison failed: {str(e)}"}
 
     @MCPResource(name="imaging_types", description="Типы медицинских изображений")
-    async def get_imaging_types(self, category: Optional[str] = None) -> Dict[str, Any]:
+    async def get_imaging_types(self, category: str | None = None) -> dict[str, Any]:
         """
         Получение информации о типах изображений
 
@@ -396,8 +396,8 @@ class MedicalImagingMCPServer(BaseMCPServer):
 
     @MCPResource(name="analysis_templates", description="Шаблоны анализа изображений")
     async def get_analysis_templates(
-        self, template_type: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, template_type: str | None = None
+    ) -> dict[str, Any]:
         """
         Получение шаблонов анализа
 
@@ -425,7 +425,7 @@ class MedicalImagingMCPServer(BaseMCPServer):
     @MCPResource(
         name="quality_criteria", description="Критерии качества медицинских изображений"
     )
-    async def get_quality_criteria(self) -> Dict[str, Any]:
+    async def get_quality_criteria(self) -> dict[str, Any]:
         """Получение критериев качества изображений"""
         return {
             "criteria": {
@@ -447,8 +447,8 @@ class MedicalImagingMCPServer(BaseMCPServer):
         }
 
     def _structure_analysis(
-        self, raw_analysis: Dict[str, Any], image_type: str, modality: Optional[str]
-    ) -> Dict[str, Any]:
+        self, raw_analysis: dict[str, Any], image_type: str, modality: str | None
+    ) -> dict[str, Any]:
         """Структурирование результатов анализа"""
         structured = {"findings": [], "impressions": [], "recommendations": []}
 
@@ -477,8 +477,8 @@ class MedicalImagingMCPServer(BaseMCPServer):
         return structured
 
     def _assess_skin_lesion_risk(
-        self, analysis_result: Dict[str, Any], lesion_info: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, analysis_result: dict[str, Any], lesion_info: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Оценка риска кожного образования по ABCDE"""
         risk_score = 0
         criteria = {
@@ -541,8 +541,8 @@ class MedicalImagingMCPServer(BaseMCPServer):
         return interpretations.get(risk_level, "Требуется оценка специалиста")
 
     def _generate_skin_recommendations(
-        self, risk_assessment: Dict[str, Any], patient_history: Optional[Dict[str, Any]]
-    ) -> List[str]:
+        self, risk_assessment: dict[str, Any], patient_history: dict[str, Any] | None
+    ) -> list[str]:
         """Генерация рекомендаций по кожным образованиям"""
         recommendations = []
 

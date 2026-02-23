@@ -8,40 +8,40 @@
  * - Inappropriate content
  */
 
-import { sanitizeAIContent, sanitizeHTML } from './sanitizer';
+import { sanitizeAIContent } from './sanitizer';
 import logger from './logger';
 
 /**
  * Suspicious patterns that might indicate prompt injection or malicious content
  */
 const SUSPICIOUS_PATTERNS = [
-  // Script injection
-  /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
-  /javascript:/gi,
-  /on\w+\s*=/gi, // onclick, onerror, etc.
+// Script injection
+/<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+/javascript:/gi,
+/on\w+\s*=/gi, // onclick, onerror, etc.
 
-  // Iframe/embed injection
-  /<iframe[\s\S]*?>/gi,
-  /<embed[\s\S]*?>/gi,
-  /<object[\s\S]*?>/gi,
+// Iframe/embed injection
+/<iframe[\s\S]*?>/gi,
+/<embed[\s\S]*?>/gi,
+/<object[\s\S]*?>/gi,
 
-  // Data URIs (potential XSS)
-  /data:text\/html/gi,
-  /data:application\/javascript/gi,
+// Data URIs (potential XSS)
+/data:text\/html/gi,
+/data:application\/javascript/gi,
 
-  // Prompt injection patterns
-  /ignore\s+previous\s+instructions/gi,
-  /disregard\s+all\s+prior\s+commands/gi,
-  /system\s*:\s*you\s+are/gi,
+// Prompt injection patterns
+/ignore\s+previous\s+instructions/gi,
+/disregard\s+all\s+prior\s+commands/gi,
+/system\s*:\s*you\s+are/gi,
 
-  // SQL injection patterns
-  /;\s*drop\s+table/gi,
-  /union\s+select/gi,
+// SQL injection patterns
+/;\s*drop\s+table/gi,
+/union\s+select/gi,
 
-  // Command injection
-  /&&\s*rm\s+-rf/gi,
-  /;\s*curl\s+/gi
-];
+// Command injection
+/&&\s*rm\s+-rf/gi,
+/;\s*curl\s+/gi];
+
 
 /**
  * Medical data schemas for validation
@@ -136,7 +136,7 @@ function sanitizeAIResponseRecursive(obj, maxDepth = 5, currentDepth = 0) {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeAIResponseRecursive(item, maxDepth, currentDepth + 1));
+    return obj.map((item) => sanitizeAIResponseRecursive(item, maxDepth, currentDepth + 1));
   }
 
   if (typeof obj === 'object' && obj !== null) {
@@ -187,7 +187,7 @@ function validateAgainstSchema(data, schema) {
     const validated = {};
 
     for (const [key, rule] of Object.entries(schema)) {
-      if (data.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
         validated[key] = validateField(data[key], rule);
       } else if (rule.required) {
         throw new Error(`Required field missing: ${key}`);
@@ -245,7 +245,7 @@ function validateField(value, rule) {
 
     // Validate items
     if (rule.items) {
-      value = value.map(item => validateField(item, rule.items));
+      value = value.map((item) => validateField(item, rule.items));
     }
   }
 
@@ -266,30 +266,30 @@ export function validateICD10Suggestions(suggestions) {
     return [];
   }
 
-  return suggestions
-    .filter(suggestion => {
-      // Must have code and description
-      if (!suggestion.code || !suggestion.description) {
-        logger.warn('[AI Validator] Invalid ICD10 suggestion: missing code or description');
-        return false;
-      }
+  return suggestions.
+  filter((suggestion) => {
+    // Must have code and description
+    if (!suggestion.code || !suggestion.description) {
+      logger.warn('[AI Validator] Invalid ICD10 suggestion: missing code or description');
+      return false;
+    }
 
-      // Validate ICD-10 code format
-      if (!MEDICAL_SCHEMAS.icd10_code.pattern.test(suggestion.code)) {
-        logger.warn(`[AI Validator] Invalid ICD10 code format: ${suggestion.code}`);
-        return false;
-      }
+    // Validate ICD-10 code format
+    if (!MEDICAL_SCHEMAS.icd10_code.pattern.test(suggestion.code)) {
+      logger.warn(`[AI Validator] Invalid ICD10 code format: ${suggestion.code}`);
+      return false;
+    }
 
-      return true;
-    })
-    .map(suggestion => ({
-      code: sanitizeAIString(suggestion.code.toUpperCase()),
-      description: sanitizeAIString(suggestion.description),
-      confidence: typeof suggestion.confidence === 'number'
-        ? Math.min(Math.max(suggestion.confidence, 0), 1)
-        : 0.5,
-      category: suggestion.category ? sanitizeAIString(suggestion.category) : null
-    }));
+    return true;
+  }).
+  map((suggestion) => ({
+    code: sanitizeAIString(suggestion.code.toUpperCase()),
+    description: sanitizeAIString(suggestion.description),
+    confidence: typeof suggestion.confidence === 'number' ?
+    Math.min(Math.max(suggestion.confidence, 0), 1) :
+    0.5,
+    category: suggestion.category ? sanitizeAIString(suggestion.category) : null
+  }));
 }
 
 /**
@@ -301,35 +301,35 @@ export function validateMedicationRecommendations(medications) {
     return [];
   }
 
-  return medications
-    .filter(med => {
-      // Must have name
-      if (!med.name) {
-        logger.warn('[AI Validator] Invalid medication: missing name');
-        return false;
-      }
+  return medications.
+  filter((med) => {
+    // Must have name
+    if (!med.name) {
+      logger.warn('[AI Validator] Invalid medication: missing name');
+      return false;
+    }
 
-      // Validate medication name
-      const nameSchema = MEDICAL_SCHEMAS.medication_name;
-      if (med.name.length < nameSchema.minLength ||
-          med.name.length > nameSchema.maxLength ||
-          !nameSchema.pattern.test(med.name)) {
-        logger.warn(`[AI Validator] Invalid medication name: ${med.name}`);
-        return false;
-      }
+    // Validate medication name
+    const nameSchema = MEDICAL_SCHEMAS.medication_name;
+    if (med.name.length < nameSchema.minLength ||
+    med.name.length > nameSchema.maxLength ||
+    !nameSchema.pattern.test(med.name)) {
+      logger.warn(`[AI Validator] Invalid medication name: ${med.name}`);
+      return false;
+    }
 
-      return true;
-    })
-    .map(med => ({
-      name: sanitizeAIString(med.name),
-      dosage: med.dosage ? sanitizeAIString(String(med.dosage)) : null,
-      frequency: med.frequency ? sanitizeAIString(String(med.frequency)) : null,
-      duration: med.duration ? sanitizeAIString(String(med.duration)) : null,
-      instructions: med.instructions ? sanitizeAIString(med.instructions) : null,
-      warnings: Array.isArray(med.warnings)
-        ? med.warnings.map(w => sanitizeAIString(String(w)))
-        : []
-    }));
+    return true;
+  }).
+  map((med) => ({
+    name: sanitizeAIString(med.name),
+    dosage: med.dosage ? sanitizeAIString(String(med.dosage)) : null,
+    frequency: med.frequency ? sanitizeAIString(String(med.frequency)) : null,
+    duration: med.duration ? sanitizeAIString(String(med.duration)) : null,
+    instructions: med.instructions ? sanitizeAIString(med.instructions) : null,
+    warnings: Array.isArray(med.warnings) ?
+    med.warnings.map((w) => sanitizeAIString(String(w))) :
+    []
+  }));
 }
 
 /**
@@ -391,25 +391,25 @@ export function validateClinicalRecommendations(recommendations) {
   }
 
   return {
-    differential_diagnosis: Array.isArray(recommendations.differential_diagnosis)
-      ? recommendations.differential_diagnosis.map(d => sanitizeAIString(String(d)))
-      : [],
+    differential_diagnosis: Array.isArray(recommendations.differential_diagnosis) ?
+    recommendations.differential_diagnosis.map((d) => sanitizeAIString(String(d))) :
+    [],
 
-    recommended_tests: Array.isArray(recommendations.recommended_tests)
-      ? recommendations.recommended_tests.map(t => sanitizeAIString(String(t)))
-      : [],
+    recommended_tests: Array.isArray(recommendations.recommended_tests) ?
+    recommendations.recommended_tests.map((t) => sanitizeAIString(String(t))) :
+    [],
 
-    red_flags: Array.isArray(recommendations.red_flags)
-      ? recommendations.red_flags.map(f => sanitizeAIString(String(f)))
-      : [],
+    red_flags: Array.isArray(recommendations.red_flags) ?
+    recommendations.red_flags.map((f) => sanitizeAIString(String(f))) :
+    [],
 
-    treatment_options: Array.isArray(recommendations.treatment_options)
-      ? recommendations.treatment_options.map(o => sanitizeAIString(String(o)))
-      : [],
+    treatment_options: Array.isArray(recommendations.treatment_options) ?
+    recommendations.treatment_options.map((o) => sanitizeAIString(String(o))) :
+    [],
 
-    urgency_level: recommendations.urgency_level
-      ? sanitizeAIString(String(recommendations.urgency_level))
-      : 'routine'
+    urgency_level: recommendations.urgency_level ?
+    sanitizeAIString(String(recommendations.urgency_level)) :
+    'routine'
   };
 }
 
@@ -423,12 +423,12 @@ export function validateAIChatMessage(message) {
 
   return {
     content: sanitizeAIString(String(message.content || '')),
-    role: ['user', 'assistant', 'system'].includes(message.role)
-      ? message.role
-      : 'assistant',
-    timestamp: message.timestamp instanceof Date
-      ? message.timestamp
-      : new Date(),
+    role: ['user', 'assistant', 'system'].includes(message.role) ?
+    message.role :
+    'assistant',
+    timestamp: message.timestamp instanceof Date ?
+    message.timestamp :
+    new Date(),
     metadata: message.metadata ? sanitizeAIResponseRecursive(message.metadata, 3) : null
   };
 }
@@ -440,14 +440,14 @@ export function detectPromptInjection(text) {
   if (typeof text !== 'string') return false;
 
   const injectionPatterns = [
-    /ignore\s+(previous|prior|all)\s+(instructions|commands|prompts)/gi,
-    /disregard\s+(previous|all)\s+(instructions|commands)/gi,
-    /new\s+instructions:/gi,
-    /system\s*:\s*(you\s+are|act\s+as|pretend)/gi,
-    /\/\s*system/gi,
-    /<\|im_start\|>/gi,
-    /<\|im_end\|>/gi
-  ];
+  /ignore\s+(previous|prior|all)\s+(instructions|commands|prompts)/gi,
+  /disregard\s+(previous|all)\s+(instructions|commands)/gi,
+  /new\s+instructions:/gi,
+  /system\s*:\s*(you\s+are|act\s+as|pretend)/gi,
+  /\/\s*system/gi,
+  /<\|im_start\|>/gi,
+  /<\|im_end\|>/gi];
+
 
   for (const pattern of injectionPatterns) {
     if (pattern.test(text)) {

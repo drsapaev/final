@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -11,8 +12,8 @@ const Table = React.forwardRef(({
   style = {},
   variant = 'default',
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
   const tableStyles = {
     width: '100%',
@@ -32,11 +33,11 @@ const Table = React.forwardRef(({
       ref={ref}
       className={`mac-table mac-table--${variant} ${className}`}
       style={tableStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </table>
-  );
+    </table>);
+
 });
 
 /**
@@ -59,11 +60,11 @@ const TableHead = React.forwardRef(({
       ref={ref}
       className={`mac-table-head ${className}`}
       style={headStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </thead>
-  );
+    </thead>);
+
 });
 
 /**
@@ -80,11 +81,11 @@ const TableBody = React.forwardRef(({
       ref={ref}
       className={`mac-table-body ${className}`}
       style={style}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </tbody>
-  );
+    </tbody>);
+
 });
 
 /**
@@ -128,11 +129,11 @@ const TableRow = React.forwardRef(({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </tr>
-  );
+    </tr>);
+
 });
 
 /**
@@ -159,11 +160,11 @@ const TableCell = React.forwardRef(({
       ref={ref}
       className={`mac-table-cell mac-table-cell--${align} ${className}`}
       style={cellStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </td>
-  );
+    </td>);
+
 });
 
 /**
@@ -206,18 +207,18 @@ const TableHeaderCell = React.forwardRef(({
       className={`mac-table-header-cell mac-table-header-cell--${align} ${sortable ? 'mac-table-header-cell--sortable' : ''} ${className}`}
       style={headerStyles}
       onClick={handleClick}
-      {...props}
-    >
+      {...props}>
+      
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         {children}
-        {sortable && (
-          <span style={{ fontSize: '12px', opacity: 0.6 }}>
+        {sortable &&
+        <span style={{ fontSize: '12px', opacity: 0.6 }}>
             {sortDirection === 'asc' ? '↑' : sortDirection === 'desc' ? '↓' : '↕'}
           </span>
-        )}
+        }
       </div>
-    </th>
-  );
+    </th>);
+
 });
 
 Table.displayName = 'Table';
@@ -226,6 +227,53 @@ TableBody.displayName = 'TableBody';
 TableRow.displayName = 'TableRow';
 TableCell.displayName = 'TableCell';
 TableHeaderCell.displayName = 'TableHeaderCell';
+
+Table.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  variant: PropTypes.string
+};
+
+TableHead.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+TableBody.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+TableRow.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  hover: PropTypes.bool,
+  selected: PropTypes.bool,
+  onClick: PropTypes.func
+};
+
+TableCell.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  align: PropTypes.string,
+  padding: PropTypes.string
+};
+
+TableHeaderCell.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  align: PropTypes.string,
+  padding: PropTypes.string,
+  sortable: PropTypes.bool,
+  sortDirection: PropTypes.string,
+  onSort: PropTypes.func
+};
 
 export default Table;
 export { TableHead, TableBody, TableRow, TableCell, TableHeaderCell };

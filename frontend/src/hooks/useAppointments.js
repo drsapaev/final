@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const useAppointments = () => {
   const [appointments, setAppointments] = useState([]);
@@ -10,7 +10,7 @@ const useAppointments = () => {
   const [filterDoctor, setFilterDoctor] = useState('');
 
   // Моковые данные для демонстрации
-  const mockAppointments = [
+  const mockAppointments = useMemo(() => [
     {
       id: 1,
       patientId: 1,
@@ -119,7 +119,7 @@ const useAppointments = () => {
       createdAt: '2024-01-28',
       updatedAt: '2024-01-30'
     }
-  ];
+  ], []);
 
   // Загрузка записей
   const loadAppointments = useCallback(async () => {
@@ -135,7 +135,7 @@ const useAppointments = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mockAppointments]);
 
   // Создание записи
   const createAppointment = useCallback(async (appointmentData) => {

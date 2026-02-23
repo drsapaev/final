@@ -4,23 +4,20 @@
 Этот модуль содержит переиспользуемые валидаторы для обеспечения
 бизнес-логики на уровне данных.
 """
-from datetime import date, datetime, timedelta
-from typing import Optional, Any
 import re
+from datetime import date, datetime, timedelta
 
-from pydantic import field_validator
 
-
-def validate_future_date(v: Optional[date]) -> Optional[date]:
+def validate_future_date(v: date | None) -> date | None:
     """
     Проверяет, что дата не в прошлом.
-    
+
     Args:
         v: Дата для проверки
-        
+
     Returns:
         Проверенная дата
-        
+
     Raises:
         ValueError: Если дата в прошлом
     """
@@ -29,16 +26,16 @@ def validate_future_date(v: Optional[date]) -> Optional[date]:
     return v
 
 
-def validate_future_datetime(v: Optional[datetime]) -> Optional[datetime]:
+def validate_future_datetime(v: datetime | None) -> datetime | None:
     """
     Проверяет, что дата/время не в прошлом.
-    
+
     Args:
         v: Дата/время для проверки
-        
+
     Returns:
         Проверенная дата/время
-        
+
     Raises:
         ValueError: Если дата/время в прошлом
     """
@@ -47,17 +44,17 @@ def validate_future_datetime(v: Optional[datetime]) -> Optional[datetime]:
     return v
 
 
-def validate_date_not_too_far(v: Optional[date], max_days: int = 365) -> Optional[date]:
+def validate_date_not_too_far(v: date | None, max_days: int = 365) -> date | None:
     """
     Проверяет, что дата не слишком далеко в будущем.
-    
+
     Args:
         v: Дата для проверки
         max_days: Максимальное количество дней в будущем
-        
+
     Returns:
         Проверенная дата
-        
+
     Raises:
         ValueError: Если дата слишком далеко в будущем
     """
@@ -68,47 +65,47 @@ def validate_date_not_too_far(v: Optional[date], max_days: int = 365) -> Optiona
     return v
 
 
-def validate_phone_format(v: Optional[str]) -> Optional[str]:
+def validate_phone_format(v: str | None) -> str | None:
     """
     Проверяет и нормализует формат телефона (Узбекистан).
-    
+
     Args:
         v: Номер телефона для проверки
-        
+
     Returns:
         Нормализованный номер телефона
-        
+
     Raises:
         ValueError: Если формат неверный
     """
     if v is not None:
         # Очищаем от лишних символов
         clean = re.sub(r"[^\d+]", "", v)
-        
+
         # Добавляем +998 если начинается с 9
         if clean.startswith("9") and len(clean) == 9:
             clean = "+998" + clean
-        
+
         # Добавляем + если начинается с 998
         if clean.startswith("998") and len(clean) == 12:
             clean = "+" + clean
-        
+
         if not re.match(r"^\+998\d{9}$", clean):
             raise ValueError("Неверный формат телефона. Ожидается: +998XXXXXXXXX")
         return clean
     return v
 
 
-def validate_email(v: Optional[str]) -> Optional[str]:
+def validate_email(v: str | None) -> str | None:
     """
     Дополнительная валидация и нормализация email.
-    
+
     Args:
         v: Email для проверки
-        
+
     Returns:
         Нормализованный email (lowercase, stripped)
-        
+
     Raises:
         ValueError: Если формат неверный
     """
@@ -119,17 +116,17 @@ def validate_email(v: Optional[str]) -> Optional[str]:
     return v
 
 
-def validate_positive_number(v: Optional[float], field_name: str = "Значение") -> Optional[float]:
+def validate_positive_number(v: float | None, field_name: str = "Значение") -> float | None:
     """
     Проверяет, что число положительное.
-    
+
     Args:
         v: Число для проверки
         field_name: Название поля для сообщения об ошибке
-        
+
     Returns:
         Проверенное число
-        
+
     Raises:
         ValueError: Если число не положительное
     """
@@ -138,17 +135,17 @@ def validate_positive_number(v: Optional[float], field_name: str = "Значен
     return v
 
 
-def validate_non_negative_number(v: Optional[float], field_name: str = "Значение") -> Optional[float]:
+def validate_non_negative_number(v: float | None, field_name: str = "Значение") -> float | None:
     """
     Проверяет, что число неотрицательное.
-    
+
     Args:
         v: Число для проверки
         field_name: Название поля для сообщения об ошибке
-        
+
     Returns:
         Проверенное число
-        
+
     Raises:
         ValueError: Если число отрицательное
     """
@@ -158,23 +155,23 @@ def validate_non_negative_number(v: Optional[float], field_name: str = "Знач
 
 
 def validate_string_length(
-    v: Optional[str], 
-    min_length: int = 0, 
+    v: str | None,
+    min_length: int = 0,
     max_length: int = 1000,
     field_name: str = "Текст"
-) -> Optional[str]:
+) -> str | None:
     """
     Проверяет длину строки.
-    
+
     Args:
         v: Строка для проверки
         min_length: Минимальная длина
         max_length: Максимальная длина
         field_name: Название поля для сообщения об ошибке
-        
+
     Returns:
         Проверенная строка (stripped)
-        
+
     Raises:
         ValueError: Если длина не соответствует ограничениям
     """
@@ -187,16 +184,16 @@ def validate_string_length(
     return v
 
 
-def validate_inn(v: Optional[str]) -> Optional[str]:
+def validate_inn(v: str | None) -> str | None:
     """
     Проверяет формат ИНН (Узбекистан - 9 цифр).
-    
+
     Args:
         v: ИНН для проверки
-        
+
     Returns:
         Проверенный ИНН
-        
+
     Raises:
         ValueError: Если формат неверный
     """
@@ -208,13 +205,13 @@ def validate_inn(v: Optional[str]) -> Optional[str]:
     return v
 
 
-def sanitize_html(v: Optional[str]) -> Optional[str]:
+def sanitize_html(v: str | None) -> str | None:
     """
     Удаляет потенциально опасные HTML теги из строки.
-    
+
     Args:
         v: Строка для очистки
-        
+
     Returns:
         Очищенная строка
     """

@@ -1,6 +1,6 @@
 import calendar
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
@@ -21,8 +21,8 @@ class AnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Получение статистики визитов"""
         query = db.query(Visit).filter(
             and_(Visit.date >= start_date, Visit.date <= end_date)
@@ -70,7 +70,7 @@ class AnalyticsService:
     @staticmethod
     def get_patient_statistics(
         db: Session, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Получение статистики пациентов"""
         # Новые пациенты за период
         new_patients = (
@@ -145,8 +145,8 @@ class AnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """
         Расчёт доходов (SSOT).
 
@@ -248,7 +248,7 @@ class AnalyticsService:
     @staticmethod
     def get_service_statistics(
         db: Session, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Получение статистики услуг"""
         # Получаем все услуги
         services = db.query(Service).all()
@@ -294,8 +294,8 @@ class AnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Получение статистики очередей"""
         # Импортируем здесь, чтобы избежать циклических импортов
         from app.models.online_queue import DailyQueue
@@ -352,8 +352,8 @@ class AnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """
         Расчёт статистики (SSOT).
 
@@ -383,7 +383,7 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_trends(db: Session, days: int = 30) -> Dict[str, Any]:
+    def get_trends(db: Session, days: int = 30) -> dict[str, Any]:
         """Получение трендов за последние N дней"""
         end_date = queue_service.get_local_timestamp(db)
         start_date = end_date - timedelta(days=days)
@@ -435,7 +435,7 @@ class AnalyticsService:
     @staticmethod
     def get_payment_provider_analytics(
         db: Session, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Аналитика по провайдерам платежей"""
         from app.models.payment_webhook import PaymentProvider, PaymentTransaction
 
@@ -535,8 +535,8 @@ class AnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Аналитика потока записей (appointments)"""
 
         query = db.query(Appointment).filter(
@@ -632,8 +632,8 @@ class AnalyticsService:
         db: Session,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        department: str | None = None,
+    ) -> dict[str, Any]:
         """Детальная аналитика доходов"""
         from app.models.payment_webhook import PaymentTransaction
         from app.models.visit import Visit
@@ -664,7 +664,7 @@ class AnalyticsService:
             provider_revenue[provider]["total_amount"] += transaction.amount
 
         # Вычисляем средние суммы
-        for provider, stats in provider_revenue.items():
+        for _provider, stats in provider_revenue.items():
             stats["average_amount"] = (
                 stats["total_amount"] / stats["count"] if stats["count"] > 0 else 0
             )
@@ -723,9 +723,9 @@ class AnalyticsService:
         report_type: str,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
+        department: str | None = None,
         format: str = "json",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Генерация отчёта (SSOT).
 
@@ -778,7 +778,7 @@ class AnalyticsService:
         report_type: str,
         start_date: datetime,
         end_date: datetime,
-        department: Optional[str] = None,
+        department: str | None = None,
         export_format: str = "json",
     ) -> bytes:
         """

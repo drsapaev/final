@@ -2,20 +2,16 @@
 Улучшенный сервис для работы с AI провайдерами с трекингом моделей
 """
 
-import asyncio
-import json
 import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.crud import ai_config as crud_ai
-from app.models.ai_config import AIPromptTemplate, AIProvider, AIUsageLog
+from app.models.ai_config import AIProvider
 from app.schemas.ai_tracking import AIRequestTracking, AIResponseWithTracking
-from app.services.ai_tracking_service import AITrackingService, get_ai_tracking_service
+from app.services.ai_tracking_service import get_ai_tracking_service
 
 
 class EnhancedAIService:
@@ -41,12 +37,12 @@ class EnhancedAIService:
         complaints_text: str,
         specialty: str = "general",
         language: str = "ru",
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
     ) -> AIResponseWithTracking:
         """
         Анализ жалоб пациента с полным трекингом AI модели
         """
-        start_time = time.time()
+        _start_time = time.time()
         tracking = None
 
         try:
@@ -117,15 +113,15 @@ class EnhancedAIService:
 
     async def generate_prescription_with_tracking(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         diagnosis: str,
         specialty: str = "general",
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
     ) -> AIResponseWithTracking:
         """
         Генерация рецепта с полным трекингом AI модели
         """
-        start_time = time.time()
+        _start_time = time.time()
         tracking = None
 
         try:
@@ -195,7 +191,7 @@ class EnhancedAIService:
 
     async def _call_ai_provider(
         self, provider: AIProvider, prompt: str, task_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Вызов AI провайдера"""
 
         if provider.name == "openai":
@@ -207,7 +203,7 @@ class EnhancedAIService:
         else:
             raise Exception(f"Неподдерживаемый провайдер: {provider.name}")
 
-    async def _call_openai(self, provider: AIProvider, prompt: str) -> Dict[str, Any]:
+    async def _call_openai(self, provider: AIProvider, prompt: str) -> dict[str, Any]:
         """Вызов OpenAI API"""
         # Здесь должна быть реальная реализация OpenAI API
         # Пока возвращаем заглушку
@@ -217,7 +213,7 @@ class EnhancedAIService:
             "confidence": 0.85,
         }
 
-    async def _call_gemini(self, provider: AIProvider, prompt: str) -> Dict[str, Any]:
+    async def _call_gemini(self, provider: AIProvider, prompt: str) -> dict[str, Any]:
         """Вызов Gemini API"""
         # Здесь должна быть реальная реализация Gemini API
         return {
@@ -226,7 +222,7 @@ class EnhancedAIService:
             "confidence": 0.82,
         }
 
-    async def _call_deepseek(self, provider: AIProvider, prompt: str) -> Dict[str, Any]:
+    async def _call_deepseek(self, provider: AIProvider, prompt: str) -> dict[str, Any]:
         """Вызов DeepSeek API"""
         # Здесь должна быть реальная реализация DeepSeek API
         return {
@@ -239,11 +235,11 @@ class EnhancedAIService:
         """Базовый шаблон для анализа жалоб"""
         return """
         Проанализируйте жалобы пациента:
-        
+
         Жалобы: {complaints}
         Специализация: {specialty}
         Язык: {language}
-        
+
         Предоставьте:
         1. Краткое резюме жалоб
         2. Возможные диагнозы
@@ -255,12 +251,12 @@ class EnhancedAIService:
         """Базовый шаблон для генерации рецепта"""
         return """
         Создайте рецепт для пациента:
-        
+
         Пациент: {patient_name}
         Возраст: {patient_age}
         Диагноз: {diagnosis}
         Специализация: {specialty}
-        
+
         Предоставьте:
         1. Названия препаратов
         2. Дозировки
@@ -291,11 +287,11 @@ class EnhancedAIService:
             error_message=error_message,
         )
 
-    def get_model_stats(self, days_back: int = 30) -> List[Dict[str, Any]]:
+    def get_model_stats(self, days_back: int = 30) -> list[dict[str, Any]]:
         """Получить статистику по AI моделям"""
         return self.tracking_service.get_model_stats(days_back)
 
-    def get_provider_stats(self, days_back: int = 30) -> List[Dict[str, Any]]:
+    def get_provider_stats(self, days_back: int = 30) -> list[dict[str, Any]]:
         """Получить статистику по провайдерам AI"""
         return self.tracking_service.get_provider_stats(days_back)
 

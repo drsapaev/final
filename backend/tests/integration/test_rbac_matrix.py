@@ -59,7 +59,7 @@ def doctor_token(client: TestClient, test_doctor_user: User) -> str:
 def cashier_token(client: TestClient, db_session: Session) -> str:
     """Токен кассира"""
     from app.core.security import get_password_hash
-    
+
     # Создаём кассира если нет
     cashier = db_session.query(User).filter(User.username == "cashier_test").first()
     if not cashier:
@@ -74,7 +74,7 @@ def cashier_token(client: TestClient, db_session: Session) -> str:
         db_session.add(cashier)
         db_session.commit()
         db_session.refresh(cashier)
-    
+
     response = client.post(
         "/api/v1/auth/minimal-login",
         json={"username": cashier.username, "password": "cashier123"},
@@ -87,7 +87,7 @@ def cashier_token(client: TestClient, db_session: Session) -> str:
 def patient_token(client: TestClient, db_session: Session) -> str:
     """Токен пациента"""
     from app.core.security import get_password_hash
-    
+
     # Создаём пациента если нет
     patient_user = db_session.query(User).filter(User.username == "patient_test").first()
     if not patient_user:
@@ -102,7 +102,7 @@ def patient_token(client: TestClient, db_session: Session) -> str:
         db_session.add(patient_user)
         db_session.commit()
         db_session.refresh(patient_user)
-    
+
     response = client.post(
         "/api/v1/auth/minimal-login",
         json={"username": patient_user.username, "password": "patient123"},
@@ -116,12 +116,12 @@ def test_patient_for_rbac(db_session: Session, admin_user: User) -> Patient:
     """Тестовый пациент для RBAC-тестов"""
     from app.crud.patient import patient as patient_crud
     from app.schemas.patient import PatientCreate
-    
+
     # Проверяем, не существует ли уже пациент с таким телефоном
     existing = patient_crud.get_patient_by_phone(db_session, phone="+998901234567")
     if existing:
         return existing
-    
+
     patient = patient_crud.create(
         db_session,
         obj_in=PatientCreate(
@@ -140,7 +140,7 @@ def test_patient_for_rbac(db_session: Session, admin_user: User) -> Patient:
 
 class TestPositiveRBAC:
     """Тесты разрешённых операций для каждой роли"""
-    
+
     def test_admin_can_create_patient(self, client: TestClient, admin_token: str):
         """Admin может создавать пациентов"""
         response = client.post(
@@ -154,7 +154,7 @@ class TestPositiveRBAC:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-    
+
     def test_registrar_can_create_patient(self, client: TestClient, registrar_token: str, db_session: Session):
         """Registrar может создавать пациентов"""
         import random
@@ -171,7 +171,7 @@ class TestPositiveRBAC:
             headers={"Authorization": f"Bearer {registrar_token}"},
         )
         assert response.status_code == 200
-    
+
     def test_registrar_can_list_patients(self, client: TestClient, registrar_token: str):
         """Registrar может просматривать список пациентов"""
         response = client.get(
@@ -179,7 +179,7 @@ class TestPositiveRBAC:
             headers={"Authorization": f"Bearer {registrar_token}"},
         )
         assert response.status_code == 200
-    
+
     def test_doctor_can_read_patient(self, client: TestClient, doctor_token: str, test_patient_for_rbac: Patient):
         """Doctor может читать данные пациента"""
         response = client.get(
@@ -187,7 +187,7 @@ class TestPositiveRBAC:
             headers={"Authorization": f"Bearer {doctor_token}"},
         )
         assert response.status_code == 200
-    
+
     def test_cashier_can_init_payment(self, client: TestClient, cashier_token: str, test_patient_for_rbac: Patient, db_session: Session):
         """Cashier может инициализировать платёж"""
         # Создаём визит
@@ -199,7 +199,7 @@ class TestPositiveRBAC:
         db_session.add(visit)
         db_session.commit()
         db_session.refresh(visit)
-        
+
         response = client.post(
             "/api/v1/payments/init",
             json={
@@ -211,7 +211,7 @@ class TestPositiveRBAC:
             headers={"Authorization": f"Bearer {cashier_token}"},
         )
         assert response.status_code == 200
-    
+
     def test_cashier_can_list_payments(self, client: TestClient, cashier_token: str):
         """Cashier может просматривать список платежей"""
         response = client.get(
@@ -225,7 +225,7 @@ class TestPositiveRBAC:
 
 class TestNegativeRBAC:
     """Тесты запрещённых операций (должны возвращать 403)"""
-    
+
     def test_patient_cannot_create_patient(self, client: TestClient, patient_token: str, db_session: Session):
         """Patient НЕ может создавать пациентов"""
         import random
@@ -242,7 +242,7 @@ class TestNegativeRBAC:
             headers={"Authorization": f"Bearer {patient_token}"},
         )
         assert response.status_code == 403
-    
+
     def test_doctor_cannot_create_patient(self, client: TestClient, doctor_token: str, db_session: Session):
         """Doctor НЕ может создавать пациентов"""
         import random
@@ -259,7 +259,7 @@ class TestNegativeRBAC:
             headers={"Authorization": f"Bearer {doctor_token}"},
         )
         assert response.status_code == 403
-    
+
     def test_cashier_cannot_create_patient(self, client: TestClient, cashier_token: str, db_session: Session):
         """Cashier НЕ может создавать пациентов"""
         import random
@@ -276,7 +276,7 @@ class TestNegativeRBAC:
             headers={"Authorization": f"Bearer {cashier_token}"},
         )
         assert response.status_code == 403
-    
+
     def test_patient_cannot_delete_patient(self, client: TestClient, patient_token: str, test_patient_for_rbac: Patient):
         """Patient НЕ может удалять пациентов"""
         response = client.delete(
@@ -284,7 +284,7 @@ class TestNegativeRBAC:
             headers={"Authorization": f"Bearer {patient_token}"},
         )
         assert response.status_code == 403
-    
+
     def test_registrar_cannot_delete_patient(self, client: TestClient, registrar_token: str, test_patient_for_rbac: Patient):
         """Registrar НЕ может удалять пациентов (только Admin)"""
         response = client.delete(
@@ -298,12 +298,12 @@ class TestNegativeRBAC:
 
 class TestUnauthorizedRBAC:
     """Тесты неавторизованных запросов (должны возвращать 401)"""
-    
+
     def test_unauthorized_list_patients(self, client: TestClient):
         """Неавторизованный запрос списка пациентов"""
         response = client.get("/api/v1/patients/")
         assert response.status_code == 401
-    
+
     def test_unauthorized_create_patient(self, client: TestClient, db_session: Session):
         """Неавторизованный запрос создания пациента"""
         import random
@@ -319,7 +319,7 @@ class TestUnauthorizedRBAC:
             },
         )
         assert response.status_code == 401
-    
+
     def test_invalid_token(self, client: TestClient):
         """Запрос с невалидным токеном"""
         response = client.get(
@@ -333,13 +333,13 @@ class TestUnauthorizedRBAC:
 
 class TestOwnDataRBAC:
     """Тесты доступа к собственным данным (Patient)"""
-    
+
     def test_patient_can_read_own_appointments(self, client: TestClient, patient_token: str, db_session: Session):
         """Patient может читать свои записи"""
         # TODO: Реализовать когда будет связь Patient -> User
         # Сейчас пропускаем, так как связь Patient-User может быть не настроена
         pass
-    
+
     def test_patient_cannot_read_other_patient_data(self, client: TestClient, patient_token: str, test_patient_for_rbac: Patient):
         """Patient НЕ может читать данные других пациентов (если не связан)"""
         # TODO: Реализовать когда будет проверка связи Patient-User
@@ -352,16 +352,16 @@ class TestOwnDataRBAC:
 
 class TestAuditLog403:
     """Тесты логирования попыток несанкционированного доступа"""
-    
+
     def test_403_is_logged(self, client: TestClient, patient_token: str, db_session: Session):
         """Попытка 403 должна логироваться в user_audit_logs"""
         from app.models.user_profile import UserAuditLog
-        
+
         # Подсчитываем текущее количество логов
         initial_count = db_session.query(UserAuditLog).filter(
             UserAuditLog.action == "ACCESS_DENIED"
         ).count()
-        
+
         # Выполняем запрос, который должен вернуть 403
         import random
         # Используем уникальный телефон для каждого теста
@@ -377,15 +377,15 @@ class TestAuditLog403:
             headers={"Authorization": f"Bearer {patient_token}"},
         )
         assert response.status_code == 403
-        
+
         # Проверяем, что появилась запись в audit log
         db_session.commit()
         final_count = db_session.query(UserAuditLog).filter(
             UserAuditLog.action == "ACCESS_DENIED"
         ).count()
-        
+
         assert final_count > initial_count, "403 должен быть залогирован в user_audit_logs"
-        
+
         # Проверяем содержимое последней записи
         last_log = (
             db_session.query(UserAuditLog)
@@ -402,13 +402,13 @@ class TestAuditLog403:
 
 class TestRegressionRBAC:
     """Smoke-тесты для проверки регрессий"""
-    
+
     def test_superadmin_bypasses_all_checks(self, client: TestClient, admin_user: User, db_session: Session):
         """SuperAdmin обходит все проверки (is_superuser=True)"""
         # Устанавливаем is_superuser=True
         admin_user.is_superuser = True
         db_session.commit()
-        
+
         # Получаем токен
         response = client.post(
             "/api/v1/auth/minimal-login",
@@ -416,12 +416,12 @@ class TestRegressionRBAC:
         )
         assert response.status_code == 200
         token = response.json()["access_token"]
-        
+
         # SuperAdmin должен иметь доступ ко всем эндпоинтам
         # (даже если его роль не указана в require_roles)
         # Это проверяется через is_superuser в require_roles
         pass  # TODO: Добавить конкретные тесты когда будет ясна логика SuperAdmin
-    
+
     def test_doctor_specialized_roles_have_same_permissions(self, client: TestClient):
         """Doctor, cardio, derma, dentist имеют одинаковые права"""
         # TODO: Реализовать когда будут созданы тестовые пользователи с этими ролями

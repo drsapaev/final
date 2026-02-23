@@ -1,10 +1,12 @@
 // Система уведомлений (Toast)
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import AnimatedToast from '../AnimatedToast.jsx';
+
 
 // Контекст для уведомлений
 const ToastContext = createContext();
+let addToastExternal = null;
 
 /**
  * Провайдер контекста уведомлений
@@ -22,12 +24,12 @@ export function ToastProvider({ children }) {
       ...toast
     };
 
-    setToasts(prev => [...prev, newToast]);
+    setToasts((prev) => [...prev, newToast]);
 
     // Автоматическое удаление
     if (newToast.duration > 0) {
       setTimeout(() => {
-        removeToast(id);
+        setToasts((prev) => prev.filter((item) => item.id !== id));
       }, newToast.duration);
     }
 
@@ -35,12 +37,21 @@ export function ToastProvider({ children }) {
   }, []);
 
   const removeToast = useCallback((id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
   const clearAllToasts = useCallback(() => {
     setToasts([]);
   }, []);
+
+  useEffect(() => {
+    addToastExternal = addToast;
+    return () => {
+      if (addToastExternal === addToast) {
+        addToastExternal = null;
+      }
+    };
+  }, [addToast]);
 
   const value = {
     toasts,
@@ -53,8 +64,8 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={value}>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} theme={theme} />
-    </ToastContext.Provider>
-  );
+    </ToastContext.Provider>);
+
 }
 
 /**
@@ -87,22 +98,22 @@ function ToastContainer({ toasts, onRemove, theme }) {
 
   return (
     <div style={containerStyle}>
-      {toasts.map(toast => (
-        <ToastItem
-          key={toast.id}
-          toast={toast}
-          onRemove={onRemove}
-          theme={theme}
-        />
-      ))}
-    </div>
-  );
+      {toasts.map((toast) =>
+      <ToastItem
+        key={toast.id}
+        toast={toast}
+        onRemove={onRemove}
+        theme={theme} />
+
+      )}
+    </div>);
+
 }
 
 /**
  * Отдельное уведомление
  */
-function ToastItem({ toast, onRemove, theme }) {
+function ToastItem({ toast, onRemove }) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -202,9 +213,9 @@ function ToastItem({ toast, onRemove, theme }) {
     left: 0,
     height: '3px',
     backgroundColor: toast.type === 'success' ? 'var(--color-success)' :
-      toast.type === 'error' ? 'var(--color-danger)' :
-        toast.type === 'warning' ? 'var(--color-warning)' :
-          'var(--color-info)',
+    toast.type === 'error' ? 'var(--color-danger)' :
+    toast.type === 'warning' ? 'var(--color-warning)' :
+    'var(--color-info)',
     width: '100%',
     transform: 'scaleX(1)',
     transformOrigin: 'left',
@@ -222,39 +233,62 @@ function ToastItem({ toast, onRemove, theme }) {
         style={closeButtonStyle}
         onClick={() => onRemove(toast.id)}
         onMouseOver={(e) => e.target.style.opacity = '1'}
-        onMouseOut={(e) => e.target.style.opacity = '0.7'}
-      >
+        onMouseOut={(e) => e.target.style.opacity = '0.7'}>
+
         ×
       </button>
-      {toast.duration > 0 && (
-        <div style={progressBarStyle} />
-      )}
-    </div>
-  );
+      {toast.duration > 0 &&
+      <div style={progressBarStyle} />
+      }
+    </div>);
+
 }
+
+const toastShape = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  type: PropTypes.oneOf(['success', 'error', 'warning', 'info']),
+  title: PropTypes.string,
+  message: PropTypes.string,
+  duration: PropTypes.number
+});
+
+ToastProvider.propTypes = {
+  children: PropTypes.node
+};
+
+ToastContainer.propTypes = {
+  toasts: PropTypes.arrayOf(toastShape),
+  onRemove: PropTypes.func,
+  theme: PropTypes.oneOfType([PropTypes.object, PropTypes.string])
+};
+
+ToastItem.propTypes = {
+  toast: toastShape,
+  onRemove: PropTypes.func
+};
 
 /**
  * Утилиты для быстрого создания уведомлений
  */
 export const toast = {
   success: (message, options = {}) => {
-    const { addToast } = useToast();
-    return addToast({ type: 'success', message, ...options });
+    if (!addToastExternal) return null;
+    return addToastExternal({ type: 'success', message, ...options });
   },
 
   error: (message, options = {}) => {
-    const { addToast } = useToast();
-    return addToast({ type: 'error', message, ...options });
+    if (!addToastExternal) return null;
+    return addToastExternal({ type: 'error', message, ...options });
   },
 
   warning: (message, options = {}) => {
-    const { addToast } = useToast();
-    return addToast({ type: 'warning', message, ...options });
+    if (!addToastExternal) return null;
+    return addToastExternal({ type: 'warning', message, ...options });
   },
 
   info: (message, options = {}) => {
-    const { addToast } = useToast();
-    return addToast({ type: 'info', message, ...options });
+    if (!addToastExternal) return null;
+    return addToastExternal({ type: 'info', message, ...options });
   }
 };
 
@@ -267,4 +301,3 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
-

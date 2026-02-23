@@ -1,23 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Button, Badge, Progress, Icon } from '../components/ui/macos';
+import { useEffect, useState } from 'react';
+import { Card, Button, Badge, Icon } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText } from 'lucide-react';
 
 // Simple Skeleton component
-const Skeleton = ({ className = '' }) => (
-  <div
-    className={className}
-    style={{
-      background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
-      backgroundSize: '200% 100%',
-      animation: 'shimmer 1.5s infinite',
-      borderRadius: '8px',
-      minHeight: '96px'
-    }}
-  />
-);
-const PatientPanel = () => {
-  const { isMobile } = useBreakpoint();
+const Skeleton = ({ className = '' }) =>
+<div
+  className={className}
+  style={{
+    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+    backgroundSize: '200% 100%',
+    animation: 'shimmer 1.5s infinite',
+    borderRadius: '8px',
+    minHeight: '96px'
+  }} />;
+
+
+const PatientPanel = () => {void
+  useBreakpoint();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [appointments, setAppointments] = useState([]);
@@ -26,15 +26,15 @@ const PatientPanel = () => {
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise((r) => setTimeout(r, 700));
       setAppointments([
-        { id: 1, date: '2025-09-02', time: '09:30', doctor: 'Кардиолог', status: 'scheduled' },
-        { id: 2, date: '2025-09-10', time: '10:00', doctor: 'Дерматолог', status: 'completed' }
-      ]);
+      { id: 1, date: '2025-09-02', time: '09:30', doctor: 'Кардиолог', status: 'scheduled' },
+      { id: 2, date: '2025-09-10', time: '10:00', doctor: 'Дерматолог', status: 'completed' }]
+      );
       setResults([
-        { id: 1, title: 'Анализ крови', date: '2025-08-15' },
-        { id: 2, title: 'ЭКГ', date: '2025-08-20' }
-      ]);
+      { id: 1, title: 'Анализ крови', date: '2025-08-15' },
+      { id: 2, title: 'ЭКГ', date: '2025-08-20' }]
+      );
       setIsLoading(false);
     };
     load();
@@ -72,8 +72,8 @@ const PatientPanel = () => {
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: 'var(--mac-text-tertiary)'
-                }}
-              />
+                }} />
+
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -91,8 +91,8 @@ const PatientPanel = () => {
                 }}
                 placeholder="Search by doctor, service or result"
                 onFocus={(e) => e.target.style.borderColor = 'var(--mac-accent-blue)'}
-                onBlur={(e) => e.target.style.borderColor = 'var(--mac-border)'}
-              />
+                onBlur={(e) => e.target.style.borderColor = 'var(--mac-border)'} />
+
             </div>
             <Button variant="primary">
               <Icon name="plus" size="small" />
@@ -109,12 +109,12 @@ const PatientPanel = () => {
               <h3 className="font-medium text-gray-900">Мои записи</h3>
             </div>
             <div className="p-4">
-              {isLoading ? (
-                <Skeleton className="h-24" />
-              ) : (
-                <div className="space-y-4">
-                  {appointments.map(a => (
-                    <div key={a.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
+              {isLoading ?
+              <Skeleton className="h-24" /> :
+
+              <div className="space-y-4">
+                  {appointments.map((a) =>
+                <div key={a.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{a.doctor}</div>
                         <div className="text-sm text-gray-500">{a.date} • {a.time}</div>
@@ -123,9 +123,9 @@ const PatientPanel = () => {
                         {a.status === 'scheduled' ? 'Запланировано' : 'Завершено'}
                       </Badge>
                     </div>
-                  ))}
+                )}
                 </div>
-              )}
+              }
             </div>
           </Card>
 
@@ -135,30 +135,27 @@ const PatientPanel = () => {
               <h3 className="font-medium text-gray-900">Результаты</h3>
             </div>
             <div className="p-4">
-              {isLoading ? (
-                <Skeleton className="h-24" />
-              ) : (
-                <div className="space-y-4">
-                  {results.map(r => (
-                    <div key={r.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
+              {isLoading ?
+              <Skeleton className="h-24" /> :
+
+              <div className="space-y-4">
+                  {results.map((r) =>
+                <div key={r.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{r.title}</div>
                         <div className="text-sm text-gray-500">{r.date}</div>
                       </div>
                       <Button variant="outline" size="sm"><FileText className="w-4 h-4 mr-2" />Открыть</Button>
                     </div>
-                  ))}
+                )}
                 </div>
-              )}
+              }
             </div>
           </Card>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default PatientPanel;
-
-
-

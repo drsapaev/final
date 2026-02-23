@@ -12,7 +12,7 @@
  * - Each insert = 1 undo
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import './PhraseSuggestions.css';
 
 /**

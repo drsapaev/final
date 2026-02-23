@@ -6,7 +6,6 @@ import os
 import secrets
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,7 +61,7 @@ class Settings(BaseSettings):
     #   - Публичный доступ: "https://clinic.example.com" или "http://123.45.67.89:5173"
     #   - Туннель (ngrok): "https://abc123.ngrok.io"
     # Установите через переменную окружения: FRONTEND_URL=https://your-domain.com
-    FRONTEND_URL: str = Field(default="http://192.168.1.9:5173", env="FRONTEND_URL")
+    FRONTEND_URL: str = Field(default="http://192.168.1.9:5173")
 
     # --- Queue / Time ---
     TIMEZONE: str = "Asia/Tashkent"
@@ -70,31 +69,91 @@ class Settings(BaseSettings):
     ONLINE_MAX_PER_DAY: int = 15  # лимит онлайн-талонов на отделение/день
 
     # --- Celery ---
-    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", env="CELERY_BROKER_URL")
-    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0", env="CELERY_RESULT_BACKEND")
+    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
 
     # --- App meta ---
     APP_NAME: str = "Clinic Manager"
     APP_VERSION: str = "0.9.0"
     ENV: str = "dev"
-    
+    LOG_LEVEL: str = Field(default="INFO", description="Root logging level")
+    LOG_STRUCTURED: bool = Field(
+        default=True, description="Enable JSON structured logs to stdout"
+    )
+
+    # --- Observability / SLA ---
+    OBS_SLA_WINDOW_SECONDS: int = Field(
+        default=300, ge=60, le=3600, description="SLA rolling window in seconds"
+    )
+    OBS_SLA_LATENCY_P95_MS: float = Field(
+        default=1200.0, ge=100.0, le=30000.0, description="SLA p95 latency threshold"
+    )
+    OBS_SLA_ERROR_RATE_PCT: float = Field(
+        default=5.0, ge=0.1, le=100.0, description="SLA error rate threshold in percent"
+    )
+    OBS_SLA_QUEUE_LAG_MAX: int = Field(
+        default=50, ge=1, le=10000, description="SLA threshold for queue lag count"
+    )
+
     # --- Message Encryption ---
     # SECURITY: В production ОБЯЗАТЕЛЬНО установите через переменную окружения!
     # Сгенерируйте ключ: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    MESSAGE_ENCRYPTION_KEY: Optional[str] = Field(
+    MESSAGE_ENCRYPTION_KEY: str | None = Field(
         default=None,
         description="Fernet encryption key for message at-rest encryption. Required in production."
     )
-    
+
     # --- Backup Settings ---
     AUTO_BACKUP_ENABLED: bool = Field(default=False, description="Enable automated daily backups")
     BACKUP_RETENTION_DAYS: int = Field(default=30, ge=1, le=365, description="Number of days to retain backups")
+
+    # --- Clinical Security Maturity ---
+    PHI_RETENTION_DAYS: int = Field(
+        default=365 * 7,
+        ge=30,
+        le=365 * 30,
+        description="Retention period for PHI-bearing records (days)"
+    )
+    BREAK_GLASS_ENABLED: bool = Field(
+        default=False,
+        description="Enable emergency break-glass access mode"
+    )
+    BREAK_GLASS_MAX_MINUTES: int = Field(
+        default=60,
+        ge=1,
+        le=720,
+        description="Maximum break-glass session duration in minutes"
+    )
+    BREAK_GLASS_REASON_MIN_LENGTH: int = Field(
+        default=20,
+        ge=5,
+        le=500,
+        description="Minimum justification length for break-glass reason"
+    )
+    BREAK_GLASS_REQUIRE_TICKET: bool = Field(
+        default=True,
+        description="Require incident/ticket reference for break-glass sessions"
+    )
+    BREAK_GLASS_ALLOWED_ROLES: str = Field(
+        default="Admin,ChiefDoctor",
+        description="Comma-separated list of roles allowed to use break-glass"
+    )
+
+    # --- Tenant Scope Enforcement (multi-clinic rollout) ---
+    TENANT_SCOPE_ENFORCE_WRITES: bool = Field(
+        default=False,
+        description="Require branch scope for high-risk write endpoints"
+    )
+    TENANT_SCOPE_WRITE_PREFIXES: str = Field(
+        default="/api/v1/billing,/api/v1/queue,/api/v1/emr,/api/v1/v2/emr,/api/v1/clinic/equipment",
+        description="Comma-separated URL prefixes protected by tenant write-scope enforcement"
+    )
 
     # --- MCP Settings ---
     MCP_ENABLED: bool = True
     MCP_LOG_REQUESTS: bool = True
     MCP_FALLBACK_TO_DIRECT: bool = True
-    
+
     # ⚠️ TIMEOUT LAYERING (ВАЖНО для AI-пайплайнов):
     # MCP_REQUEST_TIMEOUT >= AI_PROVIDER_TIMEOUT, иначе верхний уровень обрежет нижний!
     # Уровни:
@@ -113,22 +172,22 @@ class Settings(BaseSettings):
         le=600,
         description="HTTP timeout for AI provider API calls (DeepSeek, OpenAI, Gemini)"
     )
-    
+
     MCP_HEALTH_CHECK_INTERVAL: int = 60  # seconds
     MCP_MAX_BATCH_SIZE: int = 10
 
     # --- AI Provider API Keys ---
-    OPENAI_API_KEY: Optional[str] = None
-    GEMINI_API_KEY: Optional[str] = None
-    DEEPSEEK_API_KEY: Optional[str] = None
-    
+    OPENAI_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    DEEPSEEK_API_KEY: str | None = None
+
     # --- AI Security & Encryption ---
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    ENCRYPTION_KEY: Optional[str] = Field(
+    ENCRYPTION_KEY: str | None = Field(
         default=None,
         description="Fernet encryption key for encrypting API keys in database"
     )
-    
+
     # --- AI Rate Limiting ---
     AI_RATE_LIMIT_PER_USER_HOUR: int = Field(
         default=60,
@@ -142,7 +201,7 @@ class Settings(BaseSettings):
         le=500,
         description="Max requests to each AI provider per minute (protects against provider rate limits)"
     )
-    
+
     # --- AI Cost Control ---
     AI_MONTHLY_BUDGET_USD: float = Field(
         default=500.0,
@@ -155,7 +214,7 @@ class Settings(BaseSettings):
         le=100,
         description="Alert when budget usage exceeds this percentage"
     )
-    
+
     # --- AI Caching ---
     AI_CACHE_TTL_HOURS: int = Field(
         default=24,
@@ -170,50 +229,50 @@ class Settings(BaseSettings):
 
     # --- Printing / PDF ---
     PDF_FOOTER_ENABLED: bool = True
-    CLINIC_LOGO_PATH: Optional[str] = None
+    CLINIC_LOGO_PATH: str | None = None
 
     # ESC/POS settings (may be missing in env; safe defaults)
-    PRINTER_TYPE: Optional[str] = None  # none|network|usb
+    PRINTER_TYPE: str | None = None  # none|network|usb
 
     # --- SMS Providers ---
     # Eskiz SMS (Узбекистан)
-    ESKIZ_EMAIL: Optional[str] = None
-    ESKIZ_PASSWORD: Optional[str] = None
+    ESKIZ_EMAIL: str | None = None
+    ESKIZ_PASSWORD: str | None = None
 
     # PlayMobile SMS (Узбекистан)
-    PLAYMOBILE_API_KEY: Optional[str] = None
-    PLAYMOBILE_API_SECRET: Optional[str] = None
+    PLAYMOBILE_API_KEY: str | None = None
+    PLAYMOBILE_API_SECRET: str | None = None
 
     # SMS общие настройки
     SMS_SENDER: str = "Clinic"
     SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock
 
     # --- Firebase Cloud Messaging (FCM) ---
-    FCM_SERVER_KEY: Optional[str] = Field(default=None, description="FCM Server Key for push notifications")
-    FCM_SENDER_ID: Optional[str] = Field(default=None, description="FCM Sender ID")
-    FCM_PROJECT_ID: Optional[str] = Field(default=None, description="FCM Project ID")
+    FCM_SERVER_KEY: str | None = Field(default=None, description="FCM Server Key for push notifications")
+    FCM_SENDER_ID: str | None = Field(default=None, description="FCM Sender ID")
+    FCM_PROJECT_ID: str | None = Field(default=None, description="FCM Project ID")
     FCM_ENABLED: bool = Field(default=False, description="Enable FCM push notifications")
 
     # --- Email Settings ---
-    SMTP_SERVER: Optional[str] = None
+    SMTP_SERVER: str | None = None
     SMTP_PORT: int = 587
-    SMTP_USERNAME: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
 
     # --- Cloud Printing Settings ---
     # Microsoft Universal Print
-    MICROSOFT_PRINT_TENANT_ID: Optional[str] = None
-    MICROSOFT_PRINT_CLIENT_ID: Optional[str] = None
-    MICROSOFT_PRINT_CLIENT_SECRET: Optional[str] = None
+    MICROSOFT_PRINT_TENANT_ID: str | None = None
+    MICROSOFT_PRINT_CLIENT_ID: str | None = None
+    MICROSOFT_PRINT_CLIENT_SECRET: str | None = None
 
     # Cloud Printing общие настройки
     CLOUD_PRINTING_ENABLED: bool = True
     CLOUD_PRINTING_DEFAULT_PROVIDER: str = "mock"  # microsoft, mock
-    PRINTER_NET_HOST: Optional[str] = None
-    PRINTER_NET_PORT: Optional[int] = None
-    PRINTER_USB_VID: Optional[int] = None
-    PRINTER_USB_PID: Optional[int] = None
+    PRINTER_NET_HOST: str | None = None
+    PRINTER_NET_PORT: int | None = None
+    PRINTER_USB_VID: int | None = None
+    PRINTER_USB_PID: int | None = None
 
     # --- EMR v2 Feature Flags ---
     EMR_V2_ENABLED: bool = Field(
@@ -254,22 +313,20 @@ _DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-pro
 @lru_cache(1)
 def get_settings() -> Settings:
     """Get application settings with validation"""
-    # Resolve environment mode once and reuse it in all validation branches.
-    env = os.getenv("ENV", os.getenv("APP_ENV", "dev")).lower()
-
     # ✅ ИСПРАВЛЕНО: Сначала проверяем env var, затем создаем Settings с аргументами
     secret_key = os.getenv("SECRET_KEY")
-    
+
     # Если SECRET_KEY в env - используем его
     if secret_key:
         s = Settings(SECRET_KEY=secret_key)
     else:
         # Fallback для dev mode - используем default или persistent key
         s = Settings(SECRET_KEY=_DEFAULT_SECRET_KEY)
-    
+
     # Validate SECRET_KEY on load
     if not s.SECRET_KEY or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
         # In production, this should fail - but for dev we allow it with warning
+        env = os.getenv("ENV", "dev").lower()
         if env in ("prod", "production"):
             raise ValueError(
                 "SECRET_KEY must be set via environment variable in production. "
@@ -277,9 +334,9 @@ def get_settings() -> Settings:
             )
         # ✅ BUGFIX: In dev, use persistent key from file or generate once and save
         if s.SECRET_KEY == _DEFAULT_SECRET_KEY:
-            import warnings
             import pathlib
-            
+            import warnings
+
             # Try to load persistent key from .secret_key file (dev only)
             secret_key_file = pathlib.Path(".secret_key")
             if secret_key_file.exists():
@@ -307,7 +364,8 @@ def get_settings() -> Settings:
                         warnings.warn(
                             "Using temporary SECRET_KEY in development (will invalidate tokens on restart). "
                             "Set SECRET_KEY env var or ensure .secret_key file is writable!",
-                            UserWarning
+                            UserWarning,
+                            stacklevel=2,
                         )
             else:
                 # No persistent key file, generate and save
@@ -318,7 +376,8 @@ def get_settings() -> Settings:
                     logger.info("Generated and saved persistent SECRET_KEY to .secret_key file (dev mode)")
                     warnings.warn(
                         "Generated SECRET_KEY for development. Set SECRET_KEY env var for production!",
-                        UserWarning
+                        UserWarning,
+                        stacklevel=2,
                     )
                 except Exception as e:
                     logger.error(f"Error writing .secret_key file: {e}")
@@ -327,43 +386,44 @@ def get_settings() -> Settings:
                     warnings.warn(
                         "Using temporary SECRET_KEY in development (will invalidate tokens on restart). "
                         "Set SECRET_KEY env var or ensure .secret_key file is writable!",
-                        UserWarning
+                        UserWarning,
+                        stacklevel=2,
                     )
-    
+
     # Additional validation: SECRET_KEY must be at least 32 characters
     if len(s.SECRET_KEY) < 32:
         raise ValueError(
             f"SECRET_KEY must be at least 32 characters long. Current length: {len(s.SECRET_KEY)}"
         )
-    
+
     # ✅ SECURITY: Production-specific validations
     if env in ("prod", "production"):
         errors = []
         warnings_list = []
-        
+
         # === MANDATORY CHECKS (will raise error) ===
-        
+
         # 1. CORS_ALLOW_ALL must be False
         if s.CORS_ALLOW_ALL:
             errors.append(
                 "CORS_ALLOW_ALL must be False in production. "
                 "Set allowed origins via BACKEND_CORS_ORIGINS env variable."
             )
-        
+
         # 2. SECRET_KEY must not be the default placeholder
         if "change_me" in s.SECRET_KEY.lower() or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
             errors.append(
                 "SECRET_KEY must be set to a unique, secure value in production. "
                 "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
             )
-        
+
         # 3. DATABASE_URL должен быть PostgreSQL
         if "sqlite" in s.DATABASE_URL.lower():
             errors.append(
                 "SQLite is not recommended for production. "
                 "Set DATABASE_URL to PostgreSQL: postgresql://user:pass@host:5432/dbname"
             )
-        
+
         # 4. FRONTEND_URL должен быть HTTPS или localhost
         if s.FRONTEND_URL and not (
             s.FRONTEND_URL.startswith("https://") or
@@ -373,23 +433,23 @@ def get_settings() -> Settings:
             warnings_list.append(
                 f"FRONTEND_URL ({s.FRONTEND_URL}) should use HTTPS in production."
             )
-        
+
         # 5. BACKEND_CORS_ORIGINS должен содержать только HTTPS origins
         for origin in s.BACKEND_CORS_ORIGINS:
             if not origin.startswith("https://") and "localhost" not in origin and "127.0.0.1" not in origin:
                 warnings_list.append(
                     f"CORS origin '{origin}' should use HTTPS in production."
                 )
-        
+
         # === OUTPUT WARNINGS ===
         for warning in warnings_list:
             logger.warning(f"⚠️ PRODUCTION WARNING: {warning}")
-        
+
         # === RAISE ERRORS ===
         if errors:
             error_msg = "Production configuration errors:\n" + "\n".join(f"  - {e}" for e in errors)
             raise ValueError(error_msg)
-    
+
     return s
 
 

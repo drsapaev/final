@@ -1,5 +1,4 @@
-import React from 'react';
-import { designTokens, getColor } from '../design-system';
+import { getColor } from '../design-system';
 
 const AnimatedLoader = ({
   size = 'md',
@@ -43,9 +42,9 @@ const AnimatedLoader = ({
       className={`animated-loader ${className}`}
       style={loaderStyles}
       role="status"
-      aria-label="Загрузка"
-    />
-  );
+      aria-label="Загрузка" />);
+
+
 };
 
 // Компонент для скелетона таблицы
@@ -80,38 +79,38 @@ const AnimatedTableSkeleton = ({
   return (
     <div
       className={`animated-table-skeleton ${className}`}
-      style={tableStyles}
-    >
+      style={tableStyles}>
+      
       {/* Заголовок таблицы */}
       <div style={skeletonRowStyles}>
-        {Array.from({ length: columns }, (_, i) => (
-          <div
-            key={i}
-            style={{
-              ...skeletonCellStyles,
-              width: i === 0 ? '60px' : '120px',
-              height: '16px'
-            }}
-          />
-        ))}
+        {Array.from({ length: columns }, (_, i) =>
+        <div
+          key={i}
+          style={{
+            ...skeletonCellStyles,
+            width: i === 0 ? '60px' : '120px',
+            height: '16px'
+          }} />
+
+        )}
       </div>
       
       {/* Строки таблицы */}
-      {Array.from({ length: rows }, (_, rowIndex) => (
-        <div key={rowIndex} style={skeletonRowStyles}>
-          {Array.from({ length: columns }, (_, colIndex) => (
-            <div
-              key={colIndex}
-              style={{
-                ...skeletonCellStyles,
-                width: colIndex === 0 ? '60px' : '120px'
-              }}
-            />
-          ))}
+      {Array.from({ length: rows }, (_, rowIndex) =>
+      <div key={rowIndex} style={skeletonRowStyles}>
+          {Array.from({ length: columns }, (_, colIndex) =>
+        <div
+          key={colIndex}
+          style={{
+            ...skeletonCellStyles,
+            width: colIndex === 0 ? '60px' : '120px'
+          }} />
+
+        )}
         </div>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 // Компонент для скелетона карточки
@@ -136,58 +135,58 @@ const AnimatedCardSkeleton = ({
   return (
     <div
       className={`animated-card-skeleton ${className}`}
-      style={cardStyles}
-    >
+      style={cardStyles}>
+      
       <div
         style={{
           ...skeletonStyles,
           width: '60%',
           height: '24px',
           marginBottom: '16px'
-        }}
-      />
+        }} />
+      
       <div
         style={{
           ...skeletonStyles,
           width: '100%',
           height: '16px',
           marginBottom: '8px'
-        }}
-      />
+        }} />
+      
       <div
         style={{
           ...skeletonStyles,
           width: '80%',
           height: '16px',
           marginBottom: '8px'
-        }}
-      />
+        }} />
+      
       <div
         style={{
           ...skeletonStyles,
           width: '60%',
           height: '16px',
           marginBottom: '16px'
-        }}
-      />
+        }} />
+      
       <div style={{ display: 'flex', gap: '12px' }}>
         <div
           style={{
             ...skeletonStyles,
             width: '80px',
             height: '32px'
-          }}
-        />
+          }} />
+        
         <div
           style={{
             ...skeletonStyles,
             width: '100px',
             height: '32px'
-          }}
-        />
+          }} />
+        
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Прикрепляем подкомпоненты к AnimatedLoader
@@ -195,4 +194,3 @@ AnimatedLoader.TableSkeleton = AnimatedTableSkeleton;
 AnimatedLoader.CardSkeleton = AnimatedCardSkeleton;
 
 export default AnimatedLoader;
-

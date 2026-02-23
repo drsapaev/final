@@ -12,6 +12,7 @@ const SegmentedControl = React.forwardRef(({
   style = {},
   ...props
 }, ref) => {
+  void variant;
   const [value, setValue] = useState(valueProp ?? defaultValue ?? (options[0]?.value ?? options[0]));
 
   useEffect(() => {
@@ -154,5 +155,7 @@ const SegmentedControl = React.forwardRef(({
     </div>
   );
 });
+
+SegmentedControl.displayName = 'SegmentedControl';
 
 export default SegmentedControl;

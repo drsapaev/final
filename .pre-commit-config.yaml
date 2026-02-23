@@ -15,6 +15,6 @@ repos:
     hooks:
       - id: no-db-files
         name: Block database & dumps
-        entry: bash -c 'git diff --cached --name-only | grep -E "\.(db|sqlite|dump|sql)$" && exit 1 || exit 0'
-        language: system
-        pass_filenames: false
+        entry: Database and SQL dump files are not allowed in commits.
+        language: fail
+        files: \.(db|sqlite|dump|sql)$

@@ -26,7 +26,7 @@
 
 ### Backend (FastAPI + SQLAlchemy)
 - **API**: RESTful API с автоматической документацией
-- **База данных**: SQLite с поддержкой миграций Alembic
+- **База данных**: PostgreSQL + миграции Alembic (single source of truth)
 - **Аутентификация**: JWT токены с системой ролей
 - **WebSocket**: Реальное время для очередей и уведомлений
 
@@ -64,6 +64,7 @@
 ### Требования
 - Python 3.11+
 - Node.js 20+
+- PostgreSQL 17+
 - Docker (опционально)
 
 ### Локальная разработка
@@ -78,6 +79,9 @@
    ```bash
    cd backend
    pip install -r requirements.txt
+   # Local Postgres DSN example:
+   # postgresql+psycopg://clinic:<password>@localhost:5432/clinicdb
+   alembic upgrade head
    uvicorn app.main:app --reload
    ```
 
@@ -105,7 +109,7 @@ docker build -f ops/frontend.Dockerfile -t clinic-frontend .
 
 ```bash
 # Backend
-DATABASE_URL=sqlite:///./clinic.db
+DATABASE_URL=postgresql+psycopg://clinic:<password>@localhost:5432/clinicdb
 CORS_DISABLE=1
 WS_DEV_ALLOW=1
 
@@ -115,21 +119,23 @@ VITE_API_URL=http://localhost:8000
 
 ### База данных
 
-Система автоматически создает все необходимые таблицы при первом запуске. Для создания администратора:
+Все изменения схемы БД выполняются только через Alembic:
 
 ```bash
 cd backend
-python app/scripts/ensure_admin.py
+alembic upgrade head
+alembic current
 ```
+
+Ожидаемый результат: `0001_baseline (head)` или более новая head-ревизия.
 
 ## 🧪 Тестирование
 
 ### Backend тесты
 ```bash
 cd backend
-python test_authentication.py
-python test_queue_system.py
-python test_visit_reschedule.py
+pytest tests/
+pytest tests/test_openapi_contract.py -q
 ```
 
 ### Frontend тесты

@@ -15,24 +15,21 @@ from __future__ import annotations
 
 import inspect
 import logging
-import os
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Callable, Optional
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.concurrency import run_in_threadpool
-from fastapi.security import HTTPBearer, OAuth2PasswordBearer
-from jose import jwt, JWTError
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-logger = logging.getLogger(__name__)
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
 
-# Log settings loaded confirmation (non-blocking)
-logger.debug(f"deps.py: settings loaded, SECRET_KEY starts with: {settings.SECRET_KEY[:5]}")
+# import authentication service
+from app.services.authentication_service import get_authentication_service
 
 # import get_db lazily -- it may return AsyncSession or sync Session
 try:
@@ -48,14 +45,16 @@ except Exception:
     # If import fails the project is misconfigured; leave User unresolved to raise early.
     User = None  # type: ignore
 
-# import authentication service
-from app.services.authentication_service import get_authentication_service
+logger = logging.getLogger(__name__)
+
+# Log settings loaded confirmation (non-blocking)
+logger.debug(f"deps.py: settings loaded, SECRET_KEY starts with: {settings.SECRET_KEY[:5]}")
 
 # Correct tokenUrl to point to our /auth/login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/minimal-login")
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """
     Create a JWT token with `sub` claim taken from data (if provided).
     Returns encoded JWT string.
@@ -75,7 +74,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def _username_from_token(token: str) -> Optional[str]:
+def _username_from_token(token: str) -> str | None:
     """
     Decode JWT and extract username claim. Returns None if invalid.
     Tries 'username' field first, then falls back to 'sub' if it's a string.
@@ -83,7 +82,7 @@ def _username_from_token(token: str) -> Optional[str]:
     try:
         logger.debug(f"_username_from_token: SECRET_KEY starts with: {settings.SECRET_KEY[:10]}...")
         logger.debug(f"_username_from_token: token starts with: {token[:50]}...")
-        
+
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
@@ -105,27 +104,27 @@ def _username_from_token(token: str) -> Optional[str]:
             # Если sub содержит @, то это username
             if '@' in sub:
                 logger.debug(
-                    f"_username_from_token: sub contains @, returning as username"
+                    "_username_from_token: sub contains @, returning as username"
                 )
                 return sub
             # Если sub содержит только цифры, то это ID как строка - возвращаем для поиска по ID
             elif sub.isdigit():
                 logger.debug(
-                    f"_username_from_token: sub is digit string, returning for ID search"
+                    "_username_from_token: sub is digit string, returning for ID search"
                 )
                 return sub
             else:
-                logger.debug(f"_username_from_token: returning sub as username")
+                logger.debug("_username_from_token: returning sub as username")
                 return sub
 
         logger.debug("_username_from_token: no valid username found")
         return None
     except JWTError as e:
-        logger.debug(f"_username_from_token: JWT decode error: {e}")
+        logger.warning("_username_from_token: JWT decode error: %s", e)
         return None
 
 
-async def _get_user_by_username(db, username: str) -> Optional[User]:
+async def _get_user_by_username(db, username: str) -> User | None:
     """
     Universal helper that supports both AsyncSession and sync Session.
 
@@ -170,7 +169,7 @@ async def _get_user_by_username(db, username: str) -> Optional[User]:
     return None
 
 
-async def _get_user_by_id(db, user_id: int) -> Optional[User]:
+async def _get_user_by_id(db, user_id: int) -> User | None:
     """
     Получить пользователя по числовому ID, поддерживая как AsyncSession, так и sync Session.
     """
@@ -222,7 +221,7 @@ async def get_current_user(
     # Пытаемся декодировать токен и поддержать оба варианта: username или числовой sub (user_id)
     username = _username_from_token(token)
     logger.debug(f"get_current_user: username from token={username}")
-    user: Optional[User] = None
+    user: User | None = None
 
     try:
         if username:
@@ -275,18 +274,20 @@ async def get_current_user(
                 logger.debug("get_current_user: JWT decode error")
                 user = None
     except Exception as e:
-        logger.debug(f"get_current_user: exception: {e}")
+        logger.warning(
+            "get_current_user: validation failed: %s (%s)",
+            type(e).__name__,
+            str(e),
+            exc_info=False,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     if not user:
-        try:
-            logger.debug("[deps.get_current_user] user not found")
-        except Exception:
-            pass
+        logger.warning("[deps.get_current_user] user not found (username from token may not exist in DB)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
@@ -329,7 +330,7 @@ def require_roles(*roles: str) -> Callable[..., Any]:
     return _require_roles(*roles)
 
 
-def get_current_user_from_request(request: Request) -> Optional[User]:
+def get_current_user_from_request(request: Request) -> User | None:
     """Получить текущего пользователя из состояния запроса (для middleware)"""
     user_id = getattr(request.state, 'user_id', None)
     if not user_id:
@@ -344,12 +345,12 @@ def get_current_user_from_request(request: Request) -> Optional[User]:
         db.close()
 
 
-def get_current_user_id(request: Request) -> Optional[int]:
+def get_current_user_id(request: Request) -> int | None:
     """Получить ID текущего пользователя из состояния запроса"""
     return getattr(request.state, 'user_id', None)
 
 
-def get_current_user_role(request: Request) -> Optional[str]:
+def get_current_user_role(request: Request) -> str | None:
     """Получить роль текущего пользователя из состояния запроса"""
     return getattr(request.state, 'role', None)
 
@@ -418,12 +419,12 @@ def require_staff(request: Request) -> User:
     return user
 
 
-def get_optional_user(request: Request) -> Optional[User]:
+def get_optional_user(request: Request) -> User | None:
     """Получить пользователя, если он аутентифицирован (опционально)"""
     return get_current_user_from_request(request)
 
 
-def validate_token(token: str, db: Session) -> Optional[dict]:
+def validate_token(token: str, db: Session) -> dict | None:
     """Валидирует JWT токен"""
     if not get_authentication_service:
         return None
@@ -436,7 +437,7 @@ def validate_token(token: str, db: Session) -> Optional[dict]:
         return None
 
 
-def get_user_from_token(token: str, db: Session) -> Optional[User]:
+def get_user_from_token(token: str, db: Session) -> User | None:
     """Получить пользователя по токену"""
     payload = validate_token(token, db)
     if not payload:

@@ -9,14 +9,12 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
-from sqlalchemy import and_, desc, or_
+from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.models.user import User
 from app.models.webhook import (
     Webhook,
     WebhookCall,
@@ -42,14 +40,14 @@ class WebhookService:
         self,
         name: str,
         url: str,
-        events: List[str],
+        events: list[str],
         description: str = None,
-        headers: Dict[str, str] = None,
+        headers: dict[str, str] = None,
         secret: str = None,
         max_retries: int = 3,
         retry_delay: int = 60,
         timeout: int = 30,
-        filters: Dict[str, Any] = None,
+        filters: dict[str, Any] = None,
         created_by: int = None,
     ) -> Webhook:
         """Создает новый webhook"""
@@ -80,7 +78,7 @@ class WebhookService:
             self.db.rollback()
             raise
 
-    def update_webhook(self, webhook_id: int, **updates) -> Optional[Webhook]:
+    def update_webhook(self, webhook_id: int, **updates) -> Webhook | None:
         """Обновляет webhook"""
         try:
             webhook = self.db.query(Webhook).filter(Webhook.id == webhook_id).first()
@@ -120,7 +118,7 @@ class WebhookService:
             self.db.rollback()
             raise
 
-    def get_webhook(self, webhook_id: int) -> Optional[Webhook]:
+    def get_webhook(self, webhook_id: int) -> Webhook | None:
         """Получает webhook по ID"""
         return self.db.query(Webhook).filter(Webhook.id == webhook_id).first()
 
@@ -130,7 +128,7 @@ class WebhookService:
         event_type: str = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Webhook]:
+    ) -> list[Webhook]:
         """Получает список webhook'ов с фильтрацией"""
         query = self.db.query(Webhook)
 
@@ -149,7 +147,7 @@ class WebhookService:
     async def trigger_event(
         self,
         event_type: WebhookEventType,
-        event_data: Dict[str, Any],
+        event_data: dict[str, Any],
         source: str = "api",
         source_id: str = None,
         correlation_id: str = None,
@@ -206,7 +204,7 @@ class WebhookService:
             raise
 
     def _should_trigger_webhook(
-        self, webhook: Webhook, event_data: Dict[str, Any]
+        self, webhook: Webhook, event_data: dict[str, Any]
     ) -> bool:
         """Проверяет, должен ли webhook быть вызван на основе фильтров"""
         if not webhook.filters:
@@ -228,7 +226,7 @@ class WebhookService:
             return True  # При ошибке фильтрации отправляем webhook
 
     async def _send_webhook_async(
-        self, webhook: Webhook, event_type: WebhookEventType, event_data: Dict[str, Any]
+        self, webhook: Webhook, event_type: WebhookEventType, event_data: dict[str, Any]
     ):
         """Асинхронно отправляет webhook"""
         try:
@@ -269,7 +267,7 @@ class WebhookService:
             # Подготавливаем заголовки
             headers = {
                 "Content-Type": "application/json",
-                "User-Agent": f"MediLab-Webhook/1.0",
+                "User-Agent": "MediLab-Webhook/1.0",
                 "X-Webhook-Event": call.event_type.value,
                 "X-Webhook-ID": webhook.uuid,
                 "X-Webhook-Attempt": str(call.attempt_number),
@@ -470,7 +468,7 @@ class WebhookService:
 
     # ===================== СТАТИСТИКА И МОНИТОРИНГ =====================
 
-    def get_webhook_stats(self, webhook_id: int) -> Dict[str, Any]:
+    def get_webhook_stats(self, webhook_id: int) -> dict[str, Any]:
         """Получает статистику webhook'а"""
         webhook = self.get_webhook(webhook_id)
         if not webhook:
@@ -540,7 +538,7 @@ class WebhookService:
             },
         }
 
-    def get_system_webhook_stats(self) -> Dict[str, Any]:
+    def get_system_webhook_stats(self) -> dict[str, Any]:
         """Получает общую статистику системы webhook'ов"""
         total_webhooks = self.db.query(Webhook).count()
         active_webhooks = (

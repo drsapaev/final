@@ -20,12 +20,13 @@ import hashlib
 import re
 import uuid
 from datetime import datetime
-from typing import Optional, List, Literal
 from enum import Enum
+from typing import Literal
 
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel, Field
 
 from app.db.base_class import Base
 
@@ -42,7 +43,7 @@ class SectionType(str, Enum):
 class DoctorSectionTemplate(Base):
     """
     Универсальный шаблон секции EMR врача.
-    
+
     Attributes:
         id: UUID шаблона
         doctor_id: ID врача-владельца
@@ -101,7 +102,7 @@ class DoctorSectionTemplate(Base):
 class DoctorSectionTemplateBase(BaseModel):
     """Base schema for template"""
     section_type: SectionType
-    icd10_code: Optional[str] = None
+    icd10_code: str | None = None
     template_text: str
 
 
@@ -120,22 +121,21 @@ class DoctorSectionTemplateResponse(BaseModel):
     """Response schema with all fields"""
     id: str
     section_type: str
-    icd10_code: Optional[str] = None
+    icd10_code: str | None = None
     template_text: str
     usage_count: int = 1
     is_pinned: bool = False
-    frequency_label: Optional[str] = None  # "часто" | "редко" | None
+    frequency_label: str | None = None  # "часто" | "редко" | None
     is_stale: bool = False  # True if not used > 12 months
-    last_used_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
+    created_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DoctorSectionTemplatesListResponse(BaseModel):
     """Response for list of templates"""
     section_type: str
-    icd10_code: Optional[str] = None
-    templates: List[DoctorSectionTemplateResponse] = []
+    icd10_code: str | None = None
+    templates: list[DoctorSectionTemplateResponse] = []
     total: int = 0

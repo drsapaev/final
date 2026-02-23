@@ -1,5 +1,3 @@
-import React from 'react';
-
 // Minimal macOS-style Typography supporting common MUI variants
 const variantMap = {
   h1: { fontSize: '28px', fontWeight: 700 },
@@ -31,6 +29,7 @@ const Typography = ({ children, variant = 'body1', color, gutterBottom = false, 
     color: color ? (colorMap[color] || color) : 'var(--mac-text-primary)',
     ...(variantMap[variant] || variantMap.body1),
     ...(gutterBottom ? { marginBottom: '8px' } : {}),
+    ...(paragraph ? { marginBottom: '16px' } : {}),
     ...style
   };
   const Tag = variant.startsWith('h') ? 'h' + variant.replace('h', '') : 'p';

@@ -46,7 +46,7 @@ def audit_all_foreign_keys(conn) -> Dict[str, any]:
     """Аудит всех внешних ключей в базе данных"""
     inspector = inspect(conn)
     tables = inspector.get_table_names()
-    
+
     results = {
         "total_tables": len(tables),
         "tables_with_fks": 0,
@@ -54,38 +54,38 @@ def audit_all_foreign_keys(conn) -> Dict[str, any]:
         "orphaned_records": [],
         "errors": []
     }
-    
+
     print("=" * 80)
     print("АУДИТ ВНЕШНИХ КЛЮЧЕЙ И ORPHANED RECORDS")
     print("=" * 80)
     print()
-    
+
     for table in tables:
         fks = get_foreign_keys(conn, table)
         if not fks:
             continue
-        
+
         results["tables_with_fks"] += 1
         results["total_fks"] += len(fks)
-        
+
         print(f"📋 Таблица: {table}")
         for fk in fks:
             fk_name = fk.get("name", "unnamed")
             constrained_columns = fk.get("constrained_columns", [])
             referred_table = fk.get("referred_table", "")
             referred_columns = fk.get("referred_columns", [])
-            
+
             if not constrained_columns or not referred_table:
                 continue
-            
+
             fk_column = constrained_columns[0]
             parent_pk = referred_columns[0] if referred_columns else "id"
-            
+
             print(f"  🔗 FK: {fk_column} -> {referred_table}.{parent_pk}")
-            
+
             # Проверяем orphaned records
             orphan_count = check_orphaned_records(conn, table, fk_column, referred_table, parent_pk)
-            
+
             if orphan_count > 0:
                 results["orphaned_records"].append({
                     "table": table,
@@ -103,9 +103,9 @@ def audit_all_foreign_keys(conn) -> Dict[str, any]:
                     "column": fk_column,
                     "error": "Check failed"
                 })
-        
+
         print()
-    
+
     return results
 
 
@@ -119,23 +119,23 @@ def main():
             url = getattr(settings, "DATABASE_URL", None)
         except Exception:
             pass
-    
+
     if not url:
         url = "sqlite:///./clinic.db"
         print(f"⚠️  DATABASE_URL не установлен, используем: {url}", file=sys.stderr)
-    
+
     # Нормализуем SQLite URL
     if url.startswith("sqlite+aiosqlite://"):
         url = url.replace("sqlite+aiosqlite://", "sqlite://", 1)
-    
+
     engine = sa.create_engine(url, future=True)
-    
+
     with engine.connect() as conn:
         # ✅ SECURITY: Включаем проверку FK для SQLite
         if url.startswith("sqlite"):
             conn.execute(text("PRAGMA foreign_keys=ON"))
             print("✅ Foreign key enforcement включен для SQLite\n")
-        
+
         # Проверяем, включены ли FK
         if url.startswith("sqlite"):
             fk_status = conn.execute(text("PRAGMA foreign_keys")).fetchone()
@@ -143,10 +143,10 @@ def main():
                 print("✅ Foreign keys включены в SQLite\n")
             else:
                 print("⚠️  WARNING: Foreign keys НЕ включены в SQLite!\n")
-        
+
         # Выполняем аудит
         results = audit_all_foreign_keys(conn)
-    
+
     # Выводим итоговый отчет
     print("=" * 80)
     print("ИТОГОВЫЙ ОТЧЕТ")
@@ -157,7 +157,7 @@ def main():
     print(f"Orphaned записей найдено: {len(results['orphaned_records'])}")
     print(f"Ошибок: {len(results['errors'])}")
     print()
-    
+
     if results['orphaned_records']:
         print("⚠️  ORPHANED RECORDS НАЙДЕНЫ:")
         for orphan in results['orphaned_records']:

@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  DollarSign, 
-  User, 
+import { useState, useEffect, useCallback } from 'react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  DollarSign,
+  User,
   Calendar,
   AlertCircle,
-  FileText,
+
   Filter,
-  RefreshCw
-} from 'lucide-react';
+  RefreshCw } from
+'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
-const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
+const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
 /**
  * Компонент для одобрения/отклонения изменений цен врачами
  */
-const PriceOverrideApproval = () => {
-  const { theme, getColor } = useTheme();
+const PriceOverrideApproval = () => {void
+  useTheme();
   const [priceOverrides, setPriceOverrides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
@@ -30,11 +30,7 @@ const PriceOverrideApproval = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    loadPriceOverrides();
-  }, [statusFilter]);
-
-  const loadPriceOverrides = async () => {
+  const loadPriceOverrides = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(
@@ -52,7 +48,11 @@ const PriceOverrideApproval = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
+
+  useEffect(() => {
+    loadPriceOverrides();
+  }, [loadPriceOverrides]);
 
   const handleApproval = async (overrideId, action, rejectionReason = null) => {
     setIsProcessing(true);
@@ -70,10 +70,10 @@ const PriceOverrideApproval = () => {
       if (response.ok) {
         const result = await response.json();
         toast.success(result.message);
-        
+
         // Обновляем список
         loadPriceOverrides();
-        
+
         // Закрываем модальное окно
         setShowApprovalModal(false);
         setSelectedOverride(null);
@@ -96,39 +96,39 @@ const PriceOverrideApproval = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'approved': return 'text-green-600 bg-green-100';
-      case 'rejected': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'pending':return 'text-yellow-600 bg-yellow-100';
+      case 'approved':return 'text-green-600 bg-green-100';
+      case 'rejected':return 'text-red-600 bg-red-100';
+      default:return 'text-gray-600 bg-gray-100';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending': return <Clock size={16} />;
-      case 'approved': return <CheckCircle size={16} />;
-      case 'rejected': return <XCircle size={16} />;
-      default: return <AlertCircle size={16} />;
+      case 'pending':return <Clock size={16} />;
+      case 'approved':return <CheckCircle size={16} />;
+      case 'rejected':return <XCircle size={16} />;
+      default:return <AlertCircle size={16} />;
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending': return 'Ожидает одобрения';
-      case 'approved': return 'Одобрено';
-      case 'rejected': return 'Отклонено';
-      default: return status;
+      case 'pending':return 'Ожидает одобрения';
+      case 'approved':return 'Одобрено';
+      case 'rejected':return 'Отклонено';
+      default:return status;
     }
   };
 
   const getSpecialtyText = (specialty) => {
     switch (specialty) {
-      case 'dermatology': return 'Дерматология';
-      case 'cosmetology': return 'Косметология';
-      case 'stomatology': return 'Стоматология';
-      case 'dental': return 'Стоматология';
-      case 'cardiology': return 'Кардиология';
-      default: return specialty;
+      case 'dermatology':return 'Дерматология';
+      case 'cosmetology':return 'Косметология';
+      case 'stomatology':return 'Стоматология';
+      case 'dental':return 'Стоматология';
+      case 'cardiology':return 'Кардиология';
+      default:return specialty;
     }
   };
 
@@ -152,8 +152,8 @@ const PriceOverrideApproval = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+              
               <option value="pending">Ожидают одобрения</option>
               <option value="approved">Одобренные</option>
               <option value="rejected">Отклоненные</option>
@@ -165,8 +165,8 @@ const PriceOverrideApproval = () => {
           <button
             onClick={loadPriceOverrides}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          >
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+            
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Обновить
           </button>
@@ -174,23 +174,23 @@ const PriceOverrideApproval = () => {
       </div>
 
       {/* Список изменений цен */}
-      {loading ? (
-        <div className="text-center py-8">
+      {loading ?
+      <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
           <p className="text-gray-500 mt-2">Загрузка...</p>
-        </div>
-      ) : priceOverrides.length === 0 ? (
-        <div className="text-center py-8">
+        </div> :
+      priceOverrides.length === 0 ?
+      <div className="text-center py-8">
           <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500">Изменений цен не найдено</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {priceOverrides.map((override) => (
-            <div
-              key={override.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm"
-            >
+        </div> :
+
+      <div className="grid gap-4">
+          {priceOverrides.map((override) =>
+        <div
+          key={override.id}
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+          
               {/* Header карточки */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -273,44 +273,44 @@ const PriceOverrideApproval = () => {
                   Обоснование
                 </label>
                 <div className="text-sm">{override.reason}</div>
-                {override.details && (
-                  <div className="text-sm text-gray-500 mt-1">{override.details}</div>
-                )}
+                {override.details &&
+            <div className="text-sm text-gray-500 mt-1">{override.details}</div>
+            }
               </div>
 
               {/* Действия */}
-              {override.status === 'pending' && (
-                <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              {override.status === 'pending' &&
+          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
-                    onClick={() => handleApproval(override.id, 'approve')}
-                    disabled={isProcessing}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                  >
+              onClick={() => handleApproval(override.id, 'approve')}
+              disabled={isProcessing}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50">
+              
                     <CheckCircle size={16} />
                     Одобрить
                   </button>
                   
                   <button
-                    onClick={() => {
-                      setSelectedOverride(override);
-                      setShowApprovalModal(true);
-                    }}
-                    disabled={isProcessing}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
-                  >
+              onClick={() => {
+                setSelectedOverride(override);
+                setShowApprovalModal(true);
+              }}
+              disabled={isProcessing}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50">
+              
                     <XCircle size={16} />
                     Отклонить
                   </button>
                 </div>
-              )}
+          }
             </div>
-          ))}
+        )}
         </div>
-      )}
+      }
 
       {/* Модальное окно для отклонения */}
-      {showApprovalModal && selectedOverride && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {showApprovalModal && selectedOverride &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -331,47 +331,46 @@ const PriceOverrideApproval = () => {
                   Причина отклонения
                 </label>
                 <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Укажите причину отклонения..."
-                />
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="Укажите причину отклонения..." />
+              
               </div>
               
               <div className="flex gap-3">
                 <button
-                  onClick={() => handleApproval(selectedOverride.id, 'reject', rejectionReason)}
-                  disabled={isProcessing || !rejectionReason.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
-                >
-                  {isProcessing ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  ) : (
-                    <XCircle size={16} />
-                  )}
+                onClick={() => handleApproval(selectedOverride.id, 'reject', rejectionReason)}
+                disabled={isProcessing || !rejectionReason.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50">
+                
+                  {isProcessing ?
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> :
+
+                <XCircle size={16} />
+                }
                   Отклонить
                 </button>
                 
                 <button
-                  onClick={() => {
-                    setShowApprovalModal(false);
-                    setSelectedOverride(null);
-                    setRejectionReason('');
-                  }}
-                  disabled={isProcessing}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                >
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  setSelectedOverride(null);
+                  setRejectionReason('');
+                }}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+                
                   Отмена
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default PriceOverrideApproval;
-

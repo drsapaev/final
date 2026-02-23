@@ -3,24 +3,23 @@ Telegram Bot сервис для клиники
 Полнофункциональный бот с обработкой команд и webhook
 """
 
-import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
 import requests
 from sqlalchemy.orm import Session
 
 from app.crud import (
     appointment as crud_appointment,
-    lab as crud_lab,
-    patient as crud_patient,
+)
+from app.crud import (
     telegram_config as crud_telegram,
+)
+from app.crud import (
     user as crud_user,
 )
-from app.db.session import get_db
-from app.services.telegram_service import get_telegram_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ class TelegramBotService:
             logger.error(f"Ошибка инициализации бота: {e}")
             return False
 
-    async def process_webhook_update(self, update: Dict[str, Any], db: Session):
+    async def process_webhook_update(self, update: dict[str, Any], db: Session):
         """Обработка webhook обновлений от Telegram"""
         try:
             if "message" in update:
@@ -59,7 +58,7 @@ class TelegramBotService:
         except Exception as e:
             logger.error(f"Ошибка обработки webhook: {e}")
 
-    async def _handle_message(self, message: Dict[str, Any], db: Session):
+    async def _handle_message(self, message: dict[str, Any], db: Session):
         """Обработка текстовых сообщений"""
         try:
             chat_id = message["chat"]["id"]
@@ -84,12 +83,12 @@ class TelegramBotService:
         except Exception as e:
             logger.error(f"Ошибка обработки сообщения: {e}")
 
-    async def _handle_callback_query(self, callback_query: Dict[str, Any], db: Session):
+    async def _handle_callback_query(self, callback_query: dict[str, Any], db: Session):
         """Обработка callback запросов (кнопки)"""
         try:
             chat_id = callback_query["message"]["chat"]["id"]
             data = callback_query["data"]
-            user_id = callback_query["from"]["id"]
+            _user_id = callback_query["from"]["id"]
 
             # Обрабатываем callback данные
             if data.startswith("confirm_"):
@@ -111,7 +110,7 @@ class TelegramBotService:
         except Exception as e:
             logger.error(f"Ошибка обработки callback: {e}")
 
-    async def _handle_inline_query(self, inline_query: Dict[str, Any], db: Session):
+    async def _handle_inline_query(self, inline_query: dict[str, Any], db: Session):
         """Обработка inline запросов"""
         try:
             query_id = inline_query["id"]
@@ -371,7 +370,7 @@ class TelegramBotService:
             await self._send_message(chat_id, "❌ Ошибка получения списка врачей.")
 
     async def _send_message(
-        self, chat_id: int, text: str, reply_markup: Optional[Dict] = None
+        self, chat_id: int, text: str, reply_markup: dict | None = None
     ):
         """Отправка сообщения в Telegram"""
         try:
@@ -416,7 +415,7 @@ class TelegramBotService:
             logger.error(f"Ошибка ответа на callback: {e}")
             return False
 
-    async def _answer_inline_query(self, query_id: str, results: List[Dict]):
+    async def _answer_inline_query(self, query_id: str, results: list[dict]):
         """Ответ на inline запрос"""
         try:
             if not self.bot_token:

@@ -3,12 +3,9 @@
 """
 
 import base64
-import hashlib
-import hmac
-import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 import requests
 
@@ -18,7 +15,7 @@ from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 class PayMeProvider(BasePaymentProvider):
     """Провайдер для PayMe платежной системы"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
 
         # Конфигурация PayMe
@@ -195,7 +192,7 @@ class PayMeProvider(BasePaymentProvider):
                 success=False, error_message=f"Ошибка проверки статуса PayMe: {str(e)}"
             )
 
-    def process_webhook(self, webhook_data: Dict[str, Any]) -> PaymentResult:
+    def process_webhook(self, webhook_data: dict[str, Any]) -> PaymentResult:
         """Обработка webhook от PayMe (JSON-RPC методы)"""
 
         try:
@@ -274,53 +271,53 @@ class PayMeProvider(BasePaymentProvider):
             )
 
     def validate_webhook_signature(
-        self, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
+        self, webhook_data: dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """
         Валидация webhook PayMe
         PayMe использует Basic Auth в Authorization header для аутентификации webhook
-        
+
         Args:
             webhook_data: Данные webhook
             signature: Не используется для PayMe (оставлен для совместимости)
             auth_header: Значение заголовка Authorization (формат: "Basic base64(Paycom:secret_key)")
-        
+
         Returns:
             bool: True если авторизация валидна
         """
         if not auth_header:
             self.log_error("validate_webhook_signature", "Missing Authorization header", webhook_data)
             return False
-        
+
         try:
             # PayMe использует Basic Auth: "Basic base64(Paycom:secret_key)"
             import base64
-            
+
             # Проверяем формат Basic Auth
             if not auth_header.startswith("Basic "):
                 self.log_error("validate_webhook_signature", "Invalid Authorization header format", {"header": auth_header[:20]})
                 return False
-            
+
             # Декодируем base64
             encoded = auth_header[6:]  # Убираем "Basic "
             decoded = base64.b64decode(encoded).decode('utf-8')
-            
+
             # Проверяем формат "Paycom:secret_key"
             if not decoded.startswith("Paycom:"):
                 self.log_error("validate_webhook_signature", "Invalid Basic Auth format", {"decoded": decoded[:20]})
                 return False
-            
+
             # Извлекаем secret_key из заголовка
             received_secret = decoded[7:]  # Убираем "Paycom:"
-            
+
             # Сравниваем с нашим secret_key
             if received_secret != self.secret_key:
                 self.log_error("validate_webhook_signature", "Secret key mismatch", {})
                 return False
-            
+
             self.log_operation("validate_webhook_signature", {"status": "valid"})
             return True
-            
+
         except Exception as e:
             self.log_error("validate_webhook_signature", str(e), {"auth_header": auth_header[:20] if auth_header else None})
             return False

@@ -8,7 +8,7 @@ import copy
 import logging
 import secrets
 from datetime import date, datetime, time, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_
@@ -18,7 +18,9 @@ from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.user import User
-from app.services.queue_session import get_or_create_session_id, generate_session_id_for_entry
+from app.services.queue_session import (
+    get_or_create_session_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,25 +60,25 @@ class QueueBusinessService:
     DEFAULT_MAX_SLOTS = 15
 
     def __init__(self) -> None:
-        self._cached_settings: Optional[Dict[str, Any]] = None
+        self._cached_settings: dict[str, Any] | None = None
 
     @staticmethod
     def _increment_token_usage(queue_token: QueueToken) -> None:
         """Унифицированно увеличивает счётчик использования QR-токена."""
         if hasattr(queue_token, "usage_count"):
-            current = getattr(queue_token, "usage_count") or 0
+            current = queue_token.usage_count or 0
             queue_token.usage_count = current + 1
         else:
             current = getattr(queue_token, "current_uses", 0) or 0
-            setattr(queue_token, "current_uses", current + 1)
+            queue_token.current_uses = current + 1
 
-    def _load_queue_settings(self, db: Session) -> Dict[str, Any]:
+    def _load_queue_settings(self, db: Session) -> dict[str, Any]:
         if self._cached_settings is None:
             self._cached_settings = get_queue_settings(db) or {}
         return self._cached_settings
 
     def get_local_timestamp(
-        self, db: Optional[Session] = None, timezone: Optional[str] = None
+        self, db: Session | None = None, timezone: str | None = None
     ) -> datetime:
         tz = timezone
         if tz is None and db is not None:
@@ -90,7 +92,7 @@ class QueueBusinessService:
             zone = ZoneInfo("Asia/Tashkent")
         return datetime.now(zone)
 
-    def normalize_queue_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize_queue_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise QueueValidationError("Payload must be a dictionary")
 
@@ -111,7 +113,7 @@ class QueueBusinessService:
         normalized.setdefault("metadata", {})
         return normalized
 
-    def validate_queue_input(self, payload: Dict[str, Any]) -> None:
+    def validate_queue_input(self, payload: dict[str, Any]) -> None:
         if not payload.get("source"):
             raise QueueValidationError("source is required")
 
@@ -149,8 +151,8 @@ class QueueBusinessService:
 
     @classmethod
     def check_queue_time_window(
-        cls, target_date: date, queue_opened_at: Optional[datetime] = None
-    ) -> Tuple[bool, str]:
+        cls, target_date: date, queue_opened_at: datetime | None = None
+    ) -> tuple[bool, str]:
         """
         Проверить, доступна ли онлайн-запись по времени
 
@@ -185,7 +187,7 @@ class QueueBusinessService:
     @classmethod
     def check_queue_limits(
         cls, db: Session, daily_queue: DailyQueue
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Проверить лимиты очереди
 
@@ -216,10 +218,10 @@ class QueueBusinessService:
         cls,
         db: Session,
         daily_queue: DailyQueue,
-        phone: Optional[str] = None,
-        telegram_id: Optional[str] = None,
+        phone: str | None = None,
+        telegram_id: str | None = None,
         source: str = "online",  # ✅ Added source parameter
-    ) -> Tuple[Optional[OnlineQueueEntry], str]:
+    ) -> tuple[OnlineQueueEntry | None, str]:
         """
         Проверить уникальность записи
 
@@ -228,14 +230,14 @@ class QueueBusinessService:
         """
         if not phone and not telegram_id:
             return None, ""
-            
+
         # ✅ SKIP CHECK for trusted sources (desk, morning_assignment)
         # This allows registrars to add multiple services/appointments for the same patient
         # The uniqueness check is primarily for online/QR users to prevent spam
         # We need to pass 'source' to check_uniqueness or check it before calling
         # ✅ ALLOW DUPLICATES for trusted sources
         if source in ["desk", "morning_assignment"]:
-            return None, "" 
+            return None, ""
 
         if phone:
             phone_entry = (
@@ -283,7 +285,7 @@ class QueueBusinessService:
         return max(max_number + 1, start_number)
 
     @classmethod
-    def get_queue_statistics(cls, db: Session, daily_queue: DailyQueue) -> Dict:
+    def get_queue_statistics(cls, db: Session, daily_queue: DailyQueue) -> dict:
         """Получить статистику очереди"""
         entries = (
             db.query(OnlineQueueEntry)
@@ -316,9 +318,9 @@ class QueueBusinessService:
     def validate_queue_entry_data(
         cls,
         patient_name: str,
-        phone: Optional[str] = None,
-        telegram_id: Optional[str] = None,
-    ) -> Tuple[bool, str]:
+        phone: str | None = None,
+        telegram_id: str | None = None,
+    ) -> tuple[bool, str]:
         """Валидация данных записи в очередь"""
         if not patient_name or not patient_name.strip():
             return False, "❌ Укажите ваше ФИО"
@@ -348,27 +350,27 @@ class QueueBusinessService:
         *,
         day: date,
         specialist_id: int,
-        queue_tag: Optional[str] = None,
-        defaults: Optional[Dict[str, Any]] = None,
+        queue_tag: str | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> DailyQueue:
         """
         Получить или создать ежедневную очередь
-        
+
         Args:
             db: Database session
             day: Дата очереди
             specialist_id: ID врача (ForeignKey на doctors.id)
             queue_tag: Тег очереди (опционально)
             defaults: Значения по умолчанию
-        
+
         Returns:
             DailyQueue instance
-        
+
         Raises:
             IntegrityError: Если врач с specialist_id не существует
         """
         defaults = defaults or {}
-        
+
         # ✅ SECURITY: Проверяем существование врача перед созданием очереди
         # ✅ ИСПРАВЛЕНО: Используем правильный импорт Doctor из app.models.clinic
         # ✅ ИСПРАВЛЕНО: Проверяем как по doctor.id, так и по doctor.user_id (для совместимости)
@@ -389,11 +391,11 @@ class QueueBusinessService:
             raise ValueError(
                 f"Врач с ID {specialist_id} не найден. Невозможно создать очередь."
             )
-        
+
         # ✅ ИСПРАВЛЕНО: Используем doctor.id для specialist_id (ForeignKey на doctors.id)
         # DailyQueue.specialist_id должен быть doctor.id, а не doctor.user_id
         actual_specialist_id = doctor.id
-        
+
         # ⭐ SSOT FIX: Сначала ищем очередь по (day, queue_tag), игнорируя specialist_id
         # Это предотвращает создание дубликатов очередей с разными specialist_id
         if queue_tag:
@@ -405,7 +407,7 @@ class QueueBusinessService:
             ).first()
             if existing_by_tag:
                 return existing_by_tag
-        
+
         # Fallback: ищем по specialist_id (для legacy совместимости или без queue_tag)
         query = db.query(DailyQueue).filter(
             DailyQueue.day == day,
@@ -456,10 +458,10 @@ class QueueBusinessService:
         self,
         db: Session,
         *,
-        daily_queue: Optional[DailyQueue] = None,
-        queue_id: Optional[int] = None,
-        default_start: Optional[int] = None,
-        queue_tag: Optional[str] = None,
+        daily_queue: DailyQueue | None = None,
+        queue_id: int | None = None,
+        default_start: int | None = None,
+        queue_tag: str | None = None,
         scope: str = "per_queue",
     ) -> int:
         """
@@ -511,15 +513,15 @@ class QueueBusinessService:
         self,
         db: Session,
         *,
-        specialist_id: Optional[int],
-        department: Optional[str],
-        generated_by_user_id: Optional[int],
-        target_date: Optional[date] = None,
+        specialist_id: int | None,
+        department: str | None,
+        generated_by_user_id: int | None,
+        target_date: date | None = None,
         expires_hours: int = 24,
         is_clinic_wide: bool = False,
-        queue_tag: Optional[str] = None,
+        queue_tag: str | None = None,
         commit: bool = True,
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         """
         Создаёт QR-токен для очереди и возвращает его вместе с метаданными.
         """
@@ -534,10 +536,10 @@ class QueueBusinessService:
             if now_local.hour >= int(cutoff_hour):
                 day += timedelta(days=1)
 
-        doctor: Optional[Doctor] = None
-        daily_queue: Optional[DailyQueue] = None
+        doctor: Doctor | None = None
+        daily_queue: DailyQueue | None = None
         queue_user_id = specialist_id
-        doctor_id: Optional[int] = None
+        doctor_id: int | None = None
 
         if not is_clinic_wide:
             if specialist_id is None:
@@ -647,7 +649,7 @@ class QueueBusinessService:
 
     def validate_queue_token(
         self, db: Session, token: str
-    ) -> Tuple[QueueToken, Dict[str, Any]]:
+    ) -> tuple[QueueToken, dict[str, Any]]:
         queue_token = db.query(QueueToken).filter(QueueToken.token == token).first()
         if not queue_token:
             raise QueueValidationError("Неверный или истёкший QR токен")
@@ -666,7 +668,7 @@ class QueueBusinessService:
             if expires_cmp <= now_local:
                 raise QueueValidationError("Срок действия QR токена истёк")
 
-        daily_queue: Optional[DailyQueue] = None
+        daily_queue: DailyQueue | None = None
         if not queue_token.is_clinic_wide and queue_token.specialist_id:
             # ✅ ИСПРАВЛЕНО: DailyQueue.specialist_id ссылается на doctors.id,
             # а не на users.id. queue_token.specialist_id уже содержит doctor.id
@@ -706,12 +708,12 @@ class QueueBusinessService:
         *,
         token_str: str,
         patient_name: str,
-        phone: Optional[str] = None,
-        telegram_id: Optional[int] = None,
-        specialist_id_override: Optional[int] = None,
-        patient_id: Optional[int] = None,
+        phone: str | None = None,
+        telegram_id: int | None = None,
+        specialist_id_override: int | None = None,
+        patient_id: int | None = None,
         source: str = "online",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Единая точка входа для присоединения к очереди через QR-токен.
 
@@ -722,7 +724,7 @@ class QueueBusinessService:
         queue_settings = self._load_queue_settings(db)
 
         day = token_meta.get("day") or token_obj.day
-        daily_queue: Optional[DailyQueue] = token_meta.get("daily_queue")
+        daily_queue: DailyQueue | None = token_meta.get("daily_queue")
         specialist_name = token_meta.get("specialist_name")
         cabinet = token_meta.get("cabinet")
 
@@ -736,19 +738,19 @@ class QueueBusinessService:
             # 2. Doctor.id (legacy)
             # Сначала проверяем, не является ли это QueueProfile.id
             from app.models.queue_profile import QueueProfile
-            
+
             queue_profile = db.query(QueueProfile).filter(
                 QueueProfile.id == specialist_id_override,
                 QueueProfile.is_active == True
             ).first()
-            
+
             if queue_profile:
                 # ⭐ Это QueueProfile.id - ищем врача по specialty, соответствующему профилю
                 # QueueProfile.key - это "cardiology", "dermatology", etc.
                 # QueueProfile.queue_tags - это список возможных doctor.specialty значений
                 profile_key = queue_profile.key
                 queue_tags = queue_profile.queue_tags or [profile_key]
-                
+
                 # Ищем врача с specialty из queue_tags профиля
                 doctor = (
                     db.query(Doctor)
@@ -758,7 +760,7 @@ class QueueBusinessService:
                     )
                     .first()
                 )
-                
+
                 # Если не нашли - используем queue_tag напрямую из профиля
                 if not doctor:
                     # Создаём/получаем очередь по queue_tag профиля
@@ -766,7 +768,7 @@ class QueueBusinessService:
                     fallback_doctor = db.query(Doctor).filter(Doctor.active.is_(True)).first()
                     if not fallback_doctor:
                         raise QueueValidationError("Нет доступных врачей")
-                    
+
                     queue_user_id = fallback_doctor.user_id or fallback_doctor.id
                     queue_tag = profile_key  # ⭐ Используем ключ профиля как queue_tag
                     defaults = {
@@ -931,23 +933,23 @@ class QueueBusinessService:
         self,
         db: Session,
         *,
-        daily_queue: Optional[DailyQueue] = None,
-        payload: Optional[Dict[str, Any]] = None,
-        queue_id: Optional[int] = None,
-        number: Optional[int] = None,
-        patient_id: Optional[int] = None,
-        patient_name: Optional[str] = None,
-        phone: Optional[str] = None,
-        telegram_id: Optional[str] = None,
-        visit_id: Optional[int] = None,
+        daily_queue: DailyQueue | None = None,
+        payload: dict[str, Any] | None = None,
+        queue_id: int | None = None,
+        number: int | None = None,
+        patient_id: int | None = None,
+        patient_name: str | None = None,
+        phone: str | None = None,
+        telegram_id: str | None = None,
+        visit_id: int | None = None,
         visit_type: str = "paid",
         discount_mode: str = "none",
-        services: Optional[List[Dict[str, Any]]] = None,
-        service_codes: Optional[List[str]] = None,
-        total_amount: Optional[int] = None,
+        services: list[dict[str, Any]] | None = None,
+        service_codes: list[str] | None = None,
+        total_amount: int | None = None,
         source: str = "desk",
         status: str = "waiting",
-        queue_time: Optional[datetime] = None,
+        queue_time: datetime | None = None,
         auto_number: bool = False,
         commit: bool = True,
     ) -> OnlineQueueEntry:
@@ -1032,8 +1034,8 @@ class QueueBusinessService:
         *,
         entry_id: int,
         new_status: str,
-        meta: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        meta: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         raise NotImplementedError("update_queue_status is pending implementation")
 
     def validate_status_transition(self, current_status: str, new_status: str) -> None:
@@ -1047,26 +1049,26 @@ class QueueBusinessService:
         *,
         entry_id: int,
         result_status: str = "served",
-        closed_by: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        closed_by: int | None = None,
+    ) -> dict[str, Any]:
         raise NotImplementedError("close_queue_entry is pending implementation")
 
-    def calculate_wait_time(self, entry: OnlineQueueEntry) -> Dict[str, Any]:
+    def calculate_wait_time(self, entry: OnlineQueueEntry) -> dict[str, Any]:
         raise NotImplementedError("calculate_wait_time is pending implementation")
 
     def get_visit_history(
         self, db: Session, *, patient_id: int, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         raise NotImplementedError("get_visit_history is pending implementation")
 
     def reorder_queue(
-        self, db: Session, *, queue_id: int, entry_orders: List[Dict[str, int]]
-    ) -> Dict[str, Any]:
+        self, db: Session, *, queue_id: int, entry_orders: list[dict[str, int]]
+    ) -> dict[str, Any]:
         raise NotImplementedError("reorder_queue is pending implementation")
 
     def resolve_conflicts(
         self, db: Session, *, queue_id: int, strategy: str = "compact"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         raise NotImplementedError("resolve_conflicts is pending implementation")
 
 

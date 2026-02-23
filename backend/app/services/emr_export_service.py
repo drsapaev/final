@@ -6,12 +6,7 @@ import io
 import json
 import zipfile
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-
-from app.schemas.emr import EMRBase, EMRUpdate
-from app.schemas.emr_template import EMRTemplateBase
-from app.schemas.emr_version import EMRVersionBase
+from typing import Any
 
 
 class EMRExportService:
@@ -22,11 +17,11 @@ class EMRExportService:
 
     async def export_emr_to_json(
         self,
-        emr_data: Dict[str, Any],
+        emr_data: dict[str, Any],
         include_versions: bool = False,
         include_templates: bool = False,
         include_attachments: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Экспорт EMR в JSON формат"""
         try:
             export_data = {
@@ -58,19 +53,19 @@ class EMRExportService:
             raise Exception(f"Ошибка экспорта в JSON: {str(e)}")
 
     async def export_emr_to_xml(
-        self, emr_data: Dict[str, Any], include_versions: bool = False
+        self, emr_data: dict[str, Any], include_versions: bool = False
     ) -> str:
         """Экспорт EMR в XML формат"""
         try:
             xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
             xml_content += '<emr_export>\n'
-            xml_content += f'  <metadata>\n'
+            xml_content += '  <metadata>\n'
             xml_content += (
                 f'    <export_date>{datetime.utcnow().isoformat()}</export_date>\n'
             )
-            xml_content += f'    <format_version>1.0</format_version>\n'
-            xml_content += f'    <export_type>emr</export_type>\n'
-            xml_content += f'  </metadata>\n'
+            xml_content += '    <format_version>1.0</format_version>\n'
+            xml_content += '    <export_type>emr</export_type>\n'
+            xml_content += '  </metadata>\n'
 
             xml_content += '  <emr_data>\n'
             for key, value in emr_data.items():
@@ -100,7 +95,7 @@ class EMRExportService:
             raise Exception(f"Ошибка экспорта в XML: {str(e)}")
 
     async def export_emr_to_csv(
-        self, emr_data: Dict[str, Any], fields: List[str] = None
+        self, emr_data: dict[str, Any], fields: list[str] = None
     ) -> str:
         """Экспорт EMR в CSV формат"""
         try:
@@ -112,7 +107,7 @@ class EMRExportService:
             row_data = []
             for field in fields:
                 value = emr_data.get(field, '')
-                if isinstance(value, (dict, list)):
+                if isinstance(value, dict | list):
                     value = str(value)
                 row_data.append(f'"{value}"')
 
@@ -124,7 +119,7 @@ class EMRExportService:
             raise Exception(f"Ошибка экспорта в CSV: {str(e)}")
 
     async def export_emr_to_zip(
-        self, emr_data: Dict[str, Any], include_attachments: bool = True
+        self, emr_data: dict[str, Any], include_attachments: bool = True
     ) -> bytes:
         """Экспорт EMR в ZIP архив"""
         try:
@@ -163,8 +158,8 @@ class EMRExportService:
             raise Exception(f"Ошибка экспорта в ZIP: {str(e)}")
 
     async def import_emr_from_json(
-        self, json_data: Union[str, Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, json_data: str | dict[str, Any]
+    ) -> dict[str, Any]:
         """Импорт EMR из JSON формата"""
         try:
             if isinstance(json_data, str):
@@ -191,7 +186,7 @@ class EMRExportService:
         except Exception as e:
             raise Exception(f"Ошибка импорта из JSON: {str(e)}")
 
-    async def import_emr_from_xml(self, xml_data: str) -> Dict[str, Any]:
+    async def import_emr_from_xml(self, xml_data: str) -> dict[str, Any]:
         """Импорт EMR из XML формата"""
         try:
             import xml.etree.ElementTree as ET
@@ -216,7 +211,7 @@ class EMRExportService:
         except Exception as e:
             raise Exception(f"Ошибка импорта из XML: {str(e)}")
 
-    async def import_emr_from_zip(self, zip_data: bytes) -> Dict[str, Any]:
+    async def import_emr_from_zip(self, zip_data: bytes) -> dict[str, Any]:
         """Импорт EMR из ZIP архива"""
         try:
             zip_buffer = io.BytesIO(zip_data)
@@ -236,8 +231,8 @@ class EMRExportService:
             raise Exception(f"Ошибка импорта из ZIP: {str(e)}")
 
     async def validate_import_data(
-        self, data: Union[str, Dict[str, Any], bytes], format_type: str = 'json'
-    ) -> Dict[str, Any]:
+        self, data: str | dict[str, Any] | bytes, format_type: str = 'json'
+    ) -> dict[str, Any]:
         """Валидация импортируемых данных"""
         try:
             validation_result = {
@@ -330,17 +325,17 @@ class EMRExportService:
                 "format_version": None,
             }
 
-    async def get_export_formats(self) -> List[str]:
+    async def get_export_formats(self) -> list[str]:
         """Получить список поддерживаемых форматов экспорта"""
         return self.supported_formats
 
-    async def get_import_formats(self) -> List[str]:
+    async def get_import_formats(self) -> list[str]:
         """Получить список поддерживаемых форматов импорта"""
         return ['json', 'xml', 'zip']
 
     async def estimate_export_size(
-        self, emr_data: Dict[str, Any], format_type: str = 'json'
-    ) -> Dict[str, Any]:
+        self, emr_data: dict[str, Any], format_type: str = 'json'
+    ) -> dict[str, Any]:
         """Оценить размер экспортируемых данных"""
         try:
             if format_type == 'json':

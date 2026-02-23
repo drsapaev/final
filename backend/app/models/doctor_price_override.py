@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.clinic import Doctor
+    from app.models.service import Service
+    from app.models.user import User
+    from app.models.visit import Visit
 
 
 class DoctorPriceOverride(Base):
@@ -21,21 +27,21 @@ class DoctorPriceOverride(Base):
 
     # Связи
     visit_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("visits.id", ondelete="SET NULL"), 
-        nullable=True, 
+        Integer,
+        ForeignKey("visits.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve override record
     doctor_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("doctors.id", ondelete="SET NULL"), 
-        nullable=True, 
+        Integer,
+        ForeignKey("doctors.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve override record
     service_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("services.id", ondelete="SET NULL"), 
-        nullable=True, 
+        Integer,
+        ForeignKey("services.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve override record
 
@@ -45,7 +51,7 @@ class DoctorPriceOverride(Base):
 
     # Обоснование изменения
     reason: Mapped[str] = mapped_column(String(255), nullable=False)  # Краткая причина
-    details: Mapped[Optional[str]] = mapped_column(
+    details: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Подробное описание
 
@@ -55,21 +61,21 @@ class DoctorPriceOverride(Base):
     )  # pending, approved, rejected
 
     # Кто и когда одобрил/отклонил (регистратура)
-    approved_by: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    approved_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
-    approved_at: Mapped[Optional[datetime]] = mapped_column(
+    approved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    rejection_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Уведомления
     notification_sent: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
-    notification_sent_at: Mapped[Optional[datetime]] = mapped_column(
+    notification_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -85,11 +91,11 @@ class DoctorPriceOverride(Base):
     )
 
     # Связи
-    visit: Mapped["Visit"] = relationship("Visit", back_populates="price_overrides")
-    doctor: Mapped["Doctor"] = relationship("Doctor", back_populates="price_overrides")
-    service: Mapped["Service"] = relationship(
+    visit: Mapped[Visit] = relationship("Visit", back_populates="price_overrides")
+    doctor: Mapped[Doctor] = relationship("Doctor", back_populates="price_overrides")
+    service: Mapped[Service] = relationship(
         "Service", back_populates="price_overrides"
     )
-    approved_by_user: Mapped[Optional["User"]] = relationship(
+    approved_by_user: Mapped[User | None] = relationship(
         "User", foreign_keys=[approved_by]
     )

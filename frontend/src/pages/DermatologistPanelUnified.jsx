@@ -14,8 +14,8 @@ import {
   TestTube,
   Scissors,
   Sparkles,
-  DollarSign
-} from 'lucide-react';
+  DollarSign } from
+'lucide-react';
 import { MacOSButton, MacOSCard, MacOSBadge, MacOSInput, MacOSTextarea, MacOSSelect, MacOSEmptyState } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
@@ -24,7 +24,7 @@ import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import EMRSystem from '../components/medical/EMRSystem';
+import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import PhotoUploader from '../components/dermatology/PhotoUploader';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
@@ -142,7 +142,7 @@ const DermatologistPanelUnified = () => {
     derma_biopsy: 150000,
     cosm_cleaning: 80000,
     cosm_botox: 300000,
-    cosm_laser: 250000,
+    cosm_laser: 250000
   }), []);
 
   const servicesSubtotal = useMemo(() => {
@@ -181,13 +181,13 @@ const DermatologistPanelUnified = () => {
     const patientServices = new Set();
     const patientServiceCodes = new Set();
 
-    allAppointments.forEach(appointment => {
+    allAppointments.forEach((appointment) => {
       if (appointment.patient_id === patientId) {
         if (appointment.services && Array.isArray(appointment.services)) {
-          appointment.services.forEach(service => patientServices.add(service));
+          appointment.services.forEach((service) => patientServices.add(service));
         }
         if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
         }
       }
     });
@@ -227,9 +227,9 @@ const DermatologistPanelUnified = () => {
 
         // Собираем записи из очередей
         if (queuesData && queuesData.queues && Array.isArray(queuesData.queues)) {
-          queuesData.queues.forEach(queue => {
+          queuesData.queues.forEach((queue) => {
             if (queue.entries) {
-              queue.entries.forEach(entry => {
+              queue.entries.forEach((entry) => {
                 allAppointments.push({
                   id: entry.id,
                   patient_id: entry.patient_id,
@@ -269,12 +269,12 @@ const DermatologistPanelUnified = () => {
 
         if (appointmentsResponse.ok) {
           const appointmentsDBResponse = await appointmentsResponse.json();
-          const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+          const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
           logger.info('[Dermatology] Получены appointments из БД:', appointmentsDBData.length);
 
           // Создаем карту id -> payment_status
           const paymentStatusMap = new Map();
-          appointmentsDBData.forEach(apt => {
+          appointmentsDBData.forEach((apt) => {
             if (apt.id) {
               paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
             }
@@ -285,7 +285,7 @@ const DermatologistPanelUnified = () => {
           });
 
           // Обновляем payment_status в наших записях
-          allAppointments = allAppointments.map(apt => {
+          allAppointments = allAppointments.map((apt) => {
             let paymentStatus = paymentStatusMap.get(apt.id);
             if (!paymentStatus && apt.patient_id && apt.appointment_date) {
               const key = `${apt.patient_id}_${apt.appointment_date}`;
@@ -305,12 +305,12 @@ const DermatologistPanelUnified = () => {
       }
 
       // Фильтруем только дерматологические записи
-      const appointmentsData = allAppointments.filter(apt =>
-        apt.specialty === 'derma' || apt.specialty === 'dermatology'
+      const appointmentsData = allAppointments.filter((apt) =>
+      apt.specialty === 'derma' || apt.specialty === 'dermatology'
       );
 
       // Добавляем информацию о всех услугах пациента
-      const enrichedAppointmentsData = appointmentsData.map(apt => {
+      const enrichedAppointmentsData = appointmentsData.map((apt) => {
         const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
         return {
           ...apt,
@@ -490,8 +490,8 @@ const DermatologistPanelUnified = () => {
 
           if (response.ok) {
             logger.info('[Dermatology] Пациент вызван:', row.patient_fio);
-            setAppointments(prev => prev.map(a =>
-              a.id === row.id ? { ...a, status: 'called' } : a
+            setAppointments((prev) => prev.map((a) =>
+            a.id === row.id ? { ...a, status: 'called' } : a
             ));
             await loadDermatologyAppointments();
           }
@@ -542,14 +542,14 @@ const DermatologistPanelUnified = () => {
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
   const authHeader = useCallback(() => ({
-    Authorization: `Bearer ${tokenManager.getAccessToken()}`,
+    Authorization: `Bearer ${tokenManager.getAccessToken()}`
   }), []);
 
   const loadPatients = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:8000/api/v1/patients?department=Derma&limit=100', {
-        headers: authHeader(),
+        headers: authHeader()
       });
       if (response.ok) {
         const data = await response.json();
@@ -565,30 +565,30 @@ const DermatologistPanelUnified = () => {
   const loadSkinExaminations = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:8000/api/v1/derma/examinations?limit=100', {
-        headers: authHeader(),
+        headers: authHeader()
       });
       if (response.ok) {
         const data = await response.json();
         setSkinExaminations(Array.isArray(data) ? data : []);
       }
     } catch {
+
       // эндпоинт может отсутствовать
-    }
-  }, [authHeader]);
+    }}, [authHeader]);
 
   const loadCosmeticProcedures = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:8000/api/v1/derma/procedures?limit=100', {
-        headers: authHeader(),
+        headers: authHeader()
       });
       if (response.ok) {
         const data = await response.json();
         setCosmeticProcedures(Array.isArray(data) ? data : []);
       }
     } catch {
+
       // эндпоинт может отсутствовать
-    }
-  }, [authHeader]);
+    }}, [authHeader]);
 
   const loadPatientData = useCallback(async () => {
     const patientId = selectedPatient?.patient?.id;
@@ -678,30 +678,30 @@ const DermatologistPanelUnified = () => {
     loadPatientFromUrl();
   }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const saveEMR = async (emrData) => {
-    try {
-      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/emr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify(emrData)
-      });
 
-      if (response.ok) {
-        const savedEMR = await response.json();
-        setEmr(savedEMR);
-        toast.success('EMR сохранена успешно!');
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка при сохранении EMR');
-      }
-    } catch (error) {
-      logger.error('DermatologistPanel: Save EMR error:', error);
-      toast.error('Ошибка при сохранении EMR');
-    }
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   const savePrescription = async (prescriptionData) => {
     try {
@@ -756,11 +756,11 @@ const DermatologistPanelUnified = () => {
       logger.info('[Dermatology] handleSaveVisit: start', { entryId, selectedPatient, currentAppointment });
 
       // Определяем patient_id из доступных источников
-      const patientId = selectedPatient?.patient?.id
-        || selectedPatient?.patient_id
-        || currentAppointment?.patient_id
-        || selectedPatient?.id
-        || entryId;
+      const patientId = selectedPatient?.patient?.id ||
+      selectedPatient?.patient_id ||
+      currentAppointment?.patient_id ||
+      selectedPatient?.id ||
+      entryId;
 
       const visitPayload = {
         patient_id: patientId,
@@ -915,52 +915,52 @@ const DermatologistPanelUnified = () => {
         {/* Контент вкладок */}
         <div>
           {/* Записи дерматолога */}
-          {activeTab === 'appointments' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px'
-            }}>
+          {activeTab === 'appointments' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
               <MacOSCard style={{
-                padding: '24px',
-                width: '100%',
-                maxWidth: '100%',
-                minWidth: 0,
-                boxSizing: 'border-box',
-                overflow: 'hidden'
-              }}>
+              padding: '24px',
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box',
+              overflow: 'hidden'
+            }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                    display: 'flex',
-                    alignItems: 'center',
-                    margin: 0
-                  }}>
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                  display: 'flex',
+                  alignItems: 'center',
+                  margin: 0
+                }}>
                     <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Записи к дерматологу
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <MacOSBadge variant="info">Всего: {appointments.length}</MacOSBadge>
                     <MacOSBadge variant="warning">
-                      Ожидают: {appointments.filter(a => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
+                      Ожидают: {appointments.filter((a) => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
                     </MacOSBadge>
                     <MacOSBadge variant="primary">
-                      Вызваны: {appointments.filter(a => a.status === 'called' || a.status === 'in_progress').length}
+                      Вызваны: {appointments.filter((a) => a.status === 'called' || a.status === 'in_progress').length}
                     </MacOSBadge>
                     <MacOSBadge variant="success">
-                      Приняты: {appointments.filter(a => a.status === 'completed' || a.status === 'done').length}
+                      Приняты: {appointments.filter((a) => a.status === 'completed' || a.status === 'done').length}
                     </MacOSBadge>
                     <MacOSButton
-                      variant="outline"
-                      onClick={loadDermatologyAppointments}
-                      disabled={appointmentsLoading}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
+                    variant="outline"
+                    onClick={loadDermatologyAppointments}
+                    disabled={appointmentsLoading}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                       <RefreshCw size={16} />
                       Обновить
                     </MacOSButton>
@@ -968,80 +968,80 @@ const DermatologistPanelUnified = () => {
                 </div>
 
                 <EnhancedAppointmentsTable
-                  data={appointments}
-                  loading={appointmentsLoading}
-                  theme={isDark ? 'dark' : 'light'}
-                  language="ru"
-                  selectedRows={new Set()}
-                  outerBorder={false}
-                  services={services}
-                  showCheckboxes={false}
-                  view="doctor"
-                  onRowSelect={() => { }}
-                  onRowClick={handleAppointmentRowClick}
-                  onActionClick={handleAppointmentActionClick}
-                />
+                data={appointments}
+                loading={appointmentsLoading}
+                theme={isDark ? 'dark' : 'light'}
+                language="ru"
+                selectedRows={new Set()}
+                outerBorder={false}
+                services={services}
+                showCheckboxes={false}
+                view="doctor"
+                onRowSelect={() => {}}
+                onRowClick={handleAppointmentRowClick}
+                onActionClick={handleAppointmentActionClick} />
+
               </MacOSCard>
             </div>
-          )}
+          }
 
           {/* Список пациентов */}
-          {activeTab === 'patients' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'patients' &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '20px'
-                  }}>
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '20px'
+                }}>
                     <User size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Дерматологические пациенты
                   </h3>
                   <MacOSBadge variant="info">Всего: {patients.length} пациентов</MacOSBadge>
                 </div>
 
-                {loading ? (
-                  <div style={{ textAlign: 'center', padding: '32px' }}>
+                {loading ?
+              <div style={{ textAlign: 'center', padding: '32px' }}>
                     <RefreshCw size={32} style={{ margin: '0 auto 16px', color: 'var(--mac-text-secondary)', animation: 'spin 1s linear infinite' }} />
                     <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>Загрузка пациентов...</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {patients.map((patient) => (
-                      <div key={patient.id} style={{
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 'var(--mac-radius-lg)',
-                        padding: '24px',
-                        backgroundColor: 'var(--mac-bg-primary)',
-                        transition: 'box-shadow var(--mac-duration-normal) var(--mac-ease)'
-                      }}>
+                  </div> :
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {patients.map((patient) =>
+                <div key={patient.id} style={{
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  padding: '24px',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  transition: 'box-shadow var(--mac-duration-normal) var(--mac-ease)'
+                }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
                               <h4 style={{
-                                fontSize: '16px',
-                                fontWeight: '600',
-                                color: 'var(--mac-text-primary)',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-                                margin: 0
-                              }}>
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          color: 'var(--mac-text-primary)',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+                          margin: 0
+                        }}>
                                 {patient.last_name} {patient.first_name} {patient.middle_name}
                               </h4>
                               <MacOSBadge variant="success" style={{ marginLeft: '12px' }}>Дерматология</MacOSBadge>
                             </div>
                             <div style={{
-                              fontSize: '13px',
-                              color: 'var(--mac-text-secondary)',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '12px'
-                            }}>
+                        fontSize: '13px',
+                        color: 'var(--mac-text-secondary)',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
                               <div style={{ display: 'flex', alignItems: 'center' }}>
                                 <Phone size={18} style={{ marginRight: '8px', color: 'var(--mac-accent)' }} />
                                 {patient.phone}
@@ -1058,61 +1058,61 @@ const DermatologistPanelUnified = () => {
                           </div>
                           <div style={{ display: 'flex', gap: '16px' }}>
                             <MacOSButton
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedPatient(patient);
-                                setSkinExamination({ ...skinExamination, patient_id: patient.id });
-                                setShowSkinForm(true);
-                              }}
-                              style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedPatient(patient);
+                          setSkinExamination({ ...skinExamination, patient_id: patient.id });
+                          setShowSkinForm(true);
+                        }}
+                        style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                               <Activity size={16} />
                               Осмотр
                             </MacOSButton>
                             <MacOSButton
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedPatient(patient);
-                                setCosmeticProcedure({ ...cosmeticProcedure, patient_id: patient.id });
-                                setShowCosmeticForm(true);
-                              }}
-                              style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedPatient(patient);
+                          setCosmeticProcedure({ ...cosmeticProcedure, patient_id: patient.id });
+                          setShowCosmeticForm(true);
+                        }}
+                        style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                               <Sparkles size={16} />
                               Процедура
                             </MacOSButton>
                             <MacOSButton
-                              variant="outline"
-                              onClick={() => setSelectedPatient(patient)}
-                              style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
+                        variant="outline"
+                        onClick={() => setSelectedPatient(patient)}
+                        style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                               <User size={16} />
                               Просмотр
                             </MacOSButton>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
                 )}
+                  </div>
+              }
               </MacOSCard>
             </div>
-          )}
+          }
 
           {/* Прием пациента - EMR система */}
-          {activeTab === 'visit' && currentAppointment && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'visit' && currentAppointment &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                    display: 'flex',
-                    alignItems: 'center',
-                    margin: 0
-                  }}>
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                  display: 'flex',
+                  alignItems: 'center',
+                  margin: 0
+                }}>
                     <Stethoscope size={20} style={{ marginRight: '8px', color: 'var(--mac-orange-500)' }} />
                     Прием пациента: {currentAppointment.patient_name || 'Не указано'}
                   </h3>
@@ -1123,100 +1123,100 @@ const DermatologistPanelUnified = () => {
 
                 {/* Временная шкала приема */}
                 <VisitTimeline
-                  appointment={currentAppointment}
-                  emr={emr}
-                  prescription={prescription}
-                />
+                appointment={currentAppointment}
+                emr={emr}
+                prescription={prescription} />
+
 
                 {/* EMR система */}
                 <div style={{ marginTop: '24px' }}>
                   <h4 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    marginBottom: '16px',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
-                    Электронная медицинская карта
-                  </h4>
-                  <EMRSystem
-                    appointment={currentAppointment}
-                    emr={emr}
-                    onSave={saveEMR}
-                  />
-                </div>
-
-                {/* Система рецептов */}
-                {emr && !emr.is_draft && (
-                  <div style={{ marginTop: '24px' }}>
-                    <h4 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      marginBottom: '16px',
-                      color: 'var(--mac-text-primary)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}>
-                      <TestTube size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
-                      Рецепт
-                    </h4>
-                    <PrescriptionSystem
-                      appointment={currentAppointment}
-                      emr={emr}
-                      prescription={prescription}
-                      onSave={savePrescription}
-                    />
-                  </div>
-                )}
-
-                {/* Кнопка завершения приема */}
-                {emr && !emr.is_draft && (
-                  <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <MacOSButton
-                      onClick={handleSaveVisit}
-                      disabled={loading}
-                      style={{
-                        backgroundColor: 'var(--mac-green-500)',
-                        color: 'white',
-                        fontSize: '16px',
-                        padding: '12px 32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        margin: '0 auto'
-                      }}
-                    >
-                      {loading ? (
-                        <RefreshCw size={20} className="animate-spin" />
-                      ) : (
-                        <CheckCircle size={20} />
-                      )}
-                      {loading ? 'Завершение...' : 'Завершить прием'}
-                    </MacOSButton>
-                  </div>
-                )}
-              </MacOSCard>
-            </div>
-          )}
-
-          {/* Прием пациента - простая версия */}
-          {activeTab === 'visit' && selectedPatient && !currentAppointment && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Информация о пациенте */}
-              <MacOSCard style={{ padding: '24px' }}>
-                <h3 style={{
-                  fontSize: '18px',
+                  fontSize: '16px',
                   fontWeight: '600',
-                  marginBottom: '20px',
+                  marginBottom: '16px',
                   color: 'var(--mac-text-primary)',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
                   display: 'flex',
                   alignItems: 'center'
                 }}>
+                    <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
+                    Электронная медицинская карта
+                  </h4>
+                  <EMRContainerV2
+                  visitId={currentAppointment?.id}
+                  patientId={currentAppointment?.patient_id}
+                  specialty="dermatology" />
+
+                </div>
+
+                {/* Система рецептов */}
+                {emr && !emr.is_draft &&
+              <div style={{ marginTop: '24px' }}>
+                    <h4 style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  marginBottom: '16px',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                      <TestTube size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
+                      Рецепт
+                    </h4>
+                    <PrescriptionSystem
+                  appointment={currentAppointment}
+                  emr={emr}
+                  prescription={prescription}
+                  onSave={savePrescription} />
+
+                  </div>
+              }
+
+                {/* Кнопка завершения приема */}
+                {emr && !emr.is_draft &&
+              <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                    <MacOSButton
+                  onClick={handleSaveVisit}
+                  disabled={loading}
+                  style={{
+                    backgroundColor: 'var(--mac-green-500)',
+                    color: 'white',
+                    fontSize: '16px',
+                    padding: '12px 32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    margin: '0 auto'
+                  }}>
+
+                      {loading ?
+                  <RefreshCw size={20} className="animate-spin" /> :
+
+                  <CheckCircle size={20} />
+                  }
+                      {loading ? 'Завершение...' : 'Завершить прием'}
+                    </MacOSButton>
+                  </div>
+              }
+              </MacOSCard>
+            </div>
+          }
+
+          {/* Прием пациента - простая версия */}
+          {activeTab === 'visit' && selectedPatient && !currentAppointment &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Информация о пациенте */}
+              <MacOSCard style={{ padding: '24px' }}>
+                <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
                   <User size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                   Пациент #{selectedPatient.number}
                 </h3>
@@ -1224,121 +1224,82 @@ const DermatologistPanelUnified = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                   <div>
                     <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       ФИО пациента
                     </label>
                     <div style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: 'var(--mac-text-primary)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>{selectedPatient.patient_name}</div>
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>{selectedPatient.patient_name}</div>
                   </div>
 
-                  {selectedPatient.phone && (
-                    <div>
+                  {selectedPatient.phone &&
+                <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                         Телефон
                       </label>
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         <Phone size={16} style={{ marginRight: '8px', color: 'var(--mac-text-secondary)' }} />
                         <span style={{
-                          fontSize: '16px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-primary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>{selectedPatient.phone}</span>
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-primary)',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>{selectedPatient.phone}</span>
                       </div>
                     </div>
-                  )}
+                }
                 </div>
               </MacOSCard>
 
               {/* Жалобы и диагноз */}
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  marginBottom: '20px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>📝 Жалобы и диагноз</h3>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>📝 Жалобы и диагноз</h3>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
                     <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       Жалобы пациента
                     </label>
                     <MacOSTextarea
-                      value={visitData.complaint}
-                      onChange={(e) => setVisitData({ ...visitData, complaint: e.target.value })}
-                      rows={4}
-                      placeholder="Опишите жалобы пациента..."
-                    />
+                    value={visitData.complaint}
+                    onChange={(e) => setVisitData({ ...visitData, complaint: e.target.value })}
+                    rows={4}
+                    placeholder="Опишите жалобы пациента..." />
+
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
-                        Диагноз
-                      </label>
-                      <MacOSInput
-                        type="text"
-                        value={visitData.diagnosis}
-                        onChange={(e) => setVisitData({ ...visitData, diagnosis: e.target.value })}
-                        placeholder="Диагноз"
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
-                        МКБ-10
-                      </label>
-                      <MacOSInput
-                        type="text"
-                        value={visitData.icd10}
-                        onChange={(e) => setVisitData({ ...visitData, icd10: e.target.value })}
-                        placeholder="L70.9"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{
                       display: 'block',
                       fontSize: '13px',
                       fontWeight: '500',
@@ -1346,189 +1307,228 @@ const DermatologistPanelUnified = () => {
                       marginBottom: '6px',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
                     }}>
+                        Диагноз
+                      </label>
+                      <MacOSInput
+                      type="text"
+                      value={visitData.diagnosis}
+                      onChange={(e) => setVisitData({ ...visitData, diagnosis: e.target.value })}
+                      placeholder="Диагноз" />
+
+                    </div>
+
+                    <div>
+                      <label style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
+                        МКБ-10
+                      </label>
+                      <MacOSInput
+                      type="text"
+                      value={visitData.icd10}
+                      onChange={(e) => setVisitData({ ...visitData, icd10: e.target.value })}
+                      placeholder="L70.9" />
+
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       Примечания
                     </label>
                     <MacOSTextarea
-                      value={visitData.notes}
-                      onChange={(e) => setVisitData({ ...visitData, notes: e.target.value })}
-                      rows={3}
-                      placeholder="Дополнительные примечания..."
-                    />
+                    value={visitData.notes}
+                    onChange={(e) => setVisitData({ ...visitData, notes: e.target.value })}
+                    rows={3}
+                    placeholder="Дополнительные примечания..." />
+
                   </div>
                 </div>
               </MacOSCard>
 
               {/* Услуги визита */}
               <DoctorServiceSelector
-                specialty="dermatology"
-                selectedServices={selectedServices}
-                onServicesChange={setSelectedServices}
-                canEditPrices={true}
-              />
+              specialty="dermatology"
+              selectedServices={selectedServices}
+              onServicesChange={setSelectedServices}
+              canEditPrices={true} />
+
 
               {/* EMR система */}
-              {currentAppointment && (
-                <MacOSCard style={{ padding: '24px' }}>
+              {currentAppointment &&
+            <MacOSCard style={{ padding: '24px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    marginBottom: '20px',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
                     <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                     Электронная медицинская карта
                   </h3>
-                  <EMRSystem
-                    appointment={currentAppointment}
-                    emr={emr}
-                    onSave={saveEMR}
-                  />
+                  <EMRContainerV2
+                visitId={currentAppointment?.id}
+                patientId={currentAppointment?.patient_id}
+                specialty="dermatology" />
+
                 </MacOSCard>
-              )}
+            }
 
               {/* Система рецептов */}
-              {currentAppointment && emr && !emr.is_draft && (
-                <MacOSCard style={{ padding: '24px' }}>
+              {currentAppointment && emr && !emr.is_draft &&
+            <MacOSCard style={{ padding: '24px' }}>
                   <h3 className="text-lg font-medium mb-4 flex items-center">
                     <TestTube size={20} className="mr-2 text-green-600" />
                     Рецепт
                   </h3>
                   <PrescriptionSystem
-                    appointment={currentAppointment}
-                    emr={emr}
-                    prescription={prescription}
-                    onSave={savePrescription}
-                  />
+                appointment={currentAppointment}
+                emr={emr}
+                prescription={prescription}
+                onSave={savePrescription} />
+
                 </MacOSCard>
-              )}
+            }
 
               {/* Действия */}
               <MacOSCard style={{ padding: '24px' }}>
                 <div className="flex justify-end space-x-3">
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedPatient(null);
-                      handleTabChange('queue');
-                    }}
-                  >
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedPatient(null);
+                    handleTabChange('queue');
+                  }}>
+
                     Отменить
                   </MacOSButton>
                   <MacOSButton
-                    onClick={handleSaveVisit}
-                    disabled={loading || (!visitData.complaint && !emr)}
-                  >
-                    {loading ? (
-                      <RefreshCw size={16} className="animate-spin mr-2" />
-                    ) : (
-                      <Save size={16} className="mr-2" />
-                    )}
+                  onClick={handleSaveVisit}
+                  disabled={loading || !visitData.complaint && !emr}>
+
+                    {loading ?
+                  <RefreshCw size={16} className="animate-spin mr-2" /> :
+
+                  <Save size={16} className="mr-2" />
+                  }
                     {loading ? 'Завершение...' : 'Завершить прием'}
                   </MacOSButton>
                 </div>
               </MacOSCard>
             </div>
-          )}
+          }
 
           {/* Фото до/после */}
-          {activeTab === 'photos' && (currentAppointment || selectedPatient) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'photos' && (currentAppointment || selectedPatient) &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  marginBottom: '20px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>
                   Загрузить фото
                 </h3>
                 {/* Загрузчик фото с HEIC поддержкой */}
                 <PhotoUploader
-                  visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
-                  patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
-                  onDataUpdate={() => {
-                    logger.info('Фото обновлены');
-                    loadPatientData();
-                  }}
-                />
+                visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
+                patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
+                onDataUpdate={() => {
+                  logger.info('Фото обновлены');
+                  loadPatientData();
+                }} />
+
               </MacOSCard>
 
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  marginBottom: '20px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>
                   AI анализ кожи
                 </h3>
                 {/* AI анализ кожи */}
                 <SkinAnalysis
-                  photos={photoData}
-                  visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
-                  patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
-                  onAnalysisComplete={(result) => {
-                    logger.info('AI анализ завершен:', result);
-                  }}
-                />
+                photos={photoData}
+                visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
+                patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
+                onAnalysisComplete={(result) => {
+                  logger.info('AI анализ завершен:', result);
+                }} />
+
               </MacOSCard>
 
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  marginBottom: '20px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>
                   Сравнение «до» и «после»
                 </h3>
                 {/* Сравнение фото до и после */}
                 <PhotoComparison
-                  photos={photoData}
-                  visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
-                  patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
-                  onComparisonComplete={(result) => {
-                    logger.info('Сравнение завершено:', result);
-                  }}
-                />
+                photos={photoData}
+                visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
+                patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
+                onComparisonComplete={(result) => {
+                  logger.info('Сравнение завершено:', result);
+                }} />
+
               </MacOSCard>
             </div>
-          )}
+          }
 
-          {activeTab === 'photos' && !currentAppointment && !selectedPatient && (
-            <MacOSCard style={{ padding: '48px', textAlign: 'center' }}>
+          {activeTab === 'photos' && !currentAppointment && !selectedPatient &&
+          <MacOSCard style={{ padding: '48px', textAlign: 'center' }}>
               <MacOSEmptyState
-                type="image"
-                title="Выберите пациента"
-                description="Перейдите на вкладку 'Очередь' и выберите пациента для просмотра фото"
-                action={
-                  <MacOSButton variant="outline" onClick={() => handleTabChange('queue')} style={{ marginTop: '16px' }}>
+              type="image"
+              title="Выберите пациента"
+              description="Перейдите на вкладку 'Очередь' и выберите пациента для просмотра фото"
+              action={
+              <MacOSButton variant="outline" onClick={() => handleTabChange('queue')} style={{ marginTop: '16px' }}>
                     Перейти к очереди
                   </MacOSButton>
-                }
-              />
+              } />
+
             </MacOSCard>
-          )}
+          }
 
           {/* Осмотр кожи */}
-          {activeTab === 'skin' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'skin' &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                  }}>
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+                }}>
                     <Activity size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Осмотры кожи
                   </h3>
@@ -1538,105 +1538,105 @@ const DermatologistPanelUnified = () => {
                   </MacOSButton>
                 </div>
 
-                {skinExaminations.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {skinExaminations.map((exam) => (
-                      <div key={exam.id} style={{
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        backgroundColor: 'var(--mac-bg-secondary)'
-                      }}>
+                {skinExaminations.length > 0 ?
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {skinExaminations.map((exam) =>
+                <div key={exam.id} style={{
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  backgroundColor: 'var(--mac-bg-secondary)'
+                }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                           <h4 style={{
-                            fontWeight: '600',
-                            fontSize: '16px',
-                            color: 'var(--mac-text-primary)',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                          }}>Осмотр #{exam.id}</h4>
+                      fontWeight: '600',
+                      fontSize: '16px',
+                      color: 'var(--mac-text-primary)',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>Осмотр #{exam.id}</h4>
                           <MacOSBadge variant="info">{exam.examination_date}</MacOSBadge>
                         </div>
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                          gap: '16px',
-                          fontSize: '14px',
-                          color: 'var(--mac-text-secondary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: '16px',
+                    fontSize: '14px',
+                    color: 'var(--mac-text-secondary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                           <div>🧴 Тип кожи: {exam.skin_type}</div>
                           <div>📈 Состояние: {exam.skin_condition}</div>
                           <div>🎯 Поражения: {exam.lesions}</div>
                           <div>📍 Распространение: {exam.distribution}</div>
                         </div>
-                        {exam.diagnosis && (
-                          <div style={{
-                            marginTop: '8px',
-                            fontSize: '14px',
-                            color: 'var(--mac-text-primary)',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                          }}>
+                        {exam.diagnosis &&
+                  <div style={{
+                    marginTop: '8px',
+                    fontSize: '14px',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                             <strong>Диагноз:</strong> {exam.diagnosis}
                           </div>
-                        )}
+                  }
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <MacOSEmptyState
-                    type="doc"
-                    title="Нет данных осмотров кожи"
-                    description="Добавьте новый осмотр кожи для пациента"
-                  />
                 )}
+                  </div> :
+
+              <MacOSEmptyState
+                type="doc"
+                title="Нет данных осмотров кожи"
+                description="Добавьте новый осмотр кожи для пациента" />
+
+              }
               </MacOSCard>
 
               {/* Форма осмотра кожи */}
-              {showSkinForm && (
-                <MacOSCard style={{ padding: '24px' }}>
+              {showSkinForm &&
+            <MacOSCard style={{ padding: '24px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    marginBottom: '16px',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                  }}>Новый осмотр кожи</h3>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>Новый осмотр кожи</h3>
                   <form onSubmit={handleSkinExaminationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Дата осмотра *
                         </label>
                         <MacOSInput
-                          type="date"
-                          value={skinExamination.examination_date}
-                          onChange={(e) => setSkinExamination({ ...skinExamination, examination_date: e.target.value })}
-                          required
-                        />
+                      type="date"
+                      value={skinExamination.examination_date}
+                      onChange={(e) => setSkinExamination({ ...skinExamination, examination_date: e.target.value })}
+                      required />
+
                       </div>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Тип кожи *
                         </label>
                         <MacOSSelect
-                          value={skinExamination.skin_type}
-                          onChange={(e) => setSkinExamination({ ...skinExamination, skin_type: e.target.value })}
-                          required
-                        >
+                      value={skinExamination.skin_type}
+                      onChange={(e) => setSkinExamination({ ...skinExamination, skin_type: e.target.value })}
+                      required>
+
                           <option value="">Выберите тип кожи</option>
                           <option value="normal">Нормальная</option>
                           <option value="dry">Сухая</option>
@@ -1650,86 +1650,86 @@ const DermatologistPanelUnified = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Состояние кожи
                         </label>
                         <MacOSInput
-                          type="text"
-                          value={skinExamination.skin_condition}
-                          onChange={(e) => setSkinExamination({ ...skinExamination, skin_condition: e.target.value })}
-                          placeholder="Хорошее, удовлетворительное, проблемное"
-                        />
+                      type="text"
+                      value={skinExamination.skin_condition}
+                      onChange={(e) => setSkinExamination({ ...skinExamination, skin_condition: e.target.value })}
+                      placeholder="Хорошее, удовлетворительное, проблемное" />
+
                       </div>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Поражения
                         </label>
                         <MacOSInput
-                          type="text"
-                          value={skinExamination.lesions}
-                          onChange={(e) => setSkinExamination({ ...skinExamination, lesions: e.target.value })}
-                          placeholder="Акне, пигментация, родинки"
-                        />
+                      type="text"
+                      value={skinExamination.lesions}
+                      onChange={(e) => setSkinExamination({ ...skinExamination, lesions: e.target.value })}
+                      placeholder="Акне, пигментация, родинки" />
+
                       </div>
                     </div>
 
                     <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                         Диагноз
                       </label>
                       <MacOSInput
-                        type="text"
-                        value={skinExamination.diagnosis}
-                        onChange={(e) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })}
-                        placeholder="Диагноз"
-                      />
+                    type="text"
+                    value={skinExamination.diagnosis}
+                    onChange={(e) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })}
+                    placeholder="Диагноз" />
+
                     </div>
 
                     <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                         План лечения
                       </label>
                       <MacOSTextarea
-                        value={skinExamination.treatment_plan}
-                        onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })}
-                        rows={4}
-                        placeholder="План лечения и рекомендации"
-                      />
+                    value={skinExamination.treatment_plan}
+                    onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })}
+                    rows={4}
+                    placeholder="План лечения и рекомендации" />
+
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                       <MacOSButton
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowSkinForm(false)}
-                      >
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSkinForm(false)}>
+
                         Отмена
                       </MacOSButton>
                       <MacOSButton type="submit">
@@ -1739,23 +1739,23 @@ const DermatologistPanelUnified = () => {
                     </div>
                   </form>
                 </MacOSCard>
-              )}
+            }
             </div>
-          )}
+          }
 
           {/* Косметология */}
-          {activeTab === 'cosmetic' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'cosmetic' &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                  }}>
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+                }}>
                     <Sparkles size={20} style={{ marginRight: '8px', color: 'var(--mac-pink-500)' }} />
                     Косметические процедуры
                   </h3>
@@ -1765,104 +1765,104 @@ const DermatologistPanelUnified = () => {
                   </MacOSButton>
                 </div>
 
-                {cosmeticProcedures.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {cosmeticProcedures.map((procedure) => (
-                      <div key={procedure.id} style={{
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        backgroundColor: 'var(--mac-bg-secondary)'
-                      }}>
+                {cosmeticProcedures.length > 0 ?
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {cosmeticProcedures.map((procedure) =>
+                <div key={procedure.id} style={{
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  backgroundColor: 'var(--mac-bg-secondary)'
+                }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                           <h4 style={{
-                            fontWeight: '600',
-                            fontSize: '16px',
-                            color: 'var(--mac-text-primary)',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                          }}>Процедура #{procedure.id}</h4>
+                      fontWeight: '600',
+                      fontSize: '16px',
+                      color: 'var(--mac-text-primary)',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>Процедура #{procedure.id}</h4>
                           <MacOSBadge variant="info">{procedure.procedure_date}</MacOSBadge>
                         </div>
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                          gap: '16px',
-                          fontSize: '14px',
-                          color: 'var(--mac-text-secondary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: '16px',
+                    fontSize: '14px',
+                    color: 'var(--mac-text-secondary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                           <div>✨ Тип: {procedure.procedure_type}</div>
                           <div>📍 Область: {procedure.area_treated}</div>
                           <div>🧴 Продукты: {procedure.products_used}</div>
                         </div>
-                        {procedure.results && (
-                          <div style={{
-                            marginTop: '8px',
-                            fontSize: '14px',
-                            color: 'var(--mac-text-primary)',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                          }}>
+                        {procedure.results &&
+                  <div style={{
+                    marginTop: '8px',
+                    fontSize: '14px',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                             <strong>Результаты:</strong> {procedure.results}
                           </div>
-                        )}
+                  }
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <MacOSEmptyState
-                    type="doc"
-                    title="Нет данных косметических процедур"
-                    description="Добавьте новую косметическую процедуру для пациента"
-                  />
                 )}
+                  </div> :
+
+              <MacOSEmptyState
+                type="doc"
+                title="Нет данных косметических процедур"
+                description="Добавьте новую косметическую процедуру для пациента" />
+
+              }
               </MacOSCard>
 
               {/* Форма косметической процедуры */}
-              {showCosmeticForm && (
-                <MacOSCard style={{ padding: '24px' }}>
+              {showCosmeticForm &&
+            <MacOSCard style={{ padding: '24px' }}>
                   <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    marginBottom: '16px',
-                    color: 'var(--mac-text-primary)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                  }}>Новая косметическая процедура</h3>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>Новая косметическая процедура</h3>
                   <form onSubmit={handleCosmeticProcedureSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Дата процедуры *
                         </label>
                         <MacOSInput
-                          type="date"
-                          value={cosmeticProcedure.procedure_date}
-                          onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })}
-                          required
-                        />
+                      type="date"
+                      value={cosmeticProcedure.procedure_date}
+                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })}
+                      required />
+
                       </div>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Тип процедуры *
                         </label>
                         <MacOSSelect
-                          value={cosmeticProcedure.procedure_type}
-                          onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_type: e.target.value })}
-                          required
-                        >
+                      value={cosmeticProcedure.procedure_type}
+                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_type: e.target.value })}
+                      required>
+
                           <option value="">Выберите процедуру</option>
                           <option value="cleaning">Чистка лица</option>
                           <option value="peeling">Пилинг</option>
@@ -1877,86 +1877,86 @@ const DermatologistPanelUnified = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Область обработки
                         </label>
                         <MacOSInput
-                          type="text"
-                          value={cosmeticProcedure.area_treated}
-                          onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, area_treated: e.target.value })}
-                          placeholder="Лицо, шея, декольте"
-                        />
+                      type="text"
+                      value={cosmeticProcedure.area_treated}
+                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, area_treated: e.target.value })}
+                      placeholder="Лицо, шея, декольте" />
+
                       </div>
                       <div>
                         <label style={{
-                          display: 'block',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-secondary)',
-                          marginBottom: '6px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '6px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                           Использованные продукты
                         </label>
                         <MacOSInput
-                          type="text"
-                          value={cosmeticProcedure.products_used}
-                          onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, products_used: e.target.value })}
-                          placeholder="Названия препаратов"
-                        />
+                      type="text"
+                      value={cosmeticProcedure.products_used}
+                      onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, products_used: e.target.value })}
+                      placeholder="Названия препаратов" />
+
                       </div>
                     </div>
 
                     <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                         Результаты
                       </label>
                       <MacOSTextarea
-                        value={cosmeticProcedure.results}
-                        onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })}
-                        rows={4}
-                        placeholder="Описание результатов процедуры"
-                      />
+                    value={cosmeticProcedure.results}
+                    onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })}
+                    rows={4}
+                    placeholder="Описание результатов процедуры" />
+
                     </div>
 
                     <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                         Рекомендации по уходу
                       </label>
                       <MacOSTextarea
-                        value={cosmeticProcedure.follow_up}
-                        onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, follow_up: e.target.value })}
-                        rows={3}
-                        placeholder="Рекомендации по уходу после процедуры"
-                      />
+                    value={cosmeticProcedure.follow_up}
+                    onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, follow_up: e.target.value })}
+                    rows={3}
+                    placeholder="Рекомендации по уходу после процедуры" />
+
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                       <MacOSButton
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowCosmeticForm(false)}
-                      >
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowCosmeticForm(false)}>
+
                         Отмена
                       </MacOSButton>
                       <MacOSButton type="submit">
@@ -1966,31 +1966,31 @@ const DermatologistPanelUnified = () => {
                     </div>
                   </form>
                 </MacOSCard>
-              )}
+            }
             </div>
-          )}
+          }
 
           {/* AI Помощник */}
-          {activeTab === 'ai' && (
-            <AIAssistant
-              specialty="dermatology"
-              onSuggestionSelect={handleAISuggestion}
-            />
-          )}
+          {activeTab === 'ai' &&
+          <AIAssistant
+            specialty="dermatology"
+            onSuggestionSelect={handleAISuggestion} />
+
+          }
 
           {/* Управление услугами */}
-          {activeTab === 'services' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'services' &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>
                   <Scissors size={20} style={{ marginRight: '8px', color: 'var(--mac-orange-600)' }} />
                   Услуги дерматологии и косметологии
                 </h3>
@@ -1998,6 +1998,43 @@ const DermatologistPanelUnified = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
                     <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '8px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
+                      Выбор услуг
+                    </label>
+
+                    {/* Шаблоны процедур */}
+                    <ProcedureTemplates
+                    visitId={selectedPatient?.visitId || 'demo-visit-1'}
+                    onSelectProcedure={(procedure) => {
+                      logger.info('Выбрана процедура:', procedure);
+                      // Добавляем процедуру в список услуг
+                      setSelectedServices((prev) => [...prev, {
+                        id: Date.now(),
+                        name: procedure.name,
+                        price: procedure.price,
+                        duration: procedure.duration
+                      }]);
+                    }} />
+
+
+                    <div style={{ marginTop: '16px' }}>
+                      <ServiceChecklist
+                      value={selectedServices}
+                      onChange={setSelectedServices}
+                      department="derma" />
+
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <label style={{
                       display: 'block',
                       fontSize: '13px',
                       fontWeight: '500',
@@ -2005,79 +2042,42 @@ const DermatologistPanelUnified = () => {
                       marginBottom: '8px',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
                     }}>
-                      Выбор услуг
-                    </label>
-
-                    {/* Шаблоны процедур */}
-                    <ProcedureTemplates
-                      visitId={selectedPatient?.visitId || 'demo-visit-1'}
-                      onSelectProcedure={(procedure) => {
-                        logger.info('Выбрана процедура:', procedure);
-                        // Добавляем процедуру в список услуг
-                        setSelectedServices(prev => [...prev, {
-                          id: Date.now(),
-                          name: procedure.name,
-                          price: procedure.price,
-                          duration: procedure.duration,
-                        }]);
-                      }}
-                    />
-
-                    <div style={{ marginTop: '16px' }}>
-                      <ServiceChecklist
-                        value={selectedServices}
-                        onChange={setSelectedServices}
-                        department="derma"
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '8px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
                         Стоимость от врача (UZS)
                       </label>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <div style={{ position: 'relative', flex: '1' }}>
                           <DollarSign size={16} style={{
-                            position: 'absolute',
-                            left: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            color: 'var(--mac-text-secondary)'
-                          }} />
+                          position: 'absolute',
+                          left: '12px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'var(--mac-text-secondary)'
+                        }} />
                           <MacOSInput
-                            type="text"
-                            value={doctorPrice}
-                            onChange={(e) => setDoctorPrice(e.target.value)}
-                            placeholder="Например: 50000"
-                            inputMode="numeric"
-                            style={{ paddingLeft: '40px' }}
-                          />
+                          type="text"
+                          value={doctorPrice}
+                          onChange={(e) => setDoctorPrice(e.target.value)}
+                          placeholder="Например: 50000"
+                          inputMode="numeric"
+                          style={{ paddingLeft: '40px' }} />
+
                         </div>
                         <MacOSButton
-                          onClick={() => {
-                            if (selectedServices.length > 0) {
-                              setSelectedServiceForPriceOverride({
-                                id: selectedServices[0].id || 1,
-                                name: selectedServices[0].name || 'Выбранная услуга',
-                                price: selectedServices[0].price || 50000
-                              });
-                              setShowPriceOverride(true);
-                            } else {
-                              alert('Сначала выберите услугу');
-                            }
-                          }}
-                          variant="primary"
-                          title="Изменить цену процедуры"
-                        >
+                        onClick={() => {
+                          if (selectedServices.length > 0) {
+                            setSelectedServiceForPriceOverride({
+                              id: selectedServices[0].id || 1,
+                              name: selectedServices[0].name || 'Выбранная услуга',
+                              price: selectedServices[0].price || 50000
+                            });
+                            setShowPriceOverride(true);
+                          } else {
+                            alert('Сначала выберите услугу');
+                          }
+                        }}
+                        variant="primary"
+                        title="Изменить цену процедуры">
+
                           <DollarSign size={16} />
                         </MacOSButton>
                       </div>
@@ -2085,38 +2085,38 @@ const DermatologistPanelUnified = () => {
 
                     <div>
                       <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '8px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: 'var(--mac-text-secondary)',
+                      marginBottom: '8px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                         Итого к оплате
                       </label>
                       <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        height: '40px',
-                        padding: '0 12px',
-                        border: '2px dashed var(--mac-border)',
-                        borderRadius: '8px',
-                        backgroundColor: 'var(--mac-bg-secondary)'
-                      }}>
+                      display: 'flex',
+                      alignItems: 'center',
+                      height: '40px',
+                      padding: '0 12px',
+                      border: '2px dashed var(--mac-border)',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--mac-bg-secondary)'
+                    }}>
                         <span style={{
-                          fontSize: '18px',
-                          fontWeight: '600',
-                          color: 'var(--mac-text-primary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: 'var(--mac-text-primary)',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                      }}>
                           {totalCost.toLocaleString()} UZS
                         </span>
                         <span style={{
-                          marginLeft: '8px',
-                          fontSize: '13px',
-                          color: 'var(--mac-text-secondary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>
+                        marginLeft: '8px',
+                        fontSize: '13px',
+                        color: 'var(--mac-text-secondary)',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                      }}>
                           (услуги: {servicesSubtotal.toLocaleString()} UZS
                           {doctorPriceNum ? `, врач: ${doctorPriceNum.toLocaleString()} UZS` : ''})
                         </span>
@@ -2125,28 +2125,28 @@ const DermatologistPanelUnified = () => {
                   </div>
 
                   <div style={{
-                    backgroundColor: 'var(--mac-blue-50)',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--mac-blue-200)'
-                  }}>
+                  backgroundColor: 'var(--mac-blue-50)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--mac-blue-200)'
+                }}>
                     <h4 style={{
-                      fontWeight: '600',
-                      fontSize: '14px',
-                      color: 'var(--mac-blue-900)',
-                      marginBottom: '8px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    color: 'var(--mac-blue-900)',
+                    marginBottom: '8px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       💡 Справочник цен
                     </h4>
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '8px',
-                      fontSize: '13px',
-                      color: 'var(--mac-blue-800)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--mac-blue-800)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       <div>• Консультация: 50,000 UZS</div>
                       <div>• Биопсия: 150,000 UZS</div>
                       <div>• Чистка лица: 80,000 UZS</div>
@@ -2158,21 +2158,21 @@ const DermatologistPanelUnified = () => {
                 </div>
               </MacOSCard>
             </div>
-          )}
+          }
 
           {/* История */}
-          {activeTab === 'history' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {activeTab === 'history' &&
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                fontSize: '18px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>
                   <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-text-secondary)' }} />
                   История приемов и процедур
                 </h3>
@@ -2181,179 +2181,179 @@ const DermatologistPanelUnified = () => {
                   {/* История осмотров кожи */}
                   <div>
                     <h4 style={{
-                      fontWeight: '600',
-                      fontSize: '14px',
-                      marginBottom: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'var(--mac-text-primary)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       <Activity size={16} style={{ marginRight: '8px', color: 'var(--mac-green-600)' }} />
                       Осмотры кожи ({skinExaminations.length})
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
-                      {skinExaminations.map((exam) => (
-                        <div key={exam.id} style={{
-                          border: '1px solid var(--mac-border)',
-                          borderRadius: '8px',
-                          padding: '12px',
-                          fontSize: '13px',
-                          backgroundColor: 'var(--mac-bg-secondary)'
-                        }}>
+                      {skinExaminations.map((exam) =>
+                    <div key={exam.id} style={{
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--mac-bg-secondary)'
+                    }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                             <span style={{
-                              fontWeight: '600',
-                              fontSize: '14px',
-                              color: 'var(--mac-text-primary)',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                            }}>#{exam.id}</span>
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          color: 'var(--mac-text-primary)',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                        }}>#{exam.id}</span>
                             <MacOSBadge variant="info">{exam.examination_date}</MacOSBadge>
                           </div>
                           <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '4px',
-                            fontSize: '13px',
-                            color: 'var(--mac-text-secondary)',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                          }}>
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        fontSize: '13px',
+                        color: 'var(--mac-text-secondary)',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                      }}>
                             <div>🧴 {exam.skin_type} • {exam.skin_condition}</div>
                             <div>🎯 {exam.lesions}</div>
                             {exam.diagnosis && <div>📋 {exam.diagnosis}</div>}
                           </div>
                         </div>
-                      ))}
+                    )}
                     </div>
                   </div>
 
                   {/* История косметических процедур */}
                   <div>
                     <h4 style={{
-                      fontWeight: '600',
-                      fontSize: '14px',
-                      marginBottom: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'var(--mac-text-primary)',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       <Sparkles size={16} style={{ marginRight: '8px', color: 'var(--mac-pink-600)' }} />
                       Косметические процедуры ({cosmeticProcedures.length})
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
-                      {cosmeticProcedures.map((procedure) => (
-                        <div key={procedure.id} style={{
-                          border: '1px solid var(--mac-border)',
-                          borderRadius: '8px',
-                          padding: '12px',
-                          fontSize: '13px',
-                          backgroundColor: 'var(--mac-bg-secondary)'
-                        }}>
+                      {cosmeticProcedures.map((procedure) =>
+                    <div key={procedure.id} style={{
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--mac-bg-secondary)'
+                    }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                             <span style={{
-                              fontWeight: '600',
-                              fontSize: '14px',
-                              color: 'var(--mac-text-primary)',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                            }}>#{procedure.id}</span>
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          color: 'var(--mac-text-primary)',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                        }}>#{procedure.id}</span>
                             <MacOSBadge variant="info">{procedure.procedure_date}</MacOSBadge>
                           </div>
                           <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '4px',
-                            fontSize: '13px',
-                            color: 'var(--mac-text-secondary)',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                          }}>
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        fontSize: '13px',
+                        color: 'var(--mac-text-secondary)',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                      }}>
                             <div>✨ {procedure.procedure_type}</div>
                             <div>📍 {procedure.area_treated}</div>
                             {procedure.results && <div>📊 {procedure.results}</div>}
-                            {procedure.total_cost && (
-                              <div style={{
-                                fontWeight: '600',
-                                fontSize: '14px',
-                                color: 'var(--mac-green-600)',
-                                marginTop: '4px'
-                              }}>
+                            {procedure.total_cost &&
+                        <div style={{
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          color: 'var(--mac-green-600)',
+                          marginTop: '4px'
+                        }}>
                                 💰 {Number(procedure.total_cost).toLocaleString()} UZS
                               </div>
-                            )}
+                        }
                           </div>
                         </div>
-                      ))}
+                    )}
                     </div>
                   </div>
                 </div>
 
-                {skinExaminations.length === 0 && cosmeticProcedures.length === 0 && (
-                  <MacOSEmptyState
-                    type="calendar"
-                    title="Нет данных о приемах и процедурах"
-                    description="История приемов и процедур будет отображаться здесь"
-                  />
-                )}
+                {skinExaminations.length === 0 && cosmeticProcedures.length === 0 &&
+              <MacOSEmptyState
+                type="calendar"
+                title="Нет данных о приемах и процедурах"
+                description="История приемов и процедур будет отображаться здесь" />
+
+              }
               </MacOSCard>
             </div>
-          )}
+          }
         </div>
 
         {/* PriceOverrideManager Modal */}
-        {showPriceOverride && selectedServiceForPriceOverride && (
-          <PriceOverrideManager
-            visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
-            serviceId={selectedServiceForPriceOverride.id}
-            serviceName={selectedServiceForPriceOverride.name}
-            originalPrice={selectedServiceForPriceOverride.price}
-            isOpen={showPriceOverride}
-            onClose={() => {
-              setShowPriceOverride(false);
-              setSelectedServiceForPriceOverride(null);
-            }}
-            onPriceOverrideCreated={(override) => {
-              logger.info('Price override created:', override);
-              // Можно добавить логику обновления состояния
-            }}
-          />
-        )}
+        {showPriceOverride && selectedServiceForPriceOverride &&
+        <PriceOverrideManager
+          visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
+          serviceId={selectedServiceForPriceOverride.id}
+          serviceName={selectedServiceForPriceOverride.name}
+          originalPrice={selectedServiceForPriceOverride.price}
+          isOpen={showPriceOverride}
+          onClose={() => {
+            setShowPriceOverride(false);
+            setSelectedServiceForPriceOverride(null);
+          }}
+          onPriceOverrideCreated={(override) => {
+            logger.info('Price override created:', override);
+            // Можно добавить логику обновления состояния
+          }} />
+
+        }
 
         {/* Модальное окно Schedule Next */}
-        {scheduleNextModal.open && (
-          <ScheduleNextModal
-            isOpen={scheduleNextModal.open}
-            onClose={() => setScheduleNextModal({ open: false, patient: null })}
-            patient={scheduleNextModal.patient}
-            theme={{ isDark, getColor, getSpacing, getFontSize }}
-            specialtyFilter="dermatology"
-          />
-        )}
+        {scheduleNextModal.open &&
+        <ScheduleNextModal
+          isOpen={scheduleNextModal.open}
+          onClose={() => setScheduleNextModal({ open: false, patient: null })}
+          patient={scheduleNextModal.patient}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
+          specialtyFilter="dermatology" />
+
+        }
 
         {/* Модальное окно редактирования пациента */}
-        {editPatientModal.open && (
-          <EditPatientModal
-            isOpen={editPatientModal.open}
-            onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
-            patient={editPatientModal.patient}
-            onSave={async () => {
-              await loadDermatologyAppointments();
-              setEditPatientModal({ open: false, patient: null, loading: false });
-            }}
-            loading={editPatientModal.loading}
-            theme={{ isDark, getColor, getSpacing, getFontSize }}
-          />
-        )}
+        {editPatientModal.open &&
+        <EditPatientModal
+          isOpen={editPatientModal.open}
+          onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
+          patient={editPatientModal.patient}
+          onSave={async () => {
+            await loadDermatologyAppointments();
+            setEditPatientModal({ open: false, patient: null, loading: false });
+          }}
+          loading={editPatientModal.loading}
+          theme={{ isDark, getColor, getSpacing, getFontSize }} />
+
+        }
 
         {/* AI Chat Widget */}
         <AIChatWidget
           contextType="general"
           specialty="dermatology"
           useWebSocket={false}
-          position="bottom-right"
-        />
+          position="bottom-right" />
+
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default DermatologistPanelUnified;

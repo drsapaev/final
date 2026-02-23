@@ -3,8 +3,8 @@
  * Интеграция с медицинскими стандартами и доступностью
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { designTokens, getColor, getToken } from '../tokens/design-tokens';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { designTokens, getToken } from '../tokens/design-tokens';
 
 const ThemeContext = createContext();
 
@@ -23,12 +23,12 @@ export const ThemeProvider = ({ children }) => {
     if (saved && (saved === 'light' || saved === 'dark' || saved === 'auto')) {
       return saved;
     }
-    
+
     // Проверяем системную тему
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
-    
+
     return 'light';
   });
 
@@ -39,28 +39,28 @@ export const ThemeProvider = ({ children }) => {
     return 'light';
   });
 
-  const isDark = theme === 'dark' || (theme === 'auto' && systemTheme === 'dark');
-  const isLight = theme === 'light' || (theme === 'auto' && systemTheme === 'light');
-  
+  const isDark = theme === 'dark' || theme === 'auto' && systemTheme === 'dark';
+  const isLight = theme === 'light' || theme === 'auto' && systemTheme === 'light';
+
   // Медицинские цветовые схемы
   const medicalSchemes = {
     cardiology: {
-      primary: '#dc2626',    // Красный для кардиологии
+      primary: '#dc2626', // Красный для кардиологии
       secondary: '#fef2f2',
       accent: '#fca5a5'
     },
     dermatology: {
-      primary: '#059669',   // Зеленый для дерматологии
+      primary: '#059669', // Зеленый для дерматологии
       secondary: '#ecfdf5',
       accent: '#6ee7b7'
     },
     dentistry: {
-      primary: '#7c3aed',   // Фиолетовый для стоматологии
+      primary: '#7c3aed', // Фиолетовый для стоматологии
       secondary: '#f3e8ff',
       accent: '#c4b5fd'
     },
     laboratory: {
-      primary: '#0891b2',   // Голубой для лаборатории
+      primary: '#0891b2', // Голубой для лаборатории
       secondary: '#f0f9ff',
       accent: '#7dd3fc'
     }
@@ -121,15 +121,15 @@ export const ThemeProvider = ({ children }) => {
     // Сохраняем тему
     localStorage.setItem('ui_theme', theme);
     localStorage.setItem('theme', theme);
-    
+
     // Применяем CSS классы к body и document
     document.body.classList.remove('light-theme', 'dark-theme', 'auto-theme');
     document.body.classList.add(`${theme}-theme`);
     document.documentElement.setAttribute('data-theme', theme);
-    
+
     // Устанавливаем CSS переменные из design-system
     const root = document.documentElement;
-    
+
     if (isDark) {
       // Темная тема
       root.style.setProperty('--bg-primary', getToken('colors.dark.background.primary'));
@@ -153,26 +153,26 @@ export const ThemeProvider = ({ children }) => {
       root.style.setProperty('--hover-bg', getToken('colors.semantic.surface.hover'));
       root.style.setProperty('--accent-color', getToken('colors.primary.500'));
     }
-    
+
     // Дополнительные переменные для статусов
     root.style.setProperty('--success-color', getToken('colors.medical.success'));
     root.style.setProperty('--warning-color', getToken('colors.medical.warning'));
     root.style.setProperty('--danger-color', getToken('colors.medical.danger'));
     root.style.setProperty('--info-color', getToken('colors.medical.info'));
-    
+
     // Переменные для теней
     root.style.setProperty('--shadow-sm', getToken('boxShadow.sm'));
     root.style.setProperty('--shadow-md', getToken('boxShadow.md'));
     root.style.setProperty('--shadow-lg', getToken('boxShadow.lg'));
     root.style.setProperty('--shadow-xl', getToken('boxShadow.xl'));
-    
+
     // Переменные для отступов
     root.style.setProperty('--spacing-xs', getToken('spacing.xs'));
     root.style.setProperty('--spacing-sm', getToken('spacing.sm'));
     root.style.setProperty('--spacing-md', getToken('spacing.md'));
     root.style.setProperty('--spacing-lg', getToken('spacing.lg'));
     root.style.setProperty('--spacing-xl', getToken('spacing.xl'));
-    
+
     // Переменные для размеров шрифтов
     root.style.setProperty('--font-size-xs', getToken('typography.fontSize.xs'));
     root.style.setProperty('--font-size-sm', getToken('typography.fontSize.sm'));
@@ -181,7 +181,7 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--font-size-xl', getToken('typography.fontSize.xl'));
     root.style.setProperty('--font-size-2xl', getToken('typography.fontSize.2xl'));
     root.style.setProperty('--font-size-3xl', getToken('typography.fontSize.3xl'));
-    
+
   }, [theme, isDark, systemTheme]);
 
   // Слушаем изменения системной темы
@@ -221,8 +221,8 @@ export const ThemeProvider = ({ children }) => {
   return (
     <ThemeContext.Provider value={value}>
       {children}
-    </ThemeContext.Provider>
-  );
+    </ThemeContext.Provider>);
+
 };
 
 export default ThemeProvider;

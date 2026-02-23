@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import TelegramBotManager from './TelegramBotManager';
 import TelegramSettings from './TelegramSettings';
@@ -26,30 +26,30 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
       border: `1px solid ${colors.border}`,
       marginBottom: '20px'
     }}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            background: activeTab === tab.id ? colors.active : 'transparent',
-            color: activeTab === tab.id ? colors.activeText : colors.text,
-            fontSize: '14px',
-            fontWeight: activeTab === tab.id ? '600' : '400',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
+      {tabs.map((tab) =>
+      <button
+        key={tab.id}
+        onClick={() => onTabChange(tab.id)}
+        style={{
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '6px',
+          background: activeTab === tab.id ? colors.active : 'transparent',
+          color: activeTab === tab.id ? colors.activeText : colors.text,
+          fontSize: '14px',
+          fontWeight: activeTab === tab.id ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+        
           {tab.label}
         </button>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 AdminTabs.propTypes = {
@@ -62,13 +62,13 @@ AdminTabs.propTypes = {
 };
 
 const UnifiedTelegramManagement = () => {
-  const [activeTab, setActiveTab] = useState('bot');
-  const { isDark } = useTheme();
+  const [activeTab, setActiveTab] = useState('bot');void
+  useTheme();
 
   const tabs = [
-    { id: 'bot', label: 'Bot Manager', icon: 'Bot' },
-    { id: 'settings', label: 'Settings', icon: 'Settings' }
-  ];
+  { id: 'bot', label: 'Bot Manager', icon: 'Bot' },
+  { id: 'settings', label: 'Settings', icon: 'Settings' }];
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -86,13 +86,13 @@ const UnifiedTelegramManagement = () => {
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+        onTabChange={setActiveTab} />
+      
       <div style={{ flex: 1, overflow: 'auto' }}>
         {renderContent()}
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default UnifiedTelegramManagement;

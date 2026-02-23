@@ -1,21 +1,22 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
 import logger from '../utils/logger';
-import { 
-  APPOINTMENT_STATUS, 
-  STATUS_LABELS, 
+import {
+  APPOINTMENT_STATUS,
+  STATUS_LABELS,
   STATUS_COLORS,
-  canStartVisit,
-  canCreatePrescription 
-} from '../constants/appointmentStatus';
+  canStartVisit } from
+
+'../constants/appointmentStatus';
 
 const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleStartVisit = async () => {
     if (!canStartVisit(appointment?.status)) return;
-    
+
     setIsProcessing(true);
     try {
       await onStartVisit(appointment);
@@ -37,7 +38,7 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
     }
   };
 
-  const getStepIcon = (step, status) => {
+  const getStepIcon = (step) => {
     switch (step) {
       case 'payment':
         return <CreditCard className="w-5 h-5" />;
@@ -56,18 +57,18 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
     switch (step) {
       case 'payment':
         return appointment?.status === APPOINTMENT_STATUS.PENDING ? 'current' :
-               appointment?.status === APPOINTMENT_STATUS.PAID || 
-               appointment?.status === APPOINTMENT_STATUS.IN_VISIT || 
-               appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending';
+        appointment?.status === APPOINTMENT_STATUS.PAID ||
+        appointment?.status === APPOINTMENT_STATUS.IN_VISIT ||
+        appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending';
       case 'visit':
         return appointment?.status === APPOINTMENT_STATUS.IN_VISIT ? 'current' :
-               appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending';
+        appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending';
       case 'emr':
         return appointment?.emr && !appointment.emr.isDraft ? 'completed' :
-               appointment?.emr && appointment.emr.isDraft ? 'current' : 'pending';
+        appointment?.emr && appointment.emr.isDraft ? 'current' : 'pending';
       case 'prescription':
         return appointment?.prescription && !appointment.prescription.isDraft ? 'completed' :
-               appointment?.prescription && appointment.prescription.isDraft ? 'current' : 'pending';
+        appointment?.prescription && appointment.prescription.isDraft ? 'current' : 'pending';
       default:
         return 'pending';
     }
@@ -87,31 +88,31 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
   };
 
   const steps = [
-    {
-      id: 'payment',
-      title: 'Оплата',
-      description: 'Ожидание оплаты записи',
-      action: appointment?.status === APPOINTMENT_STATUS.PENDING ? 'Оплатить' : null
-    },
-    {
-      id: 'visit',
-      title: 'Начать прием',
-      description: 'Отправить пациента к врачу',
-      action: canStartVisit(appointment?.status) ? 'Начать прием' : null
-    },
-    {
-      id: 'emr',
-      title: 'ЭМК',
-      description: 'Электронная медицинская карта',
-      action: null
-    },
-    {
-      id: 'prescription',
-      title: 'Рецепт',
-      description: 'Назначение препаратов',
-      action: null
-    }
-  ];
+  {
+    id: 'payment',
+    title: 'Оплата',
+    description: 'Ожидание оплаты записи',
+    action: appointment?.status === APPOINTMENT_STATUS.PENDING ? 'Оплатить' : null
+  },
+  {
+    id: 'visit',
+    title: 'Начать прием',
+    description: 'Отправить пациента к врачу',
+    action: canStartVisit(appointment?.status) ? 'Начать прием' : null
+  },
+  {
+    id: 'emr',
+    title: 'ЭМК',
+    description: 'Электронная медицинская карта',
+    action: null
+  },
+  {
+    id: 'prescription',
+    title: 'Рецепт',
+    description: 'Назначение препаратов',
+    action: null
+  }];
+
 
   return (
     <Card className="p-6">
@@ -129,15 +130,15 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
         {steps.map((step, index) => {
           const status = getStepStatus(step.id);
           const colorClass = getStepColor(status);
-          
+
           return (
             <div key={step.id} className="relative">
               {/* Соединительная линия */}
-              {index < steps.length - 1 && (
-                <div className={`absolute left-6 top-10 w-0.5 h-8 ${
-                  status === 'completed' ? 'bg-green-500' : 'bg-gray-300'
-                }`} />
-              )}
+              {index < steps.length - 1 &&
+              <div className={`absolute left-6 top-10 w-0.5 h-8 ${
+              status === 'completed' ? 'bg-green-500' : 'bg-gray-300'}`
+              } />
+              }
               
               <div className={`flex items-center gap-4 p-4 rounded-lg border-2 ${colorClass}`}>
                 <div className="flex-shrink-0">
@@ -147,35 +148,35 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium">{step.title}</h4>
-                    <Badge 
+                    <Badge
                       variant={
-                        status === 'completed' ? 'success' :
-                        status === 'current' ? 'info' : 'secondary'
+                      status === 'completed' ? 'success' :
+                      status === 'current' ? 'info' : 'secondary'
                       }
-                      size="sm"
-                    >
+                      size="sm">
+
                       {status === 'completed' ? 'Готово' :
-                       status === 'current' ? 'В процессе' : 'Ожидание'}
+                      status === 'current' ? 'В процессе' : 'Ожидание'}
                     </Badge>
                   </div>
                   
                   <p className="text-sm opacity-75">{step.description}</p>
                 </div>
                 
-                {step.action && (
-                  <div className="flex-shrink-0">
+                {step.action &&
+                <div className="flex-shrink-0">
                     <Button
-                      size="sm"
-                      onClick={step.id === 'payment' ? handlePayment : handleStartVisit}
-                      disabled={isProcessing}
-                    >
+                    size="sm"
+                    onClick={step.id === 'payment' ? handlePayment : handleStartVisit}
+                    disabled={isProcessing}>
+
                       {isProcessing ? 'Обработка...' : step.action}
                     </Button>
                   </div>
-                )}
+                }
               </div>
-            </div>
-          );
+            </div>);
+
         })}
       </div>
 
@@ -195,8 +196,8 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
       </div>
 
       {/* Предупреждения */}
-      {appointment?.status === APPOINTMENT_STATUS.PENDING && (
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+      {appointment?.status === APPOINTMENT_STATUS.PENDING &&
+      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4 text-yellow-600" />
             <div className="font-medium text-yellow-900">Требуется оплата</div>
@@ -205,10 +206,10 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
             Запись не может быть передана врачу без предварительной оплаты
           </div>
         </div>
-      )}
+      }
 
-      {appointment?.status === APPOINTMENT_STATUS.PAID && (
-        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+      {appointment?.status === APPOINTMENT_STATUS.PAID &&
+      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle className="w-4 h-4 text-green-600" />
             <div className="font-medium text-green-900">Готово к приему</div>
@@ -217,10 +218,15 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
             Запись оплачена, можно отправлять пациента к врачу
           </div>
         </div>
-      )}
-    </Card>
-  );
+      }
+    </Card>);
+
+};
+
+AppointmentFlow.propTypes = {
+  appointment: PropTypes.object,
+  onStartVisit: PropTypes.func,
+  onPayment: PropTypes.func
 };
 
 export default AppointmentFlow;
-

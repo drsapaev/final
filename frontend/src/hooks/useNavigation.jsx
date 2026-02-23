@@ -3,7 +3,8 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
@@ -21,7 +22,7 @@ export const useNavigation = (initialRoute = '/') => {
     setIsNavigating(true);
 
     if (replace) {
-      setHistory(prev => [...prev.slice(0, historyIndex), route]);
+      setHistory((prev) => [...prev.slice(0, historyIndex), route]);
       setCurrentRoute(route);
     } else {
       const newHistory = [...history.slice(0, historyIndex + 1), route];
@@ -118,7 +119,7 @@ export const useTabs = (initialTab = 0) => {
   // Переключение вкладки
   const switchTab = useCallback((tabIndex) => {
     setActiveTab(tabIndex);
-    setTabHistory(prev => [...prev, tabIndex]);
+    setTabHistory((prev) => [...prev, tabIndex]);
   }, []);
 
   // Переход к предыдущей вкладке
@@ -181,11 +182,11 @@ export const Tab = ({
           e.target.style.backgroundColor = 'transparent';
         }
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </button>
-  );
+    </button>);
+
 };
 
 // Компонент контейнера вкладок
@@ -204,17 +205,17 @@ export const Tabs = ({
           display: 'flex',
           borderBottom: '1px solid #e5e7eb',
           backgroundColor: '#f9fafb'
-        }}
-      >
+        }}>
+        
         {React.Children.map(children, (child, index) =>
-          React.cloneElement(child, {
-            active: index === activeTab,
-            onClick: () => onTabChange && onTabChange(index)
-          })
+        React.cloneElement(child, {
+          active: index === activeTab,
+          onClick: () => onTabChange && onTabChange(index)
+        })
         )}
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент панели вкладки
@@ -235,11 +236,11 @@ export const TabPanel = ({
         padding: '20px',
         backgroundColor: '#ffffff'
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент навигационного меню
@@ -269,66 +270,66 @@ export const NavigationMenu = ({
           paddingRight: '16px'
         })
       }}
-      {...props}
-    >
-      {items.map((item, index) => (
-        <button
-          key={item.id || index}
-          onClick={() => onItemClick && onItemClick(item, index)}
-          disabled={item.disabled}
-          className={`navigation-item ${activeItem === item.id ? 'active' : ''}`}
-          style={{
-            padding: isHorizontal ? '12px 16px' : '8px 16px',
-            fontSize: '14px',
-            fontWeight: activeItem === item.id ? '600' : '400',
-            color: activeItem === item.id ? '#3b82f6' : item.disabled ? '#9ca3af' : '#374151',
-            backgroundColor: activeItem === item.id ? '#eff6ff' : 'transparent',
-            border: 'none',
-            borderRadius: isHorizontal ? '0' : '6px',
-            cursor: item.disabled ? 'not-allowed' : 'pointer',
-            textAlign: 'left',
-            transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            width: '100%',
-            ...(isHorizontal && activeItem === item.id ? {
-              borderBottom: '2px solid #3b82f6'
-            } : {})
-          }}
-          onMouseEnter={(e) => {
-            if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'transparent';
-            }
-          }}
-        >
+      {...props}>
+      
+      {items.map((item, index) =>
+      <button
+        key={item.id || index}
+        onClick={() => onItemClick && onItemClick(item, index)}
+        disabled={item.disabled}
+        className={`navigation-item ${activeItem === item.id ? 'active' : ''}`}
+        style={{
+          padding: isHorizontal ? '12px 16px' : '8px 16px',
+          fontSize: '14px',
+          fontWeight: activeItem === item.id ? '600' : '400',
+          color: activeItem === item.id ? '#3b82f6' : item.disabled ? '#9ca3af' : '#374151',
+          backgroundColor: activeItem === item.id ? '#eff6ff' : 'transparent',
+          border: 'none',
+          borderRadius: isHorizontal ? '0' : '6px',
+          cursor: item.disabled ? 'not-allowed' : 'pointer',
+          textAlign: 'left',
+          transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          width: '100%',
+          ...(isHorizontal && activeItem === item.id ? {
+            borderBottom: '2px solid #3b82f6'
+          } : {})
+        }}
+        onMouseEnter={(e) => {
+          if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
+            e.target.style.backgroundColor = '#f9fafb';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
+            e.target.style.backgroundColor = 'transparent';
+          }
+        }}>
+        
           {item.icon && <span style={{ fontSize: '16px' }}>{item.icon}</span>}
           <span>{item.label}</span>
-          {item.badge && (
-            <span
-              style={{
-                marginLeft: 'auto',
-                padding: '2px 6px',
-                fontSize: '11px',
-                backgroundColor: '#ef4444',
-                color: '#ffffff',
-                borderRadius: '10px',
-                minWidth: '18px',
-                textAlign: 'center'
-              }}
-            >
+          {item.badge &&
+        <span
+          style={{
+            marginLeft: 'auto',
+            padding: '2px 6px',
+            fontSize: '11px',
+            backgroundColor: '#ef4444',
+            color: '#ffffff',
+            borderRadius: '10px',
+            minWidth: '18px',
+            textAlign: 'center'
+          }}>
+          
               {item.badge}
             </span>
-          )}
+        }
         </button>
-      ))}
-    </nav>
-  );
+      )}
+    </nav>);
+
 };
 
 // Компонент хлебных крошек
@@ -348,43 +349,43 @@ export const Breadcrumbs = ({
         fontSize: '14px',
         color: '#6b7280'
       }}
-      {...props}
-    >
-      {items.map((item, index) => (
-        <React.Fragment key={item.id || index}>
-          {index > 0 && (
-            <span style={{ color: '#9ca3af' }}>{separator}</span>
-          )}
-          {index === items.length - 1 ? (
-            <span style={{ color: '#374151', fontWeight: '500' }}>
+      {...props}>
+      
+      {items.map((item, index) =>
+      <React.Fragment key={item.id || index}>
+          {index > 0 &&
+        <span style={{ color: '#9ca3af' }}>{separator}</span>
+        }
+          {index === items.length - 1 ?
+        <span style={{ color: '#374151', fontWeight: '500' }}>
               {item.label}
-            </span>
-          ) : (
-            <button
-              onClick={item.onClick}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#3b82f6',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                padding: '0',
-                fontSize: 'inherit'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.textDecoration = 'underline';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.textDecoration = 'none';
-              }}
-            >
+            </span> :
+
+        <button
+          onClick={item.onClick}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#3b82f6',
+            cursor: 'pointer',
+            textDecoration: 'none',
+            padding: '0',
+            fontSize: 'inherit'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.textDecoration = 'underline';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.textDecoration = 'none';
+          }}>
+          
               {item.label}
             </button>
-          )}
+        }
         </React.Fragment>
-      ))}
-    </nav>
-  );
+      )}
+    </nav>);
+
 };
 
 // Компонент пагинации
@@ -409,10 +410,10 @@ export const Pagination = ({
     const rangeWithDots = [];
 
     for (
-      let i = Math.max(2, currentPage - delta);
-      i <= Math.min(totalPages - 1, currentPage + delta);
-      i++
-    ) {
+    let i = Math.max(2, currentPage - delta);
+    i <= Math.min(totalPages - 1, currentPage + delta);
+    i++)
+    {
       range.push(i);
     }
 
@@ -444,8 +445,8 @@ export const Pagination = ({
         justifyContent: 'space-between',
         padding: '16px 0'
       }}
-      {...props}
-    >
+      {...props}>
+      
       {/* Информация о странице */}
       <div style={{ fontSize: '14px', color: '#6b7280' }}>
         Страница {currentPage} из {totalPages}
@@ -476,47 +477,47 @@ export const Pagination = ({
             if (currentPage !== 1 && !prefersReducedMotion) {
               e.target.style.backgroundColor = '#ffffff';
             }
-          }}
-        >
+          }}>
+          
           ← Предыдущая
         </button>
 
         {/* Номера страниц */}
-        {showPageNumbers && (
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {visiblePages.map((page, index) => (
-              <button
-                key={index}
-                onClick={() => typeof page === 'number' && onPageChange(page)}
-                disabled={page === '...'}
-                style={{
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  fontWeight: page === currentPage ? '600' : '400',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: page === currentPage ? '#3b82f6' : page === '...' ? 'transparent' : '#ffffff',
-                  color: page === currentPage ? '#ffffff' : page === '...' ? 'transparent' : '#374151',
-                  cursor: page === '...' ? 'default' : 'pointer',
-                  minWidth: '40px',
-                  transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = page === currentPage ? '#2563eb' : '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = page === currentPage ? '#3b82f6' : '#ffffff';
-                  }
-                }}
-              >
+        {showPageNumbers &&
+        <div style={{ display: 'flex', gap: '4px' }}>
+            {visiblePages.map((page, index) =>
+          <button
+            key={index}
+            onClick={() => typeof page === 'number' && onPageChange(page)}
+            disabled={page === '...'}
+            style={{
+              padding: '8px 12px',
+              fontSize: '14px',
+              fontWeight: page === currentPage ? '600' : '400',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              backgroundColor: page === currentPage ? '#3b82f6' : page === '...' ? 'transparent' : '#ffffff',
+              color: page === currentPage ? '#ffffff' : page === '...' ? 'transparent' : '#374151',
+              cursor: page === '...' ? 'default' : 'pointer',
+              minWidth: '40px',
+              transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
+                e.target.style.backgroundColor = page === currentPage ? '#2563eb' : '#f9fafb';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
+                e.target.style.backgroundColor = page === currentPage ? '#3b82f6' : '#ffffff';
+              }
+            }}>
+            
                 {page}
               </button>
-            ))}
+          )}
           </div>
-        )}
+        }
 
         {/* Следующая страница */}
         <button
@@ -541,38 +542,85 @@ export const Pagination = ({
             if (currentPage !== totalPages && !prefersReducedMotion) {
               e.target.style.backgroundColor = '#ffffff';
             }
-          }}
-        >
+          }}>
+          
           Следующая →
         </button>
       </div>
 
       {/* Выбор размера страницы */}
-      {showPageSize && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {showPageSize &&
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '14px', color: '#6b7280' }}>Показывать:</span>
           <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
-            style={{
-              padding: '4px 8px',
-              fontSize: '14px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              backgroundColor: '#ffffff',
-              color: '#374151'
-            }}
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
+          value={pageSize}
+          onChange={(e) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
+          style={{
+            padding: '4px 8px',
+            fontSize: '14px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            backgroundColor: '#ffffff',
+            color: '#374151'
+          }}>
+          
+            {pageSizeOptions.map((size) =>
+          <option key={size} value={size}>
                 {size}
               </option>
-            ))}
+          )}
           </select>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
+};
+
+Tab.propTypes = {
+  children: PropTypes.node,
+  active: PropTypes.bool,
+  disabled: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string
+};
+
+Tabs.propTypes = {
+  children: PropTypes.node,
+  activeTab: PropTypes.number,
+  onTabChange: PropTypes.func,
+  className: PropTypes.string
+};
+
+TabPanel.propTypes = {
+  children: PropTypes.node,
+  active: PropTypes.bool,
+  className: PropTypes.string
+};
+
+NavigationMenu.propTypes = {
+  items: PropTypes.array,
+  activeItem: PropTypes.any,
+  onItemClick: PropTypes.func,
+  orientation: PropTypes.string,
+  className: PropTypes.string
+};
+
+Breadcrumbs.propTypes = {
+  items: PropTypes.array,
+  separator: PropTypes.node,
+  className: PropTypes.string
+};
+
+Pagination.propTypes = {
+  currentPage: PropTypes.number,
+  totalPages: PropTypes.number,
+  onPageChange: PropTypes.func,
+  showPageNumbers: PropTypes.bool,
+  showPageSize: PropTypes.bool,
+  pageSize: PropTypes.number,
+  pageSizeOptions: PropTypes.array,
+  onPageSizeChange: PropTypes.func,
+  className: PropTypes.string
 };
 
 export default useNavigation;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -10,10 +10,10 @@ import {
   MacOSBadge,
   MacOSModal,
   MacOSAlert,
-  Avatar,
+
   Box,
-  Typography
-} from '../ui/macos';
+  Typography } from
+'../ui/macos';
 import {
   Plus,
   Edit,
@@ -23,10 +23,10 @@ import {
   RefreshCw,
   User,
   CheckCircle,
-  Ban,
-  Shield,
-  Mail
-} from 'lucide-react';
+  Ban } from
+
+
+'lucide-react';
 import { Menu, MenuItem, ListItemIcon, ListItemText, Divider, IconButton } from '@mui/material'; // Legacy for Actions menu
 import UserModal from './UserModal';
 import { useRoles } from '../../hooks/useRoles';
@@ -45,29 +45,29 @@ const UserManagement = () => {
   const [anchorEl, setAnchorEl] = useState(null);
 
   // Load roles from API (Phase 4: DB-driven roles)
-  const { roleOptions: apiRoleOptions, loading: rolesLoading } = useRoles({ includeAll: true });
+  const { roleOptions: apiRoleOptions } = useRoles({ includeAll: true });
 
   // Fallback roles if API fails
-  const roles = apiRoleOptions.filter(r => r.value !== '') || [
-    { value: 'Admin', label: 'Администратор' },
-    { value: 'Doctor', label: 'Врач' },
-    { value: 'Nurse', label: 'Медсестра' },
-    { value: 'Receptionist', label: 'Регистратор' },
-    { value: 'Cashier', label: 'Кассир' },
-    { value: 'Lab', label: 'Лаборант' },
-    { value: 'Patient', label: 'Пациент' }
-  ];
+  const roles = apiRoleOptions.filter((r) => r.value !== '') || [
+  { value: 'Admin', label: 'Администратор' },
+  { value: 'Doctor', label: 'Врач' },
+  { value: 'Nurse', label: 'Медсестра' },
+  { value: 'Receptionist', label: 'Регистратор' },
+  { value: 'Cashier', label: 'Кассир' },
+  { value: 'Lab', label: 'Лаборант' },
+  { value: 'Patient', label: 'Пациент' }];
+
 
   const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
-    { value: '', label: 'Все роли' },
-    ...roles
-  ];
+  { value: '', label: 'Все роли' },
+  ...roles];
+
 
   const statusOptions = [
-    { value: '', label: 'Все статусы' },
-    { value: 'active', label: 'Активные' },
-    { value: 'inactive', label: 'Неактивные' }
-  ];
+  { value: '', label: 'Все статусы' },
+  { value: 'active', label: 'Активные' },
+  { value: 'inactive', label: 'Неактивные' }];
+
 
   useEffect(() => {
     loadUsers();
@@ -183,34 +183,34 @@ const UserManagement = () => {
   };
 
   const getRoleLabel = (role) => {
-    const roleData = roles.find(r => r.value === role);
+    const roleData = roles.find((r) => r.value === role);
     return roleData?.label || role;
   };
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = users.filter((user) => {
     const matchesSearch = user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === '' || user.role === roleFilter;
     const matchesStatus = statusFilter === '' ||
-      (statusFilter === 'active' && user.is_active) ||
-      (statusFilter === 'inactive' && !user.is_active);
+    statusFilter === 'active' && user.is_active ||
+    statusFilter === 'inactive' && !user.is_active;
 
     return matchesSearch && matchesRole && matchesStatus;
   });
 
   // Table Columns Configuration
   const columns = [
-    {
-      key: 'user',
-      title: 'Пользователь',
-      render: (_, user) => (
-        <Box display="flex" alignItems="center" gap="12px">
+  {
+    key: 'user',
+    title: 'Пользователь',
+    render: (_, user) =>
+    <Box display="flex" alignItems="center" gap="12px">
           {/* Placeholder Avatar - can be replaced with MacOSAvatar if available */}
           <div style={{
-            width: '32px', height: '32px', borderRadius: '50%', background: '#007AFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
-          }}>
+        width: '32px', height: '32px', borderRadius: '50%', background: '#007AFF',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
+      }}>
             <User size={16} />
           </div>
           <Box>
@@ -222,63 +222,63 @@ const UserManagement = () => {
             </Typography>
           </Box>
         </Box>
-      )
-    },
-    {
-      key: 'role',
-      title: 'Роль',
-      render: (role) => (
-        <MacOSBadge variant={getRoleBadgeVariant(role)}>
+
+  },
+  {
+    key: 'role',
+    title: 'Роль',
+    render: (role) =>
+    <MacOSBadge variant={getRoleBadgeVariant(role)}>
           {getRoleLabel(role)}
         </MacOSBadge>
-      )
-    },
-    {
-      key: 'email',
-      title: 'Email',
-      render: (email) => <span style={{ fontSize: '13px' }}>{email || '-'}</span>
-    },
-    {
-      key: 'phone',
-      title: 'Телефон',
-      render: (phone) => <span style={{ fontSize: '13px' }}>{phone || '-'}</span>
-    },
-    {
-      key: 'status',
-      title: 'Статус',
-      render: (_, user) => (
-        <MacOSBadge variant={user.is_active ? 'success' : 'default'} outline>
+
+  },
+  {
+    key: 'email',
+    title: 'Email',
+    render: (email) => <span style={{ fontSize: '13px' }}>{email || '-'}</span>
+  },
+  {
+    key: 'phone',
+    title: 'Телефон',
+    render: (phone) => <span style={{ fontSize: '13px' }}>{phone || '-'}</span>
+  },
+  {
+    key: 'status',
+    title: 'Статус',
+    render: (_, user) =>
+    <MacOSBadge variant={user.is_active ? 'success' : 'default'} outline>
           {user.is_active ? 'Активен' : 'Неактивен'}
         </MacOSBadge>
-      )
-    },
-    {
-      key: 'last_login',
-      title: 'Последний вход',
-      render: (last_login) => (
-        <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+
+  },
+  {
+    key: 'last_login',
+    title: 'Последний вход',
+    render: (last_login) =>
+    <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
           {last_login ? new Date(last_login).toLocaleDateString() : '-'}
         </span>
-      )
-    },
-    {
-      key: 'actions',
-      title: '',
-      render: (_, user) => (
-        <div onClick={(e) => e.stopPropagation()}>
+
+  },
+  {
+    key: 'actions',
+    title: '',
+    render: (_, user) =>
+    <div onClickCapture={(e) => e.stopPropagation()}>
           <IconButton
-            onClick={(e) => {
-              setAnchorEl(e.currentTarget);
-              setSelectedUser(user);
-            }}
-            size="small"
-          >
+        onClick={(e) => {
+          setAnchorEl(e.currentTarget);
+          setSelectedUser(user);
+        }}
+        size="small">
+        
             <MoreVertical size={16} />
           </IconButton>
         </div>
-      )
-    }
-  ];
+
+  }];
+
 
   return (
     <Box style={{ padding: '24px' }}>
@@ -290,23 +290,23 @@ const UserManagement = () => {
         <MacOSButton
           variant="primary"
           onClick={() => openUserDialog()}
-          startIcon={<Plus size={16} />}
-        >
+          startIcon={<Plus size={16} />}>
+          
           Добавить пользователя
         </MacOSButton>
       </Box>
 
       {/* Alerts */}
-      {error && (
-        <MacOSAlert variant="error" title="Ошибка" onClose={() => setError('')} style={{ marginBottom: '16px' }}>
+      {error &&
+      <MacOSAlert variant="error" title="Ошибка" onClose={() => setError('')} style={{ marginBottom: '16px' }}>
           {error}
         </MacOSAlert>
-      )}
-      {success && (
-        <MacOSAlert variant="success" title="Успешно" onClose={() => setSuccess('')} style={{ marginBottom: '16px' }}>
+      }
+      {success &&
+      <MacOSAlert variant="success" title="Успешно" onClose={() => setSuccess('')} style={{ marginBottom: '16px' }}>
           {success}
         </MacOSAlert>
-      )}
+      }
 
       {/* Filters */}
       <MacOSCard style={{ marginBottom: '24px', padding: '16px' }}>
@@ -321,8 +321,8 @@ const UserManagement = () => {
                 placeholder="Поиск пользователей..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: '32px', width: '100%' }}
-              />
+                style={{ paddingLeft: '32px', width: '100%' }} />
+              
             </div>
           </div>
 
@@ -333,8 +333,8 @@ const UserManagement = () => {
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               options={roleOptions}
-              placeholder="Все роли"
-            />
+              placeholder="Все роли" />
+            
           </div>
 
           {/* Status Filter */}
@@ -344,8 +344,8 @@ const UserManagement = () => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               options={statusOptions}
-              placeholder="Все статусы"
-            />
+              placeholder="Все статусы" />
+            
           </div>
 
           {/* Refresh Button */}
@@ -355,8 +355,8 @@ const UserManagement = () => {
               variant="secondary"
               onClick={loadUsers}
               style={{ width: '100%', justifyContent: 'center' }}
-              disabled={loading}
-            >
+              disabled={loading}>
+              
               <RefreshCw size={16} style={{ marginRight: '8px' }} />
               Обновить
             </MacOSButton>
@@ -370,8 +370,8 @@ const UserManagement = () => {
           columns={columns}
           data={filteredUsers}
           loading={loading}
-          hoverable
-        />
+          hoverable />
+        
       </MacOSCard>
 
       {/* Actions Menu (MUI Legacy for now) */}
@@ -385,9 +385,9 @@ const UserManagement = () => {
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             border: '1px solid #e5e7eb'
           }
-        }}
-      >
-        <MenuItem onClick={() => { openUserDialog(selectedUser); setAnchorEl(null); }}>
+        }}>
+        
+        <MenuItem onClick={() => {openUserDialog(selectedUser);setAnchorEl(null);}}>
           <ListItemIcon><Edit size={16} /></ListItemIcon>
           <ListItemText primary="Редактировать" primaryTypographyProps={{ fontSize: '13px' }} />
         </MenuItem>
@@ -400,8 +400,8 @@ const UserManagement = () => {
           </ListItemIcon>
           <ListItemText
             primary={selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
-            primaryTypographyProps={{ fontSize: '13px' }}
-          />
+            primaryTypographyProps={{ fontSize: '13px' }} />
+          
         </MenuItem>
         <Divider />
         <MenuItem onClick={() => {
@@ -419,16 +419,16 @@ const UserManagement = () => {
         onClose={() => setShowUserModal(false)}
         user={selectedUser}
         onSave={handleSaveUser}
-        loading={loading && showUserModal}
-      />
+        loading={loading && showUserModal} />
+      
 
       {/* Delete Confirmation Dialog (Using MacOSModal) */}
       <MacOSModal
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         title="Подтверждение удаления"
-        size="sm"
-      >
+        size="sm">
+        
         <div style={{ padding: '0 0 24px 0' }}>
           <Typography>
             Вы уверены, что хотите удалить пользователя <b>{selectedUser?.username}</b>?
@@ -446,8 +446,8 @@ const UserManagement = () => {
         </div>
       </MacOSModal>
 
-    </Box>
-  );
+    </Box>);
+
 };
 
 export default UserManagement;

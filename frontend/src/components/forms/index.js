@@ -21,7 +21,7 @@ export const validators = {
 
   phone: (message = 'Введите корректный номер телефона') => (value) => {
     if (!value) return true;
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     return phoneRegex.test(value) ? true : message;
   },
 

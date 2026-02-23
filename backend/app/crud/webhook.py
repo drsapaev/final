@@ -3,9 +3,9 @@ CRUD операции для webhook'ов
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
 from app.models.webhook import (
@@ -44,11 +44,11 @@ class CRUDWebhook:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, id: int) -> Optional[Webhook]:
+    def get(self, db: Session, id: int) -> Webhook | None:
         """Получает webhook по ID"""
         return db.query(Webhook).filter(Webhook.id == id).first()
 
-    def get_by_uuid(self, db: Session, uuid: str) -> Optional[Webhook]:
+    def get_by_uuid(self, db: Session, uuid: str) -> Webhook | None:
         """Получает webhook по UUID"""
         return db.query(Webhook).filter(Webhook.uuid == uuid).first()
 
@@ -61,7 +61,7 @@ class CRUDWebhook:
         status: WebhookStatus = None,
         event_type: str = None,
         created_by: int = None,
-    ) -> List[Webhook]:
+    ) -> list[Webhook]:
         """Получает список webhook'ов с фильтрацией"""
         query = db.query(Webhook)
 
@@ -78,7 +78,7 @@ class CRUDWebhook:
 
     def get_active_for_event(
         self, db: Session, event_type: WebhookEventType
-    ) -> List[Webhook]:
+    ) -> list[Webhook]:
         """Получает активные webhook'и для определенного типа события"""
         return (
             db.query(Webhook)
@@ -103,7 +103,7 @@ class CRUDWebhook:
         db.refresh(db_obj)
         return db_obj
 
-    def remove(self, db: Session, *, id: int) -> Optional[Webhook]:
+    def remove(self, db: Session, *, id: int) -> Webhook | None:
         """Удаляет webhook"""
         obj = db.query(Webhook).get(id)
         if obj:
@@ -111,7 +111,7 @@ class CRUDWebhook:
             db.commit()
         return obj
 
-    def activate(self, db: Session, *, id: int) -> Optional[Webhook]:
+    def activate(self, db: Session, *, id: int) -> Webhook | None:
         """Активирует webhook"""
         obj = db.query(Webhook).get(id)
         if obj:
@@ -121,7 +121,7 @@ class CRUDWebhook:
             db.refresh(obj)
         return obj
 
-    def deactivate(self, db: Session, *, id: int) -> Optional[Webhook]:
+    def deactivate(self, db: Session, *, id: int) -> Webhook | None:
         """Деактивирует webhook"""
         obj = db.query(Webhook).get(id)
         if obj:
@@ -131,7 +131,7 @@ class CRUDWebhook:
             db.refresh(obj)
         return obj
 
-    def get_stats(self, db: Session, *, id: int) -> Dict[str, Any]:
+    def get_stats(self, db: Session, *, id: int) -> dict[str, Any]:
         """Получает статистику webhook'а"""
         webhook = self.get(db, id)
         if not webhook:
@@ -210,7 +210,7 @@ class CRUDWebhookCall:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, id: int) -> Optional[WebhookCall]:
+    def get(self, db: Session, id: int) -> WebhookCall | None:
         """Получает вызов webhook'а по ID"""
         return db.query(WebhookCall).filter(WebhookCall.id == id).first()
 
@@ -222,7 +222,7 @@ class CRUDWebhookCall:
         skip: int = 0,
         limit: int = 100,
         status: WebhookCallStatus = None,
-    ) -> List[WebhookCall]:
+    ) -> list[WebhookCall]:
         """Получает вызовы webhook'а"""
         query = db.query(WebhookCall).filter(WebhookCall.webhook_id == webhook_id)
 
@@ -233,7 +233,7 @@ class CRUDWebhookCall:
             query.order_by(desc(WebhookCall.created_at)).offset(skip).limit(limit).all()
         )
 
-    def get_pending_retries(self, db: Session, limit: int = 50) -> List[WebhookCall]:
+    def get_pending_retries(self, db: Session, limit: int = 50) -> list[WebhookCall]:
         """Получает вызовы, готовые к повтору"""
         return (
             db.query(WebhookCall)
@@ -301,7 +301,7 @@ class CRUDWebhookEvent:
         db: Session,
         *,
         event_type: WebhookEventType,
-        event_data: Dict[str, Any],
+        event_data: dict[str, Any],
         source: str = "api",
         source_id: str = None,
         correlation_id: str = None,
@@ -319,11 +319,11 @@ class CRUDWebhookEvent:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, id: int) -> Optional[WebhookEvent]:
+    def get(self, db: Session, id: int) -> WebhookEvent | None:
         """Получает событие по ID"""
         return db.query(WebhookEvent).filter(WebhookEvent.id == id).first()
 
-    def get_unprocessed(self, db: Session, limit: int = 100) -> List[WebhookEvent]:
+    def get_unprocessed(self, db: Session, limit: int = 100) -> list[WebhookEvent]:
         """Получает необработанные события"""
         return (
             db.query(WebhookEvent)

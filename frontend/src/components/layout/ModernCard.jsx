@@ -1,5 +1,5 @@
-import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 import './ModernCard.css';
 
 const ModernCard = ({
@@ -49,14 +49,34 @@ const ModernCard = ({
       onClick(e);
     }
   };
+  const handleKeyDown = (e) => {
+    if (clickable && onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onClick(e);
+    }
+  };
+  const cardClassName = `modern-card variant-${variant} ${hoverable ? 'hoverable' : ''} ${clickable ? 'clickable' : ''} ${rounded ? 'rounded' : ''} ${className}`;
+
+  if (clickable && onClick) {
+    return (
+      <div
+        className={cardClassName}
+        style={cardStyles}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`modern-card variant-${variant} ${hoverable ? 'hoverable' : ''} ${clickable ? 'clickable' : ''} ${rounded ? 'rounded' : ''} ${className}`}
+      className={cardClassName}
       style={cardStyles}
-      onClick={handleClick}
-      role={clickable ? 'button' : undefined}
-      tabIndex={clickable ? 0 : undefined}
       {...props}
     >
       {children}
@@ -118,6 +138,45 @@ export const CardDescription = ({
     {children}
   </p>
 );
+
+ModernCard.propTypes = {
+  children: PropTypes.node,
+  variant: PropTypes.string,
+  padding: PropTypes.string,
+  shadow: PropTypes.string,
+  border: PropTypes.bool,
+  rounded: PropTypes.bool,
+  hoverable: PropTypes.bool,
+  clickable: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string
+};
+
+CardHeader.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
+
+CardBody.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
+
+CardFooter.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
+
+CardTitle.propTypes = {
+  children: PropTypes.node,
+  level: PropTypes.number,
+  className: PropTypes.string
+};
+
+CardDescription.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
 
 export default ModernCard;
 

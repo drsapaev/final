@@ -3,7 +3,7 @@
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ class EMRTemplateService:
     """Сервис для работы с шаблонами EMR"""
 
     @staticmethod
-    def get_default_templates() -> List[Dict[str, Any]]:
+    def get_default_templates() -> list[dict[str, Any]]:
         """Получить предустановленные шаблоны EMR"""
         return [
             EMRTemplateService._get_cardiology_template(),
@@ -22,7 +22,7 @@ class EMRTemplateService:
         ]
 
     @staticmethod
-    def _get_cardiology_template() -> Dict[str, Any]:
+    def _get_cardiology_template() -> dict[str, Any]:
         """Шаблон для кардиологии"""
         return {
             "template_name": "Кардиологический осмотр",
@@ -209,7 +209,7 @@ class EMRTemplateService:
         }
 
     @staticmethod
-    def _get_dermatology_template() -> Dict[str, Any]:
+    def _get_dermatology_template() -> dict[str, Any]:
         """Шаблон для дерматологии"""
         return {
             "template_name": "Дерматологический осмотр",
@@ -342,7 +342,7 @@ class EMRTemplateService:
         }
 
     @staticmethod
-    def _get_dentistry_template() -> Dict[str, Any]:
+    def _get_dentistry_template() -> dict[str, Any]:
         """Шаблон для стоматологии"""
         return {
             "template_name": "Стоматологический осмотр",
@@ -474,7 +474,7 @@ class EMRTemplateService:
         }
 
     @staticmethod
-    def _get_general_template() -> Dict[str, Any]:
+    def _get_general_template() -> dict[str, Any]:
         """Общий шаблон EMR"""
         return {
             "template_name": "Общий медицинский осмотр",
@@ -604,7 +604,7 @@ class EMRTemplateService:
         }
 
     @staticmethod
-    def create_template_from_structure(structure: Dict[str, Any]) -> Dict[str, Any]:
+    def create_template_from_structure(structure: dict[str, Any]) -> dict[str, Any]:
         """Создать шаблон из структуры"""
         return {
             "name": structure.get("template_name", "Новый шаблон"),

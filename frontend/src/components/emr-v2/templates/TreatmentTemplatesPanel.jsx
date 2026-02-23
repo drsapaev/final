@@ -10,7 +10,7 @@
  * - Audit: template_applied (no PHI)
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 
@@ -112,13 +112,24 @@ export function TreatmentTemplatesPanel({
         setSearchQuery('');
         onClose?.();
     }, [onClose]);
+    const handleActivationKeyDown = (event, action) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            action();
+        }
+    };
 
     if (!isOpen) return null;
 
     return (
         <div className="treatment-templates-overlay">
             {/* Backdrop */}
-            <div className="treatment-templates-backdrop" onClick={handleClose} />
+            <div
+                className="treatment-templates-backdrop"
+                role="button"
+                tabIndex={0}
+                onClick={handleClose}
+                onKeyDown={(event) => handleActivationKeyDown(event, handleClose)} />
 
             {/* Panel */}
             <div className="treatment-templates-panel">
@@ -166,6 +177,9 @@ export function TreatmentTemplatesPanel({
                                 <div
                                     className="treatment-templates-item-content"
                                     onClick={() => handlePreview(template)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(event) => handleActivationKeyDown(event, () => handlePreview(template))}
                                 >
                                     <span className="treatment-templates-item-title">{template.title}</span>
                                     <span className="treatment-templates-item-body">{template.body}</span>

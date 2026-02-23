@@ -9,15 +9,16 @@ import socket
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 
 from jose import jwt
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.activation import Activation  # type: ignore[attr-defined]
-from app.models.activation import ActivationStatus
+from app.models.activation import (
+    Activation,  # type: ignore[attr-defined]
+    ActivationStatus,
+)
 
 # ---------- Машинный идентификатор (серверный) ----------
 
@@ -80,7 +81,7 @@ def generate_key(prefix: str = "CQ") -> str:
 @dataclass
 class IssueResult:
     key: str
-    expiry_date: Optional[str]
+    expiry_date: str | None
     status: str
 
 
@@ -89,7 +90,7 @@ def issue_key(
     *,
     days: int = 365,
     status: str = ActivationStatus.ACTIVE,
-    meta: Optional[str] = None,
+    meta: str | None = None,
 ) -> IssueResult:
     key = generate_key()
     exp = datetime.utcnow() + timedelta(days=int(days))
@@ -117,12 +118,12 @@ def issue_key(
 @dataclass
 class ActivateResult:
     ok: bool
-    reason: Optional[str] = None
-    token: Optional[str] = None
-    key: Optional[str] = None
-    machine_hash: Optional[str] = None
-    expiry_date: Optional[str] = None
-    status: Optional[str] = None
+    reason: str | None = None
+    token: str | None = None
+    key: str | None = None
+    machine_hash: str | None = None
+    expiry_date: str | None = None
+    status: str | None = None
 
 
 def activate_key(db: Session, *, key: str) -> ActivateResult:
@@ -130,7 +131,7 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
     if not key:
         return ActivateResult(ok=False, reason="EMPTY_KEY")
 
-    row: Optional[Activation] = (
+    row: Activation | None = (
         db.execute(select(Activation).where(Activation.key == key)).scalars().first()
     )
     if not row:
@@ -189,17 +190,17 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
 @dataclass
 class Status:
     ok: bool
-    reason: Optional[str] = None
-    key: Optional[str] = None
-    expiry_date: Optional[str] = None
-    status: Optional[str] = None
-    machine_hash: Optional[str] = None
+    reason: str | None = None
+    key: str | None = None
+    expiry_date: str | None = None
+    status: str | None = None
+    machine_hash: str | None = None
 
 
 def validate_server_activation(db: Session) -> Status:
     """Проверка сервера: есть ли активная неистёкшая привязка к текущей машине."""
     mh = server_machine_hash()
-    row: Optional[Activation] = (
+    row: Activation | None = (
         db.execute(
             select(Activation).where(
                 and_(

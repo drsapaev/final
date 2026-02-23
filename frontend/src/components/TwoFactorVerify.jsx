@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -6,7 +6,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Verification data
   const [totpCode, setTotpCode] = useState('');
   const [backupCode, setBackupCode] = useState('');
@@ -16,7 +16,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
   const handleVerify = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const requestData = {
         remember_device: rememberDevice
@@ -40,7 +40,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       }
 
       const response = await api.post('/2fa/verify', requestData);
-      
+
       if (response.data?.access_token || response.success) {
         setSuccess('Верификация успешна!');
         if (onSuccess) {
@@ -62,8 +62,8 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
     }
   };
 
-  const renderTOTPForm = () => (
-    <div>
+  const renderTOTPForm = () =>
+  <div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <Smartphone size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
@@ -75,41 +75,41 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ 
-          display: 'block', 
-          marginBottom: '8px', 
-          fontWeight: '500',
-          color: 'var(--text-primary)'
-        }}>
+        <label style={{
+        display: 'block',
+        marginBottom: '8px',
+        fontWeight: '500',
+        color: 'var(--text-primary)'
+      }}>
           Код аутентификатора:
         </label>
         <input
-          type="text"
-          value={totpCode}
-          onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          onKeyPress={handleKeyPress}
-          placeholder="123456"
-          maxLength={6}
-          style={{
-            width: '100%',
-            padding: '16px',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            background: 'var(--bg-primary)',
-            color: 'var(--text-primary)',
-            fontSize: '24px',
-            textAlign: 'center',
-            letterSpacing: '4px',
-            fontFamily: 'monospace',
-            fontWeight: '500'
-          }}
-        />
-      </div>
-    </div>
-  );
+        type="text"
+        value={totpCode}
+        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onKeyPress={handleKeyPress}
+        placeholder="123456"
+        maxLength={6}
+        style={{
+          width: '100%',
+          padding: '16px',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
+          fontSize: '24px',
+          textAlign: 'center',
+          letterSpacing: '4px',
+          fontFamily: 'monospace',
+          fontWeight: '500'
+        }} />
 
-  const renderBackupCodeForm = () => (
-    <div>
+      </div>
+    </div>;
+
+
+  const renderBackupCodeForm = () =>
+  <div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <Key size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
@@ -121,41 +121,41 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ 
-          display: 'block', 
-          marginBottom: '8px', 
-          fontWeight: '500',
-          color: 'var(--text-primary)'
-        }}>
+        <label style={{
+        display: 'block',
+        marginBottom: '8px',
+        fontWeight: '500',
+        color: 'var(--text-primary)'
+      }}>
           Backup код:
         </label>
         <input
-          type="text"
-          value={backupCode}
-          onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
-          onKeyPress={handleKeyPress}
-          placeholder="ABCD1234"
-          maxLength={8}
-          style={{
-            width: '100%',
-            padding: '16px',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            background: 'var(--bg-primary)',
-            color: 'var(--text-primary)',
-            fontSize: '18px',
-            textAlign: 'center',
-            letterSpacing: '2px',
-            fontFamily: 'monospace',
-            fontWeight: '500'
-          }}
-        />
-      </div>
-    </div>
-  );
+        type="text"
+        value={backupCode}
+        onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+        onKeyPress={handleKeyPress}
+        placeholder="ABCD1234"
+        maxLength={8}
+        style={{
+          width: '100%',
+          padding: '16px',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
+          fontSize: '18px',
+          textAlign: 'center',
+          letterSpacing: '2px',
+          fontFamily: 'monospace',
+          fontWeight: '500'
+        }} />
 
-  const renderRecoveryForm = () => (
-    <div>
+      </div>
+    </div>;
+
+
+  const renderRecoveryForm = () =>
+  <div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <Shield size={48} style={{ color: 'var(--accent-color)', marginBottom: '16px' }} />
         <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
@@ -167,34 +167,34 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ 
-          display: 'block', 
-          marginBottom: '8px', 
-          fontWeight: '500',
-          color: 'var(--text-primary)'
-        }}>
+        <label style={{
+        display: 'block',
+        marginBottom: '8px',
+        fontWeight: '500',
+        color: 'var(--text-primary)'
+      }}>
           Токен восстановления:
         </label>
         <input
-          type="text"
-          value={recoveryToken}
-          onChange={(e) => setRecoveryToken(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Введите токен восстановления"
-          style={{
-            width: '100%',
-            padding: '16px',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            background: 'var(--bg-primary)',
-            color: 'var(--text-primary)',
-            fontSize: '14px',
-            fontFamily: 'monospace'
-          }}
-        />
+        type="text"
+        value={recoveryToken}
+        onChange={(e) => setRecoveryToken(e.target.value)}
+        onKeyPress={handleKeyPress}
+        placeholder="Введите токен восстановления"
+        style={{
+          width: '100%',
+          padding: '16px',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
+          fontSize: '14px',
+          fontFamily: 'monospace'
+        }} />
+
       </div>
-    </div>
-  );
+    </div>;
+
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto' }}>
@@ -202,72 +202,72 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       {method === 'backup' && renderBackupCodeForm()}
       {method === 'recovery' && renderRecoveryForm()}
 
-      {method !== 'recovery' && (
-        <div style={{ marginBottom: '24px' }}>
-          <label style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            cursor: 'pointer',
-            color: 'var(--text-primary)'
-          }}>
+      {method !== 'recovery' &&
+      <div style={{ marginBottom: '24px' }}>
+          <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          color: 'var(--text-primary)'
+        }}>
             <input
-              type="checkbox"
-              checked={rememberDevice}
-              onChange={(e) => setRememberDevice(e.target.checked)}
-              style={{ margin: 0 }}
-            />
+            type="checkbox"
+            checked={rememberDevice}
+            onChange={(e) => setRememberDevice(e.target.checked)}
+            style={{ margin: 0 }} />
+
             <span style={{ fontSize: '14px' }}>
               Запомнить это устройство на 30 дней
             </span>
           </label>
         </div>
-      )}
+      }
 
-      {error && (
-        <div style={{ 
-          background: '#FEE2E2', 
-          border: '1px solid #FCA5A5', 
-          borderRadius: '8px', 
-          padding: '12px',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          color: '#DC2626',
-          fontSize: '14px'
-        }}>
+      {error &&
+      <div style={{
+        background: '#FEE2E2',
+        border: '1px solid #FCA5A5',
+        borderRadius: '8px',
+        padding: '12px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        color: '#DC2626',
+        fontSize: '14px'
+      }}>
           <AlertCircle size={16} />
           <span>{error}</span>
         </div>
-      )}
+      }
 
-      {success && (
-        <div style={{ 
-          background: '#D1FAE5', 
-          border: '1px solid #6EE7B7', 
-          borderRadius: '8px', 
-          padding: '12px',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          color: '#059669',
-          fontSize: '14px'
-        }}>
+      {success &&
+      <div style={{
+        background: '#D1FAE5',
+        border: '1px solid #6EE7B7',
+        borderRadius: '8px',
+        padding: '12px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        color: '#059669',
+        fontSize: '14px'
+      }}>
           <CheckCircle size={16} />
           <span>{success}</span>
         </div>
-      )}
+      }
 
       <div style={{ display: 'flex', gap: '12px' }}>
         <button
           onClick={handleVerify}
-          disabled={loading || (
-            (method === 'totp' && totpCode.length !== 6) ||
-            (method === 'backup' && backupCode.length !== 8) ||
-            (method === 'recovery' && !recoveryToken)
-          )}
+          disabled={loading ||
+          method === 'totp' && totpCode.length !== 6 ||
+          method === 'backup' && backupCode.length !== 8 ||
+          method === 'recovery' && !recoveryToken
+          }
           style={{
             flex: 1,
             padding: '16px 24px',
@@ -275,44 +275,43 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
             color: 'white',
             border: 'none',
             borderRadius: '8px',
-            cursor: (loading || (
-              (method === 'totp' && totpCode.length !== 6) ||
-              (method === 'backup' && backupCode.length !== 8) ||
-              (method === 'recovery' && !recoveryToken)
-            )) ? 'not-allowed' : 'pointer',
+            cursor: loading ||
+            method === 'totp' && totpCode.length !== 6 ||
+            method === 'backup' && backupCode.length !== 8 ||
+            method === 'recovery' && !recoveryToken ?
+            'not-allowed' : 'pointer',
             fontSize: '16px',
             fontWeight: '500',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px'
-          }}
-        >
+          }}>
+
           {loading ? <RefreshCw size={20} className="animate-spin" /> : <CheckCircle size={20} />}
           {loading ? 'Проверка...' : 'Подтвердить'}
         </button>
         
-        {onCancel && (
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '16px 24px',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: '500'
-            }}
-          >
+        {onCancel &&
+        <button
+          onClick={onCancel}
+          style={{
+            padding: '16px 24px',
+            background: 'var(--bg-secondary)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '500'
+          }}>
+
             Отмена
           </button>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default TwoFactorVerify;
-

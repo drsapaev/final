@@ -2,8 +2,8 @@
  * Улучшенный провайдер темы с поддержкой токенов дизайна
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getTheme, applyCSSVariables, lightTheme, darkTheme } from './themes';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { getTheme, applyCSSVariables, lightTheme } from './themes';
 import { tokens } from './tokens';
 import logger from '../utils/logger';
 import '../theme/macos-tokens.css';
@@ -81,12 +81,12 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
     if (saved && ['light', 'dark'].includes(saved)) {
       return saved;
     }
-    
+
     // Проверяем системные предпочтения
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
-    
+
     return defaultTheme;
   });
 
@@ -98,7 +98,7 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
       logger.warn(`Invalid theme name: ${newThemeName}. Using 'light' instead.`);
       newThemeName = 'light';
     }
-    
+
     setThemeName(newThemeName);
     setThemeState(getTheme(newThemeName));
     localStorage.setItem('theme', newThemeName);
@@ -112,16 +112,16 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
   // Применяем CSS переменные при изменении темы
   useEffect(() => {
     applyCSSVariables(theme);
-    
+
     // Добавляем класс темы к body
-    document.body.className = document.body.className
-      .replace(/theme-\w+/g, '')
-      .trim();
+    document.body.className = document.body.className.
+    replace(/theme-\w+/g, '').
+    trim();
     document.body.classList.add(`theme-${themeName}`);
-    
+
     // Устанавливаем атрибут data-theme для CSS селекторов
     document.documentElement.setAttribute('data-theme', themeName);
-    
+
     // Мета-тег для цвета статус-бара на мобильных устройствах
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
@@ -137,7 +137,7 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
   // Слушаем изменения системных предпочтений
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
+
     const handleChange = (e) => {
       // Только если пользователь не установил тему вручную
       const savedTheme = localStorage.getItem('theme');
@@ -170,8 +170,8 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
   return (
     <ThemeContext.Provider value={contextValue}>
       {children}
-    </ThemeContext.Provider>
-  );
+    </ThemeContext.Provider>);
+
 };
 
 // HOC для компонентов, которым нужна тема
@@ -185,11 +185,11 @@ export const withTheme = (Component) => {
 // Хук для адаптивных значений
 export const useResponsiveValue = (values) => {
   const [currentValue, setCurrentValue] = useState(values.base || values);
-  
+
   useEffect(() => {
     const updateValue = () => {
       const width = window.innerWidth;
-      
+
       if (width >= parseInt(tokens.breakpoints['2xl']) && values['2xl'] !== undefined) {
         setCurrentValue(values['2xl']);
       } else if (width >= parseInt(tokens.breakpoints.xl) && values.xl !== undefined) {
@@ -204,15 +204,13 @@ export const useResponsiveValue = (values) => {
         setCurrentValue(values.base || values);
       }
     };
-    
+
     updateValue();
     window.addEventListener('resize', updateValue);
     return () => window.removeEventListener('resize', updateValue);
   }, [values]);
-  
+
   return currentValue;
 };
 
 export default ThemeProvider;
-
-

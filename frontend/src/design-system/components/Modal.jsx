@@ -2,7 +2,7 @@
  * Унифицированный компонент Modal
  * Согласно MASTER_TODO_LIST строка 219
  */
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { colors, typography, spacing } from '../theme';
 
 const Modal = ({
@@ -158,15 +158,33 @@ const Modal = ({
     padding: spacing.spacing[6],
   };
 
+  const handleOverlayClick = () => {
+    if (closeOnOverlayClick) {
+      onClose?.();
+    }
+  };
+
   return (
-    <div
-      style={overlayStyles}
-      onClick={closeOnOverlayClick ? onClose : undefined}
-    >
+    <div style={overlayStyles}>
+      {closeOnOverlayClick ? (
+        <button
+          type="button"
+          aria-label="Закрыть модальное окно"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            border: 'none',
+            margin: 0,
+            padding: 0,
+            background: 'transparent',
+            cursor: 'pointer',
+          }}
+          onClick={handleOverlayClick}
+        />
+      ) : null}
       <div
         style={modalStyles}
         className={className}
-        onClick={(e) => e.stopPropagation()}
         {...props}
       >
         {/* Заголовок */}

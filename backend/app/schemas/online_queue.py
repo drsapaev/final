@@ -3,7 +3,6 @@ Pydantic схемы для онлайн-очереди согласно detail.m
 """
 
 from datetime import date, datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,7 +23,7 @@ class QRTokenResponse(BaseModel):
     qr_url: str = Field(..., description="URL для QR кода")
     specialist_name: str = Field(..., description="Имя специалиста")
     specialty: str = Field(..., description="Специальность")
-    cabinet: Optional[str] = Field(None, description="Номер кабинета")
+    cabinet: str | None = Field(None, description="Номер кабинета")
     day: date = Field(..., description="Дата приема")
     start_time: str = Field(..., description="Время начала онлайн-записи")
     max_slots: int = Field(..., description="Максимум мест в очереди")
@@ -38,23 +37,23 @@ class QueueJoinRequest(BaseModel):
     """Запрос на вступление в очередь"""
 
     token: str = Field(..., description="Токен из QR кода")
-    phone: Optional[str] = Field(None, description="Номер телефона")
-    telegram_id: Optional[int] = Field(None, description="ID Telegram чата")
-    patient_name: Optional[str] = Field(None, description="Имя пациента")
+    phone: str | None = Field(None, description="Номер телефона")
+    telegram_id: int | None = Field(None, description="ID Telegram чата")
+    patient_name: str | None = Field(None, description="Имя пациента")
 
 
 class QueueJoinResponse(BaseModel):
     """Ответ на вступление в очередь"""
 
     success: bool = Field(..., description="Успешность операции")
-    number: Optional[int] = Field(None, description="Номер в очереди")
+    number: int | None = Field(None, description="Номер в очереди")
     duplicate: bool = Field(False, description="Повторная запись (тот же номер)")
     message: str = Field(..., description="Сообщение пользователю")
 
     # Дополнительная информация
-    specialist_name: Optional[str] = None
-    cabinet: Optional[str] = None
-    estimated_time: Optional[str] = None  # Примерное время приема
+    specialist_name: str | None = None
+    cabinet: str | None = None
+    estimated_time: str | None = None  # Примерное время приема
 
 
 class QueueJoinError(BaseModel):
@@ -100,12 +99,12 @@ class QueueEntryOut(BaseModel):
 
     id: int
     number: int
-    patient_name: Optional[str] = None
-    phone: Optional[str] = None
+    patient_name: str | None = None
+    phone: str | None = None
     source: str
     status: str
     created_at: datetime
-    called_at: Optional[datetime] = None
+    called_at: datetime | None = None
 
 
 class DailyQueueOut(BaseModel):
@@ -117,12 +116,12 @@ class DailyQueueOut(BaseModel):
     day: date
     specialist_id: int
     active: bool
-    opened_at: Optional[datetime] = None
+    opened_at: datetime | None = None
     created_at: datetime
 
     # Связанные данные
-    specialist: Optional[dict] = None
-    entries: List[QueueEntryOut] = []
+    specialist: dict | None = None
+    entries: list[QueueEntryOut] = []
 
     # Статистика
     total_entries: int = 0
@@ -138,7 +137,7 @@ class QueueSettings(BaseModel):
 
     timezone: str = Field("Asia/Tashkent", description="Часовой пояс")
     queue_start_hour: int = Field(7, ge=0, le=23, description="Час начала (07:00)")
-    auto_close_time: Optional[str] = Field("09:00", description="Время автозакрытия")
+    auto_close_time: str | None = Field("09:00", description="Время автозакрытия")
 
     # По специальностям
     start_numbers: dict = Field(
@@ -163,4 +162,4 @@ class QueueStatusCheck(BaseModel):
     has_slots: bool = Field(..., description="Есть свободные места")
     current_time: datetime = Field(..., description="Текущее время")
     queue_start_time: str = Field(..., description="Время начала очереди")
-    opened_at: Optional[datetime] = Field(None, description="Время открытия приема")
+    opened_at: datetime | None = Field(None, description="Время открытия приема")

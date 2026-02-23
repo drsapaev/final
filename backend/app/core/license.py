@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,9 +12,9 @@ from app.models.setting import Setting  # type: ignore[attr-defined]
 @dataclass
 class LicenseStatus:
     ok: bool
-    reason: Optional[str] = None
-    key: Optional[str] = None
-    valid_until: Optional[str] = None  # YYYY-MM-DD
+    reason: str | None = None
+    key: str | None = None
+    valid_until: str | None = None  # YYYY-MM-DD
 
 
 def _load_license_rows(db: Session) -> dict:

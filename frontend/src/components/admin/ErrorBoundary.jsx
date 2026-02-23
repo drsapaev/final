@@ -9,7 +9,7 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError() {
     return { hasError: true };
   }
 
@@ -18,7 +18,7 @@ class ErrorBoundary extends React.Component {
       error: error,
       errorInfo: errorInfo
     });
-    
+
     // Логируем ошибку в консоль для разработки
     logger.error('ErrorBoundary caught an error:', error, errorInfo);
   }
@@ -32,8 +32,8 @@ class ErrorBoundary extends React.Component {
       return (
         <Card className="p-6">
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" 
-                 style={{ background: 'var(--danger-color)', opacity: 0.1 }}>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ background: 'var(--danger-color)', opacity: 0.1 }}>
               <AlertTriangle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
             </div>
             
@@ -51,34 +51,34 @@ class ErrorBoundary extends React.Component {
                 Попробовать снова
               </Button>
               
-              <Button 
-                onClick={() => window.location.reload()} 
-                variant="outline"
-              >
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline">
+                
                 Обновить страницу
               </Button>
             </div>
             
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details className="mt-4 text-left">
-                <summary className="cursor-pointer text-sm font-medium mb-2" 
-                         style={{ color: 'var(--text-secondary)' }}>
+            {process.env.NODE_ENV === 'development' && this.state.error &&
+            <details className="mt-4 text-left">
+                <summary className="cursor-pointer text-sm font-medium mb-2"
+              style={{ color: 'var(--text-secondary)' }}>
                   Детали ошибки (только для разработки)
                 </summary>
-                <pre className="text-xs p-3 rounded bg-gray-100 overflow-auto" 
-                      style={{ 
-                        background: 'var(--bg-secondary)', 
-                        color: 'var(--text-primary)',
-                        border: '1px solid var(--border-color)'
-                      }}>
+                <pre className="text-xs p-3 rounded bg-gray-100 overflow-auto"
+              style={{
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)'
+              }}>
                   {this.state.error && this.state.error.toString()}
                   {this.state.errorInfo.componentStack}
                 </pre>
               </details>
-            )}
+            }
           </div>
-        </Card>
-      );
+        </Card>);
+
     }
 
     return this.props.children;
@@ -86,4 +86,3 @@ class ErrorBoundary extends React.Component {
 }
 
 export default ErrorBoundary;
-

@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Search,
-  Filter,
+
   Download,
   ChevronUp,
   ChevronDown,
@@ -9,38 +9,48 @@ import {
   Clock,
   User,
   Phone,
-  Home,  // ✅ Добавлена иконка дома
+  Home, // ✅ Добавлена иконка дома
   CreditCard,
   FileText,
   MoreHorizontal,
   Eye,
   Edit,
-  Trash2,
+
   CheckCircle,
   XCircle,
-  AlertCircle,
-  Stethoscope,
-  RotateCcw
-} from 'lucide-react';
+  AlertCircle } from
+
+
+'lucide-react';
 import {
   MacOSInput,
   MacOSButton,
   MacOSBadge,
-  MacOSSelect,
-  MacOSCard
-} from '../ui/macos';
+  MacOSSelect } from
+
+'../ui/macos';
 import './EnhancedAppointmentsTable.css';
-import { colors } from '../../theme/tokens';
+
 import { QueueActionButtons } from '../queue/QueueManagementCard';
 
 import logger from '../../utils/logger';
 
 // ⭐ SSOT: Centralized service code resolver
-import { CODE_TO_NAME, LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName, isServiceCode as checkIsServiceCode } from '../../utils/serviceCodeResolver';
+import { LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName } from '../../utils/serviceCodeResolver';
+
+const SESSION_COLORS = [
+  '#3B82F6', // blue
+  '#10B981', // emerald
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#84CC16' // lime
+];
 
 const EnhancedAppointmentsTable = ({
   data = [],
-  rawEntries = [],       // ⭐ SSOT FIX: Flat list of ALL entries before aggregation, for accurate Tooltip
   loading = false,
   onRowClick,
   onActionClick,
@@ -50,8 +60,8 @@ const EnhancedAppointmentsTable = ({
   onRowSelect,
   services = {},
   outerBorder = true,
-  showCheckboxes = true,  // ✅ Новый проп для отключения чекбоксов
-  view = 'registrar'      // 'registrar' | 'doctor' — режим отображения
+  showCheckboxes = true, // ✅ Новый проп для отключения чекбоксов
+  view = 'registrar' // 'registrar' | 'doctor' — режим отображения
 }) => {
   const containerRef = useRef(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -64,7 +74,7 @@ const EnhancedAppointmentsTable = ({
     department: ''
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize] = useState(20);
   // Используем внешнее состояние, если передано, иначе внутреннее
   const [internalSelectedRows, setInternalSelectedRows] = useState(new Set());
   const selectedRows = externalSelectedRows || internalSelectedRows;
@@ -86,39 +96,25 @@ const EnhancedAppointmentsTable = ({
         } else {
           el.removeAttribute('data-color-scheme');
         }
-      } catch (_) {
+      } catch {
+
+
+
+
+
+
         // ignore
-      }
-    };
-    applyLocalScheme();
-    const handler = () => applyLocalScheme();
-    window.addEventListener('colorSchemeChanged', handler);
-    window.addEventListener('storage', handler);
-    return () => {
+      }};applyLocalScheme();const handler = () => applyLocalScheme();window.addEventListener('colorSchemeChanged', handler);window.addEventListener('storage', handler);return () => {
       window.removeEventListener('colorSchemeChanged', handler);
       window.removeEventListener('storage', handler);
     };
   }, []);
 
-  // Цвета для темы - используем macOS CSS переменные
-  const themeColors = {
-    bg: 'var(--mac-bg-primary)',
-    bgSecondary: 'var(--mac-bg-secondary)',
-    border: 'var(--mac-border)',
-    text: 'var(--mac-text-primary)',
-    textSecondary: 'var(--mac-text-secondary)',
-    accent: 'var(--mac-accent-blue, var(--mac-accent, #007aff))',
-    success: 'var(--mac-success, #34c759)',
-    warning: 'var(--mac-warning, #ff9500)',
-    error: 'var(--mac-error, #ff3b30)',
-    info: 'var(--mac-info, var(--mac-accent-blue, #007aff))'
-  };
-
   // Вспомогательная функция для добавления прозрачности к CSS переменной
-  const withOpacity = (cssVar, opacity) => {
+  const withOpacity = useCallback((cssVar, opacity) => {
     // Используем color-mix если доступен, иначе fallback
     return `color-mix(in srgb, ${cssVar} ${opacity * 100}%, transparent)`;
-  };
+  }, []);
 
   // ✅ FIX 17: Helper для безопасного парсинга даты
   // КРИТИЧНО: Backend хранит ЛОКАЛЬНОЕ время, но добавляет 'Z' (UTC) суффикс при сериализации
@@ -158,26 +154,12 @@ const EnhancedAppointmentsTable = ({
     }
   }, []);
 
-  // ⭐ SSOT: Session ID Color Helper (presentation only)
-  // Generates consistent colors for entries with same session_id
-  // This enables visual grouping without modifying data structure
-  const SESSION_COLORS = [
-    '#3B82F6', // blue
-    '#10B981', // emerald
-    '#F59E0B', // amber
-    '#EF4444', // red
-    '#8B5CF6', // violet
-    '#EC4899', // pink
-    '#06B6D4', // cyan
-    '#84CC16', // lime
-  ];
-
   const getSessionColor = useCallback((sessionId) => {
     if (!sessionId) return null;
     // Simple hash to get consistent color for same session_id
     let hash = 0;
     for (let i = 0; i < sessionId.length; i++) {
-      hash = ((hash << 5) - hash) + sessionId.charCodeAt(i);
+      hash = (hash << 5) - hash + sessionId.charCodeAt(i);
       hash = hash & hash; // Convert to 32bit integer
     }
     return SESSION_COLORS[Math.abs(hash) % SESSION_COLORS.length];
@@ -186,12 +168,12 @@ const EnhancedAppointmentsTable = ({
   // ⭐ SSOT: Presentation-Only Grouping (1 patient = 1 visual row)
   // This does NOT modify data - only groups for rendering
   // All original entries are preserved in group.rows[]
-  const groupedByPatient = useMemo(() => {
+  void useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) return [];
 
     const map = new Map();
 
-    data.forEach(entry => {
+    data.forEach((entry) => {
       const patientId = entry.patient_id || entry.id;
 
       if (!map.has(patientId)) {
@@ -211,7 +193,7 @@ const EnhancedAppointmentsTable = ({
 
     // Sort rows within each group by queue_time
     const grouped = Array.from(map.values());
-    grouped.forEach(group => {
+    grouped.forEach((group) => {
       group.rows.sort((a, b) => {
         const timeA = a.queue_time ? new Date(a.queue_time).getTime() : 0;
         const timeB = b.queue_time ? new Date(b.queue_time).getTime() : 0;
@@ -221,9 +203,9 @@ const EnhancedAppointmentsTable = ({
       // Compute display values (presentation only)
       group.status = group.rows[0]?.status || 'waiting';
       group.cost = group.rows.reduce((sum, r) => sum + (r.cost || 0), 0);
-      group.payment_status = group.rows.every(r => r.payment_status === 'paid') ? 'paid' : 'pending';
+      group.payment_status = group.rows.every((r) => r.payment_status === 'paid') ? 'paid' : 'pending';
       group.visit_type = group.rows[0]?.visit_type || 'paid';
-      group.entry_ids = group.rows.map(r => r.id);
+      group.entry_ids = group.rows.map((r) => r.id);
     });
 
     return grouped;
@@ -231,14 +213,14 @@ const EnhancedAppointmentsTable = ({
 
   // ⭐ SSOT: Display helper for services with queue numbers
   // Format: "K01 (1), D01 (2), L10 (3)"
-  const renderServicesByQueue = useCallback((rows) => {
+  void useCallback((rows) => {
     if (!rows || rows.length === 0) return '—';
 
-    return rows.map(row => {
+    return rows.map((row) => {
       let serviceDisplay = '—';
       if (Array.isArray(row.services) && row.services.length > 0) {
         const svc = row.services[0];
-        serviceDisplay = typeof svc === 'object' ? (svc.code || svc.name || '—') : String(svc);
+        serviceDisplay = typeof svc === 'object' ? svc.code || svc.name || '—' : String(svc);
       } else if (row.service_codes && row.service_codes.length > 0) {
         serviceDisplay = row.service_codes[0];
       }
@@ -250,13 +232,14 @@ const EnhancedAppointmentsTable = ({
 
   // ⭐ SSOT: Display helper for queue numbers
   // Format: "1, 2, 3"
-  const renderQueuesDisplay = useCallback((rows) => {
+  void useCallback((rows) => {
     if (!rows || rows.length === 0) return '—';
-    return rows.map(r => r.queue_number ?? r.number ?? '?').join(', ');
+    return rows.map((r) => r.queue_number ?? r.number ?? '?').join(', ');
   }, []);
 
   // Переводы
-  const t = {
+  const t = useMemo(() =>
+  ({
     ru: {
       search: 'Поиск',
       filter: 'Фильтр',
@@ -304,7 +287,7 @@ const EnhancedAppointmentsTable = ({
       paid_pending: 'Ожидает оплаты',
       payment_paid: 'Оплачен'
     }
-  }[language] || {};
+  })[language] || {}, [language]);
 
   // Сортировка данных
   const sortedData = useMemo(() => {
@@ -323,8 +306,8 @@ const EnhancedAppointmentsTable = ({
       // ✅ Специальная обработка для номера очереди
       if (sortConfig.key === 'queue_number') {
         // Извлекаем первый номер очереди из массива queue_numbers
-        aVal = (a.queue_numbers && a.queue_numbers.length > 0) ? a.queue_numbers[0].number : 999999;
-        bVal = (b.queue_numbers && b.queue_numbers.length > 0) ? b.queue_numbers[0].number : 999999;
+        aVal = a.queue_numbers && a.queue_numbers.length > 0 ? a.queue_numbers[0].number : 999999;
+        bVal = b.queue_numbers && b.queue_numbers.length > 0 ? b.queue_numbers[0].number : 999999;
       }
 
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -335,11 +318,11 @@ const EnhancedAppointmentsTable = ({
 
   // Фильтрация данных
   const filteredData = useMemo(() => {
-    return sortedData.filter(row => {
+    return sortedData.filter((row) => {
       const searchMatch = !filterConfig.search ||
-        Object.values(row).some(val =>
-          String(val).toLowerCase().includes(filterConfig.search.toLowerCase())
-        );
+      Object.values(row).some((val) =>
+      String(val).toLowerCase().includes(filterConfig.search.toLowerCase())
+      );
 
       const statusMatch = !filterConfig.status || row.status === filterConfig.status;
       const doctorMatch = !filterConfig.doctor || row.doctor_id === parseInt(filterConfig.doctor);
@@ -359,7 +342,7 @@ const EnhancedAppointmentsTable = ({
 
   // Обработчик сортировки
   const handleSort = useCallback((key) => {
-    setSortConfig(prev => ({
+    setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -372,7 +355,7 @@ const EnhancedAppointmentsTable = ({
       onRowSelect(id, checked);
     } else {
       // Используем внутреннее состояние
-      setInternalSelectedRows(prev => {
+      setInternalSelectedRows((prev) => {
         const newSet = new Set(prev);
         if (checked) {
           newSet.add(id);
@@ -388,13 +371,13 @@ const EnhancedAppointmentsTable = ({
   const handleSelectAll = useCallback((checked) => {
     if (onRowSelect) {
       // Используем внешний обработчик для каждой строки
-      paginatedData.forEach(row => {
+      paginatedData.forEach((row) => {
         onRowSelect(row.id, checked);
       });
     } else {
       // Используем внутреннее состояние
       if (checked) {
-        setInternalSelectedRows(new Set(paginatedData.map(row => row.id)));
+        setInternalSelectedRows(new Set(paginatedData.map((row) => row.id)));
       } else {
         setInternalSelectedRows(new Set());
       }
@@ -537,8 +520,8 @@ const EnhancedAppointmentsTable = ({
       }
     };
 
-    const config = statusConfig[status] || statusConfig.scheduled;
-    const Icon = config.icon;
+    const config = statusConfig[status] || statusConfig.scheduled;void
+    config.icon;
 
     return (
       <div
@@ -559,8 +542,8 @@ const EnhancedAppointmentsTable = ({
         }}>
         <span style={{ fontSize: '14px' }}>{config.emoji}</span>
         <span>{config.text}</span>
-      </div>
-    );
+      </div>);
+
   }, [withOpacity]);
 
   // ✅ УНИВЕРСАЛЬНЫЙ МАППИНГ УСЛУГ (работает с любыми данными из админ панели)
@@ -571,7 +554,7 @@ const EnhancedAppointmentsTable = ({
     // Преобразуем структуру services в плоские маппинги
     Object.entries(services).forEach(([category, group]) => {
       if (Array.isArray(group)) {
-        group.forEach(service => {
+        group.forEach((service) => {
           if (service.id && service.name) {
             const id = String(service.id);
             mapping[id] = service.name;
@@ -596,12 +579,12 @@ const EnhancedAppointmentsTable = ({
       return '—';
     }
 
-    const { mapping: serviceMapping, categoryMapping } = createServiceMapping();
+    const { mapping: serviceMapping } = createServiceMapping();
 
     // Поддерживаем как массив строк, так и массив объектов
     let servicesList = [];
     if (Array.isArray(appointmentServices)) {
-      servicesList = appointmentServices.map(service => {
+      servicesList = appointmentServices.map((service) => {
         // Обрабатываем строки-числа (ID услуг)
         if (typeof service === 'string' && /^\d+$/.test(service)) {
           return serviceMapping[service] || `Услуга ${service}`;
@@ -642,7 +625,7 @@ const EnhancedAppointmentsTable = ({
     };
 
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
-    const compactCodes = servicesList.map((serviceName, index) => {
+    const compactCodes = servicesList.map((serviceName) => {
       // Если это уже код (K01, D02, D_PROC03, etc), возвращаем в верхнем регистре
       if (isServiceCode(serviceName)) {
         return String(serviceName).toUpperCase();
@@ -651,7 +634,7 @@ const EnhancedAppointmentsTable = ({
       // Если это название, ищем услугу и получаем её код
       for (const group of Object.values(services)) {
         if (Array.isArray(group)) {
-          const foundService = group.find(s => s.name === serviceName);
+          const foundService = group.find((s) => s.name === serviceName);
           if (foundService) {
             // Используем service_code если есть, иначе генерируем из category_code
             if (foundService.service_code) {
@@ -671,7 +654,7 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ Преобразуем коды обратно в названия для tooltip
     // ⭐ SSOT: Используем централизованную функцию getServiceDisplayName
-    const serviceNamesForTooltip = compactCodes.map(code => {
+    const serviceNamesForTooltip = compactCodes.map((code) => {
       // Если это код, ищем полное название через SSOT
       if (isServiceCode(code)) {
         // ⭐ SSOT: Сначала используем централизованный маппинг
@@ -683,9 +666,9 @@ const EnhancedAppointmentsTable = ({
         // Fallback: Ищем в services prop по service_code (точное совпадение)
         for (const group of Object.values(services)) {
           if (Array.isArray(group)) {
-            const foundService = group.find(s =>
-              (s.service_code || '').toUpperCase() === code ||
-              (s.code || '').toUpperCase() === code
+            const foundService = group.find((s) =>
+            (s.service_code || '').toUpperCase() === code ||
+            (s.code || '').toUpperCase() === code
             );
             if (foundService) {
               return foundService.name;
@@ -706,7 +689,7 @@ const EnhancedAppointmentsTable = ({
 
     if (allPatientServices && allPatientServices.length > 0) {
       // ✅ Преобразуем коды всех услуг в названия
-      const allPatientServiceNames = allPatientServices.map(service => {
+      const allPatientServiceNames = allPatientServices.map((service) => {
         // Если это уже название (длинное, с пробелами), возвращаем как есть
         if (typeof service === 'string' && service.length > 20 && /\s/.test(service)) {
           return service;
@@ -717,7 +700,7 @@ const EnhancedAppointmentsTable = ({
           // Ищем по service_code
           for (const group of Object.values(services)) {
             if (Array.isArray(group)) {
-              const foundService = group.find(s => s.service_code === service);
+              const foundService = group.find((s) => s.service_code === service);
               if (foundService) {
                 return foundService.name;
               }
@@ -727,7 +710,7 @@ const EnhancedAppointmentsTable = ({
           // Ищем по старому полю code
           for (const group of Object.values(services)) {
             if (Array.isArray(group)) {
-              const foundService = group.find(s => s.code === service);
+              const foundService = group.find((s) => s.code === service);
               if (foundService) {
                 return foundService.name;
               }
@@ -751,40 +734,40 @@ const EnhancedAppointmentsTable = ({
       // Добавляем информацию о текущих услугах с полными названиями
       if (serviceNamesForTooltip.length > 0) {
         tooltipText += `\n📋 Текущие услуги (${serviceNamesForTooltip.length}):\n`;
-        serviceNamesForTooltip.forEach((serviceName, idx) => {
+        serviceNamesForTooltip.forEach((serviceName) => {
           tooltipText += `• ${serviceName}\n`;
         });
       }
     } else {
       // Fallback: показываем только текущие услуги с полными названиями
-      tooltipText = serviceNamesForTooltip.length > 1
-        ? `Услуги:\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}`
-        : serviceNamesForTooltip[0] || '';
+      tooltipText = serviceNamesForTooltip.length > 1 ?
+      `Услуги:\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}` :
+      serviceNamesForTooltip[0] || '';
     }
 
     return (
       <div
         style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', cursor: 'help' }}
-        title={tooltipText}
-      >
-        {compactCodes.map((code, idx) => (
-          <span
-            key={idx}
-            style={{
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              backgroundColor: withOpacity('var(--mac-accent-blue)', 0.12),
-              color: 'var(--mac-accent-blue)',
-              border: `1px solid ${withOpacity('var(--mac-accent-blue)', 0.25)}`
-            }}
-          >
+        title={tooltipText}>
+
+        {compactCodes.map((code, idx) =>
+        <span
+          key={idx}
+          style={{
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            backgroundColor: withOpacity('var(--mac-accent-blue)', 0.12),
+            color: 'var(--mac-accent-blue)',
+            border: `1px solid ${withOpacity('var(--mac-accent-blue)', 0.25)}`
+          }}>
+
             {code}
           </span>
-        ))}
-      </div>
-    );
+        )}
+      </div>);
+
   }, [withOpacity, createServiceMapping, services]);
 
   // Рендер типа обращения
@@ -801,12 +784,12 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ ИСПРАВЛЕНО: Для allfree используем rgba напрямую, так как withOpacity работает только с CSS переменными
     const isAllFree = visitType === 'allfree';
-    const backgroundColor = isAllFree
-      ? 'rgba(255, 107, 53, 0.08)'
-      : withOpacity(color, 0.08);
-    const borderColor = isAllFree
-      ? 'rgba(255, 107, 53, 0.2)'
-      : withOpacity(color, 0.2);
+    const backgroundColor = isAllFree ?
+    'rgba(255, 107, 53, 0.08)' :
+    withOpacity(color, 0.08);
+    const borderColor = isAllFree ?
+    'rgba(255, 107, 53, 0.2)' :
+    withOpacity(color, 0.2);
 
     return (
       <span style={{
@@ -819,9 +802,9 @@ const EnhancedAppointmentsTable = ({
         border: `1px solid ${borderColor}`
       }}>
         {typeText}
-      </span>
-    );
-  }, [themeColors, withOpacity, t]);
+      </span>);
+
+  }, [withOpacity, t]);
 
   // Рендер вида оплаты
   const renderPaymentType = useCallback((paymentType, paymentStatus) => {
@@ -845,10 +828,10 @@ const EnhancedAppointmentsTable = ({
       failed: 'var(--mac-error)'
     };
 
-    const typeText = paymentType === 'free' ? (t.free || 'Бесплатно') : (t[paymentType] || paymentType);
+    const typeText = paymentType === 'free' ? t.free || 'Бесплатно' : t[paymentType] || paymentType;
     const icon = paymentIcons[paymentType] || '💰';
-    const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';
-    const statusColor = statusColors[paymentStatus] || 'var(--mac-text-secondary)';
+    const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';void (
+    statusColors[paymentStatus] || 'var(--mac-text-secondary)');
 
     // ✅ Упрощённый вид: вид оплаты + иконка статуса
     return (
@@ -873,18 +856,18 @@ const EnhancedAppointmentsTable = ({
           <span>{icon}</span>
           <span>{typeText}</span>
         </span>
-        {paymentStatus && (
-          <span style={{
-            fontSize: '16px',
-            lineHeight: 1
-          }}>
+        {paymentStatus &&
+        <span style={{
+          fontSize: '16px',
+          lineHeight: 1
+        }}>
             {paymentStatus === 'paid' ? '✅' :
-              paymentStatus === 'pending' ? '⏳' :
-                paymentStatus === 'failed' ? '❌' : ''}
+          paymentStatus === 'pending' ? '⏳' :
+          paymentStatus === 'failed' ? '❌' : ''}
           </span>
-        )}
-      </div>
-    );
+        }
+      </div>);
+
   }, [withOpacity, t]);
 
   // Функция для форматирования номера телефона
@@ -918,7 +901,7 @@ const EnhancedAppointmentsTable = ({
 
       let servicesList = [];
       if (Array.isArray(services)) {
-        servicesList = services.map(service => {
+        servicesList = services.map((service) => {
           if (typeof service === 'string') return service;
           if (typeof service === 'object' && service.name) return service.name;
           if (typeof service === 'object' && service.code) {
@@ -937,55 +920,55 @@ const EnhancedAppointmentsTable = ({
     };
 
     const csvContent = [
-      // Заголовки - для doctor view убираем телефон и адрес
-      isDoctorView
-        ? [t.number, t.patient, t.birthYear, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(',')
-        : [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
-      // Данные
-      ...filteredData.map((row, index) => {
-        const baseData = [
-          // Номера очередей для CSV
-          row.queue_numbers && row.queue_numbers.length > 0
-            ? row.queue_numbers.map(q => `${q.queue_name}: №${q.number}`).join('; ')
-            : index + 1,
-          row.patient_fio || '',
-        ];
+    // Заголовки - для doctor view убираем телефон и адрес
+    isDoctorView ?
+    [t.number, t.patient, t.birthYear, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(',') :
+    [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
+    // Данные
+    ...filteredData.map((row, index) => {
+      const baseData = [
+      // Номера очередей для CSV
+      row.queue_numbers && row.queue_numbers.length > 0 ?
+      row.queue_numbers.map((q) => `${q.queue_name}: №${q.number}`).join('; ') :
+      index + 1,
+      row.patient_fio || ''];
 
-        // Для doctor view не включаем телефон и адрес
-        if (!isDoctorView) {
-          baseData.push(
-            formatPhoneNumber(row.patient_phone),
-            row.patient_birth_year || '',
-            row.address || ''
-          );
-        } else {
-          baseData.push(row.patient_birth_year || '');
-        }
 
-        return baseData.concat([
-          (() => {
-            const discountMode = row.discount_mode;
-            if (discountMode === 'benefit') return t.free;
-            if (discountMode === 'repeat') return t.repeat;
-            if (discountMode === 'all_free') return t.free;
-            return t.paid;
-          })(),
-          formatServicesForCsv(row.services),
-          t[row.payment_type] || row.payment_type || '',
-          row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : (row.appointment_date || ''),
-          row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (row.appointment_time || ''),
-          t[row.status] || row.status || '',
-          row.total_amount || row.cost || row.payment_amount || ''
-        ]).join(',');
-      })
-    ].join('\n');
+      // Для doctor view не включаем телефон и адрес
+      if (!isDoctorView) {
+        baseData.push(
+          formatPhoneNumber(row.patient_phone),
+          row.patient_birth_year || '',
+          row.address || ''
+        );
+      } else {
+        baseData.push(row.patient_birth_year || '');
+      }
+
+      return baseData.concat([
+      (() => {
+        const discountMode = row.discount_mode;
+        if (discountMode === 'benefit') return t.free;
+        if (discountMode === 'repeat') return t.repeat;
+        if (discountMode === 'all_free') return t.free;
+        return t.paid;
+      })(),
+      formatServicesForCsv(row.services),
+      t[row.payment_type] || row.payment_type || '',
+      row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : row.appointment_date || '',
+      row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : row.appointment_time || '',
+      t[row.status] || row.status || '',
+      row.total_amount || row.cost || row.payment_amount || '']
+      ).join(',');
+    })].
+    join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `appointments_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-  }, [filteredData, t]);
+  }, [filteredData, t, formatPhoneNumber, isDoctorView]);
 
   // Преждевременный возврат перенесён ниже, чтобы не нарушать порядок хуков
 
@@ -995,10 +978,10 @@ const EnhancedAppointmentsTable = ({
     const today = new Date().toISOString().split('T')[0];
 
     // Helper для форматирования времени
-    const formatQueueTime = (timeStr) => {
-      const date = safeParseDate(timeStr);
-      return date ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
-    };
+
+
+
+
 
     // Если запись на текущий день - показываем номер в очереди
     if (row.date === today || row.appointment_date === today) {
@@ -1010,7 +993,7 @@ const EnhancedAppointmentsTable = ({
         let queueStatus = row.queue_number_status;
         if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
           // Ищем queue_number в queue_numbers и берём его статус
-          const matchingQueue = row.queue_numbers.find(q => q.number === row.queue_number);
+          const matchingQueue = row.queue_numbers.find((q) => q.number === row.queue_number);
           if (matchingQueue) {
             queueStatus = matchingQueue.status;
           } else if (row.queue_numbers.length > 0) {
@@ -1064,11 +1047,11 @@ const EnhancedAppointmentsTable = ({
               display: 'inline-block',
               boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
             }}
-            title={`№${row.queue_number}`}
-          >
+            title={`№${row.queue_number}`}>
+
             {row.queue_number}
-          </span>
-        );
+          </span>);
+
       }
 
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
@@ -1118,19 +1101,19 @@ const EnhancedAppointmentsTable = ({
               display: 'inline-block',
               boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
             }}
-            title={`${firstQueue.queue_name || 'Очередь'}: №${firstQueue.number}`}
-          >
+            title={`${firstQueue.queue_name || 'Очередь'}: №${firstQueue.number}`}>
+
             {firstQueue.number}
-          </span>
-        );
+          </span>);
+
       }
 
       // Если нет номеров очередей, но запись на сегодня - показываем порядковый номер
       // Для этого нужно найти позицию записи среди всех записей на сегодня
-      const todayAppointments = data.filter(item =>
-        item.date === today || item.appointment_date === today
+      const todayAppointments = data.filter((item) =>
+      item.date === today || item.appointment_date === today
       );
-      const todayIndex = todayAppointments.findIndex(item => item.id === row.id) + 1;
+      const todayIndex = todayAppointments.findIndex((item) => item.id === row.id) + 1;
 
       return (
         <span style={{
@@ -1146,12 +1129,12 @@ const EnhancedAppointmentsTable = ({
           boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
         }}>
           {todayIndex}
-        </span>
-      );
+        </span>);
+
     }
 
     // Для записей не на сегодня показываем дефолтный номер
-    const fallbackIndex = data.findIndex(item => item.id === row.id) + 1;
+    const fallbackIndex = data.findIndex((item) => item.id === row.id) + 1;
     return (
       <span style={{
         color: 'var(--mac-text-secondary)',
@@ -1161,35 +1144,35 @@ const EnhancedAppointmentsTable = ({
         borderRadius: '4px'
       }}>
         #{fallbackIndex}
-      </span>
-    );
+      </span>);
+
   }, [data, withOpacity]);
 
 
   // Инлайновый лоадер без раннего возврата
-  const loaderNode = (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '60px',
-      color: 'var(--mac-text-secondary)'
-    }}>
+  const loaderNode =
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px',
+    color: 'var(--mac-text-secondary)'
+  }}>
       <div style={{ textAlign: 'center' }}>
         <div
-          className="loading-spinner"
-          style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid var(--mac-border)',
-            borderTop: '3px solid var(--mac-accent-blue)',
-            borderRadius: '50%',
-            margin: '0 auto 16px'
-          }} />
+        className="loading-spinner"
+        style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid var(--mac-border)',
+          borderTop: '3px solid var(--mac-accent-blue)',
+          borderRadius: '50%',
+          margin: '0 auto 16px'
+        }} />
         {t.loading}
       </div>
-    </div>
-  );
+    </div>;
+
 
   return (
     <div
@@ -1220,29 +1203,29 @@ const EnhancedAppointmentsTable = ({
               type="text"
               placeholder={t.search}
               value={filterConfig.search}
-              onChange={(e) => setFilterConfig(prev => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
               icon={Search}
-              style={{ width: '100%' }}
-            />
+              style={{ width: '100%' }} />
+
           </div>
 
           {/* Фильтр по статусу */}
           <MacOSSelect
             value={filterConfig.status}
-            onChange={(e) => setFilterConfig(prev => ({ ...prev, status: e.target.value }))}
+            onChange={(e) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
-              { value: '', label: t.filter },
-              { value: 'scheduled', label: t.scheduled },
-              { value: 'confirmed', label: t.confirmed },
-              { value: 'queued', label: t.queued },
-              { value: 'in_cabinet', label: t.in_cabinet },
-              { value: 'done', label: t.done },
-              { value: 'cancelled', label: t.cancelled },
-              { value: 'paid_pending', label: t.paid_pending },
-              { value: 'paid', label: t.paid }
-            ]}
-            style={{ minWidth: '120px', maxWidth: '150px', flex: '0 0 auto' }}
-          />
+            { value: '', label: t.filter },
+            { value: 'scheduled', label: t.scheduled },
+            { value: 'confirmed', label: t.confirmed },
+            { value: 'queued', label: t.queued },
+            { value: 'in_cabinet', label: t.in_cabinet },
+            { value: 'done', label: t.done },
+            { value: 'cancelled', label: t.cancelled },
+            { value: 'paid_pending', label: t.paid_pending },
+            { value: 'paid', label: t.paid }]
+            }
+            style={{ minWidth: '120px', maxWidth: '150px', flex: '0 0 auto' }} />
+
 
           {/* Экспорт */}
           <MacOSButton
@@ -1254,18 +1237,18 @@ const EnhancedAppointmentsTable = ({
               gap: '6px',
               flex: '0 0 auto',
               minWidth: '100px'
-            }}
-          >
+            }}>
+
             <Download size={16} />
             {t.export}
           </MacOSButton>
 
           {/* Информация о выбранных */}
-          {showCheckboxes && selectedRows.size > 0 && (
-            <MacOSBadge variant="info" style={{ flex: '0 0 auto' }}>
+          {showCheckboxes && selectedRows.size > 0 &&
+          <MacOSBadge variant="info" style={{ flex: '0 0 auto' }}>
               {t.selected}: {selectedRows.size}
             </MacOSBadge>
-          )}
+          }
         </div>
       </div>
 
@@ -1293,22 +1276,22 @@ const EnhancedAppointmentsTable = ({
           <thead>
             <tr>
               {/* Чекбокс для выбора всех */}
-              {showCheckboxes && (
-                <th style={{
-                  padding: '12px 8px',
-                  textAlign: 'left',
-                  borderBottom: '1px solid var(--mac-border)',
-                  width: '40px',
-                  color: 'var(--mac-text-primary)'
-                }}>
+              {showCheckboxes &&
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'left',
+                borderBottom: '1px solid var(--mac-border)',
+                width: '40px',
+                color: 'var(--mac-text-primary)'
+              }}>
                   <input
-                    type="checkbox"
-                    checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
-                  />
+                  type="checkbox"
+                  checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  style={{ cursor: 'pointer' }} />
+
                 </th>
-              )}
+              }
 
               {/* Номер */}
               <th
@@ -1323,13 +1306,13 @@ const EnhancedAppointmentsTable = ({
                   width: '60px',
                   cursor: 'pointer',
                   userSelect: 'none'
-                }}
-              >
+                }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                   {t.number}
                   {sortConfig.key === 'queue_number' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                  )}
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  }
                 </div>
               </th>
 
@@ -1346,30 +1329,30 @@ const EnhancedAppointmentsTable = ({
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '15%' : '200px',
                   width: isDoctorView ? '15%' : 'auto'
-                }}
-              >
+                }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {t.patient}
                   {sortConfig.key === 'patient_fio' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                  )}
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  }
                 </div>
               </th>
 
               {/* Телефон - скрыт для doctor view */}
-              {!isDoctorView && (
-                <th style={{
-                  padding: '12px 8px',
-                  textAlign: 'left',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  minWidth: '170px'
-                }}>
+              {!isDoctorView &&
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'left',
+                borderBottom: '1px solid var(--mac-border)',
+                color: 'var(--mac-text-primary)',
+                fontWeight: '600',
+                fontSize: '14px',
+                minWidth: '170px'
+              }}>
                   {t.phone}
                 </th>
-              )}
+              }
 
               {/* Год рождения */}
               <th
@@ -1384,32 +1367,32 @@ const EnhancedAppointmentsTable = ({
                   cursor: 'pointer',
                   width: isDoctorView ? '5%' : '60px',
                   minWidth: isDoctorView ? '5%' : '60px'
-                }}
-              >
+                }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                   {t.birthYear}
                   {sortConfig.key === 'patient_birth_year' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                  )}
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  }
                 </div>
               </th>
 
               {/* Адрес - скрыт для doctor view */}
-              {!isDoctorView && (
-                <th style={{
-                  padding: '12px 8px',
-                  textAlign: 'left',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  minWidth: '140px'
-                }}
-                  className="hide-on-mobile"
-                >
+              {!isDoctorView &&
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'left',
+                borderBottom: '1px solid var(--mac-border)',
+                color: 'var(--mac-text-primary)',
+                fontWeight: '600',
+                fontSize: '14px',
+                minWidth: '140px'
+              }}
+              className="hide-on-mobile">
+
                   {t.address}
                 </th>
-              )}
+              }
 
               {/* Тип обращения */}
               <th style={{
@@ -1466,13 +1449,13 @@ const EnhancedAppointmentsTable = ({
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '9%' : '100px',
                   width: isDoctorView ? '9%' : 'auto'
-                }}
-              >
+                }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                   {t.date}
                   {sortConfig.key === 'appointment_date' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                  )}
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  }
                 </div>
               </th>
 
@@ -1489,13 +1472,13 @@ const EnhancedAppointmentsTable = ({
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '7%' : '80px',
                   width: isDoctorView ? '7%' : 'auto'
-                }}
-              >
+                }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                   {t.status}
                   {sortConfig.key === 'status' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                  )}
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  }
                 </div>
               </th>
 
@@ -1513,13 +1496,13 @@ const EnhancedAppointmentsTable = ({
                   cursor: 'pointer',
                   minWidth: isDoctorView ? '8%' : '90px',
                   width: isDoctorView ? '8%' : 'auto'
-                }}
-              >
+                }}>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
                   {t.cost}
                   {sortConfig.key === 'cost' && (
-                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                  )}
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  }
                 </div>
               </th>
 
@@ -1539,840 +1522,831 @@ const EnhancedAppointmentsTable = ({
             </tr>
           </thead>
           <tbody>
-            {paginatedData.length === 0 ? (
-              <tr>
+            {paginatedData.length === 0 ?
+            <tr>
                 <td
-                  colSpan="10"
-                  style={{
-                    padding: '40px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: '16px'
-                  }}
-                >
+                colSpan="10"
+                style={{
+                  padding: '40px',
+                  textAlign: 'center',
+                  color: 'var(--mac-text-secondary)',
+                  fontSize: '16px'
+                }}>
+
                   {t.noData}
                 </td>
-              </tr>
-            ) : (
-              paginatedData.map((row, index) => {
-                // ⭐ SSOT: Get session color for visual grouping (presentation only)
-                const sessionColor = getSessionColor(row.session_id);
+              </tr> :
 
-                return (
-                  <tr
-                    key={row.id}
-                    className="enhanced-table-row"
-                    style={{
-                      backgroundColor: selectedRows.has(row.id)
-                        ? withOpacity('var(--mac-accent-blue)', 0.06)
-                        : (index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)'),
-                      borderBottom: '1px solid var(--mac-border)',
-                      cursor: 'pointer',
-                      // ⭐ SSOT: Visual session grouping indicator
-                      borderLeft: sessionColor ? `4px solid ${sessionColor}` : 'none',
-                      position: 'relative'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!selectedRows.has(row.id)) {
-                        e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
+            paginatedData.map((row, index) => {
+              // ⭐ SSOT: Get session color for visual grouping (presentation only)
+              const sessionColor = getSessionColor(row.session_id);
+
+              return (
+                <tr
+                  key={row.id}
+                  className="enhanced-table-row"
+                  style={{
+                    backgroundColor: selectedRows.has(row.id) ?
+                    withOpacity('var(--mac-accent-blue)', 0.06) :
+                    index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)',
+                    borderBottom: '1px solid var(--mac-border)',
+                    cursor: 'pointer',
+                    // ⭐ SSOT: Visual session grouping indicator
+                    borderLeft: sessionColor ? `4px solid ${sessionColor}` : 'none',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedRows.has(row.id)) {
+                      e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedRows.has(row.id)) {
+                      // Восстанавливаем фон на основе индекса (для полосатой таблицы)
+                      const tr = e.target.closest('tr');
+                      if (tr) {
+                        tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
                       }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!selectedRows.has(row.id)) {
-                        // Восстанавливаем фон на основе индекса (для полосатой таблицы)
-                        const tr = e.target.closest('tr');
-                        if (tr) {
-                          tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
-                        }
-                      }
-                    }}
-                    onClick={() => onRowClick?.(row)}
-                    title={row.session_id ? `Сессия: ${row.session_id}` : undefined}
-                  >
+                    }
+                  }}
+                  onClick={() => onRowClick?.(row)}
+                  title={row.session_id ? `Сессия: ${row.session_id}` : undefined}>
+
                     {/* Чекбокс */}
-                    {showCheckboxes && (
-                      <td style={{ padding: '12px 8px' }}>
+                    {showCheckboxes &&
+                  <td style={{ padding: '12px 8px' }}>
                         <input
-                          type="checkbox"
-                          checked={selectedRows.has(row.id)}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleRowSelect(row.id, e.target.checked);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
+                      type="checkbox"
+                      checked={selectedRows.has(row.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleRowSelect(row.id, e.target.checked);
+                      }}
+                      style={{ cursor: 'pointer' }} />
+
                       </td>
-                    )}
+                  }
 
                     {/* Номер */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      color: 'var(--mac-text-secondary)',
-                      fontSize: '14px'
-                    }}>
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    color: 'var(--mac-text-secondary)',
+                    fontSize: '14px'
+                  }}>
                       {renderQueueNumbers(row)}
                     </td>
 
                     {/* Пациент */}
                     <td style={{
-                      padding: '12px 8px',
-                      color: 'var(--mac-text-primary)',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      minWidth: isDoctorView ? '15%' : '200px',
-                      width: isDoctorView ? '15%' : 'auto',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                      title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
-                    >
+                    padding: '12px 8px',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    minWidth: isDoctorView ? '15%' : '200px',
+                    width: isDoctorView ? '15%' : 'auto',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}>
+
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span>{row.patient_fio || '—'}</span>
                           {/* Ярлыки источника/приоритета */}
                           {/* ✅ SSOT: Только source='online' показывает QR badge */}
-                          {row.source === 'online' && (
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                color: 'white',
-                                fontWeight: '600',
-                                whiteSpace: 'nowrap'
-                              }}
-                              title="Приоритет: ранняя онлайн-регистрация"
-                            >
+                          {row.source === 'online' &&
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: 'white',
+                            fontWeight: '600',
+                            whiteSpace: 'nowrap'
+                          }}
+                          title="Приоритет: ранняя онлайн-регистрация">
+
                               QR
                             </span>
-                          )}
-                          {row.source === 'desk' && (
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: 'var(--mac-separator)',
-                                color: 'var(--mac-text-secondary)',
-                                fontWeight: '600',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
+                        }
+                          {row.source === 'desk' &&
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: 'var(--mac-separator)',
+                            color: 'var(--mac-text-secondary)',
+                            fontWeight: '600',
+                            whiteSpace: 'nowrap'
+                          }}>
+
                               Manual
                             </span>
-                          )}
+                        }
                         </div>
-                        {row.patient_birth_year && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: 'var(--mac-text-secondary)',
-                            marginTop: '2px'
-                          }}>
+                        {row.patient_birth_year &&
+                      <div style={{
+                        fontSize: '12px',
+                        color: 'var(--mac-text-secondary)',
+                        marginTop: '2px'
+                      }}>
                             {new Date().getFullYear() - row.patient_birth_year} лет
                           </div>
-                        )}
+                      }
                       </div>
                     </td>
 
                     {/* Телефон - скрыт для doctor view */}
-                    {!isDoctorView && (
-                      <td style={{
-                        padding: '12px 8px',
-                        color: 'var(--mac-text-primary)',
-                        fontSize: '14px',
-                        minWidth: '170px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
+                    {!isDoctorView &&
+                  <td style={{
+                    padding: '12px 8px',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: '14px',
+                    minWidth: '170px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
                         <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
                           <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
                           {formatPhoneNumber(row.patient_phone)}
                         </div>
                       </td>
-                    )}
+                  }
 
                     {/* Год рождения */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      color: 'var(--mac-text-primary)',
-                      fontSize: '14px',
-                      width: isDoctorView ? '50px' : '60px',
-                      minWidth: isDoctorView ? '50px' : '60px',
-                      maxWidth: isDoctorView ? '50px' : '60px'
-                    }}>
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: '14px',
+                    width: isDoctorView ? '50px' : '60px',
+                    minWidth: isDoctorView ? '50px' : '60px',
+                    maxWidth: isDoctorView ? '50px' : '60px'
+                  }}>
                       {row.patient_birth_year || '—'}
                     </td>
 
                     {/* Адрес - скрыт для doctor view */}
-                    {!isDoctorView && (
-                      <td style={{
-                        padding: '12px 8px',
-                        color: 'var(--mac-text-primary)',
-                        fontSize: '14px',
-                        minWidth: '140px',
+                    {!isDoctorView &&
+                  <td style={{
+                    padding: '12px 8px',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: '14px',
+                    minWidth: '140px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'normal',
+                    lineHeight: '1.4'
+                  }}
+                  className="hide-on-mobile"
+                  title={row.address}>
+
+                        {row.address ?
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                            <Home size={18} style={{
+                        color: 'var(--mac-accent-blue)',
+                        fontWeight: 'bold',
+                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
+                        flexShrink: 0
+                      }} />
+                            <span style={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        whiteSpace: 'normal',
-                        lineHeight: '1.4'
-                      }}
-                        className="hide-on-mobile"
-                        title={row.address}
-                      >
-                        {row.address ? (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            <Home size={18} style={{
-                              color: 'var(--mac-accent-blue)',
-                              fontWeight: 'bold',
-                              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
-                              flexShrink: 0
-                            }} />
-                            <span style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical'
-                            }}>
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}>
                               {row.address}
                             </span>
-                          </div>
-                        ) : '—'}
+                          </div> :
+                    '—'}
                       </td>
-                    )}
+                  }
 
                     {/* Тип обращения */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      minWidth: '80px'
-                    }}>
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    minWidth: '80px'
+                  }}>
                       {renderVisitType((() => {
-                        // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
-                        const discountMode = row.discount_mode;
-                        const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
+                      // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
+                      const discountMode = row.discount_mode;
+                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
 
-                        if (discountMode === 'benefit') return 'free';
-                        if (discountMode === 'repeat') return 'repeat';
-                        // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
-                        if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
-                        return 'paid';
-                      })())}
+                      if (discountMode === 'benefit') return 'free';
+                      if (discountMode === 'repeat') return 'repeat';
+                      // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
+                      if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
+                      return 'paid';
+                    })())}
                     </td>
 
                     {/* Услуги */}
                     <td style={{
-                      padding: '12px 8px',
-                      minWidth: '180px'
-                    }}>
+                    padding: '12px 8px',
+                    minWidth: '180px'
+                  }}>
                       {/* ✅ ИСПРАВЛЕНО: Fallback для QR-записей (через service_name или queue_numbers) */}
                       {renderServices(
-                        (() => {
-                          // Если есть services, используем их
-                          if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
-                            return row.services;
-                          }
-                          // Fallback 1: service_name из записи
-                          if (row.service_name) {
-                            return [row.service_name];
-                          }
-                          // Fallback 2: service_name из queue_numbers
-                          if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
-                            return [row.queue_numbers[0].service_name];
-                          }
-                          // Fallback 3: specialty из queue_numbers (для совместимости)
-                          if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
-                            return [row.queue_numbers[0].specialty];
-                          }
+                      (() => {
+                        // Если есть services, используем их
+                        if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
                           return row.services;
-                        })(),
-                        row.all_patient_services
-                      )}
+                        }
+                        // Fallback 1: service_name из записи
+                        if (row.service_name) {
+                          return [row.service_name];
+                        }
+                        // Fallback 2: service_name из queue_numbers
+                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
+                          return [row.queue_numbers[0].service_name];
+                        }
+                        // Fallback 3: specialty из queue_numbers (для совместимости)
+                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
+                          return [row.queue_numbers[0].specialty];
+                        }
+                        return row.services;
+                      })(),
+                      row.all_patient_services
+                    )}
                     </td>
 
                     {/* Вид оплаты */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      minWidth: '100px'
-                    }}>
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    minWidth: '100px'
+                  }}>
                       {renderPaymentType(
-                        // ✅ ИСПРАВЛЕНО: Для all_free (одобренных или нет) используем 'free', иначе payment_type или 'cash'
-                        (() => {
-                          const discountMode = row.discount_mode;
-                          const approvalStatus = row.approval_status;
-                          // Если discount_mode = 'all_free', показываем как 'free' независимо от approval_status
-                          // (так как пользователь уже выбрал all_free при редактировании)
-                          if (discountMode === 'all_free') {
-                            return 'free';
-                          }
-                          return row.payment_type || 'cash';
-                        })(),
-                        row.payment_status
-                      )}
+                      // ✅ ИСПРАВЛЕНО: Для all_free (одобренных или нет) используем 'free', иначе payment_type или 'cash'
+                      (() => {
+                        const discountMode = row.discount_mode;void
+                        row.approval_status;
+                        // Если discount_mode = 'all_free', показываем как 'free' независимо от approval_status
+                        // (так как пользователь уже выбрал all_free при редактировании)
+                        if (discountMode === 'all_free') {
+                          return 'free';
+                        }
+                        return row.payment_type || 'cash';
+                      })(),
+                      row.payment_status
+                    )}
                     </td>
 
                     {/* Дата и время регистрации */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      color: 'var(--mac-text-primary)',
-                      fontSize: '14px',
-                      minWidth: '100px'
-                    }}>
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: '14px',
+                    minWidth: '100px'
+                  }}>
                       <div>
                         {/* Дата и время регистрации */}
                         {/* ✅ SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
                         {(() => {
-                          // ⭐ SSOT: Use row.queue_time directly - no aggregation
-                          const displayDate = row.queue_time ? safeParseDate(row.queue_time) :
-                            row.created_at ? safeParseDate(row.created_at) : null;
+                        // ⭐ SSOT: Use row.queue_time directly - no aggregation
+                        const displayDate = row.queue_time ? safeParseDate(row.queue_time) :
+                        row.created_at ? safeParseDate(row.created_at) : null;
 
-                          if (displayDate) {
-                            return (
-                              <div>
+                        if (displayDate) {
+                          return (
+                            <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                                   <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
                                   {displayDate.toLocaleDateString('ru-RU')}
                                 </div>
                                 <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  justifyContent: 'center',
-                                  marginTop: '2px',
-                                  fontSize: '12px',
-                                  color: 'var(--mac-text-secondary)'
-                                }}>
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                justifyContent: 'center',
+                                marginTop: '2px',
+                                fontSize: '12px',
+                                color: 'var(--mac-text-secondary)'
+                              }}>
                                   <Clock size={10} />
                                   {displayDate.toLocaleTimeString('ru-RU', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    second: '2-digit'
-                                  })}
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit'
+                                })}
                                 </div>
-                              </div>
-                            );
-                          }
+                              </div>);
 
-                          // Fallback: use appointment_date/time for legacy records without queue_time
-                          if (row.appointment_date || row.appointment_time) {
-                            return (
-                              <div>
+                        }
+
+                        // Fallback: use appointment_date/time for legacy records without queue_time
+                        if (row.appointment_date || row.appointment_time) {
+                          return (
+                            <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                                   <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
                                   {row.appointment_date || '—'}
                                 </div>
-                                {row.appointment_time && (
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    justifyContent: 'center',
-                                    marginTop: '2px',
-                                    fontSize: '12px',
-                                    color: 'var(--mac-text-secondary)'
-                                  }}>
+                                {row.appointment_time &&
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                justifyContent: 'center',
+                                marginTop: '2px',
+                                fontSize: '12px',
+                                color: 'var(--mac-text-secondary)'
+                              }}>
                                     <Clock size={10} />
                                     {row.appointment_time}
                                   </div>
-                                )}
-                              </div>
-                            );
-                          }
+                              }
+                              </div>);
 
-                          return '-';
-                        })()}
+                        }
+
+                        return '-';
+                      })()}
                       </div>
                     </td>
 
                     {/* Статус */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      minWidth: '80px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    minWidth: '80px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
                       {renderStatus(row.status)}
                     </td>
 
 
                     {/* Стоимость */}
                     <td style={{
-                      padding: '12px 8px',
-                      textAlign: 'right',
-                      color: (() => {
-                        // ✅ ИСПРАВЛЕНИЕ #3: Цвет зависит от реальной стоимости (cost из VisitService)
-                        const discountMode = row.discount_mode;
-                        const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
-                        if (isAllFreeApproved) return 'var(--mac-warning)';
+                    padding: '12px 8px',
+                    textAlign: 'right',
+                    color: (() => {
+                      // ✅ ИСПРАВЛЕНИЕ #3: Цвет зависит от реальной стоимости (cost из VisitService)
+                      const discountMode = row.discount_mode;
+                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
+                      if (isAllFreeApproved) return 'var(--mac-warning)';
 
-                        // ⭐ Используем ту же логику что и в отображении
-                        let amount = 0;
-                        if (row.has_shared_invoice) {
-                          amount = row.cost || 0;
-                        } else {
-                          amount = row.cost || row.invoice_amount || row.payment_amount || 0;
-                        }
+                      // ⭐ Используем ту же логику что и в отображении
+                      let amount = 0;
+                      if (row.has_shared_invoice) {
+                        amount = row.cost || 0;
+                      } else {
+                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                      }
 
-                        return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
-                      })(),
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      minWidth: '90px'
-                    }}>
+                      return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
+                    })(),
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    minWidth: '90px'
+                  }}>
                       {(() => {
-                        // ✅ ИСПРАВЛЕНИЕ #3: Правильный приоритет отображения цен
-                        // 1. cost из VisitService (реальная цена с учётом скидок из wizard)
-                        // 2. invoice_amount (только если НЕ shared invoice)
-                        const discountMode = row.discount_mode;
+                      // ✅ ИСПРАВЛЕНИЕ #3: Правильный приоритет отображения цен
+                      // 1. cost из VisitService (реальная цена с учётом скидок из wizard)
+                      // 2. invoice_amount (только если НЕ shared invoice)
+                      const discountMode = row.discount_mode;
 
-                        // Показываем "Бесплатно" если discount_mode = 'all_free'
-                        if (discountMode === 'all_free') {
-                          return 'Бесплатно';
-                        }
+                      // Показываем "Бесплатно" если discount_mode = 'all_free'
+                      if (discountMode === 'all_free') {
+                        return 'Бесплатно';
+                      }
 
-                        // ⭐ НОВАЯ ЛОГИКА: Приоритет cost, затем invoice_amount (если не shared)
-                        let amount = 0;
-                        if (row.has_shared_invoice) {
-                          // Для shared invoice используем ТОЛЬКО cost (не показываем сумму всего invoice)
-                          amount = row.cost || 0;
-                        } else {
-                          // Для обычных случаев: приоритет cost, fallback invoice_amount
-                          amount = row.cost || row.invoice_amount || row.payment_amount || 0;
-                        }
+                      // ⭐ НОВАЯ ЛОГИКА: Приоритет cost, затем invoice_amount (если не shared)
+                      let amount = 0;
+                      if (row.has_shared_invoice) {
+                        // Для shared invoice используем ТОЛЬКО cost (не показываем сумму всего invoice)
+                        amount = row.cost || 0;
+                      } else {
+                        // Для обычных случаев: приоритет cost, fallback invoice_amount
+                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                      }
 
-                        // Если есть сумма - показываем, иначе "—"
-                        return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
-                      })()}
+                      // Если есть сумма - показываем, иначе "—"
+                      return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
+                    })()}
                     </td>
 
                     {/* Действия */}
                     <td
+                    style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      width: '200px',
+                      minWidth: '200px',
+                      maxWidth: '200px',
+                      position: 'relative',
+                      zIndex: 100
+                    }}
+                    onClick={(e) => {
+                      // Блокируем клик на строку при клике в ячейке действий
+                      e.stopPropagation();
+                    }}
+                    onMouseDown={(e) => {
+                      // Блокируем mousedown на строку при клике в ячейке действий
+                      e.stopPropagation();
+                    }}>
+
+                      <div
                       style={{
-                        padding: '12px 8px',
-                        textAlign: 'center',
-                        width: '200px',
-                        minWidth: '200px',
-                        maxWidth: '200px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        flexWrap: 'wrap',
                         position: 'relative',
                         zIndex: 100
-                      }}
-                      onClick={(e) => {
-                        // Блокируем клик на строку при клике в ячейке действий
-                        e.stopPropagation();
-                      }}
-                      onMouseDown={(e) => {
-                        // Блокируем mousedown на строку при клике в ячейке действий
-                        e.stopPropagation();
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          flexWrap: 'wrap',
-                          position: 'relative',
-                          zIndex: 100
-                        }}
-                        onClick={(e) => {
-                          // Блокируем клик на строку при клике в контейнере действий
-                          e.stopPropagation();
-                        }}
-                        onMouseDown={(e) => {
-                          // Блокируем mousedown на строку при клике в контейнере действий
-                          e.stopPropagation();
-                        }}
-                      >
+                      }}>
+
                         {/* В режиме панели врача кнопки оплаты не показываем */}
                         {!isDoctorView && (() => {
-                          const status = (row.status || '').toLowerCase();
-                          const paymentStatus = (row.payment_status || '').toLowerCase();
-                          return (
-                            status === 'paid_pending' ||
-                            paymentStatus === 'pending' ||
-                            (status === 'scheduled' && paymentStatus !== 'paid') ||
-                            (status === 'confirmed' && paymentStatus !== 'paid') ||
-                            (status === 'waiting' && paymentStatus !== 'paid') ||
-                            (status === 'queued' && paymentStatus !== 'paid') ||
-                            (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled')
-                          );
-                        })() && (
-                            <button
-                              className="action-button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onActionClick?.('payment', row, e);
-                              }}
-                              style={{
-                                padding: '4px 8px',
-                                border: 'none',
-                                borderRadius: '4px',
-                                backgroundColor: 'var(--mac-success, #34c759)',
-                                color: 'var(--mac-text-primary)',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: '500'
-                              }}
-                              title="Оплата"
-                            >
+                        const status = (row.status || '').toLowerCase();
+                        const paymentStatus = (row.payment_status || '').toLowerCase();
+                        return (
+                          status === 'paid_pending' ||
+                          paymentStatus === 'pending' ||
+                          status === 'scheduled' && paymentStatus !== 'paid' ||
+                          status === 'confirmed' && paymentStatus !== 'paid' ||
+                          status === 'waiting' && paymentStatus !== 'paid' ||
+                          status === 'queued' && paymentStatus !== 'paid' ||
+                          !paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled');
+
+                      })() &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('payment', row, e);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--mac-success, #34c759)',
+                          color: 'var(--mac-text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                        title="Оплата">
+
                               💸 Оплата
                             </button>
-                          )}
+                      }
 
                         {/* Вызвать */}
-                        {(isDoctorView ? (row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid') : (row.status === 'queued' || row.status === 'waiting')) && (
-                          <button
-                            className="action-button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onActionClick?.('call', row, e);
-                            }}
-                            style={{
-                              padding: '4px 8px',
-                              border: 'none',
-                              borderRadius: '4px',
-                              backgroundColor: 'var(--mac-success, #34c759)',
-                              color: 'var(--mac-text-primary)',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}
-                            title="Вызвать"
-                          >
+                        {(isDoctorView ? row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid' : row.status === 'queued' || row.status === 'waiting') &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('call', row, e);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--mac-success, #34c759)',
+                          color: 'var(--mac-text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                        title="Вызвать">
+
                             📢 Вызвать
                           </button>
-                        )}
+                      }
 
                         {/* Печать */}
-                        {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') && (
-                          <button
-                            className="action-button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onActionClick?.('print', row, e);
-                            }}
-                            style={{
-                              padding: '4px',
-                              border: 'none',
-                              borderRadius: '4px',
-                              backgroundColor: 'transparent',
-                              color: 'var(--mac-accent-blue)',
-                              cursor: 'pointer',
-                              pointerEvents: 'auto'
-                            }}
-                            title="Печать"
-                          >
+                        {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('print', row, e);
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-accent-blue)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto'
+                        }}
+                        title="Печать">
+
                             <FileText size={14} />
                           </button>
-                        )}
+                      }
 
                         {/* Завершить */}
-                        {(row.status === 'in_cabinet' || row.status === 'called') && (
-                          <button
-                            className="action-button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onActionClick?.('complete', row, e);
-                            }}
-                            style={{
-                              padding: '4px 8px',
-                              border: 'none',
-                              borderRadius: '4px',
-                              backgroundColor: 'var(--mac-success, #34c759)',
-                              color: 'var(--mac-text-primary)',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}
-                            title="Завершить"
-                          >
+                        {(row.status === 'in_cabinet' || row.status === 'called') &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('complete', row, e);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--mac-success, #34c759)',
+                          color: 'var(--mac-text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                        title="Завершить">
+
                             ✅ Завершить
                           </button>
-                        )}
+                      }
 
                         {/* ✅ НОВОЕ: Кнопки управления статусами очереди (для режима врача) */}
-                        {isDoctorView && (
-                          <QueueActionButtons
-                            entry={{
-                              id: row.queue_entry_id || row.id,
-                              queue_entry_id: row.queue_entry_id,
-                              status: row.status
-                            }}
-                            onStatusChange={(action, entry, result) => {
-                              logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
-                              // Передаём событие наружу для обновления списка
-                              onActionClick?.(`queue_${action}`, row, null);
-                            }}
-                            compact={true}
-                          />
-                        )}
+                        {isDoctorView &&
+                      <QueueActionButtons
+                        entry={{
+                          id: row.queue_entry_id || row.id,
+                          queue_entry_id: row.queue_entry_id,
+                          status: row.status
+                        }}
+                        onStatusChange={(action, entry, result) => {
+                          logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
+                          // Передаём событие наружу для обновления списка
+                          onActionClick?.(`queue_${action}`, row, null);
+                        }}
+                        compact={true} />
+
+                      }
 
                         {/* Просмотр */}
                         <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
-                            if (onActionClick) {
-                              onActionClick('view', row, e);
-                            }
-                          }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            // Дублируем обработчик для надежности
-                            if (onActionClick) {
-                              onActionClick('view', row, e);
-                            }
-                          }}
-                          style={{
-                            padding: '4px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--mac-text-secondary)',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            position: 'relative',
-                            zIndex: 101
-                          }}
-                          title="Просмотр"
-                        >
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
+                          if (onActionClick) {
+                            onActionClick('view', row, e);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Дублируем обработчик для надежности
+                          if (onActionClick) {
+                            onActionClick('view', row, e);
+                          }
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-text-secondary)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto',
+                          position: 'relative',
+                          zIndex: 101
+                        }}
+                        title="Просмотр">
+
                           <Eye size={14} />
                         </button>
 
                         {/* Редактировать */}
                         <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
-                            if (onActionClick) {
-                              onActionClick('edit', row, e);
-                            }
-                          }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            // Дублируем обработчик для надежности
-                            if (onActionClick) {
-                              onActionClick('edit', row, e);
-                            }
-                          }}
-                          style={{
-                            padding: '4px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--mac-text-secondary)',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            position: 'relative',
-                            zIndex: 101
-                          }}
-                          title="Редактировать"
-                        >
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
+                          if (onActionClick) {
+                            onActionClick('edit', row, e);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Дублируем обработчик для надежности
+                          if (onActionClick) {
+                            onActionClick('edit', row, e);
+                          }
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-text-secondary)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto',
+                          position: 'relative',
+                          zIndex: 101
+                        }}
+                        title="Редактировать">
+
                           <Edit size={14} />
                         </button>
 
                         {/* Просмотр EMR (только для завершённых записей) */}
                         {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
-                          (row.status === 'in_visit' && row.payment_status === 'paid')) && (
-                            <button
-                              className="action-button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onActionClick?.('view_emr', row, e);
-                              }}
-                              style={{
-                                padding: '4px',
-                                border: 'none',
-                                borderRadius: '4px',
-                                backgroundColor: 'transparent',
-                                color: 'var(--mac-accent-blue, #007aff)',
-                                cursor: 'pointer',
-                                pointerEvents: 'auto'
-                              }}
-                              title="Просмотр EMR"
-                            >
+                      row.status === 'in_visit' && row.payment_status === 'paid') &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('view_emr', row, e);
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-accent-blue, #007aff)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto'
+                        }}
+                        title="Просмотр EMR">
+
                               <FileText size={14} />
                             </button>
-                          )}
+                      }
 
                         {/* Еще */}
                         <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('more', row, e);
-                          }}
-                          style={{
-                            padding: '4px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--mac-text-secondary)',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto'
-                          }}
-                          title="Еще"
-                        >
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('more', row, e);
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-text-secondary)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto'
+                        }}
+                        title="Еще">
+
                           <MoreHorizontal size={14} />
                         </button>
 
                         {/* Назначить следующий визит */}
-                        {isDoctorView && row.status === 'done' && (
-                          <button
-                            className="action-button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onActionClick?.('schedule_next', row, e);
-                            }}
-                            style={{
-                              padding: '4px 8px',
-                              border: 'none',
-                              borderRadius: '4px',
-                              backgroundColor: 'var(--mac-accent-blue, #007aff)',
-                              color: 'var(--mac-text-primary)',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}
-                            title="Назначить следующий визит"
-                          >
+                        {isDoctorView && row.status === 'done' &&
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onActionClick?.('schedule_next', row, e);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--mac-accent-blue, #007aff)',
+                          color: 'var(--mac-text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                        title="Назначить следующий визит">
+
                             📅 Следующий
                           </button>
-                        )}
+                      }
                       </div>
                     </td>
-                  </tr>
-                );  // ⭐ End of return statement
-              })  // ⭐ End of paginatedData.map
-            )}
+                  </tr>);
+              // ⭐ End of return statement
+            }) // ⭐ End of paginatedData.map
+            }
           </tbody>
         </table>
       </div>
 
       {/* Пагинация */}
-      {totalPages > 1 && (
-        <div style={{
-          padding: '16px',
-          borderTop: '1px solid var(--mac-border)',
+      {totalPages > 1 &&
+      <div style={{
+        padding: '16px',
+        borderTop: '1px solid var(--mac-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'between',
+        gap: '16px',
+        flexWrap: 'wrap'
+      }}>
+          <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'between',
-          gap: '16px',
-          flexWrap: 'wrap'
+          gap: '8px',
+          color: 'var(--mac-text-secondary)',
+          fontSize: '14px'
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: 'var(--mac-text-secondary)',
-            fontSize: '14px'
-          }}>
             <span>{t.page}</span>
             <select
-              value={currentPage}
-              onChange={(e) => setCurrentPage(parseInt(e.target.value))}
-              style={{
-                padding: '4px 8px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: '4px',
-                backgroundColor: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: '14px'
-              }}
-            >
-              {Array.from({ length: totalPages }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
+            value={currentPage}
+            onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: '4px',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: '14px'
+            }}>
+
+              {Array.from({ length: totalPages }, (_, i) =>
+            <option key={i + 1} value={i + 1}>
                   {i + 1}
                 </option>
-              ))}
+            )}
             </select>
             <span>{t.of} {totalPages}</span>
           </div>
 
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: 'var(--mac-text-secondary)',
-            fontSize: '14px'
-          }}>
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: 'var(--mac-text-secondary)',
+          fontSize: '14px'
+        }}>
             <span>Показано: {paginatedData.length} из {filteredData.length}</span>
           </div>
 
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
             <button
-              className="pagination-button"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              style={{
-                padding: '6px 12px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: '6px',
-                backgroundColor: 'var(--mac-bg-primary)',
-                color: currentPage === 1 ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
-                fontSize: '14px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-              }}
-            >
+            className="pagination-button"
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: currentPage === 1 ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
+              fontSize: '14px',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+            }}>
+
               Назад
             </button>
             <button
-              className="pagination-button"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              style={{
-                padding: '6px 12px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: '6px',
-                backgroundColor: 'var(--mac-bg-primary)',
-                color: currentPage === totalPages ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
-                fontSize: '14px',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-              }}
-            >
+            className="pagination-button"
+            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: currentPage === totalPages ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
+              fontSize: '14px',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+            }}>
+
               Далее
             </button>
           </div>
         </div>
-      )}
+      }
 
-    </div>
-  );
+    </div>);
+
 };
 
 export default EnhancedAppointmentsTable;
-

@@ -5,10 +5,9 @@
 
 import base64
 import io
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import qrcode
 from jinja2 import Environment, FileSystemLoader
@@ -22,9 +21,9 @@ except ImportError:
 
 try:
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.pagesizes import A4, A5
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm, mm
     from reportlab.platypus import (
         Paragraph,
@@ -78,7 +77,7 @@ class PDFService:
         return text.replace('\n', '<br>')
 
     def generate_pdf_from_html(
-        self, template_name: str, data: Dict[str, Any], paper_size: str = "A4"
+        self, template_name: str, data: dict[str, Any], paper_size: str = "A4"
     ) -> bytes:
         """
         Генерация PDF из HTML шаблона с помощью WeasyPrint
@@ -113,7 +112,7 @@ class PDFService:
             raise Exception(f"Ошибка генерации PDF: {str(e)}")
 
     def generate_pdf_with_reportlab(
-        self, document_type: str, data: Dict[str, Any], paper_size: str = "A4"
+        self, document_type: str, data: dict[str, Any], paper_size: str = "A4"
     ) -> bytes:
         """
         Генерация PDF с помощью ReportLab
@@ -204,7 +203,7 @@ class PDFService:
         except Exception as e:
             raise Exception(f"Ошибка генерации QR кода: {str(e)}")
 
-    def _build_prescription_reportlab(self, data: Dict[str, Any]) -> list:
+    def _build_prescription_reportlab(self, data: dict[str, Any]) -> list:
         """Построить рецепт с помощью ReportLab"""
         story = []
         styles = getSampleStyleSheet()
@@ -295,7 +294,7 @@ class PDFService:
 
         return story
 
-    def _build_certificate_reportlab(self, data: Dict[str, Any]) -> list:
+    def _build_certificate_reportlab(self, data: dict[str, Any]) -> list:
         """Построить медицинскую справку с помощью ReportLab"""
         story = []
         styles = getSampleStyleSheet()
@@ -354,7 +353,7 @@ class PDFService:
 
         return story
 
-    def _build_lab_results_reportlab(self, data: Dict[str, Any]) -> list:
+    def _build_lab_results_reportlab(self, data: dict[str, Any]) -> list:
         """Построить результаты анализов с помощью ReportLab"""
         story = []
         styles = getSampleStyleSheet()

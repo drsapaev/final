@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 import Icon from './Icon';
@@ -19,8 +20,9 @@ const Sidebar = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
+  void variant;
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   const sidebarStyles = {
@@ -76,41 +78,41 @@ const Sidebar = React.forwardRef(({
       ref={ref}
       className={`mac-sidebar ${isCollapsed ? 'mac-sidebar--collapsed' : ''} ${className}`}
       style={sidebarStyles}
-      {...props}
-    >
+      {...props}>
+
       {/* Header */}
-      {header && (
-        <div className="mac-sidebar-header" style={headerStyles}>
-          {!isCollapsed && (
-            <div className="mac-sidebar-header-content">
+      {header &&
+      <div className="mac-sidebar-header" style={headerStyles}>
+          {!isCollapsed &&
+        <div className="mac-sidebar-header-content">
               {header}
             </div>
-          )}
+        }
 
-          {collapsible && (
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={toggleCollapsed}
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: 'var(--mac-radius-sm)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--mac-text-primary)'
-              }}
-            >
+          {collapsible &&
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={toggleCollapsed}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: 'var(--mac-radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--mac-text-primary)'
+          }}>
+
               <Icon
-                name={isCollapsed ? 'chevron.right' : 'chevron.left'}
-                size="small"
-                style={{ color: 'var(--mac-text-primary)' }}
-              />
+            name={isCollapsed ? 'chevron.right' : 'chevron.left'}
+            size="small"
+            style={{ color: 'var(--mac-text-primary)' }} />
+
             </Button>
-          )}
+        }
         </div>
-      )}
+      }
 
       {/* Navigation Items */}
       <nav className="mac-sidebar-nav" style={navStyles}>
@@ -147,56 +149,56 @@ const Sidebar = React.forwardRef(({
               className={`mac-sidebar-item ${isActive ? 'mac-sidebar-item--active' : ''}`}
               style={itemStyles}
               onClick={handleItemClick}
-              title={isCollapsed ? item.label : undefined}
-            >
-              {item.icon && (
-                <Icon
-                  name={item.icon}
-                  size="default"
-                  style={{
-                    color: isActive ? 'white' : 'var(--mac-text-primary)'
-                  }}
-                />
-              )}
+              title={isCollapsed ? item.label : undefined}>
 
-              {!isCollapsed && (
-                <span style={{
-                  flex: 1,
-                  textAlign: 'left',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+              {item.icon &&
+              <Icon
+                name={item.icon}
+                size="default"
+                style={{
                   color: isActive ? 'white' : 'var(--mac-text-primary)'
-                }}>
+                }} />
+
+              }
+
+              {!isCollapsed &&
+              <span style={{
+                flex: 1,
+                textAlign: 'left',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                color: isActive ? 'white' : 'var(--mac-text-primary)'
+              }}>
                   {item.label}
                 </span>
-              )}
+              }
 
-              {!isCollapsed && item.badge && (
-                <span style={{
-                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-secondary)',
-                  color: isActive ? 'white' : 'var(--mac-text-primary)',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  minWidth: '18px',
-                  textAlign: 'center'
-                }}>
+              {!isCollapsed && item.badge &&
+              <span style={{
+                backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-secondary)',
+                color: isActive ? 'white' : 'var(--mac-text-primary)',
+                fontSize: '11px',
+                fontWeight: '600',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                minWidth: '18px',
+                textAlign: 'center'
+              }}>
                   {item.badge}
                 </span>
-              )}
-            </button>
-          );
+              }
+            </button>);
+
         })}
       </nav>
 
       {/* Footer */}
-      {footer && (
-        <div className="mac-sidebar-footer" style={footerStyles}>
+      {footer &&
+      <div className="mac-sidebar-footer" style={footerStyles}>
           {!isCollapsed && footer}
         </div>
-      )}
+      }
 
       <style>{`
         .mac-sidebar::-webkit-scrollbar {
@@ -260,8 +262,8 @@ const Sidebar = React.forwardRef(({
           }
         }
       `}</style>
-    </aside>
-  );
+    </aside>);
+
 });
 
 Sidebar.displayName = 'macOS Sidebar';
@@ -303,17 +305,17 @@ export const SidebarItem = React.forwardRef(({
         ...style
       }}
       onClick={onClick}
-      {...props}
-    >
-      {icon && (
-        <Icon
-          name={icon}
-          size="default"
-          style={{
-            color: active ? 'white' : 'var(--mac-text-primary)'
-          }}
-        />
-      )}
+      {...props}>
+
+      {icon &&
+      <Icon
+        name={icon}
+        size="default"
+        style={{
+          color: active ? 'white' : 'var(--mac-text-primary)'
+        }} />
+
+      }
 
       <span style={{
         flex: 1,
@@ -325,22 +327,22 @@ export const SidebarItem = React.forwardRef(({
         {label}
       </span>
 
-      {badge && (
-        <span style={{
-          backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-secondary)',
-          color: active ? 'white' : 'var(--mac-text-primary)',
-          fontSize: '11px',
-          fontWeight: '600',
-          padding: '2px 6px',
-          borderRadius: '10px',
-          minWidth: '18px',
-          textAlign: 'center'
-        }}>
+      {badge &&
+      <span style={{
+        backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-secondary)',
+        color: active ? 'white' : 'var(--mac-text-primary)',
+        fontSize: '11px',
+        fontWeight: '600',
+        padding: '2px 6px',
+        borderRadius: '10px',
+        minWidth: '18px',
+        textAlign: 'center'
+      }}>
           {badge}
         </span>
-      )}
-    </button>
-  );
+      }
+    </button>);
+
 });
 
 SidebarItem.displayName = 'macOS Sidebar Item';
@@ -388,56 +390,111 @@ export const SidebarSection = React.forwardRef(({
       setIsCollapsed(!isCollapsed);
     }
   };
+  const handleToggleKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleToggle();
+    }
+  };
 
   return (
     <div
       ref={ref}
       className={`mac-sidebar-section ${className}`}
       style={sectionStyles}
-      {...props}
-    >
-      {title && (
-        <div
-          className="mac-sidebar-section-header"
-          style={headerStyles}
-          onClick={handleToggle}
-        >
+      {...props}>
+
+      {title && collapsible &&
+      <div
+        className="mac-sidebar-section-header"
+        style={headerStyles}
+        onClick={handleToggle}
+        onKeyDown={handleToggleKeyDown}
+        role="button"
+        tabIndex={0}>
+
           <span style={{
-            fontSize: '11px',
-            fontWeight: '600',
-            color: 'var(--mac-text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-          }}>
+          fontSize: '11px',
+          fontWeight: '600',
+          color: 'var(--mac-text-tertiary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
+        }}>
             {title}
           </span>
 
-          {collapsible && (
-            <Icon
-              name={isCollapsed ? 'chevron.right' : 'chevron.down'}
-              size="small"
-              style={{
-                color: 'var(--mac-text-tertiary)',
-                transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                transform: isCollapsed ? 'rotate(0deg)' : 'rotate(0deg)'
-              }}
-            />
-          )}
+          <Icon
+          name={isCollapsed ? 'chevron.right' : 'chevron.down'}
+          size="small"
+          style={{
+            color: 'var(--mac-text-tertiary)',
+            transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            transform: isCollapsed ? 'rotate(0deg)' : 'rotate(0deg)'
+          }} />
         </div>
-      )}
+      }
+      {title && !collapsible &&
+      <div
+        className="mac-sidebar-section-header"
+        style={headerStyles}>
+
+          <span style={{
+          fontSize: '11px',
+          fontWeight: '600',
+          color: 'var(--mac-text-tertiary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
+        }}>
+            {title}
+          </span>
+
+        </div>
+      }
 
       <div
         className="mac-sidebar-section-content"
-        style={contentStyles}
-      >
+        style={contentStyles}>
+
         {children}
       </div>
-    </div>
-  );
+    </div>);
+
 });
 
 SidebarSection.displayName = 'macOS Sidebar Section';
 
-export default Sidebar;
+Sidebar.propTypes = {
+  items: PropTypes.array,
+  activeItem: PropTypes.any,
+  onItemClick: PropTypes.func,
+  collapsible: PropTypes.bool,
+  defaultCollapsed: PropTypes.bool,
+  header: PropTypes.node,
+  footer: PropTypes.node,
+  variant: PropTypes.string,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
+SidebarItem.propTypes = {
+  icon: PropTypes.string,
+  label: PropTypes.node,
+  badge: PropTypes.node,
+  active: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+SidebarSection.propTypes = {
+  title: PropTypes.node,
+  children: PropTypes.node,
+  collapsible: PropTypes.bool,
+  defaultCollapsed: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+export default Sidebar;

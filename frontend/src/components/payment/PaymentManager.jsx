@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { CreditCard, DollarSign, Receipt, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { CreditCard, DollarSign, Receipt, Clock, CheckCircle } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
 import logger from '../../utils/logger';
@@ -155,8 +155,8 @@ const PaymentManager = ({
             </h2>
             <button
               className="close-btn"
-              onClick={() => onClose && onClose({ success: false })}
-            >
+              onClick={() => onClose && onClose({ success: false })}>
+              
               ✕
             </button>
           </div>
@@ -177,8 +177,8 @@ const PaymentManager = ({
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(Number(e.target.value))}
                     placeholder="Введите сумму"
-                    min="1"
-                  />
+                    min="1" />
+                  
                 </div>
 
                 <div className="form-row">
@@ -190,8 +190,8 @@ const PaymentManager = ({
                         name="provider"
                         value="click"
                         checked={selectedProvider === 'click'}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
-                      />
+                        onChange={(e) => setSelectedProvider(e.target.value)} />
+                      
                       <span>Click</span>
                     </label>
 
@@ -201,25 +201,25 @@ const PaymentManager = ({
                         name="provider"
                         value="payme"
                         checked={selectedProvider === 'payme'}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
-                      />
+                        onChange={(e) => setSelectedProvider(e.target.value)} />
+                      
                       <span>PayMe</span>
                     </label>
                   </div>
                 </div>
 
-                {patientInfo && (
-                  <div className="patient-info">
+                {patientInfo &&
+                <div className="patient-info">
                     <p><strong>Пациент:</strong> {patientInfo.fio}</p>
                     <p><strong>Телефон:</strong> {patientInfo.phone}</p>
                   </div>
-                )}
+                }
 
                 <button
                   className="create-payment-btn"
                   onClick={createPaymentInvoice}
-                  disabled={loading || !paymentAmount}
-                >
+                  disabled={loading || !paymentAmount}>
+                  
                   {loading ? 'Создание...' : 'Создать оплату'}
                 </button>
               </div>
@@ -232,20 +232,20 @@ const PaymentManager = ({
                 Неоплаченные счета
               </h3>
 
-              {loading ? (
-                <div className="loading-state">
+              {loading ?
+              <div className="loading-state">
                   <Clock size={20} />
                   Загрузка...
-                </div>
-              ) : invoices.length === 0 ? (
-                <div className="empty-state">
+                </div> :
+              invoices.length === 0 ?
+              <div className="empty-state">
                   <CheckCircle size={24} />
                   Нет неоплаченных счетов
-                </div>
-              ) : (
-                <div className="invoices-list">
-                  {invoices.map(invoice => (
-                    <div key={invoice.id} className="invoice-item">
+                </div> :
+
+              <div className="invoices-list">
+                  {invoices.map((invoice) =>
+                <div key={invoice.id} className="invoice-item">
                       <div className="invoice-info">
                         <div className="invoice-amount">
                           {invoice.amount.toLocaleString()} сум
@@ -255,24 +255,24 @@ const PaymentManager = ({
                           <span className="invoice-provider">{invoice.provider}</span>
                           <span className="invoice-status">{invoice.status}</span>
                         </div>
-                        {invoice.description && (
-                          <div className="invoice-description">
+                        {invoice.description &&
+                    <div className="invoice-description">
                             {invoice.description}
                           </div>
-                        )}
+                    }
                       </div>
 
                       <button
-                        className="pay-invoice-btn"
-                        onClick={() => payExistingInvoice(invoice)}
-                        disabled={loading}
-                      >
+                    className="pay-invoice-btn"
+                    onClick={() => payExistingInvoice(invoice)}
+                    disabled={loading}>
+                    
                         Оплатить
                       </button>
                     </div>
-                  ))}
+                )}
                 </div>
-              )}
+              }
             </div>
           </div>
         </div>
@@ -286,8 +286,8 @@ const PaymentManager = ({
         totalAmount={paymentAmount}
         currency="UZS"
         onSuccess={handlePaymentSuccess}
-        onError={handlePaymentError}
-      />
+        onError={handlePaymentError} />
+      
 
       <PaymentPayMe
         isOpen={showPayMePayment}
@@ -296,11 +296,10 @@ const PaymentManager = ({
         totalAmount={paymentAmount}
         currency="UZS"
         onSuccess={handlePaymentSuccess}
-        onError={handlePaymentError}
-      />
-    </>
-  );
+        onError={handlePaymentError} />
+      
+    </>);
+
 };
 
 export default PaymentManager;
-

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
@@ -12,11 +12,11 @@ import {
   LogOut,
   Home,
   User,
-  Settings,
-  Globe,
+
+
   CreditCard,
-  Search as SearchIcon
-} from 'lucide-react';
+  Search as SearchIcon } from
+'lucide-react';
 
 export default function Header() {
   const [st, setSt] = useState(auth.getState());
@@ -33,7 +33,7 @@ export default function Header() {
   }
 
   const user = st.profile || st.user || null;
-  const role = (user?.role || user?.role_name || 'Guest');
+  const role = user?.role || user?.role_name || 'Guest';
   const roleLower = String(role).toLowerCase();
   // Normalize receptionist to registrar for UI consistency
   const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
@@ -43,13 +43,13 @@ export default function Header() {
   const {
     getColor,
     getSpacing,
-    getFontSize,
-    designTokens
+    getFontSize
+
   } = useTheme();
 
   // Адаптивные цвета для тем
-  const textColor = theme === 'light' ? getColor('gray', 900) : getColor('gray', 50);
-  const bgColor = theme === 'light' ? getColor('gray', 50) : getColor('gray', 900);
+  const textColor = theme === 'light' ? getColor('gray', 900) : getColor('gray', 50);void (
+  theme === 'light' ? getColor('gray', 50) : getColor('gray', 900));
   const borderColor = theme === 'light' ? getColor('gray', 200) : getColor('gray', 700);
 
   const navItems = [];
@@ -65,14 +65,14 @@ export default function Header() {
   if (roleLower === 'dentist') navItems.push({ to: '/dentist', label: 'Стоматолог', icon: '🦷' });
 
   // Стили в стиле RegistrarPanel - на весь экран
-  const headerStyle = {
+  void {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: `${getSpacing('md')} ${getSpacing('xl')}`,
-    background: theme === 'light'
-      ? 'rgba(255, 255, 255, 0.9)'
-      : 'rgba(15, 23, 42, 0.9)',
+    background: theme === 'light' ?
+    'rgba(255, 255, 255, 0.9)' :
+    'rgba(15, 23, 42, 0.9)',
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${borderColor}`,
     position: 'sticky',
@@ -81,13 +81,13 @@ export default function Header() {
     right: 0,
     width: '100%',
     zIndex: 1000,
-    boxShadow: theme === 'light'
-      ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-      : '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
+    boxShadow: theme === 'light' ?
+    '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' :
+    '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
     boxSizing: 'border-box'
-  };
+  };void
 
-  const logoStyle = {
+  {
     display: 'flex',
     alignItems: 'center',
     gap: getSpacing('sm'),
@@ -96,22 +96,22 @@ export default function Header() {
     fontSize: getFontSize('xl'),
     color: textColor,
     transition: 'all 0.3s ease'
-  };
+  };void
 
-  const navStyle = {
+  {
     display: 'flex',
     gap: getSpacing('sm'),
     alignItems: 'center'
-  };
+  };void
 
-  const historyPanelStyle = {
+  {
     display: 'flex',
     alignItems: 'center',
     gap: getSpacing('sm'),
     marginLeft: getSpacing('xl')
-  };
+  };void
 
-  const inputStyle = {
+  {
     padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     border: `1px solid ${borderColor}`,
     borderRadius: '8px',
@@ -134,18 +134,18 @@ export default function Header() {
     fontWeight: '500',
     transition: 'all 0.3s ease',
     textDecoration: 'none'
-  };
+  };void
 
-  const activeNavButtonStyle = {
+  {
     ...navButtonStyle,
     background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
     transform: 'translateY(-1px)',
     textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-  };
+  };void
 
-  const controlsStyle = {
+  {
     display: 'flex',
     gap: getSpacing('sm'),
     alignItems: 'center'
@@ -164,15 +164,15 @@ export default function Header() {
     fontSize: getFontSize('sm'),
     fontWeight: '500',
     transition: 'all 0.3s ease'
-  };
+  };void
 
-  const selectStyle = {
+  {
     ...buttonStyle,
     padding: `${getSpacing('sm')} ${getSpacing('sm')}`,
     minWidth: '60px'
-  };
+  };void
 
-  const userInfoStyle = {
+  {
     display: 'flex',
     alignItems: 'center',
     gap: getSpacing('sm'),
@@ -181,9 +181,9 @@ export default function Header() {
     borderRadius: '8px',
     fontSize: getFontSize('sm'),
     color: textColor
-  };
+  };void
 
-  const logoutButtonStyle = {
+  {
     ...buttonStyle,
     background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
     color: 'white',
@@ -213,14 +213,14 @@ export default function Header() {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  const displayNameRaw = (user?.full_name && String(user.full_name).trim()) || (user?.username && String(user.username).trim()) || '';
+  const displayNameRaw = user?.full_name && String(user.full_name).trim() || user?.username && String(user.username).trim() || '';
   const roleLabel = getRoleLabel(roleLower);
   // Если username совпадает с ролью (admin/Admin), показываем только аккуратную роль
   const isNameEqualsRole = displayNameRaw && displayNameRaw.toLowerCase() === roleLower;
-  const displayName = isNameEqualsRole ? roleLabel : (user?.full_name ? displayNameRaw : capitalize(displayNameRaw));
-  const showRoleBadge = !isNameEqualsRole && !!roleLabel;
+  const displayName = isNameEqualsRole ? roleLabel : user?.full_name ? displayNameRaw : capitalize(displayNameRaw);
+  const showRoleBadge = !isNameEqualsRole && !!roleLabel;void
 
-  const roleBadgeStyle = {
+  {
     padding: '2px 8px',
     borderRadius: 999,
     fontSize: '12px',
@@ -245,9 +245,9 @@ export default function Header() {
         transition: 'all 0.2s ease',
         backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.9)',
         borderColor: theme === 'light' ? getColor('gray', 200) : getColor('gray', 700),
-        boxShadow: theme === 'light'
-          ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          : '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
+        boxShadow: theme === 'light' ?
+        '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' :
+        '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
         fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
         fontFeatureSettings: '"calt" 1, "liga" 1',
         WebkitFontSmoothing: 'antialiased',
@@ -291,8 +291,8 @@ export default function Header() {
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             color: textColor
-          }}
-        >
+          }}>
+          
           <Hospital size={24} color={getColor('primary', 500)} />
           <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Clinic</span>
           <span style={{ fontSize: '12px', fontWeight: 'normal', opacity: 0.6 }}>v0.1.0</span>
@@ -300,7 +300,7 @@ export default function Header() {
 
         {/* Навигация */}
         <nav style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {navItems.map(item => {
+          {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (
               <button
@@ -330,151 +330,151 @@ export default function Header() {
                     boxShadow: 'none'
                   })
                 }}
-                onClick={() => navigate(item.to)}
-              >
+                onClick={() => navigate(item.to)}>
+                
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
-              </button>
-            );
+              </button>);
+
           })}
 
           {/* Быстрые ссылки для регистратора внутри панели */}
-          {roleNormalized === 'registrar' && location.pathname === '/registrar-panel' && (
-            <>
+          {roleNormalized === 'registrar' && location.pathname === '/registrar-panel' &&
+          <>
               <button
-                className="interactive-element hover-lift ripple-effect focus-ring"
-                style={{
-                  height: '40px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  ...(new URLSearchParams(location.search).get('view') === 'welcome' ? {
-                    background: `linear-gradient(135deg, ${getColor('success', 600)} 0%, ${getColor('success', 700)} 100%)`,
-                    color: 'white',
-                    border: 'none',
-                    boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)',
-                    transform: 'translateY(-1px)'
-                  } : {
-                    background: theme === 'light' ? 'white' : getColor('gray', 700),
-                    color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
-                    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                    boxShadow: 'none'
-                  })
-                }}
-                onClick={() => navigate('/registrar-panel?view=welcome')}
-                title="Главная"
-              >
+              className="interactive-element hover-lift ripple-effect focus-ring"
+              style={{
+                height: '40px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                ...(new URLSearchParams(location.search).get('view') === 'welcome' ? {
+                  background: `linear-gradient(135deg, ${getColor('success', 600)} 0%, ${getColor('success', 700)} 100%)`,
+                  color: 'white',
+                  border: 'none',
+                  boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)',
+                  transform: 'translateY(-1px)'
+                } : {
+                  background: theme === 'light' ? 'white' : getColor('gray', 700),
+                  color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                  border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                  boxShadow: 'none'
+                })
+              }}
+              onClick={() => navigate('/registrar-panel?view=welcome')}
+              title="Главная">
+              
                 <Home size={16} />
                 <span>Главная</span>
               </button>
               <button
-                className="interactive-element hover-lift ripple-effect focus-ring"
-                style={{
-                  height: '40px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  ...(new URLSearchParams(location.search).get('view') === 'queue' ? {
-                    background: 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)',
-                    color: 'white',
-                    border: 'none',
-                    boxShadow: '0 4px 6px -1px rgba(147, 51, 234, 0.3)',
-                    transform: 'translateY(-1px)'
-                  } : {
-                    background: theme === 'light' ? 'white' : getColor('gray', 700),
-                    color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
-                    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                    boxShadow: 'none'
-                  })
-                }}
-                onClick={() => navigate('/registrar-panel?view=queue')}
-                title="Онлайн‑записи"
-              >
+              className="interactive-element hover-lift ripple-effect focus-ring"
+              style={{
+                height: '40px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                ...(new URLSearchParams(location.search).get('view') === 'queue' ? {
+                  background: 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)',
+                  color: 'white',
+                  border: 'none',
+                  boxShadow: '0 4px 6px -1px rgba(147, 51, 234, 0.3)',
+                  transform: 'translateY(-1px)'
+                } : {
+                  background: theme === 'light' ? 'white' : getColor('gray', 700),
+                  color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                  border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                  boxShadow: 'none'
+                })
+              }}
+              onClick={() => navigate('/registrar-panel?view=queue')}
+              title="Онлайн‑записи">
+              
                 <span>📱</span>
                 <span>Онлайн‑записи</span>
               </button>
 
               {/* История (календарь+поиск) в контексте кнопки "Главная" */}
-              {view === 'welcome' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '24px' }}>
+              {view === 'welcome' &&
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '24px' }}>
                   <input
-                    type="date"
-                    className="interactive-element focus-ring"
-                    style={{
-                      height: '40px',
-                      padding: '8px 12px',
-                      border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      transition: 'all 0.2s ease',
-                      backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
-                      color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
-                    }}
-                    defaultValue={new URLSearchParams(location.search).get('date') || ''}
-                    onChange={(e) => {
-                      const params = new URLSearchParams(location.search);
-                      const val = e.currentTarget.value;
-                      if (val) params.set('date', val); else params.delete('date');
-                      params.set('view', 'welcome');
-                      navigate(`/registrar-panel?${params.toString()}`, { replace: true });
-                    }}
-                  />
+                type="date"
+                className="interactive-element focus-ring"
+                style={{
+                  height: '40px',
+                  padding: '8px 12px',
+                  border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+                  color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
+                }}
+                defaultValue={new URLSearchParams(location.search).get('date') || ''}
+                onChange={(e) => {
+                  const params = new URLSearchParams(location.search);
+                  const val = e.currentTarget.value;
+                  if (val) params.set('date', val);else params.delete('date');
+                  params.set('view', 'welcome');
+                  navigate(`/registrar-panel?${params.toString()}`, { replace: true });
+                }} />
+              
                   <div style={{ position: 'relative' }}>
                     <SearchIcon
-                      size={16}
-                      style={{
-                        position: 'absolute',
-                        left: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        opacity: 0.6,
-                        color: theme === 'light' ? getColor('gray', 600) : getColor('gray', 300)
-                      }}
-                    />
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    opacity: 0.6,
+                    color: theme === 'light' ? getColor('gray', 600) : getColor('gray', 300)
+                  }} />
+                
                     <input
-                      type="search"
-                      placeholder="Поиск по ФИО, телефону, услугам или ID записи..."
-                      className="interactive-element focus-ring"
-                      style={{
-                        height: '40px',
-                        paddingLeft: '40px',
-                        paddingRight: '12px',
-                        border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        minWidth: '240px',
-                        transition: 'all 0.2s ease',
-                        backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
-                        color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
-                      }}
-                      defaultValue={new URLSearchParams(location.search).get('q') || ''}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const params = new URLSearchParams(location.search);
-                          const val = e.currentTarget.value.trim();
-                          if (val) params.set('q', val); else params.delete('q');
-                          params.set('view', 'welcome');
-                          navigate(`/registrar-panel?${params.toString()}`, { replace: true });
-                        }
-                      }}
-                    />
+                  type="search"
+                  placeholder="Поиск по ФИО, телефону, услугам или ID записи..."
+                  className="interactive-element focus-ring"
+                  style={{
+                    height: '40px',
+                    paddingLeft: '40px',
+                    paddingRight: '12px',
+                    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    minWidth: '240px',
+                    transition: 'all 0.2s ease',
+                    backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+                    color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
+                  }}
+                  defaultValue={new URLSearchParams(location.search).get('q') || ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const params = new URLSearchParams(location.search);
+                      const val = e.currentTarget.value.trim();
+                      if (val) params.set('q', val);else params.delete('q');
+                      params.set('view', 'welcome');
+                      navigate(`/registrar-panel?${params.toString()}`, { replace: true });
+                    }
+                  }} />
+                
                   </div>
                 </div>
-              )}
+            }
             </>
-          )}
+          }
         </nav>
 
         {/* Управление */}
@@ -501,8 +501,8 @@ export default function Header() {
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
               cursor: 'pointer'
             }}
-            title="Переключить тему"
-          >
+            title="Переключить тему">
+            
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
@@ -523,96 +523,63 @@ export default function Header() {
               backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
               cursor: 'pointer'
-            }}
-          >
+            }}>
+            
             <option value="ru">RU</option>
             <option value="uz">UZ</option>
             <option value="en">EN</option>
           </select>
 
           {/* Информация о пользователе */}
-          {user ? (
-            <>
+          {user ?
+          <>
               <button
-                onClick={() => navigate('/registrar-panel')}
-                className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
-                style={{
-                  height: '40px',
-                  padding: '8px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                  backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
-                  color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  minWidth: 'auto',
-                  maxWidth: '200px',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Открыть панель регистратора"
-              >
+              onClick={() => navigate('/registrar-panel')}
+              className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
+              style={{
+                height: '40px',
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+                color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                cursor: 'pointer',
+                flexShrink: 0,
+                minWidth: 'auto',
+                maxWidth: '200px',
+                whiteSpace: 'nowrap'
+              }}
+              title="Открыть панель регистратора">
+              
                 <User size={16} />
                 <span style={{ fontWeight: '700' }}>{displayName}</span>
-                {showRoleBadge && (
-                  <span
-                    className="role-badge"
-                    style={{
-                      padding: '2px 8px',
-                      fontSize: '12px',
-                      borderRadius: '999px',
-                      border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
-                      backgroundColor: theme === 'light' ? getColor('gray', 100) : getColor('gray', 600),
-                      color: theme === 'light' ? getColor('gray', 700) : getColor('gray', 200),
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
+                {showRoleBadge &&
+              <span
+                className="role-badge"
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '12px',
+                  borderRadius: '999px',
+                  border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                  backgroundColor: theme === 'light' ? getColor('gray', 100) : getColor('gray', 600),
+                  color: theme === 'light' ? getColor('gray', 700) : getColor('gray', 200),
+                  whiteSpace: 'nowrap'
+                }}>
+                
                     {roleLabel}
                   </span>
-                )}
+              }
               </button>
               <button
-                id="logout-header-btn"
-                onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
-                className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
-                style={{
-                  height: '40px',
-                  padding: '8px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: 'white',
-                  transition: 'all 0.2s ease',
-                  background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
-                  boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  flexGrow: 0,
-                  width: 'auto',
-                  minWidth: 'fit-content',
-                  maxWidth: '160px',
-                  whiteSpace: 'nowrap',
-                  alignSelf: 'center',
-                  overflow: 'visible'
-                }}
-              >
-                <LogOut size={16} />
-                <span>Выйти</span>
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => navigate('/login')}
-              className="interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+              id="logout-header-btn"
+              onClick={() => {auth.clearToken();setProfile(null);navigate('/login');}}
+              className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
               style={{
                 height: '40px',
                 padding: '8px 12px',
@@ -624,21 +591,51 @@ export default function Header() {
                 fontWeight: '500',
                 color: 'white',
                 transition: 'all 0.2s ease',
-                background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
-                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+                background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
+                boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)',
                 border: 'none',
-                cursor: 'pointer'
-              }}
-            >
+                cursor: 'pointer',
+                flexShrink: 0,
+                flexGrow: 0,
+                width: 'auto',
+                minWidth: 'fit-content',
+                maxWidth: '160px',
+                whiteSpace: 'nowrap',
+                alignSelf: 'center',
+                overflow: 'visible'
+              }}>
+              
+                <LogOut size={16} />
+                <span>Выйти</span>
+              </button>
+            </> :
+
+          <button
+            onClick={() => navigate('/login')}
+            className="interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+            style={{
+              height: '40px',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'white',
+              transition: 'all 0.2s ease',
+              background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+              boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+              border: 'none',
+              cursor: 'pointer'
+            }}>
+            
               <User size={16} />
               <span>Войти</span>
             </button>
-          )}
+          }
         </div>
       </div>
-    </header>
-  );
+    </header>);
+
 }
-
-
-

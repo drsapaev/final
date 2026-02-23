@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import text
+from types import SimpleNamespace
+
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 
@@ -77,15 +79,20 @@ class MigrationManagementRepository:
         return self.db.execute(text(f"SELECT COUNT(*) FROM {table}")).fetchone()[0]
 
     def get_queue_indexes(self):
-        return self.db.execute(
-            text(
-                """
-                SELECT name FROM sqlite_master
-                WHERE type='index'
-                AND name LIKE 'ix_%queue%'
-                """
-            )
-        ).fetchall()
+        inspector = inspect(self.db.get_bind())
+        queue_tables = [
+            table_name
+            for table_name in inspector.get_table_names()
+            if "queue" in table_name
+        ]
+
+        indexes: list[SimpleNamespace] = []
+        for table_name in queue_tables:
+            for idx in inspector.get_indexes(table_name):
+                idx_name = idx.get("name")
+                if idx_name and "queue" in idx_name:
+                    indexes.append(SimpleNamespace(name=idx_name, table=table_name))
+        return indexes
 
     def get_alembic_revision(self):
         return self.db.execute(
@@ -95,4 +102,3 @@ class MigrationManagementRepository:
                 """
             )
         ).fetchone()
-

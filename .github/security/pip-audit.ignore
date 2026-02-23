@@ -1,0 +1,6 @@
+# pip-audit vulnerability allowlist (temporary).
+# Keep this file minimal and remove entries once upstream fixes are available.
+#
+# CVE-2024-23342: ecdsa has no fixed release yet and comes transitively via python-jose.
+# We use HS256 in auth flows and do not rely on ECDSA signing/verification.
+CVE-2024-23342

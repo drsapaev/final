@@ -2,8 +2,8 @@
  * Унифицированный компонент Input
  * Согласно MASTER_TODO_LIST строка 216
  */
-import React from 'react';
-import { colors, typography, spacing } from '../theme';
+import PropTypes from 'prop-types';
+import { typography, spacing } from '../theme';
 import { colors as designColors } from '../../theme/tokens';
 
 const Input = ({
@@ -28,20 +28,20 @@ const Input = ({
   // Размеры (обновлены для touch-friendly интерфейса)
   const sizes = {
     small: {
-      height: '44px',  // Минимум 44px для мобильных устройств
+      height: '44px', // Минимум 44px для мобильных устройств
       padding: `${spacing.spacing[2]} ${spacing.spacing[3]}`, // Увеличен padding
-      fontSize: typography.fontSizes.base, // Увеличен размер шрифта для читаемости
+      fontSize: typography.fontSizes.base // Увеличен размер шрифта для читаемости
     },
     medium: {
-      height: '48px',  // Оптимальный размер для мобильных и десктоп
+      height: '48px', // Оптимальный размер для мобильных и десктоп
       padding: `${spacing.spacing[3]} ${spacing.spacing[4]}`, // Увеличен padding
-      fontSize: typography.fontSizes.base,
+      fontSize: typography.fontSizes.base
     },
     large: {
-      height: '56px',  // Большой размер для важных полей
+      height: '56px', // Большой размер для важных полей
       padding: `${spacing.spacing[4]} ${spacing.spacing[5]}`,
-      fontSize: typography.fontSizes.lg,
-    },
+      fontSize: typography.fontSizes.lg
+    }
   };
 
   // Варианты стилей (обновлены на новую цветовую систему)
@@ -52,11 +52,11 @@ const Input = ({
       backgroundColor: designColors.semantic.background.primary,
       '&:focus': {
         borderColor: error ? designColors.status.danger : designColors.border.focus,
-        boxShadow: `0 0 0 2px ${error ? designColors.status.danger : designColors.primary[100]}`,
+        boxShadow: `0 0 0 2px ${error ? designColors.status.danger : designColors.primary[100]}`
       },
       '&:hover': {
-        borderColor: error ? designColors.status.danger : designColors.border.dark,
-      },
+        borderColor: error ? designColors.status.danger : designColors.border.dark
+      }
     },
     filled: {
       border: 'none',
@@ -65,8 +65,8 @@ const Input = ({
       borderBottom: `2px solid ${error ? designColors.status.danger : designColors.border.medium}`,
       '&:focus': {
         backgroundColor: designColors.gray[50],
-        borderBottomColor: error ? designColors.status.danger : designColors.primary[500],
-      },
+        borderBottomColor: error ? designColors.status.danger : designColors.primary[500]
+      }
     },
     standard: {
       border: 'none',
@@ -75,9 +75,9 @@ const Input = ({
       backgroundColor: 'transparent',
       '&:focus': {
         borderBottomColor: error ? designColors.status.danger : designColors.primary[500],
-        borderBottomWidth: '2px',
-      },
-    },
+        borderBottomWidth: '2px'
+      }
+    }
   };
 
   const sizeStyles = sizes[size];
@@ -93,41 +93,41 @@ const Input = ({
     color: designColors.semantic.text.primary,
     outline: 'none',
     transition: 'all 200ms ease-in-out',
-    
+
     // Состояния
     ...(disabled && {
       backgroundColor: designColors.gray[100],
       color: designColors.gray[500],
-      cursor: 'not-allowed',
+      cursor: 'not-allowed'
     }),
-    
-    ...style,
+
+    ...style
   };
 
   const containerStyles = {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.spacing[1],
-    width: fullWidth ? '100%' : 'auto',
+    width: fullWidth ? '100%' : 'auto'
   };
 
   const labelStyles = {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
     color: error ? designColors.status.danger : designColors.semantic.text.primary,
-    marginBottom: spacing.spacing[1],
+    marginBottom: spacing.spacing[1]
   };
 
   const errorStyles = {
     fontSize: typography.fontSizes.xs,
     color: designColors.status.danger,
-    marginTop: spacing.spacing[1],
+    marginTop: spacing.spacing[1]
   };
 
   const inputWrapperStyles = {
     position: 'relative',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'center'
   };
 
   const iconStyles = {
@@ -136,34 +136,34 @@ const Input = ({
     alignItems: 'center',
     justifyContent: 'center',
     color: designColors.semantic.text.secondary,
-    pointerEvents: 'none',
+    pointerEvents: 'none'
   };
 
   const startIconStyles = {
     ...iconStyles,
-    left: spacing.spacing[3],
+    left: spacing.spacing[3]
   };
 
   const endIconStyles = {
     ...iconStyles,
-    right: spacing.spacing[3],
+    right: spacing.spacing[3]
   };
 
   return (
     <div style={containerStyles} className={className}>
-      {label && (
-        <label style={labelStyles}>
+      {label &&
+      <label style={labelStyles}>
           {label}
           {required && <span style={{ color: designColors.status.danger }}> *</span>}
         </label>
-      )}
+      }
       
       <div style={inputWrapperStyles}>
-        {startIcon && (
-          <div style={startIconStyles}>
+        {startIcon &&
+        <div style={startIconStyles}>
             {startIcon}
           </div>
-        )}
+        }
         
         <input
           type={type}
@@ -175,25 +175,44 @@ const Input = ({
           style={{
             ...inputStyles,
             paddingLeft: startIcon ? spacing.spacing[10] : inputStyles.padding.split(' ')[1],
-            paddingRight: endIcon ? spacing.spacing[10] : inputStyles.padding.split(' ')[1],
+            paddingRight: endIcon ? spacing.spacing[10] : inputStyles.padding.split(' ')[1]
           }}
-          {...props}
-        />
+          {...props} />
         
-        {endIcon && (
-          <div style={endIconStyles}>
+        
+        {endIcon &&
+        <div style={endIconStyles}>
             {endIcon}
           </div>
-        )}
+        }
       </div>
       
-      {error && errorMessage && (
-        <div style={errorStyles}>
+      {error && errorMessage &&
+      <div style={errorStyles}>
           {errorMessage}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
+};
+
+Input.propTypes = {
+  type: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  placeholder: PropTypes.string,
+  disabled: PropTypes.bool,
+  error: PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
+  errorMessage: PropTypes.node,
+  label: PropTypes.node,
+  required: PropTypes.bool,
+  size: PropTypes.oneOf(['small', 'medium', 'large']),
+  variant: PropTypes.oneOf(['outlined', 'filled', 'standard']),
+  fullWidth: PropTypes.bool,
+  startIcon: PropTypes.node,
+  endIcon: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default Input;

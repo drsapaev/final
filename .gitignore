@@ -45,6 +45,7 @@ backend/quality-reports/*.md
 !backend/quality-reports/README.md
 !backend/quality-reports/.gitkeep.secret_key
 backend/.secret_key
+.secret_key
 *.db.backup*
 
 # Database files (local development)
@@ -82,3 +83,9 @@ secrets/
 # Local dev artifacts
 .mypy_cache/
 .ruff_cache/
+
+# Generated CI/debug artifacts (large)
+backend/mypy_ci_check.txt
+run_*.final.html
+run_latest.html
+wf_page*.html

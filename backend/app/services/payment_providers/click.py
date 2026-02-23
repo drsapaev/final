@@ -3,11 +3,8 @@
 """
 
 import hashlib
-import hmac
-import json
-from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 import requests
 
@@ -17,7 +14,7 @@ from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 class ClickProvider(BasePaymentProvider):
     """Провайдер для Click платежной системы"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
 
         # Конфигурация Click
@@ -151,19 +148,19 @@ class ClickProvider(BasePaymentProvider):
                 success=False, error_message=f"Ошибка проверки статуса Click: {str(e)}"
             )
 
-    def process_webhook(self, webhook_data: Dict[str, Any]) -> PaymentResult:
+    def process_webhook(self, webhook_data: dict[str, Any]) -> PaymentResult:
         """Обработка webhook от Click"""
 
         try:
             # Извлекаем данные
             click_trans_id = webhook_data.get("click_trans_id")
-            service_id = webhook_data.get("service_id")
-            merchant_id = webhook_data.get("merchant_id")
+            _service_id = webhook_data.get("service_id")
+            _merchant_id = webhook_data.get("merchant_id")
             amount = webhook_data.get("amount")
             action = webhook_data.get("action")
             error = webhook_data.get("error")
             error_note = webhook_data.get("error_note", "")
-            sign_time = webhook_data.get("sign_time")
+            _sign_time = webhook_data.get("sign_time")
             sign_string = webhook_data.get("sign_string")
             transaction_param = webhook_data.get("merchant_trans_id")
 
@@ -222,7 +219,7 @@ class ClickProvider(BasePaymentProvider):
                 success=False, error_message=f"Ошибка обработки webhook Click: {str(e)}"
             )
 
-    def _generate_webhook_signature(self, webhook_data: Dict[str, Any]) -> str:
+    def _generate_webhook_signature(self, webhook_data: dict[str, Any]) -> str:
         """Генерация подписи для webhook"""
 
         # Порядок полей для подписи Click
@@ -249,20 +246,20 @@ class ClickProvider(BasePaymentProvider):
         return hashlib.md5(sign_string.encode()).hexdigest()
 
     def validate_webhook_signature(
-        self, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
+        self, webhook_data: dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """Валидация подписи webhook"""
         if not signature:
             self.log_error("validate_webhook_signature", "Missing signature", webhook_data)
             return False
-        
+
         expected_signature = self._generate_webhook_signature(webhook_data)
         is_valid = signature == expected_signature
-        
+
         if not is_valid:
             self.log_error("validate_webhook_signature", "Signature mismatch", {
                 "received": signature[:20] if signature else None,
                 "expected": expected_signature[:20] if expected_signature else None
             })
-        
+
         return is_valid

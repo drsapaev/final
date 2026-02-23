@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
 
@@ -16,8 +16,8 @@ const Tooltip = ({
   className = '',
   style = {},
   ...props
-}) => {
-  const { theme } = useTheme();
+}) => {void
+  useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
@@ -224,12 +224,12 @@ const Tooltip = ({
       <div
         ref={triggerRef}
         className={`mac-tooltip-trigger ${className}`}
-        onMouseEnter={handleMouseEnter}
-        onMouseMove={followCursor ? handleMouseMove : undefined}
-        onMouseLeave={handleMouseLeave}
+        onPointerEnter={handleMouseEnter}
+        onPointerMove={followCursor ? handleMouseMove : undefined}
+        onPointerLeave={handleMouseLeave}
         style={{ display: 'inline-block', ...style }}
-        {...props}
-      >
+        {...props}>
+
         {children}
       </div>
 
@@ -241,47 +241,47 @@ const Tooltip = ({
             ...tooltipStyles,
             ...getPositionedStyles()
           }}
-          role="tooltip"
-        >
+          role="tooltip">
+
           <div className="mac-tooltip-content" style={contentStyles}>
             {content}
           </div>
 
           {/* Стрелочку показываем только если НЕ followCursor */}
-          {!followCursor && (
-            <div
-              className="mac-tooltip-arrow"
-              style={{
-                position: 'absolute',
-                width: '8px',
-                height: '8px',
-                backgroundColor: 'var(--mac-bg-tertiary)',
-                border: '1px solid var(--mac-border)',
-                transform: 'rotate(45deg)',
-                zIndex: -1,
-                ...(tooltipPosition.x === 'left' && tooltipPosition.y === 'center' && {
-                  right: '-5px',
-                  top: '50%',
-                  marginTop: '-5px'
-                }),
-                ...(tooltipPosition.x === 'right' && tooltipPosition.y === 'center' && {
-                  left: '-5px',
-                  top: '50%',
-                  marginTop: '-5px'
-                }),
-                ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'top' && {
-                  bottom: '-5px',
-                  left: '50%',
-                  marginLeft: '-5px'
-                }),
-                ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'bottom' && {
-                  top: '-5px',
-                  left: '50%',
-                  marginLeft: '-5px'
-                })
-              }}
-            />
-          )}
+          {!followCursor &&
+          <div
+            className="mac-tooltip-arrow"
+            style={{
+              position: 'absolute',
+              width: '8px',
+              height: '8px',
+              backgroundColor: 'var(--mac-bg-tertiary)',
+              border: '1px solid var(--mac-border)',
+              transform: 'rotate(45deg)',
+              zIndex: -1,
+              ...(tooltipPosition.x === 'left' && tooltipPosition.y === 'center' && {
+                right: '-5px',
+                top: '50%',
+                marginTop: '-5px'
+              }),
+              ...(tooltipPosition.x === 'right' && tooltipPosition.y === 'center' && {
+                left: '-5px',
+                top: '50%',
+                marginTop: '-5px'
+              }),
+              ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'top' && {
+                bottom: '-5px',
+                left: '50%',
+                marginLeft: '-5px'
+              }),
+              ...(tooltipPosition.x === 'center' && tooltipPosition.y === 'bottom' && {
+                top: '-5px',
+                left: '50%',
+                marginLeft: '-5px'
+              })
+            }} />
+
+          }
 
           <style>{`
             /* Dark mode adjustments */
@@ -314,8 +314,8 @@ const Tooltip = ({
         </div>,
         document.body
       )}
-    </>
-  );
+    </>);
+
 };
 
 Tooltip.displayName = 'macOS Tooltip';

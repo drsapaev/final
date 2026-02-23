@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import logger from '../utils/logger';
 const useSettings = () => {
@@ -8,7 +8,7 @@ const useSettings = () => {
   const [activeTab, setActiveTab] = useState('general');
 
   // Моковые данные для настроек
-  const mockSettings = {
+  const mockSettingsRef = useRef({
     // Общие настройки
     name: 'Медицинский центр "Здоровье"',
     description: 'Современный медицинский центр с полным спектром услуг',
@@ -79,7 +79,7 @@ const useSettings = () => {
     backupFrequency: 'daily',
     backupRetention: 30,
     encryptBackups: true
-  };
+  });
 
   // Загрузка настроек
   const loadSettings = useCallback(async () => {
@@ -89,7 +89,7 @@ const useSettings = () => {
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
-      setSettings(mockSettings);
+      setSettings(mockSettingsRef.current);
     } catch (err) {
       setError(err);
     } finally {
@@ -129,9 +129,9 @@ const useSettings = () => {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setSettings(mockSettings);
+      setSettings(mockSettingsRef.current);
       
-      return mockSettings;
+      return mockSettingsRef.current;
     } catch (err) {
       setError(err);
       throw err;
@@ -204,7 +204,7 @@ const useSettings = () => {
     const result = {};
     
     fields.forEach(field => {
-      if (settings.hasOwnProperty(field)) {
+      if (Object.prototype.hasOwnProperty.call(settings, field)) {
         result[field] = settings[field];
       }
     });
@@ -225,7 +225,7 @@ const useSettings = () => {
       errors.email = 'Некорректный email';
     }
     
-    if (settingsToValidate.phone && !/^\+?[\d\s\-\(\)]+$/.test(settingsToValidate.phone)) {
+    if (settingsToValidate.phone && !/^\+?[\d\s-()]+$/.test(settingsToValidate.phone)) {
       errors.phone = 'Некорректный номер телефона';
     }
     

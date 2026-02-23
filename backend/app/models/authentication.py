@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class TokenBlacklist(Base):
     """
     Модель для черного списка access токенов.
-    
+
     Используется для немедленного отзыва access токенов при:
     - Logout
     - Смене пароля
@@ -37,18 +37,18 @@ class TokenBlacklist(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)  # JWT ID
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
-    
+
     # Метаданные
-    blacklisted_at: Mapped[Optional[datetime]] = mapped_column(
+    blacklisted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # "logout", "password_change", "security"
+    reason: Mapped[str | None] = mapped_column(String(100), nullable=True)  # "logout", "password_change", "security"
 
 
 class RefreshToken(Base):
@@ -63,8 +63,8 @@ class RefreshToken(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
@@ -73,20 +73,20 @@ class RefreshToken(Base):
     jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)  # JWT ID
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # IP и устройство
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)  # IPv4 или IPv6
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    device_fingerprint: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv4 или IPv6
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    device_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Связи
-    user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
+    user: Mapped[User] = relationship("User", back_populates="refresh_tokens")
 
 
 class UserSession(Base):
@@ -101,25 +101,25 @@ class UserSession(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Сессия (соответствует реальной схеме БД)
-    refresh_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    refresh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Связи
-    user: Mapped["User"] = relationship("User", back_populates="user_sessions")
+    user: Mapped[User] = relationship("User", back_populates="user_sessions")
 
 
 class PasswordResetToken(Base):
@@ -134,8 +134,8 @@ class PasswordResetToken(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
@@ -143,19 +143,19 @@ class PasswordResetToken(Base):
     token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
-    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # IP и устройство
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи
-    user: Mapped["User"] = relationship("User", back_populates="password_reset_tokens")
+    user: Mapped[User] = relationship("User", back_populates="password_reset_tokens")
 
 
 class EmailVerificationToken(Base):
@@ -170,8 +170,8 @@ class EmailVerificationToken(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
@@ -179,19 +179,19 @@ class EmailVerificationToken(Base):
     token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # IP и устройство
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи
-    user: Mapped["User"] = relationship("User", back_populates="email_verification_tokens")
+    user: Mapped[User] = relationship("User", back_populates="email_verification_tokens")
 
 
 class LoginAttempt(Base):
@@ -205,31 +205,31 @@ class LoginAttempt(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve failed attempts even if user deleted
 
     # Данные попытки
-    username: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Для неудачных попыток
-    email: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    username: Mapped[str | None] = mapped_column(String(50), nullable=True)  # Для неудачных попыток
+    email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     ip_address: Mapped[str] = mapped_column(String(45), nullable=False)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Результат
     success: Mapped[bool] = mapped_column(Boolean, default=False)
-    failure_reason: Mapped[Optional[str]] = mapped_column(
+    failure_reason: Mapped[str | None] = mapped_column(
         String(100), nullable=True
     )  # "invalid_password", "user_not_found", etc.
 
     # Метаданные
-    attempted_at: Mapped[Optional[datetime]] = mapped_column(
+    attempted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Связи
-    user: Mapped[Optional["User"]] = relationship("User", back_populates="login_attempts")
+    user: Mapped[User | None] = relationship("User", back_populates="login_attempts")
 
 
 class UserActivity(Base):
@@ -244,8 +244,8 @@ class UserActivity(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (tokens die with user)
 
@@ -253,20 +253,20 @@ class UserActivity(Base):
     activity_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # "login", "logout", "profile_update", etc.
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Дополнительные данные
-    extra_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON строка с дополнительными данными
+    extra_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON строка с дополнительными данными
 
     # Связи
-    user: Mapped["User"] = relationship("User", back_populates="user_activities")
+    user: Mapped[User] = relationship("User", back_populates="user_activities")
 
 
 class SecurityEvent(Base):
@@ -280,9 +280,9 @@ class SecurityEvent(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve security events
 
@@ -294,24 +294,24 @@ class SecurityEvent(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Дополнительные данные
-    extra_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON строка с дополнительными данными
+    extra_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON строка с дополнительными данными
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    resolved_by: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
 
     # Связи
-    user: Mapped[Optional["User"]] = relationship(
+    user: Mapped[User | None] = relationship(
         "User", foreign_keys=[user_id], back_populates="security_events"
     )
-    resolver: Mapped[Optional["User"]] = relationship("User", foreign_keys=[resolved_by])
+    resolver: Mapped[User | None] = relationship("User", foreign_keys=[resolved_by])

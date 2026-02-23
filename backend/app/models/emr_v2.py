@@ -15,18 +15,19 @@ Rules:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,7 +44,7 @@ SYSTEM_USER_ID = 0
 class EMRRecord(Base):
     """
     Production EMR Record - One per visit
-    
+
     RULE: EMR is NEVER physically deleted
     RULE: visit_id is unique (one EMR per visit)
     """
@@ -83,13 +84,13 @@ class EMRRecord(Base):
     )
 
     # ✅ Materialized fields for search/indexing (per user feedback)
-    diagnosis_main: Mapped[Optional[str]] = mapped_column(
+    diagnosis_main: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         index=True,
         comment="Extracted main diagnosis for search",
     )
-    icd10_code: Mapped[Optional[str]] = mapped_column(
+    icd10_code: Mapped[str | None] = mapped_column(
         String(16),
         nullable=True,
         index=True,
@@ -112,14 +113,14 @@ class EMRRecord(Base):
     created_by: Mapped[int] = mapped_column(
         Integer, nullable=False, index=True, comment="User ID who created"
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    updated_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    signed_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    signed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True, comment="When EMR was signed"
     )
-    signed_by: Mapped[Optional[int]] = mapped_column(
+    signed_by: Mapped[int | None] = mapped_column(
         Integer, nullable=True, index=True, comment="Doctor who signed"
     )
 
@@ -135,14 +136,14 @@ class EMRRecord(Base):
     )
 
     # ✅ Client session for smart conflict resolution (per user feedback)
-    last_client_session_id: Mapped[Optional[str]] = mapped_column(
+    last_client_session_id: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
         comment="UUID of last editing session - for conflict resolution",
     )
 
     # Relationships
-    revisions: Mapped[list["EMRRevision"]] = relationship(
+    revisions: Mapped[list[EMRRevision]] = relationship(
         "EMRRevision",
         back_populates="emr_record",
         cascade="all, delete-orphan",
@@ -162,10 +163,10 @@ class EMRRecord(Base):
 class EMRRevision(Base):
     """
     EMR Revision - Immutable snapshot of EMR at a point in time
-    
+
     RULE: Revisions are NEVER modified or deleted
     RULE: Store full snapshot (not diff) for legal compliance
-    
+
     Note: Model uses DB column names for compatibility with existing schema
     """
 
@@ -196,7 +197,7 @@ class EMRRevision(Base):
         comment="created | updated | signed | amended | restored | migrated",
     )
 
-    change_summary: Mapped[Optional[str]] = mapped_column(
+    change_summary: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Auto-generated: 'Changed fields: complaints, diagnosis'",
@@ -212,14 +213,14 @@ class EMRRevision(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-    
+
     # Client session for tracking
-    client_session_id: Mapped[Optional[str]] = mapped_column(
+    client_session_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True, comment="Client session that made this revision"
     )
 
     # Relationship
-    emr_record: Mapped["EMRRecord"] = relationship(back_populates="revisions")
+    emr_record: Mapped[EMRRecord] = relationship(back_populates="revisions")
 
     # Unique constraint: one revision per version per EMR
     __table_args__ = (
@@ -234,7 +235,7 @@ class EMRRevision(Base):
 class EMRAuditLog(Base):
     """
     EMR-specific audit log for PHI compliance
-    
+
     Separate from general AuditLog for:
     - PHI isolation
     - EMR-specific actions
@@ -263,13 +264,13 @@ class EMRAuditLog(Base):
     user_role: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # ✅ Request metadata
-    ip_address: Mapped[Optional[str]] = mapped_column(
+    ip_address: Mapped[str | None] = mapped_column(
         String(45), nullable=True, comment="IPv4 or IPv6"
     )
-    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     # ✅ Additional context
-    extra_data: Mapped[Optional[dict]] = mapped_column(
+    extra_data: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
         comment="Additional context: version, fields_changed, etc.",
@@ -288,3 +289,14 @@ class EMRAuditLog(Base):
 
     def __repr__(self) -> str:
         return f"<EMRAuditLog(id={self.id}, emr_id={self.emr_id}, action={self.action}, user_id={self.user_id})>"
+
+
+# Enforce append-only semantics at ORM level: forbid UPDATE/DELETE for audit logs
+@event.listens_for(EMRAuditLog, "before_update")
+def _prevent_audit_update(mapper, connection, target):  # pragma: no cover - safety
+    raise ValueError("EMRAuditLog is append-only; updates are not allowed.")
+
+
+@event.listens_for(EMRAuditLog, "before_delete")
+def _prevent_audit_delete(mapper, connection, target):  # pragma: no cover - safety
+    raise ValueError("EMRAuditLog is append-only; deletes are not allowed.")

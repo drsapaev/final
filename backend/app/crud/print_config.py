@@ -2,7 +2,7 @@
 CRUD операции для системы печати
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -11,8 +11,6 @@ from app.models.print_config import PrinterConfig, PrintJob, PrintTemplate
 from app.schemas.print_config import (
     PrinterConfigCreate,
     PrinterConfigUpdate,
-    PrintJobCreate,
-    PrintJobUpdate,
     PrintTemplateCreate,
     PrintTemplateUpdate,
 )
@@ -20,19 +18,19 @@ from app.schemas.print_config import (
 # ===================== ПРИНТЕРЫ =====================
 
 
-def get_printer_config(db: Session, printer_id: int) -> Optional[PrinterConfig]:
+def get_printer_config(db: Session, printer_id: int) -> PrinterConfig | None:
     """Получить конфигурацию принтера по ID"""
     return db.query(PrinterConfig).filter(PrinterConfig.id == printer_id).first()
 
 
-def get_printer_by_name(db: Session, name: str) -> Optional[PrinterConfig]:
+def get_printer_by_name(db: Session, name: str) -> PrinterConfig | None:
     """Получить принтер по имени"""
     return db.query(PrinterConfig).filter(PrinterConfig.name == name).first()
 
 
 def get_printer_configs(
     db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
-) -> List[PrinterConfig]:
+) -> list[PrinterConfig]:
     """Получить список принтеров"""
     query = db.query(PrinterConfig)
 
@@ -55,7 +53,7 @@ def create_printer_config(
 
 def update_printer_config(
     db: Session, printer_id: int, printer_data: PrinterConfigUpdate
-) -> Optional[PrinterConfig]:
+) -> PrinterConfig | None:
     """Обновить конфигурацию принтера"""
     db_printer = get_printer_config(db, printer_id)
     if not db_printer:
@@ -83,7 +81,7 @@ def delete_printer_config(db: Session, printer_id: int) -> bool:
 
 def get_default_printer_for_type(
     db: Session, document_type: str
-) -> Optional[PrinterConfig]:
+) -> PrinterConfig | None:
     """Получить принтер по умолчанию для типа документа"""
     # Пока возвращаем первый активный принтер
     # В будущем можно добавить логику сопоставления типов документов и принтеров
@@ -97,19 +95,19 @@ def get_default_printer_for_type(
 # ===================== ШАБЛОНЫ =====================
 
 
-def get_print_template(db: Session, template_id: int) -> Optional[PrintTemplate]:
+def get_print_template(db: Session, template_id: int) -> PrintTemplate | None:
     """Получить шаблон по ID"""
     return db.query(PrintTemplate).filter(PrintTemplate.id == template_id).first()
 
 
 def get_print_templates(
     db: Session,
-    template_type: Optional[str] = None,
-    language: Optional[str] = None,
+    template_type: str | None = None,
+    language: str | None = None,
     active_only: bool = True,
     skip: int = 0,
     limit: int = 100,
-) -> List[PrintTemplate]:
+) -> list[PrintTemplate]:
     """Получить список шаблонов"""
     query = db.query(PrintTemplate)
 
@@ -138,7 +136,7 @@ def create_print_template(
 
 def update_print_template(
     db: Session, template_id: int, template_data: PrintTemplateUpdate
-) -> Optional[PrintTemplate]:
+) -> PrintTemplate | None:
     """Обновить шаблон печати"""
     db_template = get_print_template(db, template_id)
     if not db_template:
@@ -166,7 +164,7 @@ def delete_print_template(db: Session, template_id: int) -> bool:
 
 def get_template_by_type_and_printer(
     db: Session, template_type: str, printer_id: int
-) -> Optional[PrintTemplate]:
+) -> PrintTemplate | None:
     """Получить шаблон по типу и принтеру"""
     # Сначала ищем шаблон для конкретного принтера
     template = (
@@ -200,19 +198,19 @@ def get_template_by_type_and_printer(
 # ===================== ЗАДАНИЯ ПЕЧАТИ =====================
 
 
-def get_print_job(db: Session, job_id: int) -> Optional[PrintJob]:
+def get_print_job(db: Session, job_id: int) -> PrintJob | None:
     """Получить задание печати по ID"""
     return db.query(PrintJob).filter(PrintJob.id == job_id).first()
 
 
 def get_print_jobs(
     db: Session,
-    status_filter: Optional[str] = None,
-    document_type: Optional[str] = None,
-    user_id: Optional[int] = None,
+    status_filter: str | None = None,
+    document_type: str | None = None,
+    user_id: int | None = None,
     skip: int = 0,
     limit: int = 100,
-) -> List[PrintJob]:
+) -> list[PrintJob]:
     """Получить список заданий печати"""
     query = db.query(PrintJob)
 
@@ -228,7 +226,7 @@ def get_print_jobs(
     return query.order_by(PrintJob.created_at.desc()).offset(skip).limit(limit).all()
 
 
-def create_print_job(db: Session, job_data: Dict[str, Any]) -> PrintJob:
+def create_print_job(db: Session, job_data: dict[str, Any]) -> PrintJob:
     """Создать задание печати"""
     db_job = PrintJob(**job_data)
     db.add(db_job)
@@ -238,8 +236,8 @@ def create_print_job(db: Session, job_data: Dict[str, Any]) -> PrintJob:
 
 
 def update_print_job(
-    db: Session, job_id: int, job_data: Dict[str, Any]
-) -> Optional[PrintJob]:
+    db: Session, job_id: int, job_data: dict[str, Any]
+) -> PrintJob | None:
     """Обновить задание печати"""
     db_job = get_print_job(db, job_id)
     if not db_job:

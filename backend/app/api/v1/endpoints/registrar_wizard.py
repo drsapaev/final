@@ -2668,7 +2668,19 @@ def _assign_queue_numbers_on_confirmation(
             unique_queue_tags.add(service.queue_tag)
 
     if not unique_queue_tags:
-        return {}, []
+        department_to_queue = {
+            "cardiology": "cardiology_common",
+            "dermatology": "dermatology",
+            "stomatology": "stomatology",
+            "cosmetology": "cosmetology",
+            "lab": "lab",
+            "ecg": "ecg",
+        }
+        fallback_tag = department_to_queue.get((visit.department or "").lower())
+        if fallback_tag:
+            unique_queue_tags.add(fallback_tag)
+        else:
+            return {}, []
 
     today = date.today()
     queue_numbers = {}
@@ -2750,6 +2762,7 @@ def _assign_queue_numbers_on_confirmation(
         queue_entry = OnlineQueueEntry(
             queue_id=daily_queue.id,
             patient_id=visit.patient_id,
+            visit_id=visit.id,
             number=next_number,
             status="waiting",
             source="confirmation",  # Источник: подтверждение визита

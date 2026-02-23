@@ -49,7 +49,7 @@ export function useSafeInput(initialValue = '', options = {}) {
         sanitized = sanitizePhone(newValue);
         break;
 
-      case 'email':
+      case 'email': {
         const emailResult = sanitizeEmail(newValue);
         if (emailResult === null && newValue.trim().length > 0) {
           validationError = 'Невалидный email адрес';
@@ -58,6 +58,7 @@ export function useSafeInput(initialValue = '', options = {}) {
           sanitized = emailResult || '';
         }
         break;
+      }
 
       case 'text':
       default:
@@ -140,13 +141,14 @@ export function useSafeForm(initialState = {}, validationRules = {}) {
         sanitized = sanitizePhone(value);
         break;
 
-      case 'email':
+      case 'email': {
         const emailResult = sanitizeEmail(value);
         if (emailResult === null && value.trim().length > 0) {
           error = 'Невалидный email адрес';
         }
         sanitized = emailResult || value;
         break;
+      }
 
       case 'text':
       default:

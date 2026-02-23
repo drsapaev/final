@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Bell, BellOff, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, X } from 'lucide-react';
 import { pushNotifications } from '../../services/pushNotifications';
 import logger from '../../utils/logger';
 
@@ -106,16 +106,16 @@ export function NotificationPrompt() {
         <button
           className="notification-prompt__btn notification-prompt__btn--primary"
           onClick={handleEnable}
-          disabled={isLoading}
-        >
+          disabled={isLoading}>
+          
           {isLoading ? '...' : 'Включить'}
         </button>
         <button
           className="notification-prompt__btn notification-prompt__btn--secondary"
           onClick={handleDismiss}
           aria-label="Закрыть"
-          disabled={isLoading}
-        >
+          disabled={isLoading}>
+          
           <X size={16} />
         </button>
       </div>
@@ -213,8 +213,8 @@ export function NotificationPrompt() {
           background: rgba(255, 255, 255, 0.3);
         }
       `}</style>
-    </div>
-  );
+    </div>);
+
 }
 
 export default NotificationPrompt;

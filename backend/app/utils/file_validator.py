@@ -13,10 +13,8 @@ Security Features:
 """
 
 import logging
-import mimetypes
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, UploadFile, status
 
@@ -43,7 +41,6 @@ MAGIC_NUMBERS = {
     b'GIF87a': {'ext': ['.gif'], 'mime': 'image/gif', 'category': FileCategory.IMAGE},
     b'GIF89a': {'ext': ['.gif'], 'mime': 'image/gif', 'category': FileCategory.IMAGE},
     b'BM': {'ext': ['.bmp'], 'mime': 'image/bmp', 'category': FileCategory.IMAGE},
-    b'RIFF': {'ext': ['.webp'], 'mime': 'image/webp', 'category': FileCategory.IMAGE},  # Needs WEBP check
     b'II*\x00': {'ext': ['.tiff', '.tif'], 'mime': 'image/tiff', 'category': FileCategory.IMAGE},
     b'MM\x00*': {'ext': ['.tiff', '.tif'], 'mime': 'image/tiff', 'category': FileCategory.IMAGE},
 
@@ -78,7 +75,6 @@ MAGIC_NUMBERS = {
     # Audio
     b'ID3': {'ext': ['.mp3'], 'mime': 'audio/mpeg', 'category': FileCategory.AUDIO},
     b'\xFF\xFB': {'ext': ['.mp3'], 'mime': 'audio/mpeg', 'category': FileCategory.AUDIO},
-    b'RIFF': {'ext': ['.wav'], 'mime': 'audio/wav', 'category': FileCategory.AUDIO},  # Needs WAVE check
 
     # Video
     b'\x00\x00\x00\x18ftypmp42': {'ext': ['.mp4'], 'mime': 'video/mp4', 'category': FileCategory.VIDEO},
@@ -122,7 +118,7 @@ ALLOWED_EXTENSIONS = {
 }
 
 
-def detect_file_type_by_magic(content: bytes, max_bytes: int = 512) -> Optional[Dict]:
+def detect_file_type_by_magic(content: bytes, max_bytes: int = 512) -> dict | None:
     """
     Detect file type by magic number (file signature)
 
@@ -135,6 +131,22 @@ def detect_file_type_by_magic(content: bytes, max_bytes: int = 512) -> Optional[
     """
     # Read first bytes
     header = content[:max_bytes]
+
+    # RIFF контейнеры (WEBP/WAVE)
+    if header.startswith(b'RIFF') and len(header) >= 12:
+        riff_type = header[8:12]
+        if riff_type == b'WEBP':
+            return {
+                'ext': ['.webp'],
+                'mime': 'image/webp',
+                'category': FileCategory.IMAGE,
+            }
+        if riff_type == b'WAVE':
+            return {
+                'ext': ['.wav'],
+                'mime': 'audio/wav',
+                'category': FileCategory.AUDIO,
+            }
 
     # Check each magic number
     for magic, info in MAGIC_NUMBERS.items():
@@ -224,9 +236,9 @@ def validate_extension(filename: str, category: FileCategory) -> bool:
 
 async def validate_upload_file(
     upload_file: UploadFile,
-    expected_category: Optional[FileCategory] = None,
-    max_size: Optional[int] = None
-) -> Tuple[bool, str, Optional[Dict]]:
+    expected_category: FileCategory | None = None,
+    max_size: int | None = None
+) -> tuple[bool, str, dict | None]:
     """
     Comprehensive file validation
 
@@ -254,8 +266,22 @@ async def validate_upload_file(
         file_info = detect_file_type_by_magic(content)
 
         if not file_info:
-            logger.warning(f"[File Validator] Unknown file type for {upload_file.filename}")
-            return False, "Unknown or unsupported file type", None
+            actual_ext = Path(upload_file.filename or "").suffix.lower()
+            # Backward compatibility: plain text files (.txt/.csv/.rtf) do not have magic headers.
+            if _is_probably_plain_text(content) and actual_ext in {".txt", ".csv", ".rtf"}:
+                category = (
+                    FileCategory.SPREADSHEET
+                    if actual_ext == ".csv"
+                    else FileCategory.DOCUMENT
+                )
+                file_info = {
+                    "ext": [actual_ext],
+                    "mime": upload_file.content_type or "text/plain",
+                    "category": category,
+                }
+            else:
+                logger.warning(f"[File Validator] Unknown file type for {upload_file.filename}")
+                return False, "Unknown or unsupported file type", None
 
         category = file_info['category']
         detected_ext = file_info['ext'][0]
@@ -299,8 +325,8 @@ async def validate_upload_file(
 async def validate_upload_file_strict(
     upload_file: UploadFile,
     expected_category: FileCategory,
-    max_size: Optional[int] = None
-) -> Dict:
+    max_size: int | None = None
+) -> dict:
     """
     Strict file validation with HTTPException on failure
 
@@ -330,7 +356,7 @@ async def validate_upload_file_strict(
     return file_info
 
 
-def get_allowed_extensions(category: FileCategory) -> List[str]:
+def get_allowed_extensions(category: FileCategory) -> list[str]:
     """Get list of allowed extensions for a category"""
     return ALLOWED_EXTENSIONS.get(category, [])
 
@@ -338,3 +364,17 @@ def get_allowed_extensions(category: FileCategory) -> List[str]:
 def get_size_limit(category: FileCategory) -> int:
     """Get size limit for a category"""
     return SIZE_LIMITS.get(category, SIZE_LIMITS[FileCategory.OTHER])
+
+
+def _is_probably_plain_text(content: bytes) -> bool:
+    """Heuristic check for text files without magic numbers."""
+    if not content:
+        return True
+    sample = content[:4096]
+    if b"\x00" in sample:
+        return False
+    try:
+        sample.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True

@@ -1,29 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Button, 
-  Input, 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent, 
-  CardFooter,
-  Modal, 
-  Tooltip, 
-  Icon, 
-  Badge, 
-  Progress, 
+import { useState, useEffect } from 'react';
+import {
+  Button,
+  Input,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+
+  Modal,
+
+  Icon,
+  Badge,
+  Progress,
   CircularProgress,
-  Sidebar, 
+  Sidebar,
   Checkbox,
   Radio,
   Switch,
   Select,
   SegmentedControl,
   Textarea,
-  Toast,
-  ToastContainer
-} from '../ui/macos';
+  Toast } from
+
+'../ui/macos';
 import AccentPicker from '../ui/macos/AccentPicker.jsx';
 
 /**
@@ -37,7 +37,7 @@ const MacOSDemo = () => {
   const [textareaValue, setTextareaValue] = useState('');
   const [toasts, setToasts] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  
+
   // Tab states for demo
   const [activeTab1, setActiveTab1] = useState('tab1-2');
   const [activeTab2, setActiveTab2] = useState('tab2-3');
@@ -48,11 +48,11 @@ const MacOSDemo = () => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const systemIsDark = mediaQuery.matches;
     setIsDarkMode(systemIsDark);
-    
+
     // Initialize theme classes
     document.documentElement.style.colorScheme = systemIsDark ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', systemIsDark ? 'dark' : 'light');
-    
+
     if (systemIsDark) {
       document.documentElement.classList.add('dark-theme');
       document.documentElement.classList.remove('light-theme');
@@ -60,14 +60,14 @@ const MacOSDemo = () => {
       document.documentElement.classList.add('light-theme');
       document.documentElement.classList.remove('dark-theme');
     }
-    
+
     const handleChange = (e) => {
       const newIsDark = e.matches;
       setIsDarkMode(newIsDark);
-      
+
       document.documentElement.style.colorScheme = newIsDark ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', newIsDark ? 'dark' : 'light');
-      
+
       if (newIsDark) {
         document.documentElement.classList.add('dark-theme');
         document.documentElement.classList.remove('light-theme');
@@ -76,9 +76,9 @@ const MacOSDemo = () => {
         document.documentElement.classList.remove('dark-theme');
       }
     };
-    
+
     mediaQuery.addEventListener('change', handleChange);
-    
+
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
@@ -86,11 +86,11 @@ const MacOSDemo = () => {
   const toggleDarkMode = () => {
     const newDarkMode = !isDarkMode;
     setIsDarkMode(newDarkMode);
-    
+
     // Update system color scheme and theme class
     document.documentElement.style.colorScheme = newDarkMode ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', newDarkMode ? 'dark' : 'light');
-    
+
     // Force CSS variables update
     if (newDarkMode) {
       document.documentElement.classList.add('dark-theme');
@@ -103,19 +103,19 @@ const MacOSDemo = () => {
 
   const showToast = (type, message) => {
     const id = Math.random().toString(36).slice(2);
-    setToasts(prev => [...prev, { id, type, message }]);
+    setToasts((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+      setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
   };
 
   const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'house' },
-    { id: 'patients', label: 'Patients', icon: 'person', badge: '12' },
-    { id: 'appointments', label: 'Appointments', icon: 'calendar' },
-    { id: 'reports', label: 'Reports', icon: 'chart.bar' },
-    { id: 'settings', label: 'Settings', icon: 'gear' }
-  ];
+  { id: 'dashboard', label: 'Dashboard', icon: 'house' },
+  { id: 'patients', label: 'Patients', icon: 'person', badge: '12' },
+  { id: 'appointments', label: 'Appointments', icon: 'calendar' },
+  { id: 'reports', label: 'Reports', icon: 'chart.bar' },
+  { id: 'settings', label: 'Settings', icon: 'gear' }];
+
 
   return (
     <div style={{
@@ -132,113 +132,113 @@ const MacOSDemo = () => {
     }}>
           {/* Custom Header с иконками */}
           <div style={{
-            padding: '12px 0 0 0',
-            backgroundColor: 'transparent'
-          }}>
+        padding: '12px 0 0 0',
+        backgroundColor: 'transparent'
+      }}>
             <header style={{
-              backgroundColor: 'var(--mac-bg-toolbar)',
-              borderBottom: '1px solid var(--mac-separator)',
-              borderRadius: 'var(--mac-radius-md)',
-              boxShadow: 'var(--mac-shadow-sm)',
-              backdropFilter: 'var(--mac-blur-light)',
-              WebkitBackdropFilter: 'var(--mac-blur-light)',
-              height: '54px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0 12px',
-              position: 'sticky',
-              top: '12px',
-              margin: '0 12px',
-              zIndex: 100
-            }}>
+          backgroundColor: 'var(--mac-bg-toolbar)',
+          borderBottom: '1px solid var(--mac-separator)',
+          borderRadius: 'var(--mac-radius-md)',
+          boxShadow: 'var(--mac-shadow-sm)',
+          backdropFilter: 'var(--mac-blur-light)',
+          WebkitBackdropFilter: 'var(--mac-blur-light)',
+          height: '54px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 12px',
+          position: 'sticky',
+          top: '12px',
+          margin: '0 12px',
+          zIndex: 100
+        }}>
               {/* Left section - Title */}
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                flex: 1
-              }}>
+              <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flex: 1
+          }}>
                 <h1 style={{
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  margin: 0
-                }}>
+              fontSize: '15px',
+              fontWeight: '600',
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
                   macOS Medical Dashboard
                 </h1>
                 <Badge variant="secondary">Demo</Badge>
               </div>
 
               {/* Center section - Actions */}
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px',
-                alignItems: 'center'
-              }}>
-                <Button 
-                  variant="primary" 
-                  size="small" 
-                  onClick={() => showToast('success', 'Patient created!')}
-                  style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
+              <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center'
+          }}>
+                <Button
+              variant="primary"
+              size="small"
+              onClick={() => showToast('success', 'Patient created!')}
+              style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                   <Icon name="plus" size="small" style={{ color: 'white' }} />
                   New Patient
                 </Button>
                 
-                <Button 
-                  variant="outline" 
-                  size="small" 
-                  onClick={() => showToast('info', 'Search initiated')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
+                <Button
+              variant="outline"
+              size="small"
+              onClick={() => showToast('info', 'Search initiated')}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                   <Icon name="magnifyingglass" size="small" style={{ color: '#007aff' }} />
                   Search
                 </Button>
                 
-                <Button 
-                  variant="secondary" 
-                  size="small" 
-                  onClick={() => showToast('warning', 'Settings opened')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
+                <Button
+              variant="secondary"
+              size="small"
+              onClick={() => showToast('warning', 'Settings opened')}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
                   <Icon name="gear" size="small" style={{ color: '#8e8e93' }} />
                   Settings
                 </Button>
               </div>
 
               {/* Right section - Accent & Theme */}
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px',
-                alignItems: 'center',
-                marginLeft: '12px'
-              }}>
+              <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            marginLeft: '12px'
+          }}>
                 <AccentPicker />
-                <Button 
-                  variant="ghost" 
-                  size="small" 
-                  onClick={toggleDarkMode}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    padding: 0,
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                  title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
-                >
+                <Button
+              variant="ghost"
+              size="small"
+              onClick={toggleDarkMode}
+              style={{
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
+
                   <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? '#ff9500' : '#5ac8fa' }} />
                 </Button>
               </div>
             </header>
           </div>
 
-      <div style={{ 
-        display: 'flex', 
-        gap: '20px', 
+      <div style={{
+        display: 'flex',
+        gap: '20px',
         marginTop: '0px', // Убираем marginTop, так как отступ уже есть в хедере
         flex: 1,
         minHeight: 0,
@@ -247,26 +247,26 @@ const MacOSDemo = () => {
       }}>
             {/* Sidebar с отступом */}
             <div style={{
-              marginTop: '20px', // Увеличиваем отступ сверху для сайдбара от хедера
-              flexShrink: 0
-            }}>
+          marginTop: '20px', // Увеличиваем отступ сверху для сайдбара от хедера
+          flexShrink: 0
+        }}>
               <Sidebar
-                items={sidebarItems}
-                activeItem={activeSidebarItem}
-                onItemClick={(item) => setActiveSidebarItem(item.id)}
-                header="Medical System"
-                style={{
-                  background: 'var(--mac-gradient-sidebar)',
-                  borderRight: '1px solid var(--mac-separator)',
-                  borderRadius: 'var(--mac-radius-md)',
-                  backdropFilter: 'var(--mac-blur-light)',
-                  WebkitBackdropFilter: 'var(--mac-blur-light)'
-                }}
-              />
+            items={sidebarItems}
+            activeItem={activeSidebarItem}
+            onItemClick={(item) => setActiveSidebarItem(item.id)}
+            header="Medical System"
+            style={{
+              background: 'var(--mac-gradient-sidebar)',
+              borderRight: '1px solid var(--mac-separator)',
+              borderRadius: 'var(--mac-radius-md)',
+              backdropFilter: 'var(--mac-blur-light)',
+              WebkitBackdropFilter: 'var(--mac-blur-light)'
+            }} />
+
             </div>
 
         {/* Main Content */}
-        <div style={{ 
+        <div style={{
           flex: 1,
           overflow: 'auto',
           paddingRight: '10px',
@@ -353,20 +353,20 @@ const MacOSDemo = () => {
                   <Input
                     label="Patient Name"
                     placeholder="Enter patient name"
-                    hint="Full name as on ID"
-                  />
+                    hint="Full name as on ID" />
+
                   <Input
                     label="Email Address"
                     type="email"
                     placeholder="patient@example.com"
-                    error="Invalid email format"
-                  />
+                    error="Invalid email format" />
+
                   <Input
                     label="Phone Number"
                     type="tel"
                     placeholder="+1 (555) 123-4567"
-                    disabled
-                  />
+                    disabled />
+
                 </div>
               </CardContent>
             </Card>
@@ -434,13 +434,13 @@ const MacOSDemo = () => {
                   <Select
                     label="Department"
                     options={[
-                      { value: 'cardio', label: 'Cardiology' },
-                      { value: 'derma', label: 'Dermatology' },
-                      { value: 'dental', label: 'Dentistry' },
-                      { value: 'lab', label: 'Laboratory' }
-                    ]}
-                    placeholder="Choose department"
-                  />
+                    { value: 'cardio', label: 'Cardiology' },
+                    { value: 'derma', label: 'Dermatology' },
+                    { value: 'dental', label: 'Dentistry' },
+                    { value: 'lab', label: 'Laboratory' }]
+                    }
+                    placeholder="Choose department" />
+
                 </div>
               </div>
               
@@ -449,14 +449,14 @@ const MacOSDemo = () => {
                   <h4 style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--mac-text-secondary)', fontWeight: '600' }}>Segmented Control</h4>
                   <SegmentedControl
                     options={[
-                      { value: 'all', label: 'All Patients' },
-                      { value: 'active', label: 'Active' },
-                      { value: 'pending', label: 'Pending' },
-                      { value: 'completed', label: 'Completed' }
-                    ]}
+                    { value: 'all', label: 'All Patients' },
+                    { value: 'active', label: 'Active' },
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'completed', label: 'Completed' }]
+                    }
                     value={segmentedValue}
-                    onChange={setSegmentedValue}
-                  />
+                    onChange={setSegmentedValue} />
+
                 </div>
                 
                 <div>
@@ -470,8 +470,8 @@ const MacOSDemo = () => {
                     minRows={3}
                     maxRows={8}
                     autoResize
-                    maxLength={500}
-                  />
+                    maxLength={500} />
+
                 </div>
               </div>
             </CardContent>
@@ -488,27 +488,27 @@ const MacOSDemo = () => {
                 
                 {/* Variant 1: Underline Style (Safari-like) */}
                 <div>
-                  <h4 style={{ 
-                    margin: '0 0 16px 0', 
-                    fontSize: '13px', 
-                    color: 'var(--mac-text-secondary)', 
-                    fontWeight: '600' 
+                  <h4 style={{
+                    margin: '0 0 16px 0',
+                    fontSize: '13px',
+                    color: 'var(--mac-text-secondary)',
+                    fontWeight: '600'
                   }}>
                     Variant 1: Underline Style (Safari-like)
                   </h4>
-                  <div style={{ 
-                    display: 'flex', 
+                  <div style={{
+                    display: 'flex',
                     marginBottom: '24px',
                     borderBottom: '1px solid var(--mac-border)'
                   }}>
                     {[
-                      { id: 'tab1-1', label: 'Overview', icon: 'house' },
-                      { id: 'tab1-2', label: 'Patients', icon: 'person' },
-                      { id: 'tab1-3', label: 'Reports', icon: 'chart.bar' },
-                      { id: 'tab1-4', label: 'Settings', icon: 'gear' }
-                    ].map((tab) => {
+                    { id: 'tab1-1', label: 'Overview', icon: 'house' },
+                    { id: 'tab1-2', label: 'Patients', icon: 'person' },
+                    { id: 'tab1-3', label: 'Reports', icon: 'chart.bar' },
+                    { id: 'tab1-4', label: 'Settings', icon: 'gear' }].
+                    map((tab) => {
                       const isActive = tab.id === activeTab1;
-                      
+
                       return (
                         <button
                           key={tab.id}
@@ -538,14 +538,14 @@ const MacOSDemo = () => {
                             if (!isActive) {
                               e.target.style.color = 'var(--mac-text-secondary)';
                             }
-                          }}
-                        >
-                          <Icon name={tab.icon} size="small" style={{ 
+                          }}>
+
+                          <Icon name={tab.icon} size="small" style={{
                             color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
                           }} />
                           {tab.label}
-                        </button>
-                      );
+                        </button>);
+
                     })}
                   </div>
                   
@@ -560,37 +560,37 @@ const MacOSDemo = () => {
                   }}>
                     Active: <strong style={{ color: 'var(--mac-accent-blue)' }}>
                       {[
-                        { id: 'tab1-1', label: 'Overview' },
-                        { id: 'tab1-2', label: 'Patients' },
-                        { id: 'tab1-3', label: 'Reports' },
-                        { id: 'tab1-4', label: 'Settings' }
-                      ].find(tab => tab.id === activeTab1)?.label}
+                      { id: 'tab1-1', label: 'Overview' },
+                      { id: 'tab1-2', label: 'Patients' },
+                      { id: 'tab1-3', label: 'Reports' },
+                      { id: 'tab1-4', label: 'Settings' }].
+                      find((tab) => tab.id === activeTab1)?.label}
                     </strong>
                   </div>
                 </div>
 
                 {/* Variant 2: Colored Bar Style (Finder-like) */}
                 <div>
-                  <h4 style={{ 
-                    margin: '0 0 16px 0', 
-                    fontSize: '13px', 
-                    color: 'var(--mac-text-secondary)', 
-                    fontWeight: '600' 
+                  <h4 style={{
+                    margin: '0 0 16px 0',
+                    fontSize: '13px',
+                    color: 'var(--mac-text-secondary)',
+                    fontWeight: '600'
                   }}>
                     Variant 2: Colored Bar Style (Finder-like)
                   </h4>
-                  <div style={{ 
-                    display: 'flex', 
+                  <div style={{
+                    display: 'flex',
                     marginBottom: '24px'
                   }}>
                     {[
-                      { id: 'tab2-1', label: 'Dashboard', icon: 'house' },
-                      { id: 'tab2-2', label: 'Analytics', icon: 'chart.bar' },
-                      { id: 'tab2-3', label: 'Users', icon: 'person' },
-                      { id: 'tab2-4', label: 'System', icon: 'gear' }
-                    ].map((tab) => {
+                    { id: 'tab2-1', label: 'Dashboard', icon: 'house' },
+                    { id: 'tab2-2', label: 'Analytics', icon: 'chart.bar' },
+                    { id: 'tab2-3', label: 'Users', icon: 'person' },
+                    { id: 'tab2-4', label: 'System', icon: 'gear' }].
+                    map((tab) => {
                       const isActive = tab.id === activeTab2;
-                      
+
                       return (
                         <button
                           key={tab.id}
@@ -619,28 +619,28 @@ const MacOSDemo = () => {
                             if (!isActive) {
                               e.target.style.color = 'var(--mac-text-secondary)';
                             }
-                          }}
-                        >
-                          <Icon name={tab.icon} size="small" style={{ 
+                          }}>
+
+                          <Icon name={tab.icon} size="small" style={{
                             color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
                           }} />
                           {tab.label}
-                          {isActive && (
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '0',
-                              left: '0',
-                              right: '0',
-                              height: '3px',
-                              backgroundColor: 'var(--mac-accent-blue)',
-                              borderRadius: '2px 2px 0 0'
-                            }} />
-                          )}
-                        </button>
-                      );
+                          {isActive &&
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '0',
+                            left: '0',
+                            right: '0',
+                            height: '3px',
+                            backgroundColor: 'var(--mac-accent-blue)',
+                            borderRadius: '2px 2px 0 0'
+                          }} />
+                          }
+                        </button>);
+
                     })}
                   </div>
-                  <div style={{ 
+                  <div style={{
                     borderBottom: '1px solid var(--mac-border)',
                     marginBottom: '24px'
                   }} />
@@ -656,41 +656,41 @@ const MacOSDemo = () => {
                   }}>
                     Active: <strong style={{ color: 'var(--mac-accent-blue)' }}>
                       {[
-                        { id: 'tab2-1', label: 'Dashboard' },
-                        { id: 'tab2-2', label: 'Analytics' },
-                        { id: 'tab2-3', label: 'Users' },
-                        { id: 'tab2-4', label: 'System' }
-                      ].find(tab => tab.id === activeTab2)?.label}
+                      { id: 'tab2-1', label: 'Dashboard' },
+                      { id: 'tab2-2', label: 'Analytics' },
+                      { id: 'tab2-3', label: 'Users' },
+                      { id: 'tab2-4', label: 'System' }].
+                      find((tab) => tab.id === activeTab2)?.label}
                     </strong>
                   </div>
                 </div>
 
                 {/* Variant 3: Rounded Style (Xcode-like) */}
                 <div>
-                  <h4 style={{ 
-                    margin: '0 0 16px 0', 
-                    fontSize: '13px', 
-                    color: 'var(--mac-text-secondary)', 
-                    fontWeight: '600' 
+                  <h4 style={{
+                    margin: '0 0 16px 0',
+                    fontSize: '13px',
+                    color: 'var(--mac-text-secondary)',
+                    fontWeight: '600'
                   }}>
                     Variant 3: Rounded Style (Xcode-like)
                   </h4>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '8px', 
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
                     marginBottom: '24px',
                     backgroundColor: 'var(--mac-bg-secondary)',
                     borderRadius: 'var(--mac-radius-md)',
                     padding: '4px'
                   }}>
                     {[
-                      { id: 'tab3-1', label: 'Files', icon: 'folder' },
-                      { id: 'tab3-2', label: 'Search', icon: 'magnifyingglass' },
-                      { id: 'tab3-3', label: 'Debug', icon: 'gear' },
-                      { id: 'tab3-4', label: 'Help', icon: 'help' }
-                    ].map((tab) => {
+                    { id: 'tab3-1', label: 'Files', icon: 'folder' },
+                    { id: 'tab3-2', label: 'Search', icon: 'magnifyingglass' },
+                    { id: 'tab3-3', label: 'Debug', icon: 'gear' },
+                    { id: 'tab3-4', label: 'Help', icon: 'help' }].
+                    map((tab) => {
                       const isActive = tab.id === activeTab3;
-                      
+
                       return (
                         <button
                           key={tab.id}
@@ -721,14 +721,14 @@ const MacOSDemo = () => {
                               e.target.style.backgroundColor = 'transparent';
                               e.target.style.color = 'var(--mac-text-secondary)';
                             }
-                          }}
-                        >
-                          <Icon name={tab.icon} size="small" style={{ 
+                          }}>
+
+                          <Icon name={tab.icon} size="small" style={{
                             color: isActive ? 'white' : 'var(--mac-text-secondary)'
                           }} />
                           {tab.label}
-                        </button>
-                      );
+                        </button>);
+
                     })}
                   </div>
                   
@@ -743,11 +743,11 @@ const MacOSDemo = () => {
                   }}>
                     Active: <strong style={{ color: 'var(--mac-accent-blue)' }}>
                       {[
-                        { id: 'tab3-1', label: 'Files' },
-                        { id: 'tab3-2', label: 'Search' },
-                        { id: 'tab3-3', label: 'Debug' },
-                        { id: 'tab3-4', label: 'Help' }
-                      ].find(tab => tab.id === activeTab3)?.label}
+                      { id: 'tab3-1', label: 'Files' },
+                      { id: 'tab3-2', label: 'Search' },
+                      { id: 'tab3-3', label: 'Debug' },
+                      { id: 'tab3-4', label: 'Help' }].
+                      find((tab) => tab.id === activeTab3)?.label}
                     </strong>
                   </div>
                 </div>
@@ -759,18 +759,18 @@ const MacOSDemo = () => {
                   borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border)'
                 }}>
-                  <h5 style={{ 
-                    margin: '0 0 12px 0', 
-                    fontSize: '13px', 
-                    color: 'var(--mac-text-primary)', 
-                    fontWeight: '600' 
+                  <h5 style={{
+                    margin: '0 0 12px 0',
+                    fontSize: '13px',
+                    color: 'var(--mac-text-primary)',
+                    fontWeight: '600'
                   }}>
                     Usage Guidelines:
                   </h5>
-                  <ul style={{ 
-                    margin: 0, 
-                    paddingLeft: '20px', 
-                    fontSize: '12px', 
+                  <ul style={{
+                    margin: 0,
+                    paddingLeft: '20px',
+                    fontSize: '12px',
                     color: 'var(--mac-text-secondary)',
                     lineHeight: '1.5'
                   }}>
@@ -796,30 +796,30 @@ const MacOSDemo = () => {
                 gap: '20px'
               }}>
                 {[
-                  'house', 'person', 'heart', 'gear', 'bell', 'chart.bar',
-                  'magnifyingglass', 'plus', 'trash', 'eye', 'phone', 'envelope'
-                ].map((iconName) => (
-                  <div key={iconName} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '16px',
-                    borderRadius: '10px',
-                    backgroundColor: 'var(--mac-bg-tertiary)',
-                    transition: 'all 0.2s ease'
-                  }}>
+                'house', 'person', 'heart', 'gear', 'bell', 'chart.bar',
+                'magnifyingglass', 'plus', 'trash', 'eye', 'phone', 'envelope'].
+                map((iconName) =>
+                <div key={iconName} style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--mac-bg-tertiary)',
+                  transition: 'all 0.2s ease'
+                }}>
                     <Icon name={iconName} size="large" />
                     <span style={{
-                      fontSize: '11px',
-                      color: 'var(--mac-text-secondary)',
-                      textAlign: 'center',
-                      fontWeight: '500'
-                    }}>
+                    fontSize: '11px',
+                    color: 'var(--mac-text-secondary)',
+                    textAlign: 'center',
+                    fontWeight: '500'
+                  }}>
                       {iconName}
                     </span>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
@@ -832,26 +832,26 @@ const MacOSDemo = () => {
         onClose={() => setIsModalOpen(false)}
         title="macOS Modal Demo"
         actions={
-          <>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsModalOpen(false)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
+        <>
+            <Button
+            variant="outline"
+            onClick={() => setIsModalOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
               <Icon name="xmark" size="small" style={{ color: '#8e8e93' }} />
               Cancel
             </Button>
-            <Button 
-              variant="primary" 
-              onClick={() => setIsModalOpen(false)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
+            <Button
+            variant="primary"
+            onClick={() => setIsModalOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
               <Icon name="checkmark" size="small" style={{ color: 'white' }} />
               Confirm
             </Button>
           </>
-        }
-      >
+        }>
+
         <p style={{ margin: 0, lineHeight: '1.5' }}>
           This is a demonstration of the macOS-style modal component.
           It features backdrop blur, smooth animations, and proper accessibility.
@@ -860,35 +860,34 @@ const MacOSDemo = () => {
         <div style={{ marginTop: '16px' }}>
           <Input
             label="Demo Input"
-            placeholder="Type something..."
-          />
+            placeholder="Type something..." />
+
         </div>
       </Modal>
 
       {/* Toast Notifications */}
-      {toasts.map(toast => (
-        <Toast
-          key={toast.id}
-          type={toast.type}
-          message={toast.message}
-          position="top-right"
-        />
-      ))}
+      {toasts.map((toast) =>
+      <Toast
+        key={toast.id}
+        type={toast.type}
+        message={toast.message}
+        position="top-right" />
+
+      )}
 
       {/* Demo Button */}
       <div style={{ position: 'fixed', bottom: '20px', right: '20px' }}>
         <Button
           variant="primary"
           size="large"
-          onClick={() => setIsModalOpen(true)}
-        >
+          onClick={() => setIsModalOpen(true)}>
+
           <Icon name="plus" />
           Open Demo Modal
         </Button>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default MacOSDemo;
-

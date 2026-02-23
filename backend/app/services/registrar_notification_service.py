@@ -4,13 +4,12 @@
 """
 
 import logging
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Union
+from datetime import date, datetime
+from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
@@ -37,7 +36,7 @@ class RegistrarNotificationService:
 
     # ===================== ПОЛУЧЕНИЕ РЕГИСТРАТОРОВ =====================
 
-    def get_active_registrars(self) -> List[User]:
+    def get_active_registrars(self) -> list[User]:
         """Получает список активных регистраторов"""
         return (
             self.db.query(User)
@@ -45,7 +44,7 @@ class RegistrarNotificationService:
             .all()
         )
 
-    def get_registrars_by_department(self, department: str = None) -> List[User]:
+    def get_registrars_by_department(self, department: str = None) -> list[User]:
         """Получает регистраторов по отделению"""
         query = self.db.query(User).filter(
             and_(User.role == "Registrar", User.is_active == True)
@@ -63,11 +62,11 @@ class RegistrarNotificationService:
 
     async def notify_new_appointment(
         self,
-        appointment: Union[Appointment, Visit],
+        appointment: Appointment | Visit,
         patient: Patient,
-        services: List[Service] = None,
+        services: list[Service] = None,
         priority: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Уведомляет регистраторов о новой записи"""
         try:
             registrars = self.get_active_registrars()
@@ -168,7 +167,7 @@ class RegistrarNotificationService:
         service: Service,
         visit: Visit = None,
         patient: Patient = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Уведомляет регистраторов об изменении цены"""
         try:
             registrars = self.get_active_registrars()
@@ -249,7 +248,7 @@ class RegistrarNotificationService:
         queue_entry: OnlineQueueEntry,
         status_change: str,
         additional_info: str = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Уведомляет регистраторов о статусе очереди"""
         try:
             registrars = self.get_active_registrars()
@@ -342,7 +341,7 @@ class RegistrarNotificationService:
         message: str,
         priority: str = "normal",
         department: str = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Отправляет системные уведомления регистраторам"""
         try:
             registrars = self.get_registrars_by_department(department)
@@ -396,7 +395,7 @@ class RegistrarNotificationService:
 
     # ===================== ЕЖЕДНЕВНЫЕ ОТЧЕТЫ =====================
 
-    async def send_daily_summary(self, target_date: date = None) -> Dict[str, Any]:
+    async def send_daily_summary(self, target_date: date = None) -> dict[str, Any]:
         """Отправляет ежедневную сводку регистраторам"""
         try:
             if not target_date:
@@ -461,10 +460,10 @@ class RegistrarNotificationService:
     async def notify_services_assigned(
         self,
         appointment: Appointment,
-        services: List[Any],
+        services: list[Any],
         doctor: User,
         department: str = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Уведомляет регистраторов о назначенных услугах
 
@@ -579,7 +578,7 @@ class RegistrarNotificationService:
 
     async def _send_notification_to_registrar(
         self, registrar: User, message: str, notification_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Отправляет уведомление конкретному регистратору"""
         try:
             results = {"telegram": False, "email": False, "sms": False}
@@ -652,7 +651,7 @@ class RegistrarNotificationService:
             )
             return {"success": False, "registrar_id": registrar.id, "error": str(e)}
 
-    async def _collect_daily_stats(self, target_date: date) -> Dict[str, Any]:
+    async def _collect_daily_stats(self, target_date: date) -> dict[str, Any]:
         """Собирает статистику за день"""
         try:
             # Базовая статистика (заглушки, можно расширить)

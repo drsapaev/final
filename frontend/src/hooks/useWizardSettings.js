@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-
+import { useState, useEffect } from 'react';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 const useWizardSettings = () => {

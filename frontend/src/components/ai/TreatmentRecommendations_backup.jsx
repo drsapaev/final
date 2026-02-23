@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Heart, 
   Pill, 
@@ -322,7 +322,6 @@ const TreatmentRecommendations = () => {
           </MacOSButton>
         </div>
       </div>
-    </div>
   );
 
   const renderMedicationForm = () => (
@@ -463,7 +462,6 @@ const TreatmentRecommendations = () => {
           </MacOSButton>
         </div>
       </div>
-    </div>
   );
 
   const renderEffectivenessForm = () => (
@@ -599,7 +597,6 @@ const TreatmentRecommendations = () => {
           </MacOSButton>
         </div>
       </div>
-    </div>
   );
 
   const renderLifestyleForm = () => (
@@ -779,7 +776,6 @@ const TreatmentRecommendations = () => {
           </MacOSButton>
         </div>
       </div>
-    </div>
   );
 
   const renderResult = () => {
@@ -1025,4 +1021,3 @@ const TreatmentRecommendations = () => {
 };
 
 export default TreatmentRecommendations;
-

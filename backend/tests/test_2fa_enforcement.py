@@ -17,6 +17,12 @@ from app.models.user import User
 from app.services.two_factor_service import get_two_factor_service
 
 
+@pytest.fixture(autouse=True)
+def enforce_2fa_requirement(monkeypatch):
+    """В этой группе тестов 2FA requirement должен быть включен."""
+    monkeypatch.setenv("DISABLE_2FA_REQUIREMENT", "false")
+
+
 @pytest.fixture
 def admin_user_without_2fa(db_session: Session) -> User:
     """Создает тестового админа БЕЗ настроенной 2FA"""
@@ -30,7 +36,7 @@ def admin_user_without_2fa(db_session: Session) -> User:
             db_session.delete(two_fa)
         db_session.delete(existing)
         db_session.commit()
-    
+
     user = User(
         username="test_admin_2fa",
         email="admin2fa@test.com",
@@ -54,7 +60,7 @@ def cashier_user_without_2fa(db_session: Session) -> User:
     if existing:
         db_session.delete(existing)
         db_session.commit()
-    
+
     user = User(
         username="test_cashier_2fa",
         email="cashier2fa@test.com",
@@ -74,10 +80,10 @@ def cashier_user_without_2fa(db_session: Session) -> User:
 def admin_user_with_2fa(db_session: Session, admin_user_without_2fa: User) -> tuple[User, str]:
     """Создает тестового админа С настроенной 2FA и возвращает secret"""
     service = get_two_factor_service()
-    
+
     # Генерируем secret
     secret = service.generate_totp_secret()
-    
+
     # Создаем объект 2FA напрямую
     two_factor_auth = TwoFactorAuth(
         user_id=admin_user_without_2fa.id,
@@ -88,7 +94,7 @@ def admin_user_with_2fa(db_session: Session, admin_user_without_2fa: User) -> tu
     )
     db_session.add(two_factor_auth)
     db_session.flush()  # Получаем ID для backup кодов
-    
+
     # Создаем backup коды
     backup_codes = service.generate_backup_codes()
     for code in backup_codes:
@@ -98,10 +104,10 @@ def admin_user_with_2fa(db_session: Session, admin_user_without_2fa: User) -> tu
             used=False,
         )
         db_session.add(backup_code)
-    
+
     db_session.commit()
     db_session.refresh(admin_user_without_2fa)
-    
+
     return admin_user_without_2fa, secret
 
 
@@ -109,10 +115,10 @@ def admin_user_with_2fa(db_session: Session, admin_user_without_2fa: User) -> tu
 def cashier_user_with_2fa(db_session: Session, cashier_user_without_2fa: User) -> tuple[User, str]:
     """Создает тестового кассира С настроенной 2FA и возвращает secret"""
     service = get_two_factor_service()
-    
+
     # Генерируем secret
     secret = service.generate_totp_secret()
-    
+
     # Создаем объект 2FA напрямую
     two_factor_auth = TwoFactorAuth(
         user_id=cashier_user_without_2fa.id,
@@ -123,7 +129,7 @@ def cashier_user_with_2fa(db_session: Session, cashier_user_without_2fa: User) -
     )
     db_session.add(two_factor_auth)
     db_session.flush()  # Получаем ID для backup кодов
-    
+
     # Создаем backup коды
     backup_codes = service.generate_backup_codes()
     for code in backup_codes:
@@ -133,16 +139,16 @@ def cashier_user_with_2fa(db_session: Session, cashier_user_without_2fa: User) -
             used=False,
         )
         db_session.add(backup_code)
-    
+
     db_session.commit()
     db_session.refresh(cashier_user_without_2fa)
-    
+
     return cashier_user_without_2fa, secret
 
 
 class Test2FAEnforcement:
     """Тесты принудительного 2FA для критичных ролей"""
-    
+
     def test_admin_cannot_login_without_2fa(
         self, client: TestClient, admin_user_without_2fa: User
     ):
@@ -154,7 +160,7 @@ class Test2FAEnforcement:
                 "password": "admin123",
             },
         )
-        
+
         # Эндпоинт возвращает 401, когда success=False
         assert response.status_code == 401, f"Expected 401, got {response.status_code}. Response: {response.text}"
         data = response.json()
@@ -162,7 +168,7 @@ class Test2FAEnforcement:
         detail = data["detail"]
         assert "2fa" in detail.lower() or "двухфакторной" in detail.lower(), \
             f"Message should mention 2FA setup requirement. Detail: {detail}"
-    
+
     def test_cashier_cannot_login_without_2fa(
         self, client: TestClient, cashier_user_without_2fa: User
     ):
@@ -174,7 +180,7 @@ class Test2FAEnforcement:
                 "password": "cashier123",
             },
         )
-        
+
         # Эндпоинт возвращает 401, когда success=False
         assert response.status_code == 401, f"Expected 401, got {response.status_code}. Response: {response.text}"
         data = response.json()
@@ -182,17 +188,17 @@ class Test2FAEnforcement:
         detail = data["detail"]
         assert "2fa" in detail.lower() or "двухфакторной" in detail.lower(), \
             f"Message should mention 2FA setup requirement. Detail: {detail}"
-    
+
     def test_admin_can_login_with_correct_otp(
         self, client: TestClient, admin_user_with_2fa: tuple[User, str]
     ):
         """Admin может войти с правильным OTP после настройки 2FA"""
         admin_user, secret = admin_user_with_2fa
         service = get_two_factor_service()
-        
+
         # Генерируем правильный OTP код
         correct_otp = service.generate_totp_code(secret)
-        
+
         # Шаг 1: Логин должен вернуть pending_2fa_token
         login_response = client.post(
             "/api/v1/authentication/login",
@@ -208,7 +214,7 @@ class Test2FAEnforcement:
         assert "pending_2fa_token" in login_data and login_data["pending_2fa_token"] is not None, \
             "pending_2fa_token should be returned"
         pending_token = login_data["pending_2fa_token"]
-        
+
         # Шаг 2: Верификация OTP должна вернуть access_token
         # pending_2fa_token передается в теле запроса, не в заголовке
         verify_response = client.post(
@@ -222,13 +228,13 @@ class Test2FAEnforcement:
         verify_data = verify_response.json()
         assert verify_data["success"] is True, "2FA verification should succeed"
         assert "access_token" in verify_data, "access_token should be returned after 2FA verification"
-    
+
     def test_admin_cannot_login_with_incorrect_otp(
         self, client: TestClient, admin_user_with_2fa: tuple[User, str]
     ):
         """Admin НЕ может войти с неправильным OTP"""
         admin_user, secret = admin_user_with_2fa
-        
+
         # Шаг 1: Логин должен вернуть pending_2fa_token
         login_response = client.post(
             "/api/v1/authentication/login",
@@ -241,7 +247,7 @@ class Test2FAEnforcement:
         login_data = login_response.json()
         assert login_data["requires_2fa"] is True
         pending_token = login_data["pending_2fa_token"]
-        
+
         # Шаг 2: Верификация с неправильным OTP должна провалиться
         verify_response = client.post(
             "/api/v1/2fa/verify",
@@ -255,17 +261,17 @@ class Test2FAEnforcement:
         assert verify_data["success"] is False, "2FA verification should fail with incorrect OTP"
         assert "access_token" not in verify_data or verify_data.get("access_token") is None, \
             "No access_token should be returned for incorrect OTP"
-    
+
     def test_cashier_can_login_with_correct_otp(
         self, client: TestClient, cashier_user_with_2fa: tuple[User, str]
     ):
         """Cashier может войти с правильным OTP после настройки 2FA"""
         cashier_user, secret = cashier_user_with_2fa
         service = get_two_factor_service()
-        
+
         # Генерируем правильный OTP код
         correct_otp = service.generate_totp_code(secret)
-        
+
         # Шаг 1: Логин должен вернуть pending_2fa_token
         login_response = client.post(
             "/api/v1/authentication/login",
@@ -278,7 +284,7 @@ class Test2FAEnforcement:
         login_data = login_response.json()
         assert login_data["requires_2fa"] is True
         pending_token = login_data["pending_2fa_token"]
-        
+
         # Шаг 2: Верификация OTP должна вернуть access_token
         verify_response = client.post(
             "/api/v1/2fa/verify",

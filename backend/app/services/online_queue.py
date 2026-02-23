@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as _dt
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,7 +45,7 @@ class DayStats:
     department: str
     date_str: str
     is_open: bool
-    start_number: Optional[int]
+    start_number: int | None
     last_ticket: int
     waiting: int
     serving: int
@@ -91,7 +90,7 @@ def _set_int(db: Session, key: str, value: int) -> None:
         db.add(row)
 
 
-def _get_str(db: Session, key: str) -> Optional[str]:
+def _get_str(db: Session, key: str) -> str | None:
     row = (
         db.execute(
             select(Setting).where(Setting.category == "queue", Setting.key == key)
@@ -122,8 +121,8 @@ def get_or_create_day(
     *,
     department: str,
     date_str: str,
-    start_number: Optional[int] = None,
-    open_flag: Optional[bool] = None,
+    start_number: int | None = None,
+    open_flag: bool | None = None,
 ) -> OnlineDay:
     dep = department.strip()
     d = date_str.strip()
@@ -274,9 +273,9 @@ def get_existing_ticket_for_identity(
     db: Session,
     department: str,
     date_str: str,
-    phone: Optional[str],
-    tg_id: Optional[str],
-) -> Optional[int]:
+    phone: str | None,
+    tg_id: str | None,
+) -> int | None:
     dep = department.strip()
     d = date_str.strip()
     if phone:
@@ -303,8 +302,8 @@ def remember_identity_ticket(
     db: Session,
     department: str,
     date_str: str,
-    phone: Optional[str],
-    tg_id: Optional[str],
+    phone: str | None,
+    tg_id: str | None,
     ticket: int,
 ) -> None:
     dep = department.strip()

@@ -1,5 +1,6 @@
 // Система таблиц с сортировкой, фильтрацией и пагинацией
-import React, { useState, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
@@ -400,6 +401,38 @@ export function TableExport({ data, columns, filename = 'export.csv' }) {
     </button>
   );
 }
+
+const columnShape = PropTypes.shape({
+  key: PropTypes.string,
+  title: PropTypes.string,
+  render: PropTypes.func,
+  filterable: PropTypes.bool
+});
+
+Table.propTypes = {
+  data: PropTypes.arrayOf(PropTypes.object),
+  columns: PropTypes.arrayOf(columnShape),
+  sortable: PropTypes.bool,
+  filterable: PropTypes.bool,
+  pagination: PropTypes.bool,
+  pageSize: PropTypes.number,
+  onSort: PropTypes.func,
+  onFilter: PropTypes.func,
+  onPageChange: PropTypes.func,
+  loading: PropTypes.bool,
+  emptyMessage: PropTypes.string
+};
+
+TableLoading.propTypes = {
+  columns: PropTypes.number,
+  rows: PropTypes.number
+};
+
+TableExport.propTypes = {
+  data: PropTypes.arrayOf(PropTypes.object),
+  columns: PropTypes.arrayOf(columnShape),
+  filename: PropTypes.string
+};
 
 // CSS анимация для скелетона
 const style = document.createElement('style');

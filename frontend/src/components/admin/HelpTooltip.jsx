@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { HelpCircle, Keyboard, X } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 

@@ -48,7 +48,7 @@ def doctor_with_queue(db_session):
         db_session.add(doctor_user)
         db_session.commit()
         db_session.refresh(doctor_user)
-    
+
     # Создаем профиль врача
     doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
     if not doctor:
@@ -60,7 +60,7 @@ def doctor_with_queue(db_session):
         db_session.add(doctor)
         db_session.commit()
         db_session.refresh(doctor)
-    
+
     # Создаем пациентов для очереди
     patients = []
     for i in range(3):
@@ -78,7 +78,7 @@ def doctor_with_queue(db_session):
             db_session.commit()
             db_session.refresh(patient)
         patients.append(patient)
-    
+
     # Создаем дневную очередь
     queue = DailyQueue(
         day=date.today(),
@@ -89,7 +89,7 @@ def doctor_with_queue(db_session):
     db_session.add(queue)
     db_session.commit()
     db_session.refresh(queue)
-    
+
     # Добавляем пациентов в очередь
     entries = []
     for i, patient in enumerate(patients):
@@ -105,7 +105,7 @@ def doctor_with_queue(db_session):
         db_session.add(visit)
         db_session.commit()
         db_session.refresh(visit)
-        
+
         # Создаем запись в очереди
         entry = OnlineQueueEntry(
             queue_id=queue.id,
@@ -119,9 +119,9 @@ def doctor_with_queue(db_session):
         )
         db_session.add(entry)
         entries.append({"entry": entry, "visit": visit})
-    
+
     db_session.commit()
-    
+
     return {
         "doctor_user": doctor_user,
         "doctor": doctor,
@@ -158,58 +158,58 @@ class TestDoctorVisitFlow:
     ):
         """Врач может видеть свою очередь"""
         queue = doctor_with_queue["queue"]
-        
+
         response = client.get(
             f"/api/v1/queue/qr-tokens/{queue.queue_tag}/entries",
             headers=doctor_auth_headers,
             params={"date": date.today().isoformat()},
         )
-        
+
         # Может потребоваться другой endpoint
         if response.status_code == 200:
             data = response.json()
             assert isinstance(data, list) or "entries" in data
-    
+
     def test_doctor_can_call_next_patient(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue
     ):
         """Врач может вызвать следующего пациента"""
         queue = doctor_with_queue["queue"]
         entry = doctor_with_queue["entries"][0]["entry"]
-        
+
         response = client.post(
             f"/api/v1/queue/qr-tokens/{queue.queue_tag}/call-next",
             headers=doctor_auth_headers,
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             # Проверяем что вызван пациент
             assert "patient" in data or "entry" in data or "number" in data
-    
+
     def test_doctor_can_start_visit(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue, db_session
     ):
         """Врач может начать приём (изменить статус визита)"""
         visit = doctor_with_queue["entries"][0]["visit"]
-        
+
         response = client.patch(
             f"/api/v1/visits/{visit.id}",
             headers=doctor_auth_headers,
             json={"status": "in_progress"},
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             assert data.get("status") == "in_progress"
-    
+
     def test_doctor_can_fill_emr(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue
     ):
         """Врач может заполнить ЭМК"""
         visit = doctor_with_queue["entries"][0]["visit"]
         patient = doctor_with_queue["patients"][0]
-        
+
         emr_data = {
             "visit_id": visit.id,
             "patient_id": patient.id,
@@ -221,18 +221,18 @@ class TestDoctorVisitFlow:
                 {"name": "Парацетамол", "dosage": "500мг", "frequency": "2 раза в день"}
             ],
         }
-        
+
         response = client.post(
             "/api/v1/emr/records",
             headers=doctor_auth_headers,
             json=emr_data,
         )
-        
+
         # EMR endpoint может отличаться
         if response.status_code in [200, 201]:
             data = response.json()
             assert "id" in data
-    
+
     def test_doctor_can_use_emr_template(
         self, client: TestClient, doctor_auth_headers
     ):
@@ -241,11 +241,11 @@ class TestDoctorVisitFlow:
             "/api/v1/emr/templates",
             headers=doctor_auth_headers,
         )
-        
+
         assert response.status_code == 200
         templates = response.json()
         assert isinstance(templates, list)
-    
+
     def test_doctor_can_add_diagnosis_with_ai_suggestion(
         self, client: TestClient, doctor_auth_headers
     ):
@@ -255,19 +255,19 @@ class TestDoctorVisitFlow:
             headers=doctor_auth_headers,
             json={"symptoms": "головная боль, температура, слабость"},
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             # Проверяем структуру ответа AI
             assert "suggestions" in data or "codes" in data or isinstance(data, list)
-    
+
     def test_doctor_can_generate_prescription_pdf(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue
     ):
         """Врач может сгенерировать рецепт в PDF"""
         visit = doctor_with_queue["entries"][0]["visit"]
         patient = doctor_with_queue["patients"][0]
-        
+
         response = client.post(
             "/api/v1/print/templates/prescription",
             headers=doctor_auth_headers,
@@ -279,30 +279,30 @@ class TestDoctorVisitFlow:
                 ],
             },
         )
-        
+
         # 200 - PDF, 404 - endpoint не реализован
         if response.status_code == 200:
             assert response.headers.get("content-type") in [
                 "application/pdf",
                 "application/json",
             ]
-    
+
     def test_doctor_can_complete_visit(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue, db_session
     ):
         """Врач может завершить приём"""
         visit = doctor_with_queue["entries"][0]["visit"]
-        
+
         response = client.patch(
             f"/api/v1/visits/{visit.id}",
             headers=doctor_auth_headers,
             json={"status": "completed"},
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             assert data.get("status") == "completed"
-            
+
             # Проверяем что запись в очереди тоже обновилась
             db_session.refresh(visit)
             assert visit.status == "completed"
@@ -318,28 +318,28 @@ class TestDoctorQueueManagement:
     ):
         """Врач может пропустить пациента (неявка)"""
         entry = doctor_with_queue["entries"][0]["entry"]
-        
+
         response = client.patch(
             f"/api/v1/queue/entries/{entry.id}/skip",
             headers=doctor_auth_headers,
         )
-        
+
         # Endpoint может отличаться
         if response.status_code == 200:
             data = response.json()
             assert data.get("status") in ["skipped", "no_show"]
-    
+
     def test_doctor_can_get_patient_history(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue
     ):
         """Врач может просмотреть историю пациента"""
         patient = doctor_with_queue["patients"][0]
-        
+
         response = client.get(
             f"/api/v1/patients/{patient.id}/history",
             headers=doctor_auth_headers,
         )
-        
+
         # Endpoint может быть /patients/{id}/visits или /emr/patient/{id}
         if response.status_code == 200:
             data = response.json()
@@ -359,10 +359,10 @@ class TestDoctorSecurity:
             "/api/v1/admin/users",
             headers=doctor_auth_headers,
         )
-        
+
         # Должен вернуть 403 Forbidden
         assert response.status_code in [403, 401]
-    
+
     def test_doctor_cannot_view_other_doctor_queue(
         self, client: TestClient, doctor_auth_headers
     ):
@@ -372,7 +372,7 @@ class TestDoctorSecurity:
             headers=doctor_auth_headers,
             params={"date": date.today().isoformat()},
         )
-        
+
         # Должен вернуть пустой список или 404
         if response.status_code == 200:
             data = response.json()

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Heart,
   Activity,
@@ -16,8 +16,8 @@ import {
   Scissors,
   FolderTree,
   Sparkles,
-  Users
-} from 'lucide-react';
+  Users } from
+'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -46,9 +46,8 @@ const iconMap = {
 const ModernTabs = ({
   activeTab,
   onTabChange,
-  onProfilesLoaded,  // ⭐ NEW: Callback to pass loaded profiles to parent for SSOT filtering
+  onProfilesLoaded, // ⭐ NEW: Callback to pass loaded profiles to parent for SSOT filtering
   departmentStats = {},
-  theme = 'light',
   language = 'ru'
 }) => {
   const [indicatorStyle, setIndicatorStyle] = useState({});
@@ -68,7 +67,7 @@ const ModernTabs = ({
 
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
-  const loadQueueProfiles = async () => {
+  const loadQueueProfiles = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -84,9 +83,9 @@ const ModernTabs = ({
       }
 
       // Преобразуем данные из API в формат для вкладок
-      const profilesData = profiles.map(profile => ({
+      const profilesData = profiles.map((profile) => ({
         key: profile.key,
-        label: language === 'uz' ? (profile.title || profile.title_ru) : (profile.title_ru || profile.title),
+        label: language === 'uz' ? profile.title || profile.title_ru : profile.title_ru || profile.title,
         // ⭐ SSOT: queue_tags используются для фильтрации записей на вкладке
         queue_tags: profile.queue_tags || [profile.key],
         icon: iconMap[profile.icon] || Package, // Fallback на Package если иконка не найдена
@@ -107,63 +106,63 @@ const ModernTabs = ({
       // Fallback на hardcoded вкладки если API не работает
       // ⚠️ TEMPORARY ADAPTER: Remove when API is stable
       setTabs([
-        {
-          key: 'cardiology',
-          label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
-          queue_tags: ['cardio', 'cardiology', 'cardiology_common'],
-          icon: Heart,
-          color: '#ef4444',
-          gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
-        },
-        {
-          key: 'ecg',
-          label: language === 'uz' ? 'EKG' : 'ЭКГ',
-          queue_tags: ['ecg', 'echokg'],
-          icon: Activity,
-          color: '#ec4899',
-          gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
-        },
-        {
-          key: 'dermatology',
-          label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
-          queue_tags: ['derma', 'dermatology'],
-          icon: UserCheck,
-          color: '#f59e0b',
-          gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
-        },
-        {
-          key: 'stomatology',
-          label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
-          queue_tags: ['dental', 'stomatology', 'dentist'],
-          icon: Smile,
-          color: '#3b82f6',
-          gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
-        },
-        {
-          key: 'lab',
-          label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
-          queue_tags: ['lab', 'laboratory'],
-          icon: FlaskConical,
-          color: '#10b981',
-          gradient: 'linear-gradient(135deg, #10b981, #059669)'
-        },
-        {
-          key: 'procedures',
-          label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
-          queue_tags: ['procedures', 'physio', 'therapy'],
-          icon: Syringe,
-          color: '#8b5cf6',
-          gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
-        }
-      ]);
+      {
+        key: 'cardiology',
+        label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
+        queue_tags: ['cardio', 'cardiology', 'cardiology_common'],
+        icon: Heart,
+        color: '#ef4444',
+        gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
+      },
+      {
+        key: 'ecg',
+        label: language === 'uz' ? 'EKG' : 'ЭКГ',
+        queue_tags: ['ecg', 'echokg'],
+        icon: Activity,
+        color: '#ec4899',
+        gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
+      },
+      {
+        key: 'dermatology',
+        label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
+        queue_tags: ['derma', 'dermatology'],
+        icon: UserCheck,
+        color: '#f59e0b',
+        gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
+      },
+      {
+        key: 'stomatology',
+        label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
+        queue_tags: ['dental', 'stomatology', 'dentist'],
+        icon: Smile,
+        color: '#3b82f6',
+        gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
+      },
+      {
+        key: 'lab',
+        label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
+        queue_tags: ['lab', 'laboratory'],
+        icon: FlaskConical,
+        color: '#10b981',
+        gradient: 'linear-gradient(135deg, #10b981, #059669)'
+      },
+      {
+        key: 'procedures',
+        label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
+        queue_tags: ['procedures', 'physio', 'therapy'],
+        icon: Syringe,
+        color: '#8b5cf6',
+        gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+      }]
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [language, onProfilesLoaded]);
 
   useEffect(() => {
     loadQueueProfiles();
-  }, [language]);
+  }, [loadQueueProfiles]);
 
   // Слушаем обновления профилей очередей
   useEffect(() => {
@@ -180,7 +179,7 @@ const ModernTabs = ({
       window.removeEventListener('queue-profiles:updated', handleProfilesUpdate);
       window.removeEventListener('departments:updated', handleProfilesUpdate);
     };
-  }, []);
+  }, [loadQueueProfiles]);
 
   // Используем ту же систему цветов, что и таблица
   const { isDark } = useTheme();
@@ -234,8 +233,8 @@ const ModernTabs = ({
         <div
           key="queue"
           className="status-indicator queue"
-          title={`${t.queue}: ${stats.todayCount}`}
-        >
+          title={`${t.queue}: ${stats.todayCount}`}>
+
           <Clock size={10} />
         </div>
       );
@@ -246,8 +245,8 @@ const ModernTabs = ({
         <div
           key="pending"
           className="status-indicator pending"
-          title={t.pending}
-        >
+          title={t.pending}>
+
           <AlertCircle size={10} />
         </div>
       );
@@ -258,8 +257,8 @@ const ModernTabs = ({
         <div
           key="count"
           className="status-indicator count"
-          title={`${t.today}: ${stats.todayCount}`}
-        >
+          title={`${t.today}: ${stats.todayCount}`}>
+
           {stats.todayCount}
         </div>
       );
@@ -284,14 +283,14 @@ const ModernTabs = ({
             borderRadius: '12px 12px 0 0',
             padding: '8px 16px',
             boxShadow: 'none'
-          }}
-        >
+          }}>
+
           <div style={{ padding: '12px', textAlign: 'center', color: colors.textSecondary }}>
             Загрузка отделений...
           </div>
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -308,16 +307,16 @@ const ModernTabs = ({
           borderRadius: '12px 12px 0 0',
           padding: '8px 16px',
           boxShadow: 'none'
-        }}
-      >
+        }}>
+
         {/* Кнопка "Все отделения" */}
         <button
           className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
           onClick={() => onTabChange(null)}
           style={{
             color: !activeTab ? '#3b82f6' : colors.text
-          }}
-        >
+          }}>
+
           <div className="tab-icon">
             <TrendingUp size={16} />
           </div>
@@ -327,8 +326,8 @@ const ModernTabs = ({
         {/* Разделитель */}
         <div
           className="tabs-divider"
-          style={{ backgroundColor: colors.border }}
-        />
+          style={{ backgroundColor: colors.border }} />
+
 
         {/* Контейнер для вкладок отделений */}
         <div className="department-tabs" ref={tabsRef}>
@@ -337,15 +336,15 @@ const ModernTabs = ({
             className="tab-indicator"
             style={{
               ...indicatorStyle,
-              background: activeTab ? tabs.find(t => t.key === activeTab)?.gradient : 'transparent'
-            }}
-          />
+              background: activeTab ? tabs.find((t) => t.key === activeTab)?.gradient : 'transparent'
+            }} />
+
 
           {/* Вкладки отделений */}
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            const stats = getStats(tab.key);
+            const isActive = activeTab === tab.key;void
+            getStats(tab.key);
 
             return (
               <button
@@ -354,12 +353,12 @@ const ModernTabs = ({
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange(isActive ? null : tab.key)}
                 style={{
-                  color: isActive ? (isDark ? '#ffffff' : '#0f172a') : colors.text,
-                  backgroundColor: isActive ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)') : 'transparent',
+                  color: isActive ? isDark ? '#ffffff' : '#0f172a' : colors.text,
+                  backgroundColor: isActive ? isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' : 'transparent',
                   '--tab-color': tab.color,
                   '--tab-gradient': tab.gradient
-                }}
-              >
+                }}>
+
                 <div className="tab-content">
                   <div className="tab-icon">
                     <Icon size={16} />
@@ -374,16 +373,15 @@ const ModernTabs = ({
 
                 {/* Эффект ripple */}
                 <div className="ripple-effect" />
-              </button>
-            );
+              </button>);
+
           })}
         </div>
       </div>
 
       {/* Информационная панель убрана для стиля Edge */}
-    </div>
-  );
+    </div>);
+
 };
 
 export default ModernTabs;
-

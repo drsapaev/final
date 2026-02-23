@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save, User, Mail, Phone, MapPin, GraduationCap, Clock, AlertCircle, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Save, User, Mail, Phone, GraduationCap, Clock, AlertCircle, X } from 'lucide-react';
 import {
   MacOSModal,
   MacOSInput,
@@ -7,8 +7,8 @@ import {
   MacOSTextarea,
   MacOSButton,
   Label,
-  MacOSAlert
-} from '../ui/macos';
+  MacOSAlert } from
+'../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -51,7 +51,7 @@ const DoctorModal = ({
       // Backend returns {success: true, data: [...], count: N}
       const departments = response.data?.data || [];
       if (departments.length > 0) {
-        const deptOptions = departments.map(dept => ({
+        const deptOptions = departments.map((dept) => ({
           value: dept.key || dept.department_key || dept.id?.toString(),
           label: dept.name_ru || dept.name || dept.key || 'Неизвестно'
         }));
@@ -62,11 +62,11 @@ const DoctorModal = ({
       logger.error('Ошибка загрузки отделений:', error);
       // Fallback на статический список
       setDepartments([
-        { value: 'cardiology', label: 'Кардиология' },
-        { value: 'dermatology', label: 'Дерматология' },
-        { value: 'dentistry', label: 'Стоматология' },
-        { value: 'general', label: 'Общее' }
-      ]);
+      { value: 'cardiology', label: 'Кардиология' },
+      { value: 'dermatology', label: 'Дерматология' },
+      { value: 'dentistry', label: 'Стоматология' },
+      { value: 'general', label: 'Общее' }]
+      );
     } finally {
       setLoadingDepartments(false);
     }
@@ -84,9 +84,9 @@ const DoctorModal = ({
         const doctorPhone = doctor.user?.phone || doctor.phone || '';
         const doctorSpecialization = doctor.specialty || doctor.specialization || '';
         const doctorDepartment = doctor.specialty || doctor.department || doctor.department_key || '';
-        const doctorStatus = doctor.active !== undefined
-          ? (doctor.active ? 'active' : 'inactive')
-          : (doctor.status || 'active');
+        const doctorStatus = doctor.active !== undefined ?
+        doctor.active ? 'active' : 'inactive' :
+        doctor.status || 'active';
 
         logger.log('🔵 Инициализация формы врача:', {
           doctor,
@@ -142,7 +142,7 @@ const DoctorModal = ({
     // Проверяем department - может быть строкой или числом
     const departmentValue = formData.department;
     logger.log('🔍 Проверка department:', { departmentValue, type: typeof departmentValue, isEmpty: !departmentValue, isStringEmpty: typeof departmentValue === 'string' && !departmentValue.trim() });
-    if (!departmentValue || (typeof departmentValue === 'string' && !departmentValue.trim())) {
+    if (!departmentValue || typeof departmentValue === 'string' && !departmentValue.trim()) {
       newErrors.department = 'Отделение обязательно';
     }
 
@@ -213,13 +213,13 @@ const DoctorModal = ({
 
   const handleChange = (field, value) => {
     logger.log(`🔵 handleChange: ${field} =`, value, typeof value);
-    setFormData(prev => {
+    setFormData((prev) => {
       const newData = { ...prev, [field]: value };
       logger.log('🔵 Новый formData:', newData);
       return newData;
     });
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
+      setErrors((prev) => ({ ...prev, [field]: null }));
     }
   };
 
@@ -228,14 +228,14 @@ const DoctorModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={doctor ? 'Редактировать врача' : 'Добавить врача'}
-      size="lg"
-    >
+      size="lg">
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {submitError && (
-          <MacOSAlert type="error" style={{ marginBottom: '16px' }}>
+        {submitError &&
+        <MacOSAlert type="error" style={{ marginBottom: '16px' }}>
             {submitError}
           </MacOSAlert>
-        )}
+        }
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           {/* Имя */}
@@ -251,21 +251,21 @@ const DoctorModal = ({
               placeholder="Введите имя"
               icon={User}
               iconPosition="left"
-              error={errors.name}
-            />
-            {errors.name && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '4px',
-                fontSize: '12px',
-                color: 'var(--mac-error)'
-              }}>
+              error={errors.name} />
+
+            {errors.name &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginTop: '4px',
+              fontSize: '12px',
+              color: 'var(--mac-error)'
+            }}>
                 <AlertCircle size={14} />
                 {errors.name}
               </div>
-            )}
+            }
           </div>
 
           {/* Email */}
@@ -281,21 +281,21 @@ const DoctorModal = ({
               placeholder="Введите email"
               icon={Mail}
               iconPosition="left"
-              error={errors.email}
-            />
-            {errors.email && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '4px',
-                fontSize: '12px',
-                color: 'var(--mac-error)'
-              }}>
+              error={errors.email} />
+
+            {errors.email &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginTop: '4px',
+              fontSize: '12px',
+              color: 'var(--mac-error)'
+            }}>
                 <AlertCircle size={14} />
                 {errors.email}
               </div>
-            )}
+            }
           </div>
 
           {/* Телефон */}
@@ -309,8 +309,8 @@ const DoctorModal = ({
               onChange={(e) => handleChange('phone', e.target.value)}
               placeholder="+998 90 123 45 67"
               icon={Phone}
-              iconPosition="left"
-            />
+              iconPosition="left" />
+
           </div>
 
           {/* Специализация */}
@@ -326,21 +326,21 @@ const DoctorModal = ({
               placeholder="Кардиолог, Терапевт, Хирург..."
               icon={GraduationCap}
               iconPosition="left"
-              error={errors.specialization}
-            />
-            {errors.specialization && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '4px',
-                fontSize: '12px',
-                color: 'var(--mac-error)'
-              }}>
+              error={errors.specialization} />
+
+            {errors.specialization &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginTop: '4px',
+              fontSize: '12px',
+              color: 'var(--mac-error)'
+            }}>
                 <AlertCircle size={14} />
                 {errors.specialization}
               </div>
-            )}
+            }
           </div>
 
           {/* Отделение */}
@@ -357,25 +357,25 @@ const DoctorModal = ({
                 handleChange('department', selectedValue);
               }}
               options={[
-                { value: '', label: 'Выберите отделение' },
-                ...departments
-              ]}
+              { value: '', label: 'Выберите отделение' },
+              ...departments]
+              }
               error={errors.department}
-              disabled={loadingDepartments}
-            />
-            {errors.department && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '4px',
-                fontSize: '12px',
-                color: 'var(--mac-error)'
-              }}>
+              disabled={loadingDepartments} />
+
+            {errors.department &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginTop: '4px',
+              fontSize: '12px',
+              color: 'var(--mac-error)'
+            }}>
                 <AlertCircle size={14} />
                 {errors.department}
               </div>
-            )}
+            }
           </div>
 
           {/* Опыт работы */}
@@ -390,21 +390,21 @@ const DoctorModal = ({
               placeholder="5"
               min="0"
               max="50"
-              error={errors.experience}
-            />
-            {errors.experience && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '4px',
-                fontSize: '12px',
-                color: 'var(--mac-error)'
-              }}>
+              error={errors.experience} />
+
+            {errors.experience &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginTop: '4px',
+              fontSize: '12px',
+              color: 'var(--mac-error)'
+            }}>
                 <AlertCircle size={14} />
                 {errors.experience}
               </div>
-            )}
+            }
           </div>
 
           {/* График работы */}
@@ -418,8 +418,8 @@ const DoctorModal = ({
               onChange={(e) => handleChange('schedule', e.target.value)}
               placeholder="Пн-Пт 9:00-18:00"
               icon={Clock}
-              iconPosition="left"
-            />
+              iconPosition="left" />
+
           </div>
 
           {/* Статус */}
@@ -431,11 +431,11 @@ const DoctorModal = ({
               value={formData.status}
               onChange={(e) => handleChange('status', e.target.value)}
               options={[
-                { value: 'active', label: 'Активен' },
-                { value: 'inactive', label: 'Неактивен' },
-                { value: 'on_leave', label: 'В отпуске' }
-              ]}
-            />
+              { value: 'active', label: 'Активен' },
+              { value: 'inactive', label: 'Неактивен' },
+              { value: 'on_leave', label: 'В отпуске' }]
+              } />
+
           </div>
         </div>
 
@@ -451,8 +451,8 @@ const DoctorModal = ({
             rows={3}
             autoResize={true}
             minRows={3}
-            maxRows={6}
-          />
+            maxRows={6} />
+
         </div>
 
         {/* Кнопки */}
@@ -468,21 +468,21 @@ const DoctorModal = ({
             variant="outline"
             onClick={onClose}
             disabled={isSubmitting || loading}
-            icon={<X size={16} />}
-          >
+            icon={<X size={16} />}>
+
             Отмена
           </MacOSButton>
           <MacOSButton
             type="submit"
             disabled={isSubmitting || loading}
-            icon={<Save size={16} />}
-          >
-            {isSubmitting ? 'Сохранение...' : (doctor ? 'Сохранить изменения' : 'Добавить врача')}
+            icon={<Save size={16} />}>
+
+            {isSubmitting ? 'Сохранение...' : doctor ? 'Сохранить изменения' : 'Добавить врача'}
           </MacOSButton>
         </div>
       </form>
-    </MacOSModal>
-  );
+    </MacOSModal>);
+
 };
 
 export default DoctorModal;

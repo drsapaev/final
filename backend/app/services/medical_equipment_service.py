@@ -7,18 +7,15 @@ import asyncio
 import json
 import logging
 import socket
-import struct
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import requests
 import serial
 from sqlalchemy.orm import Session
-
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +66,11 @@ class MeasurementData:
     device_id: str
     device_type: DeviceType
     timestamp: datetime
-    patient_id: Optional[str] = None
-    measurements: Dict[str, Any] = None
-    raw_data: Optional[str] = None
-    quality_score: Optional[float] = None
-    notes: Optional[str] = None
+    patient_id: str | None = None
+    measurements: dict[str, Any] = None
+    raw_data: str | None = None
+    quality_score: float | None = None
+    notes: str | None = None
 
     def __post_init__(self):
         if self.measurements is None:
@@ -94,7 +91,7 @@ class DeviceInfo:
     serial_number: str
     firmware_version: str
     connection_type: ConnectionType
-    connection_params: Dict[str, Any]
+    connection_params: dict[str, Any]
     status: DeviceStatus
     location: str = ""
     last_seen: datetime = None
@@ -132,8 +129,8 @@ class BaseDeviceDriver(ABC):
 
     @abstractmethod
     async def take_measurement(
-        self, patient_id: Optional[str] = None
-    ) -> Optional[MeasurementData]:
+        self, patient_id: str | None = None
+    ) -> MeasurementData | None:
         """Выполнить измерение"""
         pass
 
@@ -205,8 +202,8 @@ class SerialDeviceDriver(BaseDeviceDriver):
             return DeviceStatus.ERROR
 
     async def take_measurement(
-        self, patient_id: Optional[str] = None
-    ) -> Optional[MeasurementData]:
+        self, patient_id: str | None = None
+    ) -> MeasurementData | None:
         if not self.is_connected:
             await self.connect()
 
@@ -261,7 +258,7 @@ class SerialDeviceDriver(BaseDeviceDriver):
             self.device_info.status = DeviceStatus.ERROR
             return False
 
-    def _parse_measurement_data(self, raw_data: str) -> Dict[str, Any]:
+    def _parse_measurement_data(self, raw_data: str) -> dict[str, Any]:
         """Парсинг данных измерения в зависимости от типа устройства"""
         measurements = {}
 
@@ -302,7 +299,7 @@ class SerialDeviceDriver(BaseDeviceDriver):
 
         return measurements
 
-    def _calculate_quality_score(self, measurements: Dict[str, Any]) -> float:
+    def _calculate_quality_score(self, measurements: dict[str, Any]) -> float:
         """Расчет оценки качества измерения"""
         # Простая оценка качества на основе наличия данных
         if not measurements:
@@ -379,8 +376,8 @@ class TCPDeviceDriver(BaseDeviceDriver):
             return DeviceStatus.ERROR
 
     async def take_measurement(
-        self, patient_id: Optional[str] = None
-    ) -> Optional[MeasurementData]:
+        self, patient_id: str | None = None
+    ) -> MeasurementData | None:
         if not self.is_connected:
             await self.connect()
 
@@ -428,7 +425,7 @@ class TCPDeviceDriver(BaseDeviceDriver):
             self.device_info.status = DeviceStatus.ERROR
             return False
 
-    def _parse_tcp_data(self, raw_data: str) -> Dict[str, Any]:
+    def _parse_tcp_data(self, raw_data: str) -> dict[str, Any]:
         """Парсинг TCP данных"""
         try:
             # Попытка парсинга JSON
@@ -508,8 +505,8 @@ class HTTPDeviceDriver(BaseDeviceDriver):
             return DeviceStatus.ERROR
 
     async def take_measurement(
-        self, patient_id: Optional[str] = None
-    ) -> Optional[MeasurementData]:
+        self, patient_id: str | None = None
+    ) -> MeasurementData | None:
         try:
             params = self.device_info.connection_params
             base_url = params.get('base_url')
@@ -598,8 +595,8 @@ class MockDeviceDriver(BaseDeviceDriver):
         return DeviceStatus.ONLINE if self.is_connected else DeviceStatus.OFFLINE
 
     async def take_measurement(
-        self, patient_id: Optional[str] = None
-    ) -> Optional[MeasurementData]:
+        self, patient_id: str | None = None
+    ) -> MeasurementData | None:
         await asyncio.sleep(1)  # Имитация измерения
 
         # Генерируем тестовые данные в зависимости от типа устройства
@@ -623,7 +620,7 @@ class MockDeviceDriver(BaseDeviceDriver):
         self.device_info.calibration_date = datetime.now()
         return True
 
-    def _generate_mock_data(self) -> Dict[str, Any]:
+    def _generate_mock_data(self) -> dict[str, Any]:
         """Генерация тестовых данных"""
         import random
 
@@ -650,8 +647,8 @@ class MedicalEquipmentService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.devices: Dict[str, BaseDeviceDriver] = {}
-        self.measurements: List[MeasurementData] = []
+        self.devices: dict[str, BaseDeviceDriver] = {}
+        self.measurements: list[MeasurementData] = []
         self._initialize_devices()
 
     def _initialize_devices(self):
@@ -732,7 +729,7 @@ class MedicalEquipmentService:
 
         logger.info(f"Инициализировано {len(self.devices)} медицинских устройств")
 
-    def _create_driver(self, device_info: DeviceInfo) -> Optional[BaseDeviceDriver]:
+    def _create_driver(self, device_info: DeviceInfo) -> BaseDeviceDriver | None:
         """Создание драйвера для устройства"""
         try:
             if device_info.connection_type == ConnectionType.SERIAL:
@@ -754,7 +751,7 @@ class MedicalEquipmentService:
             )
             return None
 
-    async def get_all_devices(self) -> List[DeviceInfo]:
+    async def get_all_devices(self) -> list[DeviceInfo]:
         """Получить список всех устройств"""
         devices = []
         for driver in self.devices.values():
@@ -762,7 +759,7 @@ class MedicalEquipmentService:
             devices.append(device_info)
         return devices
 
-    async def get_device(self, device_id: str) -> Optional[DeviceInfo]:
+    async def get_device(self, device_id: str) -> DeviceInfo | None:
         """Получить информацию об устройстве"""
         driver = self.devices.get(device_id)
         if driver:
@@ -783,7 +780,7 @@ class MedicalEquipmentService:
             return await driver.disconnect()
         return False
 
-    async def get_device_status(self, device_id: str) -> Optional[DeviceStatus]:
+    async def get_device_status(self, device_id: str) -> DeviceStatus | None:
         """Получить статус устройства"""
         driver = self.devices.get(device_id)
         if driver:
@@ -791,8 +788,8 @@ class MedicalEquipmentService:
         return None
 
     async def take_measurement(
-        self, device_id: str, patient_id: Optional[str] = None
-    ) -> Optional[MeasurementData]:
+        self, device_id: str, patient_id: str | None = None
+    ) -> MeasurementData | None:
         """Выполнить измерение"""
         driver = self.devices.get(device_id)
         if driver:
@@ -814,13 +811,13 @@ class MedicalEquipmentService:
 
     async def get_measurements(
         self,
-        device_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        device_type: Optional[DeviceType] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        device_id: str | None = None,
+        patient_id: str | None = None,
+        device_type: DeviceType | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         limit: int = 100,
-    ) -> List[MeasurementData]:
+    ) -> list[MeasurementData]:
         """Получить измерения с фильтрацией"""
         filtered_measurements = self.measurements
 
@@ -853,7 +850,7 @@ class MedicalEquipmentService:
         filtered_measurements.sort(key=lambda x: x.timestamp, reverse=True)
         return filtered_measurements[:limit]
 
-    async def get_device_statistics(self, device_id: str) -> Dict[str, Any]:
+    async def get_device_statistics(self, device_id: str) -> dict[str, Any]:
         """Получить статистику устройства"""
         device_measurements = [m for m in self.measurements if m.device_id == device_id]
 
@@ -893,7 +890,7 @@ class MedicalEquipmentService:
             ),
         }
 
-    async def run_diagnostics(self, device_id: str) -> Dict[str, Any]:
+    async def run_diagnostics(self, device_id: str) -> dict[str, Any]:
         """Запустить диагностику устройства"""
         driver = self.devices.get(device_id)
         if not driver:
@@ -949,7 +946,7 @@ class MedicalEquipmentService:
         return results
 
     async def update_device_config(
-        self, device_id: str, config: Dict[str, Any]
+        self, device_id: str, config: dict[str, Any]
     ) -> bool:
         """Обновить конфигурацию устройства"""
         driver = self.devices.get(device_id)
@@ -975,10 +972,10 @@ class MedicalEquipmentService:
     async def export_measurements(
         self,
         format: str = "json",
-        device_id: Optional[str] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Optional[str]:
+        device_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> str | None:
         """Экспорт измерений"""
         measurements = await self.get_measurements(
             device_id=device_id, start_date=start_date, end_date=end_date, limit=10000

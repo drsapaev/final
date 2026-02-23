@@ -3,24 +3,21 @@
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any
 
-from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.crud import (
-    appointment as crud_appointment,
     patient as crud_patient,
+)
+from app.crud import (
     user as crud_user,
-    visit as crud_visit,
 )
 from app.models.appointment import Appointment
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.online_queue import OnlineQueueEntry
-from app.models.patient import Patient
-from app.models.user import User
-from app.models.visit import Visit, VisitService
+from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +28,7 @@ class UserDataTransferService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def get_user_data_summary(self, db: Session, user_id: int) -> Dict[str, Any]:
+    def get_user_data_summary(self, db: Session, user_id: int) -> dict[str, Any]:
         """
         Получить сводку данных пользователя для передачи
         """
@@ -174,9 +171,9 @@ class UserDataTransferService:
         db: Session,
         source_user_id: int,
         target_user_id: int,
-        data_types: List[str] = None,
+        data_types: list[str] = None,
         initiated_by_user_id: int = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Передать данные от одного пользователя к другому
 
@@ -268,7 +265,7 @@ class UserDataTransferService:
 
     def _transfer_appointments(
         self, db: Session, source_patient_id: int, target_patient_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Передать назначения"""
         try:
             appointments = (
@@ -292,7 +289,7 @@ class UserDataTransferService:
 
     def _transfer_visits(
         self, db: Session, source_patient_id: int, target_patient_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Передать визиты"""
         try:
             visits = db.query(Visit).filter(Visit.patient_id == source_patient_id).all()
@@ -312,7 +309,7 @@ class UserDataTransferService:
 
     def _transfer_queue_entries(
         self, db: Session, source_patient_id: int, target_patient_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Передать записи в очереди"""
         try:
             queue_entries = (
@@ -335,8 +332,8 @@ class UserDataTransferService:
             return {"count": 0, "success": False, "error": str(e)}
 
     def get_transfer_history(
-        self, db: Session, user_id: Optional[int] = None, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+        self, db: Session, user_id: int | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """
         Получить историю передач данных
         """
@@ -350,7 +347,7 @@ class UserDataTransferService:
         source_user_id: int,
         target_user_id: int,
         requester_user_id: int,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Валидировать запрос на передачу данных
 
@@ -402,7 +399,7 @@ class UserDataTransferService:
         db: Session,
         source_user_id: int,
         target_user_id: int,
-        data_types: List[str],
+        data_types: list[str],
         expires_in_hours: int = 24,
     ) -> str:
         """
@@ -419,7 +416,7 @@ class UserDataTransferService:
 
     def confirm_transfer_by_token(
         self, db: Session, token: str, confirmed_by_user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Подтвердить передачу по токену
         """

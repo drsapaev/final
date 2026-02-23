@@ -5,14 +5,13 @@
 import logging
 import secrets
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.crud import user as crud_user
-from app.models.user import User
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
 from app.services.phone_verification_service import get_phone_verification_service
 
@@ -48,7 +47,7 @@ class PasswordResetService:
         for key in expired_keys:
             del self.reset_tokens[key]
 
-    async def initiate_phone_reset(self, db: Session, phone: str) -> Dict[str, Any]:
+    async def initiate_phone_reset(self, db: Session, phone: str) -> dict[str, Any]:
         """Инициация сброса пароля по телефону"""
         try:
             # Проверяем, существует ли пользователь с таким номером
@@ -85,7 +84,7 @@ class PasswordResetService:
             logger.error(f"Error initiating phone reset for {phone}: {e}")
             return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
-    async def initiate_email_reset(self, db: Session, email: str) -> Dict[str, Any]:
+    async def initiate_email_reset(self, db: Session, email: str) -> dict[str, Any]:
         """Инициация сброса пароля по email"""
         try:
             # Проверяем, существует ли пользователь с таким email
@@ -122,30 +121,30 @@ class PasswordResetService:
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
                     <h1>🔐 Сброс пароля</h1>
                 </div>
-                
+
                 <div style="padding: 30px; background: #f9f9f9;">
                     <h2>Здравствуйте!</h2>
-                    
+
                     <p>Вы запросили сброс пароля для вашего аккаунта в медицинской клинике.</p>
-                    
+
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="{reset_url}" 
+                        <a href="{reset_url}"
                            style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
                             Сбросить пароль
                         </a>
                     </div>
-                    
+
                     <p><strong>Важно:</strong></p>
                     <ul>
                         <li>Ссылка действительна в течение {self.token_ttl_hours} часа</li>
                         <li>Если вы не запрашивали сброс пароля, проигнорируйте это письмо</li>
                         <li>Ссылка может быть использована только один раз</li>
                     </ul>
-                    
+
                     <p>Если кнопка не работает, скопируйте и вставьте эту ссылку в браузер:</p>
                     <p style="word-break: break-all; color: #667eea;">{reset_url}</p>
                 </div>
-                
+
                 <div style="padding: 20px; text-align: center; color: #666; font-size: 12px;">
                     <p>© 2024 Медицинская клиника. Все права защищены.</p>
                 </div>
@@ -155,19 +154,19 @@ class PasswordResetService:
 
             text_content = f"""
             Сброс пароля
-            
+
             Здравствуйте!
-            
+
             Вы запросили сброс пароля для вашего аккаунта в медицинской клинике.
-            
+
             Перейдите по ссылке для сброса пароля:
             {reset_url}
-            
+
             Важно:
             - Ссылка действительна в течение {self.token_ttl_hours} часа
             - Если вы не запрашивали сброс пароля, проигнорируйте это письмо
             - Ссылка может быть использована только один раз
-            
+
             © 2024 Медицинская клиника
             """
 
@@ -198,7 +197,7 @@ class PasswordResetService:
 
     async def verify_phone_and_get_token(
         self, db: Session, phone: str, verification_code: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Верификация телефона и получение токена сброса"""
         try:
             # Проверяем код верификации
@@ -247,7 +246,7 @@ class PasswordResetService:
 
     def reset_password_with_token(
         self, db: Session, token: str, new_password: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Сброс пароля с использованием токена"""
         try:
             # Очищаем истекшие токены
@@ -340,7 +339,7 @@ class PasswordResetService:
             logger.error(f"Error resetting password with token: {e}")
             return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
-    def validate_reset_token(self, token: str) -> Dict[str, Any]:
+    def validate_reset_token(self, token: str) -> dict[str, Any]:
         """Проверка валидности токена сброса"""
         try:
             self._clean_expired_tokens()
@@ -384,7 +383,7 @@ class PasswordResetService:
             logger.error(f"Error validating reset token: {e}")
             return {"valid": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Статистика сброса паролей"""
         try:
             self._clean_expired_tokens()

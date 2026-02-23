@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
@@ -17,7 +18,7 @@ const ModernForm = ({
   spacing = 'medium',
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  const { getColor } = useTheme();
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -26,36 +27,36 @@ const ModernForm = ({
 
   // Обновление значения поля
   const updateValue = (name, value) => {
-    setValues(prev => ({ ...prev, [name]: value }));
-    
+    setValues((prev) => ({ ...prev, [name]: value }));
+
     // Очистка ошибки при изменении значения
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
+      setErrors((prev) => ({ ...prev, [name]: null }));
     }
   };
 
   // Пометка поля как затронутого
   const markTouched = (name) => {
-    setTouched(prev => ({ ...prev, [name]: true }));
+    setTouched((prev) => ({ ...prev, [name]: true }));
   };
 
   // Валидация поля
   const validateField = (name, value) => {
     if (!validation || !validation[name]) return null;
-    
+
     const fieldValidation = validation[name];
-    
+
     if (typeof fieldValidation === 'function') {
       return fieldValidation(value, values);
     }
-    
+
     if (Array.isArray(fieldValidation)) {
       for (const validator of fieldValidation) {
         const result = validator(value, values);
         if (result !== true) return result;
       }
     }
-    
+
     return null;
   };
 
@@ -63,9 +64,9 @@ const ModernForm = ({
   const validateForm = () => {
     const newErrors = {};
     let hasErrors = false;
-    
+
     if (validation) {
-      Object.keys(validation).forEach(fieldName => {
+      Object.keys(validation).forEach((fieldName) => {
         const error = validateField(fieldName, values[fieldName]);
         if (error) {
           newErrors[fieldName] = error;
@@ -73,7 +74,7 @@ const ModernForm = ({
         }
       });
     }
-    
+
     setErrors(newErrors);
     return !hasErrors;
   };
@@ -81,17 +82,17 @@ const ModernForm = ({
   // Обработка отправки формы
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (isSubmitting || loading) return;
-    
+
     // Пометить все поля как затронутые
     const allFields = Object.keys(validation || {});
     const newTouched = {};
-    allFields.forEach(field => {
+    allFields.forEach((field) => {
       newTouched[field] = true;
     });
     setTouched(newTouched);
-    
+
     // Валидация
     if (!validateForm()) {
       // Фокус на первое поле с ошибкой
@@ -102,9 +103,9 @@ const ModernForm = ({
       }
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       await onSubmit?.(values);
     } catch (error) {
@@ -118,12 +119,12 @@ const ModernForm = ({
   const cloneChildren = (children) => {
     return React.Children.map(children, (child) => {
       if (!React.isValidElement(child)) return child;
-      
+
       // Если это поле формы
       if (child.props.name) {
         const name = child.props.name;
         const fieldError = touched[name] ? errors[name] : null;
-        
+
         return React.cloneElement(child, {
           value: values[name] || '',
           onChange: (e) => {
@@ -135,7 +136,7 @@ const ModernForm = ({
             markTouched(name);
             const error = validateField(name, values[name]);
             if (error) {
-              setErrors(prev => ({ ...prev, [name]: error }));
+              setErrors((prev) => ({ ...prev, [name]: error }));
             }
             child.props.onBlur?.(e);
           },
@@ -143,7 +144,7 @@ const ModernForm = ({
           ...child.props
         });
       }
-      
+
       // Рекурсивная обработка вложенных элементов
       if (child.props.children) {
         return React.cloneElement(child, {
@@ -151,7 +152,7 @@ const ModernForm = ({
           children: cloneChildren(child.props.children)
         });
       }
-      
+
       return child;
     });
   };
@@ -162,28 +163,28 @@ const ModernForm = ({
       className={`modern-form ${layout} ${spacing} ${className}`}
       onSubmit={handleSubmit}
       noValidate
-      {...props}
-    >
+      {...props}>
+      
       {/* Общие сообщения формы */}
-      {error && (
-        <div 
-          className="form-message error"
-          style={{ color: getColor('danger') }}
-        >
+      {error &&
+      <div
+        className="form-message error"
+        style={{ color: getColor('danger') }}>
+        
           <AlertCircle size={16} />
           <span>{error}</span>
         </div>
-      )}
+      }
       
-      {success && (
-        <div 
-          className="form-message success"
-          style={{ color: getColor('success') }}
-        >
+      {success &&
+      <div
+        className="form-message success"
+        style={{ color: getColor('success') }}>
+        
           <CheckCircle size={16} />
           <span>{success}</span>
         </div>
-      )}
+      }
 
       {/* Поля формы */}
       <div className="form-fields">
@@ -191,98 +192,149 @@ const ModernForm = ({
       </div>
 
       {/* Индикатор загрузки */}
-      {(loading || isSubmitting) && (
-        <div className="form-loading">
+      {(loading || isSubmitting) &&
+      <div className="form-loading">
           <Loader size={16} className="spinning" />
           <span>Обработка...</span>
         </div>
-      )}
-    </form>
-  );
+      }
+    </form>);
+
 };
 
 // Компонент группы полей
-export const FormGroup = ({ 
-  title, 
-  description, 
-  children, 
+export const FormGroup = ({
+  title,
+  description,
+  children,
   className = '',
   collapsible = false,
   defaultExpanded = true,
-  ...props 
+  ...props
 }) => {
   const { getColor } = useTheme();
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const headerContent = (
+    <>
+      <h3
+        className="form-group-title"
+        style={{ color: getColor('textPrimary') }}>
+
+        {title}
+      </h3>
+      {description &&
+      <p
+        className="form-group-description"
+        style={{ color: getColor('textSecondary') }}>
+
+          {description}
+        </p>
+      }
+    </>
+  );
 
   return (
     <div className={`form-group ${className}`} {...props}>
-      {title && (
-        <div 
-          className={`form-group-header ${collapsible ? 'collapsible' : ''}`}
-          onClick={collapsible ? () => setExpanded(!expanded) : undefined}
-        >
-          <h3 
-            className="form-group-title"
-            style={{ color: getColor('textPrimary') }}
-          >
-            {title}
-          </h3>
-          {description && (
-            <p 
-              className="form-group-description"
-              style={{ color: getColor('textSecondary') }}
-            >
-              {description}
-            </p>
-          )}
+      {title && collapsible &&
+      <div
+        className="form-group-header collapsible"
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded(!expanded)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}>
+
+          {headerContent}
         </div>
-      )}
+      }
+      {title && !collapsible &&
+      <div className="form-group-header">
+          {headerContent}
+        </div>
+      }
       
-      {(!collapsible || expanded) && (
-        <div className="form-group-content">
+      {(!collapsible || expanded) &&
+      <div className="form-group-content">
           {children}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 // Компонент ряда полей
-export const FormRow = ({ 
-  children, 
+export const FormRow = ({
+  children,
   className = '',
   gap = 'medium',
   align = 'stretch',
-  ...props 
+  ...props
 }) => {
   return (
-    <div 
-      className={`form-row ${gap} ${align} ${className}`} 
-      {...props}
-    >
+    <div
+      className={`form-row ${gap} ${align} ${className}`}
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент колонки
-export const FormColumn = ({ 
-  children, 
+export const FormColumn = ({
+  children,
   className = '',
   width = 'auto',
-  ...props 
+  ...props
 }) => {
   return (
-    <div 
+    <div
       className={`form-column ${className}`}
       style={{ flex: width === 'auto' ? 1 : `0 0 ${width}` }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
+};
+
+ModernForm.propTypes = {
+  children: PropTypes.node,
+  onSubmit: PropTypes.func,
+  validation: PropTypes.object,
+  initialValues: PropTypes.object,
+  loading: PropTypes.bool,
+  error: PropTypes.node,
+  success: PropTypes.node,
+  className: PropTypes.string,
+  layout: PropTypes.string,
+  spacing: PropTypes.string
+};
+
+FormGroup.propTypes = {
+  title: PropTypes.node,
+  description: PropTypes.node,
+  children: PropTypes.node,
+  className: PropTypes.string,
+  collapsible: PropTypes.bool,
+  defaultExpanded: PropTypes.bool
+};
+
+FormRow.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  gap: PropTypes.string,
+  align: PropTypes.string
+};
+
+FormColumn.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  width: PropTypes.string
 };
 
 export default ModernForm;
-
-

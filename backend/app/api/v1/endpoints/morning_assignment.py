@@ -22,7 +22,9 @@ class MorningAssignmentResponse(BaseModel):
     success: bool
     message: str
     processed_visits: int
+    assigned_visits: int
     assigned_queues: int
+    total_queue_entries: int
     errors: list
     date: str
 

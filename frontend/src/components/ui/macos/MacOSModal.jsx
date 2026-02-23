@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 const MacOSModal = ({
@@ -139,15 +139,15 @@ const MacOSModal = ({
     }
   };
 
-  const handleClose = () => {
-    if (onClose) {
-      onClose();
+  const handleOverlayKeyDown = (e) => {
+    if (e.key === 'Escape' && closeOnOverlayClick) {
+      onClose?.();
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape' && closeOnEscape) {
-      handleClose();
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
     }
   };
 
@@ -162,6 +162,12 @@ const MacOSModal = ({
   };
 
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && closeOnEscape) {
+        onClose?.();
+      }
+    };
+
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
@@ -174,7 +180,7 @@ const MacOSModal = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, closeOnEscape, onClose]);
 
   if (!isOpen) {
     return null;
@@ -185,6 +191,7 @@ const MacOSModal = ({
       className={className}
       style={overlayStyle}
       onClick={handleOverlayClick}
+      onKeyDown={handleOverlayKeyDown}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}

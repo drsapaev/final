@@ -3,7 +3,7 @@
  * Управление результатами лабораторных исследований
  * Согласно MASTER_TODO_LIST строка 287
  */
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -12,7 +12,7 @@ import {
   Button,
   Input,
   Alert,
-  CircularProgress,
+
   Badge,
   Select,
   Option,
@@ -20,28 +20,29 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Progress
-} from '../ui/macos';
+  Progress } from
+'../ui/macos';
 import {
   TestTube,
+  X,
   Plus,
   Edit,
   Trash2,
-  Eye,
+
   Download,
   Upload,
-  Printer,
+
   Send,
-  AlertTriangle,
-  CheckCircle,
-  Calendar,
+
+
+
   TrendingUp,
   TrendingDown,
-  Minus,
+
   Microscope,
   Hospital,
-  Brain,
-} from 'lucide-react';
+  Brain } from
+'lucide-react';
 import { api } from '../../api/client';
 import { AIButton, AIAssistant } from '../ai';
 
@@ -52,7 +53,7 @@ const LAB_CATEGORIES = {
   urine: { name: 'Анализы мочи', icon: <TestTube style={{ color: 'var(--mac-accent-orange)' }} /> },
   biochemistry: { name: 'Биохимия', icon: <Microscope style={{ color: 'var(--mac-accent-blue)' }} /> },
   hormones: { name: 'Гормоны', icon: <Hospital style={{ color: 'var(--mac-accent-purple)' }} /> },
-  other: { name: 'Другие', icon: <TestTube /> },
+  other: { name: 'Другие', icon: <TestTube /> }
 };
 
 // Статусы результатов
@@ -60,7 +61,7 @@ const RESULT_STATUS = {
   pending: { label: 'Ожидается', color: 'warning' },
   in_progress: { label: 'В работе', color: 'info' },
   completed: { label: 'Готов', color: 'success' },
-  abnormal: { label: 'Отклонения', color: 'error' },
+  abnormal: { label: 'Отклонения', color: 'error' }
 };
 
 const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
@@ -71,8 +72,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const [uploadDialog, setUploadDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
-  const [aiAnalysisResults, setAiAnalysisResults] = useState(null);
-  
+  const [, setAiAnalysisResults] = useState(null);
+
   // Форма результата
   const [resultForm, setResultForm] = useState({
     test_name: '',
@@ -83,17 +84,10 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     reference_max: '',
     status: 'pending',
     notes: '',
-    performed_date: new Date().toISOString().split('T')[0],
+    performed_date: new Date().toISOString().split('T')[0]
   });
 
-  // Загрузка результатов
-  useEffect(() => {
-    if (visitId) {
-      loadResults();
-    }
-  }, [visitId]);
-
-  const loadResults = async () => {
+  const loadResults = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get(`/visits/${visitId}/lab-results`);
@@ -104,16 +98,23 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [visitId]);
+
+  // Загрузка результатов
+  useEffect(() => {
+    if (visitId) {
+      loadResults();
+    }
+  }, [visitId, loadResults]);
 
   // Фильтрация результатов
-  const filteredResults = activeTab === 'all' 
-    ? results 
-    : results.filter(r => r.category === activeTab);
+  const filteredResults = activeTab === 'all' ?
+  results :
+  results.filter((r) => r.category === activeTab);
 
   // Подсчет по категориям
   const getCategoryCount = (category) => {
-    return results.filter(r => r.category === category).length;
+    return results.filter((r) => r.category === category).length;
   };
 
   // Определение статуса по значению
@@ -121,15 +122,15 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     const numValue = parseFloat(value);
     const numMin = parseFloat(min);
     const numMax = parseFloat(max);
-    
+
     if (isNaN(numValue) || isNaN(numMin) || isNaN(numMax)) {
       return 'completed';
     }
-    
+
     if (numValue < numMin || numValue > numMax) {
       return 'abnormal';
     }
-    
+
     return 'completed';
   };
 
@@ -141,25 +142,25 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
         resultForm.reference_min,
         resultForm.reference_max
       );
-      
+
       const dataToSave = {
         ...resultForm,
         status,
         visit_id: visitId,
-        patient_id: patientId,
+        patient_id: patientId
       };
-      
+
       if (selectedResult) {
         await api.put(`/lab-results/${selectedResult.id}`, dataToSave);
       } else {
         await api.post('/lab-results', dataToSave);
       }
-      
+
       loadResults();
       setDialogOpen(false);
       resetForm();
       onUpdate && onUpdate();
-      
+
     } catch (error) {
       logger.error('Ошибка сохранения результата:', error);
     }
@@ -168,7 +169,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   // Удаление результата
   const handleDeleteResult = async (resultId) => {
     if (!window.confirm('Удалить результат?')) return;
-    
+
     try {
       await api.delete(`/lab-results/${resultId}`);
       loadResults();
@@ -182,25 +183,25 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('visit_id', visitId);
     formData.append('patient_id', patientId);
-    
+
     try {
       setLoading(true);
       const response = await api.post('/lab-results/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       if (response.data.results) {
-        setResults(prev => [...prev, ...response.data.results]);
+        setResults((prev) => [...prev, ...response.data.results]);
       }
-      
+
       setUploadDialog(false);
       onUpdate && onUpdate();
-      
+
     } catch (error) {
       logger.error('Ошибка загрузки файла:', error);
     } finally {
@@ -212,9 +213,9 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const exportToPDF = async () => {
     try {
       const response = await api.get(`/visits/${visitId}/lab-results/pdf`, {
-        responseType: 'blob',
+        responseType: 'blob'
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -222,7 +223,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
     } catch (error) {
       logger.error('Ошибка экспорта PDF:', error);
     }
@@ -233,9 +234,9 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     try {
       await api.post(`/patients/${patientId}/send-lab-results`, {
         visit_id: visitId,
-        method: 'telegram',
+        method: 'telegram'
       });
-      
+
       alert('Результаты отправлены пациенту');
     } catch (error) {
       logger.error('Ошибка отправки результатов:', error);
@@ -253,7 +254,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       reference_max: '',
       status: 'pending',
       notes: '',
-      performed_date: new Date().toISOString().split('T')[0],
+      performed_date: new Date().toISOString().split('T')[0]
     });
     setSelectedResult(null);
   };
@@ -264,13 +265,13 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     const value = parseFloat(result.value);
     const min = parseFloat(result.reference_min);
     const max = parseFloat(result.reference_max);
-    
+
     let trend = null;
     if (!isNaN(value) && !isNaN(min) && !isNaN(max)) {
-      if (value < min) trend = 'low';
-      else if (value > max) trend = 'high';
+      if (value < min) trend = 'low';else
+      if (value > max) trend = 'high';
     }
-    
+
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="body2" color={isAbnormal ? 'error' : 'text.primary'}>
@@ -278,8 +279,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
         </Typography>
         {trend === 'low' && <TrendingDown color="error" fontSize="small" />}
         {trend === 'high' && <TrendingUp color="error" fontSize="small" />}
-      </Box>
-    );
+      </Box>);
+
   };
 
   return (
@@ -318,8 +319,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                   }
                 }}
                 disabled={results.length === 0}
-                tooltip="AI интерпретация результатов"
-              />
+                tooltip="AI интерпретация результатов" />
+              
             </Box>
           </Box>
 
@@ -336,38 +337,38 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 alignItems: 'center',
                 gap: 8
               }}
-              onClick={() => setActiveTab('all')}
-            >
+              onClick={() => setActiveTab('all')}>
+              
               Все
               <Badge variant="primary">{results.length}</Badge>
             </button>
-            {Object.entries(LAB_CATEGORIES).map(([key, category]) => (
-              <button
-                key={key}
-                style={{
-                  padding: '12px 24px',
-                  border: 'none',
-                  background: activeTab === key ? 'var(--mac-accent-blue)' : 'transparent',
-                  color: activeTab === key ? 'white' : 'var(--mac-text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8
-                }}
-                onClick={() => setActiveTab(key)}
-              >
+            {Object.entries(LAB_CATEGORIES).map(([key, category]) =>
+            <button
+              key={key}
+              style={{
+                padding: '12px 24px',
+                border: 'none',
+                background: activeTab === key ? 'var(--mac-accent-blue)' : 'transparent',
+                color: activeTab === key ? 'white' : 'var(--mac-text-primary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+              onClick={() => setActiveTab(key)}>
+              
                 {category.icon}
                 {category.name}
                 <Badge variant="primary">{getCategoryCount(key)}</Badge>
               </button>
-            ))}
+            )}
           </div>
 
           {/* Таблица результатов */}
-          {loading ? (
-            <Progress />
-          ) : filteredResults.length > 0 ? (
-            <div style={{ overflow: 'auto' }}>
+          {loading ?
+          <Progress /> :
+          filteredResults.length > 0 ?
+          <div style={{ overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--mac-border)' }}>
@@ -380,8 +381,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredResults.map((result) => (
-                    <tr key={result.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                  {filteredResults.map((result) =>
+                <tr key={result.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
                       <td style={{ padding: 12 }}>
                         <Typography variant="body2" style={{ fontWeight: 500 }}>
                           {result.test_name}
@@ -401,8 +402,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                       
                       <td style={{ padding: 12 }}>
                         <Badge
-                          variant={RESULT_STATUS[result.status]?.color}
-                        >
+                      variant={RESULT_STATUS[result.status]?.color}>
+                      
                           {RESULT_STATUS[result.status]?.label}
                         </Badge>
                       </td>
@@ -415,50 +416,50 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                       
                       <td style={{ padding: 12, textAlign: 'right' }}>
                         <Button
-                          size="small"
-                          onClick={() => {
-                            setSelectedResult(result);
-                            setResultForm(result);
-                            setDialogOpen(true);
-                          }}
-                        >
+                      size="small"
+                      onClick={() => {
+                        setSelectedResult(result);
+                        setResultForm(result);
+                        setDialogOpen(true);
+                      }}>
+                      
                           <Edit style={{ width: 16, height: 16 }} />
                         </Button>
                         <Button
-                          size="small"
-                          variant="danger"
-                          onClick={() => handleDeleteResult(result.id)}
-                        >
-                          <Delete style={{ width: 16, height: 16 }} />
+                      size="small"
+                      variant="danger"
+                      onClick={() => handleDeleteResult(result.id)}>
+
+                          <Trash2 style={{ width: 16, height: 16 }} />
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                )}
                 </tbody>
               </table>
-            </div>
-          ) : (
-            <Alert severity="info">
+            </div> :
+
+          <Alert severity="info">
               Нет результатов анализов. Добавьте новый результат или загрузите файл.
             </Alert>
-          )}
+          }
 
           {/* Сводка по отклонениям */}
-          {results.filter(r => r.status === 'abnormal').length > 0 && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
+          {results.filter((r) => r.status === 'abnormal').length > 0 &&
+          <Alert severity="warning" sx={{ mt: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Обнаружены отклонения:
               </Typography>
-              {results
-                .filter(r => r.status === 'abnormal')
-                .map((result, index) => (
-                  <Typography key={index} variant="body2">
+              {results.
+            filter((r) => r.status === 'abnormal').
+            map((result, index) =>
+            <Typography key={index} variant="body2">
                     • {result.test_name}: {result.value} {result.unit} 
                     (норма: {result.reference_min}-{result.reference_max})
                   </Typography>
-                ))}
+            )}
             </Alert>
-          )}
+          }
         </CardContent>
       </Card>
 
@@ -475,21 +476,21 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 <Input
                   label="Название исследования"
                   value={resultForm.test_name}
-                  onChange={(e) => setResultForm({ ...resultForm, test_name: e.target.value })}
-                />
+                  onChange={(e) => setResultForm({ ...resultForm, test_name: e.target.value })} />
+                
               </Box>
               
               <Box style={{ flex: 1 }}>
                 <Select
                   label="Категория"
                   value={resultForm.category}
-                  onChange={(e) => setResultForm({ ...resultForm, category: e.target.value })}
-                >
-                  {Object.entries(LAB_CATEGORIES).map(([key, category]) => (
-                    <Option key={key} value={key}>
+                  onChange={(e) => setResultForm({ ...resultForm, category: e.target.value })}>
+                  
+                  {Object.entries(LAB_CATEGORIES).map(([key, category]) =>
+                  <Option key={key} value={key}>
                       {category.name}
                     </Option>
-                  ))}
+                  )}
                 </Select>
               </Box>
             </Box>
@@ -499,32 +500,32 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 <Input
                   label="Результат"
                   value={resultForm.value}
-                  onChange={(e) => setResultForm({ ...resultForm, value: e.target.value })}
-                />
+                  onChange={(e) => setResultForm({ ...resultForm, value: e.target.value })} />
+                
               </Box>
               
               <Box style={{ flex: 1 }}>
                 <Input
                   label="Ед."
                   value={resultForm.unit}
-                  onChange={(e) => setResultForm({ ...resultForm, unit: e.target.value })}
-                />
+                  onChange={(e) => setResultForm({ ...resultForm, unit: e.target.value })} />
+                
               </Box>
               
               <Box style={{ flex: 1 }}>
                 <Input
                   label="Мин. норма"
                   value={resultForm.reference_min}
-                  onChange={(e) => setResultForm({ ...resultForm, reference_min: e.target.value })}
-                />
+                  onChange={(e) => setResultForm({ ...resultForm, reference_min: e.target.value })} />
+                
               </Box>
               
               <Box style={{ flex: 1 }}>
                 <Input
                   label="Макс. норма"
                   value={resultForm.reference_max}
-                  onChange={(e) => setResultForm({ ...resultForm, reference_max: e.target.value })}
-                />
+                  onChange={(e) => setResultForm({ ...resultForm, reference_max: e.target.value })} />
+                
               </Box>
             </Box>
             
@@ -534,8 +535,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                   type="date"
                   label="Дата выполнения"
                   value={resultForm.performed_date}
-                  onChange={(e) => setResultForm({ ...resultForm, performed_date: e.target.value })}
-                />
+                  onChange={(e) => setResultForm({ ...resultForm, performed_date: e.target.value })} />
+                
               </Box>
             </Box>
             
@@ -545,8 +546,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 rows={2}
                 label="Примечания"
                 value={resultForm.notes}
-                onChange={(e) => setResultForm({ ...resultForm, notes: e.target.value })}
-              />
+                onChange={(e) => setResultForm({ ...resultForm, notes: e.target.value })} />
+              
             </Box>
           </Box>
         </DialogContent>
@@ -578,16 +579,16 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
             accept=".pdf,.xlsx,.xls,.csv"
             onChange={handleFileUpload}
             style={{ display: 'none' }}
-            id="lab-file-upload"
-          />
+            id="lab-file-upload" />
+          
           
           <label htmlFor="lab-file-upload">
             <Button
               variant="contained"
               component="span"
               fullWidth
-              startIcon={<Upload />}
-            >
+              startIcon={<Upload />}>
+              
               Выбрать файл
             </Button>
           </label>
@@ -601,42 +602,42 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       </Dialog>
 
       {/* AI Analysis Dialog */}
-      {showAIAnalysis && (
-        <Dialog 
-          open={showAIAnalysis} 
-          onClose={() => setShowAIAnalysis(false)} 
-          maxWidth="md" 
-          fullWidth
-        >
+      {showAIAnalysis &&
+      <Dialog
+        open={showAIAnalysis}
+        onClose={() => setShowAIAnalysis(false)}
+        maxWidth="md"
+        fullWidth>
+        
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="h6">
-                <Psychology sx={{ mr: 1, verticalAlign: 'middle' }} />
+                <Brain style={{ marginRight: 8, verticalAlign: 'middle' }} />
                 AI Интерпретация результатов
               </Typography>
-              <IconButton onClick={() => setShowAIAnalysis(false)}>
-                <Remove />
-              </IconButton>
+              <Button size="small" onClick={() => setShowAIAnalysis(false)}>
+                <X style={{ width: 16, height: 16 }} />
+              </Button>
             </Box>
           </DialogTitle>
           
           <DialogContent>
             <AIAssistant
-              analysisType="lab"
-              data={{
-                results: results.map(r => ({
-                  name: r.test_name,
-                  value: r.value,
-                  unit: r.unit,
-                  reference: `${r.reference_min}-${r.reference_max}`
-                })),
-                patient_age: patientId ? 35 : null, // Здесь нужно получить реальный возраст
-                patient_gender: null
-              }}
-              onResult={(result) => {
-                setAiAnalysisResults(result);
-              }}
-            />
+            analysisType="lab"
+            data={{
+              results: results.map((r) => ({
+                name: r.test_name,
+                value: r.value,
+                unit: r.unit,
+                reference: `${r.reference_min}-${r.reference_max}`
+              })),
+              patient_age: patientId ? 35 : null, // Здесь нужно получить реальный возраст
+              patient_gender: null
+            }}
+            onResult={(result) => {
+              setAiAnalysisResults(result);
+            }} />
+          
           </DialogContent>
           
           <DialogActions>
@@ -645,10 +646,9 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
             </Button>
           </DialogActions>
         </Dialog>
-      )}
-    </Box>
-  );
+      }
+    </Box>);
+
 };
 
 export default LabResultsManager;
-

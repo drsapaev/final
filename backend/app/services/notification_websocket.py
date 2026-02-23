@@ -1,8 +1,7 @@
 
 import logging
-from typing import Dict, List, Optional
-from fastapi import WebSocket, WebSocketDisconnect
-import json
+
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ class NotificationWebSocketManager:
     """
     def __init__(self):
         # Map user_id to list of active WebSockets
-        self.active_connections: Dict[int, List[WebSocket]] = {}
+        self.active_connections: dict[int, list[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: int):
         await websocket.accept()
@@ -46,7 +45,7 @@ class NotificationWebSocketManager:
                     await connection.send_json(data)
                 except Exception as e:
                     logger.error(f"Error sending JSON to user {user_id}: {e}")
-                    # Optionally handle disconnect here if needed, 
+                    # Optionally handle disconnect here if needed,
                     # but usually WebSocketDisconnect handles cleanup in the endpoint loop
 
     async def broadcast(self, message: str):

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -24,14 +24,14 @@ class TwoFactorAuth(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
-        unique=True, 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
         nullable=False
     )  # ✅ SECURITY: CASCADE (2FA dies with user)
 
     # TOTP настройки
-    totp_secret: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # Base32 encoded secret
+    totp_secret: Mapped[str | None] = mapped_column(String(32), nullable=True)  # Base32 encoded secret
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     totp_verified: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -40,27 +40,27 @@ class TwoFactorAuth(Base):
     backup_codes_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Recovery настройки
-    recovery_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    recovery_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    recovery_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    recovery_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     recovery_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), onupdate=func.now()
     )
-    last_used: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Связи
-    user: Mapped["User"] = relationship("User", back_populates="two_factor_auth")
-    backup_codes: Mapped[List["TwoFactorBackupCode"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="two_factor_auth")
+    backup_codes: Mapped[list[TwoFactorBackupCode]] = relationship(
         "TwoFactorBackupCode",
         back_populates="two_factor_auth",
         cascade="all, delete-orphan",
     )
-    recovery_attempts: Mapped[List["TwoFactorRecovery"]] = relationship(
+    recovery_attempts: Mapped[list[TwoFactorRecovery]] = relationship(
         "TwoFactorRecovery",
         back_populates="two_factor_auth",
         cascade="all, delete-orphan",
@@ -74,23 +74,23 @@ class TwoFactorBackupCode(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     two_factor_auth_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("two_factor_auth.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("two_factor_auth.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (backup codes die with 2FA)
 
     # Код и его статус
     code: Mapped[str] = mapped_column(String(10), nullable=False)  # 8-символьный код
     used: Mapped[bool] = mapped_column(Boolean, default=False)
-    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Связи
-    two_factor_auth: Mapped["TwoFactorAuth"] = relationship(
+    two_factor_auth: Mapped[TwoFactorAuth] = relationship(
         "TwoFactorAuth", back_populates="backup_codes"
     )
 
@@ -102,8 +102,8 @@ class TwoFactorRecovery(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     two_factor_auth_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("two_factor_auth.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("two_factor_auth.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (backup codes die with 2FA)
 
@@ -114,24 +114,24 @@ class TwoFactorRecovery(Base):
     recovery_value: Mapped[str] = mapped_column(
         String(255), nullable=False
     )  # email, phone, или backup code
-    recovery_token: Mapped[Optional[str]] = mapped_column(
+    recovery_token: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # токен для подтверждения
 
     # Статус
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)  # IPv4 или IPv6
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv4 или IPv6
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи
-    two_factor_auth: Mapped["TwoFactorAuth"] = relationship(
+    two_factor_auth: Mapped[TwoFactorAuth] = relationship(
         "TwoFactorAuth", back_populates="recovery_attempts"
     )
 
@@ -143,37 +143,37 @@ class TwoFactorSession(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (sessions/devices die with user)
 
     # Сессия
     session_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    device_fingerprint: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    device_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # 2FA статус
     two_factor_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    two_factor_method: Mapped[Optional[str]] = mapped_column(
+    two_factor_method: Mapped[str | None] = mapped_column(
         String(20), nullable=True
     )  # 'totp', 'backup_code', 'recovery'
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    last_activity: Mapped[Optional[datetime]] = mapped_column(
+    last_activity: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # IP и устройство
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    device_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    device_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Связи
-    user: Mapped["User"] = relationship("User")
+    user: Mapped[User] = relationship("User")
 
 
 class TwoFactorDevice(Base):
@@ -183,8 +183,8 @@ class TwoFactorDevice(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )  # ✅ SECURITY: CASCADE (sessions/devices die with user)
 
@@ -198,14 +198,14 @@ class TwoFactorDevice(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    last_used: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # IP и браузер
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи
-    user: Mapped["User"] = relationship("User")
+    user: Mapped[User] = relationship("User")

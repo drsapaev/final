@@ -1,7 +1,6 @@
-import React from 'react';
-
 // Minimal macOS-style Dialog components to replace MUI Dialog API used in CashierPanel
 // Props compatibility: open, onClose, maxWidth, fullWidth, children
+import PropTypes from 'prop-types';
 
 const overlayStyleBase = {
   position: 'fixed',
@@ -35,11 +34,29 @@ const sizeMap = {
 const Dialog = ({ open, onClose, maxWidth = 'md', fullWidth = true, children, style = {}, overlayStyle = {}, ...props }) => {
   if (!open) return null;
   const maxW = typeof maxWidth === 'string' ? (sizeMap[maxWidth] || sizeMap.md) : maxWidth;
+  const backdropStyle = {
+    position: 'absolute',
+    inset: 0,
+    border: 'none',
+    margin: 0,
+    padding: 0,
+    background: 'transparent'
+  };
+
   return (
-    <div style={{ ...overlayStyleBase, ...overlayStyle }} onMouseDown={(e) => {
-      if (e.target === e.currentTarget) onClose?.(e);
-    }}>
-      <div role="dialog" aria-modal="true" style={{ ...dialogStyleBase, maxWidth: fullWidth ? maxW : undefined, ...style }} {...props}>
+    <div style={{ ...overlayStyleBase, ...overlayStyle }}>
+      <button
+        type="button"
+        style={backdropStyle}
+        onClick={(e) => onClose?.(e)}
+        tabIndex={-1}
+        aria-label="Закрыть диалог"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{ ...dialogStyleBase, maxWidth: fullWidth ? maxW : undefined, ...style, position: 'relative', zIndex: 1 }}
+        {...props}>
         {children}
       </div>
     </div>
@@ -63,6 +80,32 @@ export const DialogActions = ({ children, style = {}, align = 'right', ...props 
     {children}
   </div>
 );
+
+Dialog.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  maxWidth: PropTypes.oneOfType([PropTypes.oneOf(['xs', 'sm', 'md', 'lg', 'xl']), PropTypes.number, PropTypes.string]),
+  fullWidth: PropTypes.bool,
+  children: PropTypes.node,
+  style: PropTypes.object,
+  overlayStyle: PropTypes.object
+};
+
+DialogTitle.propTypes = {
+  children: PropTypes.node,
+  style: PropTypes.object
+};
+
+DialogContent.propTypes = {
+  children: PropTypes.node,
+  style: PropTypes.object
+};
+
+DialogActions.propTypes = {
+  children: PropTypes.node,
+  style: PropTypes.object,
+  align: PropTypes.oneOf(['left', 'center', 'right'])
+};
 
 export default Dialog;
 

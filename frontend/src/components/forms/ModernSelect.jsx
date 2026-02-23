@@ -1,13 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  ChevronDown, 
-  ChevronUp, 
-  Check, 
-  Search, 
+import { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import {
+  ChevronDown,
+  ChevronUp,
+  Check,
+  Search,
   X,
   AlertCircle,
-  CheckCircle
-} from 'lucide-react';
+  CheckCircle } from
+'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
 
@@ -33,12 +34,12 @@ const ModernSelect = ({
   className = '',
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  const { getColor } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  
+
   const selectRef = useRef(null);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -69,25 +70,51 @@ const ModernSelect = ({
     const handleKeyDown = (event) => {
       if (!isOpen) return;
 
-      const filteredOptions = getFilteredOptions();
-      
+      const filteredOptions = !searchQuery ? options : options.filter((option) => {
+        const label = typeof option === 'object' ? option.label : option;
+        return label.toLowerCase().includes(searchQuery.toLowerCase());
+      });
+
+      const selectOption = (option) => {
+        if (!option) return;
+        if (multiple) {
+          const selectedValues = !value ? [] : Array.isArray(value) ? value : [value];
+          const optionValue = typeof option === 'object' ? option.value : option;
+          const isSelected = selectedValues.some((val) =>
+            (typeof val === 'object' ? val.value : val) === optionValue
+          );
+
+          const newValue = isSelected
+            ? selectedValues.filter((val) => (typeof val === 'object' ? val.value : val) !== optionValue)
+            : [...selectedValues, option];
+
+          onChange?.(newValue);
+          return;
+        }
+
+        onChange?.(option);
+        setIsOpen(false);
+        setSearchQuery('');
+        setHighlightedIndex(-1);
+      };
+
       switch (event.key) {
         case 'ArrowDown':
           event.preventDefault();
-          setHighlightedIndex(prev => 
-            prev < filteredOptions.length - 1 ? prev + 1 : 0
+          setHighlightedIndex((prev) =>
+          prev < filteredOptions.length - 1 ? prev + 1 : 0
           );
           break;
         case 'ArrowUp':
           event.preventDefault();
-          setHighlightedIndex(prev => 
-            prev > 0 ? prev - 1 : filteredOptions.length - 1
+          setHighlightedIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredOptions.length - 1
           );
           break;
         case 'Enter':
           event.preventDefault();
           if (highlightedIndex >= 0) {
-            handleOptionClick(filteredOptions[highlightedIndex]);
+            selectOption(filteredOptions[highlightedIndex]);
           }
           break;
         case 'Escape':
@@ -100,13 +127,13 @@ const ModernSelect = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, highlightedIndex]);
+  }, [isOpen, highlightedIndex, searchQuery, options, multiple, value, onChange]);
 
   // Фильтрация опций
   const getFilteredOptions = () => {
     if (!searchQuery) return options;
-    
-    return options.filter(option => {
+
+    return options.filter((option) => {
       const label = typeof option === 'object' ? option.label : option;
       return label.toLowerCase().includes(searchQuery.toLowerCase());
     });
@@ -115,9 +142,9 @@ const ModernSelect = ({
   // Группировка опций
   const getGroupedOptions = () => {
     const filteredOptions = getFilteredOptions();
-    
+
     if (!groupBy) return { '': filteredOptions };
-    
+
     return filteredOptions.reduce((groups, option) => {
       const group = typeof groupBy === 'function' ? groupBy(option) : option[groupBy];
       if (!groups[group]) groups[group] = [];
@@ -136,8 +163,8 @@ const ModernSelect = ({
   const isOptionSelected = (option) => {
     const selectedValues = getSelectedValues();
     const optionValue = typeof option === 'object' ? option.value : option;
-    return selectedValues.some(val => 
-      (typeof val === 'object' ? val.value : val) === optionValue
+    return selectedValues.some((val) =>
+    (typeof val === 'object' ? val.value : val) === optionValue
     );
   };
 
@@ -146,20 +173,20 @@ const ModernSelect = ({
     if (multiple) {
       const selectedValues = getSelectedValues();
       const optionValue = typeof option === 'object' ? option.value : option;
-      
-      const isSelected = selectedValues.some(val => 
-        (typeof val === 'object' ? val.value : val) === optionValue
+
+      const isSelected = selectedValues.some((val) =>
+      (typeof val === 'object' ? val.value : val) === optionValue
       );
-      
+
       let newValue;
       if (isSelected) {
-        newValue = selectedValues.filter(val => 
-          (typeof val === 'object' ? val.value : val) !== optionValue
+        newValue = selectedValues.filter((val) =>
+        (typeof val === 'object' ? val.value : val) !== optionValue
         );
       } else {
         newValue = [...selectedValues, option];
       }
-      
+
       onChange?.(newValue);
     } else {
       onChange?.(option);
@@ -180,26 +207,33 @@ const ModernSelect = ({
     e.stopPropagation();
     const selectedValues = getSelectedValues();
     const optionValue = typeof optionToRemove === 'object' ? optionToRemove.value : optionToRemove;
-    
-    const newValue = selectedValues.filter(val => 
-      (typeof val === 'object' ? val.value : val) !== optionValue
+
+    const newValue = selectedValues.filter((val) =>
+    (typeof val === 'object' ? val.value : val) !== optionValue
     );
-    
+
     onChange?.(newValue);
+  };
+  const handleSelectContainerKeyDown = (event) => {
+    if (disabled || isOpen) return;
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setIsOpen(true);
+    }
   };
 
   // Рендер значения
   const renderDisplayValue = () => {
     const selectedValues = getSelectedValues();
-    
+
     if (selectedValues.length === 0) {
       return <span className="select-placeholder">{placeholder}</span>;
     }
-    
+
     if (renderValue) {
       return renderValue(selectedValues);
     }
-    
+
     if (multiple) {
       return (
         <div className="select-tags">
@@ -212,36 +246,36 @@ const ModernSelect = ({
                   type="button"
                   className="tag-remove"
                   onClick={(e) => handleRemoveOption(e, val)}
-                  tabIndex={-1}
-                >
+                  tabIndex={-1}>
+                  
                   <X size={12} />
                 </button>
-              </span>
-            );
+              </span>);
+
           })}
-        </div>
-      );
+        </div>);
+
     }
-    
+
     const selectedValue = selectedValues[0];
     return typeof selectedValue === 'object' ? selectedValue.label : selectedValue;
   };
 
   // Рендер опции
-  const renderOptionContent = (option, index) => {
+  const renderOptionContent = (option) => {
     if (renderOption) {
       return renderOption(option, isOptionSelected(option));
     }
-    
+
     const label = typeof option === 'object' ? option.label : option;
     const isSelected = isOptionSelected(option);
-    
+
     return (
       <>
         <span className="option-label">{label}</span>
         {isSelected && <Check size={16} className="option-check" />}
-      </>
-    );
+      </>);
+
   };
 
   const hasError = !!error;
@@ -253,49 +287,50 @@ const ModernSelect = ({
   const selectStyles = {
     backgroundColor: disabled ? getColor('gray100') : getColor('cardBg'),
     color: disabled ? getColor('textSecondary') : getColor('textPrimary'),
-    borderColor: hasError 
-      ? getColor('danger') 
-      : hasSuccess 
-        ? getColor('success')
-        : focused || isOpen
-          ? getColor('primary')
-          : getColor('border')
+    borderColor: hasError ?
+    getColor('danger') :
+    hasSuccess ?
+    getColor('success') :
+    focused || isOpen ?
+    getColor('primary') :
+    getColor('border')
   };
 
   const labelStyles = {
-    color: hasError 
-      ? getColor('danger')
-      : focused || hasValue || isOpen
-        ? getColor('primary')
-        : getColor('textSecondary')
+    color: hasError ?
+    getColor('danger') :
+    focused || hasValue || isOpen ?
+    getColor('primary') :
+    getColor('textSecondary')
   };
 
   return (
     <div className={`modern-select ${className}`} ref={selectRef} {...props}>
       {/* Лейбл */}
-      {label && (
-        <label 
-          className={`select-label ${focused || hasValue || isOpen ? 'focused' : ''} ${size}`}
-          style={labelStyles}
-        >
+      {label &&
+      <label
+        className={`select-label ${focused || hasValue || isOpen ? 'focused' : ''} ${size}`}
+        style={labelStyles}>
+        
           {label}
           {required && <span className="required-mark">*</span>}
         </label>
-      )}
+      }
 
       {/* Контейнер выбора */}
-      <div 
+      <div
         className={`select-container ${variant} ${size} ${focused || isOpen ? 'focused' : ''} ${hasError ? 'error' : ''} ${hasSuccess ? 'success' : ''} ${disabled ? 'disabled' : ''}`}
         style={selectStyles}
         onClick={() => !disabled && setIsOpen(!isOpen)}
+        onKeyDown={handleSelectContainerKeyDown}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         tabIndex={disabled ? -1 : 0}
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        aria-invalid={hasError}
-      >
+        aria-invalid={hasError}>
+        
         {/* Отображаемое значение */}
         <div className="select-value">
           {renderDisplayValue()}
@@ -304,30 +339,30 @@ const ModernSelect = ({
         {/* Действия */}
         <div className="select-actions">
           {/* Кнопка очистки */}
-          {clearable && hasValue && !disabled && (
-            <button
-              type="button"
-              className="select-action-btn"
-              onClick={handleClear}
-              tabIndex={-1}
-              aria-label="Очистить выбор"
-            >
+          {clearable && hasValue && !disabled &&
+          <button
+            type="button"
+            className="select-action-btn"
+            onClick={handleClear}
+            tabIndex={-1}
+            aria-label="Очистить выбор">
+            
               <X size={16} />
             </button>
-          )}
+          }
 
           {/* Индикатор состояния */}
-          {hasError && (
-            <div className="select-status error">
+          {hasError &&
+          <div className="select-status error">
               <AlertCircle size={16} />
             </div>
-          )}
+          }
           
-          {hasSuccess && (
-            <div className="select-status success">
+          {hasSuccess &&
+          <div className="select-status success">
               <CheckCircle size={16} />
             </div>
-          )}
+          }
 
           {/* Стрелка */}
           <div className={`select-arrow ${isOpen ? 'open' : ''}`}>
@@ -337,119 +372,146 @@ const ModernSelect = ({
       </div>
 
       {/* Выпадающий список */}
-      {isOpen && (
-        <div 
-          ref={dropdownRef}
-          className="select-dropdown"
-          style={{
-            backgroundColor: getColor('cardBg'),
-            borderColor: getColor('border')
-          }}
-        >
+      {isOpen &&
+      <div
+        ref={dropdownRef}
+        className="select-dropdown"
+        style={{
+          backgroundColor: getColor('cardBg'),
+          borderColor: getColor('border')
+        }}>
+        
           {/* Поиск */}
-          {searchable && (
-            <div className="select-search">
+          {searchable &&
+        <div className="select-search">
               <Search size={16} className="search-icon" />
               <input
-                ref={searchInputRef}
-                type="text"
-                className="search-input"
-                placeholder="Поиск..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  backgroundColor: 'transparent',
-                  color: getColor('textPrimary')
-                }}
-              />
+            ref={searchInputRef}
+            type="text"
+            className="search-input"
+            placeholder="Поиск..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              backgroundColor: 'transparent',
+              color: getColor('textPrimary')
+            }} />
+          
             </div>
-          )}
+        }
 
           {/* Опции */}
           <div className="select-options" role="listbox">
-            {loading ? (
-              <div className="select-loading">
+            {loading ?
+          <div className="select-loading">
                 <div className="loading-spinner" />
                 <span>Загрузка...</span>
-              </div>
-            ) : (
-              (() => {
-                const groupedOptions = getGroupedOptions();
-                const groups = Object.keys(groupedOptions);
-                
-                if (groups.length === 0 || (groups.length === 1 && groups[0] === '' && groupedOptions[''].length === 0)) {
-                  return (
-                    <div className="select-empty" style={{ color: getColor('textSecondary') }}>
+              </div> :
+
+          (() => {
+            const groupedOptions = getGroupedOptions();
+            const groups = Object.keys(groupedOptions);
+
+            if (groups.length === 0 || groups.length === 1 && groups[0] === '' && groupedOptions[''].length === 0) {
+              return (
+                <div className="select-empty" style={{ color: getColor('textSecondary') }}>
                       Нет доступных опций
-                    </div>
-                  );
-                }
+                    </div>);
+
+            }
+
+            let optionIndex = 0;
+
+            return groups.map((groupName) =>
+            <div key={groupName} className="option-group">
+                    {groupName &&
+              <div
+                className="group-header"
+                style={{ color: getColor('textSecondary') }}>
                 
-                let optionIndex = 0;
-                
-                return groups.map(groupName => (
-                  <div key={groupName} className="option-group">
-                    {groupName && (
-                      <div 
-                        className="group-header"
-                        style={{ color: getColor('textSecondary') }}
-                      >
                         {groupName}
                       </div>
-                    )}
+              }
                     {groupedOptions[groupName].map((option) => {
-                      const currentIndex = optionIndex++;
-                      return (
-                        <div
-                          key={typeof option === 'object' ? option.value : option}
-                          className={`select-option ${isOptionSelected(option) ? 'selected' : ''} ${highlightedIndex === currentIndex ? 'highlighted' : ''}`}
-                          onClick={() => handleOptionClick(option)}
-                          role="option"
-                          aria-selected={isOptionSelected(option)}
-                          style={{
-                            backgroundColor: highlightedIndex === currentIndex 
-                              ? getColor('primary') + '10' 
-                              : 'transparent',
-                            color: getColor('textPrimary')
-                          }}
-                        >
+                const currentIndex = optionIndex++;
+                return (
+                  <div
+                    key={typeof option === 'object' ? option.value : option}
+                    className={`select-option ${isOptionSelected(option) ? 'selected' : ''} ${highlightedIndex === currentIndex ? 'highlighted' : ''}`}
+                    onClick={() => handleOptionClick(option)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleOptionClick(option);
+                      }
+                    }}
+                    role="option"
+                    tabIndex={0}
+                    aria-selected={isOptionSelected(option)}
+                    style={{
+                      backgroundColor: highlightedIndex === currentIndex ?
+                      getColor('primary') + '10' :
+                      'transparent',
+                      color: getColor('textPrimary')
+                    }}>
+                    
                           {renderOptionContent(option, currentIndex)}
-                        </div>
-                      );
-                    })}
+                        </div>);
+
+              })}
                   </div>
-                ));
-              })()
-            )}
+            );
+          })()
+          }
           </div>
         </div>
-      )}
+      }
 
       {/* Сообщение об ошибке */}
-      {hasError && (
-        <div 
-          className="select-message error"
-          style={{ color: getColor('danger') }}
-        >
+      {hasError &&
+      <div
+        className="select-message error"
+        style={{ color: getColor('danger') }}>
+        
           <AlertCircle size={14} />
           <span>{error}</span>
         </div>
-      )}
+      }
 
       {/* Сообщение об успехе */}
-      {hasSuccess && (
-        <div 
-          className="select-message success"
-          style={{ color: getColor('success') }}
-        >
+      {hasSuccess &&
+      <div
+        className="select-message success"
+        style={{ color: getColor('success') }}>
+        
           <CheckCircle size={14} />
           <span>{success}</span>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
+};
+
+ModernSelect.propTypes = {
+  label: PropTypes.node,
+  placeholder: PropTypes.string,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  options: PropTypes.array,
+  error: PropTypes.node,
+  success: PropTypes.node,
+  disabled: PropTypes.bool,
+  required: PropTypes.bool,
+  searchable: PropTypes.bool,
+  multiple: PropTypes.bool,
+  clearable: PropTypes.bool,
+  loading: PropTypes.bool,
+  size: PropTypes.string,
+  variant: PropTypes.string,
+  renderOption: PropTypes.func,
+  renderValue: PropTypes.func,
+  groupBy: PropTypes.oneOfType([PropTypes.string, PropTypes.func]),
+  className: PropTypes.string
 };
 
 export default ModernSelect;
-
-

@@ -98,7 +98,10 @@ const useDoctorQueue = (doctorId = null, currentUser = null) => {
                 setStats({ waiting: 0, called: 0, served: 0, total: 0 });
             }
 
-            logger.info('[useDoctorQueue] Loaded queue:', { doctorId: resolvedDoctorId, entries: queue.length });
+            logger.info('[useDoctorQueue] Loaded queue:', {
+                doctorId: resolvedDoctorId,
+                entries: doctorQueue ? (doctorQueue.entries || []).length : 0
+            });
         } catch (err) {
             logger.error('[useDoctorQueue] Error loading queue:', err);
             setError(err.message || 'Ошибка загрузки очереди');

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
 const MacOSTextarea = React.forwardRef(({
   className,
@@ -87,7 +87,7 @@ const MacOSTextarea = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
-  const adjustHeight = () => {
+  const adjustHeight = useCallback(() => {
     if (autoResize && internalRef.current) {
       const textarea = internalRef.current;
       textarea.style.height = 'auto';
@@ -100,13 +100,13 @@ const MacOSTextarea = React.forwardRef(({
       const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
       textarea.style.height = `${newHeight}px`;
     }
-  };
+  }, [autoResize, internalRef, currentSize.lineHeight, currentSize.fontSize, minRows, maxRows]);
 
   useEffect(() => {
     if (autoResize) {
       adjustHeight();
     }
-  }, [props.value, props.defaultValue]);
+  }, [autoResize, adjustHeight, props.value, props.defaultValue]);
 
   return (
     <textarea

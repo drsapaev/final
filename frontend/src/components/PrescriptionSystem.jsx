@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
-import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../constants/appointmentStatus';
+import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 import logger from '../utils/logger';
 const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
   const [prescription, setPrescription] = useState({
-    medications: [],         // Список препаратов
-    instructions: '',        // Общие инструкции
-    doctorNotes: '',         // Заметки врача
-    isDraft: true,          // Черновик
+    medications: [], // Список препаратов
+    instructions: '', // Общие инструкции
+    doctorNotes: '', // Заметки врача
+    isDraft: true, // Черновик
     createdAt: null,
     printedAt: null
   });
@@ -27,15 +28,15 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
   const handleMedicationAdd = () => {
     const newMedication = {
       id: Date.now(),
-      name: '',              // Название препарата
-      dosage: '',            // Дозировка
-      frequency: '',         // Кратность приема
-      duration: '',          // Продолжительность
-      instructions: '',      // Инструкции по применению
-      quantity: 1            // Количество
+      name: '', // Название препарата
+      dosage: '', // Дозировка
+      frequency: '', // Кратность приема
+      duration: '', // Продолжительность
+      instructions: '', // Инструкции по применению
+      quantity: 1 // Количество
     };
-    
-    setPrescription(prev => ({
+
+    setPrescription((prev) => ({
       ...prev,
       medications: [...prev.medications, newMedication]
     }));
@@ -43,25 +44,25 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
   };
 
   const handleMedicationRemove = (id) => {
-    setPrescription(prev => ({
+    setPrescription((prev) => ({
       ...prev,
-      medications: prev.medications.filter(m => m.id !== id)
+      medications: prev.medications.filter((m) => m.id !== id)
     }));
     setHasUnsavedChanges(true);
   };
 
   const handleMedicationChange = (id, field, value) => {
-    setPrescription(prev => ({
+    setPrescription((prev) => ({
       ...prev,
-      medications: prev.medications.map(m => 
-        m.id === id ? { ...m, [field]: value } : m
+      medications: prev.medications.map((m) =>
+      m.id === id ? { ...m, [field]: value } : m
       )
     }));
     setHasUnsavedChanges(true);
   };
 
   const handleFieldChange = (field, value) => {
-    setPrescription(prev => ({
+    setPrescription((prev) => ({
       ...prev,
       [field]: value
     }));
@@ -80,7 +81,7 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
       };
 
       await onSave(prescriptionToSave);
-      setPrescription(prev => ({ ...prev, isDraft: false }));
+      setPrescription((prev) => ({ ...prev, isDraft: false }));
       setHasUnsavedChanges(false);
     } catch (error) {
       logger.error('Prescription: Save error:', error);
@@ -92,9 +93,9 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
   const handlePrintPrescription = async () => {
     try {
       await onPrint(prescription);
-      setPrescription(prev => ({ 
-        ...prev, 
-        printedAt: new Date().toISOString() 
+      setPrescription((prev) => ({
+        ...prev,
+        printedAt: new Date().toISOString()
       }));
     } catch (error) {
       logger.error('Prescription: Print error:', error);
@@ -102,10 +103,10 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
   };
 
   // Проверки доступности
-  const canCreatePrescription = emr && !emr.isDraft && 
-    (appointment?.status === APPOINTMENT_STATUS.IN_VISIT || 
-     appointment?.status === APPOINTMENT_STATUS.COMPLETED);
-  
+  const canCreatePrescription = emr && !emr.isDraft && (
+  appointment?.status === APPOINTMENT_STATUS.IN_VISIT ||
+  appointment?.status === APPOINTMENT_STATUS.COMPLETED);
+
   const canEdit = canCreatePrescription && appointment?.status !== APPOINTMENT_STATUS.COMPLETED;
 
   if (!emr) {
@@ -118,8 +119,8 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
             Рецепт можно оформить только после сохранения ЭМК
           </p>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   if (emr.isDraft) {
@@ -132,8 +133,8 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
             Сохраните ЭМК перед оформлением рецепта
           </p>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
@@ -152,22 +153,22 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
           </div>
           
           <div className="flex items-center gap-3">
-            {prescription.isDraft ? (
-              <Badge variant="warning">Черновик</Badge>
-            ) : (
-              <Badge variant="success">
+            {prescription.isDraft ?
+            <Badge variant="warning">Черновик</Badge> :
+
+            <Badge variant="success">
                 <CheckCircle className="w-4 h-4 mr-1" />
                 Сохранено
               </Badge>
-            )}
+            }
             
-            {prescription.printedAt && (
-              <Badge variant="info">Напечатан</Badge>
-            )}
+            {prescription.printedAt &&
+            <Badge variant="info">Напечатан</Badge>
+            }
             
-            {hasUnsavedChanges && (
-              <Badge variant="info">Есть изменения</Badge>
-            )}
+            {hasUnsavedChanges &&
+            <Badge variant="info">Есть изменения</Badge>
+            }
           </div>
         </div>
       </Card>
@@ -179,29 +180,29 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
           <Button
             size="sm"
             onClick={handleMedicationAdd}
-            disabled={!canEdit}
-          >
+            disabled={!canEdit}>
+            
             <Plus className="w-4 h-4 mr-2" />
             Добавить препарат
           </Button>
         </div>
 
-        {prescription.medications.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+        {prescription.medications.length === 0 ?
+        <div className="text-center py-8 text-gray-500">
             Препараты не назначены
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {prescription.medications.map((medication, index) => (
-              <div key={medication.id} className="p-4 border border-gray-200 rounded-lg">
+          </div> :
+
+        <div className="space-y-4">
+            {prescription.medications.map((medication, index) =>
+          <div key={medication.id} className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium">Препарат #{index + 1}</h4>
                   <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={() => handleMedicationRemove(medication.id)}
-                    disabled={!canEdit}
-                  >
+                size="sm"
+                variant="danger"
+                onClick={() => handleMedicationRemove(medication.id)}
+                disabled={!canEdit}>
+                
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
@@ -210,78 +211,78 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
                   <div>
                     <label className="block text-sm font-medium mb-1">Название препарата</label>
                     <input
-                      type="text"
-                      value={medication.name}
-                      onChange={(e) => handleMedicationChange(medication.id, 'name', e.target.value)}
-                      placeholder="Например: Амоксициллин"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      disabled={!canEdit}
-                    />
+                  type="text"
+                  value={medication.name}
+                  onChange={(e) => handleMedicationChange(medication.id, 'name', e.target.value)}
+                  placeholder="Например: Амоксициллин"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={!canEdit} />
+                
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Дозировка</label>
                     <input
-                      type="text"
-                      value={medication.dosage}
-                      onChange={(e) => handleMedicationChange(medication.id, 'dosage', e.target.value)}
-                      placeholder="Например: 500мг"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      disabled={!canEdit}
-                    />
+                  type="text"
+                  value={medication.dosage}
+                  onChange={(e) => handleMedicationChange(medication.id, 'dosage', e.target.value)}
+                  placeholder="Например: 500мг"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={!canEdit} />
+                
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Кратность</label>
                     <input
-                      type="text"
-                      value={medication.frequency}
-                      onChange={(e) => handleMedicationChange(medication.id, 'frequency', e.target.value)}
-                      placeholder="Например: 3 раза в день"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      disabled={!canEdit}
-                    />
+                  type="text"
+                  value={medication.frequency}
+                  onChange={(e) => handleMedicationChange(medication.id, 'frequency', e.target.value)}
+                  placeholder="Например: 3 раза в день"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={!canEdit} />
+                
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Продолжительность</label>
                     <input
-                      type="text"
-                      value={medication.duration}
-                      onChange={(e) => handleMedicationChange(medication.id, 'duration', e.target.value)}
-                      placeholder="Например: 7 дней"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      disabled={!canEdit}
-                    />
+                  type="text"
+                  value={medication.duration}
+                  onChange={(e) => handleMedicationChange(medication.id, 'duration', e.target.value)}
+                  placeholder="Например: 7 дней"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={!canEdit} />
+                
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Количество</label>
                     <input
-                      type="number"
-                      value={medication.quantity}
-                      onChange={(e) => handleMedicationChange(medication.id, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-full p-2 border border-gray-300 rounded"
-                      disabled={!canEdit}
-                    />
+                  type="number"
+                  value={medication.quantity}
+                  onChange={(e) => handleMedicationChange(medication.id, 'quantity', parseInt(e.target.value) || 1)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={!canEdit} />
+                
                   </div>
                   
                   <div className="md:col-span-2 lg:col-span-1">
                     <label className="block text-sm font-medium mb-1">Особые указания</label>
                     <input
-                      type="text"
-                      value={medication.instructions}
-                      onChange={(e) => handleMedicationChange(medication.id, 'instructions', e.target.value)}
-                      placeholder="Например: после еды"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      disabled={!canEdit}
-                    />
+                  type="text"
+                  value={medication.instructions}
+                  onChange={(e) => handleMedicationChange(medication.id, 'instructions', e.target.value)}
+                  placeholder="Например: после еды"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={!canEdit} />
+                
                   </div>
                 </div>
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
       </Card>
 
       {/* Общие инструкции */}
@@ -292,8 +293,8 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
           onChange={(e) => handleFieldChange('instructions', e.target.value)}
           placeholder="Общие рекомендации по приему препаратов..."
           className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none"
-          disabled={!canEdit}
-        />
+          disabled={!canEdit} />
+        
       </Card>
 
       {/* Заметки врача */}
@@ -304,8 +305,8 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
           onChange={(e) => handleFieldChange('doctorNotes', e.target.value)}
           placeholder="Внутренние заметки врача..."
           className="w-full h-20 p-3 border border-gray-300 rounded-lg resize-none"
-          disabled={!canEdit}
-        />
+          disabled={!canEdit} />
+        
       </Card>
 
       {/* Предпросмотр рецепта */}
@@ -322,29 +323,29 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
             </div>
             
             <div className="border-t pt-4">
-              {prescription.medications.map((med, index) => (
-                <div key={med.id} className="text-left mb-3">
+              {prescription.medications.map((med, index) =>
+              <div key={med.id} className="text-left mb-3">
                   <div className="font-medium">
                     {index + 1}. {med.name} {med.dosage}
                   </div>
                   <div className="text-sm text-gray-600">
                     {med.frequency} • {med.duration} • {med.quantity} шт.
                   </div>
-                  {med.instructions && (
-                    <div className="text-sm text-gray-500 italic">
+                  {med.instructions &&
+                <div className="text-sm text-gray-500 italic">
                       {med.instructions}
                     </div>
-                  )}
+                }
                 </div>
-              ))}
+              )}
             </div>
             
-            {prescription.instructions && (
-              <div className="border-t pt-4 text-sm">
+            {prescription.instructions &&
+            <div className="border-t pt-4 text-sm">
                 <div className="font-medium">Инструкции:</div>
                 <div>{prescription.instructions}</div>
               </div>
-            )}
+            }
             
             <div className="border-t pt-4 text-xs text-gray-500">
               Подпись врача: _________________
@@ -363,8 +364,8 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
           <div className="flex gap-3">
             <Button
               onClick={handleSavePrescription}
-              disabled={!canEdit || isSaving || prescription.medications.length === 0}
-            >
+              disabled={!canEdit || isSaving || prescription.medications.length === 0}>
+              
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Сохранение...' : 'Сохранить рецепт'}
             </Button>
@@ -372,17 +373,37 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
             <Button
               variant="outline"
               onClick={handlePrintPrescription}
-              disabled={prescription.isDraft}
-            >
+              disabled={prescription.isDraft}>
+              
               <Printer className="w-4 h-4 mr-2" />
               Печать рецепта
             </Button>
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>);
+
+};
+
+PrescriptionSystem.propTypes = {
+  appointment: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    doctor_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    status: PropTypes.string,
+    patient_name: PropTypes.string,
+    specialist: PropTypes.string,
+    prescription: PropTypes.shape({
+      medications: PropTypes.arrayOf(PropTypes.object),
+      instructions: PropTypes.string,
+      doctorNotes: PropTypes.string,
+      isDraft: PropTypes.bool
+    })
+  }),
+  emr: PropTypes.shape({
+    isDraft: PropTypes.bool
+  }),
+  onSave: PropTypes.func,
+  onPrint: PropTypes.func
 };
 
 export default PrescriptionSystem;
-

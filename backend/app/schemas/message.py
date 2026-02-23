@@ -3,9 +3,10 @@ Pydantic схемы для сообщений
 """
 
 from datetime import datetime
-from typing import Optional, List
 from enum import Enum
+
 from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict
 
 
 class MessageType(str, Enum):
@@ -18,8 +19,8 @@ class MessageCreate(BaseModel):
     """Создание нового текстового сообщения"""
     recipient_id: int = Field(..., description="ID получателя")
     content: str = Field(..., min_length=1, max_length=5000, description="Текст сообщения")
-    patient_id: Optional[int] = Field(None, description="ID пациента для связи с EMR")
-    
+    patient_id: int | None = Field(None, description="ID пациента для связи с EMR")
+
     @field_validator('content')
     @classmethod
     def validate_content(cls, v: str) -> str:
@@ -32,7 +33,7 @@ class MessageCreate(BaseModel):
 class VoiceMessageCreate(BaseModel):
     """Создание голосового сообщения"""
     recipient_id: int = Field(..., description="ID получателя")
-    patient_id: Optional[int] = Field(None, description="ID пациента для связи с EMR")
+    patient_id: int | None = Field(None, description="ID пациента для связи с EMR")
 
 
 class MessageReactionBase(BaseModel):
@@ -47,11 +48,10 @@ class MessageReactionOut(MessageReactionBase):
     """Вывод реакции"""
     id: int
     user_id: int
-    user_name: Optional[str] = None
+    user_name: str | None = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageOut(BaseModel):
@@ -60,30 +60,29 @@ class MessageOut(BaseModel):
     sender_id: int
     recipient_id: int
     message_type: str = "text"  # "text" или "voice"
-    content: Optional[str] = None
+    content: str | None = None
     is_read: bool
     created_at: datetime
-    read_at: Optional[datetime] = None
-    
+    read_at: datetime | None = None
+
     # Для голосовых сообщений
-    file_id: Optional[int] = None
-    voice_duration: Optional[int] = None  # секунды
-    file_url: Optional[str] = None  # URL для скачивания/стриминга
-    
+    file_id: int | None = None
+    voice_duration: int | None = None  # секунды
+    file_url: str | None = None  # URL для скачивания/стриминга
+
     # Дополнительные поля для UI
-    sender_name: Optional[str] = None
-    sender_role: Optional[str] = None
-    recipient_name: Optional[str] = None
-    recipient_role: Optional[str] = None
-    
+    sender_name: str | None = None
+    sender_role: str | None = None
+    recipient_name: str | None = None
+    recipient_role: str | None = None
+
     # EMR Integration
-    patient_id: Optional[int] = None
-    
+    patient_id: int | None = None
+
     # Реакции
-    reactions: List[MessageReactionOut] = []
-    
-    class Config:
-        from_attributes = True
+    reactions: list[MessageReactionOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationOut(BaseModel):
@@ -95,21 +94,20 @@ class ConversationOut(BaseModel):
     last_message_time: datetime
     unread_count: int
     is_online: bool = False
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageListResponse(BaseModel):
     """Ответ со списком сообщений"""
-    messages: List[MessageOut]
+    messages: list[MessageOut]
     total: int
     has_more: bool
 
 
 class ConversationListResponse(BaseModel):
     """Ответ со списком бесед"""
-    conversations: List[ConversationOut]
+    conversations: list[ConversationOut]
     total_unread: int
 
 

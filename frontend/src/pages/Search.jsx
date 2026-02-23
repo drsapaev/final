@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
@@ -87,8 +87,7 @@ export default function Search() {
       }
 
       setVisits(visitsData);
-    } catch (err) {
-      console.error('Search error:', err);
+    } catch {
       setError('Ошибка поиска. Попробуйте снова.');
     } finally {
       setLoading(false);
@@ -111,6 +110,12 @@ export default function Search() {
   // Navigate to visit details in registrar panel
   const goToVisit = (visit) => {
     navigate(`/registrar-panel?visitId=${visit.id}&patientId=${visit.patient_id}`);
+  };
+  const handleActivationKeyDown = (event, onActivate) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onActivate();
+    }
   };
 
   // Get status badge color
@@ -147,6 +152,7 @@ export default function Search() {
     const fetchPatientNames = async () => {
       const uniquePatientIds = [...new Set(visits.map(v => v.patient_id).filter(Boolean))];
       const namesMap = { ...patientNames };
+      let hasUpdates = false;
 
       for (const pid of uniquePatientIds) {
         if (!namesMap[pid]) {
@@ -154,20 +160,24 @@ export default function Search() {
             const res = await api.get(`/patients/${pid}`);
             if (res.data) {
               namesMap[pid] = `${res.data.last_name || ''} ${res.data.first_name || ''} ${res.data.middle_name || ''}`.trim();
+              hasUpdates = true;
             }
           } catch {
             namesMap[pid] = `Пациент #${pid}`;
+            hasUpdates = true;
           }
         }
       }
 
-      setPatientNames(namesMap);
+      if (hasUpdates) {
+        setPatientNames(namesMap);
+      }
     };
 
     if (visits.length > 0) {
       fetchPatientNames();
     }
-  }, [visits]);
+  }, [visits, patientNames]);
 
   // Filtered results based on active tab
   const showPatients = activeTab === 'all' || activeTab === 'patients';
@@ -271,7 +281,10 @@ export default function Search() {
               {patients.map(patient => (
                 <div
                   key={patient.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => goToPatient(patient)}
+                  onKeyDown={(event) => handleActivationKeyDown(event, () => goToPatient(patient))}
                   style={styles.card}
                   onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                   onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
@@ -315,7 +328,10 @@ export default function Search() {
                 return (
                   <div
                     key={visit.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => goToVisit(visit)}
+                    onKeyDown={(event) => handleActivationKeyDown(event, () => goToVisit(visit))}
                     style={styles.card}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
@@ -376,9 +392,9 @@ export default function Search() {
               <div style={styles.tip}>
                 <strong>Примеры запросов:</strong>
               </div>
-              <div style={styles.tip}>• "Иванов" — поиск по фамилии</div>
-              <div style={styles.tip}>• "+998" — поиск по телефону</div>
-              <div style={styles.tip}>• "428" — поиск по ID пациента или визита</div>
+              <div style={styles.tip}>• «Иванов» — поиск по фамилии</div>
+              <div style={styles.tip}>• «+998» — поиск по телефону</div>
+              <div style={styles.tip}>• «428» — поиск по ID пациента или визита</div>
             </div>
           </div>
         )}

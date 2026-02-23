@@ -15,6 +15,10 @@ class VisitPaymentIntegrationService:
     """Сервис для интеграции визитов с платежами"""
 
     @staticmethod
+    def _repo(db: Session) -> VisitPaymentIntegrationRepository:
+        return VisitPaymentIntegrationRepository(db)
+
+    @staticmethod
     def create_visit_from_payment(
         db: Session,
         webhook: PaymentWebhookOut,
@@ -36,7 +40,7 @@ class VisitPaymentIntegrationService:
             (success, message, visit_id)
         """
         try:
-            repository = VisitPaymentIntegrationRepository(db)
+            repo = VisitPaymentIntegrationService._repo(db)
 
             # Создаём визит с информацией о платеже
             visit_data = {
@@ -56,15 +60,11 @@ class VisitPaymentIntegrationService:
                 "created_at": datetime.utcnow(),
             }
 
-            # Выполняем вставку
-            visit_id = repository.insert_visit(visit_data)
+            visit_id = repo.insert_visit(visit_data)
             db.commit()
 
             # Обновляем статус вебхука
-            repository.update_webhook_status(
-                webhook_id=webhook.id,
-                status="visit_created",
-            )
+            repo.update_webhook_status(webhook_id=webhook.id, status="visit_created")
 
             return True, f"Визит {visit_id} создан успешно", visit_id
 
@@ -94,10 +94,10 @@ class VisitPaymentIntegrationService:
             (success, message)
         """
         try:
-            repository = VisitPaymentIntegrationRepository(db)
+            repo = VisitPaymentIntegrationService._repo(db)
 
             # Проверяем существование визита
-            visit = repository.get_visit(visit_id)
+            visit = repo.get_visit(visit_id)
 
             if not visit:
                 return False, f"Визит {visit_id} не найден"
@@ -125,7 +125,7 @@ class VisitPaymentIntegrationService:
                 update_data.update(additional_data)
 
             # Обновляем визит
-            repository.update_visit(visit_id, update_data)
+            repo.update_visit(visit_id, update_data)
             db.commit()
 
             return (
@@ -152,10 +152,8 @@ class VisitPaymentIntegrationService:
             (success, message, payment_info)
         """
         try:
-            repository = VisitPaymentIntegrationRepository(db)
-
-            # Получаем информацию о визите и платеже
-            result = repository.get_visit_payment_projection(visit_id)
+            repo = VisitPaymentIntegrationService._repo(db)
+            result = repo.get_visit_payment_projection(visit_id)
 
             if not result:
                 return False, f"Визит {visit_id} не найден", None
@@ -191,6 +189,8 @@ class VisitPaymentIntegrationService:
             (success, message)
         """
         try:
+            repo = VisitPaymentIntegrationService._repo(db)
+
             # Обновляем статус платежа
             success, message = (
                 VisitPaymentIntegrationService.update_visit_payment_status(
@@ -212,11 +212,7 @@ class VisitPaymentIntegrationService:
                 print(f"✅ Статус записи обновлён на 'paid' для визита {visit_id}")
 
             # Обновляем статус вебхука
-            repository = VisitPaymentIntegrationRepository(db)
-            repository.update_webhook_status(
-                webhook_id=webhook.id,
-                status="visit_updated",
-            )
+            repo.update_webhook_status(webhook_id=webhook.id, status="visit_updated")
 
             return True, f"Платёж для визита {visit_id} обработан успешно"
 
@@ -240,11 +236,11 @@ class VisitPaymentIntegrationService:
             (success, message, visits)
         """
         try:
-            repository = VisitPaymentIntegrationRepository(db)
-
-            # Получаем визиты с указанным статусом платежа
-            results = repository.list_visits_by_payment_status(
-                payment_status, limit=limit, offset=offset
+            repo = VisitPaymentIntegrationService._repo(db)
+            results = repo.list_visits_by_payment_status(
+                payment_status=payment_status,
+                limit=limit,
+                offset=offset,
             )
 
             visits = []
@@ -277,13 +273,11 @@ class VisitPaymentIntegrationService:
             True если запись найдена и обновлена, False иначе
         """
         try:
-            repository = VisitPaymentIntegrationRepository(db)
-            # Ищем запись по visit_id (предполагаем, что visit_id может быть в appointment)
-            # Это зависит от структуры данных - возможно нужно добавить поле visit_id в appointments
-            appointment = repository.find_appointment_by_visit_id(visit_id)
+            repo = VisitPaymentIntegrationService._repo(db)
+            appointment = repo.find_appointment_by_visit_id(visit_id)
 
             if appointment:
-                return repository.update_appointment_status(
+                return repo.update_appointment_status(
                     appointment_id=appointment.id,
                     new_status=new_status.value,
                     validate_transition=True,
@@ -323,6 +317,8 @@ class VisitPaymentIntegrationService:
         try:
             from app.schemas.appointment import AppointmentCreate
 
+            repo = VisitPaymentIntegrationService._repo(db)
+
             # Создаём запись со статусом "paid" (уже оплачена)
             appointment_data = AppointmentCreate(
                 patient_id=patient_id,
@@ -339,13 +335,11 @@ class VisitPaymentIntegrationService:
                 payment_transaction_id=webhook.transaction_id,
             )
 
-            repository = VisitPaymentIntegrationRepository(db)
-            appointment = repository.create_appointment(appointment_data)
+            appointment = repo.create_appointment(appointment_data)
 
             # Обновляем статус вебхука
-            repository.update_webhook_status(
-                webhook_id=webhook.id,
-                status="appointment_created",
+            repo.update_webhook_status(
+                webhook_id=webhook.id, status="appointment_created"
             )
 
             return True, f"Запись {appointment.id} создана успешно", appointment.id
@@ -370,15 +364,16 @@ class VisitPaymentIntegrationService:
             (success, message)
         """
         try:
-            repository = VisitPaymentIntegrationRepository(db)
+            repo = VisitPaymentIntegrationService._repo(db)
+
             # Обновляем статус записи на "paid"
-            appointment_status_updated = repository.update_appointment_status(
+            updated_appointment = repo.update_appointment_status(
                 appointment_id=appointment_id,
                 new_status=AppointmentStatus.PAID.value,
                 validate_transition=True,
             )
 
-            if not appointment_status_updated:
+            if not updated_appointment:
                 return (
                     False,
                     f"Запись {appointment_id} не найдена или не может быть обновлена",
@@ -394,16 +389,13 @@ class VisitPaymentIntegrationService:
                 "payment_processed_at": datetime.utcnow(),
             }
 
-            repository.update_appointment_fields(
+            repo.update_appointment_fields(
                 appointment_id=appointment_id,
                 values=appointment_update_data,
             )
 
             # Обновляем статус вебхука
-            repository.update_webhook_status(
-                webhook_id=webhook.id,
-                status="appointment_updated",
-            )
+            repo.update_webhook_status(webhook_id=webhook.id, status="appointment_updated")
 
             return True, f"Платёж для записи {appointment_id} обработан успешно"
 

@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from typing import List, Literal, Optional, Union
+from typing import Literal
 
 from pydantic import Field
 
@@ -11,13 +11,13 @@ ActivationStatusLiteral = Literal["issued", "trial", "active", "expired", "revok
 
 class ActivationIssueIn(ORMModel):
     days: int = Field(365, ge=1, le=3650)
-    status: Union[ActivationStatusLiteral, None] = None
-    meta: Optional[str] = None
+    status: ActivationStatusLiteral | None = None
+    meta: str | None = None
 
 
 class ActivationIssueOut(ORMModel):
     key: str
-    expiry_date: Optional[str] = None  # YYYY-MM-DD
+    expiry_date: str | None = None  # YYYY-MM-DD
     status: ActivationStatusLiteral
 
 
@@ -27,21 +27,21 @@ class ActivationActivateIn(ORMModel):
 
 class ActivationActivateOut(ORMModel):
     ok: bool
-    reason: Optional[str] = None
-    token: Optional[str] = None
-    key: Optional[str] = None
-    machine_hash: Optional[str] = None
-    expiry_date: Optional[str] = None
-    status: Optional[ActivationStatusLiteral] = None
+    reason: str | None = None
+    token: str | None = None
+    key: str | None = None
+    machine_hash: str | None = None
+    expiry_date: str | None = None
+    status: ActivationStatusLiteral | None = None
 
 
 class ActivationStatusOut(ORMModel):
     ok: bool
-    reason: Optional[str] = None
-    key: Optional[str] = None
-    expiry_date: Optional[str] = None
-    status: Optional[ActivationStatusLiteral] = None
-    machine_hash: Optional[str] = None
+    reason: str | None = None
+    key: str | None = None
+    expiry_date: str | None = None
+    status: ActivationStatusLiteral | None = None
+    machine_hash: str | None = None
 
 
 # --- Admin list/revoke/extend ---
@@ -49,16 +49,16 @@ class ActivationStatusOut(ORMModel):
 
 class ActivationListRow(ORMModel):
     key: str
-    machine_hash: Optional[str] = None
-    expiry_date: Optional[str] = None  # YYYY-MM-DD
+    machine_hash: str | None = None
+    expiry_date: str | None = None  # YYYY-MM-DD
     status: ActivationStatusLiteral
     created_at: str
     updated_at: str
-    meta: Optional[str] = None
+    meta: str | None = None
 
 
 class ActivationListOut(ORMModel):
-    items: List[ActivationListRow]
+    items: list[ActivationListRow]
     total: int
 
 

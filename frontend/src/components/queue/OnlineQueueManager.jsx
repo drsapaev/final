@@ -1,36 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Button,
-  Input,
-  Select,
-  Option,
-  Alert,
-  Badge,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Chip,
   CircularProgress,
-} from '../ui/macos';
-import {
-  QrCode,
-  RefreshCw,
-  Play,
-  Square,
-  Eye,
-  Printer,
-  Download,
-  User,
-  Phone,
-  Clock,
-  CheckCircle,
-  BarChart3,
-  X,
-} from 'lucide-react';
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import DownloadIcon from '@mui/icons-material/Download';
+import PersonIcon from '@mui/icons-material/Person';
+import PhoneIcon from '@mui/icons-material/Phone';
+import PrintIcon from '@mui/icons-material/Print';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import StartIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import TimeIcon from '@mui/icons-material/Schedule';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQueueManager } from '../../hooks/useQueueManager';
 
@@ -49,7 +56,6 @@ const OnlineQueueManager = () => {
     loadStatistics,
     openQueue,
     callPatient,
-    clearMessages,
     setError,
     setSuccess,
     setQueueData,
@@ -264,7 +270,7 @@ const OnlineQueueManager = () => {
               <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Button
                   variant="contained"
-                  startIcon={<QrIcon />}
+                  startIcon={<QrCode2Icon />}
                   onClick={() => setQrDialog(true)}
                   disabled={!selectedSpecialist || loading}
                   fullWidth

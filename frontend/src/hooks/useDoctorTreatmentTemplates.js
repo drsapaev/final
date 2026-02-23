@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import logger from '../utils/logger';
 
 /**
  * @typedef {Object} TreatmentTemplate
@@ -60,7 +61,7 @@ export function useDoctorTreatmentTemplates({
             const data = response.data;
             setTemplates(data.templates || []);
         } catch (err) {
-            console.error('[DoctorTemplates] Error fetching:', err);
+            logger.error('[DoctorTemplates] Error fetching:', err);
             setError(err.message || 'Ошибка загрузки шаблонов');
             setTemplates([]);
         } finally {
@@ -80,7 +81,7 @@ export function useDoctorTreatmentTemplates({
             await fetchTemplates(); // Refresh
             return true;
         } catch (err) {
-            console.error('[DoctorTemplates] Error pinning:', err);
+            logger.error('[DoctorTemplates] Error pinning:', err);
             return false;
         }
     }, [fetchTemplates]);
@@ -92,7 +93,7 @@ export function useDoctorTreatmentTemplates({
             await fetchTemplates(); // Refresh
             return true;
         } catch (err) {
-            console.error('[DoctorTemplates] Error unpinning:', err);
+            logger.error('[DoctorTemplates] Error unpinning:', err);
             return false;
         }
     }, [fetchTemplates]);
@@ -107,7 +108,7 @@ export function useDoctorTreatmentTemplates({
             await fetchTemplates(); // Refresh
             return true;
         } catch (err) {
-            console.error('[DoctorTemplates] Error updating:', err);
+            logger.error('[DoctorTemplates] Error updating:', err);
             return false;
         }
     }, [fetchTemplates]);
@@ -135,7 +136,7 @@ export async function deleteTemplate(templateId) {
         await api.delete(`/emr/doctor-templates/treatment/${templateId}`);
         return true;
     } catch (err) {
-        console.error('[DoctorTemplates] Error deleting:', err);
+        logger.error('[DoctorTemplates] Error deleting:', err);
         return false;
     }
 }

@@ -3,9 +3,7 @@ Firebase Cloud Messaging Service
 
 ✅ SECURITY: Real Firebase Cloud Messaging integration for push notifications
 """
-import json
 import logging
-from typing import Dict, List, Optional
 
 import requests
 
@@ -42,10 +40,10 @@ class FirebaseService:
             self.use_legacy_api = False
             logger.warning("FCM_SERVER_KEY not configured, FCM v1 API requires OAuth2")
 
-    def _get_oauth_token(self) -> Optional[str]:
+    def _get_oauth_token(self) -> str | None:
         """
         Get OAuth2 token for FCM v1 API
-        
+
         This requires service account credentials
         """
         # TODO: Implement OAuth2 token retrieval from service account
@@ -57,19 +55,19 @@ class FirebaseService:
         device_token: str,
         title: str,
         body: str,
-        data: Optional[Dict] = None,
+        data: dict | None = None,
         priority: str = "high",
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """
         Send push notification via FCM
-        
+
         Args:
             device_token: FCM device token
             title: Notification title
             body: Notification body
             data: Additional data payload
             priority: Notification priority (normal, high)
-        
+
         Returns:
             Result dict with success status
         """
@@ -103,9 +101,9 @@ class FirebaseService:
         device_token: str,
         title: str,
         body: str,
-        data: Optional[Dict] = None,
+        data: dict | None = None,
         priority: str = "high",
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """Send using FCM Legacy HTTP API"""
         payload = {
             "to": device_token,
@@ -159,9 +157,9 @@ class FirebaseService:
         device_token: str,
         title: str,
         body: str,
-        data: Optional[Dict] = None,
+        data: dict | None = None,
         priority: str = "high",
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """Send using FCM v1 API (requires OAuth2)"""
         # FCM v1 API format
         message = {
@@ -216,20 +214,20 @@ class FirebaseService:
 
     def send_multicast(
         self,
-        device_tokens: List[str],
+        device_tokens: list[str],
         title: str,
         body: str,
-        data: Optional[Dict] = None,
-    ) -> Dict[str, any]:
+        data: dict | None = None,
+    ) -> dict[str, any]:
         """
         Send notification to multiple devices
-        
+
         Args:
             device_tokens: List of FCM device tokens
             title: Notification title
             body: Notification body
             data: Additional data payload
-        
+
         Returns:
             Result dict with success/failure counts
         """
@@ -261,10 +259,10 @@ class FirebaseService:
     def validate_token(self, device_token: str) -> bool:
         """
         Validate FCM device token
-        
+
         Args:
             device_token: FCM device token to validate
-        
+
         Returns:
             True if token appears valid
         """

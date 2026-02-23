@@ -3,8 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
-import { Button, Card, CardContent, Badge, Icon } from '../ui/macos';
-import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
+import { Button, CardContent, Badge, Icon } from '../ui/macos';
+import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import QueueTable from './QueueTable';
 import logger from '../../utils/logger';
@@ -17,8 +17,7 @@ const ModernQueueManager = ({
   language = 'ru',
   doctors = [],
   onDoctorChange,
-  onDateChange,
-  searchQuery,
+  onDateChange
 }) => {
   const {
     loading,
@@ -29,8 +28,8 @@ const ModernQueueManager = ({
     generateDoctorQRCode,
     generateClinicQRCode,
     openReceptionForDoctor,
-    callNextPatientInQueue,
-    setQrData,
+    callNextPatientInQueue
+
   } = useQueueManager();
 
   const [internalDoctor, setInternalDoctor] = useState('');
@@ -87,7 +86,7 @@ const ModernQueueManager = ({
       await loadQueueSnapshot({
         specialistId: effectiveDoctor,
         targetDate: effectiveDate,
-        doctor,
+        doctor
       });
     } catch (error) {
       // Не показываем тост при автообновлении, чтобы не спамить
@@ -143,7 +142,7 @@ const ModernQueueManager = ({
         specialistId: effectiveDoctor,
         targetDate: effectiveDate,
         department: doctor?.department || doctor?.specialty || 'general',
-        specialistName: doctor?.full_name || doctor?.name,
+        specialistName: doctor?.full_name || doctor?.name
       });
       setShowQrDialog(true);
       toast.success('QR код сгенерирован');
@@ -183,7 +182,7 @@ const ModernQueueManager = ({
     try {
       const result = await openReceptionForDoctor({
         specialistId: effectiveDoctor,
-        targetDate: effectiveDate,
+        targetDate: effectiveDate
       });
 
       toast.success(result?.message || 'Прием открыт. Онлайн-набор закрыт.');
@@ -207,7 +206,7 @@ const ModernQueueManager = ({
     try {
       const result = await callNextPatientInQueue({
         specialistId: effectiveDoctor,
-        targetDate: effectiveDate,
+        targetDate: effectiveDate
       });
 
       if (result?.success && result?.patient) {
@@ -268,7 +267,7 @@ const ModernQueueManager = ({
 
     // ⭐ SSOT: Получаем список специальностей из queueProfiles (с show_on_qr_page=true)
     const allowedSpecialties = new Set(
-      queueProfiles.map(p => p.specialty?.toLowerCase())
+      queueProfiles.map((p) => p.specialty?.toLowerCase())
     );
 
     // Группируем врачей по специальности, чтобы избежать дубликатов в списке выбора очереди
@@ -312,42 +311,42 @@ const ModernQueueManager = ({
       return s;
     };
 
-    return doctors
-      .filter(d => d.specialty) // Только врачи со специальностью
-      .filter(d => {
-        // ⭐ SSOT Filter: Показываем только тех врачей, чья специальность есть в queueProfiles
-        if (allowedSpecialties.size === 0) return true; // Если профили не загружены - показываем всех
-        const normalizedSpec = normalizeSpecialty(d.specialty);
-        return allowedSpecialties.has(normalizedSpec);
-      })
-      .reduce((acc, d) => {
-        const normalizedSpec = normalizeSpecialty(d.specialty);
+    return doctors.
+    filter((d) => d.specialty) // Только врачи со специальностью
+    .filter((d) => {
+      // ⭐ SSOT Filter: Показываем только тех врачей, чья специальность есть в queueProfiles
+      if (allowedSpecialties.size === 0) return true; // Если профили не загружены - показываем всех
+      const normalizedSpec = normalizeSpecialty(d.specialty);
+      return allowedSpecialties.has(normalizedSpec);
+    }).
+    reduce((acc, d) => {
+      const normalizedSpec = normalizeSpecialty(d.specialty);
 
-        // Если специальность уже была, пропускаем (для группировки очередей)
-        // Если нужно показывать всех врачей, уберите эту проверку
-        if (seenSpecialties.has(normalizedSpec)) {
-          return acc;
-        }
-        seenSpecialties.add(normalizedSpec);
-
-        const specialtyLabel = specialtyNames[normalizedSpec] || d.specialty;
-        const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
-
-        acc.push({
-          id: d.id,
-          label: `${specialtyLabel}${cabinetInfo}`,
-          specialty: normalizedSpec
-        });
+      // Если специальность уже была, пропускаем (для группировки очередей)
+      // Если нужно показывать всех врачей, уберите эту проверку
+      if (seenSpecialties.has(normalizedSpec)) {
         return acc;
-      }, [])
-      .sort((a, b) => a.label.localeCompare(b.label));
+      }
+      seenSpecialties.add(normalizedSpec);
+
+      const specialtyLabel = specialtyNames[normalizedSpec] || d.specialty;
+      const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
+
+      acc.push({
+        id: d.id,
+        label: `${specialtyLabel}${cabinetInfo}`,
+        specialty: normalizedSpec
+      });
+      return acc;
+    }, []).
+    sort((a, b) => a.label.localeCompare(b.label));
   }, [doctors, queueProfiles]);
 
   return (
     <div className="modern-queue-manager">
       {/* Статистические карточки */}
-      {statistics && (
-        <div className="mqm-stats-grid">
+      {statistics &&
+      <div className="mqm-stats-grid">
           <div className="mqm-card mqm-stat-card">
             <div className="mqm-stat-icon primary">
               <Icon name="person" size="large" color="white" />
@@ -378,7 +377,7 @@ const ModernQueueManager = ({
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Панель управления */}
       <div className="mqm-card mqm-controls-card">
@@ -403,8 +402,8 @@ const ModernQueueManager = ({
                     onDateChange(newDate);
                   }
                 }}
-                className="mqm-input"
-              />
+                className="mqm-input" />
+
             </div>
 
             <div className="mqm-input-group">
@@ -420,18 +419,18 @@ const ModernQueueManager = ({
                     onDoctorChange(newDoctor);
                   }
                 }}
-                className="mqm-select"
-              >
+                className="mqm-select">
+
                 <option value="">Выберите специалиста</option>
-                {doctorOptions.length > 0 ? (
-                  doctorOptions.map(opt => (
-                    <option key={opt.id} value={opt.id}>
+                {doctorOptions.length > 0 ?
+                doctorOptions.map((opt) =>
+                <option key={opt.id} value={opt.id}>
                       {opt.label}
                     </option>
-                  ))
-                ) : (
-                  <option disabled>Загрузка специалистов...</option>
-                )}
+                ) :
+
+                <option disabled>Загрузка специалистов...</option>
+                }
               </select>
             </div>
 
@@ -442,8 +441,8 @@ const ModernQueueManager = ({
                 onClick={generateQR}
                 disabled={!effectiveDoctor || loading}
                 className="mqm-button-icon"
-                title="Генерировать QR для выбранного специалиста"
-              >
+                title="Генерировать QR для выбранного специалиста">
+
                 <Icon name="magnifyingglass" size="small" style={{ color: 'white' }} />
                 {t.doctorQr}
               </Button>
@@ -454,8 +453,8 @@ const ModernQueueManager = ({
                 onClick={generateClinicQR}
                 disabled={loading}
                 className="mqm-button-icon"
-                title="Генерировать общий QR код для всех специалистов клиники"
-              >
+                title="Генерировать общий QR код для всех специалистов клиники">
+
                 <Icon name="square.grid.2x2" size="small" style={{ color: 'var(--mac-text-primary)' }} />
                 {t.clinicQr}
               </Button>
@@ -471,17 +470,17 @@ const ModernQueueManager = ({
                   onClick={openReception}
                   disabled={isDisabled}
                   title={
-                    !effectiveDoctor
-                      ? 'Выберите врача'
-                      : queueData?.is_open
-                        ? 'Прием уже открыт'
-                        : 'Открыть прием и закрыть онлайн-запись'
-                  }
-                >
+                  !effectiveDoctor ?
+                  'Выберите врача' :
+                  queueData?.is_open ?
+                  'Прием уже открыт' :
+                  'Открыть прием и закрыть онлайн-запись'
+                  }>
+
                   <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
                   {t.openReception}
-                </Button>
-              );
+                </Button>);
+
             })()}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
@@ -490,23 +489,31 @@ const ModernQueueManager = ({
                 size="default"
                 onClick={loadQueue}
                 disabled={!effectiveDoctor || loading}
-                className="mqm-button-icon"
-              >
+                className="mqm-button-icon">
+
                 <Icon name="gear" size="small" style={{ color: 'var(--mac-text-primary)' }} />
                 {t.refreshQueue}
               </Button>
 
-              <div
-                style={{ cursor: 'pointer' }}
+              <button
+                type="button"
+                style={{
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}
-              >
+                title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}>
+
                 <Icon
                   name={autoRefresh ? 'arrow.clockwise.circle.fill' : 'arrow.clockwise.circle'}
                   size="medium"
-                  style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }}
-                />
-              </div>
+                  style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
+
+              </button>
             </div>
           </div>
         </div>
@@ -519,11 +526,11 @@ const ModernQueueManager = ({
             <h3 className="mqm-title">
               {t.currentQueue}
             </h3>
-            {queueData && (
-              <Badge variant={queueData.is_open ? 'success' : 'secondary'}>
+            {queueData &&
+            <Badge variant={queueData.is_open ? 'success' : 'secondary'}>
                 {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time || '09:00'}`}
               </Badge>
-            )}
+            }
           </div>
 
           <QueueTable
@@ -532,8 +539,8 @@ const ModernQueueManager = ({
             onGenerateQR={generateQR}
             onCallPatient={callPatient}
             loading={loading}
-            t={t}
-          />
+            t={t} />
+
         </CardContent>
       </div>
 
@@ -542,22 +549,22 @@ const ModernQueueManager = ({
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
         title={qrData?.is_clinic_wide ? 'Общий QR код клиники' : 'QR код для записи'}
-        maxWidth="32rem"
-      >
+        maxWidth="32rem">
+
         <div className="mqm-qr-modal-content">
           {/* Badge для типа QR */}
           <div className="mqm-qr-badge-container">
-            {qrData?.is_clinic_wide ? (
-              <Badge variant="primary" className="mqm-qr-badge">
+            {qrData?.is_clinic_wide ?
+            <Badge variant="primary" className="mqm-qr-badge">
                 <Icon name="building.2.fill" size="small" style={{ marginRight: '6px' }} />
                 Общий QR код клиники
-              </Badge>
-            ) : (
-              <Badge variant="success" className="mqm-qr-badge">
+              </Badge> :
+
+            <Badge variant="success" className="mqm-qr-badge">
                 <Icon name="person.fill" size="small" style={{ marginRight: '6px' }} />
                 QR код специалиста
               </Badge>
-            )}
+            }
           </div>
 
           {/* Информация о враче/отделении */}
@@ -574,42 +581,42 @@ const ModernQueueManager = ({
                 {qrData?.department_name || (qrData?.is_clinic_wide ? 'Клиника' : qrData?.department)}
               </span>
             </div>
-            {qrData?.target_date && (
-              <div className="mqm-qr-info-row">
+            {qrData?.target_date &&
+            <div className="mqm-qr-info-row">
                 <span className="mqm-qr-label">Дата приема:</span>
                 <span className="mqm-qr-value">
                   {new Date(qrData.target_date).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })}
                 </span>
               </div>
-            )}
+            }
           </div>
 
           {/* QR Код */}
           <div className="mqm-qr-code-container">
-            {qrData?.qr_code_base64 ? (
-              <img
-                src={qrData.qr_code_base64}
-                alt="QR Code"
-                className="mqm-qr-image"
-              />
-            ) : qrData?.token ? (
-              <QRCodeSVG
-                value={`https://med-queue.uz/queue/join?token=${qrData.token}`}
-                size={240}
-                level="H"
-                includeMargin={true}
-                className="mqm-qr-svg"
-              />
-            ) : (
-              <div className="mqm-qr-loading">
+            {qrData?.qr_code_base64 ?
+            <img
+              src={qrData.qr_code_base64}
+              alt="QR Code"
+              className="mqm-qr-image" /> :
+
+            qrData?.token ?
+            <QRCodeSVG
+              value={`https://med-queue.uz/queue/join?token=${qrData.token}`}
+              size={240}
+              level="H"
+              includeMargin={true}
+              className="mqm-qr-svg" /> :
+
+
+            <div className="mqm-qr-loading">
                 <div className="mqm-spinner"></div>
                 <span>Генерация QR кода...</span>
               </div>
-            )}
+            }
           </div>
 
           {/* Инструкция и срок действия */}
@@ -630,23 +637,23 @@ const ModernQueueManager = ({
             <Button
               variant="primary"
               onClick={downloadQR}
-              className="mqm-qr-action-btn"
-            >
+              className="mqm-qr-action-btn">
+
               <Icon name="arrow.down.circle" size="small" style={{ marginRight: '8px' }} />
               {t.download}
             </Button>
             <Button
               variant="secondary"
               onClick={() => setShowQrDialog(false)}
-              className="mqm-qr-action-btn"
-            >
+              className="mqm-qr-action-btn">
+
               {t.close || 'Закрыть'}
             </Button>
           </div>
         </div>
       </ModernDialog>
-    </div>
-  );
+    </div>);
+
 };
 
 ModernQueueManager.propTypes = {
@@ -657,7 +664,7 @@ ModernQueueManager.propTypes = {
   doctors: PropTypes.array,
   onDoctorChange: PropTypes.func,
   onDateChange: PropTypes.func,
-  searchQuery: PropTypes.string,
+  searchQuery: PropTypes.string
 };
 
 export default ModernQueueManager;

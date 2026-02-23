@@ -2,11 +2,8 @@
 Расширенный AI сервис для EMR - умные подсказки и автозаполнение
 """
 
-import asyncio
-import json
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +27,9 @@ class EMREnhancedAIService:
     async def generate_smart_template(
         self,
         specialty: str,
-        patient_data: Dict[str, Any],
-        doctor_preferences: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        patient_data: dict[str, Any],
+        doctor_preferences: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Генерация умного шаблона на основе данных пациента и предпочтений врача"""
         try:
             # Получаем базовый шаблон для специализации
@@ -57,8 +54,8 @@ class EMREnhancedAIService:
             )
 
     async def get_smart_suggestions(
-        self, current_data: Dict[str, Any], field_name: str, specialty: str = "general"
-    ) -> List[Dict[str, Any]]:
+        self, current_data: dict[str, Any], field_name: str, specialty: str = "general"
+    ) -> list[dict[str, Any]]:
         """Получить умные подсказки для конкретного поля"""
         try:
             suggestions = []
@@ -92,10 +89,10 @@ class EMREnhancedAIService:
 
     async def auto_fill_emr_fields(
         self,
-        template_structure: Dict[str, Any],
-        patient_data: Dict[str, Any],
+        template_structure: dict[str, Any],
+        patient_data: dict[str, Any],
         specialty: str = "general",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Автоматическое заполнение полей EMR на основе данных пациента"""
         try:
             filled_data = {}
@@ -117,8 +114,8 @@ class EMREnhancedAIService:
             return {}
 
     async def validate_emr_data(
-        self, emr_data: Dict[str, Any], specialty: str = "general"
-    ) -> Dict[str, Any]:
+        self, emr_data: dict[str, Any], specialty: str = "general"
+    ) -> dict[str, Any]:
         """Валидация данных EMR с AI подсказками"""
         try:
             validation_result = {
@@ -155,7 +152,7 @@ class EMREnhancedAIService:
 
     async def generate_icd10_suggestions(
         self, diagnosis_text: str, specialty: str = "general"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Генерация предложений ICD-10 кодов"""
         try:
             # Здесь будет интеграция с реальным AI API
@@ -218,8 +215,8 @@ class EMREnhancedAIService:
             return []
 
     async def _analyze_patient_data(
-        self, patient_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Анализ данных пациента для персонализации"""
         analysis = {
             "age_group": self._get_age_group(patient_data.get("age", 0)),
@@ -233,10 +230,10 @@ class EMREnhancedAIService:
 
     async def _personalize_template(
         self,
-        base_template: Dict[str, Any],
-        patient_analysis: Dict[str, Any],
-        doctor_preferences: Optional[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        base_template: dict[str, Any],
+        patient_analysis: dict[str, Any],
+        doctor_preferences: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         """Персонализация шаблона на основе анализа пациента"""
         personalized = base_template.copy()
 
@@ -258,8 +255,8 @@ class EMREnhancedAIService:
         return personalized
 
     async def _get_complaint_suggestions(
-        self, current_data: Dict[str, Any], specialty: str
-    ) -> List[Dict[str, Any]]:
+        self, current_data: dict[str, Any], specialty: str
+    ) -> list[dict[str, Any]]:
         """Получить подсказки для жалоб"""
         suggestions = []
 
@@ -279,8 +276,8 @@ class EMREnhancedAIService:
         return suggestions
 
     async def _get_diagnosis_suggestions(
-        self, current_data: Dict[str, Any], specialty: str
-    ) -> List[Dict[str, Any]]:
+        self, current_data: dict[str, Any], specialty: str
+    ) -> list[dict[str, Any]]:
         """Получить подсказки для диагнозов"""
         suggestions = []
 
@@ -308,8 +305,8 @@ class EMREnhancedAIService:
         return suggestions
 
     async def _get_treatment_suggestions(
-        self, current_data: Dict[str, Any], specialty: str
-    ) -> List[Dict[str, Any]]:
+        self, current_data: dict[str, Any], specialty: str
+    ) -> list[dict[str, Any]]:
         """Получить подсказки для лечения"""
         suggestions = []
 
@@ -335,8 +332,8 @@ class EMREnhancedAIService:
         return suggestions
 
     async def _get_medication_suggestions(
-        self, current_data: Dict[str, Any], specialty: str
-    ) -> List[Dict[str, Any]]:
+        self, current_data: dict[str, Any], specialty: str
+    ) -> list[dict[str, Any]]:
         """Получить подсказки для лекарств"""
         suggestions = []
 
@@ -353,8 +350,8 @@ class EMREnhancedAIService:
         return suggestions
 
     async def _get_procedure_suggestions(
-        self, current_data: Dict[str, Any], specialty: str
-    ) -> List[Dict[str, Any]]:
+        self, current_data: dict[str, Any], specialty: str
+    ) -> list[dict[str, Any]]:
         """Получить подсказки для процедур"""
         suggestions = []
 
@@ -366,7 +363,7 @@ class EMREnhancedAIService:
 
         return suggestions
 
-    def _get_cardiology_template(self) -> Dict[str, Any]:
+    def _get_cardiology_template(self) -> dict[str, Any]:
         """Шаблон для кардиологии"""
         return {
             "complaints": {
@@ -412,7 +409,7 @@ class EMREnhancedAIService:
             },
         }
 
-    def _get_dermatology_template(self) -> Dict[str, Any]:
+    def _get_dermatology_template(self) -> dict[str, Any]:
         """Шаблон для дерматологии"""
         return {
             "complaints": {
@@ -440,7 +437,7 @@ class EMREnhancedAIService:
             },
         }
 
-    def _get_dentistry_template(self) -> Dict[str, Any]:
+    def _get_dentistry_template(self) -> dict[str, Any]:
         """Шаблон для стоматологии"""
         return {
             "complaints": {"type": "textarea", "label": "Жалобы", "required": True},
@@ -463,7 +460,7 @@ class EMREnhancedAIService:
             },
         }
 
-    def _get_general_template(self) -> Dict[str, Any]:
+    def _get_general_template(self) -> dict[str, Any]:
         """Общий шаблон"""
         return {
             "complaints": {"type": "textarea", "label": "Жалобы", "required": True},
@@ -490,7 +487,7 @@ class EMREnhancedAIService:
         else:
             return "adult"
 
-    def _identify_risk_factors(self, patient_data: Dict[str, Any]) -> List[str]:
+    def _identify_risk_factors(self, patient_data: dict[str, Any]) -> list[str]:
         """Идентифицировать факторы риска"""
         risk_factors = []
 
@@ -503,7 +500,7 @@ class EMREnhancedAIService:
 
         return risk_factors
 
-    def _adapt_for_pediatric(self, template: Dict[str, Any]) -> Dict[str, Any]:
+    def _adapt_for_pediatric(self, template: dict[str, Any]) -> dict[str, Any]:
         """Адаптировать шаблон для педиатрии"""
         adapted = template.copy()
         adapted["growth_development"] = {
@@ -513,7 +510,7 @@ class EMREnhancedAIService:
         }
         return adapted
 
-    def _adapt_for_elderly(self, template: Dict[str, Any]) -> Dict[str, Any]:
+    def _adapt_for_elderly(self, template: dict[str, Any]) -> dict[str, Any]:
         """Адаптировать шаблон для пожилых"""
         adapted = template.copy()
         adapted["cognitive_status"] = {
@@ -523,7 +520,7 @@ class EMREnhancedAIService:
         }
         return adapted
 
-    def _get_required_fields(self, specialty: str) -> List[str]:
+    def _get_required_fields(self, specialty: str) -> list[str]:
         """Получить обязательные поля для специализации"""
         base_fields = ["complaints", "diagnosis"]
 
@@ -537,8 +534,8 @@ class EMREnhancedAIService:
             return base_fields + ["examination", "recommendations"]
 
     async def _check_logic_consistency(
-        self, emr_data: Dict[str, Any], specialty: str
-    ) -> List[str]:
+        self, emr_data: dict[str, Any], specialty: str
+    ) -> list[str]:
         """Проверить логическую целостность данных"""
         warnings = []
 
@@ -554,8 +551,8 @@ class EMREnhancedAIService:
         return warnings
 
     async def _generate_improvement_suggestions(
-        self, emr_data: Dict[str, Any], specialty: str
-    ) -> List[str]:
+        self, emr_data: dict[str, Any], specialty: str
+    ) -> list[str]:
         """Генерировать предложения по улучшению"""
         suggestions = []
 
@@ -573,8 +570,8 @@ class EMREnhancedAIService:
     async def _fill_field(
         self,
         field_name: str,
-        field_config: Dict[str, Any],
-        patient_analysis: Dict[str, Any],
+        field_config: dict[str, Any],
+        patient_analysis: dict[str, Any],
         specialty: str,
     ) -> Any:
         """Заполнить конкретное поле на основе анализа пациента"""

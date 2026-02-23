@@ -5,13 +5,12 @@
 
 import asyncio
 import base64
-import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import requests
 from sqlalchemy.orm import Session
@@ -57,7 +56,7 @@ class PrintJob:
 
     id: str
     title: str
-    content: Union[str, bytes]
+    content: str | bytes
     format: DocumentFormat
     printer_id: str
     copies: int = 1
@@ -82,7 +81,7 @@ class Printer:
     description: str
     status: PrinterStatus
     location: str = ""
-    capabilities: Dict[str, Any] = None
+    capabilities: dict[str, Any] = None
     last_seen: datetime = None
 
     def __post_init__(self):
@@ -95,12 +94,12 @@ class Printer:
 class BasePrintProvider(ABC):
     """Базовый класс для провайдеров облачной печати"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.name = self.__class__.__name__
 
     @abstractmethod
-    async def get_printers(self) -> List[Printer]:
+    async def get_printers(self) -> list[Printer]:
         """Получить список доступных принтеров"""
         pass
 
@@ -128,7 +127,7 @@ class BasePrintProvider(ABC):
 class MicrosoftUniversalPrintProvider(BasePrintProvider):
     """Провайдер Microsoft Universal Print"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         self.tenant_id = config.get("tenant_id")
         self.client_id = config.get("client_id")
@@ -167,7 +166,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             logger.error(f"Ошибка получения токена Microsoft Universal Print: {e}")
             raise
 
-    async def get_printers(self) -> List[Printer]:
+    async def get_printers(self) -> list[Printer]:
         """Получить список принтеров"""
         try:
             token = await self._get_access_token()
@@ -329,13 +328,13 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
 class GoogleCloudPrintProvider(BasePrintProvider):
     """Провайдер Google Cloud Print (Legacy - для совместимости)"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         logger.warning(
             "Google Cloud Print был закрыт в 2021 году. Используйте альтернативные провайдеры."
         )
 
-    async def get_printers(self) -> List[Printer]:
+    async def get_printers(self) -> list[Printer]:
         return []
 
     async def get_printer_status(self, printer_id: str) -> PrinterStatus:
@@ -354,7 +353,7 @@ class GoogleCloudPrintProvider(BasePrintProvider):
 class MockPrintProvider(BasePrintProvider):
     """Мок-провайдер для тестирования"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         self.printers = [
             Printer(
@@ -374,7 +373,7 @@ class MockPrintProvider(BasePrintProvider):
         ]
         self.jobs = {}
 
-    async def get_printers(self) -> List[Printer]:
+    async def get_printers(self) -> list[Printer]:
         return self.printers
 
     async def get_printer_status(self, printer_id: str) -> PrinterStatus:
@@ -438,7 +437,7 @@ class CloudPrintingService:
             f"Инициализированы провайдеры печати: {list(self.providers.keys())}"
         )
 
-    async def get_all_printers(self) -> Dict[str, List[Printer]]:
+    async def get_all_printers(self) -> dict[str, list[Printer]]:
         """Получить принтеры от всех провайдеров"""
         all_printers = {}
 
@@ -455,7 +454,7 @@ class CloudPrintingService:
 
     async def get_printer_by_id(
         self, provider_name: str, printer_id: str
-    ) -> Optional[Printer]:
+    ) -> Printer | None:
         """Получить принтер по ID"""
         if provider_name not in self.providers:
             return None
@@ -475,12 +474,12 @@ class CloudPrintingService:
         provider_name: str,
         printer_id: str,
         title: str,
-        content: Union[str, bytes],
+        content: str | bytes,
         format: DocumentFormat,
         copies: int = 1,
         color: bool = False,
         duplex: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Печать документа"""
         if provider_name not in self.providers:
             logger.error(f"Провайдер {provider_name} не найден")
@@ -509,7 +508,7 @@ class CloudPrintingService:
 
     async def get_job_status(
         self, provider_name: str, job_id: str
-    ) -> Optional[PrintJobStatus]:
+    ) -> PrintJobStatus | None:
         """Получить статус задания печати"""
         if provider_name not in self.providers:
             return None
@@ -538,9 +537,9 @@ class CloudPrintingService:
         provider_name: str,
         printer_id: str,
         document_type: str,
-        patient_data: Dict[str, Any],
-        template_data: Dict[str, Any] = None,
-    ) -> Optional[str]:
+        patient_data: dict[str, Any],
+        template_data: dict[str, Any] = None,
+    ) -> str | None:
         """Печать медицинского документа"""
         try:
             # Генерация содержимого документа на основе типа
@@ -571,7 +570,7 @@ class CloudPrintingService:
             return None
 
     def _generate_prescription(
-        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+        self, patient_data: dict[str, Any], template_data: dict[str, Any]
     ) -> str:
         """Генерация рецепта"""
         return f"""
@@ -609,7 +608,7 @@ class CloudPrintingService:
         """
 
     def _generate_receipt(
-        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+        self, patient_data: dict[str, Any], template_data: dict[str, Any]
     ) -> str:
         """Генерация чека"""
         services = template_data.get('services', [])
@@ -640,7 +639,7 @@ class CloudPrintingService:
             <h2>ЧЕК</h2>
             <p>Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}</p>
             <p>Пациент: {patient_data.get('patient_name', 'Не указано')}</p>
-            
+
             <table>
                 <tr>
                     <th>Услуга</th>
@@ -652,14 +651,14 @@ class CloudPrintingService:
                     <td>{total} сум</td>
                 </tr>
             </table>
-            
+
             <p style="margin-top: 20px;">Спасибо за обращение!</p>
         </body>
         </html>
         """
 
     def _generate_ticket(
-        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+        self, patient_data: dict[str, Any], template_data: dict[str, Any]
     ) -> str:
         """Генерация талона"""
         return f"""
@@ -687,7 +686,7 @@ class CloudPrintingService:
         """
 
     def _generate_report(
-        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+        self, patient_data: dict[str, Any], template_data: dict[str, Any]
     ) -> str:
         """Генерация отчета"""
         return f"""
@@ -706,24 +705,24 @@ class CloudPrintingService:
                 <h1>МЕДИЦИНСКИЙ ОТЧЕТ</h1>
                 <p>Дата: {datetime.now().strftime('%d.%m.%Y')}</p>
             </div>
-            
+
             <div class="section">
                 <h3>Информация о пациенте</h3>
                 <p><strong>ФИО:</strong> {patient_data.get('patient_name', 'Не указано')}</p>
                 <p><strong>Возраст:</strong> {patient_data.get('age', 'Не указано')}</p>
                 <p><strong>Телефон:</strong> {patient_data.get('phone', 'Не указано')}</p>
             </div>
-            
+
             <div class="section">
                 <h3>Результаты обследования</h3>
                 <p>{template_data.get('examination_results', 'Результаты не указаны')}</p>
             </div>
-            
+
             <div class="section">
                 <h3>Заключение</h3>
                 <p>{template_data.get('conclusion', 'Заключение не указано')}</p>
             </div>
-            
+
             <div style="margin-top: 50px;">
                 <p>Врач: {template_data.get('doctor_name', 'Не указано')}</p>
                 <p>Подпись: ________________</p>

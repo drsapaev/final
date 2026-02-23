@@ -4,14 +4,13 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
-from app.models.user import User
 from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ class DoctorInfoService:
 
     # ===================== ИНФОРМАЦИЯ О ВРАЧАХ =====================
 
-    def get_doctor_full_info(self, doctor_id: int) -> Dict[str, Any]:
+    def get_doctor_full_info(self, doctor_id: int) -> dict[str, Any]:
         """Получает полную информацию о враче"""
         try:
             doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
@@ -92,7 +91,7 @@ class DoctorInfoService:
                 "is_active": False,
             }
 
-    def get_doctor_by_user_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_doctor_by_user_id(self, user_id: int) -> dict[str, Any] | None:
         """Получает информацию о враче по ID пользователя"""
         try:
             doctor = self.db.query(Doctor).filter(Doctor.user_id == user_id).first()
@@ -105,7 +104,7 @@ class DoctorInfoService:
 
     def get_doctors_by_specialization(
         self, specialization: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Получает список врачей по специализации"""
         try:
             doctors = (
@@ -128,7 +127,7 @@ class DoctorInfoService:
 
     # ===================== ИНФОРМАЦИЯ ОБ ОТДЕЛЕНИЯХ =====================
 
-    def get_department_info(self, specialty: str) -> Optional[Dict[str, Any]]:
+    def get_department_info(self, specialty: str) -> dict[str, Any] | None:
         """Получает информацию об отделении по специальности"""
         try:
             if not specialty:
@@ -157,7 +156,7 @@ class DoctorInfoService:
                 "name": department_names.get(specialty, specialty.title()),
                 "doctors_count": len(doctors),
                 "active_doctors": [d.id for d in doctors if d.active],
-                "cabinets": list(set([d.cabinet for d in doctors if d.cabinet])),
+                "cabinets": list({d.cabinet for d in doctors if d.cabinet}),
                 "description": f"Отделение {department_names.get(specialty, specialty)}",
             }
 
@@ -165,7 +164,7 @@ class DoctorInfoService:
             logger.error(f"Ошибка получения информации об отделении {specialty}: {e}")
             return None
 
-    def get_department_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_department_by_name(self, name: str) -> dict[str, Any] | None:
         """Получает отделение по названию"""
         try:
             # Маппинг названий на специальности
@@ -186,7 +185,7 @@ class DoctorInfoService:
             logger.error(f"Ошибка получения отделения по названию {name}: {e}")
             return None
 
-    def get_all_departments(self) -> List[Dict[str, Any]]:
+    def get_all_departments(self) -> list[dict[str, Any]]:
         """Получает список всех отделений"""
         try:
             # Получаем уникальные специальности
@@ -213,7 +212,7 @@ class DoctorInfoService:
 
     def get_appointment_doctor_info(
         self, appointment_id: int, appointment_type: str = "appointment"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Получает информацию о враче для записи"""
         try:
             if appointment_type == "visit":
@@ -262,7 +261,7 @@ class DoctorInfoService:
                 "department": {"name": "Неизвестно"},
             }
 
-    def get_doctors_by_department(self, department_name: str) -> List[Dict[str, Any]]:
+    def get_doctors_by_department(self, department_name: str) -> list[dict[str, Any]]:
         """Получает врачей по названию отделения"""
         try:
             # Сначала находим отделение
@@ -277,7 +276,7 @@ class DoctorInfoService:
             logger.error(f"Ошибка получения врачей отделения {department_name}: {e}")
             return []
 
-    def format_doctor_info_for_notification(self, doctor_info: Dict[str, Any]) -> str:
+    def format_doctor_info_for_notification(self, doctor_info: dict[str, Any]) -> str:
         """Форматирует информацию о враче для уведомления"""
         try:
             name = doctor_info.get("full_name", "Неизвестный врач")
@@ -305,7 +304,7 @@ class DoctorInfoService:
             return doctor_info.get("full_name", "Неизвестный врач")
 
     def format_department_info_for_notification(
-        self, department_info: Dict[str, Any]
+        self, department_info: dict[str, Any]
     ) -> str:
         """Форматирует информацию об отделении для уведомления"""
         try:
@@ -324,7 +323,7 @@ class DoctorInfoService:
 
     # ===================== КЭШИРОВАНИЕ =====================
 
-    def get_cached_doctor_info(self, doctor_id: int) -> Dict[str, Any]:
+    def get_cached_doctor_info(self, doctor_id: int) -> dict[str, Any]:
         """Получает информацию о враче с кэшированием"""
         # Здесь можно добавить кэширование через Redis или память
         # Пока возвращаем обычную информацию

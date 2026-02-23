@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 const MacOSRadio = React.forwardRef(({
   className,
@@ -15,6 +16,7 @@ const MacOSRadio = React.forwardRef(({
   value,
   ...props
 }, ref) => {
+  void name;
   const sizeStyles = {
     sm: {
       width: '16px',
@@ -100,7 +102,7 @@ const MacOSRadio = React.forwardRef(({
     lineHeight: '1.4'
   };
 
-  const handleClick = (e) => {
+  const handleClick = () => {
     if (!disabled && onChange) {
       onChange(value);
     }
@@ -115,38 +117,53 @@ const MacOSRadio = React.forwardRef(({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <div 
+      <div
         style={{ display: 'flex', alignItems: 'flex-start' }}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         tabIndex={disabled ? -1 : 0}
         role="radio"
         aria-checked={checked}
-        aria-disabled={disabled}
-      >
+        aria-disabled={disabled}>
+        
         <div
           ref={ref}
           className={className}
           style={radioStyle}
-          {...props}
-        >
+          {...props}>
+          
           <div style={dotStyle} />
         </div>
-        {label && (
-          <label style={labelStyle}>
+        {label &&
+        <label style={labelStyle}>
             {label}
           </label>
-        )}
+        }
       </div>
-      {description && (
-        <div style={descriptionStyle}>
+      {description &&
+      <div style={descriptionStyle}>
           {description}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 });
 
 MacOSRadio.displayName = 'MacOSRadio';
+
+MacOSRadio.propTypes = {
+  className: PropTypes.string,
+  style: PropTypes.object,
+  size: PropTypes.oneOf(['sm', 'md', 'lg']),
+  variant: PropTypes.oneOf(['default', 'filled', 'error']),
+  error: PropTypes.bool,
+  disabled: PropTypes.bool,
+  label: PropTypes.node,
+  description: PropTypes.node,
+  checked: PropTypes.bool,
+  onChange: PropTypes.func,
+  name: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+};
 
 export default MacOSRadio;

@@ -5,9 +5,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-
-from sqlalchemy.orm import Session
+from typing import Any
 
 from ...db.session import get_db
 from ...models.user import User
@@ -184,8 +182,8 @@ class TelegramNotificationService:
         self,
         user_id: int,
         change_type: str,  # "cancelled", "rescheduled", "doctor_changed"
-        old_data: Dict[str, Any],
-        new_data: Optional[Dict[str, Any]] = None,
+        old_data: dict[str, Any],
+        new_data: dict[str, Any] | None = None,
     ) -> bool:
         """Уведомление об изменении в расписании"""
         try:
@@ -248,8 +246,8 @@ class TelegramNotificationService:
             db.close()
 
     async def send_bulk_notification(
-        self, user_ids: List[int], message: str, delay_seconds: float = 0.1
-    ) -> Dict[str, int]:
+        self, user_ids: list[int], message: str, delay_seconds: float = 0.1
+    ) -> dict[str, int]:
         """Массовая рассылка уведомлений"""
         results = {"sent": 0, "failed": 0}
 

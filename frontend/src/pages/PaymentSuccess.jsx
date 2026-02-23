@@ -1,16 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Button,
-  Alert,
+  Chip,
   CircularProgress,
-  Badge
-} from '../components/ui/macos';
-import { CheckCircle as CheckIcon, Download as DownloadIcon, Home as HomeIcon, Receipt as ReceiptIcon, Printer as PrintIcon, Share as ShareIcon } from 'lucide-react';
+  Grid,
+  Paper,
+  Typography,
+} from '@mui/material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import DownloadIcon from '@mui/icons-material/Download';
+import HomeIcon from '@mui/icons-material/Home';
+import PrintIcon from '@mui/icons-material/Print';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import ShareIcon from '@mui/icons-material/Share';
 
 // API клиент
 import { api as apiClient } from '../api/client';
@@ -28,19 +35,22 @@ const PaymentSuccess = () => {
 
   // Получаем параметры из URL
   const paymentId = searchParams.get('payment_id');
-  const transactionId = searchParams.get('transaction_id');
-  const status = searchParams.get('status');
 
-  useEffect(() => {
-    if (paymentId) {
-      loadPaymentDetails();
-    } else {
-      setError('Не указан ID платежа');
-      setLoading(false);
+  const generateReceipt = useCallback(async () => {
+    try {
+      const response = await apiClient.post(`/payments/${paymentId}/receipt`, {
+        format: 'pdf'
+      });
+      
+      if (response.data?.receipt_url) {
+        setReceiptUrl(response.data.receipt_url);
+      }
+    } catch (err) {
+      logger.warn('Не удалось сгенерировать квитанцию:', err);
     }
   }, [paymentId]);
 
-  const loadPaymentDetails = async () => {
+  const loadPaymentDetails = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -62,21 +72,16 @@ const PaymentSuccess = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [paymentId, generateReceipt]);
 
-  const generateReceipt = async () => {
-    try {
-      const response = await apiClient.post(`/payments/${paymentId}/receipt`, {
-        format: 'pdf'
-      });
-      
-      if (response.data?.receipt_url) {
-        setReceiptUrl(response.data.receipt_url);
-      }
-    } catch (err) {
-      logger.warn('Не удалось сгенерировать квитанцию:', err);
+  useEffect(() => {
+    if (paymentId) {
+      loadPaymentDetails();
+    } else {
+      setError('Не указан ID платежа');
+      setLoading(false);
     }
-  };
+  }, [loadPaymentDetails, paymentId]);
 
   const downloadReceipt = () => {
     if (receiptUrl) {

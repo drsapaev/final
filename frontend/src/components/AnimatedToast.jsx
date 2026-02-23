@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { designTokens, getColor } from '../design-system';
+import { useState, useEffect, useCallback } from 'react';
+import { getColor } from '../design-system';
 
 const AnimatedToast = ({
   message,
@@ -12,6 +12,14 @@ const AnimatedToast = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+
+  const handleClose = useCallback(() => {
+    setIsLeaving(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      if (onClose) onClose();
+    }, 300);
+  }, [onClose]);
 
   useEffect(() => {
     // Показываем toast с задержкой
@@ -28,15 +36,7 @@ const AnimatedToast = ({
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
     };
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsLeaving(true);
-    setTimeout(() => {
-      setIsVisible(false);
-      if (onClose) onClose();
-    }, 300);
-  };
+  }, [duration, handleClose]);
 
   const getTypeStyles = () => {
     const typeStyles = {
@@ -89,9 +89,9 @@ const AnimatedToast = ({
     justifyContent: 'space-between',
     gap: '12px',
     opacity: isVisible && !isLeaving ? 1 : 0,
-    transform: isVisible && !isLeaving 
-      ? 'translateY(0) scale(1)' 
-      : 'translateY(-20px) scale(0.95)',
+    transform: isVisible && !isLeaving ?
+    'translateY(0) scale(1)' :
+    'translateY(-20px) scale(0.95)',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     ...getTypeStyles(),
     ...getPositionStyles(),
@@ -121,19 +121,18 @@ const AnimatedToast = ({
       className={`animated-toast ${className}`}
       style={toastStyles}
       role="alert"
-      aria-live="polite"
-    >
+      aria-live="polite">
+      
       <span style={{ flex: 1 }}>{message}</span>
       <button
         style={closeButtonStyles}
         onClick={handleClose}
-        aria-label="Закрыть уведомление"
-      >
+        aria-label="Закрыть уведомление">
+        
         ×
       </button>
-    </div>
-  );
+    </div>);
+
 };
 
 export default AnimatedToast;
-

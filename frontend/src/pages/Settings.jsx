@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
-import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
+
 import PhoneVerification from '../components/auth/PhoneVerification';
 
 import logger from '../utils/logger';
@@ -20,8 +21,8 @@ function TabButton({ active, onClick, children }) {
     transition: 'all 0.2s ease'
   };
   return (
-    <button onClick={onClick} style={st}>{children}</button>
-  );
+    <button onClick={onClick} style={st}>{children}</button>);
+
 }
 
 function Row({ k, v, onSave }) {
@@ -32,8 +33,8 @@ function Row({ k, v, onSave }) {
       <div style={{ fontWeight: 600 }}>{k}</div>
       <input value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(k, val)} style={btn}>Сохранить</button>
-    </div>
-  );
+    </div>);
+
 }
 
 /**
@@ -42,9 +43,9 @@ function Row({ k, v, onSave }) {
  *  - Вкладка "printer": простые пары key/value (если backend поддерживает PUT /settings)
  *  - Вкладка "online_queue": простые пары key/value
  */
-export default function Settings() {
-  const { isDark, isLight, getColor, getSpacing } = useTheme();
-  const [page, setPage] = useState('Settings');
+export default function Settings() {void
+  useTheme();void
+  useState('Settings');
   const [tab, setTab] = useState('license');
 
   // license tab
@@ -131,8 +132,8 @@ export default function Settings() {
     }
   }
 
-  useEffect(() => { if (tab === 'license') loadStatus(); }, [tab]);
-  useEffect(() => { if (tab === 'payment_providers') loadProviders(); }, [tab]);
+  useEffect(() => {if (tab === 'license') loadStatus();}, [tab]);
+  useEffect(() => {if (tab === 'payment_providers') loadProviders();}, [tab]);
 
   // generic category settings (printer / online_queue)
   const [cat, setCat] = useState('printer');
@@ -147,13 +148,13 @@ export default function Settings() {
       // Ожидаем форму {items:[{key,value}]} или массив объектов
       const res = await api.get('/settings', { params: { category } });
       let arr = [];
-      if (Array.isArray(res?.items)) arr = res.items;
-      else if (Array.isArray(res)) arr = res;
-      else if (res && typeof res === 'object') {
+      if (Array.isArray(res?.items)) arr = res.items;else
+      if (Array.isArray(res)) arr = res;else
+      if (res && typeof res === 'object') {
         // возможный словарь
         arr = Object.entries(res).map(([k, v]) => ({ key: k, value: v }));
       }
-      setItems(arr.map(x => ({ key: x.key ?? x.name ?? '', value: x.value ?? '' })));
+      setItems(arr.map((x) => ({ key: x.key ?? x.name ?? '', value: x.value ?? '' })));
     } catch (e) {
       setErrCat(e?.data?.detail || e?.message || 'Ошибка загрузки настроек');
       setItems([]);
@@ -173,7 +174,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (tab === 'printer' || tab === 'online_queue' || tab === 'display_board') {
-      const c = tab === 'printer' ? 'printer' : (tab === 'online_queue' ? 'online_queue' : 'display_board');
+      const c = tab === 'printer' ? 'printer' : tab === 'online_queue' ? 'online_queue' : 'display_board';
       setCat(c);
       loadCat(c);
     }
@@ -190,9 +191,9 @@ export default function Settings() {
         color: licenseOk ? '#065f46' : '#7f1d1d',
         border: `1px solid ${licenseOk ? '#a7f3d0' : '#fecaca'}`,
         fontSize: 12,
-        whiteSpace: 'nowrap',
-      }}>{st}</span>
-    );
+        whiteSpace: 'nowrap'
+      }}>{st}</span>);
+
   }, [status, licenseOk]);
 
   return (
@@ -211,17 +212,17 @@ export default function Settings() {
             <TabButton active={tab === 'security'} onClick={() => setTab('security')}>Безопасность</TabButton>
           </div>
 
-          {tab === 'notifications' && (
-            <div style={{ display: 'grid', gap: 12 }}>
+          {tab === 'notifications' &&
+          <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: 12 }}>Статус системы уведомлений</div>
                 <NotificationSystemStatus />
               </div>
             </div>
-          )}
+          }
 
-          {tab === 'license' && (
-            <div style={{ display: 'grid', gap: 12 }}>
+          {tab === 'license' &&
+          <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Статус активации</div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -237,11 +238,11 @@ export default function Settings() {
                 {errAct && <div style={errBox}>{String(errAct)}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <input
-                    placeholder="Вставьте ключ активации"
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                    style={{ ...inp, minWidth: 320 }}
-                  />
+                  placeholder="Вставьте ключ активации"
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  style={{ ...inp, minWidth: 320 }} />
+                
                   <button onClick={doActivate} disabled={busyAct || !key.trim()} style={btnPrimary}>
                     {busyAct ? '...' : 'Активировать'}
                   </button>
@@ -252,10 +253,10 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-          )}
+          }
 
-          {(tab === 'printer' || tab === 'online_queue' || tab === 'display_board') && (
-            <div style={{ display: 'grid', gap: 12 }}>
+          {(tab === 'printer' || tab === 'online_queue' || tab === 'display_board') &&
+          <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>
                   Категория: <code>{cat}</code>
@@ -263,22 +264,22 @@ export default function Settings() {
                 {busyCat && <div style={{ opacity: .7 }}>Загрузка…</div>}
                 {errCat && <div style={errBox}>{String(errCat)}</div>}
                 <div style={{ display: 'grid', gap: 8 }}>
-                  {items.map((it) => (
-                    <Row
-                      key={it.key}
-                      k={it.key}
-                      v={it.value}
-                      onSave={(k, v) => saveKV(cat, k, v)}
-                    />
-                  ))}
-                  {!busyCat && items.length === 0 && (
-                    <div style={{ opacity: .7 }}>Записей нет</div>
-                  )}
+                  {items.map((it) =>
+                <Row
+                  key={it.key}
+                  k={it.key}
+                  v={it.value}
+                  onSave={(k, v) => saveKV(cat, k, v)} />
+
+                )}
+                  {!busyCat && items.length === 0 &&
+                <div style={{ opacity: .7 }}>Записей нет</div>
+                }
                 </div>
               </div>
 
-              {tab === 'display_board' && (
-                <>
+              {tab === 'display_board' &&
+            <>
                   <div style={card}>
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: бренд и объявления</div>
                     <div style={{ display: 'grid', gap: 8 }}>
@@ -301,70 +302,70 @@ export default function Settings() {
                     <RoleMapEditor items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                   </div>
                 </>
-              )}
+            }
 
-              {tab === 'payment_providers' && (
-                <div style={{ display: 'grid', gap: 12 }}>
+              {tab === 'payment_providers' &&
+            <div style={{ display: 'grid', gap: 12 }}>
                   <div style={card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div style={{ fontWeight: 700 }}>Провайдеры оплаты</div>
                       <button
-                        onClick={() => setShowAddProvider(true)}
-                        style={{
-                          padding: '8px 16px',
-                          background: 'var(--accent-color)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          cursor: 'pointer'
-                        }}
-                      >
+                    onClick={() => setShowAddProvider(true)}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'var(--accent-color)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: 'pointer'
+                    }}>
+                    
                         + Добавить провайдера
                       </button>
                     </div>
 
-                    {loadingProviders ? (
-                      <div style={{ opacity: 0.7 }}>Загрузка...</div>
-                    ) : (
-                      <div style={{ display: 'grid', gap: 8 }}>
-                        {providers.map((provider) => (
-                          <ProviderCard
-                            key={provider.id}
-                            provider={provider}
-                            onEdit={() => setEditingProvider(provider)}
-                            onDelete={() => deleteProvider(provider.id)}
-                          />
-                        ))}
-                        {providers.length === 0 && (
-                          <div style={{ opacity: 0.7 }}>Провайдеры не найдены</div>
-                        )}
+                    {loadingProviders ?
+                <div style={{ opacity: 0.7 }}>Загрузка...</div> :
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                        {providers.map((provider) =>
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    onEdit={() => setEditingProvider(provider)}
+                    onDelete={() => deleteProvider(provider.id)} />
+
+                  )}
+                        {providers.length === 0 &&
+                  <div style={{ opacity: 0.7 }}>Провайдеры не найдены</div>
+                  }
                       </div>
-                    )}
+                }
                   </div>
                 </div>
-              )}
+            }
 
-              {showAddProvider && (
-                <ProviderModal
-                  onClose={() => setShowAddProvider(false)}
-                  onSave={createProvider}
-                  title="Добавить провайдера"
-                />
-              )}
+              {showAddProvider &&
+            <ProviderModal
+              onClose={() => setShowAddProvider(false)}
+              onSave={createProvider}
+              title="Добавить провайдера" />
 
-              {editingProvider && (
-                <ProviderModal
-                  provider={editingProvider}
-                  onClose={() => setEditingProvider(null)}
-                  onSave={(data) => updateProvider(editingProvider.id, data)}
-                  title="Редактировать провайдера"
-                />
-              )}
+            }
+
+              {editingProvider &&
+            <ProviderModal
+              provider={editingProvider}
+              onClose={() => setEditingProvider(null)}
+              onSave={(data) => updateProvider(editingProvider.id, data)}
+              title="Редактировать провайдера" />
+
+            }
             </div>
-          )}
+          }
 
-          {tab === 'security' && (
-            <div style={{ display: 'grid', gap: 12 }}>
+          {tab === 'security' &&
+          <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: 12 }}>Двухфакторная аутентификация (2FA)</div>
                 <TwoFactorManager />
@@ -373,17 +374,17 @@ export default function Settings() {
               <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: 12 }}>Верификация телефона</div>
                 <PhoneVerification
-                  showPhoneInput={true}
-                  title="Верификация телефона"
-                  onVerified={() => alert('Телефон успешно подтверждён!')}
-                />
+                showPhoneInput={true}
+                title="Верификация телефона"
+                onVerified={() => alert('Телефон успешно подтверждён!')} />
+              
               </div>
             </div>
-          )}
+          }
         </div>
       </RoleGate>
-    </div>
-  );
+    </div>);
+
 }
 
 // Компонент карточки провайдера
@@ -409,8 +410,8 @@ function ProviderCard({ provider, onEdit, onDelete }) {
               borderRadius: 4,
               cursor: 'pointer',
               fontSize: '12px'
-            }}
-          >
+            }}>
+            
             Редактировать
           </button>
           <button
@@ -423,8 +424,8 @@ function ProviderCard({ provider, onEdit, onDelete }) {
               borderRadius: 4,
               cursor: 'pointer',
               fontSize: '12px'
-            }}
-          >
+            }}>
+            
             Удалить
           </button>
         </div>
@@ -434,8 +435,8 @@ function ProviderCard({ provider, onEdit, onDelete }) {
         <div>Активен: {provider.is_active ? 'Да' : 'Нет'}</div>
         {provider.description && <div>Описание: {provider.description}</div>}
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 // Модальное окно для добавления/редактирования провайдера
@@ -492,8 +493,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               fontSize: '20px',
               cursor: 'pointer',
               color: 'var(--text-primary)'
-            }}
-          >
+            }}>
+            
             ×
           </button>
         </div>
@@ -513,8 +514,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 borderRadius: 6,
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div>
@@ -531,8 +532,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 borderRadius: 6,
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div>
@@ -549,8 +550,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)',
                 resize: 'vertical'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div>
@@ -567,8 +568,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 borderRadius: 6,
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div>
@@ -584,8 +585,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 borderRadius: 6,
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div>
@@ -601,8 +602,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 borderRadius: 6,
                 background: 'var(--bg-primary)',
                 color: 'var(--text-primary)'
-              }}
-            />
+              }} />
+            
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -610,8 +611,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               type="checkbox"
               id="is_active"
               checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-            />
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
+            
             <label htmlFor="is_active" style={{ fontWeight: 600 }}>Активен</label>
           </div>
 
@@ -626,8 +627,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 border: '1px solid var(--border-color)',
                 borderRadius: 6,
                 cursor: 'pointer'
-              }}
-            >
+              }}>
+              
               Отмена
             </button>
             <button
@@ -639,15 +640,15 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 border: 'none',
                 borderRadius: 6,
                 cursor: 'pointer'
-              }}
-            >
+              }}>
+              
               Сохранить
             </button>
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 // Стили с использованием CSS переменных
@@ -708,8 +709,8 @@ function KVField({ label, defKey, items, onSave }) {
       <div style={{ fontWeight: 600 }}>{label}</div>
       <input value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(defKey, val)} style={btn}>Сохранить</button>
-    </div>
-  );
+    </div>);
+
 }
 
 // Отдельный компонент для роли чтобы избежать hooks в map
@@ -725,28 +726,70 @@ function RoleMapItem({ role, items, onSave }) {
         value={val}
         onChange={(e) => setVal(e.target.value)}
         style={inp}
-        placeholder="Например: Cardio"
-      />
+        placeholder="Например: Cardio" />
+      
       <button onClick={() => onSave(role, val)} style={btn}>
         Сохранить
       </button>
-    </div>
-  );
+    </div>);
+
 }
 
 function RoleMapEditor({ items, onSave }) {
   const roles = ['admin', 'registrar', 'doctor', 'cardio', 'derma', 'dentist', 'lab', 'procedures', 'cashier', 'patient'];
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      {roles.map((r) => (
-        <RoleMapItem
-          key={r}
-          role={r}
-          items={items}
-          onSave={onSave}
-        />
-      ))}
-    </div>
-  );
+      {roles.map((r) =>
+      <RoleMapItem
+        key={r}
+        role={r}
+        items={items}
+        onSave={onSave} />
+
+      )}
+    </div>);
+
 }
 
+TabButton.propTypes = {
+  active: PropTypes.bool,
+  onClick: PropTypes.func,
+  children: PropTypes.node
+};
+
+Row.propTypes = {
+  k: PropTypes.node,
+  v: PropTypes.any,
+  onSave: PropTypes.func
+};
+
+ProviderCard.propTypes = {
+  provider: PropTypes.object,
+  onEdit: PropTypes.func,
+  onDelete: PropTypes.func
+};
+
+ProviderModal.propTypes = {
+  provider: PropTypes.object,
+  onClose: PropTypes.func,
+  onSave: PropTypes.func,
+  title: PropTypes.node
+};
+
+KVField.propTypes = {
+  label: PropTypes.node,
+  defKey: PropTypes.string,
+  items: PropTypes.array,
+  onSave: PropTypes.func
+};
+
+RoleMapItem.propTypes = {
+  role: PropTypes.string,
+  items: PropTypes.array,
+  onSave: PropTypes.func
+};
+
+RoleMapEditor.propTypes = {
+  items: PropTypes.array,
+  onSave: PropTypes.func
+};

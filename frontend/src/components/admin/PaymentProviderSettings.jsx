@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Settings,
   CreditCard,
@@ -54,12 +54,7 @@ const PaymentProviderSettings = () => {
 
   const [testResults, setTestResults] = useState({});
 
-  // Загрузка настроек при монтировании
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     await executeAction(
       async () => {
         const response = await fetch(`${API_BASE}/admin/payment-provider-settings`, {
@@ -78,7 +73,12 @@ const PaymentProviderSettings = () => {
         errorMessage: 'Ошибка загрузки настроек'
       }
     );
-  };
+  }, [executeAction]);
+
+  // Загрузка настроек при монтировании
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const saveSettings = async () => {
     await executeAction(

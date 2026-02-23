@@ -11,6 +11,14 @@ import {
   Calendar,
   Timer
 } from 'lucide-react';
+import { A11Y_COLORS } from '../constants/a11yTokens';
+
+const FALLBACK_SPECIALISTS = [
+  { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
+  { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
+  { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: A11Y_COLORS.primary },
+  { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: A11Y_COLORS.success }
+];
 
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
@@ -19,6 +27,7 @@ const QueueJoin = () => {
 
   // Получаем токен из URL параметров или query параметров (для PWA пути)
   const token = paramToken || searchParams.get('token');
+  const formStorageKey = token ? `queue_join_form_${token}` : null;
 
   // Состояния
   const [step, setStep] = useState('loading'); // loading, waiting, info, select-specialists, form, success, error
@@ -31,55 +40,82 @@ const QueueJoin = () => {
   });
   const [selectedSpecialists, setSelectedSpecialists] = useState([]); // Выбранные специалисты для общего QR
   const [availableSpecialists, setAvailableSpecialists] = useState([]); // Список доступных специалистов из API
+  const [isSpecialistsLoading, setIsSpecialistsLoading] = useState(true);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(null);
 
-  // ⭐ SSOT: Загрузка списка доступных специалистов из QueueProfiles (Admin Panel controlled)
   useEffect(() => {
-    const loadSpecialists = async () => {
-      try {
-        // ⭐ NEW: Используем публичный endpoint из QueueProfiles (SSOT)
-        // Управляется из Admin Panel -> Вкладки регистратуры -> "Показывать на QR-странице"
-        const response = await fetch('/api/v1/queues/profiles/public');
-        if (response.ok) {
-          const data = await response.json();
-          // API возвращает specialists уже отфильтрованные по show_on_qr_page
-          setAvailableSpecialists(data.specialists || []);
-        } else {
-          // Fallback: try old endpoint
-          const fallbackResponse = await fetch('/api/v1/queue/available-specialists');
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            const filteredSpecialists = (data.specialists || []).filter(specialist => {
-              const specialty = (specialist.specialty || '').toLowerCase();
-              return specialty !== 'ecg' && specialty !== 'general';
-            });
-            setAvailableSpecialists(filteredSpecialists);
-          } else {
-            // Fallback на статический список
-            setAvailableSpecialists([
-              { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-              { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
-              { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: '#007AFF' },
-              { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: '#34C759' }
-            ]);
-          }
-        }
-      } catch {
-        // Fallback на статический список
-        setAvailableSpecialists([
-          { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-          { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
-          { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: '#007AFF' },
-          { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: '#34C759' }
-        ]);
+    if (!formStorageKey) {
+      return;
+    }
+    const saved = localStorage.getItem(formStorageKey);
+    if (!saved) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        setFormData({
+          patientName: parsed.patientName || '',
+          phone: parsed.phone || '',
+          telegramId: parsed.telegramId || '',
+        });
       }
-    };
+    } catch {
+      localStorage.removeItem(formStorageKey);
+    }
+  }, [formStorageKey]);
 
-    loadSpecialists();
+  useEffect(() => {
+    if (!formStorageKey) {
+      return;
+    }
+    if (!formData.patientName && !formData.phone && !formData.telegramId) {
+      localStorage.removeItem(formStorageKey);
+      return;
+    }
+    localStorage.setItem(formStorageKey, JSON.stringify(formData));
+  }, [formData, formStorageKey]);
+
+  // ⭐ SSOT: Загрузка списка доступных специалистов из QueueProfiles (Admin Panel controlled)
+  const loadSpecialists = useCallback(async () => {
+    setIsSpecialistsLoading(true);
+    try {
+      // ⭐ NEW: Используем публичный endpoint из QueueProfiles (SSOT)
+      // Управляется из Admin Panel -> Вкладки регистратуры -> "Показывать на QR-странице"
+      const response = await fetch('/api/v1/queues/profiles/public');
+      if (response.ok) {
+        const data = await response.json();
+        // API возвращает specialists уже отфильтрованные по show_on_qr_page
+        setAvailableSpecialists(data.specialists || []);
+      } else {
+        // Fallback: try old endpoint
+        const fallbackResponse = await fetch('/api/v1/queue/available-specialists');
+        if (fallbackResponse.ok) {
+          const data = await fallbackResponse.json();
+          const filteredSpecialists = (data.specialists || []).filter(specialist => {
+            const specialty = (specialist.specialty || '').toLowerCase();
+            return specialty !== 'ecg' && specialty !== 'general';
+          });
+          setAvailableSpecialists(filteredSpecialists);
+        } else {
+          // Fallback на статический список
+          setAvailableSpecialists(FALLBACK_SPECIALISTS);
+        }
+      }
+    } catch {
+      // Fallback на статический список
+      setAvailableSpecialists(FALLBACK_SPECIALISTS);
+    } finally {
+      setIsSpecialistsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadSpecialists();
+  }, [loadSpecialists]);
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
@@ -341,6 +377,9 @@ const QueueJoin = () => {
       setResult(joinResult);
       // ✅ Очищаем session_token из localStorage после успешного присоединения
       localStorage.removeItem(`queue_session_${token}`);
+      if (formStorageKey) {
+        localStorage.removeItem(formStorageKey);
+      }
 
       // ✅ Отправляем событие обновления очереди для автоматического обновления таблицы
       if (joinResult.success) {
@@ -417,6 +456,9 @@ const QueueJoin = () => {
   };
 
   const handleInputChange = (field, value) => {
+    if (error) {
+      setError(null);
+    }
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -460,6 +502,9 @@ const QueueJoin = () => {
   const handlePhoneChange = (e) => {
     const input = e.target.value;
     const formatted = formatUzbekPhone(input);
+    if (error) {
+      setError(null);
+    }
 
     // Обновляем состояние с отформатированным значением для отображения
     setFormData(prev => ({
@@ -508,7 +553,7 @@ const QueueJoin = () => {
           padding: '32px 24px'
         }}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" style={{
-            borderColor: '#007AFF'
+            borderColor: A11Y_COLORS.primary
           }}></div>
           <h2 style={{
             fontSize: '22px',
@@ -561,27 +606,52 @@ const QueueJoin = () => {
             color: '#636366',
             marginBottom: '24px',
             lineHeight: '1.5'
-          }}>{error}</p>
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              width: '100%',
-              background: '#FF3B30',
-              color: 'white',
-              padding: '16px 24px',
-              borderRadius: '12px',
-              border: 'none',
-              fontSize: '17px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px rgba(255, 59, 48, 0.3)'
-            }}
-            onMouseEnter={(e) => e.target.style.background = '#D70015'}
-            onMouseLeave={(e) => e.target.style.background = '#FF3B30'}
-          >
-            Асосий саҳифа
-          </button>
+          }} role="alert" aria-live="assertive">{error}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button
+              onClick={() => {
+                setError(null);
+                loadTokenInfo();
+              }}
+              style={{
+                width: '100%',
+                background: A11Y_COLORS.primary,
+                color: 'white',
+                padding: '16px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                fontSize: '17px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 12px rgba(0, 81, 213, 0.3)'
+              }}
+              onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
+              onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
+            >
+              Қайта уриниш
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                width: '100%',
+                background: A11Y_COLORS.danger,
+                color: 'white',
+                padding: '16px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                fontSize: '17px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 12px rgba(180, 35, 24, 0.3)'
+              }}
+              onMouseEnter={(e) => e.target.style.background = '#8C1B13'}
+              onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.danger}
+            >
+              Асосий саҳифа
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -693,10 +763,10 @@ const QueueJoin = () => {
               border: '1px solid rgba(0, 122, 255, 0.15)'
             }}>
               <div className="flex items-center">
-                <Calendar style={{ width: '18px', height: '18px', color: '#007AFF', marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', fontWeight: '500', color: '#007AFF' }}>Қабул куни</span>
+                <Calendar style={{ width: '18px', height: '18px', color: A11Y_COLORS.primary, marginRight: '8px' }} />
+                <span style={{ fontSize: '14px', fontWeight: '500', color: A11Y_COLORS.primary }}>Қабул куни</span>
               </div>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#007AFF' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: A11Y_COLORS.primary }}>
                 {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('uz-UZ', {
                   year: 'numeric',
                   month: 'long',
@@ -723,7 +793,7 @@ const QueueJoin = () => {
               style={{
                 flex: 1,
                 background: 'rgba(142, 142, 147, 0.12)',
-                color: '#007AFF',
+                color: A11Y_COLORS.primary,
                 padding: '14px 20px',
                 borderRadius: '12px',
                 border: 'none',
@@ -741,7 +811,7 @@ const QueueJoin = () => {
               onClick={loadTokenInfo}
               style={{
                 flex: 1,
-                background: '#FF9500',
+                background: A11Y_COLORS.primary,
                 color: 'white',
                 padding: '14px 20px',
                 borderRadius: '12px',
@@ -750,10 +820,10 @@ const QueueJoin = () => {
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(255, 149, 0, 0.3)'
+                boxShadow: '0 4px 12px rgba(0, 81, 213, 0.3)'
               }}
-              onMouseEnter={(e) => e.target.style.background = '#E68900'}
-              onMouseLeave={(e) => e.target.style.background = '#FF9500'}
+              onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
+              onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
             >
               Янгилаш
             </button>
@@ -797,7 +867,7 @@ const QueueJoin = () => {
           <CheckCircle style={{
             width: '64px',
             height: '64px',
-            color: '#34C759',
+            color: A11Y_COLORS.success,
             margin: '0 auto 20px'
           }} />
           <h2 style={{
@@ -855,7 +925,7 @@ const QueueJoin = () => {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '28px', fontWeight: '600', color: '#34C759' }}>№{entry.queue_number || entry.number || '—'}</div>
+                        <div style={{ fontSize: '28px', fontWeight: '600', color: A11Y_COLORS.success }}>№{entry.queue_number || entry.number || '—'}</div>
                         <div style={{ fontSize: '11px', color: '#8E8E93' }}>навбатда</div>
                       </div>
                     </div>
@@ -871,7 +941,7 @@ const QueueJoin = () => {
               }}>
                 <p>Илтимос, қабулга тайёр бўлинг.</p>
                 <p>Навбатингиз келганда сизга хабар берамиз.</p>
-                <p style={{ marginTop: '12px', fontWeight: '500', color: '#007AFF' }}>
+                <p style={{ marginTop: '12px', fontWeight: '500', color: A11Y_COLORS.primary }}>
                   💡 Ёзилмаларни мутахассислар вкладкаларида кўришингиз мумкин
                 </p>
               </div>
@@ -889,7 +959,7 @@ const QueueJoin = () => {
                 <div style={{
                   fontSize: '48px',
                   fontWeight: '600',
-                  color: '#34C759',
+                  color: A11Y_COLORS.success,
                   marginBottom: '8px',
                   letterSpacing: '-0.02em'
                 }}>
@@ -957,7 +1027,7 @@ const QueueJoin = () => {
               }}>
                 <p>Илтимос, қабулга тайёр бўлинг.</p>
                 <p>Навбатингиз келганда сизга хабар берамиз.</p>
-                <p style={{ marginTop: '12px', fontWeight: '500', color: '#007AFF' }}>
+                <p style={{ marginTop: '12px', fontWeight: '500', color: A11Y_COLORS.primary }}>
                   💡 Ёзилмани {departmentName} вкладкасида кўришингиз мумкин
                 </p>
               </div>
@@ -968,7 +1038,7 @@ const QueueJoin = () => {
             onClick={() => navigate('/')}
             style={{
               width: '100%',
-              background: '#34C759',
+              background: A11Y_COLORS.success,
               color: 'white',
               padding: '16px 24px',
               borderRadius: '12px',
@@ -977,10 +1047,10 @@ const QueueJoin = () => {
               fontWeight: '600',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px rgba(52, 199, 89, 0.3)'
+              boxShadow: '0 4px 12px rgba(46, 125, 50, 0.3)'
             }}
-            onMouseEnter={(e) => e.target.style.background = '#30D158'}
-            onMouseLeave={(e) => e.target.style.background = '#34C759'}
+            onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.successHover}
+            onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.success}
           >
             Тушунарли
           </button>
@@ -995,6 +1065,23 @@ const QueueJoin = () => {
       background: 'var(--mac-gradient-window)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
     }}>
+      <div
+        aria-live="polite"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          margin: -1,
+          padding: 0,
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          border: 0
+        }}
+      >
+        {step === 'select-specialists' && 'Выберите специалистов и продолжайте регистрацию.'}
+        {step === 'form' && 'Заполните обязательные поля: ФИО и телефон.'}
+        {step === 'info' && 'Проверьте информацию по очереди и перейдите к форме.'}
+      </div>
       <div className="max-w-md w-full overflow-hidden" style={{
         background: 'rgba(255, 255, 255, 0.85)',
         backdropFilter: 'blur(20px)',
@@ -1085,7 +1172,7 @@ const QueueJoin = () => {
               gap: '12px',
               marginBottom: '24px'
             }}>
-              {availableSpecialists.length === 0 ? (
+              {isSpecialistsLoading ? (
                 <div style={{
                   padding: '16px',
                   textAlign: 'center',
@@ -1093,6 +1180,44 @@ const QueueJoin = () => {
                   fontSize: '15px'
                 }}>
                   Мутахассислар юкланмоқда...
+                </div>
+              ) : availableSpecialists.length === 0 ? (
+                <div style={{
+                  padding: '18px 16px',
+                  textAlign: 'center',
+                  color: '#636366',
+                  fontSize: '14px',
+                  borderRadius: '12px',
+                  border: '1px dashed rgba(60, 60, 67, 0.28)',
+                  background: 'rgba(242, 242, 247, 0.65)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <span>Ҳозирча QR орқали танлаш учун мутахассислар мавжуд эмас.</span>
+                  <button
+                    type="button"
+                    onClick={loadSpecialists}
+                    style={{
+                      alignSelf: 'center',
+                      background: A11Y_COLORS.primary,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '8px 14px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = A11Y_COLORS.primaryHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = A11Y_COLORS.primary;
+                    }}
+                  >
+                    Янгилаш
+                  </button>
                 </div>
               ) : (
                 availableSpecialists.map(specialist => {
@@ -1116,6 +1241,9 @@ const QueueJoin = () => {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => {
+                          if (error) {
+                            setError(null);
+                          }
                           if (isSelected) {
                             setSelectedSpecialists(prev => prev.filter(id => id !== specialist.id));
                           } else {
@@ -1152,12 +1280,13 @@ const QueueJoin = () => {
                   setTimeout(() => setError(null), 3000);
                   return;
                 }
+                setError(null);
                 setStep('form');
               }}
               disabled={selectedSpecialists.length === 0}
               style={{
                 width: '100%',
-                background: selectedSpecialists.length > 0 ? '#007AFF' : '#E5E5EA',
+                background: selectedSpecialists.length > 0 ? A11Y_COLORS.primary : '#E5E5EA',
                 color: selectedSpecialists.length > 0 ? 'white' : '#8E8E93',
                 padding: '16px 24px',
                 borderRadius: '12px',
@@ -1166,16 +1295,16 @@ const QueueJoin = () => {
                 fontWeight: '600',
                 cursor: selectedSpecialists.length > 0 ? 'pointer' : 'not-allowed',
                 transition: 'all 0.2s ease',
-                boxShadow: selectedSpecialists.length > 0 ? '0 4px 12px rgba(0, 122, 255, 0.3)' : 'none'
+                boxShadow: selectedSpecialists.length > 0 ? '0 4px 12px rgba(0, 81, 213, 0.3)' : 'none'
               }}
               onMouseEnter={(e) => {
                 if (selectedSpecialists.length > 0) {
-                  e.target.style.background = '#0051D5';
+                  e.target.style.background = A11Y_COLORS.primaryHover;
                 }
               }}
               onMouseLeave={(e) => {
                 if (selectedSpecialists.length > 0) {
-                  e.target.style.background = '#007AFF';
+                  e.target.style.background = A11Y_COLORS.primary;
                 }
               }}
             >
@@ -1192,7 +1321,7 @@ const QueueJoin = () => {
                 color: '#FF3B30',
                 fontSize: '14px',
                 textAlign: 'center'
-              }}>
+              }} role="alert" aria-live="assertive">
                 {error}
               </div>
             )}
@@ -1222,13 +1351,13 @@ const QueueJoin = () => {
                 <Users style={{
                   width: '32px',
                   height: '32px',
-                  color: '#007AFF',
+                  color: A11Y_COLORS.primary,
                   marginBottom: '12px'
                 }} />
                 <div style={{
                   fontSize: '36px',
                   fontWeight: '600',
-                  color: '#007AFF',
+                  color: A11Y_COLORS.primary,
                   letterSpacing: '-0.02em',
                   lineHeight: '1',
                   marginBottom: '8px'
@@ -1254,13 +1383,13 @@ const QueueJoin = () => {
                 <Clock style={{
                   width: '32px',
                   height: '32px',
-                  color: '#34C759',
+                  color: A11Y_COLORS.success,
                   marginBottom: '12px'
                 }} />
                 <div style={{
                   fontSize: '36px',
                   fontWeight: '600',
-                  color: '#34C759',
+                  color: A11Y_COLORS.success,
                   letterSpacing: '-0.02em',
                   lineHeight: '1',
                   marginBottom: '8px'
@@ -1294,7 +1423,7 @@ const QueueJoin = () => {
                 onClick={() => setStep('form')}
                 style={{
                   width: '100%',
-                  background: '#007AFF',
+                  background: A11Y_COLORS.primary,
                   color: 'white',
                   padding: '16px 24px',
                   borderRadius: '12px',
@@ -1303,10 +1432,10 @@ const QueueJoin = () => {
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0, 122, 255, 0.3)'
+                  boxShadow: '0 4px 12px rgba(0, 81, 213, 0.3)'
                 }}
-                onMouseEnter={(e) => e.target.style.background = '#0051D5'}
-                onMouseLeave={(e) => e.target.style.background = '#007AFF'}
+                onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
+                onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
               >
                 Давом этиш
               </button>
@@ -1319,18 +1448,23 @@ const QueueJoin = () => {
             <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* ФИО - macOS стиль */}
               <div>
-                <label style={{
+                <label
+                  htmlFor="queue-patient-name"
+                  style={{
                   display: 'block',
                   fontSize: '13px',
                   fontWeight: '500',
                   color: '#3C3C43',
                   marginBottom: '8px'
-                }}>
+                }}
+                >
                   ФИО *
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: '#8E8E93' }} />
                   <input
+                    id="queue-patient-name"
+                    name="patient_name"
                     type="text"
                     value={formData.patientName}
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
@@ -1357,6 +1491,11 @@ const QueueJoin = () => {
                       e.target.style.boxShadow = 'none';
                     }}
                     placeholder="Фамилия исмингизни киритинг"
+                    autoComplete="name"
+                    autoFocus
+                    aria-required="true"
+                    aria-invalid={Boolean(error && !formData.patientName.trim())}
+                    aria-describedby={error ? 'queue-join-error' : undefined}
                     required
                   />
                 </div>
@@ -1364,18 +1503,23 @@ const QueueJoin = () => {
 
               {/* Телефон - macOS стиль с форматированием */}
               <div>
-                <label style={{
+                <label
+                  htmlFor="queue-phone"
+                  style={{
                   display: 'block',
                   fontSize: '13px',
                   fontWeight: '500',
                   color: '#3C3C43',
                   marginBottom: '8px'
-                }}>
+                }}
+                >
                   Телефон рақами *
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: '#8E8E93' }} />
                   <input
+                    id="queue-phone"
+                    name="phone"
                     type="tel"
                     value={formData.phone}
                     onChange={handlePhoneChange}
@@ -1427,29 +1571,39 @@ const QueueJoin = () => {
                       e.target.style.boxShadow = 'none';
                     }}
                     placeholder="+998 (90) 123-45-67"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    aria-required="true"
+                    aria-invalid={Boolean(error && !formData.phone.trim())}
+                    aria-describedby={error ? 'queue-join-error queue-phone-hint' : 'queue-phone-hint'}
                     required
                   />
                 </div>
-                <div style={{ fontSize: '11px', color: '#8E8E93', marginTop: '4px' }}>
+                <div id="queue-phone-hint" style={{ fontSize: '11px', color: '#8E8E93', marginTop: '4px' }}>
                   Формат: +998 (XX) XXX-XX-XX
                 </div>
               </div>
 
               {/* Telegram ID (опционально) - macOS стиль */}
               <div>
-                <label style={{
+                <label
+                  htmlFor="queue-telegram-id"
+                  style={{
                   display: 'block',
                   fontSize: '13px',
                   fontWeight: '500',
                   color: '#3C3C43',
                   marginBottom: '8px'
-                }}>
+                }}
+                >
                   Telegram ID (ихтиёрий)
                 </label>
                 <div style={{ fontSize: '11px', color: '#8E8E93', marginBottom: '8px' }}>
                   Telegramда хабардор қилиш учун
                 </div>
                 <input
+                  id="queue-telegram-id"
+                  name="telegram_id"
                   type="number"
                   value={formData.telegramId}
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
@@ -1482,7 +1636,7 @@ const QueueJoin = () => {
                   border: '1px solid rgba(255, 59, 48, 0.2)',
                   borderRadius: '12px',
                   padding: '12px'
-                }}>
+                }} id="queue-join-error" role="alert" aria-live="assertive">
                   <div className="flex items-center">
                     <AlertCircle className="h-5 w-5 mr-2" style={{ color: '#FF3B30' }} />
                     <span style={{ color: '#FF3B30', fontSize: '14px' }}>{error}</span>
@@ -1498,7 +1652,7 @@ const QueueJoin = () => {
                   style={{
                     flex: 1,
                     background: 'rgba(142, 142, 147, 0.12)',
-                    color: '#007AFF',
+                    color: A11Y_COLORS.primary,
                     padding: '14px 20px',
                     borderRadius: '12px',
                     border: 'none',
@@ -1517,7 +1671,7 @@ const QueueJoin = () => {
                   disabled={loading}
                   style={{
                     flex: 1,
-                    background: loading ? '#8E8E93' : '#007AFF',
+                    background: loading ? '#8E8E93' : A11Y_COLORS.primary,
                     color: 'white',
                     padding: '14px 20px',
                     borderRadius: '12px',
@@ -1526,10 +1680,10 @@ const QueueJoin = () => {
                     fontWeight: '600',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: loading ? 'none' : '0 4px 12px rgba(0, 122, 255, 0.3)'
+                    boxShadow: loading ? 'none' : '0 4px 12px rgba(0, 81, 213, 0.3)'
                   }}
-                  onMouseEnter={(e) => !loading && (e.target.style.background = '#0051D5')}
-                  onMouseLeave={(e) => !loading && (e.target.style.background = '#007AFF')}
+                  onMouseEnter={(e) => !loading && (e.target.style.background = A11Y_COLORS.primaryHover)}
+                  onMouseLeave={(e) => !loading && (e.target.style.background = A11Y_COLORS.primary)}
                 >
                   {loading ? 'Қўшилмоқда...' : 'Қўшилиш'}
                 </button>

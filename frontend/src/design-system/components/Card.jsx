@@ -1,4 +1,5 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
+import PropTypes from 'prop-types';
 import { createCardStyles } from './utils';
 import { colors } from '../../theme/tokens';
 
@@ -17,13 +18,35 @@ const Card = forwardRef(({
     ...cardStyles,
     ...style
   };
+  const handleKeyDown = (event) => {
+    if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      onClick(event);
+    }
+  };
+
+  if (onClick) {
+    return (
+      <div
+        ref={ref}
+        className={`design-system-card ${className}`}
+        style={finalStyles}
+        onClick={onClick}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
       ref={ref}
       className={`design-system-card ${className}`}
       style={finalStyles}
-      onClick={onClick}
       {...props}
     >
       {children}
@@ -112,6 +135,33 @@ const CardFooter = forwardRef(({
 });
 
 CardFooter.displayName = 'CardFooter';
+
+Card.propTypes = {
+  children: PropTypes.node,
+  variant: PropTypes.string,
+  hover: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  onClick: PropTypes.func
+};
+
+CardHeader.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardContent.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardFooter.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
 // Прикрепляем подкомпоненты к Card
 Card.Header = CardHeader;

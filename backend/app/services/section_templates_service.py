@@ -17,11 +17,9 @@ Key features:
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Optional, Tuple
 
-from sqlalchemy import select, update, delete, and_, or_, func
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from ..models.section_templates import (
     DoctorSectionTemplate,
@@ -52,19 +50,19 @@ class DoctorSectionTemplatesService:
         doctor_id: int,
         section_type: str,
         text: str,
-        icd10_code: Optional[str] = None,
-    ) -> Optional[DoctorSectionTemplate]:
+        icd10_code: str | None = None,
+    ) -> DoctorSectionTemplate | None:
         """
         Обучение на подписанном EMR.
-        
+
         Вызывается при подписании EMR для каждой секции с непустым текстом.
-        
+
         Args:
             doctor_id: ID врача
             section_type: Тип секции (complaints, anamnesis, etc.)
             text: Текст секции
             icd10_code: Код МКБ-10 (опционально)
-            
+
         Returns:
             Созданный или обновленный шаблон
         """
@@ -79,7 +77,7 @@ class DoctorSectionTemplatesService:
             return None
 
         # Normalize and hash
-        normalized = DoctorSectionTemplate.normalize_text(text)
+        _normalized = DoctorSectionTemplate.normalize_text(text)
         template_hash = DoctorSectionTemplate.compute_hash(text)
 
         try:
@@ -134,27 +132,27 @@ class DoctorSectionTemplatesService:
         self,
         doctor_id: int,
         section_type: str,
-        icd10_code: Optional[str] = None,
+        icd10_code: str | None = None,
         limit: int = 10,
     ) -> DoctorSectionTemplatesListResponse:
         """
         Получить шаблоны врача по секции и диагнозу.
-        
+
         Стратегия поиска:
         1. Сначала по конкретному icd10_code (если указан)
         2. Затем общие (icd10_code IS NULL)
-        
+
         Сортировка:
         1. Закреплённые (is_pinned DESC)
         2. Частота использования (usage_count DESC)
         3. Последнее использование (last_used_at DESC)
-        
+
         Args:
             doctor_id: ID врача
             section_type: Тип секции
             icd10_code: Код МКБ-10 (опционально)
             limit: Максимум шаблонов
-            
+
         Returns:
             Список шаблонов с метаданными
         """
@@ -214,14 +212,14 @@ class DoctorSectionTemplatesService:
             templates = result.scalars().all()
 
             # Helper functions
-            def get_frequency_label(usage: int) -> Optional[str]:
+            def get_frequency_label(usage: int) -> str | None:
                 if usage >= FREQUENCY_THRESHOLD_HIGH:
                     return "часто"
                 elif usage <= FREQUENCY_THRESHOLD_LOW:
                     return "редко"
                 return None
 
-            def is_stale(last_used: Optional[datetime]) -> bool:
+            def is_stale(last_used: datetime | None) -> bool:
                 if not last_used:
                     return False
                 return last_used < datetime.utcnow() - timedelta(days=STALE_MONTHS * 30)
@@ -263,13 +261,13 @@ class DoctorSectionTemplatesService:
         self,
         doctor_id: int,
         template_id: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Закрепить шаблон.
-        
+
         Limit: MAX_PINNED_PER_SECTION per doctor+section.
         If exceeded, auto-unpins oldest.
-        
+
         Returns:
             (success, message)
         """
@@ -337,7 +335,7 @@ class DoctorSectionTemplatesService:
         self,
         doctor_id: int,
         template_id: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Открепить шаблон."""
         try:
             stmt = select(DoctorSectionTemplate).where(
@@ -369,18 +367,18 @@ class DoctorSectionTemplatesService:
         template_id: str,
         new_text: str,
         mode: str = "replace",  # "replace" | "save_as_new"
-    ) -> Tuple[Optional[DoctorSectionTemplate], str]:
+    ) -> tuple[DoctorSectionTemplate | None, str]:
         """
         Обновить или создать новый шаблон.
-        
+
         Args:
             doctor_id: ID врача
             template_id: ID исходного шаблона
             new_text: Новый текст
-            mode: 
+            mode:
                 - "replace": обновить существующий шаблон
                 - "save_as_new": создать новый шаблон с новым текстом
-                
+
         Returns:
             (template, message)
         """
@@ -462,7 +460,7 @@ class DoctorSectionTemplatesService:
         self,
         doctor_id: int,
         template_id: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Удалить шаблон (soft delete не нужен — hard delete)."""
         try:
             stmt = delete(DoctorSectionTemplate).where(

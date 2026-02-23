@@ -11,28 +11,28 @@ import os
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Optional, Tuple
+from typing import Any
 
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.crud.file_system import (
     file,
     file_access_log,
-    file_folder,
     file_quota,
     file_share,
-    file_storage,
     file_version,
 )
 from app.models.file_system import (
     File,
     FileShare,
-    FileStatus as FileStatusEnum,
     FileType,
+)
+from app.models.file_system import (
+    FileStatus as FileStatusEnum,
 )
 from app.schemas.file_system import (
     FileCreate,
@@ -40,11 +40,8 @@ from app.schemas.file_system import (
     FileImportRequest,
     FilePermissionEnum,
     FileSearchRequest,
-    FileStatus,
     FileTypeEnum,
-    FileUpdate,
     FileUploadRequest,
-    FileUploadResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,7 +125,7 @@ class FileSystemService:
 
     def _check_file_quota(
         self, db: Session, user_id: int, file_size: int
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Проверить квоту пользователя"""
         return file_quota.check_quota(
             db, user_id=user_id, additional_size=file_size, additional_files=1
@@ -168,14 +165,14 @@ class FileSystemService:
                 or mimetypes.guess_type(upload_file.filename)[0]
                 or 'application/octet-stream'
             )
-            file_type = self._get_file_type(upload_file.filename, mime_type)
+            _file_type = self._get_file_type(upload_file.filename, mime_type)
 
             # Генерируем хеш файла
             file_hash = self._generate_file_hash(file_content)
 
             # Проверяем, не загружен ли уже такой файл
             existing_file = file.get_by_hash(db, file_hash=file_hash)
-            
+
             # ✅ CERTIFICATION: Всегда генерируем file_path для нового файла
             # Используем существующий путь только если файл физически существует
             if existing_file and existing_file.file_path and os.path.exists(existing_file.file_path):
@@ -196,7 +193,7 @@ class FileSystemService:
 
             # ✅ CERTIFICATION: file_path всегда установлен перед созданием FileCreate
             assert file_path is not None and file_path != "", "file_path должен быть установлен"
-            
+
             # Преобразуем file_type из FileType (модель) в FileTypeEnum (схема), если нужно
             file_type_value = file_data.file_type
             if isinstance(file_type_value, FileType):
@@ -205,7 +202,7 @@ class FileSystemService:
             elif isinstance(file_type_value, str):
                 # Если строка, преобразуем в FileTypeEnum
                 file_type_value = FileTypeEnum(file_type_value)
-            
+
             file_create_data = FileCreate(
                 filename=file_data.filename,
                 original_filename=upload_file.filename,
@@ -260,8 +257,8 @@ class FileSystemService:
             )
 
     def get_file(
-        self, db: Session, file_id: int, user_id: Optional[int] = None
-    ) -> Optional[File]:
+        self, db: Session, file_id: int, user_id: int | None = None
+    ) -> File | None:
         """Получить файл"""
         db_file = file.get(db, id=file_id)
         if not db_file:
@@ -278,7 +275,7 @@ class FileSystemService:
         return db_file
 
     def _check_file_access(
-        self, db: Session, file_obj: File, user_id: Optional[int]
+        self, db: Session, file_obj: File, user_id: int | None
     ) -> bool:
         """Проверить права доступа к файлу"""
         if not user_id:
@@ -312,8 +309,8 @@ class FileSystemService:
         return False
 
     def download_file(
-        self, db: Session, file_id: int, user_id: Optional[int] = None
-    ) -> Tuple[bytes, str, str]:
+        self, db: Session, file_id: int, user_id: int | None = None
+    ) -> tuple[bytes, str, str]:
         """Скачать файл"""
         db_file = self.get_file(db, file_id, user_id)
         if not db_file:
@@ -341,7 +338,7 @@ class FileSystemService:
 
     def search_files(
         self, db: Session, search_request: FileSearchRequest, user_id: int
-    ) -> Tuple[List[File], int, Dict[str, Any]]:
+    ) -> tuple[list[File], int, dict[str, Any]]:
         """Поиск файлов"""
         # Добавляем фильтр по пользователю если не админ
         if not self._is_admin(db, user_id):
@@ -362,13 +359,12 @@ class FileSystemService:
         file_id: int,
         new_file: UploadFile,
         user_id: int,
-        change_description: Optional[str] = None,
+        change_description: str | None = None,
     ) -> File:
         """
         ✅ CERTIFICATION: Заменить содержимое файла с версионированием.
         Создает версию старого файла перед заменой.
         """
-        from app.models.file_system import FileVersion
 
         # Получаем текущий файл
         db_file = file.get(db, id=file_id)
@@ -557,7 +553,7 @@ class FileSystemService:
 
     async def import_files(
         self, db: Session, import_request: FileImportRequest, user_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Импортировать файлы из архива"""
         temp_dir = tempfile.mkdtemp()
         extracted_path = os.path.join(temp_dir, "extracted")
@@ -571,7 +567,7 @@ class FileSystemService:
             errors = []
 
             # Обрабатываем извлеченные файлы
-            for root, dirs, files in os.walk(extracted_path):
+            for root, _dirs, files in os.walk(extracted_path):
                 for filename in files:
                     if filename.endswith('.metadata.json'):
                         continue  # Пропускаем файлы метаданных
@@ -627,7 +623,7 @@ class FileSystemService:
             # Очищаем временные файлы
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def get_file_statistics(self, db: Session, user_id: int) -> Dict[str, Any]:
+    def get_file_statistics(self, db: Session, user_id: int) -> dict[str, Any]:
         """Получить статистику файлов"""
         # Общая статистика
         total_files = db.query(File).filter(File.owner_id == user_id).count()

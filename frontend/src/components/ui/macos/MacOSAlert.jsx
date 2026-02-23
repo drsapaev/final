@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const MacOSAlert = ({
@@ -14,6 +13,7 @@ const MacOSAlert = ({
   style,
   children
 }) => {
+  void children;
   const sizeStyles = {
     sm: {
       padding: '12px 16px',

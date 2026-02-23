@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -21,6 +21,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 # Таблица связи многие-ко-многим для пользователей и ролей
 user_roles_table = Table(
@@ -104,8 +107,8 @@ class Permission(Base):
     codename: Mapped[str] = mapped_column(
         String(100), unique=True, nullable=False, index=True
     )
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    category: Mapped[Optional[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category: Mapped[str | None] = mapped_column(
         String(50), nullable=True, index=True
     )
 
@@ -119,7 +122,7 @@ class Permission(Base):
     )
 
     # Связи
-    roles: Mapped[List["Role"]] = relationship(
+    roles: Mapped[list[Role]] = relationship(
         "Role", secondary=role_permissions_table, back_populates="permissions"
     )
 
@@ -134,10 +137,10 @@ class Role(Base):
         String(50), unique=True, nullable=False, index=True
     )
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Иерархия ролей
-    parent_role_id: Mapped[Optional[int]] = mapped_column(
+    parent_role_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("roles.id"), nullable=True
     )
     level: Mapped[int] = mapped_column(
@@ -157,12 +160,12 @@ class Role(Base):
     )
 
     # Связи
-    parent_role: Mapped[Optional["Role"]] = relationship("Role", remote_side=[id])
-    child_roles: Mapped[List["Role"]] = relationship(
+    parent_role: Mapped[Role | None] = relationship("Role", remote_side=[id])
+    child_roles: Mapped[list[Role]] = relationship(
         "Role", back_populates="parent_role"
     )
 
-    permissions: Mapped[List["Permission"]] = relationship(
+    permissions: Mapped[list[Permission]] = relationship(
         "Permission", secondary=role_permissions_table, back_populates="roles"
     )
 
@@ -190,7 +193,7 @@ class UserGroup(Base):
         String(100), unique=True, nullable=False, index=True
     )
     display_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Тип группы
     group_type: Mapped[str] = mapped_column(
@@ -199,9 +202,9 @@ class UserGroup(Base):
 
     # Метаданные
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_by: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    created_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
     created_at: Mapped[datetime] = mapped_column(
@@ -212,7 +215,7 @@ class UserGroup(Base):
     )
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
 
     # users: Mapped[List["User"]] = relationship(
     #     "User",
@@ -247,18 +250,18 @@ class UserPermissionOverride(Base):
     override_type: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # grant, deny
-    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Временные ограничения
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
+    expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Метаданные
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    granted_by: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    granted_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
     created_at: Mapped[datetime] = mapped_column(
@@ -269,11 +272,11 @@ class UserPermissionOverride(Base):
     )
 
     # Связи
-    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
-    permission: Mapped["Permission"] = relationship(
+    user: Mapped[User] = relationship("User", foreign_keys=[user_id])
+    permission: Mapped[Permission] = relationship(
         "Permission", foreign_keys=[permission_id]
     )
-    granted_by_user: Mapped[Optional["User"]] = relationship(
+    granted_by_user: Mapped[User | None] = relationship(
         "User", foreign_keys=[granted_by]
     )
 
@@ -295,16 +298,16 @@ class RoleHierarchy(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
+    created_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve audit trail
 
     # Связи
-    parent_role: Mapped["Role"] = relationship("Role", foreign_keys=[parent_role_id])
-    child_role: Mapped["Role"] = relationship("Role", foreign_keys=[child_role_id])
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    parent_role: Mapped[Role] = relationship("Role", foreign_keys=[parent_role_id])
+    child_role: Mapped[Role] = relationship("Role", foreign_keys=[child_role_id])
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
 
 
 class PermissionAuditLog(Base):
@@ -313,10 +316,10 @@ class PermissionAuditLog(Base):
     __tablename__ = "permission_audit_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, 
-        ForeignKey("users.id", ondelete="SET NULL"), 
-        nullable=True, 
+    user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve audit (user may be deleted but audit must remain)
     action: Mapped[str] = mapped_column(
@@ -326,28 +329,28 @@ class PermissionAuditLog(Base):
         String(20), nullable=False
     )  # user, role, group
     target_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    permission_id: Mapped[Optional[int]] = mapped_column(
+    permission_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("permissions.id"), nullable=True
     )
-    role_id: Mapped[Optional[int]] = mapped_column(
+    role_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("roles.id"), nullable=True
     )
 
     # Детали изменения
-    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Метаданные
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     # Связи
-    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
-    permission: Mapped[Optional["Permission"]] = relationship(
+    user: Mapped[User] = relationship("User", foreign_keys=[user_id])
+    permission: Mapped[Permission | None] = relationship(
         "Permission", foreign_keys=[permission_id]
     )
-    role: Mapped[Optional["Role"]] = relationship("Role", foreign_keys=[role_id])
+    role: Mapped[Role | None] = relationship("Role", foreign_keys=[role_id])

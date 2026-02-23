@@ -3,7 +3,6 @@ CRUD операции для шаблонов EMR
 """
 
 from datetime import datetime
-from typing import List, Optional
 
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
@@ -22,7 +21,7 @@ class CRUDEMRTemplate(CRUDBase[EMRTemplate, EMRTemplateCreate, EMRTemplateUpdate
 
     def get_by_specialty(
         self, db: Session, *, specialty: str, is_active: bool = True
-    ) -> List[EMRTemplate]:
+    ) -> list[EMRTemplate]:
         """Получить шаблоны по специализации"""
         query = db.query(self.model).filter(
             and_(self.model.specialty == specialty, self.model.is_active == is_active)
@@ -30,8 +29,8 @@ class CRUDEMRTemplate(CRUDBase[EMRTemplate, EMRTemplateCreate, EMRTemplateUpdate
         return query.order_by(self.model.name).all()
 
     def get_public_templates(
-        self, db: Session, *, specialty: Optional[str] = None
-    ) -> List[EMRTemplate]:
+        self, db: Session, *, specialty: str | None = None
+    ) -> list[EMRTemplate]:
         """Получить публичные шаблоны"""
         query = db.query(self.model).filter(
             and_(self.model.is_public == True, self.model.is_active == True)
@@ -43,8 +42,8 @@ class CRUDEMRTemplate(CRUDBase[EMRTemplate, EMRTemplateCreate, EMRTemplateUpdate
         return query.order_by(self.model.specialty, self.model.name).all()
 
     def get_user_templates(
-        self, db: Session, *, user_id: int, specialty: Optional[str] = None
-    ) -> List[EMRTemplate]:
+        self, db: Session, *, user_id: int, specialty: str | None = None
+    ) -> list[EMRTemplate]:
         """Получить шаблоны пользователя"""
         query = db.query(self.model).filter(
             and_(self.model.created_by == user_id, self.model.is_active == True)
@@ -92,7 +91,7 @@ class CRUDEMRVersion(CRUDBase[EMRVersion, EMRVersionCreate, None]):
 
     def get_by_emr(
         self, db: Session, *, emr_id: int, limit: int = 50
-    ) -> List[EMRVersion]:
+    ) -> list[EMRVersion]:
         """Получить версии EMR"""
         return (
             db.query(self.model)
@@ -102,7 +101,7 @@ class CRUDEMRVersion(CRUDBase[EMRVersion, EMRVersionCreate, None]):
             .all()
         )
 
-    def get_latest_version(self, db: Session, *, emr_id: int) -> Optional[EMRVersion]:
+    def get_latest_version(self, db: Session, *, emr_id: int) -> EMRVersion | None:
         """Получить последнюю версию EMR"""
         return (
             db.query(self.model)
@@ -118,11 +117,10 @@ class CRUDEMRVersion(CRUDBase[EMRVersion, EMRVersionCreate, None]):
         emr_id: int,
         version_data: dict,
         change_type: str,
-        change_description: Optional[str] = None,
-        changed_by: Optional[int] = None,
+        change_description: str | None = None,
+        changed_by: int | None = None,
     ) -> EMRVersion:
         """Создать новую версию EMR"""
-        from datetime import datetime
 
         # Функция для преобразования datetime в ISO строки
         def convert_datetimes_to_iso(obj):
@@ -154,7 +152,7 @@ class CRUDEMRVersion(CRUDBase[EMRVersion, EMRVersionCreate, None]):
 
     def restore_version(
         self, db: Session, *, version_id: int, restored_by: int
-    ) -> Optional[EMRVersion]:
+    ) -> EMRVersion | None:
         """Восстановить версию EMR"""
         version = self.get(db, id=version_id)
         if not version:

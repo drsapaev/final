@@ -5,43 +5,13 @@ import logging
 
 from fastapi import APIRouter
 
-logger = logging.getLogger(__name__)
-
-# CRUD departments endpoint registered
-
-# подключаем router из каждого модуля
-from app.api.v1.endpoints import admin_departments  # CRUD для управления отделениями
-from app.api.v1.endpoints import backup_management  # Database backup management
-from app.api.v1.endpoints import ai  # Новый AI модуль
-from app.api.v1.endpoints import ai_analytics  # Расширенная аналитика AI
-from app.api.v1.endpoints import billing  # Автоматическое выставление счетов
-from app.api.v1.endpoints import cloud_printing  # Облачная печать
-from app.api.v1.endpoints import departments  # Управление отделениями/вкладками
-from app.api.v1.endpoints import discount_benefits  # Система скидок и льгот
-from app.api.v1.endpoints import doctor_info  # Информация о врачах и отделениях
-from app.api.v1.endpoints import dynamic_pricing  # Динамическое ценообразование
-from app.api.v1.endpoints import feature_flags  # Фича-флаги
-from app.api.v1.endpoints import group_permissions  # Разрешения групп пользователей
-from app.api.v1.endpoints import medical_equipment  # Медицинское оборудование
-from app.api.v1.endpoints import payment_settings  # Настройки платежных провайдеров
-from app.api.v1.endpoints import payment_reconciliation  # Payment reconciliation
-from app.api.v1.endpoints import qr_queue  # QR очереди
 from app.api.v1.endpoints import (
-    queue_cabinet_management,  # Управление кабинетами в очередях
-)
-from app.api.v1.endpoints import queue_limits  # Лимиты очередей
-from app.api.v1.endpoints import registrar_notifications  # Уведомления регистратуры
-from app.api.v1.endpoints import registrar_wizard  # Новый мастер регистрации
-from app.api.v1.endpoints import reports  # Система отчетов
-from app.api.v1.endpoints import system_management  # Система бэкапов и мониторинга
-from app.api.v1.endpoints import telegram_bot  # Telegram Bot
-from app.api.v1.endpoints import user_data_transfer  # Передача данных пользователей
-from app.api.v1.endpoints import wait_time_analytics  # Аналитика времени ожидания
-from app.api.v1.endpoints import (  # online_queue,  # Временно отключено; queue,  # Временно отключено
-    online_queue_new,
     activation as activation_ep,
+)
+from app.api.v1.endpoints import (
     admin_ai,
     admin_clinic,
+    admin_departments,
     admin_display,
     admin_doctors,
     admin_providers,
@@ -49,6 +19,11 @@ from app.api.v1.endpoints import (  # online_queue,  # Временно откл
     admin_telegram,
     admin_users,
     advanced_analytics,
+    ai,
+    ai_analytics,
+    ai_chat,
+    ai_cost_analytics,
+    ai_gateway,
     ai_integration,
     analytics,
     analytics_export,
@@ -60,100 +35,134 @@ from app.api.v1.endpoints import (  # online_queue,  # Временно откл
     appointments,
     auth,
     authentication,
-    board as board_ep,
+    billing,
     cardio,
+    cashier,
     clinic_management,
+    cloud_printing,
     dental,
+    departments,
     derma,
+    discount_benefits,
     display_websocket,
     docs,
+    doctor_info,
     doctor_integration,
+    doctor_templates,
+    dynamic_pricing,
     email_sms_enhanced,
     emr_ai,
     emr_ai_enhanced,
     emr_export,
     emr_lab_integration,
     emr_templates,
+    emr_v2,
     emr_versioning_enhanced,
     fcm_notifications,
+    feature_flags,
     file_system,
     file_test,
     file_upload_json,
     file_upload_simple,
-    health as health_ep,
+    force_majeure,
+    global_search,
+    group_permissions,
     lab,
     lab_specialized,
+    medical_equipment,
+    messages,
+    minimal_auth,
     mobile_api,
     mobile_api_extended,
+    notification_websocket,
     notifications,
+    observability,
+    online_queue_new,
     password_reset,
     patients,
+    payment_reconciliation,
+    payment_settings,
     payment_webhook,
     payments,
     phone_verification,
-    print as print_ep,
+    phrase_suggest,
     print_api,
     print_templates,
+    qr_queue,
+    queue_auto_close,
+    queue_cabinet_management,
+    queue_limits,
+    queue_position,
     queue_reorder,
     queues,
+    registrar_batch,
     registrar_integration,
-    reports as reports_ep,
+    registrar_notifications,
+    registrar_wizard,
+    reports,
+    roles,
     schedule,
     services,
+    simple_auth,
     sms_providers,
     specialized_panels,
+    system_management,
+    telegram_bot,
     telegram_bot_management,
     telegram_integration,
     telegram_notifications,
     telegram_webhook,
     telegram_webhook_enhanced,
+    telemetry,
     two_factor_auth,
     two_factor_devices,
     two_factor_sms_email,
+    user_data_transfer,
     user_management,
+    utils,
     visits,
+    wait_time_analytics,
     webhooks,
     websocket_auth,
 )
-
-# Импортируем эндпоинты управления миграциями
+from app.api.v1.endpoints import (
+    board as board_ep,
+)
+from app.api.v1.endpoints import (
+    health as health_ep,
+)
+from app.api.v1.endpoints import (
+    print as print_ep,
+)
+from app.api.v1.endpoints import (
+    reports as reports_ep,
+)
 from app.api.v1.endpoints.migration_management import (
     router as migration_management_router,
 )
-
-# Импортируем эндпоинты утренней сборки
 from app.api.v1.endpoints.morning_assignment import router as morning_assignment_router
 from app.api.v1.endpoints.payment_webhooks import router as payment_webhooks_router
-
-# Импортируем новые payment endpoints
-from app.api.v1.endpoints.payments import router as payments_new_router
-
-# Импортируем новый queue endpoint
 from app.api.v1.endpoints.queue import router as queue_router
-
-# Импортируем эндпоинты управления безопасностью
+from app.api.v1.endpoints.section_templates import router as section_templates_router
 from app.api.v1.endpoints.security_management import (
     router as security_management_router,
 )
-
-# Импортируем эндпоинты подтверждения визитов
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
+from app.ws import cashier_ws
 
-# Импортируем эндпоинты универсальных секционных шаблонов
-from app.api.v1.endpoints.section_templates import router as section_templates_router
+try:
+    from app.api.v1.endpoints import mcp
+except ImportError:
+    mcp = None
+
+logger = logging.getLogger(__name__)
 
 api_router = APIRouter()
 
 # Auth (/login, /me и т.д.)
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
-# Простая авторизация (временное решение)
-from app.api.v1.endpoints import simple_auth
-
 api_router.include_router(simple_auth.router, prefix="/auth", tags=["simple-auth"])
-
-# Минимальная авторизация (без зависимостей от моделей)
-from app.api.v1.endpoints import minimal_auth
 
 api_router.include_router(minimal_auth.router, prefix="/auth", tags=["minimal-auth"])
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
@@ -163,9 +172,6 @@ api_router.include_router(
     departments.router, prefix="/departments", tags=["departments"]
 )
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
-api_router.include_router(
-    payments_new_router, prefix="/payments", tags=["payments-new"]
-)
 api_router.include_router(
     payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"]
 )
@@ -246,25 +252,17 @@ api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
 api_router.include_router(ai_integration.router, prefix="/ai", tags=["ai-integration"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])  # Новые AI endpoints
 
-# AI Gateway - унифицированный API с RBAC (рекомендуется для новых интеграций)
-from app.api.v1.endpoints import ai_gateway
 api_router.include_router(ai_gateway.router, prefix="/ai/v2", tags=["ai-gateway"])
 
-# AI Chat - REST API и WebSocket для чата с AI
-from app.api.v1.endpoints import ai_chat
 api_router.include_router(ai_chat.router, prefix="/ai/chat", tags=["ai-chat"])
 
-# AI Cost Analytics - Мониторинг расходов на AI
-from app.api.v1.endpoints import ai_cost_analytics
 api_router.include_router(ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"])
 
 
 # MCP (Model Context Protocol) endpoints
-try:
-    from app.api.v1.endpoints import mcp
-
+if mcp:
     api_router.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
-except ImportError:
+else:
     logger.info("MCP module not available - skipping MCP routes")
 api_router.include_router(
     telegram_bot.router, prefix="/telegram/bot", tags=["telegram-bot"]
@@ -301,7 +299,6 @@ api_router.include_router(
 )
 api_router.include_router(emr_templates.router, prefix="/emr", tags=["emr-templates"])
 # Doctor Treatment Templates - персональная клиническая память
-from app.api.v1.endpoints import doctor_templates
 api_router.include_router(
     doctor_templates.router, prefix="/emr", tags=["doctor-templates"]
 )
@@ -402,7 +399,6 @@ api_router.include_router(
 api_router.include_router(
     notifications.router, prefix="/notifications", tags=["notifications"]
 )
-from app.api.v1.endpoints import notification_websocket
 api_router.include_router(
     notification_websocket.router, tags=["notification-websocket"]
 )
@@ -414,6 +410,7 @@ api_router.include_router(
     specialized_panels.router, prefix="/specialized", tags=["specialized-panels"]
 )
 api_router.include_router(health_ep.router, tags=["health"])
+api_router.include_router(observability.router, tags=["observability"])
 api_router.include_router(activation_ep.router, tags=["activation"])
 api_router.include_router(
     authentication.router, prefix="/authentication", tags=["authentication"]
@@ -423,15 +420,11 @@ api_router.include_router(
 )
 
 # Роли и разрешения
-from app.api.v1.endpoints import roles
-
 api_router.include_router(roles.router, prefix="/roles", tags=["roles"])
 
 # Legacy API удалён - используйте /api/v1/queue/* endpoints
 
 # Автозакрытие очередей
-from app.api.v1.endpoints import queue_auto_close
-
 api_router.include_router(
     queue_auto_close.router, prefix="/admin/queue-auto-close", tags=["queue-auto-close"]
 )
@@ -460,73 +453,52 @@ api_router.include_router(
 )
 
 # Эндпоинты для кассира
-from app.api.v1.endpoints import cashier
-
 api_router.include_router(cashier.router, prefix="/cashier", tags=["cashier"])
 
 # WebSocket для кассира (real-time updates)
-from app.ws import cashier_ws
-
 api_router.include_router(cashier_ws.router, prefix="/ws", tags=["cashier-ws"])
 
 # Форс-мажор (массовый перенос/отмена очереди с возвратами)
-from app.api.v1.endpoints import force_majeure
-
 api_router.include_router(
     force_majeure.router, prefix="/force-majeure", tags=["force-majeure"]
 )
 
 # Push-уведомления о позиции в очереди
-from app.api.v1.endpoints import queue_position
-
 api_router.include_router(
     queue_position.router, prefix="/queue/position", tags=["queue-position"]
 )
 
 # Batch операции с записями пациентов (UI Row ↔ API Entry)
-from app.api.v1.endpoints import registrar_batch
-
 api_router.include_router(
     registrar_batch.router, prefix="/registrar", tags=["registrar-batch"]
 )
 
 # EMR Phrase Suggest - автоподсказки из истории врача
-from app.api.v1.endpoints import phrase_suggest
-
 api_router.include_router(
     phrase_suggest.router, prefix="/emr", tags=["emr-phrase-suggest"]
 )
 
 # EMR v2 - Production EMR with versioning and audit
-from app.api.v1.endpoints import emr_v2
-
 api_router.include_router(
     emr_v2.router, prefix="/v2", tags=["emr-v2"]
 )
 
 # Global Search - агрегированный поиск по всем доменам
-from app.api.v1.endpoints import global_search
-
 api_router.include_router(
     global_search.router, tags=["global-search"]
 )
 
 # Telemetry - Product metrics (NO PHI, events only)
-from app.api.v1.endpoints import telemetry
-
 api_router.include_router(
     telemetry.router, tags=["telemetry"]
 )
 
 # User-to-user messaging system
-from app.api.v1.endpoints import messages
 api_router.include_router(
     messages.router, prefix="/messages", tags=["messages"]
 )
 
 # Utils (Link preview, etc.)
-from app.api.v1.endpoints import utils
 api_router.include_router(
     utils.router, prefix="/utils", tags=["utils"]
 )
-

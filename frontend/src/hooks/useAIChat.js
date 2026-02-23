@@ -41,6 +41,7 @@ export const useAIChat = (options = {}) => {
     // Refs
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
+    const handleWebSocketMessageRef = useRef(null);
 
     // ==========================================================================
     // REST API Methods
@@ -256,7 +257,7 @@ export const useAIChat = (options = {}) => {
             wsRef.current.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    handleWebSocketMessage(data);
+                    handleWebSocketMessageRef.current?.(data);
                 } catch (err) {
                     logger.error('Failed to parse WebSocket message:', err);
                 }
@@ -341,6 +342,10 @@ export const useAIChat = (options = {}) => {
                 logger.warn('Unknown WebSocket message type:', data.type);
         }
     }, []);
+
+    useEffect(() => {
+        handleWebSocketMessageRef.current = handleWebSocketMessage;
+    }, [handleWebSocketMessage]);
 
     /**
      * Отправить сообщение через WebSocket

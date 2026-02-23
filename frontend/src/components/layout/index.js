@@ -1,3 +1,5 @@
+import React from 'react';
+
 // Экспорт всех компонентов layout
 export { default as ModernContainer } from './ModernContainer';
 export { default as ModernGrid, GridItem } from './ModernGrid';

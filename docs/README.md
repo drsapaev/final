@@ -59,6 +59,7 @@
 | [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md) | Backup & restore |
 | [PRODUCTION_SECURITY.md](./PRODUCTION_SECURITY.md) | Security in production |
 | [README_env.md](./README_env.md) | Environment variables |
+| [runbooks/LOCAL_DEV_ONBOARDING.md](./runbooks/LOCAL_DEV_ONBOARDING.md) | Local setup (Postgres-first) |
 
 ---
 
@@ -105,6 +106,11 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 2. [DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md](./DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md)
 3. [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md)
 
+### "I need local onboarding"
+1. [runbooks/LOCAL_DEV_ONBOARDING.md](./runbooks/LOCAL_DEV_ONBOARDING.md)
+2. [runbooks/POSTGRES_DR_RUNBOOK.md](./runbooks/POSTGRES_DR_RUNBOOK.md)
+3. [README_env.md](./README_env.md)
+
 ### "I need to integrate with API"
 1. [API_REFERENCE.md](./API_REFERENCE.md)
 2. [QUEUE_API_REFERENCE.md](./QUEUE_API_REFERENCE.md)
@@ -112,4 +118,4 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 
 ---
 
-*Last Updated: 2026-01-06*
+*Last Updated: 2026-02-21*

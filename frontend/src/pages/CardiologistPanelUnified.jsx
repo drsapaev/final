@@ -9,8 +9,8 @@ import {
   Calendar,
   Phone,
   Plus,
-  TestTube
-} from 'lucide-react';
+  TestTube } from
+'lucide-react';
 import {
   MacOSCard,
   MacOSButton,
@@ -18,8 +18,8 @@ import {
   MacOSLoadingSkeleton,
   MacOSEmptyState,
   MacOSTextarea,
-  MacOSCheckbox
-} from '../components/ui/macos';
+  MacOSCheckbox } from
+'../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -29,7 +29,7 @@ import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import EMRSystem from '../components/medical/EMRSystem';
+import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import tokenManager from '../utils/tokenManager';
 
@@ -74,7 +74,7 @@ const MacOSCardiologistPanelUnified = () => {
   const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ ldlThreshold: 100, showEcgEchoTogether: true });
-  const [emr, setEmr] = useState(null);
+  const [, setEmr] = useState(null);
 
   // Ref для отслеживания предыдущего пациента для очистки EMR
   const prevSelectedPatientRef = useRef(null);
@@ -82,7 +82,7 @@ const MacOSCardiologistPanelUnified = () => {
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState({});  // ✅ Добавлено: состояние для услуг
+  const [services, setServices] = useState({}); // ✅ Добавлено: состояние для услуг
 
   // Специализированные данные кардиолога
   const [bloodTestForm, setBloodTestForm] = useState({
@@ -253,13 +253,13 @@ const MacOSCardiologistPanelUnified = () => {
     const patientServices = new Set();
     const patientServiceCodes = new Set();
 
-    allAppointments.forEach(appointment => {
+    allAppointments.forEach((appointment) => {
       if (appointment.patient_id === patientId) {
         if (appointment.services && Array.isArray(appointment.services)) {
-          appointment.services.forEach(service => patientServices.add(service));
+          appointment.services.forEach((service) => patientServices.add(service));
         }
         if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
         }
       }
     });
@@ -296,9 +296,9 @@ const MacOSCardiologistPanelUnified = () => {
         const seenIds = new Set(); // Для отслеживания уже добавленных записей
 
         if (data && data.queues && Array.isArray(data.queues)) {
-          data.queues.forEach(queue => {
+          data.queues.forEach((queue) => {
             if (queue.entries) {
-              queue.entries.forEach(entry => {
+              queue.entries.forEach((entry) => {
                 const appointmentId = entry.appointment_id || entry.id;
                 const recordKey = `${entry.patient_id}_${appointmentId}_${queue.specialty}`;
 
@@ -337,7 +337,7 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         // ✅ Фильтруем только кардиологические записи, исключая ЭКГ
-        const appointmentsData = allAppointments.filter(apt => {
+        const appointmentsData = allAppointments.filter((apt) => {
           // Исключаем записи из очереди ЭКГ
           if (apt.specialty === 'echokg' || apt.specialty === 'ecg') {
             return false;
@@ -348,7 +348,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           // ✅ Проверяем по кодам услуг: исключаем записи, которые содержат только ЭКГ
           const serviceCodes = apt.service_codes || apt.services || [];
-          const hasOnlyECG = serviceCodes.length > 0 && serviceCodes.every(code => {
+          const hasOnlyECG = serviceCodes.length > 0 && serviceCodes.every((code) => {
             const codeStr = String(code).toUpperCase();
             return codeStr.includes('ECG') || codeStr.includes('ЭКГ') || codeStr === 'ECG';
           });
@@ -359,11 +359,11 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           // ✅ Проверяем, содержит ли запись консультацию кардиолога (не только ЭКГ)
-          const hasCardiologyConsultation = serviceCodes.some(code => {
+          const hasCardiologyConsultation = serviceCodes.some((code) => {
             const codeStr = String(code).toUpperCase();
             // Коды кардиологии: K01, K02, CARD_, CONSULTATION.CARDIOLOGY и т.д., но не ECG
-            return (codeStr.startsWith('K') || codeStr.startsWith('CARD_') || codeStr.includes('CONSULT'))
-              && !codeStr.includes('ECG') && !codeStr.includes('ЭКГ');
+            return (codeStr.startsWith('K') || codeStr.startsWith('CARD_') || codeStr.includes('CONSULT')) &&
+            !codeStr.includes('ECG') && !codeStr.includes('ЭКГ');
           });
 
           // Если есть консультация кардиолога и specialty правильный, включаем
@@ -383,11 +383,11 @@ const MacOSCardiologistPanelUnified = () => {
 
           if (appointmentsResponse.ok) {
             const appointmentsDBResponse = await appointmentsResponse.json();
-            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
 
             // Создаем карту id -> payment_status (используем id без смещения, так как бэкенд добавляет +20000 для Visit)
             const paymentStatusMap = new Map();
-            appointmentsDBData.forEach(apt => {
+            appointmentsDBData.forEach((apt) => {
               // Для Visit id уже добавлено +20000 в бэкенде, сохраняем как есть
               if (apt.id) {
                 paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
@@ -400,7 +400,7 @@ const MacOSCardiologistPanelUnified = () => {
             });
 
             // Обновляем payment_status в наших записях
-            allAppointments = allAppointments.map(apt => {
+            allAppointments = allAppointments.map((apt) => {
               // Пробуем найти по id
               let paymentStatus = paymentStatusMap.get(apt.id);
               // Если не нашли, пробуем по patient_id+date
@@ -420,7 +420,7 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         // Добавляем информацию о всех услугах пациента в каждую запись
-        const enrichedAppointmentsData = appointmentsData.map(apt => {
+        const enrichedAppointmentsData = appointmentsData.map((apt) => {
           const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
           return {
             ...apt,
@@ -614,34 +614,34 @@ const MacOSCardiologistPanelUnified = () => {
       case 'view':
         await handleAppointmentRowClick(row);
         break;
-      case 'view_emr': {
-        // Просмотр EMR для завершённой записи
-        const appointmentId = row.appointment_id || row.id;
+      case 'view_emr':{
+          // Просмотр EMR для завершённой записи
+          const appointmentId = row.appointment_id || row.id;
 
-        // Создаем объект пациента
-        const patientData = {
-          id: row.id,
-          appointment_id: appointmentId,
-          patient_id: row.patient_id,
-          patient_name: row.patient_fio,
-          phone: row.patient_phone,
-          number: row.id,
-          source: 'appointments',
-          status: row.status || 'waiting',
-          payment_status: row.payment_status || (row.discount_mode === 'paid' ? 'paid' : 'pending'),
-          discount_mode: row.discount_mode,
-          specialty: row.specialty || 'cardiology'
-        };
+          // Создаем объект пациента
+          const patientData = {
+            id: row.id,
+            appointment_id: appointmentId,
+            patient_id: row.patient_id,
+            patient_name: row.patient_fio,
+            phone: row.patient_phone,
+            number: row.id,
+            source: 'appointments',
+            status: row.status || 'waiting',
+            payment_status: row.payment_status || (row.discount_mode === 'paid' ? 'paid' : 'pending'),
+            discount_mode: row.discount_mode,
+            specialty: row.specialty || 'cardiology'
+          };
 
-        setSelectedPatient(patientData);
+          setSelectedPatient(patientData);
 
-        // Загружаем EMR
-        await loadEMR(appointmentId);
+          // Загружаем EMR
+          await loadEMR(appointmentId);
 
-        // Переходим на вкладку visit
-        goToTab('visit');
-        break;
-      }
+          // Переходим на вкладку visit
+          goToTab('visit');
+          break;
+        }
       case 'call':
         // Вызвать пациента
         try {
@@ -657,8 +657,8 @@ const MacOSCardiologistPanelUnified = () => {
 
           if (response.ok) {
             // Обновляем статус в локальном состоянии
-            setAppointments(prev => prev.map(a =>
-              a.id === row.id ? { ...a, status: 'called' } : a
+            setAppointments((prev) => prev.map((a) =>
+            a.id === row.id ? { ...a, status: 'called' } : a
             ));
             // Вызываем обновление списка
             await loadMacOSCardiologyAppointments();
@@ -677,36 +677,36 @@ const MacOSCardiologistPanelUnified = () => {
         // Печать талона
         window.print();
         break;
-      case 'complete': {
-        // Завершить приём
-        try {
-          // Переходим на вкладку визита для завершения
-          const patient = {
-            id: row.id,
-            appointment_id: row.appointment_id || row.id,
-            patient_id: row.patient_id,
-            patient_name: row.patient_fio,
-            phone: row.patient_phone,
-            number: row.id,
-            source: 'appointments',
-            status: 'in_cabinet',
-            payment_status: row.payment_status,
-            discount_mode: row.discount_mode,
-            specialty: row.specialty || 'cardiology'
-          };
+      case 'complete':{
+          // Завершить приём
+          try {
+            // Переходим на вкладку визита для завершения
+            const patient = {
+              id: row.id,
+              appointment_id: row.appointment_id || row.id,
+              patient_id: row.patient_id,
+              patient_name: row.patient_fio,
+              phone: row.patient_phone,
+              number: row.id,
+              source: 'appointments',
+              status: 'in_cabinet',
+              payment_status: row.payment_status,
+              discount_mode: row.discount_mode,
+              specialty: row.specialty || 'cardiology'
+            };
 
-          setSelectedPatient(patient);
+            setSelectedPatient(patient);
 
-          // Загружаем EMR если есть
-          await loadEMR(patient.appointment_id);
+            // Загружаем EMR если есть
+            await loadEMR(patient.appointment_id);
 
-          // Переходим на вкладку visit для завершения
-          goToTab('visit');
-        } catch (error) {
-          setMessage({ type: 'error', text: `Не удалось завершить приём: ${error.message || ''}`.trim() });
+            // Переходим на вкладку visit для завершения
+            goToTab('visit');
+          } catch (error) {
+            setMessage({ type: 'error', text: `Не удалось завершить приём: ${error.message || ''}`.trim() });
+          }
+          break;
         }
-        break;
-      }
       case 'edit':
         // Загружаем полные данные пациента перед открытием модального окна
         await handleEditPatient(row);
@@ -792,7 +792,7 @@ const MacOSCardiologistPanelUnified = () => {
         return null;
       }
 
-      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
       const response = await fetch(`${API_BASE}/api/v1/appointments/${appointmentId}/emr`, {
         method: 'GET',
@@ -822,100 +822,100 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Сохранение EMR
-  const saveEMR = async (emrData) => {
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!selectedPatient?.id) {
-        setMessage({ type: 'error', text: 'Не выбран пациент для сохранения EMR' });
-        return;
-      }
 
-      // appointmentId - это ID записи (appointment), а не ID пациента или записи из очереди
-      // Приоритет: appointment_id (из очереди) > id (если это уже appointment)
-      const appointmentId = selectedPatient.appointment_id || selectedPatient.id;
 
-      if (!appointmentId || appointmentId <= 0) {
-        setMessage({ type: 'error', text: 'Некорректный ID записи. Проверьте наличие appointment_id или id в данных пациента.' });
-        return;
-      }
 
-      // Используем правильный URL с backend
-      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
 
-      // Backend автоматически обновит статус called/calling на in_visit при сохранении EMR
-      // Не нужно пытаться обновлять статус заранее через start-visit
 
-      // Подготавливаем данные для сохранения согласно EMRCreate схеме
-      // appointment_id обязателен в схеме EMRCreate
-      const emrPayload = {
-        appointment_id: appointmentId, // Обязательное поле в EMRCreate
-        complaints: emrData.complaints || null,
-        anamnesis: emrData.anamnesis || null,
-        examination: emrData.examination || null,
-        diagnosis: emrData.diagnosis || null,
-        icd10: emrData.icd10 || null,
-        recommendations: emrData.recommendations || null,
-        procedures: emrData.procedures || null,
-        attachments: emrData.attachments ? emrData.attachments.map(att => ({
-          name: att.name || '',
-          type: att.type || '',
-          category: att.category || '',
-          // Не включаем file объект, только метаданные
-        })) : null,
-        is_draft: emrData.isDraft !== undefined ? emrData.isDraft : false,
-        specialty: selectedPatient?.specialty || 'cardiology'
-      };
 
-      // Добавляем dentalData если есть (это дополнительное поле, не в базовой схеме)
-      if (emrData.dentalData) {
-        emrPayload.dentalData = emrData.dentalData;
-      }
-      // Используем эндпоинт для сохранения EMR для appointment
-      // appointment_id передается в URL, не в body
-      const response = await fetch(`${API_BASE}/api/v1/appointments/${appointmentId}/emr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(emrPayload)
-      });
 
-      if (response.ok) {
-        const savedEMR = await response.json();
-        setEmr(savedEMR);
-        setMessage({ type: 'success', text: 'EMR сохранена успешно!' });
-        return savedEMR;
-      } else {
-        const error = await response.json().catch(() => ({ detail: 'Ошибка при сохранении EMR' }));
 
-        // Формируем читаемое сообщение об ошибке
-        let errorMessage = 'Ошибка при сохранении EMR';
-        if (error.detail) {
-          if (Array.isArray(error.detail)) {
-            // Если это массив ошибок валидации Pydantic
-            errorMessage = error.detail.map(err => {
-              if (typeof err === 'string') return err;
-              if (err.loc && err.msg) {
-                return `${err.loc.join('.')}: ${err.msg}`;
-              }
-              return JSON.stringify(err);
-            }).join(', ');
-          } else if (typeof error.detail === 'string') {
-            errorMessage = error.detail;
-          } else {
-            errorMessage = JSON.stringify(error.detail);
-          }
-        }
 
-        setMessage({ type: 'error', text: errorMessage });
-        throw new Error(errorMessage);
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message || 'Ошибка при сохранении EMR' });
-      throw error;
-    }
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // Обработка завершения приема через EMR
   const handleCompleteVisitFromEMR = async () => {
@@ -1008,186 +1008,186 @@ const MacOSCardiologistPanelUnified = () => {
           gap: getSpacing('lg')
         }}>
           {/* Записи кардиолога */}
-          {activeTab === 'appointments' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: getSpacing('xl')
-            }}>
+          {activeTab === 'appointments' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: getSpacing('xl')
+          }}>
               <MacOSCard style={{
-                width: '100%',
-                maxWidth: '100%',
-                minWidth: 0,
-                boxSizing: 'border-box',
-                overflow: 'hidden',
-                padding: '24px'
-              }}>
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+              padding: '24px'
+            }}>
                 <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '24px'
-                }}>
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}>
                   <h3 style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: 'var(--mac-font-size-lg)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    color: 'var(--mac-text-primary)',
-                    margin: 0
-                  }}>
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: 'var(--mac-font-size-lg)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-text-primary)',
+                  margin: 0
+                }}>
                     <Calendar size={20} style={{
-                      marginRight: '12px',
-                      color: 'var(--mac-accent)'
-                    }} />
+                    marginRight: '12px',
+                    color: 'var(--mac-accent)'
+                  }} />
                     Записи к кардиологу
                   </h3>
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}>
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
                     {/* Статистика очереди */}
                     <MacOSBadge variant="info">
                       Всего: {appointments.length}
                     </MacOSBadge>
                     <MacOSBadge variant="warning">
-                      Ожидают: {appointments.filter(a => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
+                      Ожидают: {appointments.filter((a) => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
                     </MacOSBadge>
                     <MacOSBadge variant="primary">
-                      Вызваны: {appointments.filter(a => a.status === 'called' || a.status === 'in_progress').length}
+                      Вызваны: {appointments.filter((a) => a.status === 'called' || a.status === 'in_progress').length}
                     </MacOSBadge>
                     <MacOSBadge variant="success">
-                      Приняты: {appointments.filter(a => a.status === 'completed' || a.status === 'done').length}
+                      Приняты: {appointments.filter((a) => a.status === 'completed' || a.status === 'done').length}
                     </MacOSBadge>
 
                     <MacOSButton
-                      variant="outline"
-                      onClick={loadMacOSCardiologyAppointments}
-                      disabled={appointmentsLoading}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
+                    variant="outline"
+                    onClick={loadMacOSCardiologyAppointments}
+                    disabled={appointmentsLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+
                       <RefreshCw size={16} />
                       Обновить
                     </MacOSButton>
                   </div>
                 </div>
 
-                {appointmentsLoading ? (
-                  <MacOSLoadingSkeleton type="table" count={5} />
-                ) : appointments.length === 0 ? (
-                  <MacOSEmptyState
-                    type="calendar"
-                    title="Записи не найдены"
-                    description="В системе пока нет записей к кардиологу"
-                  />
-                ) : (
-                  <EnhancedAppointmentsTable
-                    data={appointments}
-                    loading={appointmentsLoading}
-                    theme={isDark ? 'dark' : 'light'}
-                    language="ru"
-                    selectedRows={new Set()}
-                    outerBorder={false}
-                    services={services}
-                    showCheckboxes={false}
-                    view="doctor"
-                    onRowSelect={() => { }}
-                    onRowClick={handleAppointmentRowClick}
-                    onActionClick={handleAppointmentActionClick}
-                  />
-                )}
+                {appointmentsLoading ?
+              <MacOSLoadingSkeleton type="table" count={5} /> :
+              appointments.length === 0 ?
+              <MacOSEmptyState
+                type="calendar"
+                title="Записи не найдены"
+                description="В системе пока нет записей к кардиологу" /> :
+
+
+              <EnhancedAppointmentsTable
+                data={appointments}
+                loading={appointmentsLoading}
+                theme={isDark ? 'dark' : 'light'}
+                language="ru"
+                selectedRows={new Set()}
+                outerBorder={false}
+                services={services}
+                showCheckboxes={false}
+                view="doctor"
+                onRowSelect={() => {}}
+                onRowClick={handleAppointmentRowClick}
+                onActionClick={handleAppointmentActionClick} />
+
+              }
               </MacOSCard>
             </div>
-          )}
+          }
 
           {/* Прием пациента */}
-          {activeTab === 'visit' && selectedPatient && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              overflow: 'visible',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px'
-            }}>
+          {activeTab === 'visit' && selectedPatient &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
               {/* Информация о пациенте */}
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  marginBottom: '20px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
-                }}>
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+              }}>
                   <User size={20} style={{
-                    marginRight: '8px',
-                    color: 'var(--mac-blue-500)'
-                  }} />
+                  marginRight: '8px',
+                  color: 'var(--mac-blue-500)'
+                }} />
                   Пациент #{selectedPatient.number}
                 </h3>
 
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '20px'
-                }}>
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '20px'
+              }}>
                   <div>
                     <label style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--mac-text-secondary)',
-                      marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
                       ФИО пациента
                     </label>
                     <div style={{
+                    fontSize: '16px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>{selectedPatient.patient_name}</div>
+                  </div>
+
+                  {selectedPatient.phone &&
+                <div>
+                      <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                  }}>
+                        Телефон
+                      </label>
+                      <div style={{
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                        <Phone size={16} style={{
+                      marginRight: '6px',
+                      color: 'var(--mac-text-secondary)'
+                    }} />
+                        <span style={{
                       fontSize: '16px',
                       fontWeight: '500',
                       color: 'var(--mac-text-primary)',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                    }}>{selectedPatient.patient_name}</div>
-                  </div>
-
-                  {selectedPatient.phone && (
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--mac-text-secondary)',
-                        marginBottom: '6px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                      }}>
-                        Телефон
-                      </label>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}>
-                        <Phone size={16} style={{
-                          marginRight: '6px',
-                          color: 'var(--mac-text-secondary)'
-                        }} />
-                        <span style={{
-                          fontSize: '16px',
-                          fontWeight: '500',
-                          color: 'var(--mac-text-primary)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-                        }}>{selectedPatient.phone}</span>
+                    }}>{selectedPatient.phone}</span>
                       </div>
                     </div>
-                  )}
+                }
                 </div>
               </MacOSCard>
 
@@ -1195,71 +1195,62 @@ const MacOSCardiologistPanelUnified = () => {
               {/* Электронная медицинская карта */}
               <MacOSCard style={{ padding: '24px' }}>
                 <h3 style={{
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  marginBottom: '20px',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                marginBottom: '20px',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
                   <FileText size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
                   Электронная медицинская карта
                 </h3>
-                <EMRSystem
-                  appointment={{
-                    id: selectedPatient?.appointment_id || selectedPatient?.id,
-                    patient_id: selectedPatient?.patient?.id || selectedPatient?.patient_id,
-                    patient_name: selectedPatient?.patient_name || selectedPatient?.name,
-                    status: selectedPatient?.status || 'waiting',
-                    payment_status: selectedPatient?.payment_status || (selectedPatient?.discount_mode === 'paid' ? 'paid' : 'pending'),
-                    specialty: 'cardiology',
-                    discount_mode: selectedPatient?.discount_mode
-                  }}
-                  emr={emr}
-                  onSave={saveEMR}
-                  onComplete={handleCompleteVisitFromEMR}
-                />
+                <EMRContainerV2
+                visitId={selectedPatient?.appointment_id || selectedPatient?.id}
+                patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
+                specialty="cardiology" />
+
               </MacOSCard>
 
               {/* Действия */}
               <MacOSCard style={{ padding: '24px' }}>
                 <div className="flex justify-end" style={{ gap: '12px' }}>
                   <MacOSButton
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedPatient(null);
-                      setActiveTab('queue');
-                    }}
-                  >
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedPatient(null);
+                    setActiveTab('queue');
+                  }}>
+
                     Отменить
                   </MacOSButton>
                   <MacOSButton
-                    onClick={handleCompleteVisitFromEMR}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <RefreshCw size={16} style={{ marginRight: '8px' }} />
-                    ) : (
-                      <Save size={16} style={{ marginRight: '8px' }} />
-                    )}
+                  onClick={handleCompleteVisitFromEMR}
+                  disabled={loading}>
+
+                    {loading ?
+                  <RefreshCw size={16} style={{ marginRight: '8px' }} /> :
+
+                  <Save size={16} style={{ marginRight: '8px' }} />
+                  }
                     Завершить прием
                   </MacOSButton>
                 </div>
               </MacOSCard>
             </div>
-          )}
+          }
 
           {/* ЭКГ */}
-          {activeTab === 'ecg' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              overflow: 'visible',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: getSpacing('xl')
-            }}>
+          {activeTab === 'ecg' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: getSpacing('xl')
+          }}>
               <div className="flex justify-end">
                 <MacOSButton onClick={() => setShowForm({ open: true, type: 'ecg' })}>
                   <Plus size={16} style={{ marginRight: '8px' }} /> Добавить ЭКГ
@@ -1267,51 +1258,51 @@ const MacOSCardiologistPanelUnified = () => {
               </div>
               {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
               <ECGViewer
-                visitId={selectedPatient?.visitId || 'demo-visit-1'}
-                patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
-                onDataUpdate={() => {
-                  loadPatientData();
-                }}
-              />
+              visitId={selectedPatient?.visitId || 'demo-visit-1'}
+              patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
+              onDataUpdate={() => {
+                loadPatientData();
+              }} />
+
 
               <EchoForm
-                visitId={selectedPatient?.visitId || 'demo-visit-1'}
-                patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
-                onDataUpdate={() => {
-                  loadPatientData();
-                }}
-              />
+              visitId={selectedPatient?.visitId || 'demo-visit-1'}
+              patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
+              onDataUpdate={() => {
+                loadPatientData();
+              }} />
+
             </div>
-          )}
+          }
 
           {/* Анализы крови */}
-          {activeTab === 'blood' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              overflow: 'visible',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: getSpacing('xl')
-            }}>
+          {activeTab === 'blood' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: getSpacing('xl')
+          }}>
               <MacOSCard style={{ padding: '24px' }}>
                 <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: getSpacing('lg')
-                }}>
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: getSpacing('lg')
+              }}>
                   <h3 style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: getFontSize('lg'),
-                    fontWeight: '500',
-                    color: getColor('text')
-                  }}>
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: getFontSize('lg'),
+                  fontWeight: '500',
+                  color: getColor('text')
+                }}>
                     <TestTube size={20} style={{
-                      marginRight: getSpacing('sm'),
-                      color: getColor('secondary', 600)
-                    }} />
+                    marginRight: getSpacing('sm'),
+                    color: getColor('secondary', 600)
+                  }} />
                     Анализы крови
                   </h3>
                   <MacOSButton onClick={() => setShowForm({ open: true, type: 'blood' })}>
@@ -1321,370 +1312,370 @@ const MacOSCardiologistPanelUnified = () => {
                 </div>
 
                 {/* Небольшая аналитика по имеющимся анализам */}
-                {bloodTests.length > 0 && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: getSpacing('lg'),
-                    marginBottom: getSpacing('xl')
-                  }}>
+                {bloodTests.length > 0 &&
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: getSpacing('lg'),
+                marginBottom: getSpacing('xl')
+              }}>
                     {(() => {
-                      const avg = (key) => {
-                        const nums = bloodTests
-                          .map(t => Number(t[key]))
-                          .filter(v => !Number.isNaN(v));
-                        if (nums.length === 0) return '—';
-                        const sum = nums.reduce((a, b) => a + b, 0);
-                        return Math.round((sum / nums.length) * 10) / 10;
-                      };
-                      const items = [
-                        { label: 'Средний общий холестерин', value: avg('cholesterol_total'), unit: 'мг/дл' },
-                        { label: 'Средний LDL', value: avg('cholesterol_ldl'), unit: 'мг/дл' },
-                        { label: 'Средняя глюкоза', value: avg('glucose'), unit: 'мг/дл' },
-                      ];
-                      return items.map((it, idx) => (
-                        <div key={idx} style={{
-                          padding: getSpacing('md'),
-                          border: `1px solid ${getColor('border')}`,
-                          backgroundColor: getColor('surface'),
-                          color: getColor('text'),
-                          borderRadius: '8px'
-                        }}>
-                          <div style={{
-                            fontSize: getFontSize('sm'),
-                            color: getColor('textSecondary'),
-                            marginBottom: getSpacing('xs')
-                          }}>{it.label}</div>
-                          <div style={{
-                            fontSize: getFontSize('xl'),
-                            fontWeight: '600',
-                            color: getColor('text')
-                          }}>{it.value} {typeof it.value === 'number' ? it.unit : ''}</div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                )}
+                  const avg = (key) => {
+                    const nums = bloodTests.
+                    map((t) => Number(t[key])).
+                    filter((v) => !Number.isNaN(v));
+                    if (nums.length === 0) return '—';
+                    const sum = nums.reduce((a, b) => a + b, 0);
+                    return Math.round(sum / nums.length * 10) / 10;
+                  };
+                  const items = [
+                  { label: 'Средний общий холестерин', value: avg('cholesterol_total'), unit: 'мг/дл' },
+                  { label: 'Средний LDL', value: avg('cholesterol_ldl'), unit: 'мг/дл' },
+                  { label: 'Средняя глюкоза', value: avg('glucose'), unit: 'мг/дл' }];
 
-                {bloodTests.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
-                    {bloodTests.map((test) => (
-                      <div key={test.id} style={{
-                        padding: getSpacing('lg'),
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        borderRadius: '8px'
-                      }}>
+                  return items.map((it, idx) =>
+                  <div key={idx} style={{
+                    padding: getSpacing('md'),
+                    border: `1px solid ${getColor('border')}`,
+                    backgroundColor: getColor('surface'),
+                    color: getColor('text'),
+                    borderRadius: '8px'
+                  }}>
+                          <div style={{
+                      fontSize: getFontSize('sm'),
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('xs')
+                    }}>{it.label}</div>
+                          <div style={{
+                      fontSize: getFontSize('xl'),
+                      fontWeight: '600',
+                      color: getColor('text')
+                    }}>{it.value} {typeof it.value === 'number' ? it.unit : ''}</div>
+                        </div>
+                  );
+                })()}
+                  </div>
+              }
+
+                {bloodTests.length > 0 ?
+              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+                    {bloodTests.map((test) =>
+                <div key={test.id} style={{
+                  padding: getSpacing('lg'),
+                  border: `1px solid ${getColor('border')}`,
+                  backgroundColor: getColor('surface'),
+                  borderRadius: '8px'
+                }}>
                         <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          marginBottom: getSpacing('sm')
-                        }}>
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: getSpacing('sm')
+                  }}>
                           <h4 style={{
-                            fontSize: getFontSize('base'),
-                            fontWeight: '500',
-                            color: getColor('text')
-                          }}>Анализ #{test.id}</h4>
+                      fontSize: getFontSize('base'),
+                      fontWeight: '500',
+                      color: getColor('text')
+                    }}>Анализ #{test.id}</h4>
                           <MacOSBadge variant="info">{test.test_date}</MacOSBadge>
                         </div>
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                          gap: getSpacing('lg'),
-                          fontSize: getFontSize('sm'),
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: getSpacing('lg'),
+                    fontSize: getFontSize('sm'),
+                    color: getColor('textSecondary'),
+                    marginBottom: getSpacing('sm')
+                  }}>
                           <div>🩸 Холестерин: {test.cholesterol_total} мг/дл</div>
                           <div>HDL: {test.cholesterol_hdl}</div>
                           <div>LDL: {test.cholesterol_ldl}</div>
                           <div>Триглицериды: {test.triglycerides}</div>
                         </div>
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                          gap: getSpacing('lg'),
-                          fontSize: getFontSize('sm'),
-                          color: getColor('textSecondary')
-                        }}>
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: getSpacing('lg'),
+                    fontSize: getFontSize('sm'),
+                    color: getColor('textSecondary')
+                  }}>
                           <div>🍬 Глюкоза: {test.glucose} мг/дл</div>
                           <div>CRP: {test.crp} мг/л</div>
                           <div>Тропонин: {test.troponin} нг/мл</div>
                         </div>
-                        {test.interpretation && (
-                          <div style={{
-                            marginTop: getSpacing('sm'),
-                            fontSize: getFontSize('sm'),
-                            color: getColor('text')
-                          }}>
+                        {test.interpretation &&
+                  <div style={{
+                    marginTop: getSpacing('sm'),
+                    fontSize: getFontSize('sm'),
+                    color: getColor('text')
+                  }}>
                             <strong>Интерпретация:</strong> {test.interpretation}
                           </div>
-                        )}
+                  }
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: getSpacing('xl'),
-                    color: getColor('textSecondary')
-                  }}>
+                )}
+                  </div> :
+
+              <div style={{
+                textAlign: 'center',
+                padding: getSpacing('xl'),
+                color: getColor('textSecondary')
+              }}>
                     <TestTube size={48} style={{
-                      margin: '0 auto 16px',
-                      color: getColor('textSecondary')
-                    }} />
+                  margin: '0 auto 16px',
+                  color: getColor('textSecondary')
+                }} />
                     <p>Нет данных анализов</p>
                   </div>
-                )}
+              }
               </MacOSCard>
 
               {/* Форма анализа крови */}
-              {showForm.open && showForm.type === 'blood' && (
-                <MacOSCard style={{ padding: '24px' }}>
+              {showForm.open && showForm.type === 'blood' &&
+            <MacOSCard style={{ padding: '24px' }}>
                   <h3 style={{
-                    fontSize: getFontSize('lg'),
-                    fontWeight: '500',
-                    marginBottom: getSpacing('lg'),
-                    color: getColor('text')
-                  }}>Новый анализ крови</h3>
+                fontSize: getFontSize('lg'),
+                fontWeight: '500',
+                marginBottom: getSpacing('lg'),
+                color: getColor('text')
+              }}>Новый анализ крови</h3>
                   <form onSubmit={handleBloodTestSubmit} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: getSpacing('lg')
-                  }}>
+                display: 'flex',
+                flexDirection: 'column',
+                gap: getSpacing('lg')
+              }}>
                     <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: getSpacing('lg') }}>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           Дата анализа *
                         </label>
                         <input
-                          type="date"
-                          value={bloodTestForm.test_date}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          required
-                        />
+                      type="date"
+                      value={bloodTestForm.test_date}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      required />
+
                       </div>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           Общий холестерин (мг/дл)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.cholesterol_total}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_total: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder="<200"
-                        />
+                      type="number"
+                      value={bloodTestForm.cholesterol_total}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_total: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder="<200" />
+
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           HDL холестерин (мг/дл)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.cholesterol_hdl}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_hdl: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder=">40"
-                        />
+                      type="number"
+                      value={bloodTestForm.cholesterol_hdl}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_hdl: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder=">40" />
+
                       </div>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           LDL холестерин (мг/дл)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.cholesterol_ldl}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder="<100"
-                        />
+                      type="number"
+                      value={bloodTestForm.cholesterol_ldl}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder="<100" />
+
                       </div>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           Триглицериды (мг/дл)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.triglycerides}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, triglycerides: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder="<150"
-                        />
+                      type="number"
+                      value={bloodTestForm.triglycerides}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, triglycerides: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder="<150" />
+
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           Глюкоза (мг/дл)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.glucose}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, glucose: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder="70-100"
-                        />
+                      type="number"
+                      value={bloodTestForm.glucose}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, glucose: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder="70-100" />
+
                       </div>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           CRP (мг/л)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.crp}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, crp: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder="<3.0"
-                        />
+                      type="number"
+                      value={bloodTestForm.crp}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, crp: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder="<3.0" />
+
                       </div>
                       <div>
                         <label className="block" style={{
-                          fontSize: getFontSize('sm'),
-                          fontWeight: '500',
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('sm')
-                        }}>
+                      fontSize: getFontSize('sm'),
+                      fontWeight: '500',
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('sm')
+                    }}>
                           Тропонин (нг/мл)
                         </label>
                         <input
-                          type="number"
-                          value={bloodTestForm.troponin}
-                          onChange={(e) => setBloodTestForm({ ...bloodTestForm, troponin: e.target.value })}
-                          className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
-                          style={{
-                            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                            border: `1px solid ${getColor('border')}`,
-                            backgroundColor: getColor('surface'),
-                            color: getColor('text'),
-                            fontSize: getFontSize('base'),
-                            borderRadius: '6px'
-                          }}
-                          placeholder="<0.04"
-                        />
+                      type="number"
+                      value={bloodTestForm.troponin}
+                      onChange={(e) => setBloodTestForm({ ...bloodTestForm, troponin: e.target.value })}
+                      className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
+                      style={{
+                        padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                        border: `1px solid ${getColor('border')}`,
+                        backgroundColor: getColor('surface'),
+                        color: getColor('text'),
+                        fontSize: getFontSize('base'),
+                        borderRadius: '6px'
+                      }}
+                      placeholder="<0.04" />
+
                       </div>
                     </div>
 
                     <div>
                       <label className="block" style={{
-                        fontSize: getFontSize('sm'),
-                        fontWeight: '500',
-                        color: getColor('textSecondary'),
-                        marginBottom: getSpacing('sm')
-                      }}>
+                    fontSize: getFontSize('sm'),
+                    fontWeight: '500',
+                    color: getColor('textSecondary'),
+                    marginBottom: getSpacing('sm')
+                  }}>
                         Интерпретация
                       </label>
                       <MacOSTextarea
-                        value={bloodTestForm.interpretation}
-                        onChange={(e) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
-                        placeholder="Интерпретация результатов анализов"
-                        rows={4}
-                      />
+                    value={bloodTestForm.interpretation}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
+                    placeholder="Интерпретация результатов анализов"
+                    rows={4} />
+
                     </div>
 
                     <div className="flex justify-end" style={{ gap: getSpacing('md') }}>
                       <MacOSButton
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowForm({ open: false, type: 'blood' })}
-                      >
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowForm({ open: false, type: 'blood' })}>
+
                         Отмена
                       </MacOSButton>
                       <MacOSButton type="submit">
@@ -1694,235 +1685,235 @@ const MacOSCardiologistPanelUnified = () => {
                     </div>
                   </form>
                 </MacOSCard>
-              )}
+            }
             </div>
-          )}
+          }
 
           {/* AI Помощник */}
-          {activeTab === 'ai' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              overflow: 'visible'
-            }}>
+          {activeTab === 'ai' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible'
+          }}>
               <AIAssistant
-                specialty="cardiology"
-                onSuggestionSelect={handleAISuggestion}
-              />
+              specialty="cardiology"
+              onSuggestionSelect={handleAISuggestion} />
+
             </div>
-          )}
+          }
 
           {/* Управление услугами */}
-          {activeTab === 'services' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              overflow: 'visible'
-            }}>
+          {activeTab === 'services' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible'
+          }}>
               <DoctorServiceSelector
-                specialty="cardiology"
-                selectedServices={[]}
-                onServicesChange={() => { }}
-                canEditPrices={false}
-              />
+              specialty="cardiology"
+              selectedServices={[]}
+              onServicesChange={() => {}}
+              canEditPrices={false} />
+
             </div>
-          )}
+          }
 
           {/* История (заглушка) */}
-          {activeTab === 'history' && (
-            <div style={{
-              width: '100%',
-              maxWidth: 'none',
-              overflow: 'visible',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: getSpacing('xl')
+          {activeTab === 'history' &&
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: getSpacing('xl')
+          }}>
+              {!selectedPatient ?
+            <MacOSCard style={{
+              padding: getSpacing('xl'),
+              textAlign: 'center'
             }}>
-              {!selectedPatient ? (
-                <MacOSCard style={{
-                  padding: getSpacing('xl'),
-                  textAlign: 'center'
-                }}>
                   <Calendar size={48} style={{
-                    margin: '0 auto 16px',
-                    color: getColor('textSecondary')
-                  }} />
+                margin: '0 auto 16px',
+                color: getColor('textSecondary')
+              }} />
                   <h3 style={{
-                    fontSize: getFontSize('lg'),
-                    fontWeight: '500',
-                    marginBottom: getSpacing('sm'),
-                    color: getColor('text')
-                  }}>История</h3>
+                fontSize: getFontSize('lg'),
+                fontWeight: '500',
+                marginBottom: getSpacing('sm'),
+                color: getColor('text')
+              }}>История</h3>
                   <p style={{ color: getColor('textSecondary') }}>Выберите пациента в очереди или из записей</p>
-                </MacOSCard>
-              ) : (
-                <>
+                </MacOSCard> :
+
+            <>
                   <MacOSCard style={{ padding: '24px' }}>
                     <h3 style={{
-                      fontSize: getFontSize('lg'),
-                      fontWeight: '500',
-                      marginBottom: getSpacing('lg'),
-                      color: getColor('text')
-                    }}>Хронология записей пациента</h3>
+                  fontSize: getFontSize('lg'),
+                  fontWeight: '500',
+                  marginBottom: getSpacing('lg'),
+                  color: getColor('text')
+                }}>Хронология записей пациента</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
-                      {bloodTests.length === 0 && ecgResults.length === 0 && (
-                        <div style={{ color: getColor('textSecondary') }}>Нет данных по ЭКГ или анализам крови</div>
-                      )}
-                      {bloodTests.map((t) => (
-                        <div key={`blood-${t.id}`} style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: getSpacing('md')
-                        }}>
+                      {bloodTests.length === 0 && ecgResults.length === 0 &&
+                  <div style={{ color: getColor('textSecondary') }}>Нет данных по ЭКГ или анализам крови</div>
+                  }
+                      {bloodTests.map((t) =>
+                  <div key={`blood-${t.id}`} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: getSpacing('md')
+                  }}>
                           <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: getColor('secondary', 500),
-                            marginTop: getSpacing('sm')
-                          }} />
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: getColor('secondary', 500),
+                      marginTop: getSpacing('sm')
+                    }} />
                           <div>
                             <div style={{
-                              fontSize: getFontSize('base'),
-                              fontWeight: '500',
-                              color: getColor('text')
-                            }}>Анализ крови — {t.test_date}</div>
+                        fontSize: getFontSize('base'),
+                        fontWeight: '500',
+                        color: getColor('text')
+                      }}>Анализ крови — {t.test_date}</div>
                             <div style={{
-                              fontSize: getFontSize('sm'),
-                              color: getColor('textSecondary')
-                            }}>
+                        fontSize: getFontSize('sm'),
+                        color: getColor('textSecondary')
+                      }}>
                               Хол: {t.cholesterol_total}; LDL: {t.cholesterol_ldl}; Глюкоза: {t.glucose}
                             </div>
                           </div>
                         </div>
-                      ))}
-                      {ecgResults.map((e) => (
-                        <div key={`ecg-${e.id || e.ecg_date}`} style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: getSpacing('md')
-                        }}>
+                  )}
+                      {ecgResults.map((e) =>
+                  <div key={`ecg-${e.id || e.ecg_date}`} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: getSpacing('md')
+                  }}>
                           <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: getColor('success', 500),
-                            marginTop: getSpacing('sm')
-                          }} />
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: getColor('success', 500),
+                      marginTop: getSpacing('sm')
+                    }} />
                           <div>
                             <div style={{
-                              fontSize: getFontSize('base'),
-                              fontWeight: '500',
-                              color: getColor('text')
-                            }}>ЭКГ — {e.ecg_date || '—'}</div>
+                        fontSize: getFontSize('base'),
+                        fontWeight: '500',
+                        color: getColor('text')
+                      }}>ЭКГ — {e.ecg_date || '—'}</div>
                             <div style={{
-                              fontSize: getFontSize('sm'),
-                              color: getColor('textSecondary')
-                            }}>
+                        fontSize: getFontSize('sm'),
+                        color: getColor('textSecondary')
+                      }}>
                               Ритм: {e.rhythm || '—'}, ЧСС: {e.heart_rate || '—'}
                             </div>
                           </div>
                         </div>
-                      ))}
+                  )}
                     </div>
                   </MacOSCard>
 
                   <MacOSCard style={{ padding: '24px' }}>
                     <h3 style={{
-                      fontSize: getFontSize('lg'),
-                      fontWeight: '500',
-                      marginBottom: getSpacing('lg'),
-                      color: getColor('text')
-                    }}>Сводка по пациенту</h3>
+                  fontSize: getFontSize('lg'),
+                  fontWeight: '500',
+                  marginBottom: getSpacing('lg'),
+                  color: getColor('text')
+                }}>Сводка по пациенту</h3>
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: getSpacing('lg')
-                    }}>
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: getSpacing('lg')
+                }}>
                       <div style={{
-                        padding: getSpacing('md'),
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        borderRadius: '8px'
-                      }}>
+                    padding: getSpacing('md'),
+                    border: `1px solid ${getColor('border')}`,
+                    backgroundColor: getColor('surface'),
+                    borderRadius: '8px'
+                  }}>
                         <div style={{
-                          fontSize: getFontSize('sm'),
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('xs')
-                        }}>Количество ЭКГ</div>
+                      fontSize: getFontSize('sm'),
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('xs')
+                    }}>Количество ЭКГ</div>
                         <div style={{
-                          fontSize: getFontSize('xl'),
-                          fontWeight: '600',
-                          color: getColor('text')
-                        }}>{ecgResults.length}</div>
+                      fontSize: getFontSize('xl'),
+                      fontWeight: '600',
+                      color: getColor('text')
+                    }}>{ecgResults.length}</div>
                       </div>
                       <div style={{
-                        padding: getSpacing('md'),
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        borderRadius: '8px'
-                      }}>
+                    padding: getSpacing('md'),
+                    border: `1px solid ${getColor('border')}`,
+                    backgroundColor: getColor('surface'),
+                    borderRadius: '8px'
+                  }}>
                         <div style={{
-                          fontSize: getFontSize('sm'),
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('xs')
-                        }}>Количество анализов</div>
+                      fontSize: getFontSize('sm'),
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('xs')
+                    }}>Количество анализов</div>
                         <div style={{
-                          fontSize: getFontSize('xl'),
-                          fontWeight: '600',
-                          color: getColor('text')
-                        }}>{bloodTests.length}</div>
+                      fontSize: getFontSize('xl'),
+                      fontWeight: '600',
+                      color: getColor('text')
+                    }}>{bloodTests.length}</div>
                       </div>
                       <div style={{
-                        padding: getSpacing('md'),
-                        border: `1px solid ${getColor('border')}`,
-                        backgroundColor: getColor('surface'),
-                        borderRadius: '8px'
-                      }}>
+                    padding: getSpacing('md'),
+                    border: `1px solid ${getColor('border')}`,
+                    backgroundColor: getColor('surface'),
+                    borderRadius: '8px'
+                  }}>
                         <div style={{
-                          fontSize: getFontSize('sm'),
-                          color: getColor('textSecondary'),
-                          marginBottom: getSpacing('xs')
-                        }}>Выбранный пациент</div>
+                      fontSize: getFontSize('sm'),
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('xs')
+                    }}>Выбранный пациент</div>
                         <div style={{
-                          fontSize: getFontSize('xl'),
-                          fontWeight: '600',
-                          color: getColor('text')
-                        }}>{selectedPatient?.patient_name || '—'}</div>
+                      fontSize: getFontSize('xl'),
+                      fontWeight: '600',
+                      color: getColor('text')
+                    }}>{selectedPatient?.patient_name || '—'}</div>
                       </div>
                     </div>
                   </MacOSCard>
                 </>
-              )}
+            }
             </div>
-          )}
+          }
         </div>
 
         {/* Модальное окно Schedule Next */}
-        {scheduleNextModal.open && (
-          <ScheduleNextModal
-            isOpen={scheduleNextModal.open}
-            onClose={() => setScheduleNextModal({ open: false, patient: null })}
-            patient={scheduleNextModal.patient}
-            theme={{ isDark, getColor, getSpacing, getFontSize }}
-            specialtyFilter="cardiology"
-          />
-        )}
+        {scheduleNextModal.open &&
+        <ScheduleNextModal
+          isOpen={scheduleNextModal.open}
+          onClose={() => setScheduleNextModal({ open: false, patient: null })}
+          patient={scheduleNextModal.patient}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
+          specialtyFilter="cardiology" />
+
+        }
 
         {/* Модальное окно редактирования пациента */}
-        {editPatientModal.open && (
-          <EditPatientModal
-            isOpen={editPatientModal.open}
-            onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
-            patient={editPatientModal.patient}
-            onSave={async () => {
-              await loadMacOSCardiologyAppointments();
-              setEditPatientModal({ open: false, patient: null, loading: false });
-            }}
-            loading={editPatientModal.loading}
-            theme={{ isDark, getColor, getSpacing, getFontSize }}
-          />
-        )}
+        {editPatientModal.open &&
+        <EditPatientModal
+          isOpen={editPatientModal.open}
+          onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
+          patient={editPatientModal.patient}
+          onSave={async () => {
+            await loadMacOSCardiologyAppointments();
+            setEditPatientModal({ open: false, patient: null, loading: false });
+          }}
+          loading={editPatientModal.loading}
+          theme={{ isDark, getColor, getSpacing, getFontSize }} />
+
+        }
 
         {/* Настройки кардиолога: плавающая кнопка и панель */}
         <button
@@ -1937,81 +1928,81 @@ const MacOSCardiologistPanelUnified = () => {
             padding: getSpacing('md'),
             boxShadow: getShadow('lg')
           }}
-          aria-label="Открыть настройки"
-        >
+          aria-label="Открыть настройки">
+
           <Settings size={18} />
         </button>
-        {settingsOpen && (
-          <MacOSCard style={{
-            padding: '24px',
-            position: 'fixed',
-            right: 16,
-            bottom: 80,
-            width: 360,
-            backgroundColor: getColor('surface'),
-            border: `1px solid ${getColor('border')}`,
-            boxShadow: getShadow('xl')
-          }}>
+        {settingsOpen &&
+        <MacOSCard style={{
+          padding: '24px',
+          position: 'fixed',
+          right: 16,
+          bottom: 80,
+          width: 360,
+          backgroundColor: getColor('surface'),
+          border: `1px solid ${getColor('border')}`,
+          boxShadow: getShadow('xl')
+        }}>
             <h3 style={{
-              fontSize: getFontSize('lg'),
-              fontWeight: '500',
-              marginBottom: getSpacing('md'),
-              color: getColor('text')
-            }}>Настройки кардиолога</h3>
+            fontSize: getFontSize('lg'),
+            fontWeight: '500',
+            marginBottom: getSpacing('md'),
+            color: getColor('text')
+          }}>Настройки кардиолога</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
               <label className="flex items-center" style={{
-                gap: '8px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
-              }}>
+              gap: '8px',
+              color: 'var(--mac-text-primary)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+            }}>
                 <MacOSCheckbox
-                  checked={settings.showEcgEchoTogether}
-                  onChange={(e) => setSettings({ ...settings, showEcgEchoTogether: e.target.checked })}
-                />
+                checked={settings.showEcgEchoTogether}
+                onChange={(e) => setSettings({ ...settings, showEcgEchoTogether: e.target.checked })} />
+
                 Показывать ЭКГ и ЭхоКГ вместе
               </label>
               <div>
                 <div className="text-sm" style={{
-                  color: getColor('textSecondary'),
-                  marginBottom: getSpacing('xs')
-                }}>Порог LDL (мг/дл)</div>
+                color: getColor('textSecondary'),
+                marginBottom: getSpacing('xs')
+              }}>Порог LDL (мг/дл)</div>
                 <input
-                  type="number"
-                  value={settings.ldlThreshold}
-                  onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
-                  style={{
-                    width: '100%',
-                    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-                    border: `1px solid ${getColor('border')}`,
-                    borderRadius: '6px',
-                    backgroundColor: getColor('surface'),
-                    color: getColor('text'),
-                    fontSize: getFontSize('base'),
-                    outline: 'none'
-                  }}
-                />
+                type="number"
+                value={settings.ldlThreshold}
+                onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
+                style={{
+                  width: '100%',
+                  padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+                  border: `1px solid ${getColor('border')}`,
+                  borderRadius: '6px',
+                  backgroundColor: getColor('surface'),
+                  color: getColor('text'),
+                  fontSize: getFontSize('base'),
+                  outline: 'none'
+                }} />
+
               </div>
             </div>
             <div className="flex justify-end" style={{
-              gap: getSpacing('sm'),
-              marginTop: getSpacing('lg')
-            }}>
+            gap: getSpacing('sm'),
+            marginTop: getSpacing('lg')
+          }}>
               <MacOSButton variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</MacOSButton>
               <MacOSButton onClick={() => setSettingsOpen(false)}><Save size={16} style={{ marginRight: '8px' }} />Сохранить</MacOSButton>
             </div>
           </MacOSCard>
-        )}
+        }
 
         {/* AI Chat Widget */}
         <AIChatWidget
           contextType="general"
           specialty="cardiology"
           useWebSocket={false}
-          position="bottom-right"
-        />
+          position="bottom-right" />
+
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default MacOSCardiologistPanelUnified;

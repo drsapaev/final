@@ -2,12 +2,11 @@
 Сервис для аутентификации с JWT токенами
 """
 
-import hashlib
 import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from jose import jwt
 from sqlalchemy import and_, desc, or_
@@ -21,7 +20,6 @@ from app.models.authentication import (
     PasswordResetToken,
     RefreshToken,
     SecurityEvent,
-    UserActivity,
     UserSession,
 )
 from app.models.user import User
@@ -45,7 +43,7 @@ class AuthenticationService:
         self.lockout_duration_minutes = 15
 
     def create_access_token(
-        self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+        self, data: dict[str, Any], expires_delta: timedelta | None = None
     ) -> str:
         """Создает JWT access токен"""
         to_encode = data.copy()
@@ -73,7 +71,7 @@ class AuthenticationService:
 
     def verify_token(
         self, token: str, token_type: str = "access"
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Проверяет JWT токен (без проверки blacklist)"""
         try:
             payload = jwt.decode(
@@ -88,29 +86,29 @@ class AuthenticationService:
         except jwt.InvalidTokenError:
             logger.warning("Invalid token")
             return None
-    
+
     def verify_token_with_blacklist(
         self, db: Session, token: str, token_type: str = "access"
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Проверяет JWT токен с проверкой черного списка.
-        
+
         Используйте этот метод для критических операций.
         """
         payload = self.verify_token(token, token_type)
         if not payload:
             return None
-        
+
         jti = payload.get("jti")
         if not jti:
             return payload  # Старые токены без jti пропускаем
-        
+
         # Проверяем blacklist
         from app.services.token_blacklist_service import token_blacklist_service
         if token_blacklist_service.is_token_blacklisted(db, jti):
             logger.warning(f"Token {jti} is blacklisted")
             return None
-        
+
         return payload
 
     def authenticate_user(
@@ -120,7 +118,7 @@ class AuthenticationService:
         password: str,
         ip_address: str = None,
         user_agent: str = None,
-    ) -> Tuple[Optional[User], str]:
+    ) -> tuple[User | None, str]:
         """Аутентифицирует пользователя"""
         try:
             logger.debug("authenticate_user called with username=%s", username)
@@ -212,7 +210,7 @@ class AuthenticationService:
         user_agent: str = None,
         device_fingerprint: str = None,
         remember_me: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Выполняет вход пользователя"""
         logger.debug("login_user called with username=%s", username)
 
@@ -233,25 +231,25 @@ class AuthenticationService:
         # ✅ SECURITY: Проверяем, требуется ли 2FA до выдачи токенов
         requires_2fa = False
         two_factor_method = None
-        
+
         # ✅ CERTIFICATION: Принудительное 2FA для критичных ролей (Admin, Cashier)
         # ✅ CI/TESTING: Можно отключить через переменную окружения DISABLE_2FA_REQUIREMENT=1
         import os
         disable_2fa_requirement = os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes")
-        
+
         from app.core.roles import Roles
-        
+
         CRITICAL_2FA_ROLES = {Roles.ADMIN, Roles.CASHIER}
         user_role = getattr(user, "role", None)
         is_critical_role = user_role in CRITICAL_2FA_ROLES
-        
+
         # Проверяем, настроена ли 2FA у пользователя
         has_2fa_enabled = (
-            user.two_factor_auth 
-            and user.two_factor_auth.totp_enabled 
+            user.two_factor_auth
+            and user.two_factor_auth.totp_enabled
             and user.two_factor_auth.totp_verified
         )
-        
+
         # Если роль критичная (Admin/Cashier), но 2FA не настроена - блокируем вход
         # КРОМЕ случая, когда DISABLE_2FA_REQUIREMENT=1 (для тестирования)
         if is_critical_role and not has_2fa_enabled and not disable_2fa_requirement:
@@ -264,7 +262,7 @@ class AuthenticationService:
                 "requires_2fa_setup": True,  # ✅ Новый флаг: требуется настройка 2FA
                 "two_factor_method": None,
             }
-        
+
         # Если 2FA настроена, требуем верификацию
         if has_2fa_enabled:
             requires_2fa = True
@@ -352,7 +350,7 @@ class AuthenticationService:
             "must_change_password": getattr(user, 'must_change_password', False),
         }
 
-    def refresh_access_token(self, db: Session, refresh_token: str) -> Dict[str, Any]:
+    def refresh_access_token(self, db: Session, refresh_token: str) -> dict[str, Any]:
         """Обновляет access токен"""
         try:
             # Проверяем refresh токен
@@ -415,7 +413,7 @@ class AuthenticationService:
         refresh_token: str = None,
         user_id: int = None,
         logout_all: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Выполняет выход пользователя"""
         try:
             if logout_all and user_id:
@@ -428,7 +426,7 @@ class AuthenticationService:
                 db.query(UserSession).filter(UserSession.user_id == user_id).update(
                     {"is_active": False}
                 )
-                
+
                 # ✅ NEW: Блокируем все access токены пользователя
                 from app.services.token_blacklist_service import token_blacklist_service
                 token_blacklist_service.blacklist_all_user_tokens(db, user_id, reason="logout_all")
@@ -466,7 +464,7 @@ class AuthenticationService:
 
     def create_password_reset_token(
         self, db: Session, email: str, ip_address: str = None, user_agent: str = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Создает токен для сброса пароля"""
         try:
             user = db.query(User).filter(User.email == email).first()
@@ -522,7 +520,7 @@ class AuthenticationService:
 
     def reset_password(
         self, db: Session, token: str, new_password: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Сбрасывает пароль пользователя"""
         try:
             # Проверяем токен
@@ -577,7 +575,7 @@ class AuthenticationService:
 
     def change_password(
         self, db: Session, user_id: int, current_password: str, new_password: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Меняет пароль пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -615,7 +613,7 @@ class AuthenticationService:
 
     def create_email_verification_token(
         self, db: Session, user_id: int, ip_address: str = None, user_agent: str = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Создает токен для верификации email"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -660,7 +658,7 @@ class AuthenticationService:
                 "message": "Ошибка создания токена верификации email",
             }
 
-    def verify_email(self, db: Session, token: str) -> Dict[str, Any]:
+    def verify_email(self, db: Session, token: str) -> dict[str, Any]:
         """Верифицирует email пользователя"""
         try:
             # Проверяем токен
@@ -698,7 +696,7 @@ class AuthenticationService:
             logger.error(f"Error verifying email: {e}")
             return {"success": False, "message": "Ошибка верификации email"}
 
-    def get_user_profile(self, db: Session, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_user_profile(self, db: Session, user_id: int) -> dict[str, Any] | None:
         """Получает профиль пользователя"""
         try:
             user = db.query(User).filter(User.id == user_id).first()
@@ -756,12 +754,12 @@ class AuthenticationService:
     def _log_login_attempt(
         self,
         db: Session,
-        user_id: Optional[int],
+        user_id: int | None,
         username: str,
         ip_address: str,
         user_agent: str,
         success: bool,
-        failure_reason: Optional[str],
+        failure_reason: str | None,
     ):
         """Логирует попытку входа"""
         try:
@@ -786,7 +784,7 @@ class AuthenticationService:
         description: str,
         ip_address: str = None,
         user_agent: str = None,
-        metadata: Dict[str, Any] = None,
+        metadata: dict[str, Any] = None,
     ):
         """Логирует активность пользователя"""
         try:
@@ -799,13 +797,13 @@ class AuthenticationService:
     def _log_security_event(
         self,
         db: Session,
-        user_id: Optional[int],
+        user_id: int | None,
         event_type: str,
         severity: str,
         description: str,
         ip_address: str = None,
         user_agent: str = None,
-        metadata: Dict[str, Any] = None,
+        metadata: dict[str, Any] = None,
     ):
         """Логирует событие безопасности"""
         try:
@@ -851,7 +849,7 @@ class AuthenticationService:
 
     def get_current_session(
         self, db: Session, user_id: int, ip_address: str = None, user_agent: str = None
-    ) -> Optional[UserSession]:
+    ) -> UserSession | None:
         """
         Получить текущую активную сессию пользователя
         """
@@ -888,7 +886,7 @@ class AuthenticationService:
 
     def get_user_sessions(
         self, db: Session, user_id: int, active_only: bool = True
-    ) -> List[UserSession]:
+    ) -> list[UserSession]:
         """
         Получить все сессии пользователя
         """
@@ -1115,7 +1113,7 @@ class AuthenticationService:
 
     def get_session_info(
         self, db: Session, session_id: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Получить информацию о сессии
         """
@@ -1145,7 +1143,7 @@ class AuthenticationService:
 
     def validate_session_token(
         self, db: Session, user_id: int, refresh_token: str
-    ) -> Optional[UserSession]:
+    ) -> UserSession | None:
         """
         Проверить валидность токена сессии
         """

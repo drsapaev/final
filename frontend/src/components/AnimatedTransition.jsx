@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useFadeIn, useSlide, useScale } from './ui/native';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+
 
 const AnimatedTransition = ({
   children,
@@ -35,42 +36,42 @@ const AnimatedTransition = ({
           opacity: isAnimating ? 1 : 0,
           transform: isAnimating ? 'translateY(0)' : 'translateY(20px)'
         };
-      
-      case 'slide': {
-        const slideTransform = {
-          up: isAnimating ? 'translateY(0)' : 'translateY(100%)',
-          down: isAnimating ? 'translateY(0)' : 'translateY(-100%)',
-          left: isAnimating ? 'translateX(0)' : 'translateX(100%)',
-          right: isAnimating ? 'translateX(0)' : 'translateX(-100%)'
-        };
-        return {
-          ...baseStyle,
-          opacity: isAnimating ? 1 : 0,
-          transform: slideTransform[direction] || slideTransform.up
-        };
-      }
-      
+
+      case 'slide':{
+          const slideTransform = {
+            up: isAnimating ? 'translateY(0)' : 'translateY(100%)',
+            down: isAnimating ? 'translateY(0)' : 'translateY(-100%)',
+            left: isAnimating ? 'translateX(0)' : 'translateX(100%)',
+            right: isAnimating ? 'translateX(0)' : 'translateX(-100%)'
+          };
+          return {
+            ...baseStyle,
+            opacity: isAnimating ? 1 : 0,
+            transform: slideTransform[direction] || slideTransform.up
+          };
+        }
+
       case 'scale':
         return {
           ...baseStyle,
           opacity: isAnimating ? 1 : 0,
           transform: isAnimating ? 'scale(1)' : 'scale(0.8)'
         };
-      
+
       case 'zoom':
         return {
           ...baseStyle,
           opacity: isAnimating ? 1 : 0,
           transform: isAnimating ? 'scale(1)' : 'scale(0)'
         };
-      
+
       case 'rotate':
         return {
           ...baseStyle,
           opacity: isAnimating ? 1 : 0,
           transform: isAnimating ? 'rotate(0deg)' : 'rotate(-180deg)'
         };
-      
+
       default:
         return baseStyle;
     }
@@ -81,11 +82,11 @@ const AnimatedTransition = ({
   return (
     <div
       className={`animated-transition ${className}`}
-      style={getAnimationStyle()}
-    >
+      style={getAnimationStyle()}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент для анимированного списка
@@ -97,13 +98,13 @@ export const AnimatedList = ({
   className = '',
   style = {}
 }) => {
-  const [visibleItems, setVisibleItems] = useState([]);
+  const [, setVisibleItems] = useState([]);
 
   useEffect(() => {
-    const timers = items.map((_, index) => 
-      setTimeout(() => {
-        setVisibleItems(prev => [...prev, index]);
-      }, index * staggerDelay)
+    const timers = items.map((_, index) =>
+    setTimeout(() => {
+      setVisibleItems((prev) => [...prev, index]);
+    }, index * staggerDelay)
     );
 
     return () => timers.forEach(clearTimeout);
@@ -111,17 +112,17 @@ export const AnimatedList = ({
 
   return (
     <div className={`animated-list ${className}`} style={style}>
-      {items.map((item, index) => (
-        <AnimatedTransition
-          key={index}
-          type={animationType}
-          delay={index * staggerDelay}
-        >
+      {items.map((item, index) =>
+      <AnimatedTransition
+        key={index}
+        type={animationType}
+        delay={index * staggerDelay}>
+        
           {renderItem(item, index)}
         </AnimatedTransition>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 // Компонент для анимированной кнопки
@@ -135,6 +136,7 @@ export const AnimatedButton = ({
   style = {},
   ...props
 }) => {
+  void animationType;
   const [isPressed, setIsPressed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -201,9 +203,9 @@ export const AnimatedButton = ({
       ...sizes[size],
       ...variants[variant],
       transform,
-      boxShadow: isHovered 
-        ? variants[variant].boxShadow.replace('0.3', '0.4')
-        : variants[variant].boxShadow
+      boxShadow: isHovered ?
+      variants[variant].boxShadow.replace('0.3', '0.4') :
+      variants[variant].boxShadow
     };
   };
 
@@ -216,11 +218,11 @@ export const AnimatedButton = ({
       onMouseUp={handleMouseUp}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </button>
-  );
+    </button>);
+
 };
 
 // Компонент для анимированной карточки
@@ -259,14 +261,49 @@ export const AnimatedCard = ({
     <div
       className={`animated-card ${className}`}
       style={getCardStyle()}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      {...props}
-    >
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
+};
+
+AnimatedTransition.propTypes = {
+  children: PropTypes.node,
+  type: PropTypes.string,
+  duration: PropTypes.number,
+  delay: PropTypes.number,
+  direction: PropTypes.string,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+AnimatedList.propTypes = {
+  items: PropTypes.array,
+  renderItem: PropTypes.func,
+  animationType: PropTypes.string,
+  staggerDelay: PropTypes.number,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+AnimatedButton.propTypes = {
+  children: PropTypes.node,
+  onClick: PropTypes.func,
+  variant: PropTypes.string,
+  size: PropTypes.string,
+  animationType: PropTypes.string,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+AnimatedCard.propTypes = {
+  children: PropTypes.node,
+  hover: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default AnimatedTransition;
-

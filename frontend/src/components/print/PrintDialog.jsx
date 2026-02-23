@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Printer,
-  Settings,
+
   Eye,
-  Download,
+
   AlertCircle,
-  CheckCircle,
-  RefreshCw
-} from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+
+  RefreshCw } from
+'lucide-react';
+import { Button, Badge } from '../ui/native';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import { createMarkup } from '../../utils/sanitizer';
@@ -30,15 +30,9 @@ const PrintDialog = ({
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (isOpen) {
-      loadPrinters();
-    }
-  }, [isOpen]);
+  const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
-  const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-
-  const loadPrinters = async () => {
+  const loadPrinters = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/v1/print/printers`, {
@@ -50,7 +44,7 @@ const PrintDialog = ({
         setPrinters(data.printers);
 
         // Выбираем принтер по умолчанию
-        const defaultPrinter = data.printers.find(p => p.is_default);
+        const defaultPrinter = data.printers.find((p) => p.is_default);
         if (defaultPrinter) {
           setSelectedPrinter(defaultPrinter);
         }
@@ -61,7 +55,13 @@ const PrintDialog = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPrinters();
+    }
+  }, [isOpen, loadPrinters]);
 
   const handlePreview = async () => {
     if (!selectedPrinter) return;
@@ -122,8 +122,8 @@ const PrintDialog = ({
     return (
       <Badge variant={config.variant} size="sm">
         {config.label}
-      </Badge>
-    );
+      </Badge>);
+
   };
 
   if (!isOpen) return null;
@@ -182,20 +182,20 @@ const PrintDialog = ({
           }}>
             <h3 style={{ fontSize: '18px', fontWeight: '500', marginBottom: '16px' }}>Настройки печати</h3>
 
-            {error && (
-              <div style={{
-                marginBottom: '16px',
-                padding: '12px',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '8px',
-                color: '#b91c1c',
-                fontSize: '14px'
-              }}>
+            {error &&
+            <div style={{
+              marginBottom: '16px',
+              padding: '12px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              color: '#b91c1c',
+              fontSize: '14px'
+            }}>
                 <AlertCircle size={16} style={{ display: 'inline', marginRight: '8px' }} />
                 {error}
               </div>
-            )}
+            }
 
             {/* Выбор принтера */}
             <div className="mb-6">
@@ -203,22 +203,23 @@ const PrintDialog = ({
                 Принтер:
               </label>
 
-              {loading && printers.length === 0 ? (
-                <div className="flex items-center text-gray-500">
+              {loading && printers.length === 0 ?
+              <div className="flex items-center text-gray-500">
                   <RefreshCw size={16} className="animate-spin mr-2" />
                   Загрузка принтеров...
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {printers.map(printer => (
-                    <div
-                      key={printer.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedPrinter?.id === printer.id
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
-                        }`}
-                      onClick={() => setSelectedPrinter(printer)}
-                    >
+                </div> :
+
+              <div className="space-y-2">
+                  {printers.map((printer) =>
+                <button
+                  type="button"
+                  key={printer.id}
+                  className={`w-full p-3 border rounded-lg cursor-pointer transition-colors text-left ${selectedPrinter?.id === printer.id ?
+                  'border-blue-500 bg-blue-50 dark:bg-blue-900/20' :
+                  'border-gray-200 dark:border-gray-600 hover:border-gray-300'}`
+                  }
+                  onClick={() => setSelectedPrinter(printer)}>
+                  
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{printer.display_name}</div>
@@ -227,11 +228,11 @@ const PrintDialog = ({
                           </div>
                         </div>
                         {getStatusBadge(printer.status)}
-                      </div>
                     </div>
-                  ))}
+                </button>
+                )}
                 </div>
-              )}
+              }
             </div>
 
             {/* Информация о документе */}
@@ -252,8 +253,8 @@ const PrintDialog = ({
                 variant="outline"
                 onClick={handlePreview}
                 disabled={!selectedPrinter || loading}
-                className="w-full"
-              >
+                className="w-full">
+                
                 <Eye size={16} className="mr-2" />
                 Предварительный просмотр
               </Button>
@@ -261,13 +262,13 @@ const PrintDialog = ({
               <Button
                 onClick={handlePrint}
                 disabled={!selectedPrinter || loading}
-                className="w-full"
-              >
-                {loading ? (
-                  <RefreshCw size={16} className="animate-spin mr-2" />
-                ) : (
-                  <Printer size={16} className="mr-2" />
-                )}
+                className="w-full">
+                
+                {loading ?
+                <RefreshCw size={16} className="animate-spin mr-2" /> :
+
+                <Printer size={16} className="mr-2" />
+                }
                 Печать
               </Button>
             </div>
@@ -278,29 +279,29 @@ const PrintDialog = ({
             <h3 className="text-lg font-medium mb-4">Предварительный просмотр</h3>
 
             <div className="border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 h-full min-h-[400px] overflow-auto">
-              {preview ? (
-                <div className="p-4">
-                  {selectedPrinter?.printer_type === 'ESC/POS' ? (
-                    // Предварительный просмотр для ESC/POS
-                    <pre className="font-mono text-xs whitespace-pre-wrap bg-black text-green-400 p-4 rounded">
+              {preview ?
+              <div className="p-4">
+                  {selectedPrinter?.printer_type === 'ESC/POS' ?
+                // Предварительный просмотр для ESC/POS
+                <pre className="font-mono text-xs whitespace-pre-wrap bg-black text-green-400 p-4 rounded">
                       {preview}
-                    </pre>
-                  ) : (
-                    // Предварительный просмотр для PDF (с XSS защитой)
-                    <div
-                      className="prose max-w-none"
-                      {...createMarkup(preview)}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
+                    </pre> :
+
+                // Предварительный просмотр для PDF (с XSS защитой)
+                <div
+                  className="prose max-w-none"
+                  {...createMarkup(preview)} />
+
+                }
+                </div> :
+
+              <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
                     <Eye size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>Нажмите "Предварительный просмотр"<br />для отображения документа</p>
+                    <p>Нажмите «Предварительный просмотр»<br />для отображения документа</p>
                   </div>
                 </div>
-              )}
+              }
             </div>
           </div>
         </div>
@@ -308,9 +309,9 @@ const PrintDialog = ({
         {/* Нижняя панель */}
         <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <div className="text-sm text-gray-500">
-            {selectedPrinter && (
-              <>Выбран: {selectedPrinter.display_name} ({selectedPrinter.printer_type})</>
-            )}
+            {selectedPrinter &&
+            <>Выбран: {selectedPrinter.display_name} ({selectedPrinter.printer_type})</>
+            }
           </div>
 
           <div className="flex space-x-3">
@@ -319,16 +320,15 @@ const PrintDialog = ({
             </Button>
             <Button
               onClick={handlePrint}
-              disabled={!selectedPrinter || loading}
-            >
+              disabled={!selectedPrinter || loading}>
+              
               {loading ? 'Печать...' : 'Печать'}
             </Button>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default PrintDialog;
-

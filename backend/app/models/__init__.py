@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .activation import Activation
+from .ai_chat import AIChatFeedback, AIChatMessage, AIChatSession
 from .ai_config import (
     AIPromptTemplate,
     AIProvider,
@@ -44,11 +45,13 @@ from .department import (
     DepartmentRegistrationSettings,
     DepartmentService,
 )
+from .doctor_phrase_history import DoctorPhraseHistory
 from .doctor_price_override import DoctorPriceOverride
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
-from .emr_v2 import EMRAuditLog, EMRRecord, EMRRevision, SYSTEM_USER_ID
+from .emr_v2 import SYSTEM_USER_ID, EMRAuditLog, EMRRecord, EMRRevision
 from .emr_version import EMRVersion
+from .family_relation import FamilyRelation, RelationType
 from .file_system import (
     File,
     FileAccessLog,
@@ -61,6 +64,7 @@ from .file_system import (
     FileType,
     FileVersion,
 )
+from .global_search_audit import GlobalSearchAudit
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
 from .lab import LabOrder, LabResult
@@ -71,20 +75,19 @@ from .notification import (
 )
 from .online import OnlineDay
 from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
-from .queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
-from .refund_deposit import (
-    RefundRequest,
-    RefundRequestStatus,
-    RefundType,
-    PatientDeposit,
-    DepositTransaction,
-    DepositTransactionType,
-)
-from .family_relation import FamilyRelation, RelationType
 from .patient import Patient
 from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
+from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
+from .refund_deposit import (
+    DepositTransaction,
+    DepositTransactionType,
+    PatientDeposit,
+    RefundRequest,
+    RefundRequestStatus,
+    RefundType,
+)
 from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
 
 # Временно отключены из-за проблем с relationships
@@ -141,9 +144,6 @@ from .user_profile import (
     UserPreferences,
     UserProfile,
 )
-from .doctor_phrase_history import DoctorPhraseHistory
-from .global_search_audit import GlobalSearchAudit
-from .ai_chat import AIChatSession, AIChatMessage, AIChatFeedback
 from .visit import Visit, VisitService
 
 # Package marker for app.models
@@ -200,6 +200,7 @@ __all__ = [
     "AuditLog",
     "NotificationTemplate",
     "NotificationHistory",
+    "Message",
     "Setting",
     "Activation",
     "OnlineDay",
@@ -231,12 +232,23 @@ __all__ = [
     "TelegramUser",
     "TelegramMessage",
     "DoctorPriceOverride",
+    "DoctorPhraseHistory",
     "PaymentInvoice",
     "PaymentInvoiceVisit",
     "Department",
     "DepartmentService",
     "DepartmentQueueSettings",
     "DepartmentRegistrationSettings",
+    "File",
+    "FileAccessLog",
+    "FileFolder",
+    "FilePermission",
+    "FileQuota",
+    "FileShare",
+    "FileStatus",
+    "FileStorage",
+    "FileType",
+    "FileVersion",
     # Refund and Deposit models
     "RefundRequest",
     "RefundRequestStatus",

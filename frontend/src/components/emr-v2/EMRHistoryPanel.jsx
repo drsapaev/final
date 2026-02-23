@@ -12,8 +12,9 @@
  * - Restore from here
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '../../api/client';
+import logger from '../../utils/logger';
 import './EMRHistoryPanel.css';
 
 /**
@@ -96,7 +97,7 @@ export function EMRHistoryPanel({
                 const response = await apiClient.get(`/v2/emr/${visitId}/history`);
                 setHistory(response.data.revisions || []);
             } catch (err) {
-                console.error('Failed to load history:', err);
+                logger.error('Failed to load history:', err);
                 setError(err.message || 'Не удалось загрузить историю');
             } finally {
                 setLoading(false);
@@ -155,6 +156,14 @@ export function EMRHistoryPanel({
                                     key={revision.id}
                                     className={`emr-history-panel__item ${isCurrentVersion ? 'emr-history-panel__item--current' : ''} ${isSelected ? 'emr-history-panel__item--selected' : ''}`}
                                     onClick={() => onSelectVersion?.(revision.version)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            onSelectVersion?.(revision.version);
+                                        }
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
                                     title={`Выбрать версию ${revision.version} для сравнения`}
                                 >
                                     {/* Version badge */}

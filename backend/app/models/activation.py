@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import DateTime, Enum as SAEnum, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, String, Text, UniqueConstraint
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base  # декларативная база
@@ -35,12 +35,12 @@ class Activation(Base):
     key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Хэш устройства (заполняется при привязке). Пустой => ещё не активирован.
-    machine_hash: Mapped[Optional[str]] = mapped_column(
+    machine_hash: Mapped[str | None] = mapped_column(
         String(128), nullable=True, index=True
     )
 
     # Дата и время окончания действия (UTC)
-    expiry_date: Mapped[Optional[datetime]] = mapped_column(
+    expiry_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True, index=True
     )
 
@@ -59,7 +59,7 @@ class Activation(Base):
     )
 
     # Опциональные метаданные (кто выдал, заметки, версия)
-    meta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow

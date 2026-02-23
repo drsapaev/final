@@ -2,17 +2,13 @@
 Сервис для мобильных уведомлений
 """
 
-import asyncio
-import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.crud import notification as crud_notification
 from app.models.appointment import Appointment
-from app.models.notification import NotificationHistory
 from app.models.user import User
 from app.services.fcm_service import get_fcm_service
 
@@ -28,7 +24,7 @@ class MobileNotificationService:
         user_id: int,
         title: str,
         message: str,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
     ) -> bool:
         """Отправка push-уведомления"""
         try:
@@ -211,7 +207,7 @@ class MobileNotificationService:
             return False
 
     async def send_appointment_cancellation(
-        self, appointment_id: int, reason: Optional[str] = None
+        self, appointment_id: int, reason: str | None = None
     ) -> bool:
         """Отправка уведомления об отмене записи"""
         try:
@@ -249,7 +245,7 @@ class MobileNotificationService:
         device_token: str,
         title: str,
         message: str,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
     ) -> bool:
         """Отправка уведомления через FCM (заглушка)"""
         # TODO: Реальная интеграция с Firebase Cloud Messaging
@@ -258,7 +254,7 @@ class MobileNotificationService:
 
     async def get_notification_history(
         self, user_id: int, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Получение истории уведомлений"""
         try:
             notifications = crud_notification.get_user_notifications(

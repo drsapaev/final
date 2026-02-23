@@ -1,6 +1,4 @@
-// Главный провайдер для всех контекстов приложения
-import React from 'react';
-import { ThemeProvider } from '../contexts/ThemeContext';
+// Главный провайдер для всех контекстов приложенияimport { ThemeProvider } from '../contexts/ThemeContext';
 import { TranslationProvider } from '../hooks/useTranslation';
 import { AppDataProvider } from '../contexts/AppDataContext';
 import { ChatProvider } from '../contexts/ChatContext';

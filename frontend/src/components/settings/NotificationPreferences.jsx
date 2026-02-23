@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api, me } from '../../api/client';
 import logger from '../../utils/logger';
 
@@ -193,7 +193,7 @@ export default function NotificationPreferences() {
     );
 }
 
-function Toggle({ label, checked, onChange }) {
+function Toggle({ label, checked }) {
     return (
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
             <div style={{

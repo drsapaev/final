@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api, setToken } from '../../api/client';
@@ -26,8 +26,8 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(style);
 }
 
-const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
-  const { theme } = useTheme();
+const LoginFormStyled = () => {void
+  useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
@@ -51,10 +51,10 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   // Функция для проверки защищенных панелей
   const isProtectedPanelPath = (pathname) => {
     const prefixes = [
-      '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
-      '/cardiologist', '/dermatologist', '/dentist'
-    ];
-    return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
+    '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
+    '/cardiologist', '/dermatologist', '/dentist'];
+
+    return prefixes.some((p) => pathname === p || pathname.startsWith(p + '/'));
   };
 
   const handleSubmit = async (e) => {
@@ -83,7 +83,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
       const response = await fetch('http://localhost:8000/api/v1/auth/minimal-login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(credentials)
       });
@@ -105,10 +105,11 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 
       // Обычный вход без 2FA
       if (data.access_token) {
+        const accessToken = typeof data.access_token === 'string' ? data.access_token.trim() : data.access_token;
         // Проверяем, требуется ли смена пароля
         if (data.must_change_password) {
-          setToken(data.access_token);
-          localStorage.setItem('auth_token', data.access_token);
+          setToken(accessToken);
+          localStorage.setItem('auth_token', accessToken);
           navigate('/change-password-required', {
             state: { currentPassword: formData.password },
             replace: true
@@ -117,15 +118,15 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         }
 
         // Сохраняем токен единообразно для всех клиентов
-        setToken(data.access_token);
-        localStorage.setItem('auth_token', data.access_token);
+        setToken(accessToken);
+        localStorage.setItem('auth_token', accessToken);
 
         try {
           // Используем данные пользователя из ответа авторизации
           setProfile(data.user);
 
           // Расширенная логика перенаправления
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
           const state = auth.getState ? auth.getState() : { profile: null };
           const profile = state?.profile || null;
           const computedRoute = getRouteForProfile(profile);
@@ -167,7 +168,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         const detail = err.response.data.detail;
         if (Array.isArray(detail)) {
           // Pydantic validation errors
-          errorMessage = detail.map(error => `${error.loc?.join('.')}: ${error.msg}`).join(', ');
+          errorMessage = detail.map((error) => `${error.loc?.join('.')}: ${error.msg}`).join(', ');
         } else if (typeof detail === 'string') {
           errorMessage = detail;
         }
@@ -195,12 +196,13 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const handle2FASuccess = async (response) => {
     try {
       if (response.data?.access_token) {
-        setToken(response.data.access_token);
+        const accessToken = typeof response.data.access_token === 'string' ? response.data.access_token.trim() : response.data.access_token;
+        setToken(accessToken);
 
         const profileResponse = await api.get('/auth/me');
         setProfile(profileResponse.data);
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         const state = auth.getState ? auth.getState() : { profile: null };
         const profile = state?.profile || null;
         const computedRoute = getRouteForProfile(profile);
@@ -208,7 +210,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 
         navigate(target, { replace: true });
       }
-    } catch (err) {
+    } catch {
       setError('Ошибка после 2FA верификации');
       setRequires2FA(false);
     }
@@ -222,7 +224,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value
     }));
@@ -305,8 +307,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                   borderRadius: '6px',
                   fontSize: '12px',
                   cursor: 'pointer'
-                }}
-              >
+                }}>
+
                 Приложение
               </button>
               <button
@@ -321,8 +323,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                   borderRadius: '6px',
                   fontSize: '12px',
                   cursor: 'pointer'
-                }}
-              >
+                }}>
+
                 Backup код
               </button>
               <button
@@ -337,8 +339,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                   borderRadius: '6px',
                   fontSize: '12px',
                   cursor: 'pointer'
-                }}
-              >
+                }}>
+
                 Восстановление
               </button>
             </div>
@@ -348,11 +350,11 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
             method={twoFactorMethod}
             pendingToken={pending2FAToken}
             onSuccess={handle2FASuccess}
-            onCancel={handle2FACancel}
-          />
+            onCancel={handle2FACancel} />
+
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   // Если нажали "Забыли пароль", показываем компонент восстановления
@@ -371,10 +373,10 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
       }}>
         <ForgotPassword
           onBack={() => setShowForgotPassword(false)}
-          onSuccess={() => setShowForgotPassword(false)}
-        />
-      </div>
-    );
+          onSuccess={() => setShowForgotPassword(false)} />
+
+      </div>);
+
   }
 
   return (
@@ -440,13 +442,13 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>Тип входа</label>
               <Select
                 value={formData.loginType}
-                onChange={(val) => setFormData(prev => ({ ...prev, loginType: val }))}
+                onChange={(val) => setFormData((prev) => ({ ...prev, loginType: val }))}
                 options={[
-                  { value: 'username', label: 'Имя пользователя' },
-                  { value: 'email', label: 'Email' },
-                  { value: 'phone', label: 'Телефон' }
-                ]}
-              />
+                { value: 'username', label: 'Имя пользователя' },
+                { value: 'email', label: 'Email' },
+                { value: 'phone', label: 'Телефон' }]
+                } />
+
             </div>
 
             <div style={{ marginBottom: '12px' }}>
@@ -460,8 +462,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                 onChange={handleInputChange}
                 required
                 autoComplete={formData.loginType === 'email' ? 'email' : 'username'}
-                placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : formData.loginType === 'email' ? 'email' : 'телефон'}`}
-              />
+                placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : formData.loginType === 'email' ? 'email' : 'телефон'}`} />
+
             </div>
 
             <div style={{ marginBottom: '12px' }}>
@@ -474,8 +476,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                   onChange={handleInputChange}
                   required
                   autoComplete="current-password"
-                  placeholder="Введите пароль"
-                />
+                  placeholder="Введите пароль" />
+
                 <Button type="button" variant="ghost" size="small" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 4, top: 4 }}>
                   {showPassword ? 'Скрыть' : 'Показать'}
                 </Button>
@@ -491,9 +493,9 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               </Button>
             </div>
 
-            {error && (
-              <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>
-            )}
+            {error &&
+            <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>
+            }
 
             <Button type="submit" variant="primary" fullWidth disabled={loading}>
               {loading ? 'Вход...' : 'ВОЙТИ →'}
@@ -506,8 +508,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default LoginFormStyled;

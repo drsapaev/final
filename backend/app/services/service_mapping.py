@@ -7,8 +7,8 @@ Service code normalization utilities (SSOT - Single Source of Truth)
 3. Получения дефолтной услуги для QR-записей
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
 import logging
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -100,16 +100,16 @@ QUEUE_GROUPS = {
 }
 
 
-def get_queue_group_for_service(code: str) -> Optional[str]:
+def get_queue_group_for_service(code: str) -> str | None:
     """
     SSOT: Определяет к какой группе очереди относится услуга.
-    
+
     Args:
         code: Код услуги (K01, D01, L02, D_PROC02 и т.д.)
-        
+
     Returns:
         Ключ группы очереди (cardiology, dermatology, laboratory и т.д.) или None
-        
+
     Examples:
         >>> get_queue_group_for_service("K01")
         'cardiology'
@@ -120,59 +120,59 @@ def get_queue_group_for_service(code: str) -> Optional[str]:
     """
     if not code:
         return None
-    
+
     code_upper = code.upper()
-    
+
     for group_key, group_data in QUEUE_GROUPS.items():
         # Проверяем точное совпадение с service_codes
         if code_upper in [c.upper() for c in group_data.get("service_codes", [])]:
             return group_key
-        
+
         # Проверяем по префиксам (но исключаем exclude_codes)
         exclude_codes = [c.upper() for c in group_data.get("exclude_codes", [])]
         if code_upper in exclude_codes:
             continue
-            
+
         for prefix in group_data.get("service_prefixes", []):
             if code_upper.startswith(prefix.upper()):
                 # Проверяем что код не в списке исключений
                 is_excluded = any(code_upper.startswith(exc.upper()) for exc in exclude_codes)
                 if not is_excluded:
                     return group_key
-    
+
     return None
 
 
-def get_services_for_department(department_key: str) -> Dict[str, Any]:
+def get_services_for_department(department_key: str) -> dict[str, Any]:
     """
     SSOT: Получает информацию о группе услуг для отделения.
-    
+
     Args:
         department_key: Ключ отделения (cardio, derma, lab, dental, echokg, procedures)
-        
+
     Returns:
         Словарь с информацией о группе или пустой словарь
-        
+
     Examples:
         >>> get_services_for_department("cardio")
         {'display_name': 'Кардиология', 'service_codes': ['K01', 'K11'], ...}
     """
     # Маппинг tab_key -> group_key
     tab_to_group = {group["tab_key"]: key for key, group in QUEUE_GROUPS.items()}
-    
+
     group_key = tab_to_group.get(department_key, department_key)
     return QUEUE_GROUPS.get(group_key, {})
 
 def normalize_specialty(specialty: str) -> str:
     """
     Нормализует specialty к каноническому виду.
-    
+
     Args:
         specialty: Входная специальность (может быть алиасом)
-        
+
     Returns:
         Каноническое название specialty
-        
+
     Examples:
         >>> normalize_specialty("derma")
         'dermatology'
@@ -185,17 +185,17 @@ def normalize_specialty(specialty: str) -> str:
     return SPECIALTY_ALIASES.get(normalized, normalized)
 
 
-def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[Dict[str, Any]]:
+def get_default_service_by_specialty(db: "Session", specialty: str) -> dict[str, Any] | None:
     """
     SSOT: Получает дефолтную консультационную услугу по specialty.
-    
+
     Это ЕДИНСТВЕННЫЙ правильный способ найти услугу для QR-записи.
     Ищет по queue_tag с приоритетом is_consultation=True.
-    
+
     Args:
         db: Сессия БД
         specialty: Specialty (queue_tag) из QR-записи (например "dermatology", "cardiology")
-        
+
     Returns:
         Dict с данными услуги или None:
         {
@@ -206,7 +206,7 @@ def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[
             "category_code": str,
             "queue_tag": str
         }
-        
+
     Examples:
         >>> service = get_default_service_by_specialty(db, "dermatology")
         >>> service["id"]
@@ -215,13 +215,13 @@ def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[
         'Консультация дерматолога'
     """
     from app.models.service import Service
-    
+
     # Нормализуем specialty
     normalized = normalize_specialty(specialty)
     if not normalized:
         logger.warning("get_default_service_by_specialty: пустой specialty")
         return None
-    
+
     # Ищем консультацию по queue_tag
     service = (
         db.query(Service)
@@ -232,7 +232,7 @@ def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[
         )
         .first()
     )
-    
+
     # Fallback: ищем любую активную услугу с этим queue_tag
     if not service:
         service = (
@@ -243,7 +243,7 @@ def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[
             )
             .first()
         )
-    
+
     # Fallback 2: ищем по category_code (K, D, L, S, C)
     if not service:
         category_mapping = {
@@ -274,11 +274,11 @@ def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[
                     )
                     .first()
                 )
-    
+
     if not service:
         logger.warning(f"get_default_service_by_specialty: услуга не найдена для specialty={specialty}")
         return None
-    
+
     return {
         "id": service.id,
         "name": service.name,
@@ -315,7 +315,7 @@ def normalize_service_code(code: str) -> str:
         return ""
 
     code_stripped = code.strip()
-    
+
     # ⭐ SSOT формат: одна буква + 1-2 цифры (K01, D02, L14, etc.)
     # Эти коды должны быть в UPPERCASE
     import re
@@ -338,7 +338,9 @@ def normalize_service_code(code: str) -> str:
     return normalized
 
 
-def get_service_code(service_data: Dict[str, Any]) -> str:
+def get_service_code(
+    service_data: dict[str, Any] | int, db: "Session | None" = None
+) -> str:
     """
     Извлекает код услуги из различных полей
 
@@ -347,6 +349,8 @@ def get_service_code(service_data: Dict[str, Any]) -> str:
 
     Args:
         service_data: Словарь с данными услуги (может содержать 'code', 'service_code', 'category_code')
+            или ID услуги (legacy-совместимость).
+        db: Сессия БД. Нужна только если service_data передан как int (service_id).
 
     Returns:
         Код услуги в правильном формате или пустую строку
@@ -360,6 +364,25 @@ def get_service_code(service_data: Dict[str, Any]) -> str:
         'cons_cardio'  # Старый формат - нормализован
     """
     if not service_data:
+        return ""
+
+    if isinstance(service_data, int):
+        if db is None:
+            return ""
+
+        from app.models.service import Service
+
+        service = db.query(Service).filter(Service.id == service_data).first()
+        if not service:
+            return ""
+
+        service_data = {
+            "service_code": getattr(service, "service_code", None),
+            "code": getattr(service, "code", None),
+            "category_code": getattr(service, "category_code", None),
+        }
+
+    if not isinstance(service_data, dict):
         return ""
 
     # Пробуем извлечь код из разных полей (в порядке приоритета)

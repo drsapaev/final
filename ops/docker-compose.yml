@@ -1,6 +1,19 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clinic-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clinic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinicpwd}
+      POSTGRES_DB: ${POSTGRES_DB:-clinicdb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   backend:
     build:
       context: .
@@ -12,7 +25,7 @@ services:
       - ./backend/.env.production
     environment:
       # Core
-      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/app.db}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://clinic:clinicpwd@postgres:5432/clinicdb}
       APP_NAME: ${APP_NAME:-Clinic Queue Manager}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       ENV: ${ENV:-dev}
@@ -49,6 +62,8 @@ services:
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
       - "8000:8000"
+    depends_on:
+      - postgres
 
   frontend:
     build:
@@ -68,3 +83,4 @@ services:
 
 volumes:
   backend_data:
+  postgres_data:

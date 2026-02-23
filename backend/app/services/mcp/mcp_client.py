@@ -3,12 +3,11 @@ MCP клиент для медицинских сервисов
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from .base_server import MCPRequest, MCPResponse
+from .base_server import MCPRequest
 from .complaint_server import MedicalComplaintMCPServer
 from .icd10_server import MedicalICD10MCPServer
 from .imaging_server import MedicalImagingMCPServer
@@ -21,7 +20,7 @@ class MedicalMCPClient:
     """Унифицированный MCP клиент для всех медицинских сервисов"""
 
     def __init__(self):
-        self.servers: Dict[str, Any] = {}
+        self.servers: dict[str, Any] = {}
         self.initialized = False
         self._request_counter = 0
         self._initialize_servers()
@@ -78,8 +77,8 @@ class MedicalMCPClient:
         return f"req_{self._request_counter}_{datetime.utcnow().timestamp()}"
 
     async def _call_server(
-        self, server_name: str, method: str, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, server_name: str, method: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """Вызов метода на MCP сервере"""
         if server_name not in self.servers:
             return {"status": "error", "error": f"Server '{server_name}' not found"}
@@ -114,10 +113,10 @@ class MedicalMCPClient:
     async def analyze_complaint(
         self,
         complaint: str,
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
+        patient_info: dict[str, Any] | None = None,
+        provider: str | None = None,
         urgency_assessment: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализ жалоб пациента через MCP"""
         return await self._call_server(
             "complaint",
@@ -130,15 +129,15 @@ class MedicalMCPClient:
             },
         )
 
-    async def validate_complaint(self, complaint: str) -> Dict[str, Any]:
+    async def validate_complaint(self, complaint: str) -> dict[str, Any]:
         """Валидация жалоб через MCP"""
         return await self._call_server(
             "complaint", "tool/validate_complaint", {"complaint": complaint}
         )
 
     async def suggest_complaint_questions(
-        self, complaint: str, specialty: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, complaint: str, specialty: str | None = None
+    ) -> dict[str, Any]:
         """Получение уточняющих вопросов по жалобам"""
         return await self._call_server(
             "complaint",
@@ -147,8 +146,8 @@ class MedicalMCPClient:
         )
 
     async def get_complaint_templates(
-        self, specialty: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, specialty: str | None = None
+    ) -> dict[str, Any]:
         """Получение шаблонов жалоб"""
         return await self._call_server(
             "complaint", "resource/complaint_templates", {"specialty": specialty}
@@ -158,12 +157,12 @@ class MedicalMCPClient:
 
     async def suggest_icd10(
         self,
-        symptoms: List[str],
-        diagnosis: Optional[str] = None,
-        specialty: Optional[str] = None,
-        provider: Optional[str] = None,
+        symptoms: list[str],
+        diagnosis: str | None = None,
+        specialty: str | None = None,
+        provider: str | None = None,
         max_suggestions: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Подсказки кодов МКБ-10"""
         return await self._call_server(
             "icd10",
@@ -180,9 +179,9 @@ class MedicalMCPClient:
     async def validate_icd10(
         self,
         code: str,
-        symptoms: Optional[List[str]] = None,
-        diagnosis: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        symptoms: list[str] | None = None,
+        diagnosis: str | None = None,
+    ) -> dict[str, Any]:
         """Валидация кода МКБ-10"""
         return await self._call_server(
             "icd10",
@@ -191,8 +190,8 @@ class MedicalMCPClient:
         )
 
     async def search_icd10(
-        self, query: str, category: Optional[str] = None, limit: int = 10
-    ) -> Dict[str, Any]:
+        self, query: str, category: str | None = None, limit: int = 10
+    ) -> dict[str, Any]:
         """Поиск кодов МКБ-10"""
         return await self._call_server(
             "icd10",
@@ -201,8 +200,8 @@ class MedicalMCPClient:
         )
 
     async def get_common_icd10_codes(
-        self, category: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, category: str | None = None
+    ) -> dict[str, Any]:
         """Получение часто используемых кодов МКБ-10"""
         return await self._call_server(
             "icd10", "resource/common_icd10_codes", {"category": category}
@@ -212,11 +211,11 @@ class MedicalMCPClient:
 
     async def interpret_lab_results(
         self,
-        results: List[Dict[str, Any]],
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
+        results: list[dict[str, Any]],
+        patient_info: dict[str, Any] | None = None,
+        provider: str | None = None,
         include_recommendations: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Интерпретация лабораторных результатов"""
         return await self._call_server(
             "lab",
@@ -230,8 +229,8 @@ class MedicalMCPClient:
         )
 
     async def check_critical_lab_values(
-        self, results: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, results: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Проверка критических значений в анализах"""
         return await self._call_server(
             "lab", "tool/check_critical_values", {"results": results}
@@ -239,10 +238,10 @@ class MedicalMCPClient:
 
     async def suggest_follow_up_tests(
         self,
-        current_results: List[Dict[str, Any]],
-        abnormal_findings: List[str],
-        clinical_context: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        current_results: list[dict[str, Any]],
+        abnormal_findings: list[str],
+        clinical_context: str | None = None,
+    ) -> dict[str, Any]:
         """Рекомендации дополнительных анализов"""
         return await self._call_server(
             "lab",
@@ -255,8 +254,8 @@ class MedicalMCPClient:
         )
 
     async def get_normal_ranges(
-        self, test_name: Optional[str] = None, patient_gender: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, test_name: str | None = None, patient_gender: str | None = None
+    ) -> dict[str, Any]:
         """Получение нормальных диапазонов для анализов"""
         return await self._call_server(
             "lab",
@@ -265,8 +264,8 @@ class MedicalMCPClient:
         )
 
     async def get_test_panels(
-        self, panel_name: Optional[str] = None, indication: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, panel_name: str | None = None, indication: str | None = None
+    ) -> dict[str, Any]:
         """Получение панелей анализов"""
         return await self._call_server(
             "lab",
@@ -280,11 +279,11 @@ class MedicalMCPClient:
         self,
         image_data: str,
         image_type: str,
-        modality: Optional[str] = None,
-        clinical_context: Optional[str] = None,
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        modality: str | None = None,
+        clinical_context: str | None = None,
+        patient_info: dict[str, Any] | None = None,
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """Анализ медицинского изображения"""
         return await self._call_server(
             "imaging",
@@ -302,10 +301,10 @@ class MedicalMCPClient:
     async def analyze_skin_lesion(
         self,
         image_data: str,
-        lesion_info: Optional[Dict[str, Any]] = None,
-        patient_history: Optional[Dict[str, Any]] = None,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        lesion_info: dict[str, Any] | None = None,
+        patient_history: dict[str, Any] | None = None,
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """Анализ кожных образований"""
         return await self._call_server(
             "imaging",
@@ -323,8 +322,8 @@ class MedicalMCPClient:
         image1_data: str,
         image2_data: str,
         comparison_type: str,
-        time_interval: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        time_interval: str | None = None,
+    ) -> dict[str, Any]:
         """Сравнение медицинских изображений"""
         return await self._call_server(
             "imaging",
@@ -337,7 +336,7 @@ class MedicalMCPClient:
             },
         )
 
-    async def get_imaging_types(self, category: Optional[str] = None) -> Dict[str, Any]:
+    async def get_imaging_types(self, category: str | None = None) -> dict[str, Any]:
         """Получение информации о типах изображений"""
         return await self._call_server(
             "imaging", "resource/imaging_types", {"category": category}
@@ -346,8 +345,8 @@ class MedicalMCPClient:
     # === UTILITY FUNCTIONS ===
 
     async def get_server_capabilities(
-        self, server_name: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, server_name: str | None = None
+    ) -> dict[str, Any]:
         """Получение возможностей серверов"""
         if server_name:
             if server_name in self.servers:
@@ -366,7 +365,7 @@ class MedicalMCPClient:
 
         return {"status": "success", "servers": all_capabilities}
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Проверка состояния всех серверов"""
         health_status = {
             "overall": "healthy",
@@ -393,8 +392,8 @@ class MedicalMCPClient:
         return health_status
 
     async def batch_process(
-        self, requests: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, requests: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Пакетная обработка запросов"""
         tasks = []
 
@@ -434,7 +433,7 @@ class MedicalMCPClient:
 
 
 # Глобальный экземпляр клиента
-_mcp_client: Optional[MedicalMCPClient] = None
+_mcp_client: MedicalMCPClient | None = None
 
 
 async def get_mcp_client() -> MedicalMCPClient:

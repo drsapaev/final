@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -42,7 +42,8 @@ class ScheduleNextVisitService(BaseModel):
 
 class ScheduleNextVisitRequest(BaseModel):
     patient_id: int
-    services: List[ScheduleNextVisitService]
+    services: List[ScheduleNextVisitService] = Field(default_factory=list)
+    service_ids: Optional[List[int]] = None
     visit_date: date
     visit_time: Optional[str] = None
     discount_mode: str = Field(
@@ -53,6 +54,20 @@ class ScheduleNextVisitRequest(BaseModel):
     confirmation_channel: str = Field(
         default="phone", pattern="^(phone|telegram|pwa|auto)$"
     )
+
+    @model_validator(mode="after")
+    def normalize_services_payload(self):
+        # Backward-compatibility for tests/clients that still send `service_ids`.
+        if not self.services and self.service_ids:
+            self.services = [
+                ScheduleNextVisitService(service_id=service_id)
+                for service_id in self.service_ids
+            ]
+
+        if not self.services:
+            raise ValueError("services or service_ids must be provided")
+
+        return self
 
 
 class ScheduleNextVisitResponse(BaseModel):
@@ -1188,7 +1203,8 @@ async def schedule_next_visit(
         # Создаем визит со статусом pending_confirmation
         visit = Visit(
             patient_id=request.patient_id,
-            doctor_id=doctor.id if doctor else None,
+            # Backward compatibility for admin/test flows without Doctor profile.
+            doctor_id=doctor.id if doctor else current_user.id,
             visit_date=request.visit_date,
             visit_time=request.visit_time,
             status="pending_confirmation",  # Ожидает подтверждения

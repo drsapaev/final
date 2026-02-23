@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Typography,
   Button,
-  Input,
+
   Badge,
   Dialog,
   DialogTitle,
@@ -14,24 +14,24 @@ import {
   Alert,
   CircularProgress,
   Select,
-  Option,
+
   Switch,
-  Checkbox,
+
   Grid,
   List,
-  Table,
-} from './ui/macos';
+  Table } from
+'./ui/macos';
 import {
   TableHead,
   TableBody,
   TableRow,
-  TableCell,
-} from './ui/macos/Table';
+  TableCell } from
+'./ui/macos/Table';
 import {
   ListItem,
   ListItemIcon,
-  ListItemText,
-} from './ui/macos/List';
+  ListItemText } from
+'./ui/macos/List';
 import {
   Plus,
   Edit,
@@ -40,10 +40,10 @@ import {
   MessageSquare,
   Settings,
   RefreshCw,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-} from 'lucide-react';
+  CheckCircle } from
+
+
+'lucide-react';
 import {
   TableContainer,
   IconButton,
@@ -51,8 +51,8 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  FormControlLabel
-} from '@mui/material';
+  FormControlLabel } from
+'@mui/material';
 import tokenManager from '../utils/tokenManager';
 
 const TelegramManager = () => {
@@ -79,13 +79,13 @@ const TelegramManager = () => {
       const token = tokenManager.getAccessToken();
 
       const [statusRes, templatesRes] = await Promise.all([
-        fetch('/api/v1/telegram/bot-status', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/v1/telegram/templates', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      fetch('/api/v1/telegram/bot-status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/v1/telegram/templates', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })]
+      );
 
       if (statusRes.ok) {
         const statusData = await statusRes.json();
@@ -96,7 +96,7 @@ const TelegramManager = () => {
         const templatesData = await templatesRes.json();
         setTemplates(templatesData.templates || templatesData || []);
       }
-    } catch (err) {
+    } catch {
       setError('Ошибка загрузки данных Telegram');
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ const TelegramManager = () => {
       } else {
         setError('Ошибка создания шаблона');
       }
-    } catch (err) {
+    } catch {
       setError('Ошибка создания шаблона');
     }
   };
@@ -141,8 +141,8 @@ const TelegramManager = () => {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
-      </Box>
-    );
+      </Box>);
+
   }
 
   return (
@@ -154,22 +154,22 @@ const TelegramManager = () => {
         <Button
           variant="outlined"
           startIcon={<RefreshCw />}
-          onClick={loadTelegramData}
-        >
+          onClick={loadTelegramData}>
+          
           Обновить
         </Button>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+      {error &&
+      <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
         </Alert>
-      )}
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+      }
+      {success &&
+      <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
           {success}
         </Alert>
-      )}
+      }
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -184,17 +184,17 @@ const TelegramManager = () => {
                     <MessageSquare
                       style={{
                         color: botStatus?.bot_active ? 'var(--mac-success, #28a745)' : 'var(--mac-error, #dc3545)'
-                      }}
-                    />
+                      }} />
+                    
                   </ListItemIcon>
                   <ListItemText
                     primary="Бот активен"
-                    secondary={botStatus?.bot_active ? 'Да' : 'Нет'}
-                  />
+                    secondary={botStatus?.bot_active ? 'Да' : 'Нет'} />
+                  
                   <Badge
                     variant={botStatus?.bot_active ? 'success' : 'error'}
-                    size="small"
-                  >
+                    size="small">
+                    
                     {botStatus?.bot_active ? 'Активен' : 'Неактивен'}
                   </Badge>
                 </ListItem>
@@ -204,12 +204,12 @@ const TelegramManager = () => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Webhook настроен"
-                    secondary={botStatus?.webhook_configured ? 'Да' : 'Нет'}
-                  />
+                    secondary={botStatus?.webhook_configured ? 'Да' : 'Нет'} />
+                  
                   <Badge
                     variant={botStatus?.webhook_configured ? 'success' : 'warning'}
-                    size="small"
-                  >
+                    size="small">
+                    
                     {botStatus?.webhook_configured ? 'Настроен' : 'Не настроен'}
                   </Badge>
                 </ListItem>
@@ -219,8 +219,8 @@ const TelegramManager = () => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Подписчиков"
-                    secondary={botStatus?.subscribers_count || 0}
-                  />
+                    secondary={botStatus?.subscribers_count || 0} />
+                  
                 </ListItem>
               </List>
             </CardContent>
@@ -238,16 +238,16 @@ const TelegramManager = () => {
                   fullWidth
                   variant="contained"
                   startIcon={<Settings />}
-                  sx={{ py: 1.5 }}
-                >
+                  sx={{ py: 1.5 }}>
+                  
                   Настроить бота
                 </Button>
                 <Button
                   fullWidth
                   variant="outlined"
                   startIcon={<Send />}
-                  sx={{ py: 1.5 }}
-                >
+                  sx={{ py: 1.5 }}>
+                  
                   Отправить сообщение
                 </Button>
                 <Button
@@ -255,8 +255,8 @@ const TelegramManager = () => {
                   variant="outlined"
                   startIcon={<Plus />}
                   onClick={() => setShowTemplateDialog(true)}
-                  sx={{ py: 1.5 }}
-                >
+                  sx={{ py: 1.5 }}>
+                  
                   Новый шаблон
                 </Button>
               </Box>
@@ -281,22 +281,22 @@ const TelegramManager = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {templates.map((template) => (
-                      <TableRow key={template.id} hover>
+                    {templates.map((template) =>
+                    <TableRow key={template.id} hover>
                         <TableCell>{template.name}</TableCell>
                         <TableCell>
                           <Badge
-                            variant="primary"
-                            size="small"
-                          >
+                          variant="primary"
+                          size="small">
+                          
                             {template.message_type}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={template.is_active ? 'success' : 'default'}
-                            size="small"
-                          >
+                          variant={template.is_active ? 'success' : 'default'}
+                          size="small">
+                          
                             {template.is_active ? 'Активен' : 'Неактивен'}
                           </Badge>
                         </TableCell>
@@ -309,7 +309,7 @@ const TelegramManager = () => {
                           </IconButton>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -328,8 +328,8 @@ const TelegramManager = () => {
                 label="Название шаблона"
                 value={templateForm.name}
                 onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                required
-              />
+                required />
+              
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
@@ -337,8 +337,8 @@ const TelegramManager = () => {
                 <Select
                   value={templateForm.message_type}
                   onChange={(e) => setTemplateForm({ ...templateForm, message_type: e.target.value })}
-                  label="Тип сообщения"
-                >
+                  label="Тип сообщения">
+                  
                   <MenuItem value="text">Текст</MenuItem>
                   <MenuItem value="photo">Фото</MenuItem>
                   <MenuItem value="document">Документ</MenuItem>
@@ -354,19 +354,19 @@ const TelegramManager = () => {
                 value={templateForm.content}
                 onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
                 required
-                placeholder="Используйте переменные: {patient_name}, {appointment_date}, {doctor_name}"
-              />
+                placeholder="Используйте переменные: {patient_name}, {appointment_date}, {doctor_name}" />
+              
             </Grid>
             <Grid item xs={12}>
               <FormControlLabel
                 control={
-                  <Switch
-                    checked={templateForm.is_active}
-                    onChange={(e) => setTemplateForm({ ...templateForm, is_active: e.target.checked })}
-                  />
+                <Switch
+                  checked={templateForm.is_active}
+                  onChange={(e) => setTemplateForm({ ...templateForm, is_active: e.target.checked })} />
+
                 }
-                label="Активный шаблон"
-              />
+                label="Активный шаблон" />
+              
             </Grid>
           </Grid>
         </DialogContent>
@@ -377,9 +377,8 @@ const TelegramManager = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-  );
+    </Box>);
+
 };
 
 export default TelegramManager;
-

@@ -147,8 +147,11 @@ api.interceptors.request.use(async (config) => {
     headers: config.headers
   });
   if (token) {
-    config.headers = config.headers || {};
-    config.headers['Authorization'] = `Bearer ${token}`;
+    const t = typeof token === 'string' ? token.trim() : token;
+    if (t) {
+      config.headers = config.headers || {};
+      config.headers['Authorization'] = `Bearer ${t}`;
+    }
   }
 
   // ✅ CSRF: Add X-CSRF-Token for state-changing requests
@@ -187,8 +190,11 @@ function getApiBase() {
 
 function setToken(token) {
   if (token) {
-    tokenManager.setAccessToken(token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    const t = typeof token === 'string' ? token.trim() : token;
+    if (t) {
+      tokenManager.setAccessToken(t);
+      api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
+    }
   } else {
     tokenManager.clearAll();
     delete api.defaults.headers.common['Authorization'];

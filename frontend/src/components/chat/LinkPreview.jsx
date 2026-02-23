@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './LinkPreview.css';
+import logger from '../../utils/logger';
 
 const LinkPreview = ({ url }) => {
     const [preview, setPreview] = useState(null);
@@ -17,7 +18,7 @@ const LinkPreview = ({ url }) => {
                     }
                 }
             } catch (e) {
-                console.error('Failed to fetch link preview:', e);
+                logger.error('Failed to fetch link preview:', e);
             } finally {
                 setLoading(false);
             }

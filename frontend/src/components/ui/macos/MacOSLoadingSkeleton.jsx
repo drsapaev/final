@@ -1,5 +1,3 @@
-import React from 'react';
-
 const MacOSLoadingSkeleton = ({
   variant = 'text',
   width = '100%',

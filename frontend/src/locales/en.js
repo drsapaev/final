@@ -58,8 +58,6 @@ export default {
         name: 'Name',
         email: 'Email',
         phone: 'Phone',
-        cancel: 'Cancel',
-        save: 'Save',
     },
 
     // ===========================================

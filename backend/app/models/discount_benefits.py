@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -15,9 +15,9 @@ from sqlalchemy.sql import func
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.patient import Patient
     from app.models.service import Service
+    from app.models.user import User
 
 
 class DiscountType(str, enum.Enum):
@@ -62,17 +62,17 @@ class Discount(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     discount_type: Mapped[DiscountType] = mapped_column(Enum(DiscountType), nullable=False)
     value: Mapped[float] = mapped_column(Float, nullable=False)  # Значение скидки (процент или сумма)
     min_amount: Mapped[float] = mapped_column(Float, default=0)  # Минимальная сумма для применения
-    max_discount: Mapped[Optional[float]] = mapped_column(Float)  # Максимальная сумма скидки
+    max_discount: Mapped[float | None] = mapped_column(Float)  # Максимальная сумма скидки
 
     # Условия применения
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    usage_limit: Mapped[Optional[int]] = mapped_column(Integer)  # Лимит использований
+    start_date: Mapped[datetime | None] = mapped_column(DateTime)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime)
+    usage_limit: Mapped[int | None] = mapped_column(Integer)  # Лимит использований
     usage_count: Mapped[int] = mapped_column(Integer, default=0)  # Количество использований
 
     # Применимость
@@ -85,20 +85,20 @@ class Discount(Base):
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Приоритет применения
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    discount_services: Mapped[List["DiscountService"]] = relationship(
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    discount_services: Mapped[list[DiscountService]] = relationship(
         "DiscountService", back_populates="discount"
     )
-    discount_applications: Mapped[List["DiscountApplication"]] = relationship(
+    discount_applications: Mapped[list[DiscountApplication]] = relationship(
         "DiscountApplication", back_populates="discount"
     )
 
@@ -111,41 +111,41 @@ class Benefit(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     benefit_type: Mapped[BenefitType] = mapped_column(Enum(BenefitType), nullable=False)
     discount_percentage: Mapped[float] = mapped_column(Float, nullable=False)  # Процент льготы
-    max_discount_amount: Mapped[Optional[float]] = mapped_column(Float)  # Максимальная сумма льготы
+    max_discount_amount: Mapped[float | None] = mapped_column(Float)  # Максимальная сумма льготы
 
     # Условия получения
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     requires_document: Mapped[bool] = mapped_column(Boolean, default=True)  # Требует документы
-    document_types: Mapped[Optional[str]] = mapped_column(Text)  # JSON список типов документов
-    age_min: Mapped[Optional[int]] = mapped_column(Integer)  # Минимальный возраст
-    age_max: Mapped[Optional[int]] = mapped_column(Integer)  # Максимальный возраст
+    document_types: Mapped[str | None] = mapped_column(Text)  # JSON список типов документов
+    age_min: Mapped[int | None] = mapped_column(Integer)  # Минимальный возраст
+    age_max: Mapped[int | None] = mapped_column(Integer)  # Максимальный возраст
 
     # Применимость
     applies_to_services: Mapped[bool] = mapped_column(Boolean, default=True)
     applies_to_appointments: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Лимиты
-    monthly_limit: Mapped[Optional[float]] = mapped_column(Float)  # Месячный лимит льготы
-    yearly_limit: Mapped[Optional[float]] = mapped_column(Float)  # Годовой лимит льготы
+    monthly_limit: Mapped[float | None] = mapped_column(Float)  # Месячный лимит льготы
+    yearly_limit: Mapped[float | None] = mapped_column(Float)  # Годовой лимит льготы
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    patient_benefits: Mapped[List["PatientBenefit"]] = relationship(
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    patient_benefits: Mapped[list[PatientBenefit]] = relationship(
         "PatientBenefit", back_populates="benefit"
     )
-    benefit_applications: Mapped[List["BenefitApplication"]] = relationship(
+    benefit_applications: Mapped[list[BenefitApplication]] = relationship(
         "BenefitApplication", back_populates="benefit"
     )
 
@@ -165,8 +165,8 @@ class DiscountService(Base):
     )
 
     # Связи
-    discount: Mapped["Discount"] = relationship("Discount", back_populates="discount_services")
-    service: Mapped["Service"] = relationship("Service")
+    discount: Mapped[Discount] = relationship("Discount", back_populates="discount_services")
+    service: Mapped[Service] = relationship("Service")
 
 
 class PatientBenefit(Base):
@@ -186,36 +186,36 @@ class PatientBenefit(Base):
     # Статус льготы
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    verification_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    verification_notes: Mapped[Optional[str]] = mapped_column(Text)
+    verification_date: Mapped[datetime | None] = mapped_column(DateTime)
+    verification_notes: Mapped[str | None] = mapped_column(Text)
 
     # Документы
-    document_number: Mapped[Optional[str]] = mapped_column(String(100))
-    document_issued_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    document_expiry_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    document_number: Mapped[str | None] = mapped_column(String(100))
+    document_issued_date: Mapped[datetime | None] = mapped_column(DateTime)
+    document_expiry_date: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Использование
     monthly_used_amount: Mapped[float] = mapped_column(Float, default=0)
     yearly_used_amount: Mapped[float] = mapped_column(Float, default=0)
-    last_used_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_used_date: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    verified_by: Mapped[Optional[int]] = mapped_column(
+    verified_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    patient: Mapped["Patient"] = relationship("Patient")
-    benefit: Mapped["Benefit"] = relationship("Benefit", back_populates="patient_benefits")
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    verifier: Mapped[Optional["User"]] = relationship("User", foreign_keys=[verified_by])
+    patient: Mapped[Patient] = relationship("Patient")
+    benefit: Mapped[Benefit] = relationship("Benefit", back_populates="patient_benefits")
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    verifier: Mapped[User | None] = relationship("User", foreign_keys=[verified_by])
 
 
 class DiscountApplication(Base):
@@ -230,9 +230,9 @@ class DiscountApplication(Base):
     )
 
     # Связанные объекты
-    appointment_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
-    visit_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
-    invoice_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
+    appointment_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
+    visit_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
+    invoice_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
 
     # Расчеты
     original_amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -240,15 +240,15 @@ class DiscountApplication(Base):
     final_amount: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Метаданные
-    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    applied_by: Mapped[Optional[int]] = mapped_column(
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    applied_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    notes: Mapped[Optional[str]] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
 
     # Связи
-    discount: Mapped["Discount"] = relationship("Discount", back_populates="discount_applications")
-    applier: Mapped[Optional["User"]] = relationship("User", foreign_keys=[applied_by])
+    discount: Mapped[Discount] = relationship("Discount", back_populates="discount_applications")
+    applier: Mapped[User | None] = relationship("User", foreign_keys=[applied_by])
 
 
 class BenefitApplication(Base):
@@ -266,9 +266,9 @@ class BenefitApplication(Base):
     )
 
     # Связанные объекты
-    appointment_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
-    visit_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
-    invoice_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
+    appointment_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
+    visit_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
+    invoice_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
 
     # Расчеты
     original_amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -276,16 +276,16 @@ class BenefitApplication(Base):
     final_amount: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Метаданные
-    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    applied_by: Mapped[Optional[int]] = mapped_column(
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    applied_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    notes: Mapped[Optional[str]] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
 
     # Связи
-    patient_benefit: Mapped["PatientBenefit"] = relationship("PatientBenefit")
-    benefit: Mapped["Benefit"] = relationship("Benefit", back_populates="benefit_applications")
-    applier: Mapped[Optional["User"]] = relationship("User", foreign_keys=[applied_by])
+    patient_benefit: Mapped[PatientBenefit] = relationship("PatientBenefit")
+    benefit: Mapped[Benefit] = relationship("Benefit", back_populates="benefit_applications")
+    applier: Mapped[User | None] = relationship("User", foreign_keys=[applied_by])
 
 
 class LoyaltyProgram(Base):
@@ -296,7 +296,7 @@ class LoyaltyProgram(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     # Настройки начисления баллов
     points_per_ruble: Mapped[float] = mapped_column(Float, default=1.0)  # Баллов за рубль
@@ -307,25 +307,25 @@ class LoyaltyProgram(Base):
     # Настройки списания баллов
     ruble_per_point: Mapped[float] = mapped_column(Float, default=1.0)  # Рублей за балл
     min_points_to_redeem: Mapped[int] = mapped_column(Integer, default=100)  # Минимум баллов для списания
-    max_points_per_purchase: Mapped[Optional[int]] = mapped_column(Integer)  # Максимум баллов за покупку
+    max_points_per_purchase: Mapped[int | None] = mapped_column(Integer)  # Максимум баллов за покупку
 
     # Статус
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    patient_loyalty: Mapped[List["PatientLoyalty"]] = relationship(
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    patient_loyalty: Mapped[list[PatientLoyalty]] = relationship(
         "PatientLoyalty", back_populates="program"
     )
 
@@ -352,16 +352,16 @@ class PatientLoyalty(Base):
     # Статистика
     total_purchases: Mapped[int] = mapped_column(Integer, default=0)
     total_amount_spent: Mapped[float] = mapped_column(Float, default=0)
-    last_activity_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_activity_date: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Статус
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
 
     # Связи
-    patient: Mapped["Patient"] = relationship("Patient")
-    program: Mapped["LoyaltyProgram"] = relationship("LoyaltyProgram", back_populates="patient_loyalty")
-    point_transactions: Mapped[List["LoyaltyPointTransaction"]] = relationship(
+    patient: Mapped[Patient] = relationship("Patient")
+    program: Mapped[LoyaltyProgram] = relationship("LoyaltyProgram", back_populates="patient_loyalty")
+    point_transactions: Mapped[list[LoyaltyPointTransaction]] = relationship(
         "LoyaltyPointTransaction", back_populates="patient_loyalty"
     )
 
@@ -386,22 +386,22 @@ class LoyaltyPointTransaction(Base):
     )  # Положительное для начисления, отрицательное для списания
 
     # Связанные объекты
-    appointment_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
-    visit_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
-    invoice_id: Mapped[Optional[int]] = mapped_column(Integer)  # ForeignKey убран пока
+    appointment_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
+    visit_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
+    invoice_id: Mapped[int | None] = mapped_column(Integer)  # ForeignKey убран пока
 
     # Детали
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    amount_related: Mapped[Optional[float]] = mapped_column(Float)  # Сумма, связанная с транзакцией
+    description: Mapped[str | None] = mapped_column(Text)
+    amount_related: Mapped[float | None] = mapped_column(Float)  # Сумма, связанная с транзакцией
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=func.now())
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=func.now())
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    patient_loyalty: Mapped["PatientLoyalty"] = relationship(
+    patient_loyalty: Mapped[PatientLoyalty] = relationship(
         "PatientLoyalty", back_populates="point_transactions"
     )
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])

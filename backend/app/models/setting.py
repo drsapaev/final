@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,7 +15,7 @@ class Setting(Base):
     category: Mapped[str] = mapped_column(String(50), nullable=False)
     # колонка называется "key" в БД; SQLAlchemy сам её экранирует как "key"
     key: Mapped[str] = mapped_column("key", String(100), nullable=False)
-    value: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    value: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # ВАЖНО: python-дефолты, чтобы не было NULL
     created_at: Mapped[datetime] = mapped_column(

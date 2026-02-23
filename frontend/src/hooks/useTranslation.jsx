@@ -1,6 +1,5 @@
 // Translation Context and Hook
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
+import { createContext, useContext, useState, useEffect } from 'react';
 const TranslationContext = createContext();
 
 export const useTranslation = () => {

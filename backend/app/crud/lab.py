@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
-
-from sqlalchemy import MetaData, select, Table
+from sqlalchemy import MetaData, Table, select
 from sqlalchemy.orm import Session
 
 
@@ -19,9 +17,9 @@ def _results(db: Session) -> Table:
 def create_order(
     db: Session,
     *,
-    visit_id: Optional[int] = None,
-    patient_id: Optional[int] = None,
-    notes: Optional[str] = None,
+    visit_id: int | None = None,
+    patient_id: int | None = None,
+    notes: str | None = None,
 ) -> dict:
     t = _orders(db)
     row = (
@@ -40,7 +38,7 @@ def create_order(
     return dict(row)
 
 
-def set_order_status(db: Session, order_id: int, status_new: str) -> Optional[dict]:
+def set_order_status(db: Session, order_id: int, status_new: str) -> dict | None:
     if status_new not in {"ordered", "in_progress", "done", "canceled"}:
         raise ValueError("invalid status")
     t = _orders(db)
@@ -57,7 +55,7 @@ def set_order_status(db: Session, order_id: int, status_new: str) -> Optional[di
     return dict(row)
 
 
-def add_results(db: Session, order_id: int, items: List[dict]) -> List[dict]:
+def add_results(db: Session, order_id: int, items: list[dict]) -> list[dict]:
     r = _results(db)
     created: list[dict] = []
     for it in items:
@@ -84,7 +82,7 @@ def add_results(db: Session, order_id: int, items: List[dict]) -> List[dict]:
     return created
 
 
-def list_results(db: Session, order_id: int) -> List[dict]:
+def list_results(db: Session, order_id: int) -> list[dict]:
     r = _results(db)
     rows = (
         db.execute(select(r).where(r.c.order_id == order_id).order_by(r.c.id.asc()))
@@ -99,7 +97,7 @@ def list_results(db: Session, order_id: int) -> List[dict]:
 
 def get_patient_lab_results(
     db: Session, patient_id: int, limit: int = 50
-) -> List[dict]:
+) -> list[dict]:
     """Получить результаты анализов пациента"""
     r = _results(db)
     o = _orders(db)

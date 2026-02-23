@@ -1,41 +1,41 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
-import { 
-  Shield, 
-  Settings, 
-  Key, 
-  Smartphone, 
-  Mail, 
-  Lock,
+import {
+  Shield,
+
+  Key,
+  Smartphone,
+
+
   AlertTriangle,
   CheckCircle,
-  Activity
-} from 'lucide-react';
+  Activity } from
+'lucide-react';
 
 /**
  * Страница управления безопасностью
  * Централизованное управление всеми аспектами безопасности
  */
-const SecurityPage = () => {
-  const { isDark, isLight, getColor, getSpacing } = useTheme();
+const SecurityPage = () => {void
+  useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showSMSEmail, setShowSMSEmail] = useState(false);
-  const [smsEmailMethod, setSmsEmailMethod] = useState('sms');
+  const [smsEmailMethod] = useState('sms');
 
   const tabs = [
-    { id: 'overview', label: 'Обзор', icon: Shield },
-    { id: '2fa', label: '2FA', icon: Key },
-    { id: 'devices', label: 'Устройства', icon: Smartphone },
-    { id: 'sessions', label: 'Сессии', icon: Activity },
-    { id: 'logs', label: 'Журнал', icon: AlertTriangle }
-  ];
+  { id: 'overview', label: 'Обзор', icon: Shield },
+  { id: '2fa', label: '2FA', icon: Key },
+  { id: 'devices', label: 'Устройства', icon: Smartphone },
+  { id: 'sessions', label: 'Сессии', icon: Activity },
+  { id: 'logs', label: 'Журнал', icon: AlertTriangle }];
 
-  const renderOverview = () => (
-    <div className="space-y-6">
+
+  const renderOverview = () =>
+  <div className="space-y-6">
       {/* Статус безопасности */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
@@ -109,9 +109,9 @@ const SecurityPage = () => {
           <h3 className="text-lg font-semibold mb-4">Быстрые действия</h3>
           <div className="space-y-3">
             <button
-              onClick={() => setShowSetupWizard(true)}
-              className="w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
+            onClick={() => setShowSetupWizard(true)}
+            className="w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
+            
               <Key className="w-5 h-5 text-blue-600" />
               <div>
                 <div className="font-medium">Настроить 2FA</div>
@@ -119,9 +119,9 @@ const SecurityPage = () => {
               </div>
             </button>
             <button
-              onClick={() => setActiveTab('devices')}
-              className="w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
+            onClick={() => setActiveTab('devices')}
+            className="w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
+            
               <Smartphone className="w-5 h-5 text-green-600" />
               <div>
                 <div className="font-medium">Управление устройствами</div>
@@ -129,9 +129,9 @@ const SecurityPage = () => {
               </div>
             </button>
             <button
-              onClick={() => setActiveTab('logs')}
-              className="w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
+            onClick={() => setActiveTab('logs')}
+            className="w-full flex items-center space-x-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
+            
               <AlertTriangle className="w-5 h-5 text-orange-600" />
               <div>
                 <div className="font-medium">Журнал безопасности</div>
@@ -163,8 +163,8 @@ const SecurityPage = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
+
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -200,20 +200,20 @@ const SecurityPage = () => {
         {/* Навигация */}
         <div className="border-b border-gray-200 mb-8">
           <nav className="flex space-x-8">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
+            {tabs.map((tab) =>
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === tab.id ?
+              'border-blue-500 text-blue-600' :
+              'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
+              }>
+              
                 <tab.icon className="w-4 h-4" />
                 <span>{tab.label}</span>
               </button>
-            ))}
+            )}
           </nav>
         </div>
 
@@ -221,34 +221,34 @@ const SecurityPage = () => {
         {renderTabContent()}
 
         {/* Модальные окна */}
-        {showSetupWizard && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        {showSetupWizard &&
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
               <TwoFactorSetupWizard
-                onComplete={() => {
-                  setShowSetupWizard(false);
-                  setActiveTab('2fa');
-                }}
-                onCancel={() => setShowSetupWizard(false)}
-              />
+              onComplete={() => {
+                setShowSetupWizard(false);
+                setActiveTab('2fa');
+              }}
+              onCancel={() => setShowSetupWizard(false)} />
+            
             </div>
           </div>
-        )}
+        }
 
-        {showSMSEmail && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        {showSMSEmail &&
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg max-w-md w-full mx-4">
               <SMSEmail2FA
-                method={smsEmailMethod}
-                onSuccess={() => setShowSMSEmail(false)}
-                onCancel={() => setShowSMSEmail(false)}
-              />
+              method={smsEmailMethod}
+              onSuccess={() => setShowSMSEmail(false)}
+              onCancel={() => setShowSMSEmail(false)} />
+            
             </div>
           </div>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default SecurityPage;

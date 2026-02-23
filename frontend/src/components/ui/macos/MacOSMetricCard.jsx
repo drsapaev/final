@@ -1,5 +1,5 @@
-import React from 'react';
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSMetricCard = ({
   title,
@@ -7,8 +7,6 @@ const MacOSMetricCard = ({
   previousValue,
   unit = '',
   icon: Icon,
-  trend,
-  trendType = 'neutral',
   trendPeriod = 'vs предыдущий период',
   color = 'blue',
   size = 'md',
@@ -132,11 +130,11 @@ const MacOSMetricCard = ({
 
   const calculateTrend = () => {
     if (!previousValue || previousValue === 0) return null;
-    
-    const change = ((value - previousValue) / previousValue) * 100;
+
+    const change = (value - previousValue) / previousValue * 100;
     const isPositive = change > 0;
     const isNegative = change < 0;
-    
+
     return {
       percentage: Math.abs(change).toFixed(1),
       isPositive,
@@ -147,15 +145,15 @@ const MacOSMetricCard = ({
 
   const renderTrend = () => {
     const trendData = calculateTrend();
-    
+
     if (!trendData) return null;
 
-    const TrendIcon = trendData.isPositive ? ArrowUpRight : 
-                     trendData.isNegative ? ArrowDownRight : Minus;
-    
+    const TrendIcon = trendData.isPositive ? ArrowUpRight :
+    trendData.isNegative ? ArrowDownRight : Minus;
+
     const trendColor = trendData.isPositive ? 'var(--mac-success)' :
-                      trendData.isNegative ? 'var(--mac-error)' :
-                      'var(--mac-text-secondary)';
+    trendData.isNegative ? 'var(--mac-error)' :
+    'var(--mac-text-secondary)';
 
     return (
       <div style={{
@@ -171,12 +169,18 @@ const MacOSMetricCard = ({
         <span style={{ marginLeft: '4px', opacity: 0.8 }}>
           {trendPeriod}
         </span>
-      </div>
-    );
+      </div>);
+
   };
 
   const handleClick = () => {
     if (onClick) {
+      onClick();
+    }
+  };
+  const handleKeyDown = (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && onClick) {
+      e.preventDefault();
       onClick();
     }
   };
@@ -195,50 +199,44 @@ const MacOSMetricCard = ({
     }
   };
 
-  const renderLoading = () => (
-    <div style={cardStyle}>
+  const renderLoading = () =>
+  <div style={cardStyle}>
       <div style={headerStyle}>
-        <div style={{ 
-          width: '60%', 
-          height: '16px', 
-          background: 'var(--mac-bg-tertiary)', 
-          borderRadius: 'var(--mac-radius-sm)' 
-        }} />
-        <div style={{ 
-          width: '24px', 
-          height: '24px', 
-          background: 'var(--mac-bg-tertiary)', 
-          borderRadius: '50%' 
-        }} />
+        <div style={{
+        width: '60%',
+        height: '16px',
+        background: 'var(--mac-bg-tertiary)',
+        borderRadius: 'var(--mac-radius-sm)'
+      }} />
+        <div style={{
+        width: '24px',
+        height: '24px',
+        background: 'var(--mac-bg-tertiary)',
+        borderRadius: '50%'
+      }} />
       </div>
-      <div style={{ 
-        width: '80%', 
-        height: '32px', 
-        background: 'var(--mac-bg-tertiary)', 
-        borderRadius: 'var(--mac-radius-sm)',
-        marginBottom: '8px'
-      }} />
-      <div style={{ 
-        width: '40%', 
-        height: '12px', 
-        background: 'var(--mac-bg-tertiary)', 
-        borderRadius: 'var(--mac-radius-sm)' 
-      }} />
-    </div>
-  );
+      <div style={{
+      width: '80%',
+      height: '32px',
+      background: 'var(--mac-bg-tertiary)',
+      borderRadius: 'var(--mac-radius-sm)',
+      marginBottom: '8px'
+    }} />
+      <div style={{
+      width: '40%',
+      height: '12px',
+      background: 'var(--mac-bg-tertiary)',
+      borderRadius: 'var(--mac-radius-sm)'
+    }} />
+    </div>;
+
 
   if (loading) {
     return renderLoading();
   }
 
-  return (
-    <div
-      className={className}
-      style={cardStyle}
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+  const content = (
+    <>
       <div style={headerStyle}>
         <h3 style={titleStyle}>{title}</h3>
         {Icon && <Icon style={iconStyle} />}
@@ -250,8 +248,47 @@ const MacOSMetricCard = ({
       </div>
       
       {renderTrend()}
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <div
+        className={className}
+        style={cardStyle}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}>
+        
+        {content}
+      </div>);
+
+  }
+
+  return (
+    <div className={className} style={cardStyle}>
+      {content}
+    </div>);
+
+};
+
+MacOSMetricCard.propTypes = {
+  title: PropTypes.node,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.node]),
+  previousValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  unit: PropTypes.node,
+  icon: PropTypes.elementType,
+  trendPeriod: PropTypes.node,
+  color: PropTypes.oneOf(['blue', 'green', 'orange', 'red', 'purple', 'gray']),
+  size: PropTypes.oneOf(['sm', 'md', 'lg']),
+  variant: PropTypes.oneOf(['default', 'filled', 'elevated']),
+  loading: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default MacOSMetricCard;

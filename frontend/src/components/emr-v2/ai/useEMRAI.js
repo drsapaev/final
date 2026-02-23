@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../../../api/client';
+import logger from '../../../utils/logger';
 
 /**
  * Suggestion shape
@@ -95,7 +96,7 @@ export function useEMRAI({
             setLastRequestTime(Date.now());
         } catch (err) {
             if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
-                console.error('[useEMRAI] Error fetching suggestions:', err);
+                logger.error('[useEMRAI] Error fetching suggestions:', err);
                 setError(err.message || 'Не удалось получить подсказки AI');
             }
         } finally {

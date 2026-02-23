@@ -5,14 +5,12 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.crud.emr_template import emr_version
 from app.models.emr_template import EMRVersion
-from app.schemas.emr_template import EMRVersionCreate
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +34,11 @@ class EMRVersioningEnhancedService:
         self,
         db: Session,
         emr_id: int,
-        version_data: Dict[str, Any],
+        version_data: dict[str, Any],
         change_type: str,
-        change_description: Optional[str] = None,
-        changed_by: Optional[int] = None,
-        previous_version: Optional[Dict[str, Any]] = None,
+        change_description: str | None = None,
+        changed_by: int | None = None,
+        previous_version: dict[str, Any] | None = None,
     ) -> EMRVersion:
         """Создать версию с анализом изменений"""
         try:
@@ -84,7 +82,7 @@ class EMRVersioningEnhancedService:
 
     async def get_version_comparison(
         self, db: Session, emr_id: int, version1_id: int, version2_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Получить сравнение двух версий EMR"""
         try:
             # Получаем версии
@@ -124,7 +122,7 @@ class EMRVersioningEnhancedService:
 
     async def get_version_timeline(
         self, db: Session, emr_id: int, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Получить временную линию версий EMR"""
         try:
             from app.crud.emr_version import get_versions_by_emr
@@ -160,8 +158,8 @@ class EMRVersioningEnhancedService:
         emr_id: int,
         version_id: int,
         restored_by: int,
-        reason: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        reason: str | None = None,
+    ) -> dict[str, Any]:
         """Восстановить версию с созданием резервной копии"""
         try:
             # Получаем текущую версию EMR
@@ -211,7 +209,7 @@ class EMRVersioningEnhancedService:
             logger.error(f"Ошибка восстановления версии: {e}")
             raise
 
-    async def get_version_statistics(self, db: Session, emr_id: int) -> Dict[str, Any]:
+    async def get_version_statistics(self, db: Session, emr_id: int) -> dict[str, Any]:
         """Получить статистику версий EMR"""
         try:
             from app.crud.emr_version import get_versions_by_emr
@@ -263,10 +261,9 @@ class EMRVersioningEnhancedService:
             raise
 
     async def _analyze_changes(
-        self, old_data: Dict[str, Any], new_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, old_data: dict[str, Any], new_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Анализ изменений между версиями"""
-        import json
 
         # Парсим JSON если это строки
         if isinstance(old_data, str):
@@ -301,7 +298,7 @@ class EMRVersioningEnhancedService:
         return changes
 
     async def _generate_change_description(
-        self, changes_analysis: Dict[str, Any], change_type: str
+        self, changes_analysis: dict[str, Any], change_type: str
     ) -> str:
         """Генерация описания изменений"""
         description_parts = []
@@ -324,10 +321,9 @@ class EMRVersioningEnhancedService:
         return "; ".join(description_parts)
 
     async def _compare_versions(
-        self, data1: Dict[str, Any], data2: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, data1: dict[str, Any], data2: dict[str, Any]
+    ) -> dict[str, Any]:
         """Сравнение двух версий данных"""
-        import json
 
         # Парсим JSON если это строки
         if isinstance(data1, str):
@@ -371,9 +367,8 @@ class EMRVersioningEnhancedService:
 
         return comparison
 
-    async def _get_data_summary(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_data_summary(self, data: dict[str, Any]) -> dict[str, Any]:
         """Получить краткое описание данных версии"""
-        import json
 
         # Парсим JSON если это строка
         if isinstance(data, str):
@@ -390,7 +385,7 @@ class EMRVersioningEnhancedService:
 
         return summary
 
-    async def _get_current_emr_data(self, db: Session, emr_id: int) -> Dict[str, Any]:
+    async def _get_current_emr_data(self, db: Session, emr_id: int) -> dict[str, Any]:
         """Получить текущие данные EMR"""
         # Здесь должен быть запрос к базе данных для получения текущих данных EMR
         # Пока возвращаем заглушку

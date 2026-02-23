@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -8,10 +8,10 @@ import {
   CardHeader,
   CardContent,
   Badge,
-  Icon,
-  Sidebar,
-  Skeleton
-} from '../components/ui/macos';
+
+
+  Skeleton } from
+'../components/ui/macos';
 import AnimatedTransition from '../components/ui/native/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/animations.css';
@@ -37,8 +37,8 @@ import {
   Stethoscope,
   AlertCircle,
   Phone,
-  Bell
-} from 'lucide-react';
+  Bell } from
+'lucide-react';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import { useModal } from '../hooks/useModal.jsx';
@@ -52,8 +52,8 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 const DoctorPanel = () => {
   const location = useLocation();
-  const { isMobile, isTablet, isDesktop } = useBreakpoint();
-  const isTouch = useTouchDevice();
+  const { isMobile, isTablet } = useBreakpoint();void
+  useTouchDevice();
 
   // ✅ Получаем patientId из URL для автоматического выбора пациента
   const getPatientIdFromUrl = useCallback(() => {
@@ -137,12 +137,12 @@ const DoctorPanel = () => {
   // Используем централизованную систему темизации
   const {
     isDark,
-    isLight,
+
     getColor,
     getSpacing,
     getFontSize,
-    getShadow,
-    designTokens
+    getShadow
+
   } = useTheme();
 
   // Цвета и стили
@@ -158,74 +158,74 @@ const DoctorPanel = () => {
     setLoading(true);
     try {
       // Симуляция загрузки данных
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Тестовые данные
       const mockPatients = [
-        {
-          id: 1,
-          name: 'Ахмедов Алишер',
-          age: 45,
-          gender: 'М',
-          phone: '+998 90 123 45 67',
-          diagnosis: 'Гипертония',
-          status: 'active',
-          lastVisit: '2024-01-15',
-          nextAppointment: '2024-01-20'
-        },
-        {
-          id: 2,
-          name: 'Каримова Зухра',
-          age: 32,
-          gender: 'Ж',
-          phone: '+998 91 234 56 78',
-          diagnosis: 'Диабет 2 типа',
-          status: 'active',
-          lastVisit: '2024-01-14',
-          nextAppointment: '2024-01-18'
-        },
-        {
-          id: 3,
-          name: 'Тошматов Бахтиёр',
-          age: 28,
-          gender: 'М',
-          phone: '+998 93 345 67 89',
-          diagnosis: 'Астма',
-          status: 'recovery',
-          lastVisit: '2024-01-12',
-          nextAppointment: '2024-01-25'
-        }
-      ];
+      {
+        id: 1,
+        name: 'Ахмедов Алишер',
+        age: 45,
+        gender: 'М',
+        phone: '+998 90 123 45 67',
+        diagnosis: 'Гипертония',
+        status: 'active',
+        lastVisit: '2024-01-15',
+        nextAppointment: '2024-01-20'
+      },
+      {
+        id: 2,
+        name: 'Каримова Зухра',
+        age: 32,
+        gender: 'Ж',
+        phone: '+998 91 234 56 78',
+        diagnosis: 'Диабет 2 типа',
+        status: 'active',
+        lastVisit: '2024-01-14',
+        nextAppointment: '2024-01-18'
+      },
+      {
+        id: 3,
+        name: 'Тошматов Бахтиёр',
+        age: 28,
+        gender: 'М',
+        phone: '+998 93 345 67 89',
+        diagnosis: 'Астма',
+        status: 'recovery',
+        lastVisit: '2024-01-12',
+        nextAppointment: '2024-01-25'
+      }];
+
 
       const mockAppointments = [
-        {
-          id: 1,
-          patientId: 1,
-          patientName: 'Ахмедов Алишер',
-          time: '09:00',
-          type: 'Консультация',
-          status: 'scheduled',
-          notes: 'Плановый осмотр'
-        },
-        {
-          id: 2,
-          patientId: 2,
-          patientName: 'Каримова Зухра',
-          time: '10:30',
-          type: 'Повторный прием',
-          status: 'in_progress',
-          notes: 'Контроль сахара'
-        },
-        {
-          id: 3,
-          patientId: 3,
-          patientName: 'Тошматов Бахтиёр',
-          time: '14:00',
-          type: 'Экстренный',
-          status: 'completed',
-          notes: 'Обострение астмы'
-        }
-      ];
+      {
+        id: 1,
+        patientId: 1,
+        patientName: 'Ахмедов Алишер',
+        time: '09:00',
+        type: 'Консультация',
+        status: 'scheduled',
+        notes: 'Плановый осмотр'
+      },
+      {
+        id: 2,
+        patientId: 2,
+        patientName: 'Каримова Зухра',
+        time: '10:30',
+        type: 'Повторный прием',
+        status: 'in_progress',
+        notes: 'Контроль сахара'
+      },
+      {
+        id: 3,
+        patientId: 3,
+        patientName: 'Тошматов Бахтиёр',
+        time: '14:00',
+        type: 'Экстренный',
+        status: 'completed',
+        notes: 'Обострение астмы'
+      }];
+
 
       setPatients(mockPatients);
       setAppointments(mockAppointments);
@@ -272,8 +272,8 @@ const DoctorPanel = () => {
           };
 
           // Добавляем пациента в список и устанавливаем поисковый запрос
-          setPatients(prev => {
-            const exists = prev.some(p => p.id === patientObj.id);
+          setPatients((prev) => {
+            const exists = prev.some((p) => p.id === patientObj.id);
             if (!exists) {
               return [patientObj, ...prev];
             }
@@ -312,9 +312,9 @@ const DoctorPanel = () => {
     lineHeight: '1.5',
     color: 'var(--mac-text-primary)',
     transition: 'background var(--mac-duration-normal) var(--mac-ease)'
-  };
+  };void
 
-  const headerStyle = {
+  {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -324,18 +324,18 @@ const DoctorPanel = () => {
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${getColor('primary', 200)}`,
     boxShadow: getShadow('lg')
-  };
+  };void
 
-  const headerContentStyle = {
+  {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: isMobile ? getSpacing('md') : getSpacing('lg'),
     maxWidth: '1400px',
     margin: '0 auto'
-  };
+  };void
 
-  const logoStyle = {
+  {
     display: 'flex',
     alignItems: 'center',
     gap: getSpacing('sm'),
@@ -343,9 +343,9 @@ const DoctorPanel = () => {
     fontSize: isMobile ? getFontSize('lg') : getFontSize('xl'),
     fontWeight: '700',
     textDecoration: 'none'
-  };
+  };void
 
-  const headerActionsStyle = {
+  {
     display: 'flex',
     alignItems: 'center',
     gap: isMobile ? getSpacing('sm') : getSpacing('md')
@@ -511,14 +511,14 @@ const DoctorPanel = () => {
     patientModal.openModal(patient);
   };
 
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = patients.filter((patient) => {
     const matchesSearch = patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.phone.includes(searchQuery);
+    patient.phone.includes(searchQuery);
     const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
-  const filteredAppointments = appointments.filter(appointment => {
+  const filteredAppointments = appointments.filter((appointment) => {
     const matchesSearch = appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterStatus === 'all' || appointment.status === filterStatus;
     return matchesSearch && matchesFilter;
@@ -546,8 +546,8 @@ const DoctorPanel = () => {
                 e.target.style.background = 'rgba(255, 255, 255, 0.8)';
                 e.target.style.transform = 'translateY(0)';
               }
-            }}
-          >
+            }}>
+
             <Activity size={isMobile ? 16 : 20} />
             {!isMobile && <span>Панель</span>}
           </button>
@@ -566,8 +566,8 @@ const DoctorPanel = () => {
                 e.target.style.background = 'rgba(255, 255, 255, 0.8)';
                 e.target.style.transform = 'translateY(0)';
               }
-            }}
-          >
+            }}>
+
             <User size={isMobile ? 16 : 20} />
             {!isMobile && <span>Пациенты</span>}
           </button>
@@ -586,8 +586,8 @@ const DoctorPanel = () => {
                 e.target.style.background = 'rgba(255, 255, 255, 0.8)';
                 e.target.style.transform = 'translateY(0)';
               }
-            }}
-          >
+            }}>
+
             <Calendar size={isMobile ? 16 : 20} />
             {!isMobile && <span>Записи</span>}
           </button>
@@ -607,15 +607,15 @@ const DoctorPanel = () => {
                 e.target.style.background = 'rgba(255, 255, 255, 0.8)';
                 e.target.style.transform = 'translateY(0)';
               }
-            }}
-          >
+            }}>
+
             <Users size={isMobile ? 16 : 20} />
             {!isMobile && <span>Очередь</span>}
-            {queueStats.waiting > 0 && (
-              <Badge variant="warning" style={{ marginLeft: '4px', fontSize: '10px' }}>
+            {queueStats.waiting > 0 &&
+            <Badge variant="warning" style={{ marginLeft: '4px', fontSize: '10px' }}>
                 {queueStats.waiting}
               </Badge>
-            )}
+            }
           </button>
 
           <button
@@ -632,8 +632,8 @@ const DoctorPanel = () => {
                 e.target.style.background = 'rgba(255, 255, 255, 0.8)';
                 e.target.style.transform = 'translateY(0)';
               }
-            }}
-          >
+            }}>
+
             <Brain size={isMobile ? 16 : 20} />
             {!isMobile && <span>AI Помощник</span>}
           </button>
@@ -652,41 +652,41 @@ const DoctorPanel = () => {
                 e.target.style.background = 'rgba(255, 255, 255, 0.8)';
                 e.target.style.transform = 'translateY(0)';
               }
-            }}
-          >
+            }}>
+
             <FileText size={isMobile ? 16 : 20} />
             {!isMobile && <span>Отчеты</span>}
           </button>
         </div>
 
         {/* Контент вкладок */}
-        {activeTab === 'dashboard' && (
-          <AnimatedTransition type="fade" delay={100}>
+        {activeTab === 'dashboard' &&
+        <AnimatedTransition type="fade" delay={100}>
             <div>
               {/* Статистика */}
               <div style={dashboardGridStyle}>
                 <AnimatedTransition type="scale" delay={200}>
                   <Card
-                    style={statCardStyle}
-                    onMouseEnter={(e) => {
-                      Object.assign(e.currentTarget.style, statCardHoverStyle);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = getShadow('lg');
-                    }}
-                  >
+                  style={statCardStyle}
+                  onMouseEnter={(e) => {
+                    Object.assign(e.currentTarget.style, statCardHoverStyle);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = getShadow('lg');
+                  }}>
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '50%',
-                        background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}>
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white'
+                    }}>
                         <User size={24} />
                       </div>
                       <div>
@@ -703,31 +703,31 @@ const DoctorPanel = () => {
 
                 <AnimatedTransition type="scale" delay={300}>
                   <Card
-                    style={statCardStyle}
-                    onMouseEnter={(e) => {
-                      Object.assign(e.currentTarget.style, statCardHoverStyle);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = getShadow('lg');
-                    }}
-                  >
+                  style={statCardStyle}
+                  onMouseEnter={(e) => {
+                    Object.assign(e.currentTarget.style, statCardHoverStyle);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = getShadow('lg');
+                  }}>
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '50%',
-                        background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}>
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${successColor} 0%, ${getColor('success', 600)} 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white'
+                    }}>
                         <Calendar size={24} />
                       </div>
                       <div>
                         <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
-                          {appointments.filter(a => a.status === 'scheduled').length}
+                          {appointments.filter((a) => a.status === 'scheduled').length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
                           Записей на сегодня
@@ -739,31 +739,31 @@ const DoctorPanel = () => {
 
                 <AnimatedTransition type="scale" delay={400}>
                   <Card
-                    style={statCardStyle}
-                    onMouseEnter={(e) => {
-                      Object.assign(e.currentTarget.style, statCardHoverStyle);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = getShadow('lg');
-                    }}
-                  >
+                  style={statCardStyle}
+                  onMouseEnter={(e) => {
+                    Object.assign(e.currentTarget.style, statCardHoverStyle);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = getShadow('lg');
+                  }}>
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '50%',
-                        background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}>
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${warningColor} 0%, ${getColor('warning', 600)} 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white'
+                    }}>
                         <Clock size={24} />
                       </div>
                       <div>
                         <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
-                          {appointments.filter(a => a.status === 'in_progress').length}
+                          {appointments.filter((a) => a.status === 'in_progress').length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
                           В процессе
@@ -775,31 +775,31 @@ const DoctorPanel = () => {
 
                 <AnimatedTransition type="scale" delay={500}>
                   <Card
-                    style={statCardStyle}
-                    onMouseEnter={(e) => {
-                      Object.assign(e.currentTarget.style, statCardHoverStyle);
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = getShadow('lg');
-                    }}
-                  >
+                  style={statCardStyle}
+                  onMouseEnter={(e) => {
+                    Object.assign(e.currentTarget.style, statCardHoverStyle);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = getShadow('lg');
+                  }}>
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '50%',
-                        background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}>
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${accentColor} 0%, ${getColor('info', 600)} 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white'
+                    }}>
                         <CheckCircle size={24} />
                       </div>
                       <div>
                         <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
-                          {appointments.filter(a => a.status === 'completed').length}
+                          {appointments.filter((a) => a.status === 'completed').length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
                           Завершено сегодня
@@ -815,20 +815,20 @@ const DoctorPanel = () => {
                 <Card style={{ marginBottom: getSpacing('xl') }}>
                   <CardHeader>
                     <h2 style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '700',
-                      color: getColor('secondary', 800),
-                      margin: 0
-                    }}>
+                    fontSize: getFontSize('xl'),
+                    fontWeight: '700',
+                    color: getColor('secondary', 800),
+                    margin: 0
+                  }}>
                       Быстрые действия
                     </h2>
                   </CardHeader>
                   <CardContent>
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-                      gap: getSpacing('md')
-                    }}>
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+                    gap: getSpacing('md')
+                  }}>
                       <Button variant="primary" fullWidth>
                         <Plus size={20} />
                         Новый пациент
@@ -851,50 +851,50 @@ const DoctorPanel = () => {
               </AnimatedTransition>
             </div>
           </AnimatedTransition>
-        )}
+        }
 
-        {activeTab === 'patients' && (
-          <AnimatedTransition type="fade" delay={100}>
+        {activeTab === 'patients' &&
+        <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <h2 style={{
-                    fontSize: getFontSize('xl'),
-                    fontWeight: '700',
-                    color: getColor('secondary', 800),
-                    margin: 0
-                  }}>
+                  fontSize: getFontSize('xl'),
+                  fontWeight: '700',
+                  color: getColor('secondary', 800),
+                  margin: 0
+                }}>
                     Пациенты
                   </h2>
                   <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ position: 'relative' }}>
                       <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
                       <input
-                        type="text"
-                        placeholder="Поиск пациентов..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{
-                          padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
-                          border: `1px solid ${getColor('secondary', 200)}`,
-                          borderRadius: '12px',
-                          fontSize: getFontSize('sm'),
-                          width: isMobile ? '200px' : '250px',
-                          background: 'white'
-                        }}
-                      />
-                    </div>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
+                      type="text"
+                      placeholder="Поиск пациентов..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       style={{
-                        padding: getSpacing('sm'),
+                        padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
                         border: `1px solid ${getColor('secondary', 200)}`,
                         borderRadius: '12px',
                         fontSize: getFontSize('sm'),
+                        width: isMobile ? '200px' : '250px',
                         background: 'white'
-                      }}
-                    >
+                      }} />
+
+                    </div>
+                    <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    style={{
+                      padding: getSpacing('sm'),
+                      border: `1px solid ${getColor('secondary', 200)}`,
+                      borderRadius: '12px',
+                      fontSize: getFontSize('sm'),
+                      background: 'white'
+                    }}>
+
                       <option value="all">Все статусы</option>
                       <option value="active">Активные</option>
                       <option value="recovery">Выздоравливающие</option>
@@ -908,10 +908,10 @@ const DoctorPanel = () => {
                 </div>
               </CardHeader>
               <CardContent style={{ padding: 0 }}>
-                {loading ? (
-                  <Skeleton.Table rows={5} columns={6} />
-                ) : (
-                  <table style={tableStyle}>
+                {loading ?
+              <Skeleton.Table rows={5} columns={6} /> :
+
+              <table style={tableStyle}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Пациент</th>
@@ -923,36 +923,36 @@ const DoctorPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPatients.map((patient, index) => (
-                        <tr
-                          key={patient.id}
-                          style={{
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = getColor('primary', 50);
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                          onClick={() => handlePatientClick(patient)}
-                        >
+                      {filteredPatients.map((patient) =>
+                  <tr
+                    key={patient.id}
+                    style={{
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = getColor('primary', 50);
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => handlePatientClick(patient)}>
+
                           <td style={tdStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
                               <div style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                fontSize: getFontSize('sm'),
-                                fontWeight: '700'
-                              }}>
-                                {patient.name.split(' ').map(n => n[0]).join('')}
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: getFontSize('sm'),
+                          fontWeight: '700'
+                        }}>
+                                {patient.name.split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
                                 <div style={{ fontWeight: '500', color: getColor('secondary', 800) }}>
@@ -974,85 +974,85 @@ const DoctorPanel = () => {
                           </td>
                           <td style={tdStyle}>
                             <button
-                              style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePatientClick(patient);
-                              }}
-                            >
+                        style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePatientClick(patient);
+                        }}>
+
                               <Edit size={16} />
                             </button>
                             <button
-                              style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                logger.log('View patient', patient.id);
-                              }}
-                            >
+                        style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          logger.log('View patient', patient.id);
+                        }}>
+
                               <Eye size={16} />
                             </button>
                             <button
-                              style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                logger.log('Delete patient', patient.id);
-                              }}
-                            >
+                        style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          logger.log('Delete patient', patient.id);
+                        }}>
+
                               <Trash2 size={16} />
                             </button>
                           </td>
                         </tr>
-                      ))}
+                  )}
                     </tbody>
                   </table>
-                )}
+              }
               </CardContent>
             </Card>
           </AnimatedTransition>
-        )}
+        }
 
-        {activeTab === 'appointments' && (
-          <AnimatedTransition type="fade" delay={100}>
+        {activeTab === 'appointments' &&
+        <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <h2 style={{
-                    fontSize: getFontSize('xl'),
-                    fontWeight: '700',
-                    color: getColor('secondary', 800),
-                    margin: 0
-                  }}>
+                  fontSize: getFontSize('xl'),
+                  fontWeight: '700',
+                  color: getColor('secondary', 800),
+                  margin: 0
+                }}>
                     Записи на прием
                   </h2>
                   <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ position: 'relative' }}>
                       <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
                       <input
-                        type="text"
-                        placeholder="Поиск записей..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{
-                          padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
-                          border: `1px solid ${getColor('secondary', 200)}`,
-                          borderRadius: '12px',
-                          fontSize: getFontSize('sm'),
-                          width: isMobile ? '200px' : '250px',
-                          background: 'white'
-                        }}
-                      />
-                    </div>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
+                      type="text"
+                      placeholder="Поиск записей..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       style={{
-                        padding: getSpacing('sm'),
+                        padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
                         border: `1px solid ${getColor('secondary', 200)}`,
                         borderRadius: '12px',
                         fontSize: getFontSize('sm'),
+                        width: isMobile ? '200px' : '250px',
                         background: 'white'
-                      }}
-                    >
+                      }} />
+
+                    </div>
+                    <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    style={{
+                      padding: getSpacing('sm'),
+                      border: `1px solid ${getColor('secondary', 200)}`,
+                      borderRadius: '12px',
+                      fontSize: getFontSize('sm'),
+                      background: 'white'
+                    }}>
+
                       <option value="all">Все статусы</option>
                       <option value="scheduled">Запланированы</option>
                       <option value="in_progress">В процессе</option>
@@ -1060,9 +1060,9 @@ const DoctorPanel = () => {
                       <option value="cancelled">Отменены</option>
                     </select>
                     <Button
-                      variant="primary"
-                      onClick={() => setScheduleNextModal({ open: true, patient: null })}
-                    >
+                    variant="primary"
+                    onClick={() => setScheduleNextModal({ open: true, patient: null })}>
+
                       <Plus size={16} />
                       {!isMobile && <span>Назначить следующий визит</span>}
                     </Button>
@@ -1070,10 +1070,10 @@ const DoctorPanel = () => {
                 </div>
               </CardHeader>
               <CardContent style={{ padding: 0 }}>
-                {loading ? (
-                  <Skeleton.Table rows={5} columns={6} />
-                ) : (
-                  <table style={tableStyle}>
+                {loading ?
+              <Skeleton.Table rows={5} columns={6} /> :
+
+              <table style={tableStyle}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Время</th>
@@ -1085,20 +1085,20 @@ const DoctorPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredAppointments.map((appointment, index) => (
-                        <tr
-                          key={appointment.id}
-                          style={{
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = getColor('primary', 50);
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
+                      {filteredAppointments.map((appointment) =>
+                  <tr
+                    key={appointment.id}
+                    style={{
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = getColor('primary', 50);
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}>
+
                           <td style={tdStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
                               <Clock size={16} style={{ color: getColor('secondary', 400) }} />
@@ -1115,56 +1115,56 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>{appointment.notes}</td>
                           <td style={tdStyle}>
                             <button
-                              style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                logger.log('Edit appointment', appointment.id);
-                              }}
-                            >
+                        style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          logger.log('Edit appointment', appointment.id);
+                        }}>
+
                               <Edit size={16} />
                             </button>
                             <button
-                              style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                logger.log('Complete appointment', appointment.id);
-                              }}
-                            >
+                        style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          logger.log('Complete appointment', appointment.id);
+                        }}>
+
                               <CheckCircle size={16} />
                             </button>
                             <button
-                              style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                logger.log('Cancel appointment', appointment.id);
-                              }}
-                            >
+                        style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          logger.log('Cancel appointment', appointment.id);
+                        }}>
+
                               <XCircle size={16} />
                             </button>
                           </td>
                         </tr>
-                      ))}
+                  )}
                     </tbody>
                   </table>
-                )}
+              }
               </CardContent>
             </Card>
           </AnimatedTransition>
-        )}
+        }
 
         {/* ✅ НОВОЕ: Контент таба очереди */}
-        {activeTab === 'queue' && (
-          <AnimatedTransition type="fade" delay={100}>
+        {activeTab === 'queue' &&
+        <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <div>
                     <h2 style={{
-                      fontSize: getFontSize('xl'),
-                      fontWeight: '700',
-                      color: getColor('secondary', 800),
-                      margin: 0
-                    }}>
+                    fontSize: getFontSize('xl'),
+                    fontWeight: '700',
+                    color: getColor('secondary', 800),
+                    margin: 0
+                  }}>
                       Очередь пациентов
                     </h2>
                     <div style={{ display: 'flex', gap: getSpacing('md'), marginTop: getSpacing('sm') }}>
@@ -1175,47 +1175,47 @@ const DoctorPanel = () => {
                   </div>
                   <div style={{ display: 'flex', gap: getSpacing('sm') }}>
                     <Button
-                      variant="primary"
-                      onClick={async () => {
-                        try {
-                          await callNext();
-                          logger.log('Вызван следующий пациент');
-                        } catch (err) {
-                          logger.error('Ошибка вызова:', err);
-                        }
-                      }}
-                      disabled={queueStats.waiting === 0}
-                    >
+                    variant="primary"
+                    onClick={async () => {
+                      try {
+                        await callNext();
+                        logger.log('Вызван следующий пациент');
+                      } catch (err) {
+                        logger.error('Ошибка вызова:', err);
+                      }
+                    }}
+                    disabled={queueStats.waiting === 0}>
+
                       <Phone size={16} />
                       {!isMobile && <span style={{ marginLeft: '4px' }}>Вызвать следующего</span>}
                     </Button>
                     <Button
-                      variant="ghost"
-                      onClick={loadQueue}
-                    >
+                    variant="ghost"
+                    onClick={loadQueue}>
+
                       <RotateCcw size={16} />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent style={{ padding: 0 }}>
-                {queueLoading ? (
-                  <div style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
+                {queueLoading ?
+              <div style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
                     <Skeleton height={40} count={5} />
-                  </div>
-                ) : queueError ? (
-                  <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: dangerColor }}>
+                  </div> :
+              queueError ?
+              <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: dangerColor }}>
                     <AlertCircle size={32} style={{ marginBottom: getSpacing('sm') }} />
                     <p>{queueError}</p>
                     <Button variant="ghost" onClick={loadQueue}>Повторить</Button>
-                  </div>
-                ) : queueEntries.length === 0 ? (
-                  <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: getColor('secondary', 500) }}>
+                  </div> :
+              queueEntries.length === 0 ?
+              <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: getColor('secondary', 500) }}>
                     <Users size={48} style={{ opacity: 0.5, marginBottom: getSpacing('md') }} />
                     <p>Очередь пуста</p>
-                  </div>
-                ) : (
-                  <table style={tableStyle}>
+                  </div> :
+
+              <table style={tableStyle}>
                     <thead>
                       <tr>
                         <th style={thStyle}>№</th>
@@ -1227,14 +1227,14 @@ const DoctorPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {queueEntries.map((entry, index) => (
-                        <tr
-                          key={entry.id}
-                          style={{
-                            background: entry.priority > 0 ? `${warningColor}10` : 'transparent',
-                            borderLeft: entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
-                          }}
-                        >
+                      {queueEntries.map((entry, index) =>
+                  <tr
+                    key={entry.id}
+                    style={{
+                      background: entry.priority > 0 ? `${warningColor}10` : 'transparent',
+                      borderLeft: entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
+                    }}>
+
                           <td style={tdStyle}>
                             <Badge variant={entry.priority > 0 ? 'warning' : 'default'}>
                               {entry.number || index + 1}
@@ -1246,164 +1246,164 @@ const DoctorPanel = () => {
                           </td>
                           <td style={tdStyle}>{entry.phone || '—'}</td>
                           <td style={tdStyle}>
-                            {entry.service_details?.length > 0 ? (
-                              entry.service_details.slice(0, 2).map((svc, i) => (
-                                <Badge key={i} variant="default" style={{ marginRight: '4px', fontSize: '10px' }}>
+                            {entry.service_details?.length > 0 ?
+                      entry.service_details.slice(0, 2).map((svc, i) =>
+                      <Badge key={i} variant="default" style={{ marginRight: '4px', fontSize: '10px' }}>
                                   {svc.name || svc.code}
                                 </Badge>
-                              ))
-                            ) : entry.services?.length > 0 ? (
-                              <span style={{ fontSize: '12px', color: getColor('secondary', 500) }}>
+                      ) :
+                      entry.services?.length > 0 ?
+                      <span style={{ fontSize: '12px', color: getColor('secondary', 500) }}>
                                 {entry.services.slice(0, 2).join(', ')}
-                              </span>
-                            ) : '—'}
+                              </span> :
+                      '—'}
                           </td>
                           <td style={tdStyle}>
                             <Badge variant={getStatusVariant(entry.status)}>
                               {getStatusText(entry.status)}
                             </Badge>
                             {/* ✅ Таймер для активных статусов */}
-                            {(entry.status === 'called' || entry.status === 'diagnostics') && entry.called_at && (
-                              <span style={{
-                                marginLeft: '8px',
-                                fontSize: '11px',
-                                color: getColor('secondary', 500),
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px'
-                              }}>
+                            {(entry.status === 'called' || entry.status === 'diagnostics') && entry.called_at &&
+                      <span style={{
+                        marginLeft: '8px',
+                        fontSize: '11px',
+                        color: getColor('secondary', 500),
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
                                 <Clock size={12} />
                                 {formatElapsedTime(entry.called_at)}
                               </span>
-                            )}
+                      }
                           </td>
                           <td style={tdStyle}>
                             {/* Кнопки в зависимости от статуса */}
-                            {entry.status === 'waiting' && (
-                              <>
+                            {entry.status === 'waiting' &&
+                      <>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
-                                  onClick={() => markNoShow(entry.id)}
-                                  title="Отметить неявку"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                          onClick={() => markNoShow(entry.id)}
+                          title="Отметить неявку">
+
                                   <XCircle size={16} />
                                 </button>
                               </>
-                            )}
-                            {entry.status === 'called' && (
-                              <>
+                      }
+                            {entry.status === 'called' &&
+                      <>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
-                                  onClick={() => sendToDiagnostics(entry.id)}
-                                  title="На обследование"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
+                          onClick={() => sendToDiagnostics(entry.id)}
+                          title="На обследование">
+
                                   <Stethoscope size={16} />
                                 </button>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
-                                  onClick={() => completeVisit(entry.id)}
-                                  title="Завершить приём"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                          onClick={() => completeVisit(entry.id)}
+                          title="Завершить приём">
+
                                   <CheckCircle size={16} />
                                 </button>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
-                                  onClick={() => markNoShow(entry.id)}
-                                  title="Не явился"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                          onClick={() => markNoShow(entry.id)}
+                          title="Не явился">
+
                                   <XCircle size={16} />
                                 </button>
                               </>
-                            )}
-                            {entry.status === 'diagnostics' && (
-                              <>
+                      }
+                            {entry.status === 'diagnostics' &&
+                      <>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
-                                  onClick={() => callFromDiagnostics(entry.id)}
-                                  title="Вернуть с диагностики (Push)"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                          onClick={() => callFromDiagnostics(entry.id)}
+                          title="Вернуть с диагностики (Push)">
+
                                   <Bell size={16} />
                                 </button>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
-                                  onClick={() => completeVisit(entry.id)}
-                                  title="Завершить приём"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                          onClick={() => completeVisit(entry.id)}
+                          title="Завершить приём">
+
                                   <CheckCircle size={16} />
                                 </button>
                                 <button
-                                  style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
-                                  onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
-                                  title="Не вернулся"
-                                >
+                          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                          onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
+                          title="Не вернулся">
+
                                   <AlertCircle size={16} />
                                 </button>
                               </>
-                            )}
-                            {entry.status === 'no_show' && (
-                              <button
-                                style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
-                                onClick={() => restoreToNext(entry.id)}
-                                title="Восстановить следующим"
-                              >
+                      }
+                            {entry.status === 'no_show' &&
+                      <button
+                        style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                        onClick={() => restoreToNext(entry.id)}
+                        title="Восстановить следующим">
+
                                 <RotateCcw size={16} />
                               </button>
-                            )}
+                      }
                           </td>
                         </tr>
-                      ))}
+                  )}
                     </tbody>
                   </table>
-                )}
+              }
               </CardContent>
             </Card>
           </AnimatedTransition>
-        )}
+        }
 
-        {activeTab === 'ai' && (
-          <AnimatedTransition type="fade" delay={100}>
+        {activeTab === 'ai' &&
+        <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
                 <h2 style={{
-                  fontSize: getFontSize('xl'),
-                  fontWeight: '700',
-                  color: getColor('secondary', 800),
-                  margin: 0
-                }}>
+                fontSize: getFontSize('xl'),
+                fontWeight: '700',
+                color: getColor('secondary', 800),
+                margin: 0
+              }}>
                   AI Помощник врача
                 </h2>
               </CardHeader>
               <CardContent>
                 <AIAssistant
-                  specialty="general"
-                  onSuggestionSelect={(type, suggestion) => {
-                    logger.log('AI предложение для общего врача:', type, suggestion);
-                  }}
-                />
+                specialty="general"
+                onSuggestionSelect={(type, suggestion) => {
+                  logger.log('AI предложение для общего врача:', type, suggestion);
+                }} />
+
               </CardContent>
             </Card>
           </AnimatedTransition>
-        )}
+        }
 
-        {activeTab === 'reports' && (
-          <AnimatedTransition type="fade" delay={100}>
+        {activeTab === 'reports' &&
+        <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
                 <h2 style={{
-                  fontSize: getFontSize('xl'),
-                  fontWeight: '700',
-                  color: getColor('secondary', 800),
-                  margin: 0
-                }}>
+                fontSize: getFontSize('xl'),
+                fontWeight: '700',
+                color: getColor('secondary', 800),
+                margin: 0
+              }}>
                   Отчеты и аналитика
                 </h2>
               </CardHeader>
               <CardContent>
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-                  gap: getSpacing('lg')
-                }}>
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+                gap: getSpacing('lg')
+              }}>
                   <Button variant="primary" fullWidth>
                     <FileText size={20} />
                     Отчет по пациентам
@@ -1432,47 +1432,47 @@ const DoctorPanel = () => {
               </CardContent>
             </Card>
           </AnimatedTransition>
-        )}
+        }
       </main>
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
-      {patientModal.isOpen && patientModal.selectedItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
-        }}>
+      {patientModal.isOpen && patientModal.selectedItem &&
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}>
           <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '500px',
-            margin: '16px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          }}>
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '24px',
+          width: '100%',
+          maxWidth: '500px',
+          margin: '16px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+        }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0 }}>
                 Информация о пациенте
               </h3>
               <button
-                onClick={patientModal.closeModal}
-                style={{
-                  color: '#9CA3AF',
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: 'none',
-                  padding: '4px',
-                  borderRadius: '4px'
-                }}
-              >
+              onClick={patientModal.closeModal}
+              style={{
+                color: '#9CA3AF',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'none',
+                padding: '4px',
+                borderRadius: '4px'
+              }}>
+
                 <XCircle size={24} />
               </button>
             </div>
@@ -1480,17 +1480,17 @@ const DoctorPanel = () => {
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  backgroundColor: '#3B82F6',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: '18px',
-                  fontWeight: '600'
-                }}>
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#3B82F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '18px',
+                fontWeight: '600'
+              }}>
                   {patientModal.selectedItem.name?.charAt(0) || 'П'}
                 </div>
                 <div>
@@ -1518,8 +1518,8 @@ const DoctorPanel = () => {
                   </p>
                   <p style={{ fontSize: '16px', color: '#111827', margin: 0, fontWeight: '500' }}>
                     {patientModal.selectedItem.status === 'active' ? 'Активный' :
-                      patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
-                        patientModal.selectedItem.status || 'Неизвестно'}
+                  patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
+                  patientModal.selectedItem.status || 'Неизвестно'}
                   </p>
                 </div>
               </div>
@@ -1527,58 +1527,58 @@ const DoctorPanel = () => {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
               <button
-                onClick={patientModal.closeModal}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
+              onClick={patientModal.closeModal}
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                backgroundColor: 'white',
+                color: '#374151',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}>
+
                 Закрыть
               </button>
               <button
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  backgroundColor: '#3B82F6',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                borderRadius: '6px',
+                backgroundColor: '#3B82F6',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}>
+
                 Редактировать
               </button>
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Модальное окно Schedule Next */}
-      {scheduleNextModal.open && (
-        <ScheduleNextModal
-          isOpen={scheduleNextModal.open}
-          onClose={() => setScheduleNextModal({ open: false, patient: null })}
-          patient={scheduleNextModal.patient}
-          theme={{ isDark, getColor, getSpacing, getFontSize }}
-        />
-      )}
+      {scheduleNextModal.open &&
+      <ScheduleNextModal
+        isOpen={scheduleNextModal.open}
+        onClose={() => setScheduleNextModal({ open: false, patient: null })}
+        patient={scheduleNextModal.patient}
+        theme={{ isDark, getColor, getSpacing, getFontSize }} />
+
+      }
 
       {/* AI Chat Widget */}
       <AIChatWidget
         contextType="general"
         specialty="general"
         useWebSocket={false}
-        position="bottom-right"
-      />
-    </div>
-  );
+        position="bottom-right" />
+
+    </div>);
+
 };
 
 export default DoctorPanel;

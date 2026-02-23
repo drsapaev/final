@@ -624,7 +624,7 @@ export function getFileStats() {
  */
 export function getFilesByStatus(status) {
   return Object.entries(FRONTEND_FILE_MAP)
-    .filter(([_, file]) => file.status === status)
+    .filter(([, file]) => file.status === status)
     .map(([path, file]) => ({ path, ...file }));
 }
 
@@ -633,7 +633,7 @@ export function getFilesByStatus(status) {
  */
 export function getFilesWithIssues() {
   return Object.entries(FRONTEND_FILE_MAP)
-    .filter(([_, file]) => file.issues && file.issues.length > 0)
+    .filter(([, file]) => file.issues && file.issues.length > 0)
     .map(([path, file]) => ({ path, ...file }));
 }
 

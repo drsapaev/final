@@ -2,10 +2,9 @@
 AI сервис для EMR - подсказки и автозаполнение
 """
 
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +20,12 @@ class EMRService:
         }
 
     async def get_diagnosis_suggestions(
-        self, symptoms: List[str], specialty: str = "general"
-    ) -> List[Dict[str, Any]]:
+        self, symptoms: list[str], specialty: str = "general"
+    ) -> list[dict[str, Any]]:
         """Получить предложения диагнозов на основе симптомов"""
         try:
             # Формируем промпт для AI
-            prompt = self._build_diagnosis_prompt(symptoms, specialty)
+            _prompt = self._build_diagnosis_prompt(symptoms, specialty)
 
             # Здесь будет вызов AI API
             # Пока возвращаем заглушку
@@ -53,10 +52,10 @@ class EMRService:
 
     async def get_treatment_suggestions(
         self, diagnosis: str, specialty: str = "general"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Получить предложения лечения на основе диагноза"""
         try:
-            prompt = self._build_treatment_prompt(diagnosis, specialty)
+            _prompt = self._build_treatment_prompt(diagnosis, specialty)
 
             # Заглушка для предложений лечения
             suggestions = [
@@ -80,7 +79,7 @@ class EMRService:
             logger.error(f"Ошибка получения предложений лечения: {e}")
             return []
 
-    async def get_icd10_suggestions(self, diagnosis_text: str) -> List[Dict[str, Any]]:
+    async def get_icd10_suggestions(self, diagnosis_text: str) -> list[dict[str, Any]]:
         """Получить предложения кодов МКБ-10"""
         try:
             # Заглушка для кодов МКБ-10
@@ -105,10 +104,10 @@ class EMRService:
 
     async def auto_fill_emr_fields(
         self,
-        template_structure: Dict[str, Any],
-        patient_data: Dict[str, Any],
+        template_structure: dict[str, Any],
+        patient_data: dict[str, Any],
         specialty: str = "general",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Автозаполнение полей EMR на основе данных пациента"""
         try:
             filled_data = {}
@@ -145,8 +144,8 @@ class EMRService:
             return {}
 
     async def validate_emr_data(
-        self, emr_data: Dict[str, Any], template_structure: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, emr_data: dict[str, Any], template_structure: dict[str, Any]
+    ) -> dict[str, Any]:
         """Валидация данных EMR"""
         try:
             validation_result = {
@@ -196,22 +195,22 @@ class EMRService:
                 "suggestions": [],
             }
 
-    def _build_diagnosis_prompt(self, symptoms: List[str], specialty: str) -> str:
+    def _build_diagnosis_prompt(self, symptoms: list[str], specialty: str) -> str:
         """Построить промпт для получения диагнозов"""
         symptoms_text = ", ".join(symptoms)
 
         prompt = f"""
         На основе следующих симптомов предложите возможные диагнозы:
-        
+
         Симптомы: {symptoms_text}
         Специализация: {specialty}
-        
+
         Предоставьте:
         1. Наиболее вероятный диагноз
         2. Код МКБ-10
         3. Уровень уверенности (0-1)
         4. Краткое описание
-        
+
         Ответ в формате JSON.
         """
 
@@ -221,16 +220,16 @@ class EMRService:
         """Построить промпт для получения лечения"""
         prompt = f"""
         Предложите план лечения для следующего диагноза:
-        
+
         Диагноз: {diagnosis}
         Специализация: {specialty}
-        
+
         Предоставьте:
         1. Медикаментозное лечение
         2. Дозировки
         3. Продолжительность
         4. Инструкции по применению
-        
+
         Ответ в формате JSON.
         """
 
@@ -249,8 +248,8 @@ class EMRService:
         return bool(re.match(pattern, code))
 
     async def get_ai_suggestions(
-        self, emr_data: Dict[str, Any], specialty: str = "general"
-    ) -> Dict[str, Any]:
+        self, emr_data: dict[str, Any], specialty: str = "general"
+    ) -> dict[str, Any]:
         """Получить общие AI предложения для EMR"""
         try:
             suggestions = {

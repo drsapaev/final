@@ -2,11 +2,10 @@
 Сервис для визуализации аналитических данных
 """
 
-import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +14,8 @@ logger = logging.getLogger(__name__)
 class ChartData:
     """Структура данных для графика"""
 
-    labels: List[str]
-    datasets: List[Dict[str, Any]]
+    labels: list[str]
+    datasets: list[dict[str, Any]]
     title: str
     chart_type: str
 
@@ -40,7 +39,7 @@ class AnalyticsVisualizationService:
 
     def create_line_chart(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         title: str,
         x_label: str = "Дата",
         y_label: str = "Значение",
@@ -72,7 +71,7 @@ class AnalyticsVisualizationService:
 
     def create_bar_chart(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         title: str,
         x_label: str = "Категория",
         y_label: str = "Количество",
@@ -105,7 +104,7 @@ class AnalyticsVisualizationService:
             chart_type="bar",
         )
 
-    def create_pie_chart(self, data: Dict[str, Any], title: str) -> ChartData:
+    def create_pie_chart(self, data: dict[str, Any], title: str) -> ChartData:
         """Создать круговую диаграмму"""
         labels = []
         values = []
@@ -134,7 +133,7 @@ class AnalyticsVisualizationService:
             chart_type="doughnut",
         )
 
-    def create_radar_chart(self, data: Dict[str, Any], title: str) -> ChartData:
+    def create_radar_chart(self, data: dict[str, Any], title: str) -> ChartData:
         """Создать радиальную диаграмму для KPI"""
         labels = [
             "Завершенность",
@@ -173,8 +172,8 @@ class AnalyticsVisualizationService:
         )
 
     def create_dashboard_charts(
-        self, dashboard_data: Dict[str, Any]
-    ) -> Dict[str, ChartData]:
+        self, dashboard_data: dict[str, Any]
+    ) -> dict[str, ChartData]:
         """Создать набор графиков для дашборда"""
         charts = {}
 
@@ -207,7 +206,7 @@ class AnalyticsVisualizationService:
 
         return charts
 
-    def create_kpi_charts(self, kpi_data: Dict[str, Any]) -> Dict[str, ChartData]:
+    def create_kpi_charts(self, kpi_data: dict[str, Any]) -> dict[str, ChartData]:
         """Создать графики для KPI"""
         charts = {}
 
@@ -223,8 +222,8 @@ class AnalyticsVisualizationService:
         return charts
 
     def create_doctor_performance_charts(
-        self, doctor_data: Dict[str, Any]
-    ) -> Dict[str, ChartData]:
+        self, doctor_data: dict[str, Any]
+    ) -> dict[str, ChartData]:
         """Создать графики для эффективности врачей"""
         charts = {}
 
@@ -273,8 +272,8 @@ class AnalyticsVisualizationService:
         return charts
 
     def create_patient_analytics_charts(
-        self, patient_data: Dict[str, Any]
-    ) -> Dict[str, ChartData]:
+        self, patient_data: dict[str, Any]
+    ) -> dict[str, ChartData]:
         """Создать графики для аналитики пациентов"""
         charts = {}
 
@@ -314,8 +313,8 @@ class AnalyticsVisualizationService:
         return charts
 
     def create_revenue_charts(
-        self, revenue_data: Dict[str, Any]
-    ) -> Dict[str, ChartData]:
+        self, revenue_data: dict[str, Any]
+    ) -> dict[str, ChartData]:
         """Создать графики для аналитики доходов"""
         charts = {}
 
@@ -350,8 +349,8 @@ class AnalyticsVisualizationService:
         return charts
 
     def create_comprehensive_visualization(
-        self, comprehensive_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, comprehensive_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Создать полную визуализацию для комплексного отчета"""
         visualization = {
             "charts": {},
@@ -400,7 +399,7 @@ class AnalyticsVisualizationService:
 
         return visualization
 
-    def get_chart_config(self, chart_data: ChartData) -> Dict[str, Any]:
+    def get_chart_config(self, chart_data: ChartData) -> dict[str, Any]:
         """Получить конфигурацию для Chart.js"""
         base_config = {
             "type": chart_data.chart_type,

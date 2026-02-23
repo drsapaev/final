@@ -2991,10 +2991,12 @@ class BatchQueueEntriesRequest(BaseModel):
 
     patient_id: int = Field(..., description="ID пациента")
     source: str = Field(
-        ..., description="Источник регистрации: 'online', 'desk', 'morning_assignment'"
+        ...,
+        description="Источник регистрации: 'online', 'desk', 'morning_assignment'",
+        pattern="^(online|desk|morning_assignment)$",
     )
     services: List[BatchServiceItem] = Field(
-        ..., description="Список услуг с указанием специалистов"
+        ..., min_length=1, description="Список услуг с указанием специалистов"
     )
 
 
@@ -3050,14 +3052,6 @@ def create_queue_entries_batch(
     logger = logging.getLogger(__name__)
 
     try:
-        # Валидация source
-        valid_sources = ["online", "desk", "morning_assignment"]
-        if request.source not in valid_sources:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Недопустимый source: {request.source}. Допустимые значения: {', '.join(valid_sources)}",
-            )
-
         # Проверяем существование пациента
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
@@ -3075,6 +3069,13 @@ def create_queue_entries_batch(
         # ⚠️ ВАЖНО: Конвертируем doctor_id → user_id если нужно
         services_by_specialist: Dict[int, List[BatchServiceItem]] = {}
         for service_item in request.services:
+            service = db.query(Service).filter(Service.id == service_item.service_id).first()
+            if not service:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Услуга с ID {service_item.service_id} не найдена",
+                )
+
             specialist_id = service_item.specialist_id
 
             # Проверяем, является ли specialist_id user_id или doctor_id
@@ -3095,7 +3096,7 @@ def create_queue_entries_batch(
                 user = db.query(User).filter(User.id == specialist_id).first()
                 if not user:
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
+                        status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"Специалист с ID {specialist_id} не найден (ни в doctors, ни в users)",
                     )
 
@@ -3109,10 +3110,11 @@ def create_queue_entries_batch(
 
         # Создаем записи в очереди для каждого специалиста
         created_entries = []
+        reused_entries_count = 0
 
         for specialist_id, services_list in services_by_specialist.items():
-            # Проверяем, не зарегистрирован ли пациент уже в очереди к этому специалисту сегодня
-            existing_queue = (
+            # Проверяем, есть ли очередь у специалиста на сегодня
+            daily_queue = (
                 db.query(DailyQueue)
                 .filter(
                     DailyQueue.specialist_id == specialist_id, DailyQueue.day == today
@@ -3120,12 +3122,25 @@ def create_queue_entries_batch(
                 .first()
             )
 
-            if existing_queue and request.source == "online":
-                # Проверяем дубликаты (только для онлайн записи)
+            # Автосоздание DailyQueue (legacy-совместимый путь по specialist_id=user.id)
+            if not daily_queue:
+                daily_queue = DailyQueue(
+                    day=today,
+                    specialist_id=specialist_id,
+                    active=True,
+                    queue_tag=None,
+                    online_start_time="07:00",
+                    online_end_time="09:00",
+                )
+                db.add(daily_queue)
+                db.flush()
+
+            # Проверяем дубликаты (для любых source)
+            if daily_queue:
                 existing_entry = (
                     db.query(OnlineQueueEntry)
                     .filter(
-                        OnlineQueueEntry.queue_id == existing_queue.id,
+                        OnlineQueueEntry.queue_id == daily_queue.id,
                         OnlineQueueEntry.patient_id == request.patient_id,
                         OnlineQueueEntry.status.in_(
                             ["waiting", "called"]
@@ -3137,13 +3152,13 @@ def create_queue_entries_batch(
                 if existing_entry:
                     logger.warning(
                         f"[create_queue_entries_batch] Пациент {request.patient_id} уже в очереди "
-                        f"к специалисту {specialist_id} (queue_id={existing_queue.id}, entry_id={existing_entry.id})"
+                        f"к специалисту {specialist_id} (queue_id={daily_queue.id}, entry_id={existing_entry.id})"
                     )
                     # Пропускаем создание дубликата, но добавляем существующую запись в ответ
                     created_entries.append(
                         BatchQueueEntryResponse(
                             specialist_id=specialist_id,
-                            queue_id=existing_queue.id,
+                            queue_id=daily_queue.id,
                             number=existing_entry.number,
                             queue_time=(
                                 existing_entry.queue_time.isoformat()
@@ -3152,6 +3167,7 @@ def create_queue_entries_batch(
                             ),
                         )
                     )
+                    reused_entries_count += 1
                     continue
 
             # [OK] Используем SSOT queue_service для создания записи
@@ -3172,14 +3188,15 @@ def create_queue_entries_batch(
 
                 # Создаем запись через SSOT
                 queue_entry = queue_service.create_queue_entry(
-                    db=db,
-                    specialist_id=specialist_id,
-                    day=today,
+                    db,
+                    daily_queue=daily_queue,
                     patient_id=request.patient_id,
                     patient_name=patient_name,
                     phone=patient_phone,
                     source=request.source,  # ⭐ Сохраняем оригинальный source!
                     queue_time=current_time,  # ⭐ Текущее время для справедливого присвоения номера
+                    auto_number=True,
+                    commit=False,
                 )
 
                 logger.info(
@@ -3218,10 +3235,24 @@ def create_queue_entries_batch(
         db.commit()
 
         entries_count = len(created_entries)
+        created_count = max(entries_count - reused_entries_count, 0)
+        if reused_entries_count and created_count:
+            message = (
+                f"Создано {created_count} записей в очереди; "
+                f"{reused_entries_count} запись уже существовала"
+            )
+        elif reused_entries_count:
+            message = "Запись уже существовала в очереди"
+        else:
+            message = (
+                f"Создано {entries_count} "
+                f"{'записей' if entries_count != 1 else 'запись'} в очереди"
+            )
+
         return BatchQueueEntriesResponse(
             success=True,
             entries=created_entries,
-            message=f"Создано {entries_count} {'записей' if entries_count != 1 else 'запись'} в очереди",
+            message=message,
         )
 
     except HTTPException:

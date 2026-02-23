@@ -2,7 +2,7 @@
 CRUD операции для фото дерматологии
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.dermatology_photos import DermatologyPhoto
 
 
-def create_photo(db: Session, photo_data: Dict[str, Any]) -> DermatologyPhoto:
+def create_photo(db: Session, photo_data: dict[str, Any]) -> DermatologyPhoto:
     """Создать запись о фото"""
     photo = DermatologyPhoto(**photo_data)
     db.add(photo)
@@ -19,7 +19,7 @@ def create_photo(db: Session, photo_data: Dict[str, Any]) -> DermatologyPhoto:
     return photo
 
 
-def get_photo(db: Session, photo_id: int) -> Optional[DermatologyPhoto]:
+def get_photo(db: Session, photo_id: int) -> DermatologyPhoto | None:
     """Получить фото по ID"""
     return (
         db.query(DermatologyPhoto)
@@ -31,8 +31,8 @@ def get_photo(db: Session, photo_id: int) -> Optional[DermatologyPhoto]:
 
 
 def get_patient_photos(
-    db: Session, patient_id: int, category: Optional[str] = None
-) -> List[DermatologyPhoto]:
+    db: Session, patient_id: int, category: str | None = None
+) -> list[DermatologyPhoto]:
     """Получить фото пациента"""
     query = db.query(DermatologyPhoto).filter(
         and_(
@@ -48,8 +48,8 @@ def get_patient_photos(
 
 
 def update_photo(
-    db: Session, photo_id: int, photo_data: Dict[str, Any]
-) -> Optional[DermatologyPhoto]:
+    db: Session, photo_id: int, photo_data: dict[str, Any]
+) -> DermatologyPhoto | None:
     """Обновить фото"""
     photo = get_photo(db, photo_id)
     if not photo:
@@ -75,7 +75,7 @@ def delete_photo(db: Session, photo_id: int) -> bool:
     return True
 
 
-def get_patient_photo_stats(db: Session, patient_id: int) -> Dict[str, Any]:
+def get_patient_photo_stats(db: Session, patient_id: int) -> dict[str, Any]:
     """Получить статистику фото пациента"""
     # Общее количество фото
     total = (
@@ -163,7 +163,7 @@ def get_patient_photo_stats(db: Session, patient_id: int) -> Dict[str, Any]:
 
 def get_photos_by_category(
     db: Session, category: str, limit: int = 100, offset: int = 0
-) -> List[DermatologyPhoto]:
+) -> list[DermatologyPhoto]:
     """Получить фото по категории"""
     return (
         db.query(DermatologyPhoto)
@@ -181,12 +181,12 @@ def get_photos_by_category(
 
 def search_photos(
     db: Session,
-    patient_id: Optional[int] = None,
-    category: Optional[str] = None,
-    tags: Optional[str] = None,
+    patient_id: int | None = None,
+    category: str | None = None,
+    tags: str | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> List[DermatologyPhoto]:
+) -> list[DermatologyPhoto]:
     """Поиск фото по параметрам"""
     query = db.query(DermatologyPhoto).filter(DermatologyPhoto.is_active == True)
 

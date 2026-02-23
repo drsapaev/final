@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 import logger from '../../utils/logger';
 // Хук для работы с localStorage

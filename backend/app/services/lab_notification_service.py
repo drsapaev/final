@@ -4,10 +4,10 @@ Lab Results Auto-Notification Service
 """
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
 
 from app.models.lab import LabOrder, LabResult
 from app.models.patient import Patient
@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 class LabNotificationService:
     """
     Сервис автоматических уведомлений о результатах анализов
-    
+
     Функции:
     - Уведомление пациента о готовности результатов
     - Уведомление врача о критических значениях
     - Напоминание о повторных анализах
     - Уведомление о просроченных результатах
     """
-    
+
     # Критические значения для основных показателей
     CRITICAL_VALUES = {
         "glucose": {"low": 3.0, "high": 20.0, "unit": "mmol/L"},
@@ -39,14 +39,14 @@ class LabNotificationService:
         "platelets": {"low": 50, "high": 1000, "unit": "10^9/L"},
         "inr": {"low": 0.5, "high": 5.0, "unit": ""},
     }
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
-    async def check_and_notify_ready_results(self) -> Dict[str, Any]:
+
+    async def check_and_notify_ready_results(self) -> dict[str, Any]:
         """
         Проверяет готовые результаты и отправляет уведомления пациентам
-        
+
         Returns:
             Статистика отправленных уведомлений
         """
@@ -63,10 +63,10 @@ class LabNotificationService:
                 )
                 .all()
             )
-            
+
             notifications_sent = 0
             errors = []
-            
+
             for order in ready_orders:
                 try:
                     await self._notify_patient_results_ready(order)
@@ -75,31 +75,31 @@ class LabNotificationService:
                     notifications_sent += 1
                 except Exception as e:
                     errors.append({"order_id": order.id, "error": str(e)})
-            
+
             self.db.commit()
-            
+
             return {
                 "total_checked": len(ready_orders),
                 "notifications_sent": notifications_sent,
                 "errors": errors,
             }
-            
+
         except Exception as e:
             logger.error(f"Error checking ready results: {e}")
             return {"error": str(e)}
-    
+
     async def _notify_patient_results_ready(self, order: LabOrder):
         """Отправляет уведомление пациенту о готовности результатов"""
         patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
-        
+
         if not patient:
             return
-        
+
         # Получаем пользователя пациента
         user = None
         if patient.user_id:
             user = self.db.query(User).filter(User.id == patient.user_id).first()
-        
+
         message = f"""
 ✅ Результаты анализов готовы!
 
@@ -114,32 +114,32 @@ class LabNotificationService:
 С уважением,
 Ваша клиника
         """.strip()
-        
+
         # Отправляем через доступные каналы
         if user and hasattr(user, 'telegram_id') and user.telegram_id:
             await notification_sender_service.send_telegram_message(
                 user_id=user.telegram_id,
                 message=message,
             )
-        
+
         # SMS если есть телефон
         if patient.phone:
-            short_message = f"Ваши анализы готовы! Заказ #{order.id}. Просмотр в личном кабинете."
+            _short_message = f"Ваши анализы готовы! Заказ #{order.id}. Просмотр в личном кабинете."
             # await notification_sender_service.send_sms(patient.phone, short_message)
-        
+
         logger.info(f"Notification sent for order {order.id} to patient {patient.id}")
-    
-    async def check_critical_values(self) -> Dict[str, Any]:
+
+    async def check_critical_values(self) -> dict[str, Any]:
         """
         Проверяет результаты на критические значения и уведомляет врачей
-        
+
         Returns:
             Список критических результатов
         """
         try:
             # Находим результаты за последние 24 часа
             yesterday = datetime.utcnow() - timedelta(hours=24)
-            
+
             recent_results = (
                 self.db.query(LabResult)
                 .filter(
@@ -151,13 +151,13 @@ class LabNotificationService:
                 )
                 .all()
             )
-            
+
             critical_found = []
-            
+
             for result in recent_results:
                 # Проверяем на критические значения
                 test_name = result.test_name.lower() if result.test_name else ""
-                
+
                 for marker, thresholds in self.CRITICAL_VALUES.items():
                     if marker in test_name:
                         try:
@@ -172,27 +172,27 @@ class LabNotificationService:
                                     "is_low": value < thresholds["low"],
                                     "is_high": value > thresholds["high"],
                                 })
-                                
+
                                 # Уведомляем врача
                                 await self._notify_doctor_critical_value(result, value, thresholds)
-                                
+
                                 result.critical_notified = True
                                 result.critical_notified_at = datetime.utcnow()
                         except (ValueError, TypeError):
                             pass
-            
+
             self.db.commit()
-            
+
             return {
                 "checked": len(recent_results),
                 "critical_found": len(critical_found),
                 "critical_results": critical_found,
             }
-            
+
         except Exception as e:
             logger.error(f"Error checking critical values: {e}")
             return {"error": str(e)}
-    
+
     async def _notify_doctor_critical_value(
         self,
         result: LabResult,
@@ -204,11 +204,11 @@ class LabNotificationService:
         order = self.db.query(LabOrder).filter(LabOrder.id == result.order_id).first()
         if not order or not order.doctor_id:
             return
-        
+
         patient = self.db.query(Patient).filter(Patient.id == result.patient_id).first()
-        
+
         alert_type = "⬇️ КРИТИЧЕСКИ НИЗКОЕ" if value < thresholds["low"] else "⬆️ КРИТИЧЕСКИ ВЫСОКОЕ"
-        
+
         message = f"""
 🚨 КРИТИЧЕСКОЕ ЗНАЧЕНИЕ!
 
@@ -222,7 +222,7 @@ class LabNotificationService:
 
 Требуется срочное внимание!
         """.strip()
-        
+
         # Отправляем врачу
         doctor_user = self.db.query(User).filter(User.id == order.doctor_id).first()
         if doctor_user and hasattr(doctor_user, 'telegram_id') and doctor_user.telegram_id:
@@ -230,22 +230,22 @@ class LabNotificationService:
                 user_id=doctor_user.telegram_id,
                 message=message,
             )
-        
+
         logger.warning(f"Critical value alert sent for result {result.id}")
-    
-    async def send_follow_up_reminders(self, days_before: int = 3) -> Dict[str, Any]:
+
+    async def send_follow_up_reminders(self, days_before: int = 3) -> dict[str, Any]:
         """
         Отправляет напоминания о повторных анализах
-        
+
         Args:
             days_before: За сколько дней до даты напоминать
-            
+
         Returns:
             Статистика отправленных напоминаний
         """
         try:
             target_date = datetime.utcnow() + timedelta(days=days_before)
-            
+
             # Находим заказы с датой повторного анализа
             upcoming_followups = (
                 self.db.query(LabOrder)
@@ -260,15 +260,15 @@ class LabNotificationService:
                 )
                 .all()
             )
-            
+
             reminders_sent = 0
-            
+
             for order in upcoming_followups:
                 patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
-                
+
                 if patient:
                     days_until = (order.follow_up_date - datetime.utcnow()).days
-                    
+
                     message = f"""
 📅 Напоминание о повторном анализе
 
@@ -281,7 +281,7 @@ class LabNotificationService:
 С уважением,
 Ваша клиника
                     """.strip()
-                    
+
                     # Отправляем напоминание
                     if patient.user_id:
                         user = self.db.query(User).filter(User.id == patient.user_id).first()
@@ -291,35 +291,35 @@ class LabNotificationService:
                                 message=message,
                             )
                             reminders_sent += 1
-                    
+
                     order.follow_up_reminded = True
                     order.follow_up_reminded_at = datetime.utcnow()
-            
+
             self.db.commit()
-            
+
             return {
                 "upcoming_followups": len(upcoming_followups),
                 "reminders_sent": reminders_sent,
             }
-            
+
         except Exception as e:
             logger.error(f"Error sending follow-up reminders: {e}")
             return {"error": str(e)}
 
 
-async def run_lab_notifications(db: Session) -> Dict[str, Any]:
+async def run_lab_notifications(db: Session) -> dict[str, Any]:
     """
     Запускает все проверки уведомлений по анализам
     Может использоваться в cron job или scheduled task
     """
     service = LabNotificationService(db)
-    
+
     results = {
         "ready_results": await service.check_and_notify_ready_results(),
         "critical_values": await service.check_critical_values(),
         "follow_up_reminders": await service.send_follow_up_reminders(),
         "timestamp": datetime.utcnow().isoformat(),
     }
-    
+
     logger.info(f"Lab notifications run completed: {results}")
     return results

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import PropTypes from 'prop-types';
+
 import { getVisit, rescheduleVisit } from '../api';
 import RescheduleDialog from '../components/RescheduleDialog';
 
@@ -26,18 +26,18 @@ function VisitDetails() {
     let mounted = true;
     setLoading(true);
     setError('');
-    getVisit(id)
-      .then((data) => {
-        if (!mounted) return;
-        setVisit(data || null);
-      })
-      .catch((err) => {
-        logger.error('getVisit error:', err);
-        setError((err && err.data && (err.data.detail || err.data.message)) || err.message || 'Ошибка загрузки приёма');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+    getVisit(id).
+    then((data) => {
+      if (!mounted) return;
+      setVisit(data || null);
+    }).
+    catch((err) => {
+      logger.error('getVisit error:', err);
+      setError(err && err.data && (err.data.detail || err.data.message) || err.message || 'Ошибка загрузки приёма');
+    }).
+    finally(() => {
+      if (mounted) setLoading(false);
+    });
     return () => {
       mounted = false;
     };
@@ -61,7 +61,7 @@ function VisitDetails() {
       setVisit((prev) => ({ ...(prev || {}), scheduled_at: iso, ...(res || {}) }));
     } catch (err) {
       logger.error('rescheduleTomorrow error:', err);
-      setError((err && err.data && (err.data.detail || err.data.message)) || err.message || 'Ошибка переноса');
+      setError(err && err.data && (err.data.detail || err.data.message) || err.message || 'Ошибка переноса');
     } finally {
       setLoading(false);
     }
@@ -71,8 +71,8 @@ function VisitDetails() {
     return (
       <div className="p-6">
         <div>Загрузка приёма...</div>
-      </div>
-    );
+      </div>);
+
   }
 
   if (!visit) {
@@ -80,8 +80,8 @@ function VisitDetails() {
       <div className="p-6">
         <div className="text-red-600 mb-4">{error || 'Приём не найден.'}</div>
         <Link to="/" className="text-blue-600 underline">Вернуться на главную</Link>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -91,15 +91,15 @@ function VisitDetails() {
         <div className="space-x-2">
           <button
             onClick={() => setDialogOpen(true)}
-            className="px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-          >
+            className="px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
+            
             Перенести
           </button>
           <button
             onClick={rescheduleTomorrow}
             className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            disabled={loading}
-          >
+            disabled={loading}>
+            
             На завтра
           </button>
         </div>
@@ -125,19 +125,19 @@ function VisitDetails() {
           </div>
         </div>
 
-        {visit.notes && (
-          <div className="mt-4">
+        {visit.notes &&
+        <div className="mt-4">
             <div className="text-sm text-gray-500">Примечание</div>
             <div className="mt-1">{visit.notes}</div>
           </div>
-        )}
+        }
       </div>
 
       <div className="flex items-center space-x-2">
         <button
           onClick={() => navigate(-1)}
-          className="px-3 py-2 border rounded bg-white hover:bg-gray-50"
-        >
+          className="px-3 py-2 border rounded bg-white hover:bg-gray-50">
+          
           Назад
         </button>
         <Link to="/visits" className="px-3 py-2 border rounded bg-white hover:bg-gray-50">Список приёмов</Link>
@@ -147,15 +147,14 @@ function VisitDetails() {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         visit={visit}
-        onRescheduled={(u) => { handleRescheduled(u); setDialogOpen(false); }}
-      />
-    </div>
-  );
+        onRescheduled={(u) => {handleRescheduled(u);setDialogOpen(false);}} />
+      
+    </div>);
+
 }
 
 VisitDetails.propTypes = {
+
   // routed component — no props expected
 };
-
 export default VisitDetails;
-

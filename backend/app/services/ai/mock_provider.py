@@ -5,7 +5,7 @@ Mock AI провайдер для демонстрации и тестирова
 import asyncio
 import logging
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class MockProvider(BaseAIProvider):
     """Mock провайдер для демонстрации функционала без реального API"""
 
-    def __init__(self, api_key: str = "mock", model: Optional[str] = None):
+    def __init__(self, api_key: str = "mock", model: str | None = None):
         super().__init__(api_key, model)
 
     def get_default_model(self) -> str:
@@ -33,8 +33,8 @@ class MockProvider(BaseAIProvider):
         )
 
     async def analyze_complaint(
-        self, complaint: str, patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, complaint: str, patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация анализа жалоб с детальными результатами"""
         await asyncio.sleep(1)  # Имитация обработки
 
@@ -289,8 +289,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def suggest_icd10(
-        self, symptoms: List[str], diagnosis: Optional[str] = None
-    ) -> List[Dict[str, str]]:
+        self, symptoms: list[str], diagnosis: str | None = None
+    ) -> list[dict[str, str]]:
         """Имитация подсказок МКБ-10"""
         await asyncio.sleep(0.5)
 
@@ -338,8 +338,8 @@ class MockProvider(BaseAIProvider):
         return results[:5]
 
     async def interpret_lab_results(
-        self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, results: list[dict[str, Any]], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация интерпретации анализов"""
         await asyncio.sleep(1)
 
@@ -421,8 +421,8 @@ class MockProvider(BaseAIProvider):
         )
 
     async def analyze_skin(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация анализа кожи"""
         await asyncio.sleep(1)
 
@@ -453,8 +453,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def interpret_ecg(
-        self, ecg_data: Dict[str, Any], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, ecg_data: dict[str, Any], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация интерпретации ЭКГ"""
         await asyncio.sleep(0.8)
 
@@ -498,8 +498,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def differential_diagnosis(
-        self, symptoms: List[str], patient_info: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, symptoms: list[str], patient_info: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация дифференциальной диагностики"""
         await asyncio.sleep(1.5)
 
@@ -546,8 +546,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def symptom_analysis(
-        self, symptoms: List[str], severity: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+        self, symptoms: list[str], severity: list[int] | None = None
+    ) -> dict[str, Any]:
         """Имитация анализа симптомов"""
         await asyncio.sleep(1)
 
@@ -613,8 +613,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def clinical_decision_support(
-        self, case_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, case_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация поддержки клинических решений"""
         await asyncio.sleep(2)
 
@@ -655,8 +655,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_xray_image(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация анализа рентгеновского снимка"""
         await asyncio.sleep(2)
 
@@ -693,8 +693,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_ultrasound_image(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация анализа УЗИ изображения"""
         await asyncio.sleep(1.5)
 
@@ -727,8 +727,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_dermatoscopy_image(
-        self, image_data: bytes, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация анализа дерматоскопического изображения"""
         await asyncio.sleep(2)
 
@@ -779,8 +779,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_medical_image_generic(
-        self, image_data: bytes, image_type: str, metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        self, image_data: bytes, image_type: str, metadata: dict | None = None
+    ) -> dict[str, Any]:
         """Имитация универсального анализа медицинского изображения"""
         await asyncio.sleep(1.5)
 
@@ -806,15 +806,15 @@ class MockProvider(BaseAIProvider):
 
     async def generate_treatment_plan(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         diagnosis: str,
-        medical_history: Optional[List[Dict]] = None,
-    ) -> Dict[str, Any]:
+        medical_history: list[dict] | None = None,
+    ) -> dict[str, Any]:
         """Имитация генерации плана лечения"""
         await asyncio.sleep(2)
 
-        age = patient_data.get("age", 45)
-        gender = patient_data.get("gender", "не указан")
+        _age = patient_data.get("age", 45)
+        _gender = patient_data.get("gender", "не указан")
 
         return {
             "treatment_goals": [
@@ -872,10 +872,10 @@ class MockProvider(BaseAIProvider):
 
     async def optimize_medication_regimen(
         self,
-        current_medications: List[Dict],
-        patient_profile: Dict[str, Any],
+        current_medications: list[dict],
+        patient_profile: dict[str, Any],
         condition: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Имитация оптимизации медикаментозной терапии"""
         await asyncio.sleep(1.5)
 
@@ -926,8 +926,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def assess_treatment_effectiveness(
-        self, treatment_history: List[Dict], patient_response: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, treatment_history: list[dict], patient_response: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация оценки эффективности лечения"""
         await asyncio.sleep(1.5)
 
@@ -973,13 +973,13 @@ class MockProvider(BaseAIProvider):
         }
 
     async def suggest_lifestyle_modifications(
-        self, patient_profile: Dict[str, Any], conditions: List[str]
-    ) -> Dict[str, Any]:
+        self, patient_profile: dict[str, Any], conditions: list[str]
+    ) -> dict[str, Any]:
         """Имитация рекомендаций по образу жизни"""
         await asyncio.sleep(1.5)
 
-        age = patient_profile.get("age", 45)
-        bmi = patient_profile.get("bmi", 25)
+        _age = patient_profile.get("age", 45)
+        _bmi = patient_profile.get("bmi", 25)
 
         return {
             "dietary_recommendations": {
@@ -1058,9 +1058,9 @@ class MockProvider(BaseAIProvider):
 
     async def check_drug_interactions(
         self,
-        medications: List[Dict[str, Any]],
-        patient_profile: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        medications: list[dict[str, Any]],
+        patient_profile: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Имитация проверки лекарственных взаимодействий"""
         await asyncio.sleep(2)
 
@@ -1141,15 +1141,15 @@ class MockProvider(BaseAIProvider):
 
     async def analyze_drug_safety(
         self,
-        medication: Dict[str, Any],
-        patient_profile: Dict[str, Any],
-        conditions: List[str],
-    ) -> Dict[str, Any]:
+        medication: dict[str, Any],
+        patient_profile: dict[str, Any],
+        conditions: list[str],
+    ) -> dict[str, Any]:
         """Имитация анализа безопасности препарата"""
         await asyncio.sleep(1.5)
 
-        med_name = medication.get("name", "Тестовый препарат")
-        age = patient_profile.get("age", 45)
+        _med_name = medication.get("name", "Тестовый препарат")
+        _age = patient_profile.get("age", 45)
 
         return {
             "safety_assessment": {
@@ -1165,7 +1165,7 @@ class MockProvider(BaseAIProvider):
             "age_considerations": {
                 "appropriate_for_age": True,
                 "age_specific_risks": ["повышенная чувствительность"],
-                "dosage_adjustment_needed": age > 65,
+                "dosage_adjustment_needed": _age > 65,
                 "adjustment_rationale": "снижение клиренса с возрастом",
             },
             "organ_function_impact": {
@@ -1220,8 +1220,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def suggest_drug_alternatives(
-        self, medication: str, reason: str, patient_profile: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, medication: str, reason: str, patient_profile: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация предложения альтернативных препаратов"""
         await asyncio.sleep(2)
 
@@ -1326,12 +1326,12 @@ class MockProvider(BaseAIProvider):
         }
 
     async def calculate_drug_dosage(
-        self, medication: str, patient_profile: Dict[str, Any], indication: str
-    ) -> Dict[str, Any]:
+        self, medication: str, patient_profile: dict[str, Any], indication: str
+    ) -> dict[str, Any]:
         """Имитация расчета дозировки препарата"""
         await asyncio.sleep(1.5)
 
-        age = patient_profile.get("age", 45)
+        _age = patient_profile.get("age", 45)
         weight = patient_profile.get("weight", 70)
 
         return {
@@ -1413,13 +1413,13 @@ class MockProvider(BaseAIProvider):
         }
 
     async def assess_patient_risk(
-        self, patient_data: Dict[str, Any], risk_factors: List[str], condition: str
-    ) -> Dict[str, Any]:
+        self, patient_data: dict[str, Any], risk_factors: list[str], condition: str
+    ) -> dict[str, Any]:
         """Имитация комплексной оценки рисков пациента"""
         await asyncio.sleep(2)
 
         age = patient_data.get("age", 45)
-        gender = patient_data.get("gender", "не указан")
+        _gender = patient_data.get("gender", "не указан")
 
         # Имитируем различные уровни риска в зависимости от возраста
         if age < 30:
@@ -1539,14 +1539,14 @@ class MockProvider(BaseAIProvider):
 
     async def predict_complications(
         self,
-        patient_profile: Dict[str, Any],
+        patient_profile: dict[str, Any],
         procedure_or_condition: str,
         timeline: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Имитация прогнозирования возможных осложнений"""
         await asyncio.sleep(2.5)
 
-        age = patient_profile.get("age", 45)
+        _age = patient_profile.get("age", 45)
 
         return {
             "complication_overview": {
@@ -1652,10 +1652,10 @@ class MockProvider(BaseAIProvider):
 
     async def calculate_mortality_risk(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         condition: str,
-        scoring_system: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        scoring_system: str | None = None,
+    ) -> dict[str, Any]:
         """Имитация расчета риска смертности"""
         await asyncio.sleep(1.5)
 
@@ -1770,12 +1770,12 @@ class MockProvider(BaseAIProvider):
         }
 
     async def assess_surgical_risk(
-        self, patient_profile: Dict[str, Any], surgery_type: str, anesthesia_type: str
-    ) -> Dict[str, Any]:
+        self, patient_profile: dict[str, Any], surgery_type: str, anesthesia_type: str
+    ) -> dict[str, Any]:
         """Имитация оценки хирургических рисков"""
         await asyncio.sleep(2)
 
-        age = patient_profile.get("age", 55)
+        _age = patient_profile.get("age", 55)
         asa_class = patient_profile.get("asa_class", "II")
 
         return {
@@ -1891,10 +1891,10 @@ class MockProvider(BaseAIProvider):
 
     async def predict_readmission_risk(
         self,
-        patient_data: Dict[str, Any],
+        patient_data: dict[str, Any],
         discharge_condition: str,
-        social_factors: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        social_factors: dict[str, Any],
+    ) -> dict[str, Any]:
         """Имитация прогнозирования риска повторной госпитализации"""
         await asyncio.sleep(2)
 
@@ -2054,7 +2054,7 @@ class MockProvider(BaseAIProvider):
 
     async def transcribe_audio(
         self, audio_data: bytes, language: str = "ru", medical_context: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Имитация транскрипции аудио в текст"""
         await asyncio.sleep(1.5)
 
@@ -2102,7 +2102,7 @@ class MockProvider(BaseAIProvider):
 
     async def structure_medical_text(
         self, text: str, document_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Имитация структурирования медицинского текста"""
         await asyncio.sleep(2)
 
@@ -2156,7 +2156,7 @@ class MockProvider(BaseAIProvider):
             },
         }
 
-    async def extract_medical_entities(self, text: str) -> Dict[str, Any]:
+    async def extract_medical_entities(self, text: str) -> dict[str, Any]:
         """Имитация извлечения медицинских сущностей"""
         await asyncio.sleep(1.5)
 
@@ -2287,8 +2287,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def generate_medical_summary(
-        self, consultation_text: str, patient_history: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, consultation_text: str, patient_history: str | None = None
+    ) -> dict[str, Any]:
         """Имитация генерации медицинского резюме"""
         await asyncio.sleep(2.5)
 
@@ -2408,8 +2408,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def validate_medical_record(
-        self, record_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, record_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация валидации медицинской записи"""
         await asyncio.sleep(2)
 
@@ -2499,13 +2499,13 @@ class MockProvider(BaseAIProvider):
         }
 
     async def optimize_doctor_schedule(
-        self, schedule_data: Dict[str, Any], constraints: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, schedule_data: dict[str, Any], constraints: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация оптимизации расписания врача"""
         await asyncio.sleep(2.5)
 
         doctor_info = schedule_data.get("doctor", {})
-        doctor_name = doctor_info.get("name", "Доктор Иванов")
+        _doctor_name = doctor_info.get("name", "Доктор Иванов")
 
         return {
             "optimization_summary": {
@@ -2619,12 +2619,12 @@ class MockProvider(BaseAIProvider):
         }
 
     async def predict_appointment_duration(
-        self, appointment_data: Dict[str, Any], historical_data: List[Dict]
-    ) -> Dict[str, Any]:
+        self, appointment_data: dict[str, Any], historical_data: list[dict]
+    ) -> dict[str, Any]:
         """Имитация прогнозирования длительности приема"""
         await asyncio.sleep(1.5)
 
-        appointment_type = appointment_data.get("type", "консультация")
+        _appointment_type = appointment_data.get("type", "консультация")
         is_first_visit = appointment_data.get("is_first_visit", False)
 
         # Базовая длительность в зависимости от типа
@@ -2719,10 +2719,10 @@ class MockProvider(BaseAIProvider):
 
     async def suggest_optimal_slots(
         self,
-        doctor_profile: Dict[str, Any],
-        patient_requirements: Dict[str, Any],
-        available_slots: List[Dict],
-    ) -> Dict[str, Any]:
+        doctor_profile: dict[str, Any],
+        patient_requirements: dict[str, Any],
+        available_slots: list[dict],
+    ) -> dict[str, Any]:
         """Имитация предложения оптимальных временных слотов"""
         await asyncio.sleep(2)
 
@@ -2830,8 +2830,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_workload_distribution(
-        self, doctors_data: List[Dict], time_period: str
-    ) -> Dict[str, Any]:
+        self, doctors_data: list[dict], time_period: str
+    ) -> dict[str, Any]:
         """Имитация анализа распределения рабочей нагрузки"""
         await asyncio.sleep(2.5)
 
@@ -2945,12 +2945,12 @@ class MockProvider(BaseAIProvider):
         }
 
     async def generate_shift_recommendations(
-        self, department_data: Dict[str, Any], staffing_requirements: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, department_data: dict[str, Any], staffing_requirements: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация генерации рекомендаций по составлению смен"""
         await asyncio.sleep(3)
 
-        department_name = department_data.get("name", "Терапевтическое отделение")
+        _department_name = department_data.get("name", "Терапевтическое отделение")
 
         return {
             "shift_recommendations": {
@@ -3154,8 +3154,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_documentation_quality(
-        self, medical_records: List[Dict], quality_standards: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, medical_records: list[dict], quality_standards: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация анализа качества медицинской документации"""
         await asyncio.sleep(2.5)
 
@@ -3299,8 +3299,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def detect_documentation_gaps(
-        self, patient_record: Dict[str, Any], required_fields: List[str]
-    ) -> Dict[str, Any]:
+        self, patient_record: dict[str, Any], required_fields: list[str]
+    ) -> dict[str, Any]:
         """Имитация выявления пробелов в документации"""
         await asyncio.sleep(1.5)
 
@@ -3461,8 +3461,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def suggest_documentation_improvements(
-        self, record_analysis: Dict[str, Any], best_practices: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, record_analysis: dict[str, Any], best_practices: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация предложений по улучшению документации"""
         await asyncio.sleep(3)
 
@@ -3672,8 +3672,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def validate_clinical_consistency(
-        self, diagnosis: str, symptoms: List[str], treatment: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, diagnosis: str, symptoms: list[str], treatment: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация валидации клинической согласованности"""
         await asyncio.sleep(2)
 
@@ -3778,8 +3778,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def audit_prescription_safety(
-        self, prescriptions: List[Dict], patient_profile: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, prescriptions: list[dict], patient_profile: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация аудита безопасности назначений"""
         await asyncio.sleep(2.5)
 
@@ -3903,8 +3903,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def analyze_medical_trends(
-        self, medical_data: List[Dict], time_period: str, analysis_type: str
-    ) -> Dict[str, Any]:
+        self, medical_data: list[dict], time_period: str, analysis_type: str
+    ) -> dict[str, Any]:
         """Имитация анализа медицинских трендов"""
         await asyncio.sleep(3)
 
@@ -4080,8 +4080,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def detect_anomalies(
-        self, dataset: List[Dict], baseline_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, dataset: list[dict], baseline_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация выявления аномалий"""
         await asyncio.sleep(2.5)
 
@@ -4268,8 +4268,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def predict_outcomes(
-        self, patient_data: Dict[str, Any], historical_outcomes: List[Dict]
-    ) -> Dict[str, Any]:
+        self, patient_data: dict[str, Any], historical_outcomes: list[dict]
+    ) -> dict[str, Any]:
         """Имитация прогнозирования исходов"""
         await asyncio.sleep(3.5)
 
@@ -4369,8 +4369,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def generate_insights_report(
-        self, analytics_data: Dict[str, Any], report_type: str
-    ) -> Dict[str, Any]:
+        self, analytics_data: dict[str, Any], report_type: str
+    ) -> dict[str, Any]:
         """Имитация генерации отчета с инсайтами"""
         await asyncio.sleep(4)
 
@@ -4403,8 +4403,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def identify_risk_patterns(
-        self, population_data: List[Dict], risk_factors: List[str]
-    ) -> Dict[str, Any]:
+        self, population_data: list[dict], risk_factors: list[str]
+    ) -> dict[str, Any]:
         """Имитация выявления паттернов рисков"""
         await asyncio.sleep(3.5)
 
@@ -4444,10 +4444,10 @@ class MockProvider(BaseAIProvider):
 
     async def triage_patient(
         self,
-        patient_data: Dict[str, Any],
-        symptoms: List[str],
-        vital_signs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        patient_data: dict[str, Any],
+        symptoms: list[str],
+        vital_signs: dict[str, Any],
+    ) -> dict[str, Any]:
         """Имитация триажа пациента"""
         await asyncio.sleep(1)
 
@@ -4503,8 +4503,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def assess_emergency_level(
-        self, clinical_presentation: Dict[str, Any], patient_history: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, clinical_presentation: dict[str, Any], patient_history: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация оценки уровня экстренности"""
         await asyncio.sleep(0.8)
 
@@ -4538,8 +4538,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def prioritize_patient_queue(
-        self, patients_queue: List[Dict], department_capacity: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patients_queue: list[dict], department_capacity: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация приоритизации очереди пациентов"""
         await asyncio.sleep(1.2)
 
@@ -4580,8 +4580,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def predict_deterioration_risk(
-        self, patient_status: Dict[str, Any], monitoring_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, patient_status: dict[str, Any], monitoring_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация прогнозирования риска ухудшения"""
         await asyncio.sleep(1)
 
@@ -4624,8 +4624,8 @@ class MockProvider(BaseAIProvider):
         }
 
     async def recommend_care_pathway(
-        self, triage_result: Dict[str, Any], available_resources: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, triage_result: dict[str, Any], available_resources: dict[str, Any]
+    ) -> dict[str, Any]:
         """Имитация рекомендации маршрута лечения"""
         await asyncio.sleep(1)
 

@@ -5,8 +5,9 @@
  * Tests the full v2 flow: load → edit → save with conflict handling.
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useEMR } from '../../hooks/useEMR';
+import logger from '../../utils/logger';
 import './EMRContainer.css';
 
 /**
@@ -55,7 +56,7 @@ export function EMRContainer({ visitId, patientId }) {
         try {
             await saveEMR();
         } catch (err) {
-            console.error('Save failed:', err);
+            logger.error('Save failed:', err);
         }
     };
 
@@ -66,7 +67,7 @@ export function EMRContainer({ visitId, patientId }) {
         try {
             await signEMR();
         } catch (err) {
-            console.error('Sign failed:', err);
+            logger.error('Sign failed:', err);
         }
     };
 
@@ -80,7 +81,7 @@ export function EMRContainer({ visitId, patientId }) {
             setShowAmendInput(false);
             setAmendReason('');
         } catch (err) {
-            console.error('Amend failed:', err);
+            logger.error('Amend failed:', err);
         }
     };
 

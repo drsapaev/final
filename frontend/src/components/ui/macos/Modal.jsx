@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 
@@ -19,8 +20,9 @@ const Modal = ({
   className = '',
   style = {},
   ...props
-}) => {
-  const { theme } = useTheme();
+}) => {void
+  useTheme();
+  void variant;
   const modalRef = useRef(null);
   const backdropRef = useRef(null);
 
@@ -48,7 +50,15 @@ const Modal = ({
   // Handle backdrop click
   const handleBackdropClick = (e) => {
     if (closeOnBackdrop && e.target === backdropRef.current) {
-      onClose();
+      onClose?.();
+    }
+  };
+
+  const handleBackdropKeyDown = (e) => {
+    if (!closeOnBackdrop) return;
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClose?.();
     }
   };
 
@@ -111,39 +121,43 @@ const Modal = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      {...props}
-    >
+      {...props}>
+
       {/* Backdrop */}
       <div
         ref={backdropRef}
         className="mac-modal-backdrop"
         style={backdropStyles}
         onClick={handleBackdropClick}
-      />
+        onKeyDown={handleBackdropKeyDown}
+        role="button"
+        tabIndex={0}
+        aria-label="Закрыть модальное окно" />
+
 
       {/* Modal Content */}
       <div className="mac-modal-content" style={contentStyles}>
         {/* Header */}
-        {title && (
-          <div className="mac-modal-header" style={{
-            padding: '20px 20px 0 20px',
-            borderBottom: title ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-            marginBottom: title ? '16px' : '0'
-          }}>
+        {title &&
+        <div className="mac-modal-header" style={{
+          padding: '20px 20px 0 20px',
+          borderBottom: title ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+          marginBottom: title ? '16px' : '0'
+        }}>
             <h2
-              id="modal-title"
-              style={{
-                fontSize: '17px',
-                fontWeight: '600',
-                color: 'var(--mac-text-primary)',
-                margin: '0 0 8px 0',
-                fontFamily: 'inherit'
-              }}
-            >
+            id="modal-title"
+            style={{
+              fontSize: '17px',
+              fontWeight: '600',
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 8px 0',
+              fontFamily: 'inherit'
+            }}>
+
               {title}
             </h2>
           </div>
-        )}
+        }
 
         {/* Body */}
         <div className="mac-modal-body" style={{
@@ -156,41 +170,41 @@ const Modal = ({
         </div>
 
         {/* Footer */}
-        {actions && (
-          <div className="mac-modal-footer" style={{
-            padding: '16px 20px',
-            borderTop: '1px solid rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            backgroundColor: 'rgba(248, 249, 250, 0.8)'
-          }}>
+        {actions &&
+        <div className="mac-modal-footer" style={{
+          padding: '16px 20px',
+          borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '8px',
+          backgroundColor: 'rgba(248, 249, 250, 0.8)'
+        }}>
             {actions}
           </div>
-        )}
+        }
 
         {/* Close button for fullscreen modals */}
-        {size === 'fullscreen' && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={onClose}
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              padding: '0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
+        {size === 'fullscreen' &&
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            width: '28px',
+            height: '28px',
+            borderRadius: '6px',
+            padding: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+
             ✕
           </Button>
-        )}
+        }
       </div>
 
       <style>{`
@@ -269,8 +283,8 @@ const Modal = ({
           outline-offset: 2px;
         }
       `}</style>
-    </div>
-  );
+    </div>);
+
 };
 
 /**
@@ -290,11 +304,11 @@ export const ModalHeader = React.forwardRef(({
         padding: '20px 20px 0 20px',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 ModalHeader.displayName = 'macOS Modal Header';
@@ -320,11 +334,11 @@ export const ModalTitle = React.forwardRef(({
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </h2>
-  );
+    </h2>);
+
 });
 
 ModalTitle.displayName = 'macOS Modal Title';
@@ -351,11 +365,11 @@ export const ModalContent = React.forwardRef(({
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 ModalContent.displayName = 'macOS Modal Content';
@@ -382,14 +396,51 @@ export const ModalFooter = React.forwardRef(({
         backgroundColor: 'rgba(248, 249, 250, 0.8)',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 ModalFooter.displayName = 'macOS Modal Footer';
 
-export default Modal;
+Modal.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  title: PropTypes.node,
+  children: PropTypes.node,
+  actions: PropTypes.node,
+  size: PropTypes.string,
+  variant: PropTypes.string,
+  closeOnBackdrop: PropTypes.bool,
+  closeOnEscape: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
+ModalHeader.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+ModalTitle.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+ModalContent.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+ModalFooter.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+export default Modal;

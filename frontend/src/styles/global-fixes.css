@@ -107,7 +107,7 @@ body {
 
 /* Исправления для кнопок */
 .btn-primary {
-  background-color: var(--accent-color, #3b82f6);
+  background-color: var(--accent-color, #0051d5);
   color: white;
   border: none;
   border-radius: 6px;
@@ -117,8 +117,18 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: var(--accent-color, #2563eb);
+  background-color: var(--accent-color, #003eaa);
   transform: translateY(-1px);
+}
+
+/* Видимый фокус для клавиатурной навигации (WCAG 2.4.7) */
+:where(button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid #0051d5;
+  outline-offset: 2px;
+}
+
+[data-theme="dark"] :where(button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline-color: #7ab2ff;
 }
 
 /* Исправления для текста */

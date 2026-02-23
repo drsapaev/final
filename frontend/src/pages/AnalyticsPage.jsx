@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import KPIMetrics from '../components/analytics/KPIMetrics';
 import AdvancedCharts from '../components/analytics/AdvancedCharts';
-import DataExporter from '../components/analytics/DataExporter';
+
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import logger from '../utils/logger';
-import { 
-  Calendar, 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
+import {
+  Calendar,
+  TrendingUp,
+  Users,
+  DollarSign,
   Activity,
   Download,
-  Filter,
+
   RefreshCw,
   BarChart3,
-  Target
-} from 'lucide-react';
+  Target } from
+'lucide-react';
 
 export default function AnalyticsPage() {
-  const { isDark, isLight, getColor, getSpacing } = useTheme();
+  const { getColor, getSpacing } = useTheme();
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -39,14 +39,14 @@ export default function AnalyticsPage() {
     predictive: null
   });
 
-  const loadAnalytics = async (tab = activeTab) => {
+  const loadAnalytics = useCallback(async (tab = activeTab) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         start_date: dateRange.start,
         end_date: dateRange.end
       });
-      
+
       if (department) {
         params.append('department', department);
       }
@@ -77,18 +77,18 @@ export default function AnalyticsPage() {
         default:
           response = await api.get(`/analytics/dashboard?${params}`);
       }
-      
-      setData(prev => ({ ...prev, [tab]: response }));
+
+      setData((prev) => ({ ...prev, [tab]: response }));
     } catch (error) {
       logger.error('Ошибка загрузки аналитики:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, dateRange.start, dateRange.end, department]);
 
   useEffect(() => {
     loadAnalytics();
-  }, [dateRange, department]);
+  }, [loadAnalytics]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
         end_date: dateRange.end,
         format: format
       });
-      
+
       if (department) {
         params.append('department', department);
       }
@@ -112,14 +112,14 @@ export default function AnalyticsPage() {
       const response = await api.get(`/analytics/export/comprehensive/export/${format}?${params}`, {
         responseType: 'blob'
       });
-      
-      const blob = new Blob([response], { 
-        type: format === 'json' ? 'application/json' : 
-              format === 'csv' ? 'text/csv' :
-              format === 'pdf' ? 'application/pdf' :
-              'application/octet-stream'
+
+      const blob = new Blob([response], {
+        type: format === 'json' ? 'application/json' :
+        format === 'csv' ? 'text/csv' :
+        format === 'pdf' ? 'application/pdf' :
+        'application/octet-stream'
       });
-      
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -133,37 +133,37 @@ export default function AnalyticsPage() {
 
   const renderOverviewTab = () => {
     if (!data.overview) return <div>Загрузка...</div>;
-    
-    const { today, week, month } = data.overview;
-    
+
+    const { today, month } = data.overview;
+
     const metrics = [
-      {
-        label: 'Визиты сегодня',
-        value: today.visits?.total_visits || 0,
-        type: 'visits',
-        icon: <Calendar size={16} />
-      },
-      {
-        label: 'Доходы сегодня',
-        value: today.revenue?.total_revenue || 0,
-        type: 'revenue',
-        format: 'revenue',
-        icon: <DollarSign size={16} />
-      },
-      {
-        label: 'Пациенты за месяц',
-        value: month.patients?.total_patients || 0,
-        type: 'patients',
-        icon: <Users size={16} />
-      },
-      {
-        label: 'Конверсия',
-        value: month.visits?.completion_rate || 0,
-        type: 'conversion',
-        format: 'percentage',
-        icon: <TrendingUp size={16} />
-      }
-    ];
+    {
+      label: 'Визиты сегодня',
+      value: today.visits?.total_visits || 0,
+      type: 'visits',
+      icon: <Calendar size={16} />
+    },
+    {
+      label: 'Доходы сегодня',
+      value: today.revenue?.total_revenue || 0,
+      type: 'revenue',
+      format: 'revenue',
+      icon: <DollarSign size={16} />
+    },
+    {
+      label: 'Пациенты за месяц',
+      value: month.patients?.total_patients || 0,
+      type: 'patients',
+      icon: <Users size={16} />
+    },
+    {
+      label: 'Конверсия',
+      value: month.visits?.completion_rate || 0,
+      type: 'conversion',
+      format: 'percentage',
+      icon: <TrendingUp size={16} />
+    }];
+
 
     return (
       <div>
@@ -181,8 +181,8 @@ export default function AnalyticsPage() {
               value: count
             }))}
             type="bar"
-            color="#3b82f6"
-          />
+            color="#3b82f6" />
+          
           
           <AnalyticsDashboard
             title="Доходы по отделениям"
@@ -190,45 +190,45 @@ export default function AnalyticsPage() {
               label: dept,
               value: stats.total_revenue || 0
             }))}
-            type="pie"
-          />
+            type="pie" />
+          
         </div>
-      </div>
-    );
+      </div>);
+
   };
 
   const renderAppointmentsTab = () => {
     if (!data.appointments) return <div>Загрузка...</div>;
-    
+
     const { summary, status_distribution, conversion_rates } = data.appointments;
-    
+
     const metrics = [
-      {
-        label: 'Всего записей',
-        value: summary.total_appointments,
-        type: 'visits',
-        icon: <Calendar size={16} />
-      },
-      {
-        label: 'Оплачено',
-        value: summary.paid_appointments,
-        type: 'visits',
-        icon: <DollarSign size={16} />
-      },
-      {
-        label: 'Завершено',
-        value: summary.completed_appointments,
-        type: 'visits',
-        icon: <Activity size={16} />
-      },
-      {
-        label: 'Конверсия',
-        value: conversion_rates.overall_conversion,
-        type: 'conversion',
-        format: 'percentage',
-        icon: <TrendingUp size={16} />
-      }
-    ];
+    {
+      label: 'Всего записей',
+      value: summary.total_appointments,
+      type: 'visits',
+      icon: <Calendar size={16} />
+    },
+    {
+      label: 'Оплачено',
+      value: summary.paid_appointments,
+      type: 'visits',
+      icon: <DollarSign size={16} />
+    },
+    {
+      label: 'Завершено',
+      value: summary.completed_appointments,
+      type: 'visits',
+      icon: <Activity size={16} />
+    },
+    {
+      label: 'Конверсия',
+      value: conversion_rates.overall_conversion,
+      type: 'conversion',
+      format: 'percentage',
+      icon: <TrendingUp size={16} />
+    }];
+
 
     return (
       <div>
@@ -245,51 +245,51 @@ export default function AnalyticsPage() {
               label: status,
               value: count
             }))}
-            type="pie"
-          />
+            type="pie" />
+          
           
           <AnalyticsDashboard
             title="Конверсия по воронке"
             data={[
-              { label: 'Запись → Оплата', value: conversion_rates.pending_to_paid },
-              { label: 'Оплата → Завершение', value: conversion_rates.paid_to_completed },
-              { label: 'Общая конверсия', value: conversion_rates.overall_conversion }
-            ]}
+            { label: 'Запись → Оплата', value: conversion_rates.pending_to_paid },
+            { label: 'Оплата → Завершение', value: conversion_rates.paid_to_completed },
+            { label: 'Общая конверсия', value: conversion_rates.overall_conversion }]
+            }
             type="bar"
-            color="#10b981"
-          />
+            color="#10b981" />
+          
         </div>
-      </div>
-    );
+      </div>);
+
   };
 
   const renderRevenueTab = () => {
     if (!data.revenue) return <div>Загрузка...</div>;
-    
+
     const { total_revenue, total_transactions, average_transaction, daily_revenue } = data.revenue;
-    
+
     const metrics = [
-      {
-        label: 'Общий доход',
-        value: total_revenue,
-        type: 'revenue',
-        format: 'revenue',
-        icon: <DollarSign size={16} />
-      },
-      {
-        label: 'Транзакций',
-        value: total_transactions,
-        type: 'visits',
-        icon: <Activity size={16} />
-      },
-      {
-        label: 'Средний чек',
-        value: average_transaction,
-        type: 'revenue',
-        format: 'revenue',
-        icon: <TrendingUp size={16} />
-      }
-    ];
+    {
+      label: 'Общий доход',
+      value: total_revenue,
+      type: 'revenue',
+      format: 'revenue',
+      icon: <DollarSign size={16} />
+    },
+    {
+      label: 'Транзакций',
+      value: total_transactions,
+      type: 'visits',
+      icon: <Activity size={16} />
+    },
+    {
+      label: 'Средний чек',
+      value: average_transaction,
+      type: 'revenue',
+      format: 'revenue',
+      icon: <TrendingUp size={16} />
+    }];
+
 
     return (
       <div>
@@ -302,16 +302,16 @@ export default function AnalyticsPage() {
         }}>
           <AnalyticsDashboard
             title="Доходы по дням"
-            data={daily_revenue.map(item => ({
-              label: new Date(item.date).toLocaleDateString('ru-RU', { 
-                month: 'short', 
-                day: 'numeric' 
+            data={daily_revenue.map((item) => ({
+              label: new Date(item.date).toLocaleDateString('ru-RU', {
+                month: 'short',
+                day: 'numeric'
               }),
               value: item.amount
             }))}
             type="line"
-            color="#10b981"
-          />
+            color="#10b981" />
+          
           
           <AnalyticsDashboard
             title="Доходы по провайдерам"
@@ -320,46 +320,46 @@ export default function AnalyticsPage() {
               value: stats.total_amount
             }))}
             type="bar"
-            color="#8b5cf6"
-          />
+            color="#8b5cf6" />
+          
         </div>
-      </div>
-    );
+      </div>);
+
   };
 
   const renderProvidersTab = () => {
     if (!data.providers) return <div>Загрузка...</div>;
-    
+
     const { summary, providers } = data.providers;
-    
+
     const metrics = [
-      {
-        label: 'Активных провайдеров',
-        value: summary.active_providers,
-        type: 'visits',
-        icon: <Activity size={16} />
-      },
-      {
-        label: 'Всего транзакций',
-        value: summary.total_transactions,
-        type: 'visits',
-        icon: <TrendingUp size={16} />
-      },
-      {
-        label: 'Общий доход',
-        value: summary.total_revenue,
-        type: 'revenue',
-        format: 'revenue',
-        icon: <DollarSign size={16} />
-      },
-      {
-        label: 'Комиссия',
-        value: summary.total_commission,
-        type: 'revenue',
-        format: 'revenue',
-        icon: <DollarSign size={16} />
-      }
-    ];
+    {
+      label: 'Активных провайдеров',
+      value: summary.active_providers,
+      type: 'visits',
+      icon: <Activity size={16} />
+    },
+    {
+      label: 'Всего транзакций',
+      value: summary.total_transactions,
+      type: 'visits',
+      icon: <TrendingUp size={16} />
+    },
+    {
+      label: 'Общий доход',
+      value: summary.total_revenue,
+      type: 'revenue',
+      format: 'revenue',
+      icon: <DollarSign size={16} />
+    },
+    {
+      label: 'Комиссия',
+      value: summary.total_commission,
+      type: 'revenue',
+      format: 'revenue',
+      icon: <DollarSign size={16} />
+    }];
+
 
     return (
       <div>
@@ -372,25 +372,25 @@ export default function AnalyticsPage() {
         }}>
           <AnalyticsDashboard
             title="Доходы по провайдерам"
-            data={Object.entries(providers).map(([code, stats]) => ({
+            data={Object.entries(providers).map(([, stats]) => ({
               label: stats.name,
               value: stats.total_amount
             }))}
-            type="pie"
-          />
+            type="pie" />
+          
           
           <AnalyticsDashboard
             title="Успешность провайдеров"
-            data={Object.entries(providers).map(([code, stats]) => ({
+            data={Object.entries(providers).map(([, stats]) => ({
               label: stats.name,
               value: stats.success_rate
             }))}
             type="bar"
-            color="#10b981"
-          />
+            color="#10b981" />
+          
         </div>
-      </div>
-    );
+      </div>);
+
   };
 
   return (
@@ -423,8 +423,8 @@ export default function AnalyticsPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
-            }}
-          >
+            }}>
+            
             <Download size={16} />
             Экспорт
           </button>
@@ -448,28 +448,28 @@ export default function AnalyticsPage() {
           <input
             type="date"
             value={dateRange.start}
-            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+            onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
             style={{
               padding: '8px',
               border: '1px solid var(--border-color)',
               borderRadius: '6px',
               background: 'var(--bg-primary)',
               color: 'var(--text-primary)'
-            }}
-          />
+            }} />
+          
           <span style={{ color: 'var(--text-secondary)' }}>—</span>
           <input
             type="date"
             value={dateRange.end}
-            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+            onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
             style={{
               padding: '8px',
               border: '1px solid var(--border-color)',
               borderRadius: '6px',
               background: 'var(--bg-primary)',
               color: 'var(--text-primary)'
-            }}
-          />
+            }} />
+          
         </div>
         
         <select
@@ -481,8 +481,8 @@ export default function AnalyticsPage() {
             borderRadius: '6px',
             background: 'var(--bg-primary)',
             color: 'var(--text-primary)'
-          }}
-        >
+          }}>
+          
           <option value="">Все отделения</option>
           <option value="General">Общее</option>
           <option value="Cardiology">Кардиология</option>
@@ -503,8 +503,8 @@ export default function AnalyticsPage() {
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
-          }}
-        >
+          }}>
+          
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           Обновить
         </button>
@@ -518,83 +518,82 @@ export default function AnalyticsPage() {
         borderBottom: '1px solid var(--border-color)'
       }}>
         {[
-          { id: 'overview', label: 'Обзор', icon: <Activity size={16} /> },
-          { id: 'appointments', label: 'Записи', icon: <Calendar size={16} /> },
-          { id: 'revenue', label: 'Доходы', icon: <DollarSign size={16} /> },
-          { id: 'providers', label: 'Провайдеры', icon: <TrendingUp size={16} /> },
-          { id: 'visualization', label: 'Графики', icon: <BarChart3 size={16} /> },
-          { id: 'kpi', label: 'KPI', icon: <Target size={16} /> },
-          { id: 'predictive', label: 'Прогнозы', icon: <TrendingUp size={16} /> }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            style={{
-              padding: '12px 20px',
-              background: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
-              color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
-              border: 'none',
-              borderRadius: '8px 8px 0 0',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontWeight: '500',
-              transition: 'all 0.2s ease'
-            }}
-          >
+        { id: 'overview', label: 'Обзор', icon: <Activity size={16} /> },
+        { id: 'appointments', label: 'Записи', icon: <Calendar size={16} /> },
+        { id: 'revenue', label: 'Доходы', icon: <DollarSign size={16} /> },
+        { id: 'providers', label: 'Провайдеры', icon: <TrendingUp size={16} /> },
+        { id: 'visualization', label: 'Графики', icon: <BarChart3 size={16} /> },
+        { id: 'kpi', label: 'KPI', icon: <Target size={16} /> },
+        { id: 'predictive', label: 'Прогнозы', icon: <TrendingUp size={16} /> }].
+        map((tab) =>
+        <button
+          key={tab.id}
+          onClick={() => handleTabChange(tab.id)}
+          style={{
+            padding: '12px 20px',
+            background: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
+            color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
+            border: 'none',
+            borderRadius: '8px 8px 0 0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: '500',
+            transition: 'all 0.2s ease'
+          }}>
+          
             {tab.icon}
             {tab.label}
           </button>
-        ))}
+        )}
       </div>
 
       {/* Контент */}
-      {loading ? (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
-          color: 'var(--text-secondary)'
-        }}>
+      {loading ?
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '200px',
+        color: 'var(--text-secondary)'
+      }}>
           <RefreshCw size={24} className="animate-spin" />
           <span style={{ marginLeft: '12px' }}>Загрузка данных...</span>
-        </div>
-      ) : (
-        <>
+        </div> :
+
+      <>
           {activeTab === 'overview' && renderOverviewTab()}
           {activeTab === 'appointments' && renderAppointmentsTab()}
           {activeTab === 'revenue' && renderRevenueTab()}
           {activeTab === 'providers' && renderProvidersTab()}
-          {activeTab === 'visualization' && (
-            <AdvancedCharts
-              data={data.visualization}
-              loading={loading}
-              onRefresh={() => loadAnalytics('visualization')}
-              onExport={() => exportData('json')}
-              title="Интерактивные графики аналитики"
-            />
-          )}
-          {activeTab === 'kpi' && (
-            <KPIMetrics
-              data={data.kpi}
-              loading={loading}
-              onRefresh={() => loadAnalytics('kpi')}
-              onExport={() => exportData('json')}
-            />
-          )}
-          {activeTab === 'predictive' && (
-            <PredictiveAnalytics
-              data={data.predictive}
-              loading={loading}
-              onRefresh={() => loadAnalytics('predictive')}
-              onExport={() => exportData('json')}
-            />
-          )}
-        </>
-      )}
-    </div>
-  );
-}
+          {activeTab === 'visualization' &&
+        <AdvancedCharts
+          data={data.visualization}
+          loading={loading}
+          onRefresh={() => loadAnalytics('visualization')}
+          onExport={() => exportData('json')}
+          title="Интерактивные графики аналитики" />
 
+        }
+          {activeTab === 'kpi' &&
+        <KPIMetrics
+          data={data.kpi}
+          loading={loading}
+          onRefresh={() => loadAnalytics('kpi')}
+          onExport={() => exportData('json')} />
+
+        }
+          {activeTab === 'predictive' &&
+        <PredictiveAnalytics
+          data={data.predictive}
+          loading={loading}
+          onRefresh={() => loadAnalytics('predictive')}
+          onExport={() => exportData('json')} />
+
+        }
+        </>
+      }
+    </div>);
+
+}

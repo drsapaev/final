@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
 import MacOSModal from '../ui/macos/MacOSModal';
 import MacOSInput from '../ui/macos/MacOSInput';

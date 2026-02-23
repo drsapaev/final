@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -15,8 +16,8 @@ const Card = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
   // macOS card styles based on variant
   const getCardStyles = () => {
@@ -86,38 +87,38 @@ const Card = React.forwardRef(({
       onClick(e);
     }
   };
+  const handleKeyDown = (e) => {
+    if (interactive && onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onClick(e);
+    }
+  };
 
   const cardStyles = getCardStyles();
 
-  return (
-    <div
-      ref={ref}
-      className={`mac-card ${interactive ? 'mac-card--interactive' : ''} ${className}`}
-      style={cardStyles}
-      onClick={handleClick}
-      {...props}
-    >
+  const content = (
+    <>
       {/* Card content */}
       {children}
 
       {/* Interactive overlay effect */}
-      {interactive && (
-        <div
-          className="mac-card-overlay"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 122, 255, 0.02)',
-            opacity: 0,
-            transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            pointerEvents: 'none',
-            borderRadius: 'inherit'
-          }}
-        />
-      )}
+      {interactive &&
+      <div
+        className="mac-card-overlay"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 122, 255, 0.02)',
+          opacity: 0,
+          transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+          pointerEvents: 'none',
+          borderRadius: 'inherit'
+        }} />
+
+      }
 
       <style>{`
         .mac-card:hover .mac-card-overlay {
@@ -164,8 +165,36 @@ const Card = React.forwardRef(({
           }
         }
       `}</style>
-    </div>
+    </>
   );
+
+  if (interactive && onClick) {
+    return (
+      <div
+        ref={ref}
+        className={`mac-card mac-card--interactive ${className}`}
+        style={cardStyles}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
+        {...props}>
+
+        {content}
+      </div>);
+
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={`mac-card ${className}`}
+      style={cardStyles}
+      {...props}>
+
+      {content}
+    </div>);
+
 });
 
 Card.displayName = 'macOS Card';
@@ -189,11 +218,11 @@ export const CardHeader = React.forwardRef(({
         borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 CardHeader.displayName = 'macOS Card Header';
@@ -220,11 +249,11 @@ export const CardTitle = React.forwardRef(({
         borderRadius: 'var(--mac-radius-sm)',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </h3>
-  );
+    </h3>);
+
 });
 
 CardTitle.displayName = 'macOS Card Title';
@@ -250,11 +279,11 @@ export const CardDescription = React.forwardRef(({
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </p>
-  );
+    </p>);
+
 });
 
 CardDescription.displayName = 'macOS Card Description';
@@ -279,11 +308,11 @@ export const CardContent = React.forwardRef(({
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 CardContent.displayName = 'macOS Card Content';
@@ -310,14 +339,54 @@ export const CardFooter = React.forwardRef(({
         gap: '8px',
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 CardFooter.displayName = 'macOS Card Footer';
 
-export default Card;
+Card.propTypes = {
+  children: PropTypes.node,
+  variant: PropTypes.string,
+  padding: PropTypes.string,
+  shadow: PropTypes.string,
+  interactive: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
+CardHeader.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardTitle.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardDescription.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardContent.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardFooter.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+export default Card;

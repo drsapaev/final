@@ -448,7 +448,7 @@ async def regenerate_backup_codes(
         )
 
 
-@router.get("/devices", response_model=TwoFactorDeviceListResponse)
+@router.get("/devices", response_model=TwoFactorDeviceListResponse, include_in_schema=False)
 async def get_trusted_devices(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):

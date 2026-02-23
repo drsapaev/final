@@ -5,31 +5,28 @@
 import asyncio
 import json
 import logging
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime
 
 import httpx
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.crud import (
-    appointment as crud_appointment,
     clinic as crud_doctor,
-    patient as crud_patient,
-    queue as crud_queue,
+)
+from app.crud import (
     service as crud_service,
+)
+from app.crud import (
     user as crud_user,
 )
-from app.db.session import get_db
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
-from app.services.sms_providers import get_sms_manager
 from app.services.telegram_bot import TelegramBotService
-from app.services.telegram_error_handler import telegram_error_handler
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +73,7 @@ class EnhancedTelegramBotService(TelegramBotService):
     ):
         """
         Расширенная обработка команд с retry логикой
-        
+
         ✅ SECURITY: Implements error handling and retry for command processing
         """
         for attempt in range(max_retries):
@@ -98,12 +95,12 @@ class EnhancedTelegramBotService(TelegramBotService):
 
             except Exception as e:
                 logger.error(f"Ошибка обработки команды {command} (попытка {attempt + 1}/{max_retries}): {e}", exc_info=True)
-                
+
                 # Don't retry on certain errors
-                if isinstance(e, (ValueError, KeyError, AttributeError)):
+                if isinstance(e, ValueError | KeyError | AttributeError):
                     await self._send_error_message(chat_id)
                     return
-                
+
                 # Retry on transient errors
                 if attempt < max_retries - 1:
                     wait_time = 1 * (attempt + 1)  # Linear backoff: 1s, 2s
@@ -158,7 +155,7 @@ class EnhancedTelegramBotService(TelegramBotService):
             total_services = db.query(Service).count()
 
             message = f"""📊 **Статистика клиники**
-            
+
 🗓 **Сегодня ({today.strftime('%d.%m.%Y')}):**
 • Записей: {appointments_today}
 • Новых пациентов: {patients_today}
@@ -368,7 +365,7 @@ class EnhancedTelegramBotService(TelegramBotService):
         """Управление уведомлениями"""
         try:
             message = """📢 **Управление уведомлениями**
-            
+
 Выберите тип уведомления:"""
 
             keyboard = {
@@ -827,7 +824,7 @@ class EnhancedTelegramBotService(TelegramBotService):
 
 ⚠️ **При угрозе жизни немедленно вызывайте:**
 • 🚑 Скорая помощь: 103
-• 🚒 Пожарная служба: 101  
+• 🚒 Пожарная служба: 101
 • 🚔 Полиция: 102
 • 📞 Единая служба экстренных вызовов: 112
 
@@ -1447,7 +1444,7 @@ class EnhancedTelegramBotService(TelegramBotService):
     async def _send_error_message(self, chat_id: int):
         """Отправка сообщения об ошибке"""
         message = """❌ Произошла ошибка при выполнении команды.
-        
+
 Попробуйте позже или обратитесь в техподдержку."""
 
         keyboard = {
@@ -1464,7 +1461,7 @@ class EnhancedTelegramBotService(TelegramBotService):
     ):
         """
         Отправка сообщения через Telegram API с retry логикой
-        
+
         ✅ SECURITY: Implements exponential backoff retry for reliability
         ✅ BUGFIX: Uses async HTTP client (httpx) instead of blocking requests
         """
@@ -1487,34 +1484,34 @@ class EnhancedTelegramBotService(TelegramBotService):
             for attempt in range(max_retries):
                 try:
                     response = await client.post(url, json=data)
-                    
+
                     # Check for rate limiting (429)
                     if response.status_code == 429:
                         retry_after = int(response.headers.get("Retry-After", 60))
                         logger.warning(f"Rate limited, waiting {retry_after}s before retry {attempt + 1}/{max_retries}")
                         await asyncio.sleep(retry_after)
                         continue
-                    
+
                     response.raise_for_status()
-                    
+
                     result = response.json()
                     if result.get("ok"):
                         return True
                     else:
                         error = result.get("description", "Unknown error")
                         logger.error(f"Telegram API error: {error}")
-                        
+
                         # Don't retry on certain errors (bad request, forbidden, etc.)
                         if response.status_code in (400, 401, 403, 404):
                             return False
-                        
+
                         # Retry on server errors (500, 502, 503, 504)
                         if response.status_code >= 500 and attempt < max_retries - 1:
                             wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
                             logger.warning(f"Server error, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
                             await asyncio.sleep(wait_time)
                             continue
-                        
+
                         return False
 
                 except httpx.TimeoutException:
@@ -1554,7 +1551,7 @@ class EnhancedTelegramBotService(TelegramBotService):
     async def send_admin_notification(self, message: str, db: Session):
         """
         Отправка уведомления всем администраторам с error handling
-        
+
         ✅ SECURITY: Implements comprehensive error handling
         """
         try:
@@ -1595,11 +1592,11 @@ class EnhancedTelegramBotService(TelegramBotService):
             logger.error(f"Ошибка отправки уведомления администраторам: {e}", exc_info=True)
 
     async def send_bulk_notification(
-        self, message: str, user_ids: List[int], db: Session, batch_size: int = 10
+        self, message: str, user_ids: list[int], db: Session, batch_size: int = 10
     ):
         """
         Массовая отправка уведомлений с retry логикой
-        
+
         ✅ SECURITY: Implements batch processing and error recovery
         """
         try:
@@ -1610,7 +1607,7 @@ class EnhancedTelegramBotService(TelegramBotService):
             # Process in batches to avoid rate limiting
             for i in range(0, len(user_ids), batch_size):
                 batch = user_ids[i:i + batch_size]
-                
+
                 for user_id in batch:
                     try:
                         user = crud_user.get(db, id=user_id)
@@ -1627,7 +1624,7 @@ class EnhancedTelegramBotService(TelegramBotService):
 
                         # Небольшая задержка между отправками
                         await asyncio.sleep(0.1)
-                    
+
                     except Exception as e:
                         logger.error(f"Error sending to user {user_id}: {e}")
                         failed_count += 1
@@ -1641,7 +1638,7 @@ class EnhancedTelegramBotService(TelegramBotService):
             if failed_users:
                 logger.info(f"Retrying {len(failed_users)} failed notifications...")
                 await asyncio.sleep(5)  # Wait before retry
-                
+
                 for user_id in failed_users[:]:
                     try:
                         user = crud_user.get(db, id=user_id)

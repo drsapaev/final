@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 const ACCENTS = {
   blue: '#007aff',
   purple: '#5856d6',
@@ -15,10 +14,10 @@ const STORAGE_KEY = 'ui.accent';
 
 const MacOSThemeContext = createContext({
   accent: 'blue',
-  setAccent: () => { },
+  setAccent: () => {},
   mode: 'light',
-  setMode: () => { },
-  ensureContrast: (fg, bg) => fg
+  setMode: () => {},
+  ensureContrast: (fg) => fg
 });
 
 function getSystemMode() {
@@ -31,7 +30,7 @@ function getLuminance(hex) {
   const r = parseInt(c.substring(0, 2), 16) / 255;
   const g = parseInt(c.substring(2, 4), 16) / 255;
   const b = parseInt(c.substring(4, 6), 16) / 255;
-  const srgb = [r, g, b].map(v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  const srgb = [r, g, b].map((v) => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
 }
 
@@ -54,7 +53,7 @@ function adjustForContrast(colorHex, bgHex, min = 4.5) {
     const mixR = Math.round(bgIsDark ? r + (255 - r) * t : r * (1 - t));
     const mixG = Math.round(bgIsDark ? g + (255 - g) * t : g * (1 - t));
     const mixB = Math.round(bgIsDark ? b + (255 - b) * t : b * (1 - t));
-    const candidate = '#' + [mixR, mixG, mixB].map(x => x.toString(16).padStart(2, '0')).join('');
+    const candidate = '#' + [mixR, mixG, mixB].map((x) => x.toString(16).padStart(2, '0')).join('');
     if (contrastRatio(candidate, '#' + bg) >= min) return candidate;
   }
   return '#' + c;
@@ -74,11 +73,11 @@ export function MacOSThemeProvider({ children }) {
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e) => setMode(e.matches ? 'dark' : 'light');
-    if (mq.addEventListener) mq.addEventListener('change', handler);
-    else mq.addListener(handler);
+    if (mq.addEventListener) mq.addEventListener('change', handler);else
+    mq.addListener(handler);
     return () => {
-      if (mq.removeEventListener) mq.removeEventListener('change', handler);
-      else mq.removeListener(handler);
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);else
+      mq.removeListener(handler);
     };
   }, []);
 
@@ -114,7 +113,11 @@ export function MacOSThemeProvider({ children }) {
     const accentFg = whiteContrast >= blackContrast ? white : black;
     root.style.setProperty('--accent-foreground', accentFg);
     root.setAttribute('data-color-scheme', mode);
-    try { localStorage.setItem(STORAGE_KEY, accent); } catch { }
+    try {
+      localStorage.setItem(STORAGE_KEY, accent);
+    } catch (error) {
+      void error;
+    }
   }, [accent, mode]);
 
   const setAccent = (name) => {
@@ -128,8 +131,8 @@ export function MacOSThemeProvider({ children }) {
   return (
     <MacOSThemeContext.Provider value={value}>
       {children}
-    </MacOSThemeContext.Provider>
-  );
+    </MacOSThemeContext.Provider>);
+
 }
 
 export function useMacOSTheme() {
@@ -139,5 +142,3 @@ export function useMacOSTheme() {
 export const ACCENT_OPTIONS = Object.keys(ACCENTS);
 
 export default MacOSThemeProvider;
-
-

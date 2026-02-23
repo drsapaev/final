@@ -3,50 +3,45 @@ CRUD операции для расширенного управления кл�
 """
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, asc, desc, func, or_
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import (
     Backup,
     BackupStatus,
-    BackupType,
     Branch,
     BranchStatus,
     Equipment,
     EquipmentMaintenance,
     EquipmentStatus,
-    EquipmentType,
     License,
     LicenseActivation,
     LicenseStatus,
-    LicenseType,
     SystemInfo,
+)
+from app.repositories.branch_scope_repository import (
+    BranchScopeViolationError,
+    ensure_entity_within_branch_scope,
+    require_branch_scope_id,
+    resolve_scoped_branch_id,
 )
 from app.schemas.clinic import (
     BackupCreate,
-    BackupOut,
     BackupUpdate,
     BranchCreate,
-    BranchOut,
     BranchStatsOut,
     BranchUpdate,
     ClinicStatsOut,
     EquipmentCreate,
     EquipmentMaintenanceCreate,
-    EquipmentMaintenanceOut,
     EquipmentMaintenanceUpdate,
-    EquipmentOut,
     EquipmentUpdate,
     LicenseActivationCreate,
-    LicenseActivationOut,
     LicenseActivationUpdate,
     LicenseCreate,
-    LicenseOut,
     LicenseUpdate,
     SystemInfoCreate,
-    SystemInfoOut,
     SystemInfoUpdate,
 )
 
@@ -64,11 +59,11 @@ class CRUDBranch:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[Branch]:
+    def get(self, db: Session, *, id: int) -> Branch | None:
         """Получить филиал по ID"""
         return db.query(Branch).filter(Branch.id == id).first()
 
-    def get_by_code(self, db: Session, *, code: str) -> Optional[Branch]:
+    def get_by_code(self, db: Session, *, code: str) -> Branch | None:
         """Получить филиал по коду"""
         return db.query(Branch).filter(Branch.code == code).first()
 
@@ -78,9 +73,9 @@ class CRUDBranch:
         *,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[Branch]:
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[Branch]:
         """Получить список филиалов с фильтрацией"""
         query = db.query(Branch)
 
@@ -109,7 +104,7 @@ class CRUDBranch:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[Branch]:
+    def delete(self, db: Session, *, id: int) -> Branch | None:
         """Удалить филиал"""
         obj = db.query(Branch).filter(Branch.id == id).first()
         if obj:
@@ -117,7 +112,7 @@ class CRUDBranch:
             db.commit()
         return obj
 
-    def get_stats(self, db: Session, *, branch_id: int) -> Optional[BranchStatsOut]:
+    def get_stats(self, db: Session, *, branch_id: int) -> BranchStatsOut | None:
         """Получить статистику филиала"""
         branch = self.get(db, id=branch_id)
         if not branch:
@@ -204,11 +199,44 @@ class CRUDEquipment:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[Equipment]:
+    def create_scoped(
+        self,
+        db: Session,
+        *,
+        obj_in: EquipmentCreate,
+        branch_scope_id: int,
+    ) -> Equipment:
+        """Создать оборудование в рамках branch scope."""
+        ensure_entity_within_branch_scope(
+            entity_branch_id=obj_in.branch_id,
+            scoped_branch_id=branch_scope_id,
+            entity_name="Equipment",
+        )
+        return self.create(db=db, obj_in=obj_in)
+
+    def get(self, db: Session, *, id: int) -> Equipment | None:
         """Получить оборудование по ID"""
         return db.query(Equipment).filter(Equipment.id == id).first()
 
-    def get_by_serial(self, db: Session, *, serial_number: str) -> Optional[Equipment]:
+    def get_scoped(
+        self,
+        db: Session,
+        *,
+        id: int,
+        branch_scope_id: int,
+    ) -> Equipment | None:
+        """Получить оборудование по ID только внутри branch scope."""
+        scope = require_branch_scope_id(
+            branch_scope_id,
+            source="equipment.get_scoped",
+        )
+        return (
+            db.query(Equipment)
+            .filter(Equipment.id == id, Equipment.branch_id == scope)
+            .first()
+        )
+
+    def get_by_serial(self, db: Session, *, serial_number: str) -> Equipment | None:
         """Получить оборудование по серийному номеру"""
         return (
             db.query(Equipment).filter(Equipment.serial_number == serial_number).first()
@@ -220,11 +248,11 @@ class CRUDEquipment:
         *,
         skip: int = 0,
         limit: int = 100,
-        branch_id: Optional[int] = None,
-        equipment_type: Optional[str] = None,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[Equipment]:
+        branch_id: int | None = None,
+        equipment_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[Equipment]:
         """Получить список оборудования с фильтрацией"""
         query = db.query(Equipment)
 
@@ -248,6 +276,34 @@ class CRUDEquipment:
 
         return query.offset(skip).limit(limit).all()
 
+    def get_multi_scoped(
+        self,
+        db: Session,
+        *,
+        branch_scope_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        branch_id: int | None = None,
+        equipment_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[Equipment]:
+        """Получить список оборудования внутри branch scope."""
+        scoped_branch_id = resolve_scoped_branch_id(
+            request_branch_id=branch_scope_id,
+            explicit_branch_id=branch_id,
+            require_scope=True,
+        )
+        return self.get_multi(
+            db=db,
+            skip=skip,
+            limit=limit,
+            branch_id=scoped_branch_id,
+            equipment_type=equipment_type,
+            status=status,
+            search=search,
+        )
+
     def update(
         self, db: Session, *, db_obj: Equipment, obj_in: EquipmentUpdate
     ) -> Equipment:
@@ -261,7 +317,31 @@ class CRUDEquipment:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[Equipment]:
+    def update_scoped(
+        self,
+        db: Session,
+        *,
+        db_obj: Equipment,
+        obj_in: EquipmentUpdate,
+        branch_scope_id: int,
+    ) -> Equipment:
+        """Обновить оборудование в рамках branch scope."""
+        ensure_entity_within_branch_scope(
+            entity_branch_id=db_obj.branch_id,
+            scoped_branch_id=branch_scope_id,
+            entity_name="Equipment",
+            entity_id=db_obj.id,
+        )
+        if (
+            obj_in.branch_id is not None
+            and obj_in.branch_id != branch_scope_id
+        ):
+            raise BranchScopeViolationError(
+                "Cannot reassign equipment to another branch outside current scope"
+            )
+        return self.update(db=db, db_obj=db_obj, obj_in=obj_in)
+
+    def delete(self, db: Session, *, id: int) -> Equipment | None:
         """Удалить оборудование"""
         obj = db.query(Equipment).filter(Equipment.id == id).first()
         if obj:
@@ -269,9 +349,23 @@ class CRUDEquipment:
             db.commit()
         return obj
 
+    def delete_scoped(
+        self,
+        db: Session,
+        *,
+        id: int,
+        branch_scope_id: int,
+    ) -> Equipment | None:
+        """Удалить оборудование внутри branch scope."""
+        obj = self.get_scoped(db=db, id=id, branch_scope_id=branch_scope_id)
+        if obj:
+            db.delete(obj)
+            db.commit()
+        return obj
+
     def get_maintenance_due(
         self, db: Session, *, days_ahead: int = 30
-    ) -> List[Equipment]:
+    ) -> list[Equipment]:
         """Получить оборудование, требующее обслуживания"""
         due_date = datetime.utcnow() + timedelta(days=days_ahead)
         return (
@@ -312,7 +406,7 @@ class CRUDEquipmentMaintenance:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[EquipmentMaintenance]:
+    def get(self, db: Session, *, id: int) -> EquipmentMaintenance | None:
         """Получить запись обслуживания по ID"""
         return (
             db.query(EquipmentMaintenance).filter(EquipmentMaintenance.id == id).first()
@@ -320,7 +414,7 @@ class CRUDEquipmentMaintenance:
 
     def get_by_equipment(
         self, db: Session, *, equipment_id: int, skip: int = 0, limit: int = 100
-    ) -> List[EquipmentMaintenance]:
+    ) -> list[EquipmentMaintenance]:
         """Получить записи обслуживания для оборудования"""
         return (
             db.query(EquipmentMaintenance)
@@ -348,7 +442,7 @@ class CRUDEquipmentMaintenance:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[EquipmentMaintenance]:
+    def delete(self, db: Session, *, id: int) -> EquipmentMaintenance | None:
         """Удалить запись обслуживания"""
         obj = (
             db.query(EquipmentMaintenance).filter(EquipmentMaintenance.id == id).first()
@@ -373,11 +467,11 @@ class CRUDLicense:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[License]:
+    def get(self, db: Session, *, id: int) -> License | None:
         """Получить лицензию по ID"""
         return db.query(License).filter(License.id == id).first()
 
-    def get_by_key(self, db: Session, *, license_key: str) -> Optional[License]:
+    def get_by_key(self, db: Session, *, license_key: str) -> License | None:
         """Получить лицензию по ключу"""
         return db.query(License).filter(License.license_key == license_key).first()
 
@@ -387,10 +481,10 @@ class CRUDLicense:
         *,
         skip: int = 0,
         limit: int = 100,
-        license_type: Optional[str] = None,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[License]:
+        license_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[License]:
         """Получить список лицензий с фильтрацией"""
         query = db.query(License)
 
@@ -422,7 +516,7 @@ class CRUDLicense:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[License]:
+    def delete(self, db: Session, *, id: int) -> License | None:
         """Удалить лицензию"""
         obj = db.query(License).filter(License.id == id).first()
         if obj:
@@ -430,7 +524,7 @@ class CRUDLicense:
             db.commit()
         return obj
 
-    def get_expiring_soon(self, db: Session, *, days_ahead: int = 30) -> List[License]:
+    def get_expiring_soon(self, db: Session, *, days_ahead: int = 30) -> list[License]:
         """Получить лицензии, истекающие в ближайшее время"""
         expiring_date = date.today() + timedelta(days=days_ahead)
         return (
@@ -461,13 +555,13 @@ class CRUDLicenseActivation:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[LicenseActivation]:
+    def get(self, db: Session, *, id: int) -> LicenseActivation | None:
         """Получить активацию по ID"""
         return db.query(LicenseActivation).filter(LicenseActivation.id == id).first()
 
     def get_by_license(
         self, db: Session, *, license_id: int, skip: int = 0, limit: int = 100
-    ) -> List[LicenseActivation]:
+    ) -> list[LicenseActivation]:
         """Получить активации для лицензии"""
         return (
             db.query(LicenseActivation)
@@ -491,7 +585,7 @@ class CRUDLicenseActivation:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[LicenseActivation]:
+    def delete(self, db: Session, *, id: int) -> LicenseActivation | None:
         """Удалить активацию"""
         obj = db.query(LicenseActivation).filter(LicenseActivation.id == id).first()
         if obj:
@@ -514,7 +608,7 @@ class CRUDBackup:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[Backup]:
+    def get(self, db: Session, *, id: int) -> Backup | None:
         """Получить резервную копию по ID"""
         return db.query(Backup).filter(Backup.id == id).first()
 
@@ -524,9 +618,9 @@ class CRUDBackup:
         *,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[str] = None,
-        backup_type: Optional[str] = None,
-    ) -> List[Backup]:
+        status: str | None = None,
+        backup_type: str | None = None,
+    ) -> list[Backup]:
         """Получить список резервных копий с фильтрацией"""
         query = db.query(Backup)
 
@@ -549,7 +643,7 @@ class CRUDBackup:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[Backup]:
+    def delete(self, db: Session, *, id: int) -> Backup | None:
         """Удалить резервную копию"""
         obj = db.query(Backup).filter(Backup.id == id).first()
         if obj:
@@ -557,7 +651,7 @@ class CRUDBackup:
             db.commit()
         return obj
 
-    def get_expired(self, db: Session) -> List[Backup]:
+    def get_expired(self, db: Session) -> list[Backup]:
         """Получить истекшие резервные копии"""
         return db.query(Backup).filter(Backup.expires_at <= datetime.utcnow()).all()
 
@@ -576,17 +670,17 @@ class CRUDSystemInfo:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, *, id: int) -> Optional[SystemInfo]:
+    def get(self, db: Session, *, id: int) -> SystemInfo | None:
         """Получить системную информацию по ID"""
         return db.query(SystemInfo).filter(SystemInfo.id == id).first()
 
-    def get_by_key(self, db: Session, *, key: str) -> Optional[SystemInfo]:
+    def get_by_key(self, db: Session, *, key: str) -> SystemInfo | None:
         """Получить системную информацию по ключу"""
         return db.query(SystemInfo).filter(SystemInfo.key == key).first()
 
     def get_multi(
         self, db: Session, *, skip: int = 0, limit: int = 100
-    ) -> List[SystemInfo]:
+    ) -> list[SystemInfo]:
         """Получить список системной информации"""
         return db.query(SystemInfo).offset(skip).limit(limit).all()
 
@@ -603,7 +697,7 @@ class CRUDSystemInfo:
         db.refresh(db_obj)
         return db_obj
 
-    def delete(self, db: Session, *, id: int) -> Optional[SystemInfo]:
+    def delete(self, db: Session, *, id: int) -> SystemInfo | None:
         """Удалить системную информацию"""
         obj = db.query(SystemInfo).filter(SystemInfo.id == id).first()
         if obj:

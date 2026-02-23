@@ -56,7 +56,7 @@ export function EMRSection({
                     <span className={`emr-section__chevron ${isOpen ? 'emr-section__chevron--open' : ''}`}>▼</span>
                 </button>
                 {headerAction && (
-                    <div className="emr-section__header-action" onClick={(e) => e.stopPropagation()}>
+                    <div className="emr-section__header-action" onClickCapture={(e) => e.stopPropagation()}>
                         {headerAction}
                     </div>
                 )}

@@ -16,8 +16,8 @@ const Button = React.forwardRef(({
   style = {},
   onClick,
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
   // macOS button styles based on variant
   const getButtonStyles = () => {
@@ -159,32 +159,32 @@ const Button = React.forwardRef(({
       style={buttonStyles}
       disabled={disabled || loading}
       onClick={handleClick}
-      {...props}
-    >
+      {...props}>
+
       {/* Loading spinner */}
-      {loading && (
-        <svg
-          className="mac-button-spinner"
-          style={{
-            width: '14px',
-            height: '14px',
-            marginRight: '6px',
-            animation: 'mac-spin 1s linear infinite'
-          }}
-          viewBox="0 0 24 24"
-          fill="none"
-        >
+      {loading &&
+      <svg
+        className="mac-button-spinner"
+        style={{
+          width: '14px',
+          height: '14px',
+          marginRight: '6px',
+          animation: 'mac-spin 1s linear infinite'
+        }}
+        viewBox="0 0 24 24"
+        fill="none">
+
           <circle
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeDasharray="8 8"
-            strokeLinecap="round"
-          />
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeDasharray="8 8"
+          strokeLinecap="round" />
+
         </svg>
-      )}
+      }
 
       {/* Button content */}
       <span style={{ position: 'relative', zIndex: 1 }}>
@@ -192,23 +192,23 @@ const Button = React.forwardRef(({
       </span>
 
       {/* Hover effect overlay */}
-      {!disabled && !loading && (
-        <div
-          className="mac-button-overlay"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(255, 255, 255, 0.1)',
-            opacity: 0,
-            transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            pointerEvents: 'none',
-            borderRadius: 'inherit'
-          }}
-        />
-      )}
+      {!disabled && !loading &&
+      <div
+        className="mac-button-overlay"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(255, 255, 255, 0.1)',
+          opacity: 0,
+          transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+          pointerEvents: 'none',
+          borderRadius: 'inherit'
+        }} />
+
+      }
 
       <style>{`
         @keyframes mac-spin {
@@ -252,11 +252,10 @@ const Button = React.forwardRef(({
           }
         }
       `}</style>
-    </button>
-  );
+    </button>);
+
 });
 
 Button.displayName = 'macOS Button';
 
 export default Button;
-

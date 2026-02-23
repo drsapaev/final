@@ -1,10 +1,9 @@
-import React from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { colors } from '../theme/tokens';
 
 const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
-  const { theme, isDark, toggleTheme, getColor, getSpacing } = useTheme();
+  const { isDark, toggleTheme, getSpacing } = useTheme();
 
   const sizes = {
     sm: { size: 16, padding: getSpacing('xs') },
@@ -21,9 +20,9 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
     padding,
     borderRadius: '50%',
     border: `1px solid ${isDark ? colors.border.medium : colors.border.light}`,
-    background: isDark
-      ? colors.semantic.surface.card
-      : colors.semantic.surface.card,
+    background: isDark ?
+    colors.semantic.surface.card :
+    colors.semantic.surface.card,
     color: isDark ? colors.semantic.text.primary : colors.semantic.text.primary,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -33,12 +32,12 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
 
   const hoverStyle = {
     transform: 'scale(1.05)',
-    background: isDark
-      ? colors.semantic.surface.hover
-      : colors.semantic.surface.hover,
-    boxShadow: isDark
-      ? `0 4px 20px ${colors.semantic.surface.overlay}`
-      : `0 4px 20px ${colors.semantic.surface.overlay}`
+    background: isDark ?
+    colors.semantic.surface.hover :
+    colors.semantic.surface.hover,
+    boxShadow: isDark ?
+    `0 4px 20px ${colors.semantic.surface.overlay}` :
+    `0 4px 20px ${colors.semantic.surface.overlay}`
   };
 
   return (
@@ -49,12 +48,11 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
       onMouseEnter={(e) => Object.assign(e.target.style, hoverStyle)}
       onMouseLeave={(e) => Object.assign(e.target.style, buttonStyle)}
       title={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}
-      aria-label={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}
-    >
+      aria-label={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}>
+      
       {isDark ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
-    </button>
-  );
+    </button>);
+
 };
 
 export default ThemeToggle;
-

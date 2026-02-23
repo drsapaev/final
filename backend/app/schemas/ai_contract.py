@@ -5,13 +5,14 @@ AI Response Contract - единый формат ответов AI подсис�
 совместимости между backend и frontend.
 """
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
 class AISuggestion(BaseModel):
     """Единичная подсказка от AI"""
-    
+
     id: str = Field(..., description="Уникальный ID подсказки")
     text: str = Field(..., description="Текст подсказки для отображения")
     confidence: float = Field(
@@ -24,7 +25,7 @@ class AISuggestion(BaseModel):
         default="ai",
         description="Источник подсказки"
     )
-    meta: Dict[str, Any] = Field(
+    meta: dict[str, Any] = Field(
         default_factory=dict,
         description="Дополнительные данные (код МКБ, категория и т.д.)"
     )
@@ -32,7 +33,7 @@ class AISuggestion(BaseModel):
 
 class AIICD10Suggestion(BaseModel):
     """Подсказка кода МКБ-10"""
-    
+
     code: str = Field(..., description="Код МКБ-10 (например, R50.9)")
     label: str = Field(..., description="Описание кода")
     confidence: float = Field(
@@ -41,7 +42,7 @@ class AIICD10Suggestion(BaseModel):
         le=1.0,
         description="Уверенность модели"
     )
-    category: Optional[str] = Field(
+    category: str | None = Field(
         default=None,
         description="Категория (respiratory, cardiovascular, etc.)"
     )
@@ -49,25 +50,25 @@ class AIICD10Suggestion(BaseModel):
 
 class AIResponse(BaseModel):
     """Стандартный ответ AI подсистемы"""
-    
+
     status: Literal["success", "error"] = Field(..., description="Статус ответа")
-    suggestions: List[AISuggestion] = Field(
+    suggestions: list[AISuggestion] = Field(
         default_factory=list,
         description="Список подсказок"
     )
-    provider: Optional[str] = Field(
+    provider: str | None = Field(
         default=None,
         description="Имя провайдера (deepseek, openai, gemini)"
     )
-    latency_ms: Optional[int] = Field(
+    latency_ms: int | None = Field(
         default=None,
         description="Время выполнения в миллисекундах"
     )
-    error: Optional[str] = Field(
+    error: str | None = Field(
         default=None,
         description="Сообщение об ошибке (если status=error)"
     )
-    debug_meta: Optional[Dict[str, Any]] = Field(
+    debug_meta: dict[str, Any] | None = Field(
         default=None,
         description="Отладочная информация (только в dev режиме)"
     )
@@ -75,18 +76,18 @@ class AIResponse(BaseModel):
 
 class AIICD10Response(BaseModel):
     """Ответ с подсказками МКБ-10"""
-    
+
     status: Literal["success", "error"] = Field(..., description="Статус ответа")
-    suggestions: List[AIICD10Suggestion] = Field(
+    suggestions: list[AIICD10Suggestion] = Field(
         default_factory=list,
         description="Список кодов МКБ-10"
     )
-    provider: Optional[str] = Field(default=None)
-    latency_ms: Optional[int] = Field(default=None)
-    error: Optional[str] = Field(default=None)
-    debug_meta: Optional[Dict[str, Any]] = Field(default=None)
+    provider: str | None = Field(default=None)
+    latency_ms: int | None = Field(default=None)
+    error: str | None = Field(default=None)
+    debug_meta: dict[str, Any] | None = Field(default=None)
 
-    def to_generic_suggestions(self) -> List[AISuggestion]:
+    def to_generic_suggestions(self) -> list[AISuggestion]:
         """Преобразовать в универсальный формат AISuggestion"""
         return [
             AISuggestion(
@@ -102,18 +103,18 @@ class AIICD10Response(BaseModel):
 
 class AIComplaintAnalysis(BaseModel):
     """Результат анализа жалоб"""
-    
+
     status: Literal["success", "error"] = Field(...)
-    preliminary_diagnosis: List[str] = Field(default_factory=list)
-    examinations: List[Dict[str, str]] = Field(default_factory=list)
-    lab_tests: List[str] = Field(default_factory=list)
-    consultations: List[str] = Field(default_factory=list)
-    urgency: Optional[str] = Field(default="планово")
-    red_flags: List[str] = Field(default_factory=list)
-    treatment_suggestion: Optional[str] = Field(default=None)
-    examination_plan: Optional[str] = Field(default=None)
-    recommendations: Optional[str] = Field(default=None)
-    provider: Optional[str] = Field(default=None)
-    latency_ms: Optional[int] = Field(default=None)
-    error: Optional[str] = Field(default=None)
-    debug_meta: Optional[Dict[str, Any]] = Field(default=None)
+    preliminary_diagnosis: list[str] = Field(default_factory=list)
+    examinations: list[dict[str, str]] = Field(default_factory=list)
+    lab_tests: list[str] = Field(default_factory=list)
+    consultations: list[str] = Field(default_factory=list)
+    urgency: str | None = Field(default="планово")
+    red_flags: list[str] = Field(default_factory=list)
+    treatment_suggestion: str | None = Field(default=None)
+    examination_plan: str | None = Field(default=None)
+    recommendations: str | None = Field(default=None)
+    provider: str | None = Field(default=None)
+    latency_ms: int | None = Field(default=None)
+    error: str | None = Field(default=None)
+    debug_meta: dict[str, Any] | None = Field(default=None)

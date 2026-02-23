@@ -4,15 +4,14 @@ Firebase Cloud Messaging (FCM) сервис для push уведомлений
 """
 
 import asyncio
-import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
-from google.oauth2 import service_account
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -24,9 +23,9 @@ class FCMResponse(BaseModel):
     """Ответ FCM"""
 
     success: bool
-    message_id: Optional[str] = None
-    error: Optional[str] = None
-    error_code: Optional[str] = None
+    message_id: str | None = None
+    error: str | None = None
+    error_code: str | None = None
 
 
 class FCMService:
@@ -35,12 +34,12 @@ class FCMService:
     def __init__(self):
         self.project_id = getattr(settings, 'FCM_PROJECT_ID', None)
         self.fcm_url = f"https://fcm.googleapis.com/v1/projects/{self.project_id}/messages:send"
-        
+
         # OAuth2 credentials
         self.credentials = None
         self.access_token = None
         self.token_expiry = 0
-        
+
         self._load_credentials()
 
     def _load_credentials(self):
@@ -48,7 +47,7 @@ class FCMService:
         try:
             # Пытаемся найти путь к JSON файлу в env или settings
             cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            
+
             if cred_path and os.path.exists(cred_path):
                 scopes = ['https://www.googleapis.com/auth/firebase.messaging']
                 self.credentials = service_account.Credentials.from_service_account_file(
@@ -57,25 +56,25 @@ class FCMService:
                 logger.info("FCM credentials loaded successfully")
             else:
                 logger.warning("GOOGLE_APPLICATION_CREDENTIALS not found or invalid. FCM disabled.")
-                
+
         except Exception as e:
             logger.error(f"Failed to load FCM credentials: {e}")
 
-    def _get_access_token(self) -> Optional[str]:
+    def _get_access_token(self) -> str | None:
         """Получение валидного OAuth2 токена (синхронно, так как редко)"""
         if not self.credentials:
             return None
-            
+
         current_time = time.time()
-        
+
         if self.access_token and current_time < self.token_expiry - 60:
             return self.access_token
-            
+
         try:
             self.credentials.refresh(Request())
             self.access_token = self.credentials.token
             # Токен обычно живет 1 час
-            self.token_expiry = current_time + 3500 
+            self.token_expiry = current_time + 3500
             return self.access_token
         except Exception as e:
             logger.error(f"Failed to refresh FCM token: {e}")
@@ -90,16 +89,16 @@ class FCMService:
         device_token: str,
         title: str,
         body: str,
-        data: Optional[Dict[str, Any]] = None,
-        image: Optional[str] = None,
+        data: dict[str, Any] | None = None,
+        image: str | None = None,
         sound: str = "default",
-        badge: Optional[int] = None,
+        badge: int | None = None,
     ) -> FCMResponse:
         """Отправка push уведомления (HTTP v1)"""
 
         if not self.active:
             return FCMResponse(success=False, error="FCM service not configured")
-        
+
         token = self._get_access_token()
         if not token:
             return FCMResponse(success=False, error="Failed to get access token")
@@ -146,7 +145,7 @@ class FCMService:
                 response = await client.post(
                     self.fcm_url, json=payload, headers=headers
                 )
-                
+
                 response_data = response.json()
 
                 if response.status_code == 200:
@@ -169,28 +168,28 @@ class FCMService:
 
     async def send_multicast(
         self,
-        device_tokens: List[str],
+        device_tokens: list[str],
         title: str,
         body: str,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Массовая отправка (эмуляция через индивидуальные запросы, т.к. v1 не поддерживает multicast)
         """
         results = []
         sent_count = 0
         failed_count = 0
-        
+
         # Отправляем параллельно
         tasks = [
             self.send_notification(token, title, body, data, **kwargs)
             for token in device_tokens
         ]
-        
+
         # Ограничиваем concurrency если нужно, но пока просто gather
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for i, response in enumerate(responses):
             if isinstance(response, FCMResponse):
                 if response.success:
@@ -202,7 +201,7 @@ class FCMService:
             else:
                 failed_count += 1
                 results.append({"token_index": i, "success": False, "error": str(response)})
-                
+
         return {
             "success": sent_count > 0,
             "sent_count": sent_count,

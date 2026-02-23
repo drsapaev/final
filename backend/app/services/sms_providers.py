@@ -4,15 +4,12 @@ SMS провайдеры для отправки SMS сообщений
 """
 
 import asyncio
-import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
-
-import aiohttp
+from typing import Any
 
 from app.core.config import settings
 
@@ -33,8 +30,8 @@ class SMSMessage:
 
     phone: str
     text: str
-    sender: Optional[str] = None
-    callback_url: Optional[str] = None
+    sender: str | None = None
+    callback_url: str | None = None
 
 
 @dataclass
@@ -42,17 +39,17 @@ class SMSResponse:
     """Ответ от SMS провайдера"""
 
     success: bool
-    message_id: Optional[str] = None
-    error: Optional[str] = None
-    provider: Optional[str] = None
-    cost: Optional[float] = None
-    status: Optional[str] = None
+    message_id: str | None = None
+    error: str | None = None
+    provider: str | None = None
+    cost: float | None = None
+    status: str | None = None
 
 
 class BaseSMSProvider(ABC):
     """Базовый класс для SMS провайдеров"""
 
-    def __init__(self, api_key: str, api_secret: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, api_secret: str | None = None, **kwargs):
         self.api_key = api_key
         self.api_secret = api_secret
         self.base_url = kwargs.get('base_url', '')
@@ -65,12 +62,12 @@ class BaseSMSProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_balance(self) -> Dict[str, Any]:
+    async def get_balance(self) -> dict[str, Any]:
         """Получить баланс аккаунта"""
         pass
 
     @abstractmethod
-    async def get_message_status(self, message_id: str) -> Dict[str, Any]:
+    async def get_message_status(self, message_id: str) -> dict[str, Any]:
         """Получить статус сообщения"""
         pass
 
@@ -101,7 +98,7 @@ class EskizSMSProvider(BaseSMSProvider):
                 response = await client.post(
                     f"{self.base_url}/auth/login", json=auth_data, timeout=self.timeout
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     self.auth_token = data.get("data", {}).get("token")
@@ -162,7 +159,7 @@ class EskizSMSProvider(BaseSMSProvider):
             logger.error(f"Eskiz SMS error: {str(e)}")
             return SMSResponse(success=False, error=str(e), provider="eskiz")
 
-    async def get_balance(self) -> Dict[str, Any]:
+    async def get_balance(self) -> dict[str, Any]:
         """Получить баланс Eskiz"""
         try:
             token = await self._get_auth_token()
@@ -176,7 +173,7 @@ class EskizSMSProvider(BaseSMSProvider):
                     headers=headers,
                     timeout=self.timeout,
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     return {
@@ -195,7 +192,7 @@ class EskizSMSProvider(BaseSMSProvider):
         except Exception as e:
             return {"success": False, "error": str(e), "provider": "eskiz"}
 
-    async def get_message_status(self, message_id: str) -> Dict[str, Any]:
+    async def get_message_status(self, message_id: str) -> dict[str, Any]:
         """Получить статус сообщения Eskiz"""
         try:
             token = await self._get_auth_token()
@@ -209,7 +206,7 @@ class EskizSMSProvider(BaseSMSProvider):
                     headers=headers,
                     timeout=self.timeout,
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     return {
@@ -289,7 +286,7 @@ class PlayMobileSMSProvider(BaseSMSProvider):
             logger.error(f"PlayMobile SMS error: {str(e)}")
             return SMSResponse(success=False, error=str(e), provider="playmobile")
 
-    async def get_balance(self) -> Dict[str, Any]:
+    async def get_balance(self) -> dict[str, Any]:
         """Получить баланс PlayMobile"""
         try:
             headers = {
@@ -302,7 +299,7 @@ class PlayMobileSMSProvider(BaseSMSProvider):
                 response = await client.get(
                     f"{self.base_url}/v1/balance", headers=headers, timeout=self.timeout
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     return {
@@ -321,7 +318,7 @@ class PlayMobileSMSProvider(BaseSMSProvider):
         except Exception as e:
             return {"success": False, "error": str(e), "provider": "playmobile"}
 
-    async def get_message_status(self, message_id: str) -> Dict[str, Any]:
+    async def get_message_status(self, message_id: str) -> dict[str, Any]:
         """Получить статус сообщения PlayMobile"""
         try:
             headers = {
@@ -339,7 +336,7 @@ class PlayMobileSMSProvider(BaseSMSProvider):
                     params=params,
                     timeout=self.timeout,
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     return {
@@ -376,11 +373,11 @@ class MockSMSProvider(BaseSMSProvider):
             status="sent",
         )
 
-    async def get_balance(self) -> Dict[str, Any]:
+    async def get_balance(self) -> dict[str, Any]:
         """Имитация получения баланса"""
         return {"success": True, "balance": 1000, "currency": "SMS", "provider": "mock"}
 
-    async def get_message_status(self, message_id: str) -> Dict[str, Any]:
+    async def get_message_status(self, message_id: str) -> dict[str, Any]:
         """Имитация получения статуса"""
         return {"success": True, "status": "delivered", "provider": "mock"}
 
@@ -389,8 +386,8 @@ class SMSManager:
     """Менеджер для работы с SMS провайдерами"""
 
     def __init__(self):
-        self.providers: Dict[SMSProviderType, BaseSMSProvider] = {}
-        self.default_provider: Optional[SMSProviderType] = None
+        self.providers: dict[SMSProviderType, BaseSMSProvider] = {}
+        self.default_provider: SMSProviderType | None = None
         self._initialize_providers()
 
     def _initialize_providers(self):
@@ -435,8 +432,8 @@ class SMSManager:
         logger.info(f"SMS Manager initialized with {len(self.providers)} providers")
 
     def get_provider(
-        self, provider_type: Optional[SMSProviderType] = None
-    ) -> Optional[BaseSMSProvider]:
+        self, provider_type: SMSProviderType | None = None
+    ) -> BaseSMSProvider | None:
         """Получить провайдер по типу или default"""
         if provider_type:
             return self.providers.get(provider_type)
@@ -448,8 +445,8 @@ class SMSManager:
         self,
         phone: str,
         text: str,
-        provider_type: Optional[SMSProviderType] = None,
-        sender: Optional[str] = None,
+        provider_type: SMSProviderType | None = None,
+        sender: str | None = None,
     ) -> SMSResponse:
         """Отправить SMS сообщение"""
         provider = self.get_provider(provider_type)
@@ -463,20 +460,20 @@ class SMSManager:
         return await provider.send_sms(message)
 
     async def send_2fa_code(
-        self, phone: str, code: str, provider_type: Optional[SMSProviderType] = None
+        self, phone: str, code: str, provider_type: SMSProviderType | None = None
     ) -> SMSResponse:
         """Отправить код 2FA по SMS"""
         text = f"Ваш код подтверждения: {code}. Код действителен 5 минут. Никому не сообщайте этот код."
 
         return await self.send_sms(phone=phone, text=text, provider_type=provider_type)
 
-    def get_available_providers(self) -> List[str]:
+    def get_available_providers(self) -> list[str]:
         """Получить список доступных провайдеров"""
         return [p.value for p in self.providers.keys()]
 
     async def get_balance(
-        self, provider_type: Optional[SMSProviderType] = None
-    ) -> Dict[str, Any]:
+        self, provider_type: SMSProviderType | None = None
+    ) -> dict[str, Any]:
         """Получить баланс провайдера"""
         provider = self.get_provider(provider_type)
         if not provider:

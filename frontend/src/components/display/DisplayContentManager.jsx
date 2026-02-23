@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Image,
   Video,
@@ -9,10 +9,10 @@ import {
   Eye,
   Upload,
   Play,
-  Pause,
-  Volume2,
-  Monitor
-} from 'lucide-react';
+
+
+  Monitor } from
+'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
 
 import logger from '../../utils/logger';
@@ -23,7 +23,6 @@ import tokenManager from '../../utils/tokenManager';
  */
 const DisplayContentManager = ({
   boardId,
-  onContentUpdate,
   className = ''
 }) => {
   const [activeTab, setActiveTab] = useState('banners');
@@ -33,21 +32,16 @@ const DisplayContentManager = ({
     videos: [],
     themes: []
   });
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [uploadDialog, setUploadDialog] = useState({ open: false, type: '' });
 
   const contentTabs = [
-    { id: 'banners', label: 'Баннеры', icon: Image, color: 'text-blue-600' },
-    { id: 'announcements', label: 'Объявления', icon: FileText, color: 'text-green-600' },
-    { id: 'videos', label: 'Видео', icon: Video, color: 'text-purple-600' },
-    { id: 'themes', label: 'Темы', icon: Monitor, color: 'text-gray-600' }
-  ];
+  { id: 'banners', label: 'Баннеры', icon: Image, color: 'text-blue-600' },
+  { id: 'announcements', label: 'Объявления', icon: FileText, color: 'text-green-600' },
+  { id: 'videos', label: 'Видео', icon: Video, color: 'text-purple-600' },
+  { id: 'themes', label: 'Темы', icon: Monitor, color: 'text-gray-600' }];
 
-  useEffect(() => {
-    loadContent();
-  }, [boardId]);
-
-  const loadContent = async () => {
+  const loadContent = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -65,31 +59,35 @@ const DisplayContentManager = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [boardId]);
 
-  const handleFileUpload = async (file, contentType) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('content_type', contentType);
-      formData.append('board_id', boardId);
+  useEffect(() => {
+    loadContent();
+  }, [loadContent]);
 
-      const response = await fetch('/api/v1/admin/display-boards/content/upload', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` },
-        body: formData
-      });
 
-      if (response.ok) {
-        await loadContent();
-        setUploadDialog({ open: false, type: '' });
-      }
-    } catch (error) {
-      logger.error('Ошибка загрузки файла:', error);
-    }
-  };
 
-  const handleDeleteContent = async (contentId, contentType) => {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const handleDeleteContent = async (contentId) => {
     try {
       const response = await fetch(`/api/v1/admin/display-boards/content/${contentId}`, {
         method: 'DELETE',
@@ -104,8 +102,8 @@ const DisplayContentManager = ({
     }
   };
 
-  const renderBannersTab = () => (
-    <div className="space-y-4">
+  const renderBannersTab = () =>
+  <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Баннеры и изображения</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'banner' })}>
@@ -115,18 +113,18 @@ const DisplayContentManager = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {content.banners.map(banner => (
-          <Card key={banner.id} className="overflow-hidden">
+        {content.banners.map((banner) =>
+      <Card key={banner.id} className="overflow-hidden">
             <div className="aspect-video bg-gray-100 flex items-center justify-center">
-              {banner.file_url ? (
-                <img
-                  src={banner.file_url}
-                  alt={banner.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Image size={48} className="text-gray-400" />
-              )}
+              {banner.file_url ?
+          <img
+            src={banner.file_url}
+            alt={banner.title}
+            className="w-full h-full object-cover" /> :
+
+
+          <Image size={48} className="text-gray-400" />
+          }
             </div>
             <div className="p-3">
               <div className="font-medium text-sm mb-1">{banner.title}</div>
@@ -143,23 +141,23 @@ const DisplayContentManager = ({
                     <Edit size={12} />
                   </Button>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDeleteContent(banner.id, 'banner')}
-                  >
+                size="sm"
+                variant="outline"
+                onClick={() => handleDeleteContent(banner.id, 'banner')}>
+                
                     <Trash2 size={12} />
                   </Button>
                 </div>
               </div>
             </div>
           </Card>
-        ))}
+      )}
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderAnnouncementsTab = () => (
-    <div className="space-y-4">
+
+  const renderAnnouncementsTab = () =>
+  <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Текстовые объявления</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'announcement' })}>
@@ -169,22 +167,22 @@ const DisplayContentManager = ({
       </div>
 
       <div className="space-y-3">
-        {content.announcements.map(announcement => (
-          <Card key={announcement.id} className="p-4">
+        {content.announcements.map((announcement) =>
+      <Card key={announcement.id} className="p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="font-medium mb-2">{announcement.title}</div>
                 <div className="text-gray-600 text-sm mb-3">{announcement.text}</div>
                 <div className="flex items-center space-x-3">
                   <Badge
-                    variant={
-                      announcement.priority === 'high' ? 'error' :
-                        announcement.priority === 'medium' ? 'warning' : 'info'
-                    }
-                    size="sm"
-                  >
+                variant={
+                announcement.priority === 'high' ? 'error' :
+                announcement.priority === 'medium' ? 'warning' : 'info'
+                }
+                size="sm">
+                
                     {announcement.priority === 'high' ? 'Важное' :
-                      announcement.priority === 'medium' ? 'Среднее' : 'Обычное'}
+                announcement.priority === 'medium' ? 'Среднее' : 'Обычное'}
                   </Badge>
                   <span className="text-xs text-gray-500">
                     Создано: {new Date(announcement.created_at).toLocaleDateString('ru-RU')}
@@ -196,22 +194,22 @@ const DisplayContentManager = ({
                   <Edit size={14} />
                 </Button>
                 <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDeleteContent(announcement.id, 'announcement')}
-                >
+              size="sm"
+              variant="outline"
+              onClick={() => handleDeleteContent(announcement.id, 'announcement')}>
+              
                   <Trash2 size={14} />
                 </Button>
               </div>
             </div>
           </Card>
-        ))}
+      )}
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderVideosTab = () => (
-    <div className="space-y-4">
+
+  const renderVideosTab = () =>
+  <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Видео контент</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'video' })}>
@@ -221,18 +219,18 @@ const DisplayContentManager = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {content.videos.map(video => (
-          <Card key={video.id} className="overflow-hidden">
+        {content.videos.map((video) =>
+      <Card key={video.id} className="overflow-hidden">
             <div className="aspect-video bg-gray-900 flex items-center justify-center relative">
-              {video.thumbnail_url ? (
-                <img
-                  src={video.thumbnail_url}
-                  alt={video.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Video size={48} className="text-gray-400" />
-              )}
+              {video.thumbnail_url ?
+          <img
+            src={video.thumbnail_url}
+            alt={video.title}
+            className="w-full h-full object-cover" /> :
+
+
+          <Video size={48} className="text-gray-400" />
+          }
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                 <Play size={32} className="text-white" />
               </div>
@@ -254,45 +252,45 @@ const DisplayContentManager = ({
                     <Edit size={12} />
                   </Button>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDeleteContent(video.id, 'video')}
-                  >
+                size="sm"
+                variant="outline"
+                onClick={() => handleDeleteContent(video.id, 'video')}>
+                
                     <Trash2 size={12} />
                   </Button>
                 </div>
               </div>
             </div>
           </Card>
-        ))}
+      )}
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderThemesTab = () => (
-    <div className="space-y-4">
+
+  const renderThemesTab = () =>
+  <div className="space-y-4">
       <h3 className="text-lg font-medium">Темы оформления</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { id: 'light', name: 'Светлая', preview: '#f8fafc' },
-          { id: 'dark', name: 'Темная', preview: '#1a202c' },
-          { id: 'medical', name: 'Медицинская', preview: '#f0fff4' }
-        ].map(theme => (
-          <Card key={theme.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+      { id: 'light', name: 'Светлая', preview: '#f8fafc' },
+      { id: 'dark', name: 'Темная', preview: '#1a202c' },
+      { id: 'medical', name: 'Медицинская', preview: '#f0fff4' }].
+      map((theme) =>
+      <Card key={theme.id} className="cursor-pointer hover:shadow-lg transition-shadow">
             <div
-              className="h-24 rounded-t-lg"
-              style={{ background: theme.preview }}
-            />
+          className="h-24 rounded-t-lg"
+          style={{ background: theme.preview }} />
+        
             <div className="p-3">
               <div className="font-medium">{theme.name}</div>
               <div className="text-sm text-gray-500">Тема {theme.id}</div>
             </div>
           </Card>
-        ))}
+      )}
       </div>
-    </div>
-  );
+    </div>;
+
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -306,23 +304,23 @@ const DisplayContentManager = ({
 
       {/* Вкладки */}
       <div className="flex space-x-1 border-b border-gray-200">
-        {contentTabs.map(tab => {
+        {contentTabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const TabIcon = tab.icon;
 
           return (
             <button
               key={tab.id}
-              className={`flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${isActive
-                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-700'
-                }`}
-              onClick={() => setActiveTab(tab.id)}
-            >
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${isActive ?
+              'bg-blue-50 text-blue-700 border-b-2 border-blue-500' :
+              'text-gray-500 hover:text-gray-700'}`
+              }
+              onClick={() => setActiveTab(tab.id)}>
+              
               <TabIcon size={16} className="mr-2" />
               {tab.label}
-            </button>
-          );
+            </button>);
+
         })}
       </div>
 
@@ -335,13 +333,13 @@ const DisplayContentManager = ({
       </div>
 
       {/* Диалог загрузки */}
-      {uploadDialog.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {uploadDialog.open &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <div className="p-6">
               <h3 className="text-lg font-medium mb-4">
                 Загрузить {uploadDialog.type === 'banner' ? 'баннер' :
-                  uploadDialog.type === 'video' ? 'видео' : 'контент'}
+              uploadDialog.type === 'video' ? 'видео' : 'контент'}
               </h3>
 
               <div className="space-y-4">
@@ -350,10 +348,10 @@ const DisplayContentManager = ({
                     Название:
                   </label>
                   <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Введите название..."
-                  />
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Введите название..." />
+                
                 </div>
 
                 <div>
@@ -361,24 +359,24 @@ const DisplayContentManager = ({
                     Файл:
                   </label>
                   <input
-                    type="file"
-                    accept={
-                      uploadDialog.type === 'banner' ? 'image/*' :
-                        uploadDialog.type === 'video' ? 'video/*' : '*/*'
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  type="file"
+                  accept={
+                  uploadDialog.type === 'banner' ? 'image/*' :
+                  uploadDialog.type === 'video' ? 'video/*' : '*/*'
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                
                 </div>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">
                 <Button
-                  variant="outline"
-                  onClick={() => setUploadDialog({ open: false, type: '' })}
-                >
+                variant="outline"
+                onClick={() => setUploadDialog({ open: false, type: '' })}>
+                
                   Отменить
                 </Button>
-                <Button onClick={() => {/* Логика загрузки */ }}>
+                <Button onClick={() => {/* Логика загрузки */}}>
                   <Upload size={16} className="mr-2" />
                   Загрузить
                 </Button>
@@ -386,11 +384,9 @@ const DisplayContentManager = ({
             </div>
           </Card>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default DisplayContentManager;
-
-

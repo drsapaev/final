@@ -64,7 +64,10 @@ async def get_telegram_bot_stats(
         ) from e
 
 
-@router.post("/send-notification")
+@router.post(
+    "/send-notification",
+    operation_id="telegram_bot_management_send_notification",
+)
 async def send_telegram_notification(
     request: TelegramNotificationRequest,
     current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),

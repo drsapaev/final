@@ -2,19 +2,16 @@
 Сервис для управления скидками и льготами
 """
 
-import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.models.appointment import Appointment
 from app.models.discount_benefits import (
     Benefit,
     BenefitApplication,
-    BenefitType,
     Discount,
     DiscountApplication,
     DiscountService,
@@ -24,9 +21,6 @@ from app.models.discount_benefits import (
     PatientBenefit,
     PatientLoyalty,
 )
-from app.models.patient import Patient
-from app.models.service import Service
-from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +34,7 @@ class DiscountBenefitsService:
     # === СКИДКИ ===
 
     def create_discount(
-        self, discount_data: Dict[str, Any], created_by: int
+        self, discount_data: dict[str, Any], created_by: int
     ) -> Discount:
         """Создать скидку"""
         discount = Discount(**discount_data, created_by=created_by)
@@ -50,8 +44,8 @@ class DiscountBenefitsService:
         return discount
 
     def get_active_discounts(
-        self, service_ids: Optional[List[int]] = None
-    ) -> List[Discount]:
+        self, service_ids: list[int] | None = None
+    ) -> list[Discount]:
         """Получить активные скидки"""
         query = self.db.query(Discount).filter(
             Discount.is_active == True,
@@ -102,9 +96,9 @@ class DiscountBenefitsService:
         self,
         discount_id: int,
         amount: float,
-        appointment_id: Optional[int] = None,
-        visit_id: Optional[int] = None,
-        invoice_id: Optional[int] = None,
+        appointment_id: int | None = None,
+        visit_id: int | None = None,
+        invoice_id: int | None = None,
         applied_by: int = None,
     ) -> DiscountApplication:
         """Применить скидку"""
@@ -137,7 +131,7 @@ class DiscountBenefitsService:
 
     # === ЛЬГОТЫ ===
 
-    def create_benefit(self, benefit_data: Dict[str, Any], created_by: int) -> Benefit:
+    def create_benefit(self, benefit_data: dict[str, Any], created_by: int) -> Benefit:
         """Создать льготу"""
         benefit = Benefit(**benefit_data, created_by=created_by)
         self.db.add(benefit)
@@ -149,7 +143,7 @@ class DiscountBenefitsService:
         self,
         patient_id: int,
         benefit_id: int,
-        document_data: Dict[str, Any],
+        document_data: dict[str, Any],
         created_by: int,
     ) -> PatientBenefit:
         """Назначить льготу пациенту"""
@@ -169,7 +163,7 @@ class DiscountBenefitsService:
         return patient_benefit
 
     def verify_patient_benefit(
-        self, patient_benefit_id: int, verified_by: int, notes: Optional[str] = None
+        self, patient_benefit_id: int, verified_by: int, notes: str | None = None
     ) -> PatientBenefit:
         """Верифицировать льготу пациента"""
         patient_benefit = (
@@ -193,7 +187,7 @@ class DiscountBenefitsService:
 
     def get_patient_benefits(
         self, patient_id: int, active_only: bool = True
-    ) -> List[PatientBenefit]:
+    ) -> list[PatientBenefit]:
         """Получить льготы пациента"""
         query = self.db.query(PatientBenefit).filter(
             PatientBenefit.patient_id == patient_id
@@ -257,9 +251,9 @@ class DiscountBenefitsService:
         self,
         patient_benefit_id: int,
         amount: float,
-        appointment_id: Optional[int] = None,
-        visit_id: Optional[int] = None,
-        invoice_id: Optional[int] = None,
+        appointment_id: int | None = None,
+        visit_id: int | None = None,
+        invoice_id: int | None = None,
         applied_by: int = None,
     ) -> BenefitApplication:
         """Применить льготу"""
@@ -339,7 +333,7 @@ class DiscountBenefitsService:
     # === ПРОГРАММА ЛОЯЛЬНОСТИ ===
 
     def create_loyalty_program(
-        self, program_data: Dict[str, Any], created_by: int
+        self, program_data: dict[str, Any], created_by: int
     ) -> LoyaltyProgram:
         """Создать программу лояльности"""
         program = LoyaltyProgram(**program_data, created_by=created_by)
@@ -378,10 +372,10 @@ class DiscountBenefitsService:
         patient_id: int,
         program_id: int,
         amount: float,
-        appointment_id: Optional[int] = None,
-        visit_id: Optional[int] = None,
-        invoice_id: Optional[int] = None,
-        created_by: Optional[int] = None,
+        appointment_id: int | None = None,
+        visit_id: int | None = None,
+        invoice_id: int | None = None,
+        created_by: int | None = None,
     ) -> int:
         """Начислить баллы лояльности"""
         program = (
@@ -440,10 +434,10 @@ class DiscountBenefitsService:
         patient_id: int,
         program_id: int,
         points: int,
-        appointment_id: Optional[int] = None,
-        visit_id: Optional[int] = None,
-        invoice_id: Optional[int] = None,
-        created_by: Optional[int] = None,
+        appointment_id: int | None = None,
+        visit_id: int | None = None,
+        invoice_id: int | None = None,
+        created_by: int | None = None,
     ) -> float:
         """Списать баллы лояльности"""
         program = (
@@ -519,8 +513,8 @@ class DiscountBenefitsService:
     # === КОМПЛЕКСНОЕ ПРИМЕНЕНИЕ ===
 
     def calculate_total_discount(
-        self, patient_id: int, service_ids: List[int], amount: float
-    ) -> Dict[str, Any]:
+        self, patient_id: int, service_ids: list[int], amount: float
+    ) -> dict[str, Any]:
         """Рассчитать общую скидку для пациента"""
         result = {
             'original_amount': amount,
@@ -600,8 +594,8 @@ class DiscountBenefitsService:
     # === АНАЛИТИКА ===
 
     def get_discount_analytics(
-        self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
-    ) -> Dict[str, Any]:
+        self, start_date: datetime | None = None, end_date: datetime | None = None
+    ) -> dict[str, Any]:
         """Получить аналитику по скидкам"""
         query = self.db.query(DiscountApplication)
 
@@ -644,8 +638,8 @@ class DiscountBenefitsService:
         }
 
     def get_benefit_analytics(
-        self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
-    ) -> Dict[str, Any]:
+        self, start_date: datetime | None = None, end_date: datetime | None = None
+    ) -> dict[str, Any]:
         """Получить аналитику по льготам"""
         query = self.db.query(BenefitApplication)
 
@@ -687,7 +681,7 @@ class DiscountBenefitsService:
             'benefit_types': benefit_types,
         }
 
-    def get_loyalty_analytics(self, program_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_loyalty_analytics(self, program_id: int | None = None) -> dict[str, Any]:
         """Получить аналитику по программе лояльности"""
         query = self.db.query(PatientLoyalty)
 

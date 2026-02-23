@@ -2,13 +2,12 @@
 CRUD операции для управления клиникой в админ панели
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
-from app.models.service import Service
 from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsUpdate,
@@ -23,12 +22,12 @@ from app.schemas.clinic import (
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
 
-def get_settings_by_category(db: Session, category: str) -> List[ClinicSettings]:
+def get_settings_by_category(db: Session, category: str) -> list[ClinicSettings]:
     """Получить настройки по категории"""
     return db.query(ClinicSettings).filter(ClinicSettings.category == category).all()
 
 
-def get_setting_by_key(db: Session, key: str) -> Optional[ClinicSettings]:
+def get_setting_by_key(db: Session, key: str) -> ClinicSettings | None:
     """Получить настройку по ключу"""
     return db.query(ClinicSettings).filter(ClinicSettings.key == key).first()
 
@@ -46,7 +45,7 @@ def create_setting(
 
 def update_setting(
     db: Session, key: str, setting: ClinicSettingsUpdate, user_id: int
-) -> Optional[ClinicSettings]:
+) -> ClinicSettings | None:
     """Обновить настройку"""
     db_setting = get_setting_by_key(db, key)
     if not db_setting:
@@ -62,8 +61,8 @@ def update_setting(
 
 
 def update_settings_batch(
-    db: Session, category: str, settings: Dict[str, Any], user_id: int
-) -> List[ClinicSettings]:
+    db: Session, category: str, settings: dict[str, Any], user_id: int
+) -> list[ClinicSettings]:
     """Массовое обновление настроек"""
     updated_settings = []
 
@@ -96,7 +95,7 @@ def update_settings_batch(
 
 def get_doctors(
     db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
-) -> List[Doctor]:
+) -> list[Doctor]:
     """Получить список врачей"""
     query = db.query(Doctor)
 
@@ -106,17 +105,17 @@ def get_doctors(
     return query.offset(skip).limit(limit).all()
 
 
-def get_doctor_by_id(db: Session, doctor_id: int) -> Optional[Doctor]:
+def get_doctor_by_id(db: Session, doctor_id: int) -> Doctor | None:
     """Получить врача по ID"""
     return db.query(Doctor).filter(Doctor.id == doctor_id).first()
 
 
-def get_doctor_by_user_id(db: Session, user_id: int) -> Optional[Doctor]:
+def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
     """Получить врача по ID пользователя"""
     return db.query(Doctor).filter(Doctor.user_id == user_id).first()
 
 
-def get_doctors_by_specialty(db: Session, specialty: str) -> List[Doctor]:
+def get_doctors_by_specialty(db: Session, specialty: str) -> list[Doctor]:
     """Получить врачей по специальности"""
     return (
         db.query(Doctor)
@@ -136,7 +135,7 @@ def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
 
 def update_doctor(
     db: Session, doctor_id: int, doctor: DoctorUpdate
-) -> Optional[Doctor]:
+) -> Doctor | None:
     """Обновить врача"""
     db_doctor = get_doctor_by_id(db, doctor_id)
     if not db_doctor:
@@ -164,7 +163,7 @@ def delete_doctor(db: Session, doctor_id: int) -> bool:
 # ===================== РАСПИСАНИЯ =====================
 
 
-def get_doctor_schedules(db: Session, doctor_id: int) -> List[Schedule]:
+def get_doctor_schedules(db: Session, doctor_id: int) -> list[Schedule]:
     """Получить расписание врача"""
     return (
         db.query(Schedule)
@@ -185,7 +184,7 @@ def create_schedule(db: Session, schedule: ScheduleCreate) -> Schedule:
 
 def update_schedule(
     db: Session, schedule_id: int, schedule: ScheduleUpdate
-) -> Optional[Schedule]:
+) -> Schedule | None:
     """Обновить расписание"""
     db_schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if not db_schedule:
@@ -200,8 +199,8 @@ def update_schedule(
 
 
 def update_weekly_schedule(
-    db: Session, doctor_id: int, schedules: List[Dict]
-) -> List[Schedule]:
+    db: Session, doctor_id: int, schedules: list[dict]
+) -> list[Schedule]:
     """Обновить недельное расписание врача"""
     # Деактивируем старые расписания
     db.query(Schedule).filter(Schedule.doctor_id == doctor_id).update({"active": False})
@@ -235,8 +234,8 @@ def delete_schedule(db: Session, schedule_id: int) -> bool:
 
 
 def get_service_categories(
-    db: Session, specialty: Optional[str] = None, active_only: bool = True
-) -> List[ServiceCategory]:
+    db: Session, specialty: str | None = None, active_only: bool = True
+) -> list[ServiceCategory]:
     """Получить категории услуг"""
     query = db.query(ServiceCategory)
 
@@ -251,12 +250,12 @@ def get_service_categories(
 
 def get_service_category_by_id(
     db: Session, category_id: int
-) -> Optional[ServiceCategory]:
+) -> ServiceCategory | None:
     """Получить категорию по ID"""
     return db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
 
 
-def get_service_category_by_code(db: Session, code: str) -> Optional[ServiceCategory]:
+def get_service_category_by_code(db: Session, code: str) -> ServiceCategory | None:
     """Получить категорию по коду"""
     return db.query(ServiceCategory).filter(ServiceCategory.code == code).first()
 
@@ -274,7 +273,7 @@ def create_service_category(
 
 def update_service_category(
     db: Session, category_id: int, category: ServiceCategoryUpdate
-) -> Optional[ServiceCategory]:
+) -> ServiceCategory | None:
     """Обновить категорию услуг"""
     db_category = get_service_category_by_id(db, category_id)
     if not db_category:
@@ -302,7 +301,7 @@ def delete_service_category(db: Session, category_id: int) -> bool:
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
-def get_queue_settings(db: Session) -> Dict[str, Any]:
+def get_queue_settings(db: Session) -> dict[str, Any]:
     """Получить настройки очередей"""
     settings = get_settings_by_category(db, "queue")
 
@@ -332,8 +331,8 @@ def get_queue_settings(db: Session) -> Dict[str, Any]:
 
 
 def update_queue_settings(
-    db: Session, settings: Dict[str, Any], user_id: int
-) -> Dict[str, Any]:
+    db: Session, settings: dict[str, Any], user_id: int
+) -> dict[str, Any]:
     """Обновить настройки очередей"""
     updates = {}
 

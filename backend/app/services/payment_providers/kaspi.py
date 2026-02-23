@@ -8,7 +8,7 @@ import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 import requests
 
@@ -18,7 +18,7 @@ from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 class KaspiProvider(BasePaymentProvider):
     """Провайдер для Kaspi Pay платежной системы"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
 
         # Конфигурация Kaspi
@@ -165,7 +165,7 @@ class KaspiProvider(BasePaymentProvider):
                 success=False, error_message=f"Ошибка проверки статуса Kaspi: {str(e)}"
             )
 
-    def process_webhook(self, webhook_data: Dict[str, Any]) -> PaymentResult:
+    def process_webhook(self, webhook_data: dict[str, Any]) -> PaymentResult:
         """Обработка webhook от Kaspi"""
 
         try:
@@ -285,7 +285,7 @@ class KaspiProvider(BasePaymentProvider):
                 success=False, error_message=f"Ошибка возврата платежа Kaspi: {str(e)}"
             )
 
-    def _generate_signature(self, params: Dict[str, Any]) -> str:
+    def _generate_signature(self, params: dict[str, Any]) -> str:
         """Генерация подписи для параметров"""
 
         # Сортируем параметры по ключу (исключая signature)
@@ -312,7 +312,7 @@ class KaspiProvider(BasePaymentProvider):
         ).hexdigest()
 
     def validate_webhook_signature(
-        self, webhook_data: Dict[str, Any], signature: str
+        self, webhook_data: dict[str, Any], signature: str
     ) -> bool:
         """Валидация подписи webhook"""
 

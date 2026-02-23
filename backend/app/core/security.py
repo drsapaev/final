@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Union
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from jose import jwt
 from passlib.context import CryptContext
@@ -38,11 +38,11 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(
-    subject: Union[str, dict[str, Any]], expires_minutes: Optional[int] = None
+    subject: str | dict[str, Any], expires_minutes: int | None = None
 ) -> str:
     if expires_minutes is None:
         expires_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    expire = datetime.now(UTC) + timedelta(minutes=expires_minutes)
     if isinstance(subject, str):
         to_encode: dict[str, Any] = {"sub": subject, "exp": expire}
     else:
@@ -79,7 +79,7 @@ def require_roles(*roles: str):
     ) -> User:
         # Получаем Request из contextvar (установлен в AuditMiddleware)
         request = get_current_request()
-        
+
         if not roles:
             return current_user
 
@@ -91,13 +91,13 @@ def require_roles(*roles: str):
 
         # Проверяем роль с учетом регистра
         role_lower = str(role).lower() if role else ""
-        
+
         # ✅ ROLE NORMALIZATION: Map 'receptionist' to 'registrar' for compatibility
         # DB stores 'Receptionist' but API endpoints expect 'Registrar'
         role_normalized = role_lower
         if role_normalized == "receptionist":
             role_normalized = "registrar"
-        
+
         allowed_roles_lower = [r.lower() for r in roles]
         # Also add 'receptionist' as allowed if 'registrar' is in allowed roles
         if "registrar" in allowed_roles_lower and "receptionist" not in allowed_roles_lower:
@@ -112,13 +112,13 @@ def require_roles(*roles: str):
             print(f"DEBUG: ACCESS DENIED for user {current_user.username}")
             # ✅ AUDIT LOG: Логируем попытку несанкционированного доступа
             from app.core.audit import log_critical_change
-            
+
             # Извлекаем resource_type из пути (если Request доступен)
             resource_type = None
             resource_id = None
             path_str = "unknown"
             method_str = "UNKNOWN"
-            
+
             if request:
                 path_parts = [p for p in request.url.path.split("/") if p]  # Убираем пустые части
                 path_str = request.url.path
@@ -136,7 +136,7 @@ def require_roles(*roles: str):
                     f"SECURITY: require_roles: request context unavailable for user_id={current_user.id}, "
                     f"roles={roles}, user_role={role}. Audit log may be incomplete."
                 )
-            
+
             # ✅ DEBUG LOG: Explicitly log the mismatch
             import logging
             logger = logging.getLogger(__name__)
@@ -156,7 +156,7 @@ def require_roles(*roles: str):
                     row_id=resource_id,
                     old_data=None,
                     new_data={
-                        "required_roles": list(roles), 
+                        "required_roles": list(roles),
                         "user_role": role,
                         "request_available": request is not None,
                     },
@@ -169,7 +169,7 @@ def require_roles(*roles: str):
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to log ACCESS_DENIED audit: {e}", exc_info=True)
-            
+
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Доступ запрещен. Требуются роли: {', '.join(roles)}",

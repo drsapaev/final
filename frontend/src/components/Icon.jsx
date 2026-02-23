@@ -1,4 +1,3 @@
-import React from 'react';
 import iconsMap from '../assets/iconsMap';
 
 import logger from '../utils/logger';

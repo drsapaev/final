@@ -1,57 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Monitor,
   Palette,
   Image,
-  Video,
+
   Volume2,
-  VolumeX,
+
   Eye,
-  EyeOff,
+
   Users,
   MessageCircle,
-  Settings,
+
   Save,
   RefreshCw,
   AlertCircle,
   CheckCircle,
   TestTube,
-  Upload,
+
   Play,
-  Pause,
+
   Trash2,
   Plus,
-  Edit
-} from 'lucide-react';
-import { Card, Button, Badge } from '../ui/macos';
+  Edit } from
+'lucide-react';
+import { Card, Button } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [boards, setBoards] = useState([]);
+  const [, setBoards] = useState([]);
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [themes, setThemes] = useState([]);
   const [stats, setStats] = useState({});
-  const [banners, setBanners] = useState([]);
-  const [showBannerForm, setShowBannerForm] = useState(false);
+  const [banners] = useState([]);
+  const [, setShowBannerForm] = useState(false);
   const [testResults, setTestResults] = useState({});
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Опции конфиденциальности
   const privacyOptions = [
-    { value: 'full', label: 'Полное ФИО', description: 'Иванов Иван Иванович' },
-    { value: 'initials', label: 'Инициалы', description: 'Иванов И.И.' },
-    { value: 'none', label: 'Только номер', description: 'Номер A007' }
-  ];
+  { value: 'full', label: 'Полное ФИО', description: 'Иванов Иван Иванович' },
+  { value: 'initials', label: 'Инициалы', description: 'Иванов И.И.' },
+  { value: 'none', label: 'Только номер', description: 'Номер A007' }];
+
 
   // Языки озвучки
   const voiceLanguages = [
-    { value: 'ru', label: 'Русский' },
-    { value: 'uz', label: 'O\'zbekcha' },
-    { value: 'en', label: 'English' }
-  ];
+  { value: 'ru', label: 'Русский' },
+  { value: 'uz', label: 'O\'zbekcha' },
+  { value: 'en', label: 'English' }];
+
 
   useEffect(() => {
     loadData();
@@ -63,16 +63,16 @@ const DisplayBoardSettings = () => {
 
       // Загружаем табло, темы и статистику
       const [boardsRes, themesRes, statsRes] = await Promise.all([
-        fetch('/api/v1/admin/display/boards', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        }),
-        fetch('/api/v1/admin/display/themes', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        }),
-        fetch('/api/v1/admin/display/stats', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        })
-      ]);
+      fetch('/api/v1/admin/display/boards', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      }),
+      fetch('/api/v1/admin/display/themes', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      }),
+      fetch('/api/v1/admin/display/stats', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      })]
+      );
 
       if (boardsRes.ok) {
         const boardsData = await boardsRes.json();
@@ -101,7 +101,7 @@ const DisplayBoardSettings = () => {
   };
 
   const handleBoardSettingChange = (key, value) => {
-    setSelectedBoard(prev => ({ ...prev, [key]: value }));
+    setSelectedBoard((prev) => ({ ...prev, [key]: value }));
   };
 
   const saveBoard = async () => {
@@ -138,7 +138,7 @@ const DisplayBoardSettings = () => {
     if (!selectedBoard) return;
 
     try {
-      setTestResults(prev => ({ ...prev, [testType]: { testing: true } }));
+      setTestResults((prev) => ({ ...prev, [testType]: { testing: true } }));
 
       const testData = {
         test_type: testType,
@@ -163,7 +163,7 @@ const DisplayBoardSettings = () => {
 
       if (response.ok) {
         const result = await response.json();
-        setTestResults(prev => ({
+        setTestResults((prev) => ({
           ...prev,
           [testType]: {
             success: true,
@@ -177,7 +177,7 @@ const DisplayBoardSettings = () => {
       }
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
-      setTestResults(prev => ({
+      setTestResults((prev) => ({
         ...prev,
         [testType]: {
           success: false,
@@ -195,8 +195,8 @@ const DisplayBoardSettings = () => {
           <RefreshCw className="animate-spin mr-2" size={20} />
           <span>Загрузка настроек табло...</span>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   if (!selectedBoard) {
@@ -209,8 +209,8 @@ const DisplayBoardSettings = () => {
           </h3>
           <p className="text-gray-500">Создайте первое табло для отображения очереди</p>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
@@ -232,30 +232,30 @@ const DisplayBoardSettings = () => {
             Обновить
           </Button>
           <Button onClick={saveBoard} disabled={saving}>
-            {saving ? (
-              <RefreshCw size={16} className="animate-spin mr-2" />
-            ) : (
-              <Save size={16} className="mr-2" />
-            )}
+            {saving ?
+            <RefreshCw size={16} className="animate-spin mr-2" /> :
+
+            <Save size={16} className="mr-2" />
+            }
             Сохранить
           </Button>
         </div>
       </div>
 
       {/* Сообщения */}
-      {message.text && (
-        <div className={`flex items-center p-4 rounded-lg ${message.type === 'success'
-          ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-          : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-          }`}>
-          {message.type === 'success' ? (
-            <CheckCircle size={20} className="mr-2" />
-          ) : (
-            <AlertCircle size={20} className="mr-2" />
-          )}
+      {message.text &&
+      <div className={`flex items-center p-4 rounded-lg ${message.type === 'success' ?
+      'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
+      'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}`
+      }>
+          {message.type === 'success' ?
+        <CheckCircle size={20} className="mr-2" /> :
+
+        <AlertCircle size={20} className="mr-2" />
+        }
           {message.text}
         </div>
-      )}
+      }
 
       {/* Статистика */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -295,8 +295,8 @@ const DisplayBoardSettings = () => {
                 value={selectedBoard.location || ''}
                 onChange={(e) => handleBoardSettingChange('location', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Зона ожидания, 1 этаж"
-              />
+                placeholder="Зона ожидания, 1 этаж" />
+              
             </div>
 
             <div>
@@ -307,13 +307,13 @@ const DisplayBoardSettings = () => {
               <select
                 value={selectedBoard.theme}
                 onChange={(e) => handleBoardSettingChange('theme', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                {themes.map(theme => (
-                  <option key={theme.id} value={theme.name}>
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                
+                {themes.map((theme) =>
+                <option key={theme.id} value={theme.name}>
                     {theme.display_name}
                   </option>
-                ))}
+                )}
               </select>
             </div>
 
@@ -325,13 +325,13 @@ const DisplayBoardSettings = () => {
               <select
                 value={selectedBoard.show_patient_names}
                 onChange={(e) => handleBoardSettingChange('show_patient_names', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                {privacyOptions.map(option => (
-                  <option key={option.value} value={option.value}>
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                
+                {privacyOptions.map((option) =>
+                <option key={option.value} value={option.value}>
                     {option.label} - {option.description}
                   </option>
-                ))}
+                )}
               </select>
               <p className="text-sm text-gray-500 mt-1">
                 Уровень конфиденциальности для пациентов
@@ -349,8 +349,8 @@ const DisplayBoardSettings = () => {
                 max="20"
                 value={selectedBoard.queue_display_count}
                 onChange={(e) => handleBoardSettingChange('queue_display_count', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+              
               <p className="text-sm text-gray-500 mt-1">
                 Сколько номеров показывать в ожидании
               </p>
@@ -362,8 +362,8 @@ const DisplayBoardSettings = () => {
                   type="checkbox"
                   checked={selectedBoard.show_doctor_photos}
                   onChange={(e) => handleBoardSettingChange('show_doctor_photos', e.target.checked)}
-                  className="mr-2"
-                />
+                  className="mr-2" />
+                
                 <span className="text-sm font-medium">Фото врачей</span>
               </label>
 
@@ -372,8 +372,8 @@ const DisplayBoardSettings = () => {
                   type="checkbox"
                   checked={selectedBoard.show_announcements}
                   onChange={(e) => handleBoardSettingChange('show_announcements', e.target.checked)}
-                  className="mr-2"
-                />
+                  className="mr-2" />
+                
                 <span className="text-sm font-medium">Объявления</span>
               </label>
 
@@ -382,8 +382,8 @@ const DisplayBoardSettings = () => {
                   type="checkbox"
                   checked={selectedBoard.show_banners}
                   onChange={(e) => handleBoardSettingChange('show_banners', e.target.checked)}
-                  className="mr-2"
-                />
+                  className="mr-2" />
+                
                 <span className="text-sm font-medium">Баннеры</span>
               </label>
 
@@ -392,8 +392,8 @@ const DisplayBoardSettings = () => {
                   type="checkbox"
                   checked={selectedBoard.show_videos}
                   onChange={(e) => handleBoardSettingChange('show_videos', e.target.checked)}
-                  className="mr-2"
-                />
+                  className="mr-2" />
+                
                 <span className="text-sm font-medium">Видеоролики</span>
               </label>
             </div>
@@ -418,8 +418,8 @@ const DisplayBoardSettings = () => {
                 max="300"
                 value={selectedBoard.call_display_duration}
                 onChange={(e) => handleBoardSettingChange('call_display_duration', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+              
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -428,8 +428,8 @@ const DisplayBoardSettings = () => {
                   type="checkbox"
                   checked={selectedBoard.sound_enabled}
                   onChange={(e) => handleBoardSettingChange('sound_enabled', e.target.checked)}
-                  className="mr-2"
-                />
+                  className="mr-2" />
+                
                 <span className="text-sm font-medium">Звуковые сигналы</span>
               </label>
 
@@ -438,28 +438,28 @@ const DisplayBoardSettings = () => {
                   type="checkbox"
                   checked={selectedBoard.voice_announcements}
                   onChange={(e) => handleBoardSettingChange('voice_announcements', e.target.checked)}
-                  className="mr-2"
-                />
+                  className="mr-2" />
+                
                 <span className="text-sm font-medium">Голосовые объявления</span>
               </label>
             </div>
 
-            {selectedBoard.voice_announcements && (
-              <>
+            {selectedBoard.voice_announcements &&
+            <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Язык озвучки
                   </label>
                   <select
-                    value={selectedBoard.voice_language}
-                    onChange={(e) => handleBoardSettingChange('voice_language', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  >
-                    {voiceLanguages.map(lang => (
-                      <option key={lang.value} value={lang.value}>
+                  value={selectedBoard.voice_language}
+                  onChange={(e) => handleBoardSettingChange('voice_language', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                  
+                    {voiceLanguages.map((lang) =>
+                  <option key={lang.value} value={lang.value}>
                         {lang.label}
                       </option>
-                    ))}
+                  )}
                   </select>
                 </div>
 
@@ -468,16 +468,16 @@ const DisplayBoardSettings = () => {
                     Громкость: {selectedBoard.volume_level}%
                   </label>
                   <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={selectedBoard.volume_level}
-                    onChange={(e) => handleBoardSettingChange('volume_level', parseInt(e.target.value))}
-                    className="w-full"
-                  />
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={selectedBoard.volume_level}
+                  onChange={(e) => handleBoardSettingChange('volume_level', parseInt(e.target.value))}
+                  className="w-full" />
+                
                 </div>
               </>
-            )}
+            }
           </div>
         </Card>
       </div>
@@ -494,20 +494,20 @@ const DisplayBoardSettings = () => {
             <Button
               onClick={() => testBoard('call')}
               disabled={testResults.call?.testing}
-              className="w-full mb-2"
-            >
-              {testResults.call?.testing ? (
-                <RefreshCw size={16} className="animate-spin mr-2" />
-              ) : (
-                <Play size={16} className="mr-2" />
-              )}
+              className="w-full mb-2">
+              
+              {testResults.call?.testing ?
+              <RefreshCw size={16} className="animate-spin mr-2" /> :
+
+              <Play size={16} className="mr-2" />
+              }
               Тест вызова
             </Button>
-            {testResults.call && !testResults.call.testing && (
-              <div className={`text-sm ${testResults.call.success ? 'text-green-600' : 'text-red-600'}`}>
+            {testResults.call && !testResults.call.testing &&
+            <div className={`text-sm ${testResults.call.success ? 'text-green-600' : 'text-red-600'}`}>
                 {testResults.call.success ? '✅ Успешно' : '❌ Ошибка'}
               </div>
-            )}
+            }
           </div>
 
           <div className="text-center">
@@ -515,28 +515,28 @@ const DisplayBoardSettings = () => {
               onClick={() => testBoard('announcement')}
               disabled={testResults.announcement?.testing}
               className="w-full mb-2"
-              variant="outline"
-            >
-              {testResults.announcement?.testing ? (
-                <RefreshCw size={16} className="animate-spin mr-2" />
-              ) : (
-                <MessageCircle size={16} className="mr-2" />
-              )}
+              variant="outline">
+              
+              {testResults.announcement?.testing ?
+              <RefreshCw size={16} className="animate-spin mr-2" /> :
+
+              <MessageCircle size={16} className="mr-2" />
+              }
               Тест объявления
             </Button>
-            {testResults.announcement && !testResults.announcement.testing && (
-              <div className={`text-sm ${testResults.announcement.success ? 'text-green-600' : 'text-red-600'}`}>
+            {testResults.announcement && !testResults.announcement.testing &&
+            <div className={`text-sm ${testResults.announcement.success ? 'text-green-600' : 'text-red-600'}`}>
                 {testResults.announcement.success ? '✅ Успешно' : '❌ Ошибка'}
               </div>
-            )}
+            }
           </div>
 
           <div className="text-center">
             <Button
               onClick={() => window.open('/display?board=main_board', '_blank')}
               className="w-full mb-2"
-              variant="outline"
-            >
+              variant="outline">
+              
               <Eye size={16} className="mr-2" />
               Открыть табло
             </Button>
@@ -563,22 +563,22 @@ const DisplayBoardSettings = () => {
           </div>
 
           <div className="space-y-3">
-            {banners.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+            {banners.length === 0 ?
+            <div className="text-center py-8 text-gray-500">
                 <Image size={32} className="mx-auto mb-2 opacity-50" />
                 <p>Баннеры не добавлены</p>
-              </div>
-            ) : (
-              banners.map(banner => (
-                <div key={banner.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg dark:border-gray-700">
+              </div> :
+
+            banners.map((banner) =>
+            <div key={banner.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg dark:border-gray-700">
                   <div className="flex items-center">
-                    {banner.image_url && (
-                      <img
-                        src={banner.image_url}
-                        alt={banner.title}
-                        className="w-12 h-8 object-cover rounded mr-3"
-                      />
-                    )}
+                    {banner.image_url &&
+                <img
+                  src={banner.image_url}
+                  alt={banner.title}
+                  className="w-12 h-8 object-cover rounded mr-3" />
+
+                }
                     <div>
                       <div className="font-medium">{banner.title}</div>
                       <div className="text-sm text-gray-500">{banner.description}</div>
@@ -593,8 +593,8 @@ const DisplayBoardSettings = () => {
                     </Button>
                   </div>
                 </div>
-              ))
-            )}
+            )
+            }
           </div>
         </Card>
 
@@ -634,9 +634,8 @@ const DisplayBoardSettings = () => {
           <p>• Голосовые объявления поддерживают несколько языков</p>
         </div>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default DisplayBoardSettings;
-

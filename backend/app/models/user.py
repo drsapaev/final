@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -9,57 +9,78 @@ from sqlalchemy.sql import func
 from app.db.base_class import Base
 from app.models.role_permission import user_groups_table, user_roles_table
 
+if TYPE_CHECKING:
+    from app.models.authentication import (
+        EmailVerificationToken,
+        LoginAttempt,
+        PasswordResetToken,
+        RefreshToken,
+        SecurityEvent,
+        UserActivity,
+        UserSession,
+    )
+    from app.models.doctor_templates import DoctorTreatmentTemplate
+    from app.models.patient import Patient
+    from app.models.role_permission import Role, UserGroup, UserPermissionOverride
+    from app.models.two_factor_auth import TwoFactorAuth
+    from app.models.user_profile import (
+        UserAuditLog,
+        UserNotificationSettings,
+        UserPreferences,
+        UserProfile,
+    )
+
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    full_name: Mapped[Optional[str]] = mapped_column(String(100), default=None)
-    email: Mapped[Optional[str]] = mapped_column(String(120), default=None)
+    full_name: Mapped[str | None] = mapped_column(String(100), default=None)
+    email: Mapped[str | None] = mapped_column(String(120), default=None)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="Admin")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     # Требуется смена пароля при следующем входе
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # FCM Device Token for Push Notifications
-    device_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    device_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Метаданные
-    created_at: Mapped[Optional[DateTime]] = mapped_column(
+    created_at: Mapped[DateTime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    updated_at: Mapped[Optional[DateTime]] = mapped_column(
+    updated_at: Mapped[DateTime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # 2FA связи
-    two_factor_auth: Mapped[Optional["TwoFactorAuth"]] = relationship(
+    two_factor_auth: Mapped[TwoFactorAuth | None] = relationship(
         "TwoFactorAuth", back_populates="user", uselist=False
     )
 
     # Аутентификация связи
-    refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
-    user_sessions: Mapped[List["UserSession"]] = relationship(
+    user_sessions: Mapped[list[UserSession]] = relationship(
         "UserSession", back_populates="user", cascade="all, delete-orphan"
     )
-    password_reset_tokens: Mapped[List["PasswordResetToken"]] = relationship(
+    password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
         "PasswordResetToken", back_populates="user", cascade="all, delete-orphan"
     )
-    email_verification_tokens: Mapped[List["EmailVerificationToken"]] = relationship(
+    email_verification_tokens: Mapped[list[EmailVerificationToken]] = relationship(
         "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan"
     )
-    login_attempts: Mapped[List["LoginAttempt"]] = relationship(
+    login_attempts: Mapped[list[LoginAttempt]] = relationship(
         "LoginAttempt", back_populates="user", cascade="all, delete-orphan"
     )
-    user_activities: Mapped[List["UserActivity"]] = relationship(
+    user_activities: Mapped[list[UserActivity]] = relationship(
         "UserActivity", back_populates="user", cascade="all, delete-orphan"
     )
-    security_events: Mapped[List["SecurityEvent"]] = relationship(
+    security_events: Mapped[list[SecurityEvent]] = relationship(
         "SecurityEvent",
         foreign_keys="SecurityEvent.user_id",
         back_populates="user",
@@ -67,19 +88,19 @@ class User(Base):
     )
 
     # Профиль и настройки
-    profile: Mapped[Optional["UserProfile"]] = relationship(
+    profile: Mapped[UserProfile | None] = relationship(
         "UserProfile",
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
     )
-    preferences: Mapped[Optional["UserPreferences"]] = relationship(
+    preferences: Mapped[UserPreferences | None] = relationship(
         "UserPreferences",
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
     )
-    notification_settings: Mapped[Optional["UserNotificationSettings"]] = relationship(
+    notification_settings: Mapped[UserNotificationSettings | None] = relationship(
         "UserNotificationSettings",
         back_populates="user",
         uselist=False,
@@ -87,17 +108,17 @@ class User(Base):
     )
 
     # Связь с пациентом
-    patient: Mapped[Optional["Patient"]] = relationship(
-        "Patient", 
-        back_populates="user", 
-        uselist=False, 
+    patient: Mapped[Patient | None] = relationship(
+        "Patient",
+        back_populates="user",
+        uselist=False,
         cascade="all, delete-orphan",
         foreign_keys="Patient.user_id"  # ✅ FIX: Explicit FK to resolve ambiguity with Patient.deleted_by
     )
 
     # Роли и группы (через единые M2M таблицы)
     # passive_deletes=True - let DB handle cascade deletion
-    roles: Mapped[List["Role"]] = relationship(
+    roles: Mapped[list[Role]] = relationship(
         "Role",
         secondary=user_roles_table,
         primaryjoin=lambda: User.id == user_roles_table.c.user_id,
@@ -106,7 +127,7 @@ class User(Base):
         viewonly=True,  # Read-only to avoid conflicts with string role field
         lazy="noload",  # Don't load by default to avoid query errors
     )
-    groups: Mapped[List["UserGroup"]] = relationship(
+    groups: Mapped[list[UserGroup]] = relationship(
         "UserGroup",
         secondary=user_groups_table,
         primaryjoin=lambda: User.id == user_groups_table.c.user_id,
@@ -117,7 +138,7 @@ class User(Base):
     )
 
     # Переопределения разрешений
-    permission_overrides: Mapped[List["UserPermissionOverride"]] = relationship(
+    permission_overrides: Mapped[list[UserPermissionOverride]] = relationship(
         "UserPermissionOverride",
         foreign_keys="UserPermissionOverride.user_id",
         back_populates="user",
@@ -126,12 +147,12 @@ class User(Base):
     # group_memberships: Mapped[List["UserGroupMember"]] = relationship("UserGroupMember", back_populates="user", cascade="all, delete-orphan")  # Временно отключено
 
     # Аудит
-    audit_logs: Mapped[List["UserAuditLog"]] = relationship(
+    audit_logs: Mapped[list[UserAuditLog]] = relationship(
         "UserAuditLog", back_populates="user", cascade="all, delete-orphan"
     )
 
     # Персональная клиническая память врача
-    treatment_templates: Mapped[List["DoctorTreatmentTemplate"]] = relationship(
+    treatment_templates: Mapped[list[DoctorTreatmentTemplate]] = relationship(
         "DoctorTreatmentTemplate",
         back_populates="doctor",
         cascade="all, delete-orphan",

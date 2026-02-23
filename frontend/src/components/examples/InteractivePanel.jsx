@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Button, Badge } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
@@ -200,6 +200,7 @@ export const StateInteractivePanel = ({
 
   return (
     <Card
+      {...props}
       style={{
         padding: getSpacing('lg'),
         borderRadius: '12px',

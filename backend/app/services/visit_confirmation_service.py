@@ -294,7 +294,7 @@ class VisitConfirmationService:
         visit.confirmed_by = confirmed_by
         visit.status = "confirmed"
 
-        queue_numbers: dict[str, Any] = {}
+        queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
         if visit.visit_date == date.today():
             queue_numbers, print_tickets = self._assign_queue_numbers_on_confirmation(visit)
@@ -325,7 +325,7 @@ class VisitConfirmationService:
 
     def _assign_queue_numbers_on_confirmation(
         self, visit
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         visit_services = self.repository.get_visit_services(visit.id)
 
         unique_queue_tags: set[str] = set()
@@ -347,10 +347,10 @@ class VisitConfirmationService:
             if fallback_tag:
                 unique_queue_tags.add(fallback_tag)
             else:
-                return {}, []
+                return [], []
 
         today = date.today()
-        queue_numbers: dict[str, Any] = {}
+        queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
 
         for queue_tag in unique_queue_tags:
@@ -359,6 +359,9 @@ class VisitConfirmationService:
                 visit_doctor = self.repository.get_doctor(visit.doctor_id)
                 if visit_doctor:
                     specialist_user_id = visit_doctor.user_id
+                else:
+                    # Legacy/test compatibility: some flows persisted user_id in visit.doctor_id.
+                    specialist_user_id = visit.doctor_id
 
             if queue_tag == "ecg" and not specialist_user_id:
                 ecg_resource = self.repository.get_active_user_by_username("ecg_resource")
@@ -409,11 +412,13 @@ class VisitConfirmationService:
                 source="confirmation",
             )
 
-            queue_numbers[queue_tag] = {
+            queue_numbers.append(
+                {
                 "queue_tag": queue_tag,
                 "number": next_number,
                 "queue_id": daily_queue.id,
-            }
+                }
+            )
 
             queue_names = {
                 "ecg": "ЭКГ",

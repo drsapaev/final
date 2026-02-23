@@ -2,22 +2,24 @@
  * PaymentTest - Тестовая страница для проверки PaymentWidget
  */
 
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  Alert,
+  Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Button,
-  Box,
-  Alert,
-  Input,
+  Container,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
   Select,
-  Option,
-} from '../components/ui/macos';
-import {
-  CreditCard,
-  TestTube,
-} from 'lucide-react';
+  TextField,
+  Typography,
+} from '@mui/material';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import ScienceIcon from '@mui/icons-material/Science';
 
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { setToken, getToken } from '../api/client';
@@ -32,11 +34,10 @@ const PaymentTest = () => {
     description: 'Тестовая оплата медицинских услуг'
   });
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Проверяем авторизацию при загрузке
-  React.useEffect(() => {
+  useEffect(() => {
     const token = getToken();
     setIsAuthenticated(!!token);
   }, []);
@@ -101,7 +102,7 @@ const PaymentTest = () => {
           } else if (errorData.message) {
             errorMessage = errorData.message;
           }
-        } catch (parseError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -140,7 +141,6 @@ const PaymentTest = () => {
 
   const handlePaymentError = (errorMessage) => {
     logger.error('Payment Error:', errorMessage);
-    setError(errorMessage);
     setResult({
       type: 'error',
       message: errorMessage
@@ -158,7 +158,6 @@ const PaymentTest = () => {
 
   const startTest = () => {
     setResult(null);
-    setError(null);
     setShowWidget(true);
   };
 
@@ -167,7 +166,7 @@ const PaymentTest = () => {
       {/* Заголовок */}
       <Box textAlign="center" mb={4}>
         <Typography variant="h3" gutterBottom sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <TestIcon sx={{ mr: 2, fontSize: 40 }} />
+          <ScienceIcon sx={{ mr: 2, fontSize: 40 }} />
           Тестирование PaymentWidget
         </Typography>
         <Typography variant="body1" color="textSecondary">
@@ -264,7 +263,7 @@ const PaymentTest = () => {
                   size="large"
                   fullWidth
                   onClick={startTest}
-                  startIcon={<PaymentIcon />}
+                  startIcon={<CreditCardIcon />}
                   disabled={showWidget || !isAuthenticated}
                 >
                   {showWidget ? 'Тест запущен...' : isAuthenticated ? 'Запустить тест' : 'Требуется авторизация'}
@@ -303,7 +302,7 @@ const PaymentTest = () => {
         {/* Виджет платежа */}
         <Grid item xs={12} md={8}>
           {showWidget ? (
-            <PaymentWidget
+                  <PaymentWidget
               visitId={testData.visitId}
               amount={testData.amount}
               currency={testData.currency}
@@ -316,7 +315,7 @@ const PaymentTest = () => {
             <Card sx={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CardContent>
                 <Box textAlign="center">
-                  <PaymentIcon sx={{ fontSize: 80, color: 'grey.400', mb: 2 }} />
+                  <CreditCardIcon sx={{ fontSize: 80, color: 'grey.400', mb: 2 }} />
                   <Typography variant="h6" color="textSecondary">
                     Нажмите &quot;Запустить тест&quot; для отображения виджета
                   </Typography>

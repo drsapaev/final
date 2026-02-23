@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt } from './components/pwa';
@@ -190,7 +190,7 @@ function RequireAuth({ roles, children }) {
     }
 
     return unsubscribe;
-  }, []);
+  }, [st.profile]);
 
   // Показываем загрузку при проверке
   if (isChecking) {
@@ -971,6 +971,8 @@ function getHeaderActions(path) {
 
   return null;
 }
+void getPageTitle;
+void getHeaderActions;
 
 /** Каркас: macOS Header и Sidebar для всех панелей */
 function AppShell() {

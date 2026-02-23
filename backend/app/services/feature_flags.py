@@ -2,11 +2,9 @@
 Сервис для управления фича-флагами
 """
 
-import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -47,7 +45,7 @@ class FeatureFlagService:
             # В случае ошибки возвращаем значение по умолчанию
             return default
 
-    def get_flag_config(self, flag_key: str) -> Dict[str, Any]:
+    def get_flag_config(self, flag_key: str) -> dict[str, Any]:
         """
         Получает конфигурацию фича-флага
 
@@ -119,7 +117,7 @@ class FeatureFlagService:
         name: str,
         description: str = None,
         enabled: bool = False,
-        config: Dict[str, Any] = None,
+        config: dict[str, Any] = None,
         category: str = "general",
         environment: str = "all",
         user_id: str = None,
@@ -175,7 +173,7 @@ class FeatureFlagService:
     def update_flag_config(
         self,
         flag_key: str,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         user_id: str = None,
         reason: str = None,
     ) -> bool:
@@ -216,7 +214,7 @@ class FeatureFlagService:
 
         return True
 
-    def get_all_flags(self, category: str = None) -> List[FeatureFlag]:
+    def get_all_flags(self, category: str = None) -> list[FeatureFlag]:
         """
         Получает все фича-флаги
 
@@ -235,7 +233,7 @@ class FeatureFlagService:
 
     def get_flag_history(
         self, flag_key: str, limit: int = 50
-    ) -> List[FeatureFlagHistory]:
+    ) -> list[FeatureFlagHistory]:
         """
         Получает историю изменений флага
 
@@ -294,7 +292,7 @@ class FeatureFlagService:
 
         return True
 
-    def _get_flag_from_cache_or_db(self, flag_key: str) -> Optional[FeatureFlag]:
+    def _get_flag_from_cache_or_db(self, flag_key: str) -> FeatureFlag | None:
         """Получает флаг из кэша или базы данных"""
         now = datetime.utcnow()
 
@@ -335,8 +333,8 @@ class FeatureFlagService:
         self,
         flag_key: str,
         action: str,
-        old_value: Optional[Dict[str, Any]],
-        new_value: Optional[Dict[str, Any]],
+        old_value: dict[str, Any] | None,
+        new_value: dict[str, Any] | None,
         changed_by: str = None,
         reason: str = None,
         ip_address: str = None,
@@ -443,7 +441,7 @@ def initialize_feature_flags(db: Session):
 
 
 # Глобальный экземпляр сервиса (будет инициализирован при запуске)
-_feature_flag_service: Optional[FeatureFlagService] = None
+_feature_flag_service: FeatureFlagService | None = None
 
 
 def get_feature_flag_service(db: Session) -> FeatureFlagService:

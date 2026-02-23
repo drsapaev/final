@@ -3,25 +3,24 @@ CRUD операции для работы с визитами
 """
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, or_
+from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.service_mapping import normalize_service_code
 
 
-def get_visit(db: Session, visit_id: int) -> Optional[Visit]:
+def get_visit(db: Session, visit_id: int) -> Visit | None:
     """Получить визит по ID"""
     return db.query(Visit).filter(Visit.id == visit_id).first()
 
 
 def get_visits_by_patient(
-    db: Session, patient_id: int, limit: int = 100, status: Optional[str] = None
-) -> List[Visit]:
+    db: Session, patient_id: int, limit: int = 100, status: str | None = None
+) -> list[Visit]:
     """Получить визиты пациента"""
     query = db.query(Visit).filter(Visit.patient_id == patient_id)
 
@@ -34,10 +33,10 @@ def get_visits_by_patient(
 def get_visits_by_doctor(
     db: Session,
     doctor_id: int,
-    visit_date: Optional[date] = None,
-    status: Optional[str] = None,
+    visit_date: date | None = None,
+    status: str | None = None,
     limit: int = 100,
-) -> List[Visit]:
+) -> list[Visit]:
     """Получить визиты врача"""
     query = db.query(Visit).filter(Visit.doctor_id == doctor_id)
 
@@ -54,7 +53,7 @@ def get_visits_by_doctor(
     )
 
 
-def get_today_visits_by_doctor(db: Session, doctor_id: int) -> List[Visit]:
+def get_today_visits_by_doctor(db: Session, doctor_id: int) -> list[Visit]:
     """Получить сегодняшние визиты врача"""
     return get_visits_by_doctor(
         db=db, doctor_id=doctor_id, visit_date=date.today(), status="open"
@@ -64,22 +63,23 @@ def get_today_visits_by_doctor(db: Session, doctor_id: int) -> List[Visit]:
 def create_visit(
     db: Session,
     patient_id: int,
-    doctor_id: Optional[int] = None,
-    visit_date: Optional[date] = None,
-    visit_time: Optional[str] = None,
-    department: Optional[str] = None,
+    doctor_id: int | None = None,
+    visit_date: date | None = None,
+    visit_time: str | None = None,
+    department: str | None = None,
     discount_mode: str = "none",
-    notes: Optional[str] = None,
-    services: Optional[List[Dict[str, Any]]] = None,
+    notes: str | None = None,
+    services: list[dict[str, Any]] | None = None,
     # Параметры для side-effects (безопасность при миграции)
     auto_status: bool = True,
     notify: bool = False,
     log: bool = True,
     # Дополнительные поля для совместимости
-    status: Optional[str] = None,
-    approval_status: Optional[str] = None,
-    confirmed_at: Optional[datetime] = None,
-    confirmed_by: Optional[str] = None,
+    status: str | None = None,
+    approval_status: str | None = None,
+    confirmed_at: datetime | None = None,
+    confirmed_by: str | None = None,
+    source: str = "desk",
 ) -> Visit:
     """
     Создать новый визит - единая функция для всего проекта.
@@ -150,6 +150,7 @@ def create_visit(
         approval_status=approval_status,
         confirmed_at=confirmed_at,
         confirmed_by=confirmed_by,
+        source=source or "desk",
     )
 
     db.add(visit)
@@ -196,7 +197,7 @@ def create_visit(
     return visit
 
 
-def update_visit(db: Session, visit_id: int, **kwargs) -> Optional[Visit]:
+def update_visit(db: Session, visit_id: int, **kwargs) -> Visit | None:
     """Обновить визит"""
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
@@ -213,8 +214,8 @@ def update_visit(db: Session, visit_id: int, **kwargs) -> Optional[Visit]:
 
 
 def complete_visit(
-    db: Session, visit_id: int, medical_data: Optional[Dict[str, Any]] = None
-) -> Optional[Visit]:
+    db: Session, visit_id: int, medical_data: dict[str, Any] | None = None
+) -> Visit | None:
     """Завершить визит"""
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
@@ -248,8 +249,8 @@ def complete_visit(
 
 
 def cancel_visit(
-    db: Session, visit_id: int, reason: Optional[str] = None
-) -> Optional[Visit]:
+    db: Session, visit_id: int, reason: str | None = None
+) -> Visit | None:
     """Отменить визит"""
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
@@ -266,7 +267,7 @@ def cancel_visit(
     return visit
 
 
-def get_visit_services(db: Session, visit_id: int) -> List[VisitService]:
+def get_visit_services(db: Session, visit_id: int) -> list[VisitService]:
     """Получить услуги визита"""
     return db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
 
@@ -276,7 +277,7 @@ def add_visit_service(
     visit_id: int,
     service_id: int,
     quantity: int = 1,
-    custom_price: Optional[float] = None,
+    custom_price: float | None = None,
 ) -> VisitService:
     """Добавить услугу к визиту"""
     # Получаем цену услуги
@@ -326,10 +327,10 @@ def get_visits_by_date_range(
     db: Session,
     date_from: date,
     date_to: date,
-    doctor_id: Optional[int] = None,
-    department: Optional[str] = None,
-    status: Optional[str] = None,
-) -> List[Visit]:
+    doctor_id: int | None = None,
+    department: str | None = None,
+    status: str | None = None,
+) -> list[Visit]:
     """Получить визиты за период"""
     query = db.query(Visit).filter(
         and_(Visit.visit_date >= date_from, Visit.visit_date <= date_to)
@@ -349,10 +350,10 @@ def get_visits_by_date_range(
 
 def get_visit_statistics(
     db: Session,
-    doctor_id: Optional[int] = None,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-) -> Dict[str, Any]:
+    doctor_id: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, Any]:
     """Получить статистику визитов"""
     query = db.query(Visit)
 
@@ -382,7 +383,7 @@ def get_visit_statistics(
 
 
 def find_or_create_today_visit(
-    db: Session, patient_id: int, doctor_id: int, department: Optional[str] = None
+    db: Session, patient_id: int, doctor_id: int, department: str | None = None
 ) -> Visit:
     """Найти или создать визит на сегодня"""
     # Ищем открытый визит на сегодня
@@ -415,7 +416,7 @@ def find_or_create_today_visit(
 # ===================== ЕДИНЫЕ ФУНКЦИИ - SINGLE SOURCE OF TRUTH =====================
 
 
-def normalize_visit_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_visit_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Нормализация данных визита - единая функция для всего проекта.
 
@@ -453,7 +454,7 @@ def normalize_visit_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def validate_visit_time(visit_date: date, visit_time: Optional[str] = None) -> bool:
+def validate_visit_time(visit_date: date, visit_time: str | None = None) -> bool:
     """
     Валидация даты и времени визита.
 
@@ -500,7 +501,7 @@ def validate_visit_time(visit_date: date, visit_time: Optional[str] = None) -> b
     return True
 
 
-def get_visit_history(db: Session, patient_id: int, limit: int = 100) -> List[Visit]:
+def get_visit_history(db: Session, patient_id: int, limit: int = 100) -> list[Visit]:
     """
     Получить историю визитов пациента - единая функция для всего проекта.
 

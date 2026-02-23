@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, 
-  Save, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
+import { useState, useEffect, useCallback } from 'react';
+import {
+  DollarSign,
+  Save,
+  AlertCircle,
+  CheckCircle,
+  Clock,
   X,
   FileText,
   Stethoscope,
-  CheckSquare
-} from 'lucide-react';
+  CheckSquare } from
+'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
-const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
+const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
 /**
  * Компонент для указания цены стоматологом после лечения
  */
-const DentalPriceManager = ({ 
-  visitId, 
-  serviceId, 
-  serviceName, 
-  originalPrice, 
+const DentalPriceManager = ({
+  visitId,
+  serviceId,
+  serviceName,
+  originalPrice,
   onPriceSet,
   isOpen,
-  onClose 
-}) => {
-  const { theme, getColor } = useTheme();
+  onClose
+}) => {void
+  useTheme();
   const [finalPrice, setFinalPrice] = useState('');
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
@@ -38,23 +38,16 @@ const DentalPriceManager = ({
 
   // Предустановленные причины для стоматологических процедур
   const dentalReasons = [
-    'Дополнительные манипуляции',
-    'Сложность случая',
-    'Использование премиум материалов',
-    'Увеличенное время лечения',
-    'Комплексное лечение',
-    'Экстренное вмешательство',
-    'Дополнительная анестезия',
-    'Повторное лечение'
-  ];
+  'Дополнительные манипуляции',
+  'Сложность случая',
+  'Использование премиум материалов',
+  'Увеличенное время лечения',
+  'Комплексное лечение',
+  'Экстренное вмешательство',
+  'Дополнительная анестезия',
+  'Повторное лечение'];
 
-  useEffect(() => {
-    if (isOpen && visitId) {
-      loadPriceOverrides();
-    }
-  }, [isOpen, visitId]);
-
-  const loadPriceOverrides = async () => {
+  const loadPriceOverrides = useCallback(async () => {
     setLoadingOverrides(true);
     try {
       const response = await fetch(`${API_BASE}/dental/price-overrides?visit_id=${visitId}`);
@@ -67,11 +60,17 @@ const DentalPriceManager = ({
     } finally {
       setLoadingOverrides(false);
     }
-  };
+  }, [visitId]);
+
+  useEffect(() => {
+    if (isOpen && visitId) {
+      loadPriceOverrides();
+    }
+  }, [isOpen, visitId, loadPriceOverrides]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!finalPrice || !reason) {
       toast.error('Заполните цену и причину');
       return;
@@ -101,15 +100,15 @@ const DentalPriceManager = ({
       if (response.ok) {
         const result = await response.json();
         toast.success('Цена отправлена в регистратуру для подтверждения');
-        
+
         // Обновляем список изменений
         loadPriceOverrides();
-        
+
         // Очищаем форму
         setFinalPrice('');
         setReason('');
         setDetails('');
-        
+
         // Уведомляем родительский компонент
         onPriceSet?.(result);
       } else {
@@ -130,28 +129,28 @@ const DentalPriceManager = ({
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'approved': return 'text-green-600 bg-green-100';
-      case 'rejected': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'pending':return 'text-yellow-600 bg-yellow-100';
+      case 'approved':return 'text-green-600 bg-green-100';
+      case 'rejected':return 'text-red-600 bg-red-100';
+      default:return 'text-gray-600 bg-gray-100';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending': return <Clock size={16} />;
-      case 'approved': return <CheckCircle size={16} />;
-      case 'rejected': return <X size={16} />;
-      default: return <AlertCircle size={16} />;
+      case 'pending':return <Clock size={16} />;
+      case 'approved':return <CheckCircle size={16} />;
+      case 'rejected':return <X size={16} />;
+      default:return <AlertCircle size={16} />;
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending': return 'Ожидает подтверждения';
-      case 'approved': return 'Подтверждено';
-      case 'rejected': return 'Отклонено';
-      default: return status;
+      case 'pending':return 'Ожидает подтверждения';
+      case 'approved':return 'Подтверждено';
+      case 'rejected':return 'Отклонено';
+      default:return status;
     }
   };
 
@@ -173,8 +172,8 @@ const DentalPriceManager = ({
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            
             <X size={24} />
           </button>
         </div>
@@ -207,8 +206,8 @@ const DentalPriceManager = ({
                   onChange={(e) => setFinalPrice(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder="Например: 150000"
-                  inputMode="numeric"
-                />
+                  inputMode="numeric" />
+                
               </div>
             </div>
 
@@ -219,24 +218,24 @@ const DentalPriceManager = ({
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white mb-2"
-              >
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white mb-2">
+                
                 <option value="">Выберите причину</option>
-                {dentalReasons.map((reasonText, index) => (
-                  <option key={index} value={reasonText}>{reasonText}</option>
-                ))}
+                {dentalReasons.map((reasonText, index) =>
+                <option key={index} value={reasonText}>{reasonText}</option>
+                )}
                 <option value="custom">Другая причина</option>
               </select>
               
-              {reason === 'custom' && (
-                <input
-                  type="text"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Введите причину"
-                />
-              )}
+              {reason === 'custom' &&
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="Введите причину" />
+
+              }
             </div>
 
             <div>
@@ -248,20 +247,20 @@ const DentalPriceManager = ({
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Подробности о проведенном лечении..."
-              />
+                placeholder="Подробности о проведенном лечении..." />
+              
             </div>
 
             <button
               type="submit"
               disabled={isLoading || !finalPrice || !reason}
-              className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-              ) : (
-                <Save size={16} className="mr-2" />
-              )}
+              className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              
+              {isLoading ?
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> :
+
+              <Save size={16} className="mr-2" />
+              }
               {isLoading ? 'Отправка...' : 'Отправить в регистратуру'}
             </button>
           </form>
@@ -273,21 +272,21 @@ const DentalPriceManager = ({
               История указанных цен
             </h4>
             
-            {loadingOverrides ? (
-              <div className="text-center py-4">
+            {loadingOverrides ?
+            <div className="text-center py-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto" />
-              </div>
-            ) : priceOverrides.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
+              </div> :
+            priceOverrides.length === 0 ?
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
                 Цены пока не указывались
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {priceOverrides.map((override) => (
-                  <div
-                    key={override.id}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
-                  >
+              </p> :
+
+            <div className="space-y-3">
+                {priceOverrides.map((override) =>
+              <div
+                key={override.id}
+                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(override.status)}`}>
@@ -316,22 +315,21 @@ const DentalPriceManager = ({
                       <span className="ml-2 text-sm">{override.reason}</span>
                     </div>
                     
-                    {override.details && (
-                      <div className="mt-1">
+                    {override.details &&
+                <div className="mt-1">
                         <span className="text-gray-600 dark:text-gray-400 text-sm">Детали:</span>
                         <span className="ml-2 text-sm">{override.details}</span>
                       </div>
-                    )}
+                }
                   </div>
-                ))}
+              )}
               </div>
-            )}
+            }
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default DentalPriceManager;
-

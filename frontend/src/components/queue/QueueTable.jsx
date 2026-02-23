@@ -1,4 +1,3 @@
-import React from 'react';
 import { Badge, Button, Icon } from '../ui/macos';
 import PropTypes from 'prop-types';
 
@@ -9,7 +8,6 @@ import PropTypes from 'prop-types';
 const QueueTable = ({
     queueData,
     effectiveDoctor,
-    onGenerateQR,
     onCallPatient,
     loading,
     t

@@ -4,9 +4,10 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
-from typing import Optional
 
-from fastapi import APIRouter, status, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+
+from app.services.ws_redis_pubsub import RedisPubSubBridge
 
 log = logging.getLogger("ws.queue")
 log.setLevel(logging.INFO)  # Устанавливаем уровень INFO
@@ -34,6 +35,11 @@ class WSManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.rooms = defaultdict(set)
+            cls._instance._pubsub = RedisPubSubBridge(
+                channel_prefix="queue_ws",
+                redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
+            )
+            cls._instance._redis_handlers = {}
             log.info("WSManager: создан новый экземпляр")
         return cls._instance
 
@@ -44,6 +50,7 @@ class WSManager:
     async def connect(self, ws: WebSocket, room: str) -> None:
         log.info("WSManager: connecting to room %s", room)
         self.rooms[room].add(ws)
+        await self._ensure_room_subscription(room)
         log.info(
             "WSManager: room %s now has %d connections", room, len(self.rooms[room])
         )
@@ -56,6 +63,7 @@ class WSManager:
         s.discard(ws)
         if not s:
             self.rooms.pop(room, None)
+            self._dispatch(self._remove_room_subscription(room))
             log.info("WSManager: room %s removed (empty)", room)
         else:
             log.info("WSManager: room %s now has %d connections", room, len(s))
@@ -83,32 +91,50 @@ class WSManager:
         )
         log.info("WSManager: all rooms: %s", list(self.rooms.keys()))
 
+        self._dispatch(self._broadcast_room(room, data, publish=True))
+
+    def _dispatch(self, coro) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(coro)
+        else:
+            loop.create_task(coro)
+
+    def _room_channel(self, room: str) -> str:
+        return f"room:{room}"
+
+    async def _ensure_room_subscription(self, room: str) -> None:
+        if room in self._redis_handlers:
+            return
+
+        async def _handler(payload, _room: str = room) -> None:
+            remote_data = payload.get("data", payload)
+            await self._broadcast_room(_room, remote_data, publish=False)
+
+        self._redis_handlers[room] = _handler
+        await self._pubsub.subscribe(self._room_channel(room), _handler)
+
+    async def _remove_room_subscription(self, room: str) -> None:
+        handler = self._redis_handlers.pop(room, None)
+        if handler is None:
+            return
+        await self._pubsub.unsubscribe(self._room_channel(room), handler)
+
+    async def _broadcast_room(self, room: str, data, publish: bool) -> None:
         for ws in list(self.rooms.get(room, set())):
             log.info("WSManager: sending to websocket in room %s", room)
-            # Убираем asyncio.create_task для синхронного контекста
-            # asyncio.create_task(self._send_one(ws, data))
-            # Вместо этого просто вызываем _send_one синхронно
-            # Но _send_one - асинхронная функция, поэтому нужно использовать другой подход
-            try:
-                # Создаём новый event loop для этого вызова
-                import asyncio
+            await self._send_one(ws, data)
 
-                try:
-                    asyncio.get_running_loop()
-                    # Если loop уже запущен, создаём task
-                    asyncio.create_task(self._send_one(ws, data))
-                except RuntimeError:
-                    # Если loop не запущен, запускаем новый
-                    asyncio.run(self._send_one(ws, data))
-            except Exception as e:
-                log.error("WSManager: error creating task: %s", e)
+        if publish:
+            await self._pubsub.publish(self._room_channel(room), {"data": data})
 
 
 ws_manager = WSManager()
 log.info("WSManager: создан глобальный экземпляр %d", id(ws_manager))
 
 
-def _origin_allowed(origin: Optional[str]) -> bool:
+def _origin_allowed(origin: str | None) -> bool:
     if os.getenv("CORS_DISABLE", "0") == "1":
         return True
     if not origin:
@@ -123,7 +149,7 @@ def _origin_allowed(origin: Optional[str]) -> bool:
     return origin in allowed
 
 
-def _auth_ok(headers, token_qs: Optional[str]) -> bool:
+def _auth_ok(headers, token_qs: str | None) -> bool:
     if os.getenv("WS_DEV_ALLOW", "0") == "1":
         return True
     auth = headers.get("authorization") or headers.get("Authorization")
@@ -145,14 +171,14 @@ async def ws_noauth(websocket: WebSocket):
     """
     env = os.getenv("ENV", "dev").lower()
     is_production = env in ("prod", "production")
-    
+
     if is_production:
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
             reason="This endpoint is disabled in production for security"
         )
         return
-    
+
     # Only allow in development
     log.warning("⚠️  DEV mode: /ws/noauth endpoint enabled (NOT for production!)")
     await websocket.accept()
@@ -169,7 +195,7 @@ async def ws_noauth(websocket: WebSocket):
 # -----------------------------------------------------------------------------
 @router.websocket("/ws/queue")
 async def ws_queue(
-    websocket: WebSocket, department: str, date: str, token: Optional[str] = None
+    websocket: WebSocket, department: str, date: str, token: str | None = None
 ):
     origin = websocket.headers.get("origin")
     log.info(
@@ -182,7 +208,7 @@ async def ws_queue(
     # ✅ SECURITY: Check environment - only allow DEV bypass in development
     env = os.getenv("ENV", "dev").lower()
     is_production = env in ("prod", "production")
-    
+
     # ✅ DEV shortcut: только в development режиме
     if not is_production and os.getenv("WS_DEV_ALLOW", "0") == "1":
         log.warning("⚠️  DEV mode: WebSocket auth bypass enabled (NOT for production!)")
@@ -225,7 +251,7 @@ async def ws_queue(
     CONNECTION_TIMEOUT = 120  # seconds (2 minutes of inactivity)
     # ✅ BUGFIX: Use list to allow mutation from nested scopes (nonlocal doesn't work in nested try blocks)
     last_pong = [asyncio.get_event_loop().time()]
-    
+
     async def send_heartbeat():
         """Send periodic ping to detect dead connections"""
         while True:
@@ -245,12 +271,12 @@ async def ws_queue(
             try:
                 # ✅ SECURITY: Set receive timeout
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=CONNECTION_TIMEOUT)
-                
+
                 # Parse message
                 try:
                     import json
                     message = json.loads(data)
-                    
+
                     # Handle pong response
                     if message.get("type") == "pong":
                         # ✅ BUGFIX: Update list element to modify outer scope variable
@@ -259,8 +285,8 @@ async def ws_queue(
                         continue
                 except (json.JSONDecodeError, KeyError):
                     pass  # Not a JSON message or missing type
-                
-            except asyncio.TimeoutError:
+
+            except TimeoutError:
                 # Check if connection is still alive
                 # ✅ BUGFIX: Access list element to get current value
                 time_since_pong = asyncio.get_event_loop().time() - last_pong[0]

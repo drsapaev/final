@@ -3,19 +3,16 @@
 """
 
 import asyncio
-import json
 import logging
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import psutil
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +37,7 @@ class MonitoringService:
 
     # ===================== СБОР МЕТРИК =====================
 
-    def get_system_metrics(self) -> Dict[str, Any]:
+    def get_system_metrics(self) -> dict[str, Any]:
         """Получает текущие системные метрики"""
         try:
             # CPU метрики
@@ -98,7 +95,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения системных метрик: {e}")
             return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
-    def get_application_metrics(self) -> Dict[str, Any]:
+    def get_application_metrics(self) -> dict[str, Any]:
         """Получает метрики приложения"""
         try:
             # Метрики базы данных
@@ -123,7 +120,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения метрик приложения: {e}")
             return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
-    def _get_database_metrics(self) -> Dict[str, Any]:
+    def _get_database_metrics(self) -> dict[str, Any]:
         """Получает метрики базы данных"""
         try:
             engine = create_engine(settings.DATABASE_URL)
@@ -207,7 +204,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения метрик БД: {e}")
             return {"status": "error", "error": str(e)}
 
-    def _get_filesystem_metrics(self) -> Dict[str, Any]:
+    def _get_filesystem_metrics(self) -> dict[str, Any]:
         """Получает метрики файловой системы"""
         try:
             # Размеры важных директорий
@@ -253,7 +250,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения метрик ФС: {e}")
             return {"error": str(e)}
 
-    def _get_performance_metrics(self) -> Dict[str, Any]:
+    def _get_performance_metrics(self) -> dict[str, Any]:
         """Получает метрики производительности"""
         try:
             # Время отклика БД
@@ -291,7 +288,7 @@ class MonitoringService:
 
     # ===================== АЛЕРТЫ И МОНИТОРИНГ =====================
 
-    def check_health(self) -> Dict[str, Any]:
+    def check_health(self) -> dict[str, Any]:
         """Проверяет общее состояние системы"""
         try:
             system_metrics = self.get_system_metrics()
@@ -400,8 +397,8 @@ class MonitoringService:
             }
 
     def get_alerts(
-        self, severity: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, severity: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Получает список алертов"""
         try:
             alerts = self.alerts.copy()
@@ -418,7 +415,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения алертов: {e}")
             return []
 
-    def _add_alert(self, alert: Dict[str, Any]):
+    def _add_alert(self, alert: dict[str, Any]):
         """Добавляет новый алерт"""
         try:
             alert["timestamp"] = datetime.now().isoformat()
@@ -463,7 +460,7 @@ class MonitoringService:
         except Exception as e:
             logger.error(f"Ошибка сбора метрик: {e}")
 
-    def get_metrics_history(self, hours: int = 24) -> List[Dict[str, Any]]:
+    def get_metrics_history(self, hours: int = 24) -> list[dict[str, Any]]:
         """Получает историю метрик за указанное количество часов"""
         try:
             cutoff_time = datetime.now() - timedelta(hours=hours)
@@ -483,7 +480,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения истории метрик: {e}")
             return []
 
-    def get_metrics_summary(self, hours: int = 24) -> Dict[str, Any]:
+    def get_metrics_summary(self, hours: int = 24) -> dict[str, Any]:
         """Получает сводку метрик за период"""
         try:
             history = self.get_metrics_history(hours)
@@ -535,7 +532,7 @@ class MonitoringService:
             logger.error(f"Ошибка получения сводки метрик: {e}")
             return {"error": str(e)}
 
-    def _calculate_stats(self, values: List[float]) -> Dict[str, float]:
+    def _calculate_stats(self, values: list[float]) -> dict[str, float]:
         """Вычисляет статистики для списка значений"""
         if not values:
             return {"min": 0, "max": 0, "avg": 0, "current": 0}
@@ -575,7 +572,7 @@ class MonitoringService:
 
     # ===================== НАСТРОЙКИ =====================
 
-    def update_thresholds(self, new_thresholds: Dict[str, float]) -> Dict[str, Any]:
+    def update_thresholds(self, new_thresholds: dict[str, float]) -> dict[str, Any]:
         """Обновляет пороговые значения для алертов"""
         try:
             for key, value in new_thresholds.items():
@@ -588,7 +585,7 @@ class MonitoringService:
             logger.error(f"Ошибка обновления порогов: {e}")
             return {"success": False, "error": str(e)}
 
-    def get_thresholds(self) -> Dict[str, float]:
+    def get_thresholds(self) -> dict[str, float]:
         """Получает текущие пороговые значения"""
         return self.thresholds.copy()
 

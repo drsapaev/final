@@ -5,7 +5,7 @@ AI Manager для управления различными AI провайде�
 import logging
 import os
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from ...core.config import settings
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
@@ -30,15 +30,14 @@ class AIManager:
     """Менеджер для работы с AI провайдерами"""
 
     def __init__(self):
-        self.providers: Dict[AIProviderType, BaseAIProvider] = {}
-        self.default_provider: Optional[AIProviderType] = None
+        self.providers: dict[AIProviderType, BaseAIProvider] = {}
+        self.default_provider: AIProviderType | None = None
         self._initialize_providers()
 
     def _initialize_providers(self):
         """Инициализация доступных провайдеров"""
-        from .mock_provider import MockProvider
 
-        provider_classes: Dict[AIProviderType, Type[BaseAIProvider]] = {
+        provider_classes: dict[AIProviderType, type[BaseAIProvider]] = {
             AIProviderType.OPENAI: OpenAIProvider,
             AIProviderType.GEMINI: GeminiProvider,
             AIProviderType.DEEPSEEK: DeepSeekProvider,
@@ -61,8 +60,6 @@ class AIManager:
 
         # Инициализируем Mock провайдер сначала как fallback
         try:
-            from .mock_provider import MockProvider
-
             self.providers[AIProviderType.MOCK] = MockProvider()
             logger.info(
                 "Initialized Enhanced Mock provider (realistic medical responses)"
@@ -84,30 +81,28 @@ class AIManager:
                 try:
                     provider_class = provider_classes[provider_type]
                     self.providers[provider_type] = provider_class(api_key)
-                    logger.info(f"✅ Initialized {provider_type.value} provider")
+                    logger.info(f"Initialized {provider_type.value} provider")
 
                     # Устанавливаем первый доступный провайдер как default
                     if not self.default_provider:
                         self.default_provider = provider_type
-                        logger.info(f"🎯 Set {provider_type.value} as DEFAULT provider")
+                        logger.info(f"Set {provider_type.value} as DEFAULT provider")
                 except Exception as e:
                     logger.error(
-                        f"❌ Failed to initialize {provider_type.value} provider: {str(e)}"
+                        f"Failed to initialize {provider_type.value} provider: {str(e)}"
                     )
 
         # Если нет других провайдеров, используем Mock
         if not self.default_provider:
             self.default_provider = AIProviderType.MOCK
-            logger.warning(
-                "⚠️  Using Enhanced Mock provider (no external API configured)"
-            )
+            logger.warning("Using Enhanced Mock provider (no external API configured)")
 
         if not self.providers:
             logger.warning("No AI providers initialized. Please set API keys.")
 
     def get_provider(
-        self, provider_type: Optional[AIProviderType] = None
-    ) -> Optional[BaseAIProvider]:
+        self, provider_type: AIProviderType | None = None
+    ) -> BaseAIProvider | None:
         """Получить провайдер по типу или default"""
         if provider_type:
             return self.providers.get(provider_type)
@@ -122,12 +117,12 @@ class AIManager:
             return True
         return False
 
-    def get_available_providers(self) -> List[str]:
+    def get_available_providers(self) -> list[str]:
         """Получить список доступных провайдеров"""
         return [p.value for p in self.providers.keys()]
 
     async def generate(
-        self, prompt: str, provider_type: Optional[AIProviderType] = None, **kwargs
+        self, prompt: str, provider_type: AIProviderType | None = None, **kwargs
     ) -> AIResponse:
         """Универсальная генерация текста"""
         provider = self.get_provider(provider_type)
@@ -142,9 +137,9 @@ class AIManager:
     async def analyze_complaint(
         self,
         complaint: str,
-        patient_info: Optional[Dict] = None,
-        provider_type: Optional[AIProviderType] = None,
-    ) -> Dict[str, Any]:
+        patient_info: dict | None = None,
+        provider_type: AIProviderType | None = None,
+    ) -> dict[str, Any]:
         """Анализ жалоб пациента"""
         provider = self.get_provider(provider_type)
         if not provider:
@@ -154,10 +149,10 @@ class AIManager:
 
     async def suggest_icd10(
         self,
-        symptoms: List[str],
-        diagnosis: Optional[str] = None,
-        provider_type: Optional[AIProviderType] = None,
-    ) -> List[Dict[str, str]]:
+        symptoms: list[str],
+        diagnosis: str | None = None,
+        provider_type: AIProviderType | None = None,
+    ) -> list[dict[str, str]]:
         """Подсказки кодов МКБ-10"""
         provider = self.get_provider(provider_type)
         if not provider:
@@ -167,10 +162,10 @@ class AIManager:
 
     async def interpret_lab_results(
         self,
-        results: List[Dict[str, Any]],
-        patient_info: Optional[Dict] = None,
-        provider_type: Optional[AIProviderType] = None,
-    ) -> Dict[str, Any]:
+        results: list[dict[str, Any]],
+        patient_info: dict | None = None,
+        provider_type: AIProviderType | None = None,
+    ) -> dict[str, Any]:
         """Интерпретация лабораторных результатов"""
         provider = self.get_provider(provider_type)
         if not provider:
@@ -181,9 +176,9 @@ class AIManager:
     async def analyze_skin(
         self,
         image_data: bytes,
-        metadata: Optional[Dict] = None,
-        provider_type: Optional[AIProviderType] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict | None = None,
+        provider_type: AIProviderType | None = None,
+    ) -> dict[str, Any]:
         """Анализ состояния кожи"""
         # Для анализа изображений предпочитаем OpenAI или Gemini
         if not provider_type:
@@ -200,10 +195,10 @@ class AIManager:
 
     async def interpret_ecg(
         self,
-        ecg_data: Dict[str, Any],
-        patient_info: Optional[Dict] = None,
-        provider_type: Optional[AIProviderType] = None,
-    ) -> Dict[str, Any]:
+        ecg_data: dict[str, Any],
+        patient_info: dict | None = None,
+        provider_type: AIProviderType | None = None,
+    ) -> dict[str, Any]:
         """Интерпретация ЭКГ"""
         provider = self.get_provider(provider_type)
         if not provider:
@@ -213,11 +208,11 @@ class AIManager:
 
     async def analyze_medical_trends(
         self,
-        medical_data: List[Dict],
+        medical_data: list[dict],
         time_period: str,
         analysis_type: str,
-        provider: Optional[AIProviderType] = None,
-    ) -> Dict[str, Any]:
+        provider: AIProviderType | None = None,
+    ) -> dict[str, Any]:
         """Анализ медицинских трендов и паттернов в данных"""
         provider_instance = self.get_provider(provider)
         if not provider_instance:

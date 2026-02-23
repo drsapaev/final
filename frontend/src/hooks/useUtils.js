@@ -3,7 +3,7 @@
  * Основана на принципах производительности и медицинских стандартах
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 import logger from '../utils/logger';
 // Хук для дебаунса
@@ -455,7 +455,8 @@ export const useTimeout = (callback, delay) => {
 };
 
 // Хук для асинхронной функции
-export const useAsync = (asyncFunction, dependencies = []) => {
+export const useAsync = (asyncFunction, _dependencies = []) => {
+  void _dependencies;
   const [state, setState] = useState({
     data: null,
     loading: false,
@@ -473,20 +474,22 @@ export const useAsync = (asyncFunction, dependencies = []) => {
       setState({ data: null, loading: false, error: error.message });
       throw error;
     }
-  }, dependencies);
+  }, [asyncFunction]);
 
   return { ...state, execute };
 };
 
 // Хук для мемоизации
-export const useMemoizedCallback = (callback, dependencies) => {
-  const memoizedCallback = useCallback(callback, dependencies);
+export const useMemoizedCallback = (callback, _dependencies = []) => {
+  void _dependencies;
+  const memoizedCallback = useCallback((...args) => callback(...args), [callback]);
   return memoizedCallback;
 };
 
 // Хук для мемоизации значения
-export const useMemoizedValue = (value, dependencies) => {
-  const memoizedValue = useMemo(() => value, dependencies);
+export const useMemoizedValue = (value, _dependencies = []) => {
+  void _dependencies;
+  const memoizedValue = useMemo(() => value, [value]);
   return memoizedValue;
 };
 

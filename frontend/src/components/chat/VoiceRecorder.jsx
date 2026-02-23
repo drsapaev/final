@@ -2,8 +2,9 @@
  * Компонент записи голосовых сообщений
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Send, Trash2 } from 'lucide-react';
+import logger from '../../utils/logger';
 
 const VoiceRecorder = ({ onSend, onCancel }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -70,7 +71,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
             }, 1000);
 
         } catch (error) {
-            console.error('Microphone access denied:', error);
+            logger.error('Microphone access denied:', error);
             alert('Разрешите доступ к микрофону в настройках браузера');
         }
     };
@@ -99,7 +100,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
     };
 
     // Сброс
-    const reset = () => {
+    const reset = useCallback(() => {
         if (audioURL) {
             URL.revokeObjectURL(audioURL);
         }
@@ -114,14 +115,14 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
-    };
+    }, [audioURL]);
 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
             reset();
         };
-    }, []);
+    }, [reset]);
 
     // Форматирование времени
     const formatTime = (seconds) => {

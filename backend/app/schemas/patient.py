@@ -1,7 +1,6 @@
 ﻿from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
 
 from pydantic import EmailStr, Field, model_validator
 
@@ -11,7 +10,7 @@ from app.schemas.base import ORMModel
 class PatientBase(ORMModel):
     # Поддержка как полного ФИО, так и отдельных полей (для Single Source of Truth)
     # full_name - опциональное поле для удобства, если передано - будет нормализовано
-    full_name: Optional[str] = Field(
+    full_name: str | None = Field(
         None,
         max_length=384,
         description="Полное ФИО в формате 'Фамилия Имя Отчество' (альтернатива last_name+first_name)",
@@ -20,7 +19,7 @@ class PatientBase(ORMModel):
     # НО: если передан full_name, то last_name и first_name могут быть пустыми (они будут нормализованы из full_name)
     last_name: str = Field(..., max_length=128)
     first_name: str = Field(..., max_length=128)
-    middle_name: Optional[str] = Field(None, max_length=128)
+    middle_name: str | None = Field(None, max_length=128)
 
     # ✅ ВАЛИДАТОР МОДЕЛИ: Проверяем, что либо full_name передан, либо last_name и first_name не пустые
     @model_validator(mode='before')
@@ -65,12 +64,12 @@ class PatientBase(ORMModel):
 
         return data
 
-    birth_date: Optional[date] = None
-    sex: Optional[str] = Field(None, max_length=8)  # M|F|X
-    phone: Optional[str] = Field(None, max_length=32)
-    email: Optional[EmailStr] = None
-    doc_number: Optional[str] = Field(None, max_length=64)
-    address: Optional[str] = Field(None, max_length=512)
+    birth_date: date | None = None
+    sex: str | None = Field(None, max_length=8)  # M|F|X
+    phone: str | None = Field(None, max_length=32)
+    email: EmailStr | None = None
+    doc_number: str | None = Field(None, max_length=64)
+    address: str | None = Field(None, max_length=512)
 
 
 class PatientCreate(PatientBase):
@@ -78,15 +77,15 @@ class PatientCreate(PatientBase):
 
 
 class PatientUpdate(ORMModel):
-    last_name: Optional[str] = Field(None, max_length=128)
-    first_name: Optional[str] = Field(None, max_length=128)
-    middle_name: Optional[str] = Field(None, max_length=128)
-    birth_date: Optional[date] = None
-    sex: Optional[str] = Field(None, max_length=8)
-    phone: Optional[str] = Field(None, max_length=32)
-    email: Optional[EmailStr] = None
-    doc_number: Optional[str] = Field(None, max_length=64)
-    address: Optional[str] = Field(None, max_length=512)
+    last_name: str | None = Field(None, max_length=128)
+    first_name: str | None = Field(None, max_length=128)
+    middle_name: str | None = Field(None, max_length=128)
+    birth_date: date | None = None
+    sex: str | None = Field(None, max_length=8)
+    phone: str | None = Field(None, max_length=32)
+    email: EmailStr | None = None
+    doc_number: str | None = Field(None, max_length=64)
+    address: str | None = Field(None, max_length=512)
 
 
 class Patient(PatientBase):
@@ -100,20 +99,20 @@ class DailyQueueOut(ORMModel):
     date: date
     department: str = Field(max_length=64)
     last_ticket: int
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 class QueueEntryBase(ORMModel):
     daily_queue_id: int
-    patient_id: Optional[int] = None
+    patient_id: int | None = None
     ticket_number: int
     status: str = Field(default="waiting", max_length=16)
-    window_no: Optional[str] = Field(default=None, max_length=16)
-    notes: Optional[str] = Field(default=None, max_length=512)
+    window_no: str | None = Field(default=None, max_length=16)
+    notes: str | None = Field(default=None, max_length=512)
 
 
 class QueueEntryOut(QueueEntryBase):
     id: int
-    created_at: Optional[datetime] = None
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None

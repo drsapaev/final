@@ -3,9 +3,8 @@ CRUD операции для системы аутентификации
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -20,12 +19,7 @@ from app.models.authentication import (
 )
 from app.models.user import User
 from app.schemas.authentication import (
-    LoginAttemptResponse,
-    SecurityEventResponse,
-    UserActivityResponse,
     UserCreateRequest,
-    UserProfileResponse,
-    UserSessionResponse,
     UserUpdateRequest,
 )
 
@@ -33,15 +27,15 @@ from app.schemas.authentication import (
 class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
     """CRUD операции для refresh токенов"""
 
-    def get_by_token(self, db: Session, token: str) -> Optional[RefreshToken]:
+    def get_by_token(self, db: Session, token: str) -> RefreshToken | None:
         """Получить refresh токен по токену"""
         return db.query(RefreshToken).filter(RefreshToken.token == token).first()
 
-    def get_by_jti(self, db: Session, jti: str) -> Optional[RefreshToken]:
+    def get_by_jti(self, db: Session, jti: str) -> RefreshToken | None:
         """Получить refresh токен по JTI"""
         return db.query(RefreshToken).filter(RefreshToken.jti == jti).first()
 
-    def get_valid_token(self, db: Session, token: str) -> Optional[RefreshToken]:
+    def get_valid_token(self, db: Session, token: str) -> RefreshToken | None:
         """Получить действительный refresh токен"""
         return (
             db.query(RefreshToken)
@@ -55,11 +49,11 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
             .first()
         )
 
-    def get_by_user_id(self, db: Session, user_id: int) -> List[RefreshToken]:
+    def get_by_user_id(self, db: Session, user_id: int) -> list[RefreshToken]:
         """Получить все refresh токены пользователя"""
         return db.query(RefreshToken).filter(RefreshToken.user_id == user_id).all()
 
-    def get_active_tokens(self, db: Session, user_id: int) -> List[RefreshToken]:
+    def get_active_tokens(self, db: Session, user_id: int) -> list[RefreshToken]:
         """Получить активные refresh токены пользователя"""
         return (
             db.query(RefreshToken)
@@ -109,7 +103,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
 class CRUDUserSession(CRUDBase[UserSession, None, None]):
     """CRUD операции для пользовательских сессий"""
 
-    def get_by_session_id(self, db: Session, session_id: str) -> Optional[UserSession]:
+    def get_by_session_id(self, db: Session, session_id: str) -> UserSession | None:
         """Получить сессию по ID"""
         return (
             db.query(UserSession).filter(UserSession.session_id == session_id).first()
@@ -117,7 +111,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
 
     def get_by_session_token(
         self, db: Session, session_token: str
-    ) -> Optional[UserSession]:
+    ) -> UserSession | None:
         """Получить сессию по токену"""
         return (
             db.query(UserSession)
@@ -127,7 +121,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
 
     def get_valid_session(
         self, db: Session, session_token: str
-    ) -> Optional[UserSession]:
+    ) -> UserSession | None:
         """Получить действительную сессию"""
         return (
             db.query(UserSession)
@@ -141,11 +135,11 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
             .first()
         )
 
-    def get_by_user_id(self, db: Session, user_id: int) -> List[UserSession]:
+    def get_by_user_id(self, db: Session, user_id: int) -> list[UserSession]:
         """Получить все сессии пользователя"""
         return db.query(UserSession).filter(UserSession.user_id == user_id).all()
 
-    def get_active_sessions(self, db: Session, user_id: int) -> List[UserSession]:
+    def get_active_sessions(self, db: Session, user_id: int) -> list[UserSession]:
         """Получить активные сессии пользователя"""
         return (
             db.query(UserSession)
@@ -201,7 +195,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
 class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
     """CRUD операции для токенов сброса пароля"""
 
-    def get_by_token(self, db: Session, token: str) -> Optional[PasswordResetToken]:
+    def get_by_token(self, db: Session, token: str) -> PasswordResetToken | None:
         """Получить токен по токену"""
         return (
             db.query(PasswordResetToken)
@@ -209,7 +203,7 @@ class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
             .first()
         )
 
-    def get_valid_token(self, db: Session, token: str) -> Optional[PasswordResetToken]:
+    def get_valid_token(self, db: Session, token: str) -> PasswordResetToken | None:
         """Получить действительный токен"""
         return (
             db.query(PasswordResetToken)
@@ -223,7 +217,7 @@ class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
             .first()
         )
 
-    def get_by_user_id(self, db: Session, user_id: int) -> List[PasswordResetToken]:
+    def get_by_user_id(self, db: Session, user_id: int) -> list[PasswordResetToken]:
         """Получить все токены пользователя"""
         return (
             db.query(PasswordResetToken)
@@ -255,7 +249,7 @@ class CRUDPasswordResetToken(CRUDBase[PasswordResetToken, None, None]):
 class CRUDEmailVerificationToken(CRUDBase[EmailVerificationToken, None, None]):
     """CRUD операции для токенов верификации email"""
 
-    def get_by_token(self, db: Session, token: str) -> Optional[EmailVerificationToken]:
+    def get_by_token(self, db: Session, token: str) -> EmailVerificationToken | None:
         """Получить токен по токену"""
         return (
             db.query(EmailVerificationToken)
@@ -265,7 +259,7 @@ class CRUDEmailVerificationToken(CRUDBase[EmailVerificationToken, None, None]):
 
     def get_valid_token(
         self, db: Session, token: str
-    ) -> Optional[EmailVerificationToken]:
+    ) -> EmailVerificationToken | None:
         """Получить действительный токен"""
         return (
             db.query(EmailVerificationToken)
@@ -279,7 +273,7 @@ class CRUDEmailVerificationToken(CRUDBase[EmailVerificationToken, None, None]):
             .first()
         )
 
-    def get_by_user_id(self, db: Session, user_id: int) -> List[EmailVerificationToken]:
+    def get_by_user_id(self, db: Session, user_id: int) -> list[EmailVerificationToken]:
         """Получить все токены пользователя"""
         return (
             db.query(EmailVerificationToken)
@@ -313,7 +307,7 @@ class CRUDLoginAttempt(CRUDBase[LoginAttempt, None, None]):
 
     def get_by_user_id(
         self, db: Session, user_id: int, limit: int = 100
-    ) -> List[LoginAttempt]:
+    ) -> list[LoginAttempt]:
         """Получить попытки входа пользователя"""
         return (
             db.query(LoginAttempt)
@@ -325,7 +319,7 @@ class CRUDLoginAttempt(CRUDBase[LoginAttempt, None, None]):
 
     def get_by_ip(
         self, db: Session, ip_address: str, limit: int = 100
-    ) -> List[LoginAttempt]:
+    ) -> list[LoginAttempt]:
         """Получить попытки входа по IP"""
         return (
             db.query(LoginAttempt)
@@ -380,7 +374,7 @@ class CRUDUserActivity(CRUDBase[UserActivity, None, None]):
 
     def get_by_user_id(
         self, db: Session, user_id: int, limit: int = 100
-    ) -> List[UserActivity]:
+    ) -> list[UserActivity]:
         """Получить активность пользователя"""
         return (
             db.query(UserActivity)
@@ -392,7 +386,7 @@ class CRUDUserActivity(CRUDBase[UserActivity, None, None]):
 
     def get_by_activity_type(
         self, db: Session, activity_type: str, limit: int = 100
-    ) -> List[UserActivity]:
+    ) -> list[UserActivity]:
         """Получить активность по типу"""
         return (
             db.query(UserActivity)
@@ -404,7 +398,7 @@ class CRUDUserActivity(CRUDBase[UserActivity, None, None]):
 
     def get_recent_activity(
         self, db: Session, user_id: int, hours: int = 24
-    ) -> List[UserActivity]:
+    ) -> list[UserActivity]:
         """Получить недавнюю активность"""
         since = datetime.utcnow() - timedelta(hours=hours)
         return (
@@ -429,7 +423,7 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
 
     def get_by_user_id(
         self, db: Session, user_id: int, limit: int = 100
-    ) -> List[SecurityEvent]:
+    ) -> list[SecurityEvent]:
         """Получить события пользователя"""
         return (
             db.query(SecurityEvent)
@@ -441,7 +435,7 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
 
     def get_by_severity(
         self, db: Session, severity: str, limit: int = 100
-    ) -> List[SecurityEvent]:
+    ) -> list[SecurityEvent]:
         """Получить события по серьезности"""
         return (
             db.query(SecurityEvent)
@@ -453,7 +447,7 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
 
     def get_unresolved_events(
         self, db: Session, limit: int = 100
-    ) -> List[SecurityEvent]:
+    ) -> list[SecurityEvent]:
         """Получить неразрешенные события"""
         return (
             db.query(SecurityEvent)
@@ -465,7 +459,7 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
 
     def get_high_severity_events(
         self, db: Session, limit: int = 100
-    ) -> List[SecurityEvent]:
+    ) -> list[SecurityEvent]:
         """Получить события высокой серьезности"""
         return (
             db.query(SecurityEvent)
@@ -507,17 +501,17 @@ class CRUDSecurityEvent(CRUDBase[SecurityEvent, None, None]):
 class CRUDUser(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
     """CRUD операции для пользователей с аутентификацией"""
 
-    def get_by_username(self, db: Session, username: str) -> Optional[User]:
+    def get_by_username(self, db: Session, username: str) -> User | None:
         """Получить пользователя по username"""
         return db.query(User).filter(User.username == username).first()
 
-    def get_by_email(self, db: Session, email: str) -> Optional[User]:
+    def get_by_email(self, db: Session, email: str) -> User | None:
         """Получить пользователя по email"""
         return db.query(User).filter(User.email == email).first()
 
     def get_by_username_or_email(
         self, db: Session, username_or_email: str
-    ) -> Optional[User]:
+    ) -> User | None:
         """Получить пользователя по username или email"""
         return (
             db.query(User)
@@ -529,7 +523,7 @@ class CRUDUser(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
 
     def get_active_users(
         self, db: Session, skip: int = 0, limit: int = 100
-    ) -> List[User]:
+    ) -> list[User]:
         """Получить активных пользователей"""
         return (
             db.query(User)
@@ -541,13 +535,13 @@ class CRUDUser(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
 
     def get_by_role(
         self, db: Session, role: str, skip: int = 0, limit: int = 100
-    ) -> List[User]:
+    ) -> list[User]:
         """Получить пользователей по роли"""
         return db.query(User).filter(User.role == role).offset(skip).limit(limit).all()
 
     def search_users(
         self, db: Session, query: str, skip: int = 0, limit: int = 100
-    ) -> List[User]:
+    ) -> list[User]:
         """Поиск пользователей"""
         return (
             db.query(User)
@@ -563,7 +557,7 @@ class CRUDUser(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
             .all()
         )
 
-    def get_user_stats(self, db: Session) -> Dict[str, int]:
+    def get_user_stats(self, db: Session) -> dict[str, int]:
         """Получить статистику пользователей"""
         total_users = db.query(User).count()
         active_users = db.query(User).filter(User.is_active == True).count()

@@ -2,16 +2,15 @@
 Интеграция EMR с лабораторными данными
 """
 
-import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud import emr, lab_result
+from app.crud import lab_result
 from app.models.emr import EMR
-from app.models.lab import LabOrder, LabResult
+from app.models.lab import LabResult
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +32,10 @@ class EMRLabIntegrationService:
         self,
         db: Session,
         patient_id: int,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
-        test_types: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        test_types: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Получить лабораторные результаты пациента"""
         try:
             # Получаем результаты анализов
@@ -74,8 +73,8 @@ class EMRLabIntegrationService:
             raise
 
     async def integrate_lab_results_with_emr(
-        self, db: Session, emr_id: int, lab_result_ids: List[int]
-    ) -> Dict[str, Any]:
+        self, db: Session, emr_id: int, lab_result_ids: list[int]
+    ) -> dict[str, Any]:
         """Интегрировать лабораторные результаты с EMR"""
         try:
             # Получаем EMR
@@ -118,8 +117,8 @@ class EMRLabIntegrationService:
             raise
 
     async def get_abnormal_lab_results(
-        self, db: Session, patient_id: int, date_from: Optional[datetime] = None
-    ) -> List[Dict[str, Any]]:
+        self, db: Session, patient_id: int, date_from: datetime | None = None
+    ) -> list[dict[str, Any]]:
         """Получить аномальные лабораторные результаты пациента"""
         try:
             # Получаем все результаты за период
@@ -160,7 +159,7 @@ class EMRLabIntegrationService:
 
     async def generate_lab_summary_for_emr(
         self, db: Session, patient_id: int, emr_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Сгенерировать сводку лабораторных данных для EMR"""
         try:
             # Получаем последние результаты (за последние 30 дней)
@@ -201,7 +200,7 @@ class EMRLabIntegrationService:
 
     async def notify_doctor_about_lab_results(
         self, db: Session, patient_id: int, doctor_id: int, result_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Уведомить врача о готовности лабораторных результатов"""
         try:
             # Получаем результат
@@ -262,7 +261,7 @@ class EMRLabIntegrationService:
 
     async def _calculate_deviation(
         self, test_code: str, value: float, unit: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Рассчитать отклонение от нормы"""
         try:
             if test_code not in self.normal_ranges:
@@ -313,8 +312,8 @@ class EMRLabIntegrationService:
             return "unknown"
 
     async def _format_lab_data_for_emr(
-        self, lab_results: List[LabResult]
-    ) -> Dict[str, Any]:
+        self, lab_results: list[LabResult]
+    ) -> dict[str, Any]:
         """Форматировать лабораторные данные для EMR"""
         formatted_data = {}
 
@@ -338,8 +337,8 @@ class EMRLabIntegrationService:
         return formatted_data
 
     async def _generate_lab_recommendations(
-        self, results: List[Dict[str, Any]]
-    ) -> List[str]:
+        self, results: list[dict[str, Any]]
+    ) -> list[str]:
         """Генерировать рекомендации на основе лабораторных данных"""
         recommendations = []
 
@@ -359,7 +358,7 @@ class EMRLabIntegrationService:
             abnormal_by_type[test_code].append(result)
 
         # Генерируем рекомендации для каждого типа
-        for test_code, type_results in abnormal_by_type.items():
+        for test_code, _type_results in abnormal_by_type.items():
             if test_code == "glucose":
                 recommendations.append(
                     "Рекомендуется контроль уровня глюкозы и консультация эндокринолога"

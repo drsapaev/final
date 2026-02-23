@@ -25,7 +25,7 @@ class TestFileSecurity:
         # Создаем пользователя с ролью, которая может загружать файлы (Doctor)
         from app.core.security import get_password_hash
         from app.models.user import User
-        
+
         doctor_user = db_session.query(User).filter(User.username == "doctor_file_test").first()
         if not doctor_user:
             doctor_user = User(
@@ -39,7 +39,7 @@ class TestFileSecurity:
             db_session.add(doctor_user)
             db_session.commit()
             db_session.refresh(doctor_user)
-        
+
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
@@ -47,7 +47,7 @@ class TestFileSecurity:
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
-        
+
         # Загружаем тестовый файл
         file_content = b"Test file content for hashing"
         file_obj = BytesIO(file_content)
@@ -81,7 +81,7 @@ class TestFileSecurity:
         # Создаем пользователя с ролью Doctor
         from app.core.security import get_password_hash
         from app.models.user import User
-        
+
         doctor_user = db_session.query(User).filter(User.username == "doctor_file_test2").first()
         if not doctor_user:
             doctor_user = User(
@@ -95,7 +95,7 @@ class TestFileSecurity:
             db_session.add(doctor_user)
             db_session.commit()
             db_session.refresh(doctor_user)
-        
+
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
@@ -103,7 +103,7 @@ class TestFileSecurity:
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
-        
+
         # Шаг 1: Загружаем исходный файл
         file_content_1 = b"Original file content"
         file_obj_1 = BytesIO(file_content_1)
@@ -184,7 +184,7 @@ class TestFileSecurity:
         # Создаем пользователя с ролью Doctor
         from app.core.security import get_password_hash
         from app.models.user import User
-        
+
         doctor_user = db_session.query(User).filter(User.username == "doctor_file_test3").first()
         if not doctor_user:
             doctor_user = User(
@@ -198,7 +198,7 @@ class TestFileSecurity:
             db_session.add(doctor_user)
             db_session.commit()
             db_session.refresh(doctor_user)
-        
+
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
@@ -206,9 +206,9 @@ class TestFileSecurity:
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
-        
+
         file_content = b"Identical content"
-        
+
         # Загружаем первый файл
         file_obj_1 = BytesIO(file_content)
         file_obj_1.name = "file1.txt"
@@ -243,7 +243,7 @@ class TestFileSecurity:
         # Создаем пользователя с ролью Doctor
         from app.core.security import get_password_hash
         from app.models.user import User
-        
+
         doctor_user = db_session.query(User).filter(User.username == "doctor_file_test4").first()
         if not doctor_user:
             doctor_user = User(
@@ -257,7 +257,7 @@ class TestFileSecurity:
             db_session.add(doctor_user)
             db_session.commit()
             db_session.refresh(doctor_user)
-        
+
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
@@ -265,7 +265,7 @@ class TestFileSecurity:
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
-        
+
         # Загружаем файл
         file_content = b"Version test"
         file_obj = BytesIO(file_content)

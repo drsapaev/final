@@ -3,7 +3,7 @@ Pydantic схемы для системы аутентификации
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic.config import ConfigDict
@@ -17,7 +17,7 @@ class LoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=6, max_length=100)
     remember_me: bool = Field(False, description="Запомнить пользователя")
-    device_fingerprint: Optional[str] = Field(None, max_length=64)
+    device_fingerprint: str | None = Field(None, max_length=64)
 
 
 class LoginResponse(BaseModel):
@@ -25,14 +25,14 @@ class LoginResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
+    access_token: str | None = None
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
-    user: Dict[str, Any]
+    user: dict[str, Any]
     requires_2fa: bool = False
-    two_factor_method: Optional[str] = None
-    pending_2fa_token: Optional[str] = None
+    two_factor_method: str | None = None
+    pending_2fa_token: str | None = None
     must_change_password: bool = False  # Требуется смена пароля при следующем входе
 
 
@@ -60,7 +60,7 @@ class LogoutRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
     logout_all_devices: bool = False
 
 
@@ -146,10 +146,10 @@ class UserProfileUpdateRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = Field(None, min_length=10, max_length=20)
-    avatar_url: Optional[str] = Field(None, max_length=500)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, min_length=10, max_length=20)
+    avatar_url: str | None = Field(None, max_length=500)
 
 
 class UserProfileResponse(BaseModel):
@@ -159,17 +159,17 @@ class UserProfileResponse(BaseModel):
 
     id: int
     username: str
-    full_name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    avatar_url: Optional[str] = None
+    full_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    avatar_url: str | None = None
     role: str
     is_active: bool
     is_superuser: bool
     email_verified: bool
     phone_verified: bool
-    created_at: Optional[datetime] = None
-    last_login: Optional[datetime] = None
+    created_at: datetime | None = None
+    last_login: datetime | None = None
     two_factor_enabled: bool = False
 
 
@@ -184,9 +184,9 @@ class UserSessionResponse(BaseModel):
     last_activity: datetime
     expires_at: datetime
     is_active: bool
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    device_name: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    device_name: str | None = None
     current_session: bool = False
 
 
@@ -196,11 +196,11 @@ class LoginAttemptResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     id: int
-    username: Optional[str] = None
-    email: Optional[str] = None
+    username: str | None = None
+    email: str | None = None
     ip_address: str
     success: bool
-    failure_reason: Optional[str] = None
+    failure_reason: str | None = None
     attempted_at: datetime
 
 
@@ -211,10 +211,10 @@ class UserActivityResponse(BaseModel):
 
     id: int
     activity_type: str
-    description: Optional[str] = None
+    description: str | None = None
     created_at: datetime
-    ip_address: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    ip_address: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class SecurityEventResponse(BaseModel):
@@ -227,10 +227,10 @@ class SecurityEventResponse(BaseModel):
     severity: str
     description: str
     created_at: datetime
-    ip_address: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    ip_address: str | None = None
+    metadata: dict[str, Any] | None = None
     resolved: bool
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
 
 
 class TokenValidationResponse(BaseModel):
@@ -239,11 +239,11 @@ class TokenValidationResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     valid: bool
-    user_id: Optional[int] = None
-    username: Optional[str] = None
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
-    expires_at: Optional[datetime] = None
+    user_id: int | None = None
+    username: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    expires_at: datetime | None = None
     requires_2fa: bool = False
 
 
@@ -253,8 +253,8 @@ class AuthStatusResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     authenticated: bool
-    user: Optional[UserProfileResponse] = None
-    session: Optional[UserSessionResponse] = None
+    user: UserProfileResponse | None = None
+    session: UserSessionResponse | None = None
     two_factor_required: bool = False
     two_factor_verified: bool = False
 
@@ -266,7 +266,7 @@ class PasswordStrengthResponse(BaseModel):
 
     score: int = Field(..., ge=0, le=100)
     strength: str = Field(..., pattern="^(weak|fair|good|strong|very_strong)$")
-    suggestions: List[str] = []
+    suggestions: list[str] = []
 
 
 class DeviceInfoResponse(BaseModel):
@@ -277,9 +277,9 @@ class DeviceInfoResponse(BaseModel):
     device_fingerprint: str
     ip_address: str
     user_agent: str
-    device_name: Optional[str] = None
+    device_name: str | None = None
     is_trusted: bool = False
-    last_used: Optional[datetime] = None
+    last_used: datetime | None = None
 
 
 class AuthErrorResponse(BaseModel):
@@ -290,7 +290,7 @@ class AuthErrorResponse(BaseModel):
     error: str
     error_description: str
     error_code: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 class AuthSuccessResponse(BaseModel):
@@ -300,7 +300,7 @@ class AuthSuccessResponse(BaseModel):
 
     success: bool
     message: str
-    data: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
 
 
 # Схемы для административных функций
@@ -311,7 +311,7 @@ class UserListResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    users: List[UserProfileResponse]
+    users: list[UserProfileResponse]
     total: int
     page: int
     per_page: int
@@ -325,7 +325,7 @@ class UserCreateRequest(BaseModel):
 
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
     password: str = Field(..., min_length=8, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
@@ -351,14 +351,14 @@ class UserUpdateRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    email: Optional[EmailStr] = None
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    email: EmailStr | None = None
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: Optional[str] = Field(
+    role: str | None = Field(
         None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
     )
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
 
 
 class UserDeleteRequest(BaseModel):
@@ -367,7 +367,7 @@ class UserDeleteRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     confirm: bool = Field(True, description="Подтверждение удаления")
-    transfer_to: Optional[int] = Field(
+    transfer_to: int | None = Field(
         None, description="ID пользователя для передачи данных"
     )
 
@@ -377,7 +377,7 @@ class SessionListResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    sessions: List[UserSessionResponse]
+    sessions: list[UserSessionResponse]
     total: int
     page: int
     per_page: int
@@ -390,7 +390,7 @@ class SessionRevokeRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     session_id: int
-    reason: Optional[str] = Field(None, max_length=200)
+    reason: str | None = Field(None, max_length=200)
 
 
 class SecurityEventListResponse(BaseModel):
@@ -398,7 +398,7 @@ class SecurityEventListResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    events: List[SecurityEventResponse]
+    events: list[SecurityEventResponse]
     total: int
     page: int
     per_page: int
@@ -411,7 +411,7 @@ class SecurityEventResolveRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     event_id: int
-    resolution_notes: Optional[str] = Field(None, max_length=500)
+    resolution_notes: str | None = Field(None, max_length=500)
 
 
 # Схемы для статистики

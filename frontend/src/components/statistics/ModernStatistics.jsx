@@ -1,21 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Button, Card, Icon } from '../ui/macos';
 
 const ModernStatistics = ({
   appointments = [],
-  departmentStats = {},
   language = 'ru',
   selectedDate = null, // YYYY-MM-DD, если не передан — используется сегодня
   onExport,
   onRefresh,
-  className = '',
   ...props
-}) => {
-  const { theme, getColor, getSpacing, getFontSize } = useTheme();
-  const [animatedValues, setAnimatedValues] = useState({});
-  const [selectedPeriod, setSelectedPeriod] = useState('today');
-  const [showDetails, setShowDetails] = useState(false);
+}) => {void
+  useTheme();
+  const [animatedValues, setAnimatedValues] = useState({});void
+  useState('today');void
+  useState(false);
 
   // Переводы
   const t = {
@@ -48,28 +46,28 @@ const ModernStatistics = ({
   // Вычисление статистики
   const statistics = useMemo(() => {
     const targetDate = selectedDate || new Date().toISOString().split('T')[0];
-    const dayAppointments = appointments.filter(apt => {
+    const dayAppointments = appointments.filter((apt) => {
       const aptDate = apt.date || apt.appointment_date;
       return aptDate === targetDate;
     });
 
     // Завершенные визиты за выбранный день
-    const completedToday = dayAppointments.filter(apt => 
-      apt.status === 'completed' || apt.status === 'done'
+    const completedToday = dayAppointments.filter((apt) =>
+    apt.status === 'completed' || apt.status === 'done'
     );
 
     // Ожидают оплаты за выбранный день
-    const pendingPayments = dayAppointments.filter(apt => 
-      apt.status === 'paid_pending' || apt.payment_status === 'pending'
+    const pendingPayments = dayAppointments.filter((apt) =>
+    apt.status === 'paid_pending' || apt.payment_status === 'pending'
     );
 
     // Выручка: суммируем оплаченные записи (по payment_status), а не только завершенные
-    const totalRevenue = dayAppointments
-      .filter(apt => apt.payment_status === 'paid')
-      .reduce((sum, apt) => sum + (apt.payment_amount || apt.cost || 0), 0);
+    const totalRevenue = dayAppointments.
+    filter((apt) => apt.payment_status === 'paid').
+    reduce((sum, apt) => sum + (apt.payment_amount || apt.cost || 0), 0);
 
     // Уникальные пациенты
-    const uniquePatients = new Set(dayAppointments.map(apt => apt.patient_id)).size;
+    const uniquePatients = new Set(dayAppointments.map((apt) => apt.patient_id)).size;
 
     // Среднее время ожидания (мок)
     const averageWaitTime = Math.floor(Math.random() * 30) + 10;
@@ -113,8 +111,8 @@ const ModernStatistics = ({
       const timer = setInterval(() => {
         step++;
         currentValue = Math.min(stepValue * step, targetValue);
-        
-        setAnimatedValues(prev => ({
+
+        setAnimatedValues((prev) => ({
           ...prev,
           [key]: Math.floor(currentValue)
         }));
@@ -128,82 +126,82 @@ const ModernStatistics = ({
     };
 
     const timers = [
-      animateValue('totalPatients', statistics.totalPatients),
-      animateValue('todayAppointments', statistics.todayAppointments),
-      animateValue('completedToday', statistics.completedToday),
-      animateValue('pendingPayments', statistics.pendingPayments),
-      animateValue('revenue', statistics.revenue)
-    ];
+    animateValue('totalPatients', statistics.totalPatients),
+    animateValue('todayAppointments', statistics.todayAppointments),
+    animateValue('completedToday', statistics.completedToday),
+    animateValue('pendingPayments', statistics.pendingPayments),
+    animateValue('revenue', statistics.revenue)];
+
 
     return () => {
-      timers.forEach(timer => clearInterval(timer));
+      timers.forEach((timer) => clearInterval(timer));
     };
   }, [statistics]);
 
   // Данные для карточек статистики с правильными иконками
   const statCards = [
-    {
-      id: 'totalPatients',
-      title: t.totalPatients,
-      value: animatedValues.totalPatients || 0,
-      iconName: 'person',
-      color: '#007aff',
-      trend: statistics.trends.patients,
-      trendValue: statistics.trendValues.patients,
-      suffix: ''
-    },
-    {
-      id: 'todayAppointments',
-      title: t.todayAppointments,
-      value: animatedValues.todayAppointments || 0,
-      iconName: 'calendar',
-      color: '#34c759',
-      trend: statistics.trends.appointments,
-      trendValue: statistics.trendValues.appointments,
-      suffix: ''
-    },
-    {
-      id: 'completedToday',
-      title: t.completedToday,
-      value: animatedValues.completedToday || 0,
-      iconName: 'checkmark.circle',
-      color: '#5ac8fa',
-      trend: statistics.trends.appointments,
-      trendValue: statistics.trendValues.appointments,
-      suffix: ''
-    },
-    {
-      id: 'pendingPayments',
-      title: t.pendingPayments,
-      value: animatedValues.pendingPayments || 0,
-      iconName: 'creditcard',
-      color: '#ff9500',
-      trend: 'down',
-      trendValue: Math.floor(Math.random() * 5) + 1,
-      suffix: ''
-    },
-    {
-      id: 'revenue',
-      title: t.revenue,
-      value: animatedValues.revenue || 0,
-      iconName: 'creditcard',
-      color: '#34c759',
-      trend: statistics.trends.revenue,
-      trendValue: statistics.trendValues.revenue,
-      suffix: ' ' + t.sum,
-      format: 'currency'
-    },
-    {
-      id: 'averageWaitTime',
-      title: t.averageWaitTime,
-      value: statistics.averageWaitTime,
-      iconName: 'clock',
-      color: '#5ac8fa',
-      trend: statistics.trends.waitTime,
-      trendValue: statistics.trendValues.waitTime,
-      suffix: ' ' + t.minutes
-    }
-  ];
+  {
+    id: 'totalPatients',
+    title: t.totalPatients,
+    value: animatedValues.totalPatients || 0,
+    iconName: 'person',
+    color: '#007aff',
+    trend: statistics.trends.patients,
+    trendValue: statistics.trendValues.patients,
+    suffix: ''
+  },
+  {
+    id: 'todayAppointments',
+    title: t.todayAppointments,
+    value: animatedValues.todayAppointments || 0,
+    iconName: 'calendar',
+    color: '#34c759',
+    trend: statistics.trends.appointments,
+    trendValue: statistics.trendValues.appointments,
+    suffix: ''
+  },
+  {
+    id: 'completedToday',
+    title: t.completedToday,
+    value: animatedValues.completedToday || 0,
+    iconName: 'checkmark.circle',
+    color: '#5ac8fa',
+    trend: statistics.trends.appointments,
+    trendValue: statistics.trendValues.appointments,
+    suffix: ''
+  },
+  {
+    id: 'pendingPayments',
+    title: t.pendingPayments,
+    value: animatedValues.pendingPayments || 0,
+    iconName: 'creditcard',
+    color: '#ff9500',
+    trend: 'down',
+    trendValue: Math.floor(Math.random() * 5) + 1,
+    suffix: ''
+  },
+  {
+    id: 'revenue',
+    title: t.revenue,
+    value: animatedValues.revenue || 0,
+    iconName: 'creditcard',
+    color: '#34c759',
+    trend: statistics.trends.revenue,
+    trendValue: statistics.trendValues.revenue,
+    suffix: ' ' + t.sum,
+    format: 'currency'
+  },
+  {
+    id: 'averageWaitTime',
+    title: t.averageWaitTime,
+    value: statistics.averageWaitTime,
+    iconName: 'clock',
+    color: '#5ac8fa',
+    trend: statistics.trends.waitTime,
+    trendValue: statistics.trendValues.waitTime,
+    suffix: ' ' + t.minutes
+  }];
+
 
   // Форматирование значений
   const formatValue = (value, format) => {
@@ -230,8 +228,8 @@ const ModernStatistics = ({
         alignItems: 'center',
         marginBottom: 'var(--mac-spacing-4)'
       }}>
-        <h2 style={{ 
-          color: 'var(--mac-text-primary)', 
+        <h2 style={{
+          color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-xl)',
           fontWeight: 'var(--mac-font-weight-semibold)',
           margin: 0,
@@ -261,7 +259,7 @@ const ModernStatistics = ({
       }}>
         {statCards.map((card) => {
           const isGoodWhenDown = card.id === 'pendingPayments' || card.id === 'averageWaitTime';
-          
+
           return (
             <Card
               key={card.id}
@@ -276,8 +274,8 @@ const ModernStatistics = ({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--mac-spacing-4)'
-              }}
-            >
+              }}>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Icon name={card.iconName} size="xlarge" style={{ color: card.color }} />
                 
@@ -289,11 +287,11 @@ const ModernStatistics = ({
                   fontWeight: 'var(--mac-font-weight-bold)',
                   color: getTrendColor(card.trend, isGoodWhenDown)
                 }}>
-                  <Icon 
-                    name={card.trend === 'up' ? 'checkmark.circle' : 'xmark.circle'} 
+                  <Icon
+                    name={card.trend === 'up' ? 'checkmark.circle' : 'xmark.circle'}
                     size="xlarge" // xlarge для ровного размера с левой иконкой
-                    style={{ color: getTrendColor(card.trend, isGoodWhenDown) }} 
-                  />
+                    style={{ color: getTrendColor(card.trend, isGoodWhenDown) }} />
+
                   {card.trendValue}%
                 </div>
               </div>
@@ -332,21 +330,19 @@ const ModernStatistics = ({
                 <div style={{
                   height: '100%',
                   backgroundColor: card.color,
-                  width: `${Math.min((card.value / (card.value + 10)) * 100, 100)}%`,
+                  width: `${Math.min(card.value / (card.value + 10) * 100, 100)}%`,
                   borderRadius: 'var(--mac-radius-full)',
                   transition: 'width var(--mac-duration-normal) var(--mac-ease)'
                 }} />
               </div>
-            </Card>
-          );
+            </Card>);
+
         })}
       </div>
 
       {/* Детальная статистика удалена - для упрощения UI */}
-    </div>
-  );
+    </div>);
+
 };
 
 export default ModernStatistics;
-
-

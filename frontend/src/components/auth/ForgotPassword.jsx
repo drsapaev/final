@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Mail,
   Phone,
   ArrowLeft,
   Send,
   CheckCircle,
-  AlertTriangle,
+
   RefreshCw,
   Shield,
-  Key
-} from 'lucide-react';
+  Key } from
+'lucide-react';
 import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
@@ -250,8 +250,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     }
   };
 
-  const renderMethodSelection = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderMethodSelection = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ textAlign: 'center' }}>
         <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>{t.title}</h2>
         <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>{t.subtitle}</p>
@@ -260,43 +260,43 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <button
-            onClick={() => setMethod('phone')}
-            className="glass-panel"
-            style={{
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              background: method === 'phone' ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
-              borderColor: method === 'phone' ? '#007aff' : 'var(--glass-border)',
-              transition: 'all 0.2s ease',
-              borderRadius: '16px'
-            }}
-          >
+          onClick={() => setMethod('phone')}
+          className="glass-panel"
+          style={{
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            background: method === 'phone' ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
+            borderColor: method === 'phone' ? '#007aff' : 'var(--glass-border)',
+            transition: 'all 0.2s ease',
+            borderRadius: '16px'
+          }}>
+
             <Phone size={24} color={method === 'phone' ? '#007aff' : 'var(--mac-text-secondary)'} />
             <span style={{ fontSize: '13px', fontWeight: '500', color: method === 'phone' ? '#007aff' : 'var(--mac-text-primary)' }}>{t.methodPhone}</span>
           </button>
 
           <button
-            onClick={() => setMethod('email')}
-            className="glass-panel"
-            style={{
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              background: method === 'email' ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
-              borderColor: method === 'email' ? '#007aff' : 'var(--glass-border)',
-              transition: 'all 0.2s ease',
-              borderRadius: '16px'
-            }}
-          >
+          onClick={() => setMethod('email')}
+          className="glass-panel"
+          style={{
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            background: method === 'email' ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
+            borderColor: method === 'email' ? '#007aff' : 'var(--glass-border)',
+            transition: 'all 0.2s ease',
+            borderRadius: '16px'
+          }}>
+
             <Mail size={24} color={method === 'email' ? '#007aff' : 'var(--mac-text-secondary)'} />
             <span style={{ fontSize: '13px', fontWeight: '500', color: method === 'email' ? '#007aff' : 'var(--mac-text-primary)' }}>{t.methodEmail}</span>
           </button>
@@ -307,16 +307,16 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             {method === 'phone' ? t.phoneLabel : t.emailLabel}
           </label>
           <input
-            type={method === 'phone' ? 'tel' : 'email'}
-            value={contact}
-            onChange={(e) => {
-              const value = method === 'phone' ? formatPhone(e.target.value) : e.target.value;
-              setContact(value);
-            }}
-            placeholder={method === 'phone' ? '+998XXXXXXXXX' : 'example@domain.com'}
-            disabled={loading}
-            className="glass-input"
-          />
+          type={method === 'phone' ? 'tel' : 'email'}
+          value={contact}
+          onChange={(e) => {
+            const value = method === 'phone' ? formatPhone(e.target.value) : e.target.value;
+            setContact(value);
+          }}
+          placeholder={method === 'phone' ? '+998XXXXXXXXX' : 'example@domain.com'}
+          disabled={loading}
+          className="glass-input" />
+
           <p style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '6px', marginLeft: '4px' }}>
             {method === 'phone' ? t.phoneFormat : t.emailFormat}
           </p>
@@ -324,40 +324,40 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
-            onClick={onBack}
-            className="btn-premium btn-glass"
-            style={{ flex: 1, justifyContent: 'center' }}
-            disabled={loading}
-          >
+          onClick={onBack}
+          className="btn-premium btn-glass"
+          style={{ flex: 1, justifyContent: 'center' }}
+          disabled={loading}>
+
             <ArrowLeft size={16} />
             {t.back}
           </button>
 
           <button
-            onClick={handleMethodSelect}
-            className="btn-premium btn-primary"
-            style={{ flex: 1, justifyContent: 'center' }}
-            disabled={loading || !contact.trim()}
-          >
-            {loading ? (
-              <>
+          onClick={handleMethodSelect}
+          className="btn-premium btn-primary"
+          style={{ flex: 1, justifyContent: 'center' }}
+          disabled={loading || !contact.trim()}>
+
+            {loading ?
+          <>
                 <RefreshCw size={16} className="spin" />
                 {t.sending}
-              </>
-            ) : (
-              <>
+              </> :
+
+          <>
                 <Send size={16} />
                 {t.continue}
               </>
-            )}
+          }
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderPhoneVerification = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderPhoneVerification = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: '64px', height: '64px', background: 'rgba(0, 122, 255, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <Phone size={32} color="#007aff" />
@@ -373,53 +373,53 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>Код подтверждения</label>
           <input
-            type="text"
-            value={verificationCode}
-            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="000000"
-            maxLength={6}
-            className="glass-input"
-            style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '4px', fontWeight: '600' }}
-            disabled={loading}
-          />
+          type="text"
+          value={verificationCode}
+          onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="000000"
+          maxLength={6}
+          className="glass-input"
+          style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '4px', fontWeight: '600' }}
+          disabled={loading} />
+
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
-            onClick={() => setStep('method')}
-            className="btn-premium btn-glass"
-            style={{ flex: 1, justifyContent: 'center' }}
-            disabled={loading}
-          >
+          onClick={() => setStep('method')}
+          className="btn-premium btn-glass"
+          style={{ flex: 1, justifyContent: 'center' }}
+          disabled={loading}>
+
             <ArrowLeft size={16} />
             {t.back}
           </button>
 
           <button
-            onClick={handleVerifyPhoneCode}
-            className="btn-premium btn-primary"
-            style={{ flex: 1, justifyContent: 'center' }}
-            disabled={loading || !verificationCode || verificationCode.length !== 6}
-          >
-            {loading ? (
-              <>
+          onClick={handleVerifyPhoneCode}
+          className="btn-premium btn-primary"
+          style={{ flex: 1, justifyContent: 'center' }}
+          disabled={loading || !verificationCode || verificationCode.length !== 6}>
+
+            {loading ?
+          <>
                 <RefreshCw size={16} className="spin" />
                 Проверка...
-              </>
-            ) : (
-              <>
+              </> :
+
+          <>
                 <Shield size={16} />
                 Подтвердить
               </>
-            )}
+          }
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderEmailVerification = () => (
-    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderEmailVerification = () =>
+  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '64px', height: '64px', background: 'rgba(0, 122, 255, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Mail size={32} color="#007aff" />
@@ -436,22 +436,22 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
 
       <div style={{ fontSize: '13px', color: 'var(--mac-text-tertiary)', lineHeight: '1.5' }}>
         <p>Перейдите по ссылке в письме для сброса пароля.</p>
-        <p>Если письмо не пришло, проверьте папку "Спам".</p>
+        <p>Если письмо не пришло, проверьте папку «Спам».</p>
       </div>
 
       <button
-        onClick={() => setStep('method')}
-        className="btn-premium btn-glass"
-        style={{ width: '100%', justifyContent: 'center' }}
-      >
+      onClick={() => setStep('method')}
+      className="btn-premium btn-glass"
+      style={{ width: '100%', justifyContent: 'center' }}>
+
         <ArrowLeft size={16} />
         {t.back}
       </button>
-    </div>
-  );
+    </div>;
 
-  const renderPasswordReset = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderPasswordReset = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
           <div style={{ width: '64px', height: '64px', background: 'rgba(52, 199, 89, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -466,51 +466,51 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>{t.newPassword}</label>
           <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="••••••••"
-            disabled={loading}
-            className="glass-input"
-          />
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          placeholder="••••••••"
+          disabled={loading}
+          className="glass-input" />
+
         </div>
 
         <div>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>{t.confirmPassword}</label>
           <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="••••••••"
-            disabled={loading}
-            className="glass-input"
-          />
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          placeholder="••••••••"
+          disabled={loading}
+          className="glass-input" />
+
         </div>
 
         <button
-          onClick={handlePasswordReset}
-          className="btn-premium btn-primary"
-          style={{ width: '100%', justifyContent: 'center' }}
-          disabled={loading || !newPassword || !confirmPassword}
-        >
-          {loading ? (
-            <>
+        onClick={handlePasswordReset}
+        className="btn-premium btn-primary"
+        style={{ width: '100%', justifyContent: 'center' }}
+        disabled={loading || !newPassword || !confirmPassword}>
+
+          {loading ?
+        <>
               <RefreshCw size={16} className="spin" />
               {t.resetting}
-            </>
-          ) : (
-            <>
+            </> :
+
+        <>
               <Shield size={16} />
               {t.resetPassword}
             </>
-          )}
+        }
         </button>
       </div>
-    </div>
-  );
+    </div>;
 
-  const renderSuccess = () => (
-    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+  const renderSuccess = () =>
+  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '64px', height: '64px', background: 'rgba(52, 199, 89, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <CheckCircle size={32} color="#34c759" />
@@ -525,14 +525,14 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       </div>
 
       <button
-        onClick={onSuccess || onBack}
-        className="btn-premium btn-primary"
-        style={{ width: '100%', justifyContent: 'center' }}
-      >
+      onClick={onSuccess || onBack}
+      className="btn-premium btn-primary"
+      style={{ width: '100%', justifyContent: 'center' }}>
+
         {t.backToLogin}
       </button>
-    </div>
-  );
+    </div>;
+
 
   return (
     <div className="glass-panel spotlight-card" style={{ width: '100%', maxWidth: '450px', margin: '0 auto', padding: '40px' }}>
@@ -541,8 +541,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       {step === 'email-verify' && renderEmailVerification()}
       {step === 'reset-password' && renderPasswordReset()}
       {step === 'success' && renderSuccess()}
-    </div>
-  );
+    </div>);
+
 };
 
 export default ForgotPassword;

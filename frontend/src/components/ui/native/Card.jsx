@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 const Card = React.forwardRef(({
@@ -10,7 +11,7 @@ const Card = React.forwardRef(({
   style = {},
   ...props
 }, ref) => {
-  const { isDark, getColor, getSpacing, getShadow } = useTheme();
+  const { getColor, getSpacing, getShadow } = useTheme();
 
   const baseStyle = {
     borderRadius: '8px',
@@ -78,11 +79,11 @@ const Card = React.forwardRef(({
       ref={ref}
       className={className}
       style={combinedStyle}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 Card.displayName = 'Card';
@@ -106,11 +107,11 @@ const CardHeader = React.forwardRef(({
         padding: getSpacing('xl'),
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 CardHeader.displayName = 'CardHeader';
@@ -135,11 +136,11 @@ const CardTitle = React.forwardRef(({
         color: getColor('text'),
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </h3>
-  );
+    </h3>);
+
 });
 
 CardTitle.displayName = 'CardTitle';
@@ -161,11 +162,11 @@ const CardDescription = React.forwardRef(({
         color: getColor('textSecondary'),
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </p>
-  );
+    </p>);
+
 });
 
 CardDescription.displayName = 'CardDescription';
@@ -187,11 +188,11 @@ const CardContent = React.forwardRef(({
         paddingTop: 0,
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 CardContent.displayName = 'CardContent';
@@ -215,11 +216,11 @@ const CardFooter = React.forwardRef(({
         paddingTop: 0,
         ...style
       }}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 CardFooter.displayName = 'CardFooter';
@@ -231,8 +232,44 @@ Card.Description = CardDescription;
 Card.Content = CardContent;
 Card.Footer = CardFooter;
 
+Card.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  variant: PropTypes.string,
+  padding: PropTypes.string,
+  shadow: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardHeader.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardTitle.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardDescription.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardContent.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardFooter.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
 export default Card;
 export { CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
-
-
-

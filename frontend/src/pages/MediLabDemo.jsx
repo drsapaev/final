@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucide-react';
@@ -14,6 +14,13 @@ import '../styles/cursor-effects.css';
 import '../styles/animations.css';
 import '../styles/responsive.css';
 
+const resolveTabFromPath = (path) => {
+  if (path.includes('/patients')) return 'patients';
+  if (path.includes('/appointments')) return 'appointments';
+  if (path.includes('/staff-schedule')) return 'staff-schedule';
+  return 'dashboard';
+};
+
 /**
  * Демонстрационная страница нового дизайна MediLab
  * Показывает все новые компоненты в действии
@@ -23,20 +30,11 @@ const MediLabDemo = () => {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Определяем активную вкладку из URL
-  const getCurrentTab = () => {
-    const path = location.pathname;
-    if (path.includes('/patients')) return 'patients';
-    if (path.includes('/appointments')) return 'appointments';
-    if (path.includes('/staff-schedule')) return 'staff-schedule';
-    return 'dashboard';
-  };
-
-  const [activeTab, setActiveTab] = useState(getCurrentTab());
+  const [activeTab, setActiveTab] = useState(() => resolveTabFromPath(location.pathname));
 
   // Обновляем активную вкладку при изменении URL
   useEffect(() => {
-    setActiveTab(getCurrentTab());
+    setActiveTab(resolveTabFromPath(location.pathname));
   }, [location.pathname]);
 
   // Моковые данные для демонстрации

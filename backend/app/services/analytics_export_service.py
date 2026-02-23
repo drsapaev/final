@@ -8,7 +8,7 @@ import logging
 import zipfile
 from datetime import datetime
 from io import BytesIO, StringIO
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ class AnalyticsExportService:
         self.supported_formats = ["json", "csv", "pdf", "excel", "zip"]
 
     async def export_to_json(
-        self, data: Dict[str, Any], filename: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], filename: str | None = None
+    ) -> dict[str, Any]:
         """Экспорт данных в JSON формат"""
         try:
             if not filename:
@@ -52,8 +52,8 @@ class AnalyticsExportService:
             raise
 
     async def export_to_csv(
-        self, data: Dict[str, Any], filename: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], filename: str | None = None
+    ) -> dict[str, Any]:
         """Экспорт данных в CSV формат"""
         try:
             if not filename:
@@ -88,8 +88,8 @@ class AnalyticsExportService:
             raise
 
     async def export_to_pdf(
-        self, data: Dict[str, Any], filename: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], filename: str | None = None
+    ) -> dict[str, Any]:
         """Экспорт данных в PDF формат"""
         try:
             if not filename:
@@ -113,8 +113,8 @@ class AnalyticsExportService:
             raise
 
     async def export_to_excel(
-        self, data: Dict[str, Any], filename: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], filename: str | None = None
+    ) -> dict[str, Any]:
         """Экспорт данных в Excel формат"""
         try:
             if not filename:
@@ -139,10 +139,10 @@ class AnalyticsExportService:
 
     async def export_to_zip(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         include_all_formats: bool = True,
-        filename: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        filename: str | None = None,
+    ) -> dict[str, Any]:
         """Экспорт данных в ZIP архив"""
         try:
             if not filename:
@@ -173,13 +173,13 @@ class AnalyticsExportService:
                 # README файл
                 readme_content = f"""
                 АНАЛИТИЧЕСКИЙ ОТЧЕТ - ЭКСПОРТ
-                
+
                 Содержимое архива:
                 - analytics_report.json - данные в JSON формате
                 - analytics_report.csv - данные в CSV формате
                 - analytics_report.pdf - отчет в PDF формате (если включен)
                 - analytics_report.xlsx - отчет в Excel формате (если включен)
-                
+
                 Дата экспорта: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 Формат данных: Аналитические отчеты клиники
                 """
@@ -216,14 +216,14 @@ class AnalyticsExportService:
             else:
                 writer.writerow([f"{prefix}{key}", str(value)])
 
-    def _generate_text_report(self, data: Dict[str, Any]) -> str:
+    def _generate_text_report(self, data: dict[str, Any]) -> str:
         """Генерирует текстовый отчет для PDF"""
         report = f"""
         АНАЛИТИЧЕСКИЙ ОТЧЕТ КЛИНИКИ
         =============================
-        
+
         Дата создания: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        
+
         """
 
         # Добавляем основные метрики
@@ -232,7 +232,7 @@ class AnalyticsExportService:
             report += f"""
         КЛЮЧЕВЫЕ ПОКАЗАТЕЛИ ЭФФЕКТИВНОСТИ
         ===================================
-        
+
         Общее количество записей: {kpi.get('total_appointments', 0)}
         Завершенные записи: {kpi.get('completed_appointments', 0)}
         Отмененные записи: {kpi.get('cancelled_appointments', 0)}
@@ -244,17 +244,17 @@ class AnalyticsExportService:
         Процент повторных визитов: {kpi.get('repeat_visit_rate_percent', 0)}%
         Процент отмен: {kpi.get('cancellation_rate_percent', 0)}%
         Процент завершения: {kpi.get('completion_rate_percent', 0)}%
-        
+
         """
 
         # Добавляем показатели врачей
         if "doctor_performance" in data:
             doctors = data["doctor_performance"].get("doctor_performance", [])
             if doctors:
-                report += f"""
+                report += """
         ПОКАЗАТЕЛИ ЭФФЕКТИВНОСТИ ВРАЧЕЙ
         ================================
-        
+
         """
                 for doctor in doctors[:5]:  # Топ 5 врачей
                     report += f"""
@@ -263,7 +263,7 @@ class AnalyticsExportService:
         - Завершенных: {doctor.get('completed_appointments', 0)}
         - Процент завершения: {doctor.get('completion_rate_percent', 0)}%
         - Оценка эффективности: {doctor.get('performance_score', 0)}
-        
+
         """
 
         # Добавляем аналитику доходов
@@ -272,20 +272,20 @@ class AnalyticsExportService:
             report += f"""
         АНАЛИТИКА ДОХОДОВ
         ==================
-        
+
         Общий доход: {revenue.get('revenue_metrics', {}).get('total_revenue', 0)} руб.
         Средний дневной доход: {revenue.get('revenue_metrics', {}).get('avg_daily_revenue', 0)} руб.
-        
+
         """
 
-        report += f"""
-        
+        report += """
+
         Отчет сгенерирован автоматически системой аналитики клиники.
         """
 
         return report
 
-    async def get_export_formats(self) -> List[Dict[str, Any]]:
+    async def get_export_formats(self) -> list[dict[str, Any]]:
         """Получить список поддерживаемых форматов экспорта"""
         return [
             {

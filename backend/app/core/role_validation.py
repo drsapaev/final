@@ -4,7 +4,6 @@
 """
 
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +78,7 @@ def validate_role_api_access(role: str, endpoint: str) -> bool:
     return False
 
 
-def get_expected_roles_for_endpoint(endpoint: str) -> List[str]:
+def get_expected_roles_for_endpoint(endpoint: str) -> list[str]:
     """Возвращает ожидаемые роли для API endpoint"""
     if endpoint.startswith("/api/v1/cardio/"):
         return ["Admin", "Doctor", "cardio"]

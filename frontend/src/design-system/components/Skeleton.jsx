@@ -1,4 +1,5 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
+import PropTypes from 'prop-types';
 import { createSkeletonStyles } from './utils';
 
 const Skeleton = forwardRef(({
@@ -146,6 +147,35 @@ const TableSkeleton = forwardRef(({
 });
 
 TableSkeleton.displayName = 'TableSkeleton';
+
+Skeleton.propTypes = {
+  width: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  variant: PropTypes.oneOf(['rectangular', 'circular', 'rounded', 'text']),
+  animation: PropTypes.oneOf(['pulse', 'wave', 'none']),
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+TextSkeleton.propTypes = {
+  lines: PropTypes.number,
+  lineHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  spacing: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+CardSkeleton.propTypes = {
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+TableSkeleton.propTypes = {
+  rows: PropTypes.number,
+  columns: PropTypes.number,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
 // Прикрепляем подкомпоненты к Skeleton
 Skeleton.Text = TextSkeleton;

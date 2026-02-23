@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Dict, Optional, Tuple
 
-from sqlalchemy import and_, func, MetaData, select, Table
+from sqlalchemy import MetaData, Table, and_, func, select
 from sqlalchemy.orm import Session
 
 
@@ -19,7 +18,7 @@ def _qe(db: Session) -> Table:
 
 def get_daily_by_date_department(
     db: Session, *, d: date, department: str
-) -> Optional[dict]:
+) -> dict | None:
     t = _dq(db)
     row = (
         db.execute(select(t).where(and_(t.c.date == d, t.c.department == department)))
@@ -30,7 +29,7 @@ def get_daily_by_date_department(
 
 
 def ensure_daily_queue(
-    db: Session, *, d: date, department: str, start_number: Optional[int] = None
+    db: Session, *, d: date, department: str, start_number: int | None = None
 ) -> dict:
     """Вернёт существующую дневную очередь или создаст новую."""
     existing = get_daily_by_date_department(db, d=d, department=department)
@@ -52,7 +51,7 @@ def ensure_daily_queue(
 
 
 def next_ticket_and_insert_entry(
-    db: Session, *, daily_queue_id: int, patient_id: Optional[int] = None
+    db: Session, *, daily_queue_id: int, patient_id: int | None = None
 ) -> dict:
     """Инкрементирует last_ticket и создаёт запись в очереди."""
     dq_t, qe_t = _dq(db), _qe(db)
@@ -95,11 +94,11 @@ def set_entry_status(
     *,
     entry_id: int,
     status: str,
-    window_no: Optional[str] = None,
-) -> Optional[dict]:
+    window_no: str | None = None,
+) -> dict | None:
     """Установить статус: waiting|serving|done|skipped."""
     qe_t = _qe(db)
-    values: Dict[str, object] = {"status": status}
+    values: dict[str, object] = {"status": status}
     now = datetime.utcnow()
     if status == "serving":
         values["started_at"] = now
@@ -120,13 +119,13 @@ def set_entry_status(
     return dict(row)
 
 
-def get_entry_by_id(db: Session, entry_id: int) -> Optional[dict]:
+def get_entry_by_id(db: Session, entry_id: int) -> dict | None:
     qe_t = _qe(db)
     row = db.execute(select(qe_t).where(qe_t.c.id == entry_id)).mappings().first()
     return dict(row) if row else None
 
 
-def stats_for_daily(db: Session, *, daily_queue_id: int) -> Tuple[int, int, int, int]:
+def stats_for_daily(db: Session, *, daily_queue_id: int) -> tuple[int, int, int, int]:
     """Возвращает (last_ticket, waiting, serving, done)."""
     dq_t, qe_t = _dq(db), _qe(db)
 

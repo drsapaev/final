@@ -8,15 +8,11 @@ import json
 import logging
 from datetime import date, datetime, timedelta
 from statistics import mean, median
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from sqlalchemy import and_, desc, func, or_, text
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.models.appointment import Appointment
-from app.models.clinic import Doctor
-from app.models.patient import Patient
-from app.models.user import User
 from app.models.visit import Visit
 from app.services.ai.ai_manager import get_ai_manager
 
@@ -36,12 +32,12 @@ class AIAnalyticsService:
         self,
         user_id: int,
         ai_function: str,
-        input_data: Dict[str, Any],
-        output_data: Dict[str, Any],
+        input_data: dict[str, Any],
+        output_data: dict[str, Any],
         execution_time: float,
         success: bool = True,
-        error_message: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        error_message: str | None = None,
+    ) -> dict[str, Any]:
         """Отслеживает использование AI функций"""
         try:
             # Создаем хеш для входных данных (для приватности)
@@ -80,9 +76,9 @@ class AIAnalyticsService:
         self,
         start_date: date,
         end_date: date,
-        user_id: Optional[int] = None,
-        ai_function: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        user_id: int | None = None,
+        ai_function: str | None = None,
+    ) -> dict[str, Any]:
         """Получает аналитику использования AI за период"""
         try:
             # Получаем данные использования (из базы или файлов)
@@ -117,7 +113,7 @@ class AIAnalyticsService:
 
     def get_ai_learning_insights(
         self, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализирует данные клиники для обучения AI"""
         try:
             insights = {
@@ -149,7 +145,7 @@ class AIAnalyticsService:
             logger.error(f"Ошибка анализа данных для обучения AI: {e}")
             return {"period": {}, "error": str(e)}
 
-    def optimize_ai_models(self) -> Dict[str, Any]:
+    def optimize_ai_models(self) -> dict[str, Any]:
         """Оптимизирует AI модели на основе накопленных данных"""
         try:
             optimization_results = {
@@ -199,7 +195,7 @@ class AIAnalyticsService:
 
     def generate_ai_training_dataset(
         self, data_type: str, start_date: date, end_date: date, anonymize: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Генерирует обучающий датасет из данных клиники"""
         try:
             dataset_info = {
@@ -254,7 +250,7 @@ class AIAnalyticsService:
 
     # ===================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====================
 
-    def _hash_sensitive_data(self, data: Dict[str, Any]) -> str:
+    def _hash_sensitive_data(self, data: dict[str, Any]) -> str:
         """Создает хеш для чувствительных данных"""
         try:
             # Удаляем персональные данные перед хешированием
@@ -264,7 +260,7 @@ class AIAnalyticsService:
         except Exception:
             return "unknown_hash"
 
-    def _sanitize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _sanitize_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Удаляет персональные данные"""
         sensitive_keys = [
             'name',
@@ -292,7 +288,7 @@ class AIAnalyticsService:
         return sanitized
 
     def _estimate_tokens_used(
-        self, input_data: Dict[str, Any], output_data: Dict[str, Any]
+        self, input_data: dict[str, Any], output_data: dict[str, Any]
     ) -> int:
         """Оценивает количество токенов, использованных в запросе"""
         try:
@@ -304,7 +300,7 @@ class AIAnalyticsService:
             return 0
 
     def _estimate_cost(
-        self, ai_function: str, input_data: Dict[str, Any], output_data: Dict[str, Any]
+        self, ai_function: str, input_data: dict[str, Any], output_data: dict[str, Any]
     ) -> float:
         """Оценивает стоимость AI запроса"""
         try:
@@ -329,7 +325,7 @@ class AIAnalyticsService:
         except Exception:
             return 0.0
 
-    def _save_usage_record(self, record: Dict[str, Any]) -> None:
+    def _save_usage_record(self, record: dict[str, Any]) -> None:
         """Сохраняет запись об использовании AI"""
         try:
             # В реальной реализации здесь будет сохранение в БД
@@ -344,9 +340,9 @@ class AIAnalyticsService:
         self,
         start_date: date,
         end_date: date,
-        user_id: Optional[int] = None,
-        ai_function: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        user_id: int | None = None,
+        ai_function: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Получает данные использования AI из базы"""
         try:
             # В реальной реализации здесь будет запрос к БД
@@ -379,8 +375,8 @@ class AIAnalyticsService:
             return []
 
     def _calculate_usage_statistics(
-        self, usage_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, usage_data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Рассчитывает статистику использования"""
         if not usage_data:
             return {}
@@ -404,7 +400,7 @@ class AIAnalyticsService:
             "average_cost_per_request": total_cost / len(usage_data),
         }
 
-    def _analyze_by_function(self, usage_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _analyze_by_function(self, usage_data: list[dict[str, Any]]) -> dict[str, Any]:
         """Анализирует использование по функциям"""
         function_stats = {}
 
@@ -428,7 +424,7 @@ class AIAnalyticsService:
             stats["total_cost"] += record.get("cost_estimate", 0)
 
         # Рассчитываем средние значения
-        for function, stats in function_stats.items():
+        for _function, stats in function_stats.items():
             stats["success_rate"] = (stats["successful"] / stats["requests"]) * 100
             stats["average_time"] = stats["total_time"] / stats["requests"]
             stats["average_tokens"] = stats["total_tokens"] / stats["requests"]
@@ -436,7 +432,7 @@ class AIAnalyticsService:
 
         return function_stats
 
-    def _analyze_by_user(self, usage_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _analyze_by_user(self, usage_data: list[dict[str, Any]]) -> dict[str, Any]:
         """Анализирует использование по пользователям"""
         user_stats = {}
 
@@ -457,15 +453,15 @@ class AIAnalyticsService:
             stats["total_cost"] += record.get("cost_estimate", 0)
 
         # Конвертируем set в список для JSON сериализации
-        for user_id, stats in user_stats.items():
+        for _user_id, stats in user_stats.items():
             stats["functions_used"] = list(stats["functions_used"])
             stats["unique_functions"] = len(stats["functions_used"])
 
         return user_stats
 
     def _calculate_performance_metrics(
-        self, usage_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, usage_data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Рассчитывает метрики производительности"""
         if not usage_data:
             return {}
@@ -498,8 +494,8 @@ class AIAnalyticsService:
         }
 
     def _calculate_cost_analysis(
-        self, usage_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, usage_data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Анализирует затраты на AI"""
         if not usage_data:
             return {}
@@ -522,7 +518,7 @@ class AIAnalyticsService:
             "cost_trend": self._calculate_cost_trend(daily_costs),
         }
 
-    def _calculate_cost_trend(self, daily_costs: Dict[str, float]) -> str:
+    def _calculate_cost_trend(self, daily_costs: dict[str, float]) -> str:
         """Рассчитывает тренд затрат"""
         if len(daily_costs) < 2:
             return "insufficient_data"
@@ -541,7 +537,7 @@ class AIAnalyticsService:
         else:
             return "stable"
 
-    def _analyze_usage_trends(self, usage_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _analyze_usage_trends(self, usage_data: list[dict[str, Any]]) -> dict[str, Any]:
         """Анализирует тренды использования"""
         if not usage_data:
             return {}
@@ -588,8 +584,8 @@ class AIAnalyticsService:
         }
 
     def _generate_usage_recommendations(
-        self, usage_data: List[Dict[str, Any]]
-    ) -> List[str]:
+        self, usage_data: list[dict[str, Any]]
+    ) -> list[str]:
         """Генерирует рекомендации по использованию AI"""
         recommendations = []
 
@@ -630,7 +626,7 @@ class AIAnalyticsService:
 
     def _analyze_medical_patterns(
         self, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализирует медицинские паттерны для обучения AI"""
         try:
             # Анализируем визиты за период
@@ -657,7 +653,7 @@ class AIAnalyticsService:
             logger.error(f"Ошибка анализа медицинских паттернов: {e}")
             return {}
 
-    def _extract_symptom_patterns(self, visits: List[Visit]) -> Dict[str, Any]:
+    def _extract_symptom_patterns(self, visits: list[Visit]) -> dict[str, Any]:
         """Извлекает паттерны симптомов"""
         # Моковые данные для демонстрации
         return {
@@ -674,7 +670,7 @@ class AIAnalyticsService:
             },
         }
 
-    def _analyze_diagnosis_frequency(self, visits: List[Visit]) -> Dict[str, Any]:
+    def _analyze_diagnosis_frequency(self, visits: list[Visit]) -> dict[str, Any]:
         """Анализирует частоту диагнозов"""
         return {
             "top_diagnoses": [
@@ -689,7 +685,7 @@ class AIAnalyticsService:
             },
         }
 
-    def _analyze_treatment_patterns(self, visits: List[Visit]) -> Dict[str, Any]:
+    def _analyze_treatment_patterns(self, visits: list[Visit]) -> dict[str, Any]:
         """Анализирует паттерны лечения"""
         return {
             "effective_treatments": [
@@ -716,8 +712,8 @@ class AIAnalyticsService:
         }
 
     def _identify_seasonal_patterns(
-        self, visits: List[Visit], start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+        self, visits: list[Visit], start_date: date, end_date: date
+    ) -> dict[str, Any]:
         """Выявляет сезонные паттерны заболеваний"""
         return {
             "winter_diseases": ["ОРВИ", "Грипп", "Пневмония"],
@@ -728,7 +724,7 @@ class AIAnalyticsService:
 
     def _analyze_diagnostic_accuracy(
         self, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализирует точность диагностики"""
         return {
             "ai_vs_doctor_accuracy": {
@@ -745,7 +741,7 @@ class AIAnalyticsService:
 
     def _analyze_treatment_effectiveness(
         self, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализирует эффективность лечения"""
         return {
             "success_rates": {
@@ -762,7 +758,7 @@ class AIAnalyticsService:
 
     def _analyze_patient_outcomes(
         self, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализирует исходы лечения пациентов"""
         return {
             "recovery_rates": {
@@ -775,7 +771,7 @@ class AIAnalyticsService:
 
     def _analyze_seasonal_trends(
         self, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Анализирует сезонные тренды"""
         return {
             "monthly_patterns": {
@@ -791,7 +787,7 @@ class AIAnalyticsService:
 
     def _generate_learning_recommendations(
         self, start_date: date, end_date: date
-    ) -> List[str]:
+    ) -> list[str]:
         """Генерирует рекомендации для обучения AI"""
         return [
             "Увеличить объем данных по редким заболеваниям",
@@ -801,7 +797,7 @@ class AIAnalyticsService:
             "Интегрировать данные о генетических факторах",
         ]
 
-    def _analyze_function_performance(self, function: str) -> Dict[str, Any]:
+    def _analyze_function_performance(self, function: str) -> dict[str, Any]:
         """Анализирует производительность конкретной AI функции"""
         return {
             "function": function,
@@ -813,8 +809,8 @@ class AIAnalyticsService:
         }
 
     def _apply_optimization(
-        self, function: str, analysis: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, function: str, analysis: dict[str, Any]
+    ) -> dict[str, Any]:
         """Применяет оптимизации к AI функции"""
         return {
             "function": function,
@@ -824,8 +820,8 @@ class AIAnalyticsService:
         }
 
     def _generate_optimization_recommendations(
-        self, analyses: List[Dict[str, Any]]
-    ) -> List[str]:
+        self, analyses: list[dict[str, Any]]
+    ) -> list[str]:
         """Генерирует рекомендации по оптимизации"""
         return [
             "Рассмотрите использование кэширования для часто запрашиваемых диагнозов",
@@ -835,7 +831,7 @@ class AIAnalyticsService:
 
     def _generate_diagnostic_dataset(
         self, start_date: date, end_date: date, anonymize: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Генерирует датасет для обучения диагностики"""
         # Моковые данные
         return [
@@ -850,7 +846,7 @@ class AIAnalyticsService:
 
     def _generate_treatment_dataset(
         self, start_date: date, end_date: date, anonymize: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Генерирует датасет для обучения лечения"""
         return [
             {
@@ -864,7 +860,7 @@ class AIAnalyticsService:
 
     def _generate_symptoms_dataset(
         self, start_date: date, end_date: date, anonymize: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Генерирует датасет симптомов"""
         return [
             {
@@ -878,7 +874,7 @@ class AIAnalyticsService:
 
     def _generate_scheduling_dataset(
         self, start_date: date, end_date: date, anonymize: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Генерирует датасет для оптимизации расписания"""
         return [
             {
@@ -890,13 +886,13 @@ class AIAnalyticsService:
             }
         ] * 200
 
-    def _calculate_dataset_quality(self, dataset: List[Dict[str, Any]]) -> float:
+    def _calculate_dataset_quality(self, dataset: list[dict[str, Any]]) -> float:
         """Рассчитывает качество датасета"""
         if not dataset:
             return 0.0
 
         # Простая оценка качества на основе полноты данных
-        total_fields = len(dataset[0].keys()) if dataset else 0
+        _total_fields = len(dataset[0].keys()) if dataset else 0
         complete_records = 0
 
         for record in dataset:
@@ -906,8 +902,8 @@ class AIAnalyticsService:
         return (complete_records / len(dataset)) * 100 if dataset else 0
 
     def _check_privacy_compliance(
-        self, dataset: List[Dict[str, Any]], anonymized: bool
-    ) -> Dict[str, Any]:
+        self, dataset: list[dict[str, Any]], anonymized: bool
+    ) -> dict[str, Any]:
         """Проверяет соответствие требованиям приватности"""
         return {
             "anonymized": anonymized,
@@ -918,7 +914,7 @@ class AIAnalyticsService:
         }
 
     def _save_training_dataset(
-        self, dataset: List[Dict[str, Any]], info: Dict[str, Any]
+        self, dataset: list[dict[str, Any]], info: dict[str, Any]
     ) -> str:
         """Сохраняет обучающий датасет"""
         # В реальной реализации здесь будет сохранение в зашифрованном файле
@@ -926,7 +922,7 @@ class AIAnalyticsService:
         filename = f"training_dataset_{info['data_type']}_{timestamp}.json"
         return f"/secure/datasets/{filename}"
 
-    def _get_empty_usage_analytics(self) -> Dict[str, Any]:
+    def _get_empty_usage_analytics(self) -> dict[str, Any]:
         """Возвращает пустую структуру аналитики"""
         return {
             "period": {},

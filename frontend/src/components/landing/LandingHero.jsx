@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const LandingHero = ({ onGetStarted }) => {
   return (
     <section className="landing-hero">

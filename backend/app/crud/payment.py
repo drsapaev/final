@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import List, Optional
-
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,14 +9,14 @@ from app.models.payment import Payment  # type: ignore[attr-defined]
 def list_payments(
     db: Session,
     *,
-    visit_id: Optional[int] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    visit_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     limit: int = 200,
     offset: int = 0,
-) -> List[Payment]:
+) -> list[Payment]:
     """Получить список платежей с фильтрацией"""
-    from datetime import date, datetime
+    from datetime import datetime
 
     from sqlalchemy.orm import selectinload
 
@@ -99,7 +97,7 @@ def count_pending_payments(db: Session, patient_id: int) -> int:
     )
 
     pending_count = 0
-    for visit in visits:
+    for _visit in visits:
         # Проверяем, есть ли неоплаченные услуги
         # Здесь должна быть логика проверки неоплаченных услуг
         # Пока что просто считаем все записи как потенциально требующие оплаты

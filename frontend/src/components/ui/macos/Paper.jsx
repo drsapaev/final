@@ -13,8 +13,8 @@ const Paper = React.forwardRef(({
   variant = 'elevation',
   square = false,
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
   const getElevationStyles = (elevation) => {
     const elevations = {
@@ -60,11 +60,11 @@ const Paper = React.forwardRef(({
       ref={ref}
       className={`mac-paper mac-paper--${variant} mac-paper--elevation-${elevation} ${square ? 'mac-paper--square' : ''} ${className}`}
       style={paperStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 });
 
 Paper.displayName = 'Paper';

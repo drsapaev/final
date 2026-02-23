@@ -5,15 +5,14 @@ Security Middleware для rate limiting, brute force protection и IP logging
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request, status
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-
-from app.core.audit import log_critical_change
-from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -28,30 +27,30 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app):
         super().__init__(app)
-        
+
         # Rate limiting конфигурация
-        self.rate_limits: Dict[str, Dict[str, int]] = {
+        self.rate_limits: dict[str, dict[str, int]] = {
             "login": {"requests": 5, "window": 300},  # 5 попыток за 5 минут
             "2fa_verify": {"requests": 10, "window": 300},  # 10 попыток за 5 минут
             "password_reset": {"requests": 3, "window": 3600},  # 3 попытки за час
             "password_change": {"requests": 5, "window": 3600},  # 5 попыток за час
             "api": {"requests": 100, "window": 3600},  # 100 запросов за час
         }
-        
+
         # Brute force protection конфигурация
         self.brute_force_config = {
             "max_failed_attempts": 5,  # Максимум неудачных попыток
             "lockout_duration": 900,  # 15 минут блокировки
             "tracking_window": 3600,  # Окно отслеживания: 1 час
         }
-        
+
         # In-memory хранилище (в продакшене использовать Redis)
-        self.request_counts: Dict[str, list] = defaultdict(list)  # IP -> [timestamps]
-        self.failed_attempts: Dict[str, Dict[str, list]] = defaultdict(
+        self.request_counts: dict[str, list] = defaultdict(list)  # IP -> [timestamps]
+        self.failed_attempts: dict[str, dict[str, list]] = defaultdict(
             lambda: defaultdict(list)
         )  # IP -> endpoint -> [timestamps]
-        self.locked_ips: Dict[str, datetime] = {}  # IP -> lock_until
-        
+        self.locked_ips: dict[str, datetime] = {}  # IP -> lock_until
+
         # Очистка старых записей каждые 5 минут
         self.last_cleanup = datetime.utcnow()
         self.cleanup_interval = timedelta(minutes=5)
@@ -63,21 +62,21 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if forwarded_for:
             # Берем первый IP из списка
             return forwarded_for.split(",")[0].strip()
-        
+
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
             return real_ip.strip()
-        
+
         # Fallback на client.host
         if request.client:
             return request.client.host
-        
+
         return "unknown"
 
     def _get_endpoint_type(self, path: str) -> str:
         """Определить тип эндпоинта для применения соответствующих лимитов"""
         path_lower = path.lower()
-        
+
         # Проверяем более специфичные пути первыми
         if "/authentication/login" in path_lower or path_lower.endswith("/login"):
             return "login"
@@ -93,14 +92,16 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     def _cleanup_old_records(self):
         """Очистить старые записи из памяти"""
         now = datetime.utcnow()
-        if now - self.last_cleanup < self.cleanup_interval:
-            return
-        
-        current_timestamp = now.timestamp()
-        
+        # Use epoch seconds from the system clock to avoid naive datetime timezone shifts.
+        current_timestamp = time.time()
+        default_window = min(cfg["window"] for cfg in self.rate_limits.values())
+
         # Очистка request_counts
         for key in list(self.request_counts.keys()):
-            window = 3600  # 1 час по умолчанию
+            endpoint_type = key.split(":", 1)[0]
+            window = self.rate_limits.get(endpoint_type, {}).get(
+                "window", default_window
+            )
             self.request_counts[key] = [
                 ts
                 for ts in self.request_counts[key]
@@ -108,7 +109,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             ]
             if not self.request_counts[key]:
                 del self.request_counts[key]
-        
+
         # Очистка failed_attempts
         for ip in list(self.failed_attempts.keys()):
             for endpoint in list(self.failed_attempts[ip].keys()):
@@ -122,33 +123,33 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                     del self.failed_attempts[ip][endpoint]
             if not self.failed_attempts[ip]:
                 del self.failed_attempts[ip]
-        
+
         # Очистка истекших блокировок
         for ip in list(self.locked_ips.keys()):
             if now > self.locked_ips[ip]:
                 del self.locked_ips[ip]
-        
+
         self.last_cleanup = now
 
     def _check_rate_limit(
         self, ip_address: str, endpoint_type: str
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Проверить rate limit
-        
+
         Returns:
             (is_limited, error_message)
         """
         if endpoint_type not in self.rate_limits:
             return False, None
-        
+
         limit_config = self.rate_limits[endpoint_type]
         window = limit_config["window"]
         max_requests = limit_config["requests"]
-        
+
         key = f"{endpoint_type}:{ip_address}"
         current_timestamp = time.time()
-        
+
         # Очищаем старые записи для этого ключа
         if key in self.request_counts:
             self.request_counts[key] = [
@@ -158,19 +159,19 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             ]
         else:
             self.request_counts[key] = []
-        
+
         # Проверяем лимит
         if len(self.request_counts[key]) >= max_requests:
             return True, f"Превышен лимит запросов: {max_requests} за {window} секунд"
-        
+
         # Добавляем текущий запрос
         self.request_counts[key].append(current_timestamp)
         return False, None
 
-    def _check_brute_force(self, ip_address: str, endpoint: str) -> Tuple[bool, Optional[str]]:
+    def _check_brute_force(self, ip_address: str, endpoint: str) -> tuple[bool, str | None]:
         """
         Проверить brute force protection
-        
+
         Returns:
             (is_blocked, error_message)
         """
@@ -183,17 +184,17 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             else:
                 # Блокировка истекла
                 del self.locked_ips[ip_address]
-        
+
         # Проверяем количество неудачных попыток
         failed = self.failed_attempts[ip_address][endpoint]
         current_timestamp = time.time()
         window = self.brute_force_config["tracking_window"]
-        
+
         # Очищаем старые записи
         failed[:] = [
             ts for ts in failed if current_timestamp - ts < window
         ]
-        
+
         max_attempts = self.brute_force_config["max_failed_attempts"]
         if len(failed) >= max_attempts:
             # Блокируем IP
@@ -204,8 +205,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             logger.warning(
                 f"IP {ip_address} заблокирован из-за {len(failed)} неудачных попыток на {endpoint}"
             )
-            return True, f"IP заблокирован из-за множественных неудачных попыток. Попробуйте позже."
-        
+            return True, "IP заблокирован из-за множественных неудачных попыток. Попробуйте позже."
+
         return False, None
 
     def _record_failed_attempt(self, ip_address: str, endpoint: str):
@@ -234,44 +235,48 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json",
             "/health",
-            "/",
+            "/api/v1/health",
+            "/api/v1/status",
+            "/api/v1/queues/profiles/public",
+            "/api/v1/activation/status",
         ]
-        
-        if any(request.url.path.startswith(path) for path in public_paths):
+
+        path = request.url.path
+        if path == "/" or any(path.startswith(prefix) for prefix in public_paths):
             return await call_next(request)
-        
+
         # Получаем IP адрес
         ip_address = self._get_client_ip(request)
-        
+
         # Определяем тип эндпоинта
         endpoint_type = self._get_endpoint_type(request.url.path)
-        
+
         # Очистка старых записей
         self._cleanup_old_records()
-        
+
         # Проверка brute force protection (только для auth endpoints)
         if endpoint_type in ["login", "2fa_verify", "password_reset", "password_change"]:
             is_blocked, error_msg = self._check_brute_force(ip_address, request.url.path)
             if is_blocked:
                 self._log_ip_access(request, ip_address, endpoint_type, blocked=True)
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=error_msg or "Превышен лимит неудачных попыток",
+                    content={"detail": error_msg or "Превышен лимит неудачных попыток"},
                 )
-        
+
         # Проверка rate limiting
         is_limited, error_msg = self._check_rate_limit(ip_address, endpoint_type)
         if is_limited:
             self._log_ip_access(request, ip_address, endpoint_type, blocked=True)
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=error_msg or "Превышен лимит запросов",
+                content={"detail": error_msg or "Превышен лимит запросов"},
             )
-        
+
         # Выполняем запрос
         try:
             response = await call_next(request)
-            
+
             # Если запрос неудачный (4xx/5xx) на auth endpoint, записываем как failed attempt
             if (
                 endpoint_type in ["login", "2fa_verify", "password_reset", "password_change"]
@@ -279,24 +284,21 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             ):
                 self._record_failed_attempt(ip_address, request.url.path)
                 self._log_ip_access(request, ip_address, endpoint_type, blocked=True)
-            
+
             # Добавляем заголовки с информацией о лимитах (только для успешных запросов)
             if endpoint_type in self.rate_limits and response.status_code < 400:
                 limit_config = self.rate_limits[endpoint_type]
                 response.headers["X-RateLimit-Limit"] = str(limit_config["requests"])
                 response.headers["X-RateLimit-Window"] = str(limit_config["window"])
-                
+
                 # Подсчитываем оставшиеся запросы
                 key = f"{endpoint_type}:{ip_address}"
                 if key in self.request_counts:
                     remaining = limit_config["requests"] - len(self.request_counts[key])
                     response.headers["X-RateLimit-Remaining"] = str(max(0, remaining))
-            
+
             return response
-            
-        except HTTPException:
-            # Перебрасываем HTTPException
-            raise
+
         except Exception as e:
             logger.error(f"Security middleware error: {e}", exc_info=True)
             # В случае ошибки пропускаем проверку

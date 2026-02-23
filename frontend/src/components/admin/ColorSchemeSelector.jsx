@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { MacOSButton, MacOSCard, MacOSSelect } from '../ui/macos';
 import { Palette, Sun, Moon, Monitor, Sparkles, Rainbow, Layers } from 'lucide-react';
 
 import logger from '../../utils/logger';
 const ColorSchemeSelector = () => {
-  const { theme, setTheme, isDark, isLight } = useTheme();
+  const { theme, setTheme } = useTheme();
   // Initialize with saved scheme or current theme
   const [selectedScheme, setSelectedScheme] = useState(() => {
     const savedScheme = localStorage.getItem('colorScheme');
@@ -15,101 +15,101 @@ const ColorSchemeSelector = () => {
     return theme;
   });
 
-  const colorSchemes = [
-    {
-      id: 'light',
-      name: 'Светлая тема',
-      description: 'Классическая светлая тема macOS',
-      icon: Sun,
-      type: 'standard',
-      colors: {
-        primary: '#ffffff',
-        secondary: '#f5f5f7',
-        accent: '#007aff',
-        text: '#000000'
-      }
-    },
-    {
-      id: 'dark',
-      name: 'Темная тема',
-      description: 'Современная темная тема macOS',
-      icon: Moon,
-      type: 'standard',
-      colors: {
-        primary: '#1c1c1e',
-        secondary: '#2c2c2e',
-        accent: '#007aff',
-        text: '#ffffff'
-      }
-    },
-    {
-      id: 'auto',
-      name: 'Автоматически',
-      description: 'Следует системным настройкам',
-      icon: Monitor,
-      type: 'standard',
-      colors: {
-        primary: 'var(--mac-bg-primary)',
-        secondary: 'var(--mac-bg-secondary)',
-        accent: 'var(--mac-accent-blue)',
-        text: 'var(--mac-text-primary)'
-      }
-    },
-    {
-      id: 'vibrant',
-      name: 'Яркая многоцветная',
-      description: 'Насыщенные яркие цвета для энергичного интерфейса',
-      icon: Rainbow,
-      type: 'vibrant',
-      colors: {
-        primary: '#ff6b9d',
-        secondary: '#c44569',
-        accent: '#ff9500',
-        text: '#ffffff',
-        gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%)'
-      }
-    },
-    {
-      id: 'glass',
-      name: 'Полупрозрачная стеклянная',
-      description: 'Эффект размытого стекла с лёгкими оттенками',
-      icon: Layers,
-      type: 'glass',
-      colors: {
-        primary: 'rgba(255,255,255,0.25)',
-        secondary: 'rgba(245,245,247,0.4)',
-        accent: 'rgba(0,122,255,0.6)',
-        text: '#1c1c1e',
-        backdrop: 'blur(20px)'
-      }
-    },
-    {
-      id: 'gradient',
-      name: 'Градиентная палитра',
-      description: 'Многоцветные градиенты с плавными переходами',
-      icon: Sparkles,
-      type: 'gradient',
-      colors: {
-        primary: '#667eea',
-        secondary: '#764ba2',
-        accent: '#f093fb',
-        text: '#ffffff',
-        gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)'
-      }
+  const colorSchemes = useMemo(() => [
+  {
+    id: 'light',
+    name: 'Светлая тема',
+    description: 'Классическая светлая тема macOS',
+    icon: Sun,
+    type: 'standard',
+    colors: {
+      primary: '#ffffff',
+      secondary: '#f5f5f7',
+      accent: '#007aff',
+      text: '#000000'
     }
-  ];
+  },
+  {
+    id: 'dark',
+    name: 'Темная тема',
+    description: 'Современная темная тема macOS',
+    icon: Moon,
+    type: 'standard',
+    colors: {
+      primary: '#1c1c1e',
+      secondary: '#2c2c2e',
+      accent: '#007aff',
+      text: '#ffffff'
+    }
+  },
+  {
+    id: 'auto',
+    name: 'Автоматически',
+    description: 'Следует системным настройкам',
+    icon: Monitor,
+    type: 'standard',
+    colors: {
+      primary: 'var(--mac-bg-primary)',
+      secondary: 'var(--mac-bg-secondary)',
+      accent: 'var(--mac-accent-blue)',
+      text: 'var(--mac-text-primary)'
+    }
+  },
+  {
+    id: 'vibrant',
+    name: 'Яркая многоцветная',
+    description: 'Насыщенные яркие цвета для энергичного интерфейса',
+    icon: Rainbow,
+    type: 'vibrant',
+    colors: {
+      primary: '#ff6b9d',
+      secondary: '#c44569',
+      accent: '#ff9500',
+      text: '#ffffff',
+      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%)'
+    }
+  },
+  {
+    id: 'glass',
+    name: 'Полупрозрачная стеклянная',
+    description: 'Эффект размытого стекла с лёгкими оттенками',
+    icon: Layers,
+    type: 'glass',
+    colors: {
+      primary: 'rgba(255,255,255,0.25)',
+      secondary: 'rgba(245,245,247,0.4)',
+      accent: 'rgba(0,122,255,0.6)',
+      text: '#1c1c1e',
+      backdrop: 'blur(20px)'
+    }
+  },
+  {
+    id: 'gradient',
+    name: 'Градиентная палитра',
+    description: 'Многоцветные градиенты с плавными переходами',
+    icon: Sparkles,
+    type: 'gradient',
+    colors: {
+      primary: '#667eea',
+      secondary: '#764ba2',
+      accent: '#f093fb',
+      text: '#ffffff',
+      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)'
+    }
+  }], []);
+
 
   // Apply color scheme CSS variables
-  const applyColorScheme = (schemeId) => {
+  const applyColorScheme = useCallback((schemeId) => {
     const root = document.documentElement;
-    const scheme = colorSchemes.find(s => s.id === schemeId);
-    
+    const scheme = colorSchemes.find((s) => s.id === schemeId);
+
     if (!scheme) return;
-    
+
     // Remove theme classes to prevent ThemeContext from overriding
     document.body.classList.remove('light-theme', 'dark-theme');
     root.removeAttribute('data-theme');
-    
+
     if (scheme.type === 'vibrant') {
       // Apply vibrant theme - матовые приглушённые цвета
       root.style.setProperty('--mac-bg-primary', '#6b8db3'); /* Приглушённый синий */
@@ -169,15 +169,15 @@ const ColorSchemeSelector = () => {
       document.body.style.webkitBackdropFilter = '';
       root.setAttribute('data-color-scheme', 'gradient');
     }
-  };
+  }, [colorSchemes]);
 
   const handleSchemeChange = (schemeId) => {
     setSelectedScheme(schemeId);
-    
+
     // Clear custom scheme flags first
     localStorage.removeItem('customColorScheme');
     localStorage.removeItem('activeColorSchemeId');
-    
+
     if (schemeId === 'vibrant' || schemeId === 'glass' || schemeId === 'gradient') {
       // Set flags BEFORE applying to prevent ThemeContext override
       localStorage.setItem('customColorScheme', 'true');
@@ -197,7 +197,7 @@ const ColorSchemeSelector = () => {
       // Apply standard theme without reload
       setTheme(schemeId);
       document.documentElement.removeAttribute('data-color-scheme');
-      
+
       // Force update theme context
       const root = document.documentElement;
       if (schemeId === 'dark') {
@@ -211,7 +211,7 @@ const ColorSchemeSelector = () => {
       }
       window.dispatchEvent(new CustomEvent('colorSchemeChanged', { detail: schemeId }));
     }
-    
+
     // Save to localStorage
     try {
       localStorage.setItem('colorScheme', schemeId);
@@ -219,13 +219,19 @@ const ColorSchemeSelector = () => {
       logger.warn('Failed to save color scheme:', e);
     }
   };
-  
+  const handleActivationKeyDown = (event, onActivate) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onActivate();
+    }
+  };
+
   // Sync selectedScheme with actually applied theme on mount and when theme changes
   useEffect(() => {
     const savedScheme = localStorage.getItem('colorScheme');
     const activeSchemeId = localStorage.getItem('activeColorSchemeId');
     const isCustomScheme = localStorage.getItem('customColorScheme') === 'true';
-    
+
     // Determine what scheme is actually active
     let actualScheme = theme; // default
     if (isCustomScheme && activeSchemeId) {
@@ -233,13 +239,13 @@ const ColorSchemeSelector = () => {
     } else if (savedScheme) {
       actualScheme = savedScheme;
     }
-    
+
     // Sync state if needed (but don't trigger handleSchemeChange to avoid reapplication)
     if (actualScheme !== selectedScheme && ['light', 'dark', 'auto', 'vibrant', 'glass', 'gradient'].includes(actualScheme)) {
       setSelectedScheme(actualScheme);
     }
-  }, [theme]); // Re-sync when theme changes
-  
+  }, [theme, selectedScheme]); // Re-sync when theme changes
+
   // Ensure custom schemes persist (backup application)
   useEffect(() => {
     if (selectedScheme === 'vibrant' || selectedScheme === 'glass' || selectedScheme === 'gradient') {
@@ -255,7 +261,7 @@ const ColorSchemeSelector = () => {
       localStorage.removeItem('customColorScheme');
       localStorage.removeItem('activeColorSchemeId');
     }
-  }, [selectedScheme]);
+  }, [selectedScheme, applyColorScheme]);
 
   // React to external changes (Header menu, other tabs)
   useEffect(() => {
@@ -278,15 +284,15 @@ const ColorSchemeSelector = () => {
     };
   }, [selectedScheme]);
 
-  const currentScheme = colorSchemes.find(scheme => scheme.id === selectedScheme) || colorSchemes[0];
+  const currentScheme = colorSchemes.find((scheme) => scheme.id === selectedScheme) || colorSchemes[0];
 
   return (
     <MacOSCard style={{ padding: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
         <Palette style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
-        <h3 style={{ 
-          fontSize: 'var(--mac-font-size-lg)', 
-          fontWeight: 'var(--mac-font-weight-semibold)', 
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-primary)',
           margin: 0
         }}>
@@ -295,10 +301,10 @@ const ColorSchemeSelector = () => {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ 
-          display: 'block', 
-          fontSize: 'var(--mac-font-size-sm)', 
-          fontWeight: 'var(--mac-font-weight-medium)', 
+        <label style={{
+          display: 'block',
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           marginBottom: '8px',
           color: 'var(--mac-text-primary)'
         }}>
@@ -307,17 +313,17 @@ const ColorSchemeSelector = () => {
         <MacOSSelect
           value={selectedScheme}
           onChange={(e) => handleSchemeChange(e.target.value)}
-          options={colorSchemes.map(scheme => ({
+          options={colorSchemes.map((scheme) => ({
             value: scheme.id,
             label: scheme.name
           }))}
-          placeholder="Выберите схему"
-        />
+          placeholder="Выберите схему" />
+        
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <p style={{ 
-          fontSize: 'var(--mac-font-size-sm)', 
+        <p style={{
+          fontSize: 'var(--mac-font-size-sm)',
           color: 'var(--mac-text-secondary)',
           margin: 0
         }}>
@@ -327,9 +333,9 @@ const ColorSchemeSelector = () => {
 
       {/* Улучшенный предпросмотр цветовых схем */}
       <div style={{ marginBottom: '20px' }}>
-        <h4 style={{ 
-          fontSize: 'var(--mac-font-size-base)', 
-          fontWeight: 'var(--mac-font-weight-medium)', 
+        <h4 style={{
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           marginBottom: '12px',
           color: 'var(--mac-text-primary)'
         }}>
@@ -348,44 +354,47 @@ const ColorSchemeSelector = () => {
               <div
                 key={scheme.id}
                 data-preview-card
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSchemeChange(scheme.id)}
+                onKeyDown={(event) => handleActivationKeyDown(event, () => handleSchemeChange(scheme.id))}
                 style={{
                   cursor: 'pointer',
                   borderRadius: 'var(--mac-radius-lg)',
                   padding: '12px',
-                  border: isActive
-                    ? '2px solid var(--mac-accent-blue)'
-                    : '1px solid var(--mac-border)',
-                  background: scheme.colors.gradient
-                    ? scheme.colors.gradient
-                    : scheme.type === 'glass'
-                    ? 'rgba(255, 255, 255, 0.15)'
-                    : scheme.colors.primary,
+                  border: isActive ?
+                  '2px solid var(--mac-accent-blue)' :
+                  '1px solid var(--mac-border)',
+                  background: scheme.colors.gradient ?
+                  scheme.colors.gradient :
+                  scheme.type === 'glass' ?
+                  'rgba(255, 255, 255, 0.15)' :
+                  scheme.colors.primary,
                   color: scheme.colors.text,
-                  boxShadow: isActive
-                    ? '0 4px 16px rgba(0,0,0,0.25)'
-                    : '0 2px 8px rgba(0,0,0,0.1)',
+                  boxShadow: isActive ?
+                  '0 4px 16px rgba(0,0,0,0.25)' :
+                  '0 2px 8px rgba(0,0,0,0.1)',
                   backdropFilter: scheme.type === 'glass' ? 'blur(12px) saturate(180%)' : 'none',
                   transition: 'all 0.25s ease-in-out'
-                }}
-              >
+                }}>
+                
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
                   {React.createElement(scheme.icon, {
                     style: {
                       width: '18px',
                       height: '18px',
                       marginRight: '8px',
-                      color: scheme.type === 'vibrant' || scheme.type === 'gradient'
-                        ? '#fff'
-                        : 'var(--mac-text-secondary)'
+                      color: scheme.type === 'vibrant' || scheme.type === 'gradient' ?
+                      '#fff' :
+                      'var(--mac-text-secondary)'
                     }
                   })}
                   <span style={{
                     fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: 600,
-                    color: scheme.type === 'vibrant' || scheme.type === 'gradient'
-                      ? '#fff'
-                      : 'var(--mac-text-primary)'
+                    color: scheme.type === 'vibrant' || scheme.type === 'gradient' ?
+                    '#fff' :
+                    'var(--mac-text-primary)'
                   }}>
                     {scheme.name}
                   </span>
@@ -418,17 +427,17 @@ const ColorSchemeSelector = () => {
                     border: '1px solid rgba(255,255,255,0.2)'
                   }} />
                 </div>
-              </div>
-            );
+              </div>);
+
           })}
         </div>
       </div>
 
       {/* Дополнительные настройки */}
       <div style={{ marginBottom: '20px' }}>
-        <h4 style={{ 
-          fontSize: 'var(--mac-font-size-base)', 
-          fontWeight: 'var(--mac-font-weight-medium)', 
+        <h4 style={{
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)',
           marginBottom: '12px',
           color: 'var(--mac-text-primary)'
         }}>
@@ -439,8 +448,8 @@ const ColorSchemeSelector = () => {
             variant="outline"
             size="sm"
             onClick={() => setTheme('light')}
-            disabled={theme === 'light'}
-          >
+            disabled={theme === 'light'}>
+            
             <Sun style={{ width: '16px', height: '16px', marginRight: '6px' }} />
             Светлая
           </MacOSButton>
@@ -448,8 +457,8 @@ const ColorSchemeSelector = () => {
             variant="outline"
             size="sm"
             onClick={() => setTheme('dark')}
-            disabled={theme === 'dark'}
-          >
+            disabled={theme === 'dark'}>
+            
             <Moon style={{ width: '16px', height: '16px', marginRight: '6px' }} />
             Темная
           </MacOSButton>
@@ -457,34 +466,34 @@ const ColorSchemeSelector = () => {
       </div>
 
       {/* Информация о текущей теме */}
-      <div style={{ 
-        padding: '12px', 
-        backgroundColor: 'var(--mac-bg-tertiary)', 
+      <div style={{
+        padding: '12px',
+        backgroundColor: 'var(--mac-bg-tertiary)',
         borderRadius: 'var(--mac-radius-md)',
         border: '1px solid var(--mac-border)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-          {React.createElement(currentScheme.icon, { 
-            style: { width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-accent-blue)' } 
+          {React.createElement(currentScheme.icon, {
+            style: { width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-accent-blue)' }
           })}
-          <span style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
+          <span style={{
+            fontSize: 'var(--mac-font-size-sm)',
             fontWeight: 'var(--mac-font-weight-medium)',
             color: 'var(--mac-text-primary)'
           }}>
             Текущая тема: {currentScheme.name}
           </span>
         </div>
-        <p style={{ 
-          fontSize: 'var(--mac-font-size-xs)', 
+        <p style={{
+          fontSize: 'var(--mac-font-size-xs)',
           color: 'var(--mac-text-secondary)',
           margin: 0
         }}>
           Изменения применяются мгновенно и сохраняются в настройках браузера.
         </p>
       </div>
-    </MacOSCard>
-  );
+    </MacOSCard>);
+
 };
 
 export default ColorSchemeSelector;

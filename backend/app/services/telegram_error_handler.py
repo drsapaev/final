@@ -5,8 +5,9 @@ Telegram Bot Error Handler
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Optional, TypeVar
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -36,42 +37,39 @@ class TelegramErrorHandler:
     def __init__(self, max_retries: int = 3, base_delay: float = 1.0):
         self.max_retries = max_retries
         self.base_delay = base_delay
-        self.error_counts: Dict[str, int] = {}
+        self.error_counts: dict[str, int] = {}
 
     async def retry_with_backoff(
         self,
         func: Callable[..., T],
         *args: Any,
         **kwargs: Any,
-    ) -> Optional[T]:
+    ) -> T | None:
         """
         Execute function with exponential backoff retry
-        
+
         Args:
             func: Async function to execute
             *args: Function arguments
             **kwargs: Function keyword arguments
-        
+
         Returns:
             Function result or None if all retries failed
         """
-        last_exception = None
-
         for attempt in range(self.max_retries):
             try:
                 result = await func(*args, **kwargs)
-                
+
                 # Reset error count on success
                 func_name = getattr(func, "__name__", "unknown")
                 if func_name in self.error_counts:
                     del self.error_counts[func_name]
-                
+
                 return result
 
             except Exception as e:
-                last_exception = e
                 func_name = getattr(func, "__name__", "unknown")
-                
+
                 # Check if error is retryable
                 error_code = getattr(e, "status_code", None)
                 if error_code in self.NON_RETRYABLE_ERRORS:
@@ -86,7 +84,7 @@ class TelegramErrorHandler:
                 if attempt < self.max_retries - 1:
                     # Calculate exponential backoff delay
                     delay = self.base_delay * (2 ** attempt)
-                    
+
                     # Check for rate limiting
                     if error_code == 429:
                         retry_after = getattr(e, "retry_after", delay)
@@ -111,21 +109,21 @@ class TelegramErrorHandler:
     def should_retry(self, error: Exception) -> bool:
         """Check if error should be retried"""
         error_code = getattr(error, "status_code", None)
-        
+
         if error_code in self.NON_RETRYABLE_ERRORS:
             return False
-        
+
         if error_code in self.RETRYABLE_ERRORS:
             return True
-        
+
         # Retry on network errors
         error_type = type(error).__name__
         if "Connection" in error_type or "Timeout" in error_type:
             return True
-        
+
         return False
 
-    def get_error_stats(self) -> Dict[str, Any]:
+    def get_error_stats(self) -> dict[str, Any]:
         """Get error statistics"""
         return {
             "error_counts": self.error_counts.copy(),

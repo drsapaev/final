@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -11,11 +10,11 @@ from app.schemas.emr import EMRCreate, EMRUpdate, PrescriptionCreate, Prescripti
 class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):
     """CRUD операции для EMR"""
 
-    def get_by_appointment(self, db: Session, *, appointment_id: int) -> Optional[EMR]:
+    def get_by_appointment(self, db: Session, *, appointment_id: int) -> EMR | None:
         """Получить EMR по ID записи"""
         return db.query(EMR).filter(EMR.appointment_id == appointment_id).first()
 
-    def save_emr(self, db: Session, *, emr_id: int) -> Optional[EMR]:
+    def save_emr(self, db: Session, *, emr_id: int) -> EMR | None:
         """Сохранить EMR (перевести из draft в saved)"""
         emr = db.query(EMR).filter(EMR.id == emr_id).first()
         if emr and emr.is_draft:
@@ -26,7 +25,7 @@ class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):
             db.refresh(emr)
         return emr
 
-    def get_drafts(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[EMR]:
+    def get_drafts(self, db: Session, *, skip: int = 0, limit: int = 100) -> list[EMR]:
         """Получить черновики EMR"""
         # Форматирование обновлено для CI/CD
         return db.query(EMR).filter(EMR.is_draft).offset(skip).limit(limit).all()
@@ -37,7 +36,7 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
 
     def get_by_appointment(
         self, db: Session, *, appointment_id: int
-    ) -> Optional[Prescription]:
+    ) -> Prescription | None:
         """Получить рецепт по ID записи"""
         return (
             db.query(Prescription)
@@ -45,13 +44,13 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
             .first()
         )
 
-    def get_by_emr(self, db: Session, *, emr_id: int) -> Optional[Prescription]:
+    def get_by_emr(self, db: Session, *, emr_id: int) -> Prescription | None:
         """Получить рецепт по ID EMR"""
         return db.query(Prescription).filter(Prescription.emr_id == emr_id).first()
 
     def save_prescription(
         self, db: Session, *, prescription_id: int
-    ) -> Optional[Prescription]:
+    ) -> Prescription | None:
         """Сохранить рецепт (перевести из draft в saved)"""
         prescription = (
             db.query(Prescription).filter(Prescription.id == prescription_id).first()
@@ -66,7 +65,7 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
 
     def mark_printed(
         self, db: Session, *, prescription_id: int
-    ) -> Optional[Prescription]:
+    ) -> Prescription | None:
         """Отметить рецепт как напечатанный"""
         prescription = (
             db.query(Prescription).filter(Prescription.id == prescription_id).first()
@@ -80,7 +79,7 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
 
     def get_drafts(
         self, db: Session, *, skip: int = 0, limit: int = 100
-    ) -> List[Prescription]:
+    ) -> list[Prescription]:
         """Получить черновики рецептов"""
         return (
             db.query(Prescription)

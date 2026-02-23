@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 /**
@@ -16,10 +17,10 @@ const Progress = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+  const percentage = Math.min(100, Math.max(0, value / max * 100));
 
   // Size mapping
   const sizeMap = {
@@ -110,20 +111,32 @@ const Progress = React.forwardRef(({
       aria-valuemin={0}
       aria-valuemax={max}
       aria-label={`Progress: ${displayValue}`}
-      {...props}
-    >
+      {...props}>
+      
       <div className="mac-progress-fill" style={fillStyles}>
-        {showValue && (
-          <span className="mac-progress-value" style={valueTextStyles}>
+        {showValue &&
+        <span className="mac-progress-value" style={valueTextStyles}>
             {displayValue}
           </span>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 });
 
 Progress.displayName = 'macOS Progress';
+
+Progress.propTypes = {
+  value: PropTypes.number,
+  max: PropTypes.number,
+  variant: PropTypes.oneOf(['default', 'primary', 'success', 'warning', 'danger']),
+  size: PropTypes.oneOf(['small', 'default', 'large']),
+  animated: PropTypes.bool,
+  showValue: PropTypes.bool,
+  formatValue: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
 /**
  * Circular Progress Component
@@ -140,10 +153,10 @@ export const CircularProgress = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+  const percentage = Math.min(100, Math.max(0, value / max * 100));
 
   // Size mapping
   const sizeMap = {
@@ -166,7 +179,7 @@ export const CircularProgress = React.forwardRef(({
   const radius = (dimensions.width - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDasharray = circumference;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+  const strokeDashoffset = circumference - percentage / 100 * circumference;
 
   const containerStyles = {
     position: 'relative',
@@ -200,14 +213,14 @@ export const CircularProgress = React.forwardRef(({
       aria-valuemin={0}
       aria-valuemax={max}
       aria-label={`Progress: ${displayValue}%`}
-      {...props}
-    >
+      {...props}>
+      
       <svg
         width={dimensions.width}
         height={dimensions.height}
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-        style={{ transform: 'rotate(-90deg)' }}
-      >
+        style={{ transform: 'rotate(-90deg)' }}>
+        
         {/* Background circle */}
         <circle
           cx={dimensions.width / 2}
@@ -215,8 +228,8 @@ export const CircularProgress = React.forwardRef(({
           r={radius}
           stroke="var(--mac-bg-tertiary)"
           strokeWidth={strokeWidth}
-          fill="none"
-        />
+          fill="none" />
+        
 
         {/* Progress circle */}
         <circle
@@ -231,26 +244,26 @@ export const CircularProgress = React.forwardRef(({
           strokeLinecap="round"
           style={{
             transition: animated ? 'stroke-dashoffset 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none'
-          }}
-        />
+          }} />
+        
       </svg>
 
       {/* Value text */}
-      {showValue && (
-        <div
-          className="mac-circular-progress-value"
-          style={{
-            position: 'absolute',
-            fontSize: size === 'small' ? '8px' : size === 'default' ? '10px' : '12px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-            userSelect: 'none'
-          }}
-        >
+      {showValue &&
+      <div
+        className="mac-circular-progress-value"
+        style={{
+          position: 'absolute',
+          fontSize: size === 'small' ? '8px' : size === 'default' ? '10px' : '12px',
+          fontWeight: '600',
+          color: 'var(--mac-text-primary)',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+          userSelect: 'none'
+        }}>
+        
           {displayValue}%
         </div>
-      )}
+      }
 
       <style>{`
         /* Dark mode adjustments */
@@ -267,11 +280,23 @@ export const CircularProgress = React.forwardRef(({
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
+
 });
 
 CircularProgress.displayName = 'macOS Circular Progress';
 
-export default Progress;
+CircularProgress.propTypes = {
+  value: PropTypes.number,
+  max: PropTypes.number,
+  size: PropTypes.oneOf(['small', 'default', 'large', 'xlarge']),
+  thickness: PropTypes.oneOf(['thin', 'medium', 'thick']),
+  variant: PropTypes.oneOf(['default', 'primary', 'success', 'warning', 'danger']),
+  animated: PropTypes.bool,
+  showValue: PropTypes.bool,
+  formatValue: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
+export default Progress;

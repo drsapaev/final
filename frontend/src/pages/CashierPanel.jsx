@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign, User, Stethoscope, Clock, Receipt, RefreshCw } from 'lucide-react';
-import { Card, Badge, Button, Progress, Icon } from '../components/ui/macos';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, User, RefreshCw } from 'lucide-react';
+import { Card, Badge, Button } from '../components/ui/macos';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import PaymentWidget from '../components/payment/PaymentWidget';
@@ -23,8 +23,8 @@ import {
   Typography,
   Box,
   Alert,
-  Skeleton
-} from '../components/ui/macos';
+  Skeleton } from
+'../components/ui/macos';
 
 // ✅ Компоненты для возвратов
 import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
@@ -39,12 +39,12 @@ const getLocalDateString = (date = new Date()) => {
 };
 
 // Вспомогательная функция для создания прозрачного цвета
-const withOpacity = (color, opacity) => {
-  if (color.startsWith('var(')) {
-    return `rgba(from ${color} r g b / ${opacity})`;
-  }
-  return color;
-};
+
+
+
+
+
+
 
 // Custom debounce hook
 const useDebounce = (value, delay) => {
@@ -63,8 +63,8 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
-const CashierPanel = () => {
-  const { isMobile } = useBreakpoint();
+const CashierPanel = () => {void
+  useBreakpoint();
   const location = useLocation();
   const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
   // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
@@ -177,7 +177,7 @@ const CashierPanel = () => {
 
   // Load Data Effect
   // ✅ v2.1: Отдельные loading состояния для каждой секции
-  const [statsLoading, setStatsLoading] = useState(false);
+  const [, setStatsLoading] = useState(false);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -296,7 +296,7 @@ const CashierPanel = () => {
   }, [currentPage, debouncedQuery, status, getDateParams, refreshKey, getPayments]);
 
   // ✅ v2.1: Вычисляемое общее состояние загрузки
-  const isLoading = statsLoading || pendingLoading || historyLoading;
+
 
   // Reset page when date or search changes
   useEffect(() => {
@@ -313,14 +313,14 @@ const CashierPanel = () => {
     paymentWidget.closeModal();
 
     // Force reload to get fresh data
-    const load = async () => {
-      const { date_from, date_to } = getDateParams();
-      await paymentsHook.getPayments({ date_from, date_to, page: 1, size: itemsPerPage });
-      await paymentsHook.getPendingPayments({ date_from, date_to });
-      // Instead of manually updating state, we trigger a re-fetch or let useEffect handle it if we signal update
-      // But re-fetching is safer to ensure consistency
-      window.location.reload(); // Simple reload or better: trigger reload state
-    };
+
+
+
+
+
+
+
+
     // For now, let's just create a quick local update for UX responsiveness while assuming background fetch works
     // But since pagination is server-side, local update is complex. 
     // Best to just re-trigger the main load effect.
@@ -356,21 +356,21 @@ const CashierPanel = () => {
   const processPayment = async (appointment, paymentData) => {
     try {
       // Получаем все visit_id пациента
-      const visitIds = appointment.visit_ids && appointment.visit_ids.length > 0
-        ? appointment.visit_ids
-        : [appointment.visit_id || appointment.id];
+      const visitIds = appointment.visit_ids && appointment.visit_ids.length > 0 ?
+      appointment.visit_ids :
+      [appointment.visit_id || appointment.id];
 
       // 1. Рассчитываем долг по каждому визиту на основе услуг
       const visitDebts = {};
       const services = appointment.services || [];
 
       // Инициализируем долги нулями
-      visitIds.forEach(id => visitDebts[id] = 0);
+      visitIds.forEach((id) => visitDebts[id] = 0);
 
       // Суммируем стоимость услуг для каждого визита
-      services.forEach(s => {
+      services.forEach((s) => {
         if (s.visit_id) {
-          visitDebts[s.visit_id] = (visitDebts[s.visit_id] || 0) + ((s.price || 0) * (s.quantity || 1));
+          visitDebts[s.visit_id] = (visitDebts[s.visit_id] || 0) + (s.price || 0) * (s.quantity || 1);
         }
       });
 
@@ -430,7 +430,7 @@ const CashierPanel = () => {
       alert(`✅ Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
       paymentModal.closeModal();
       setPendingPage(1);
-      setRefreshKey(prev => prev + 1); // Принудительное обновление списка
+      setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
 
     } catch (error) {
       logger.error('Ошибка обработки платежа:', error);
@@ -447,9 +447,9 @@ const CashierPanel = () => {
 
     try {
       await paymentsHook.confirmPayment(paymentId);
-      setRefreshKey(prev => prev + 1); // Обновляем данные
+      setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
-      console.error('Error confirming payment:', err);
+      logger.error('Error confirming payment:', err);
       alert(`❌ Ошибка подтверждения платежа: ${err.message}`);
     }
   };
@@ -495,7 +495,7 @@ const CashierPanel = () => {
   const handleRefresh = () => {
     setCurrentPage(1);
     setPendingPage(1);
-    setRefreshKey(prev => prev + 1); // Force reload
+    setRefreshKey((prev) => prev + 1); // Force reload
   };
 
   // ✅ v2.0: Состояние для возврата
@@ -574,8 +574,8 @@ const CashierPanel = () => {
     // Проверяем, является ли первый элемент объектом
     if (serviceCodes.length > 0 && typeof serviceCodes[0] === 'object' && serviceCodes[0] !== null) {
       // Извлекаем имена услуг из объектов
-      codes = serviceCodes.map(s => s.name || s.code || `Услуга #${s.id || '?'}`);
-      names = serviceCodes.map(s => {
+      codes = serviceCodes.map((s) => s.name || s.code || `Услуга #${s.id || '?'}`);
+      names = serviceCodes.map((s) => {
         const parts = [];
         if (s.name) parts.push(s.name);
         if (s.price) parts.push(`${new Intl.NumberFormat('ru-RU').format(s.price)} сум`);
@@ -585,38 +585,38 @@ const CashierPanel = () => {
     }
 
     // Создаем tooltip с полными названиями услуг
-    const tooltipContent = (
-      <div style={{ padding: '4px 0', maxWidth: '300px' }}>
-        {names && Array.isArray(names) && names.length === codes.length
-          ? names.map((name, idx) => (
-            <div key={idx} style={{
-              marginBottom: idx < names.length - 1 ? '6px' : '0',
-              lineHeight: '1.4',
-              fontSize: '12px'
-            }}>
+    const tooltipContent =
+    <div style={{ padding: '4px 0', maxWidth: '300px' }}>
+        {names && Array.isArray(names) && names.length === codes.length ?
+      names.map((name, idx) =>
+      <div key={idx} style={{
+        marginBottom: idx < names.length - 1 ? '6px' : '0',
+        lineHeight: '1.4',
+        fontSize: '12px'
+      }}>
               {name}
             </div>
-          ))
-          : codes.map((code, idx) => (
-            <div key={idx} style={{
-              marginBottom: idx < codes.length - 1 ? '6px' : '0',
-              lineHeight: '1.4',
-              fontSize: '12px'
-            }}>
+      ) :
+      codes.map((code, idx) =>
+      <div key={idx} style={{
+        marginBottom: idx < codes.length - 1 ? '6px' : '0',
+        lineHeight: '1.4',
+        fontSize: '12px'
+      }}>
               {code}
             </div>
-          ))
-        }
-      </div>
-    );
+      )
+      }
+      </div>;
+
 
     return (
       <Tooltip
         content={tooltipContent}
         position="bottom"
         delay={200}
-        followCursor
-      >
+        followCursor>
+
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -624,30 +624,30 @@ const CashierPanel = () => {
           cursor: 'help',
           maxWidth: '280px'
         }}>
-          {codes.map((code, idx) => (
-            <span
-              key={idx}
-              style={{
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
-                backgroundColor: 'rgba(0, 122, 255, 0.12)',
-                color: '#007AFF',
-                border: '1px solid rgba(0, 122, 255, 0.25)',
-                whiteSpace: 'nowrap',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-                maxWidth: '150px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
+          {codes.map((code, idx) =>
+          <span
+            key={idx}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: '600',
+              backgroundColor: 'rgba(0, 122, 255, 0.12)',
+              color: '#007AFF',
+              border: '1px solid rgba(0, 122, 255, 0.25)',
+              whiteSpace: 'nowrap',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+              maxWidth: '150px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+
               {typeof code === 'string' ? code : String(code)}
             </span>
-          ))}
+          )}
         </div>
-      </Tooltip>
-    );
+      </Tooltip>);
+
   };
 
   // ✅ ГРУППИРОВКА: Объединяем платежи одного пациента, созданных в одно время
@@ -661,7 +661,7 @@ const CashierPanel = () => {
 
     const grouped = {};
 
-    paymentsList.forEach(payment => {
+    paymentsList.forEach((payment) => {
       // Parse dates from backend
       const dateObj = new Date(payment.created_at);
       const dateKey = dateObj.toLocaleDateString('ru-RU');
@@ -711,8 +711,8 @@ const CashierPanel = () => {
           <Card
             variant="default"
             padding="default"
-            style={{ marginBottom: '16px' }}
-          >
+            style={{ marginBottom: '16px' }}>
+
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
               {/* Поиск */}
               <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
@@ -742,8 +742,8 @@ const CashierPanel = () => {
                     outline: 'none',
                     transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                   }}
-                  placeholder="Поиск по пациенту (Server Search)"
-                />
+                  placeholder="Поиск по пациенту (Server Search)" />
+
               </div>
 
               {/* Статус */}
@@ -759,8 +759,8 @@ const CashierPanel = () => {
                   fontSize: '14px',
                   outline: 'none',
                   minWidth: '140px'
-                }}
-              >
+                }}>
+
                 <option value="all">Все статусы</option>
                 <option value="paid">Оплачено</option>
                 <option value="pending">Ожидает</option>
@@ -771,63 +771,63 @@ const CashierPanel = () => {
                 <Calendar style={{ width: '16px', height: '16px', color: 'var(--mac-text-secondary)' }} />
                 <SegmentedControl
                   options={[
-                    { label: 'Одна дата', value: 'single' },
-                    { label: 'Диапазон', value: 'range' }
-                  ]}
+                  { label: 'Одна дата', value: 'single' },
+                  { label: 'Диапазон', value: 'range' }]
+                  }
                   value={dateMode}
                   onChange={setDateMode}
-                  size="default"
-                />
+                  size="default" />
+
               </div>
 
               {/* Поля даты */}
-              {dateMode === 'single' ? (
-                <>
+              {dateMode === 'single' ?
+              <>
                   <Input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    style={{ minWidth: '160px' }}
-                  />
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{ minWidth: '160px' }} />
+
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const today = getLocalDateString();
-                      setSelectedDate(today);
-                    }}
-                  >
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const today = getLocalDateString();
+                    setSelectedDate(today);
+                  }}>
+
                     Сегодня
                   </Button>
-                </>
-              ) : (
-                <>
+                </> :
+
+              <>
                   <Input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    style={{ minWidth: '140px' }}
-                  />
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{ minWidth: '140px' }} />
+
                   <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>—</span>
                   <Input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    style={{ minWidth: '140px' }}
-                  />
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{ minWidth: '140px' }} />
+
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const today = getLocalDateString();
-                      setDateFrom(today);
-                      setDateTo(today);
-                    }}
-                  >
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const today = getLocalDateString();
+                    setDateFrom(today);
+                    setDateTo(today);
+                  }}>
+
                     Сегодня
                   </Button>
                 </>
-              )}
+              }
             </div>
           </Card>
 
@@ -840,8 +840,8 @@ const CashierPanel = () => {
               alignItems: 'center'
             }}>
               {/* Conditional Stats based on Active Tab */}
-              {activeTab === 'history' ? (
-                <>
+              {activeTab === 'history' ?
+              <>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent)' }}>
                       {format(stats.total_amount)}
@@ -874,8 +874,8 @@ const CashierPanel = () => {
                       Оплачено
                     </div>
                   </div>
-                  {stats.cancelled_count > 0 && (
-                    <div style={{ textAlign: 'center' }}>
+                  {stats.cancelled_count > 0 &&
+                <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '20px', fontWeight: '700', color: '#ff4d4f' }}>
                         {stats.cancelled_count}
                       </div>
@@ -883,10 +883,10 @@ const CashierPanel = () => {
                         Отменено
                       </div>
                     </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ textAlign: 'center' }}>
+                }
+                </> :
+
+              <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: '700', color: '#FF9500' }}>
                     {format(stats.pending_amount || 0)}
                   </div>
@@ -894,30 +894,30 @@ const CashierPanel = () => {
                     Ожидает оплаты ({stats.pending_count} заявок)
                   </div>
                 </div>
-              )}
+              }
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleRefresh}
-                  title="Обновить данные"
-                >
+                  title="Обновить данные">
+
                   🔄 Обновить
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={exportToCSV}
-                  title="Экспорт в CSV"
-                >
+                  title="Экспорт в CSV">
+
                   📥 Экспорт
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={loadHourlyStats}
-                  title="Почасовая статистика"
-                >
+                  title="Почасовая статистика">
+
                   📊 Аналитика
                 </Button>
               </div>
@@ -927,50 +927,50 @@ const CashierPanel = () => {
           {/* Объединенная секция с вкладками */}
           <Card
             variant="default"
-            padding="default"
-          >
+            padding="default">
+
             <MacOSTab
               tabs={[
-                {
-                  id: 'pending',
-                  label: 'Ожидающие оплаты',
-                  icon: DollarSign,
-                  badge: appointments.length > 0 ? appointments.length : undefined
-                },
-                {
-                  id: 'history',
-                  label: 'История платежей',
-                  icon: CreditCard
-                },
-                {
-                  id: 'refunds',
-                  label: 'Возвраты',
-                  icon: RefreshCw
-                },
-                {
-                  id: 'deposits',
-                  label: 'Депозиты',
-                  icon: User
-                }
-              ]}
+              {
+                id: 'pending',
+                label: 'Ожидающие оплаты',
+                icon: DollarSign,
+                badge: appointments.length > 0 ? appointments.length : undefined
+              },
+              {
+                id: 'history',
+                label: 'История платежей',
+                icon: CreditCard
+              },
+              {
+                id: 'refunds',
+                label: 'Возвраты',
+                icon: RefreshCw
+              },
+              {
+                id: 'deposits',
+                label: 'Депозиты',
+                icon: User
+              }]
+              }
               activeTab={activeTab}
               onTabChange={setActiveTab}
               size="md"
-              variant="default"
-            />
+              variant="default" />
 
-            {activeTab === 'pending' && (
-              <div style={{ marginTop: '24px' }}>
-                {pendingLoading ? (
-                  <Skeleton style={{ height: '192px' }} />
-                ) : appointments.length > 0 ? (
-                  <div style={{ overflowX: 'auto' }}>
+
+            {activeTab === 'pending' &&
+            <div style={{ marginTop: '24px' }}>
+                {pendingLoading ?
+              <Skeleton style={{ height: '192px' }} /> :
+              appointments.length > 0 ?
+              <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%' }}>
                       <thead>
                         <tr style={{
-                          backgroundColor: 'var(--mac-bg-tertiary)',
-                          borderBottom: '1px solid var(--mac-border)'
-                        }}>
+                      backgroundColor: 'var(--mac-bg-tertiary)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
                           <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
                           <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
                           <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуги</th>
@@ -980,46 +980,46 @@ const CashierPanel = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {appointments.map((appointment, index) => (
-                          <tr
-                            key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`}
-                            style={{
-                              borderBottom: '1px solid var(--mac-border)',
-                              transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
+                        {appointments.map((appointment, index) =>
+                    <tr
+                      key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`}
+                      style={{
+                        borderBottom: '1px solid var(--mac-border)',
+                        transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+
                             <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <span style={{ fontWeight: '500' }}>
-                                  {appointment.created_at
-                                    ? new Date(appointment.created_at).toLocaleDateString('ru-RU', {
-                                      day: '2-digit',
-                                      month: '2-digit',
-                                      year: 'numeric',
-                                      timeZone: 'Asia/Tashkent'
-                                    })
-                                    : appointment.appointment_date || '—'
-                                  }
+                                  {appointment.created_at ?
+                            new Date(appointment.created_at).toLocaleDateString('ru-RU', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              timeZone: 'Asia/Tashkent'
+                            }) :
+                            appointment.appointment_date || '—'
+                            }
                                 </span>
                                 <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
-                                  {appointment.created_at
-                                    ? new Date(appointment.created_at).toLocaleTimeString('ru-RU', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      timeZone: 'Asia/Tashkent'
-                                    })
-                                    : appointment.appointment_time || '—'
-                                  }
+                                  {appointment.created_at ?
+                            new Date(appointment.created_at).toLocaleTimeString('ru-RU', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: 'Asia/Tashkent'
+                            }) :
+                            appointment.appointment_time || '—'
+                            }
                                 </span>
                               </div>
                             </td>
                             <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
-                              {appointment.patient_last_name && appointment.patient_first_name
-                                ? `${appointment.patient_last_name} ${appointment.patient_first_name}`
-                                : appointment.patient_name || `Пациент #${appointment.patient_id}`
-                              }
+                              {appointment.patient_last_name && appointment.patient_first_name ?
+                        `${appointment.patient_last_name} ${appointment.patient_first_name}` :
+                        appointment.patient_name || `Пациент #${appointment.patient_id}`
+                        }
                             </td>
                             <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                               {renderServiceBadges(appointment.services, appointment.services_names)}
@@ -1033,84 +1033,84 @@ const CashierPanel = () => {
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openPaymentWidget(appointment)}
-                                >
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openPaymentWidget(appointment)}>
+
                                   💳 Онлайн
                                 </Button>
                                 <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    paymentModal.openModal(appointment);
-                                  }}
-                                >
+                            size="sm"
+                            onClick={() => {
+                              paymentModal.openModal(appointment);
+                            }}>
+
                                   💵 Касса
                                 </Button>
                               </div>
                             </td>
                           </tr>
-                        ))}
+                    )}
                       </tbody>
                     </table>
 
                     {/* ✅ v2.0: Пагинация для ожидающих оплаты */}
-                    {pendingTotalPages > 1 && (
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: '12px',
-                        marginTop: '16px',
-                        padding: '12px'
-                      }}>
+                    {pendingTotalPages > 1 &&
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginTop: '16px',
+                  padding: '12px'
+                }}>
                         <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={pendingPage === 1 || pendingLoading}
-                          onClick={() => setPendingPage(p => Math.max(1, p - 1))}
-                        >
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingPage === 1 || pendingLoading}
+                    onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>
+
                           ← Назад
                         </Button>
                         <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
                           Страница {pendingPage} из {pendingTotalPages} (Всего: {pendingTotalItems})
                         </span>
                         <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={pendingPage === pendingTotalPages || pendingLoading}
-                          onClick={() => setPendingPage(p => Math.min(pendingTotalPages, p + 1))}
-                        >
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingPage === pendingTotalPages || pendingLoading}
+                    onClick={() => setPendingPage((p) => Math.min(pendingTotalPages, p + 1))}>
+
                           Вперёд →
                         </Button>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '48px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: '14px'
-                  }}>
+                }
+                  </div> :
+
+              <div style={{
+                padding: '48px',
+                textAlign: 'center',
+                color: 'var(--mac-text-secondary)',
+                fontSize: '14px'
+              }}>
                     Нет записей, ожидающих оплаты
                   </div>
-                )}
+              }
               </div>
-            )}
+            }
 
-            {activeTab === 'history' && (
-              <div style={{ marginTop: '24px' }}>
-                {historyLoading ? (
-                  <Skeleton style={{ height: '192px' }} />
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
+            {activeTab === 'history' &&
+            <div style={{ marginTop: '24px' }}>
+                {historyLoading ?
+              <Skeleton style={{ height: '192px' }} /> :
+
+              <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%' }}>
                       <thead>
                         <tr style={{
-                          backgroundColor: 'var(--mac-bg-tertiary)',
-                          borderBottom: '1px solid var(--mac-border)'
-                        }}>
+                      backgroundColor: 'var(--mac-bg-tertiary)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
                           <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
                           <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
                           <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуга</th>
@@ -1121,15 +1121,15 @@ const CashierPanel = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredPayments.length > 0 ? (
-                          filteredPayments.map((row, index) => (
-                            <tr key={`payment-${row.id || row.payment_id || index}`} style={{
-                              borderBottom: '1px solid var(--mac-border)',
-                              transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
-                            }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
+                        {filteredPayments.length > 0 ?
+                    filteredPayments.map((row, index) =>
+                    <tr key={`payment-${row.id || row.payment_id || index}`} style={{
+                      borderBottom: '1px solid var(--mac-border)',
+                      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <span style={{ fontWeight: '500' }}>{row.date || '—'}</span>
@@ -1151,16 +1151,16 @@ const CashierPanel = () => {
                               </td>
                               <td style={{ padding: '12px 16px' }}>
                                 <Badge variant={
-                                  row.status === 'paid' ? 'success' :
-                                    row.status === 'partial' ? 'info' :
-                                      (row.status === 'cancelled' || row.status === 'refunded') ? 'danger' :
-                                        'warning'
-                                }>
+                        row.status === 'paid' ? 'success' :
+                        row.status === 'partial' ? 'info' :
+                        row.status === 'cancelled' || row.status === 'refunded' ? 'danger' :
+                        'warning'
+                        }>
                                   {row.status === 'paid' ? 'Оплачено' :
-                                    row.status === 'partial' ? 'Частично' :
-                                      row.status === 'cancelled' ? 'Отменён' :
-                                        row.status === 'refunded' ? 'Возвращено' :
-                                          'Ожидает'}
+                          row.status === 'partial' ? 'Частично' :
+                          row.status === 'cancelled' ? 'Отменён' :
+                          row.status === 'refunded' ? 'Возвращено' :
+                          'Ожидает'}
                                 </Badge>
                               </td>
                               <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1168,101 +1168,101 @@ const CashierPanel = () => {
                                   ✅ Принять
                                 </Button>
                                 <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openCancelDialog(row.id)}
-                                  disabled={row.status === 'cancelled'}
-                                >
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openCancelDialog(row.id)}
+                          disabled={row.status === 'cancelled'}>
+
                                   ❌ Отмена
                                 </Button>
                                 {/* ✅ v2.0: Кнопка возврата */}
                                 <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openRefundDialog(row)}
-                                  disabled={row.status === 'cancelled' || row.status === 'refunded'}
-                                  title="Возврат средств"
-                                >
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openRefundDialog(row)}
+                          disabled={row.status === 'cancelled' || row.status === 'refunded'}
+                          title="Возврат средств">
+
                                   💸 Возврат
                                 </Button>
                                 {/* ✅ v2.0: Кнопка печати чека */}
                                 <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handlePrintReceipt(row.id)}
-                                  title="Печать чека"
-                                >
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handlePrintReceipt(row.id)}
+                          title="Печать чека">
+
                                   🧾 Чек
                                 </Button>
                               </td>
                             </tr>
-                          ))
-                        ) : (
-                          <tr>
+                    ) :
+
+                    <tr>
                             <td colSpan="7" style={{
-                              padding: '48px',
-                              textAlign: 'center',
-                              color: 'var(--mac-text-secondary)',
-                              fontSize: '14px'
-                            }}>
+                        padding: '48px',
+                        textAlign: 'center',
+                        color: 'var(--mac-text-secondary)',
+                        fontSize: '14px'
+                      }}>
                               Нет данных для отображения
                             </td>
                           </tr>
-                        )}
+                    }
                       </tbody>
                     </table>
 
                     {/* ✅ УЛУЧШЕНИЕ: Пагинация c Server-Side логикой */}
-                    {totalPages > 1 && (
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: '12px',
-                        marginTop: '16px',
-                        padding: '12px'
-                      }}>
+                    {totalPages > 1 &&
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginTop: '16px',
+                  padding: '12px'
+                }}>
                         <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={currentPage === 1 || historyLoading}
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        >
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage === 1 || historyLoading}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+
                           ← Назад
                         </Button>
                         <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
                           Страница {currentPage} из {totalPages} (Всего: {totalItems})
                         </span>
                         <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={currentPage === totalPages || historyLoading}
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        >
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage === totalPages || historyLoading}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+
                           Вперёд →
                         </Button>
                       </div>
-                    )}
+                }
                   </div>
-                )}
+              }
               </div>
-            )}
+            }
 
             {/* Вкладка Возвраты */}
-            {activeTab === 'refunds' && (
-              <div style={{ marginTop: '24px' }}>
+            {activeTab === 'refunds' &&
+            <div style={{ marginTop: '24px' }}>
                 <RefundRequestsTable onRefresh={handleRefresh} />
               </div>
-            )}
+            }
 
             {/* Вкладка Депозиты */}
-            {activeTab === 'deposits' && (
-              <div style={{ marginTop: '24px', padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+            {activeTab === 'deposits' &&
+            <div style={{ marginTop: '24px', padding: '40px', textAlign: 'center', color: '#6b7280' }}>
                 <User size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
                 <h3>Управление депозитами</h3>
                 <p>Раздел находится в разработке</p>
               </div>
-            )}
+            }
           </Card>
 
           {/* ✅ УЛУЧШЕНИЕ: Диалог подтверждения отмены платежа */}
@@ -1270,8 +1270,8 @@ const CashierPanel = () => {
             open={cancelDialogOpen}
             onClose={() => setCancelDialogOpen(false)}
             maxWidth="sm"
-            fullWidth
-          >
+            fullWidth>
+
             <DialogTitle>Отмена платежа</DialogTitle>
             <DialogContent>
               <Typography variant="body2" style={{ marginBottom: '16px' }}>
@@ -1292,8 +1292,8 @@ const CashierPanel = () => {
                   resize: 'vertical',
                   fontFamily: 'inherit',
                   fontSize: '14px'
-                }}
-              />
+                }} />
+
             </DialogContent>
             <DialogActions>
               <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
@@ -1306,50 +1306,50 @@ const CashierPanel = () => {
           </Dialog>
 
           {/* ✅ УЛУЧШЕНИЕ: Модальное окно оплаты с универсальным хуком */}
-          {paymentModal.isOpen && paymentModal.selectedItem && (
-            <CashPaymentModal
-              appointment={paymentModal.selectedItem}
-              onProcessPayment={processPayment}
-              onClose={paymentModal.closeModal}
-            />
-          )}
+          {paymentModal.isOpen && paymentModal.selectedItem &&
+          <CashPaymentModal
+            appointment={paymentModal.selectedItem}
+            onProcessPayment={processPayment}
+            onClose={paymentModal.closeModal} />
+
+          }
 
           {/* ✅ УЛУЧШЕНИЕ: Диалог онлайн-оплаты с универсальным хуком */}
           <Dialog
             open={paymentWidget.isOpen}
             onClose={handlePaymentCancel}
             maxWidth="md"
-            fullWidth
-          >
+            fullWidth>
+
             <DialogTitle>
               <Typography variant="h6">
                 Онлайн-оплата
               </Typography>
-              {paymentWidget.selectedItem && (
-                <Typography variant="body2" color="textSecondary">
+              {paymentWidget.selectedItem &&
+              <Typography variant="body2" color="textSecondary">
                   Пациент: {paymentWidget.selectedItem.patient_name} • {paymentWidget.selectedItem.department}
                 </Typography>
-              )}
+              }
             </DialogTitle>
 
             <DialogContent>
-              {paymentError && (
-                <Alert severity="error" style={{ marginBottom: 8 }}>
+              {paymentError &&
+              <Alert severity="error" style={{ marginBottom: 8 }}>
                   {paymentError}
                 </Alert>
-              )}
+              }
 
-              {paymentWidget.selectedItem && (
-                <PaymentWidget
-                  visitId={paymentWidget.selectedItem.visit_id || paymentWidget.selectedItem.id}
-                  amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
-                  currency="UZS"
-                  description={`Оплата за ${paymentWidget.selectedItem.department || 'медицинские услуги'}`}
-                  onSuccess={handlePaymentSuccess}
-                  onError={handlePaymentError}
-                  onCancel={handlePaymentCancel}
-                />
-              )}
+              {paymentWidget.selectedItem &&
+              <PaymentWidget
+                visitId={paymentWidget.selectedItem.visit_id || paymentWidget.selectedItem.id}
+                amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
+                currency="UZS"
+                description={`Оплата за ${paymentWidget.selectedItem.department || 'медицинские услуги'}`}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+                onCancel={handlePaymentCancel} />
+
+              }
             </DialogContent>
 
             <DialogActions>
@@ -1364,8 +1364,8 @@ const CashierPanel = () => {
             open={!!paymentSuccess}
             onClose={() => setPaymentSuccess(null)}
             maxWidth="sm"
-            fullWidth
-          >
+            fullWidth>
+
             <DialogTitle>
               <Box display="flex" alignItems="center">
                 <CheckCircle style={{ color: 'var(--color-status-success)', marginRight: 8 }} />
@@ -1374,8 +1374,8 @@ const CashierPanel = () => {
             </DialogTitle>
 
             <DialogContent>
-              {paymentSuccess && (
-                <Box>
+              {paymentSuccess &&
+              <Box>
                   <Typography variant="body1" gutterBottom>
                     Платеж успешно обработан
                   </Typography>
@@ -1386,7 +1386,7 @@ const CashierPanel = () => {
                     Провайдер: {paymentSuccess.provider}
                   </Typography>
                 </Box>
-              )}
+              }
             </DialogContent>
 
             <DialogActions>
@@ -1422,8 +1422,8 @@ const CashierPanel = () => {
                       fontSize: '14px'
                     }}
                     max={refundPaymentAmount}
-                    min={1}
-                  />
+                    min={1} />
+
                 </Box>
                 <Box>
                   <Typography variant="body2" gutterBottom>Причина возврата:</Typography>
@@ -1439,8 +1439,8 @@ const CashierPanel = () => {
                       border: '1px solid var(--mac-border)',
                       fontSize: '14px',
                       resize: 'vertical'
-                    }}
-                  />
+                    }} />
+
                 </Box>
               </Box>
             </DialogContent>
@@ -1461,32 +1461,32 @@ const CashierPanel = () => {
             </DialogTitle>
             <DialogContent>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {hourlyStats.filter(h => h.count > 0).length > 0 ? (
-                  hourlyStats.filter(h => h.count > 0).map(h => (
-                    <Box key={h.hour} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {hourlyStats.filter((h) => h.count > 0).length > 0 ?
+                hourlyStats.filter((h) => h.count > 0).map((h) =>
+                <Box key={h.hour} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Typography sx={{ width: 60, fontWeight: 600 }}>{h.hour}:00</Typography>
                       <Box sx={{
-                        flex: 1,
-                        height: 24,
-                        backgroundColor: 'rgba(52, 199, 89, 0.2)',
-                        borderRadius: 4,
-                        position: 'relative'
-                      }}>
+                    flex: 1,
+                    height: 24,
+                    backgroundColor: 'rgba(52, 199, 89, 0.2)',
+                    borderRadius: 4,
+                    position: 'relative'
+                  }}>
                         <Box sx={{
-                          width: `${Math.min(100, (h.count / Math.max(...hourlyStats.map(s => s.count))) * 100)}%`,
-                          height: '100%',
-                          backgroundColor: 'var(--color-status-success)',
-                          borderRadius: 4
-                        }} />
+                      width: `${Math.min(100, h.count / Math.max(...hourlyStats.map((s) => s.count)) * 100)}%`,
+                      height: '100%',
+                      backgroundColor: 'var(--color-status-success)',
+                      borderRadius: 4
+                    }} />
                       </Box>
                       <Typography sx={{ width: 80, textAlign: 'right' }}>
                         {h.count} / {Number(h.amount).toLocaleString()}
                       </Typography>
                     </Box>
-                  ))
-                ) : (
-                  <Typography color="textSecondary">Нет платежей за этот день</Typography>
-                )}
+                ) :
+
+                <Typography color="textSecondary">Нет платежей за этот день</Typography>
+                }
               </Box>
             </DialogContent>
             <DialogActions>
@@ -1494,9 +1494,9 @@ const CashierPanel = () => {
             </DialogActions>
           </Dialog>
         </div>
-      </div >
-    </div >
-  );
+      </div>
+    </div>);
+
 };
 
 export default CashierPanel;

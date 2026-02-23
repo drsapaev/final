@@ -18,8 +18,8 @@ import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
-import { queueService } from '../services/queue';
-import EMRSystem from '../components/medical/EMRSystem';
+
+import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import {
   Calendar,
   Stethoscope,
@@ -37,8 +37,8 @@ import {
   DollarSign,
   Scissors,
   Save,
-  Building
-} from 'lucide-react';
+  Building } from
+'lucide-react';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
 import logger from '../utils/logger';
@@ -97,13 +97,20 @@ const DentistPanelUnified = () => {
     setActiveTab(tabId);
     navigate(`/dentist?tab=${tabId}`, { replace: true });
   };
+
+  const handleCardKeyDown = useCallback((event, action) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      action();
+    }
+  }, []);
   const [patients, setPatients] = useState([]);
   const [treatmentPlans, setTreatmentPlans] = useState([]);
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  const [emr, setEmr] = useState(null);
+  useState(null);
 
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
@@ -207,13 +214,13 @@ const DentistPanelUnified = () => {
     const patientServices = new Set();
     const patientServiceCodes = new Set();
 
-    allAppointments.forEach(appointment => {
+    allAppointments.forEach((appointment) => {
       if (appointment.patient_id === patientId) {
         if (appointment.services && Array.isArray(appointment.services)) {
-          appointment.services.forEach(service => patientServices.add(service));
+          appointment.services.forEach((service) => patientServices.add(service));
         }
         if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
         }
       }
     });
@@ -249,9 +256,9 @@ const DentistPanelUnified = () => {
         // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
         let allAppointments = [];
         if (data && data.queues && Array.isArray(data.queues)) {
-          data.queues.forEach(queue => {
+          data.queues.forEach((queue) => {
             if (queue.entries) {
-              queue.entries.forEach(entry => {
+              queue.entries.forEach((entry) => {
                 allAppointments.push({
                   id: entry.id,
                   visit_id: entry.id, // Добавляем visit_id для сопоставления с БД
@@ -280,8 +287,8 @@ const DentistPanelUnified = () => {
         }
 
         // Фильтруем только стоматологические записи для отображения
-        const appointmentsData = allAppointments.filter(apt =>
-          apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
+        const appointmentsData = allAppointments.filter((apt) =>
+        apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
         );
 
         // 2. Получаем актуальный payment_status из БД через all-appointments
@@ -297,12 +304,12 @@ const DentistPanelUnified = () => {
 
           if (appointmentsResponse.ok) {
             const appointmentsDBResponse = await appointmentsResponse.json();
-            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
             logger.info('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
 
             // Создаем карту id -> payment_status
             const paymentStatusMap = new Map();
-            appointmentsDBData.forEach(apt => {
+            appointmentsDBData.forEach((apt) => {
               if (apt.id) {
                 paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
               }
@@ -313,7 +320,7 @@ const DentistPanelUnified = () => {
             });
 
             // Обновляем payment_status в наших записях
-            allAppointments = allAppointments.map(apt => {
+            allAppointments = allAppointments.map((apt) => {
               let paymentStatus = paymentStatusMap.get(apt.id);
               if (!paymentStatus && apt.patient_id && apt.appointment_date) {
                 const key = `${apt.patient_id}_${apt.appointment_date}`;
@@ -333,7 +340,7 @@ const DentistPanelUnified = () => {
         }
 
         // Добавляем информацию о всех услугах пациента в каждую запись
-        const enrichedAppointmentsData = appointmentsData.map(apt => {
+        const enrichedAppointmentsData = appointmentsData.map((apt) => {
           const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
           return {
             ...apt,
@@ -459,7 +466,7 @@ const DentistPanelUnified = () => {
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
   const authHeader = useCallback(() => ({
-    Authorization: `Bearer ${tokenManager.getAccessToken()}`,
+    Authorization: `Bearer ${tokenManager.getAccessToken()}`
   }), []);
 
   const loadPatients = useCallback(async () => {
@@ -482,11 +489,11 @@ const DentistPanelUnified = () => {
       setTreatmentPlans([]);
       logger.info('Treatment plans endpoint not implemented yet');
     } catch {
-      // Игнорируем ошибки загрузки планов лечения
-    }
-  }, []);
 
-  const loadProsthetics = useCallback(async () => {
+
+
+      // Игнорируем ошибки загрузки планов лечения
+    }}, []);const loadProsthetics = useCallback(async () => {
     try {
       // TODO: Implement prosthetics endpoint
       // const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
@@ -494,18 +501,18 @@ const DentistPanelUnified = () => {
       setProsthetics([]);
       logger.info('Prosthetics endpoint not implemented yet');
     } catch {
-      // Игнорируем ошибки загрузки протезирования
-    }
-  }, []);
 
-  const loadData = useCallback(async () => {
+
+
+      // Игнорируем ошибки загрузки протезирования
+    }}, []);const loadData = useCallback(async () => {
     setLoading(true);
     try {
       await Promise.all([
-        loadPatients(),
-        loadTreatmentPlans(),
-        loadProsthetics()
-      ]);
+      loadPatients(),
+      loadTreatmentPlans(),
+      loadProsthetics()]
+      );
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
     } finally {
@@ -572,70 +579,70 @@ const DentistPanelUnified = () => {
   };
 
   // Сохранение EMR
-  const saveEMR = async (emrData) => {
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!selectedPatient?.id) {
-        logger.warn('[Dentist] saveEMR: нет selectedPatient.id');
-        return;
-      }
 
-      const appointmentForEMR = {
-        id: selectedPatient.id,
-        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
-        patient_name: selectedPatient.patient_name || selectedPatient.name
-      };
 
-      const response = await fetch(`/api/v1/appointments/${appointmentForEMR.id}/emr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(emrData)
-      });
 
-      if (response.ok) {
-        const savedEMR = await response.json();
-        setEmr(savedEMR);
-        logger.info('[Dentist] saveEMR: успешно', savedEMR);
-      } else {
-        const error = await response.json();
-        logger.error('[Dentist] saveEMR: ошибка', error);
-        throw new Error(error.detail || 'Ошибка при сохранении EMR');
-      }
-    } catch (error) {
-      logger.error('DentistPanel: Save EMR error:', error);
-      throw error;
-    }
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // Завершение визита
-  const handleCompleteVisit = async () => {
-    if (!selectedPatient) return;
 
-    try {
-      const visitPayload = {
-        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
-        notes: 'Стоматологический прием завершен'
-      };
 
-      await queueService.completeVisit(selectedPatient.id, visitPayload);
 
-      // Автоматически вызвать следующего пациента
-      try {
-        await queueService.callNextWaiting('dentist');
-      } catch (err) {
-        logger.warn('[Dentist] callNextWaiting failed:', err);
-      }
 
-      setSelectedPatient(null);
-      setEmr(null);
-      handleTabChange('queue');
-    } catch (error) {
-      logger.error('[Dentist] handleCompleteVisit: error', error);
-    }
-  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   const handleExamination = (patient) => {
     setSelectedPatient(patient);
@@ -757,10 +764,10 @@ const DentistPanelUnified = () => {
   };
 
   // Фильтрация пациентов
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = patients.filter((patient) => {
     const matchesSearch = !searchQuery ||
-      patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.phone?.includes(searchQuery);
+    patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    patient.phone?.includes(searchQuery);
 
     const matchesStatus = filterStatus === 'all' || patient.status === filterStatus;
 
@@ -770,19 +777,19 @@ const DentistPanelUnified = () => {
   // Статистика
   const stats = useMemo(() => {
     const todayString = new Date().toDateString();
-    const todayAppointmentsCount = appointmentsTableData.filter(apt => {
+    const todayAppointmentsCount = appointmentsTableData.filter((apt) => {
       if (!apt.appointment_date) {
         return false;
       }
       return new Date(apt.appointment_date).toDateString() === todayString;
     }).length;
 
-    const activePlansFromState = treatmentPlans.filter(plan => plan.status === 'active').length;
-    const activePlansDerived = appointmentsTableData.filter(apt => apt.status === 'in_progress' || apt.status === 'waiting').length;
+    const activePlansFromState = treatmentPlans.filter((plan) => plan.status === 'active').length;
+    const activePlansDerived = appointmentsTableData.filter((apt) => apt.status === 'in_progress' || apt.status === 'waiting').length;
     const activeTreatmentPlansCount = activePlansFromState || activePlansDerived;
 
-    const completedProstheticsFromState = prosthetics.filter(prosthetic => prosthetic.status === 'completed').length;
-    const completedProstheticsDerived = appointmentsTableData.filter(apt => apt.status === 'completed').length;
+    const completedProstheticsFromState = prosthetics.filter((prosthetic) => prosthetic.status === 'completed').length;
+    const completedProstheticsDerived = appointmentsTableData.filter((apt) => apt.status === 'completed').length;
     const completedProstheticsCount = completedProstheticsFromState || completedProstheticsDerived;
 
     return {
@@ -795,218 +802,186 @@ const DentistPanelUnified = () => {
 
   // Вкладки
   // Рендер дашборда
-  const renderDashboard = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+  const renderDashboard = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Статистические карточки */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '24px'
-      }}>
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+      gap: '24px'
+    }}>
         <div style={{
-          background: 'var(--mac-bg-primary)',
-          borderRadius: 'var(--mac-radius-xl)',
-          padding: '24px',
-          boxShadow: 'var(--mac-shadow-sm)',
-          border: '1px solid var(--mac-border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-          cursor: 'pointer'
-        }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
+        background: 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-xl)',
+        padding: '24px',
+        boxShadow: 'var(--mac-shadow-sm)',
+        border: '1px solid var(--mac-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+        cursor: 'default'
+      }}>
           <div>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-secondary)',
-              marginBottom: '4px'
-            }}>Всего пациентов</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-secondary)',
+            marginBottom: '4px'
+          }}>Всего пациентов</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-3xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)'
-            }}>{stats.totalPatients}</p>
+            fontSize: 'var(--mac-font-size-3xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
+            color: 'var(--mac-text-primary)'
+          }}>{stats.totalPatients}</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-success)',
-              marginTop: '4px'
-            }}>+12% за месяц</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-success)',
+            marginTop: '4px'
+          }}>+12% за месяц</p>
           </div>
           <div style={{
-            width: '56px',
-            height: '56px',
-            background: 'var(--mac-accent-blue)',
-            borderRadius: 'var(--mac-radius-xl)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--mac-shadow-lg)'
-          }}>
+          width: '56px',
+          height: '56px',
+          background: 'var(--mac-accent-blue)',
+          borderRadius: 'var(--mac-radius-xl)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 'var(--mac-shadow-lg)'
+        }}>
             <Users style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
 
         <div style={{
-          background: 'var(--mac-bg-primary)',
-          borderRadius: 'var(--mac-radius-xl)',
-          padding: '24px',
-          boxShadow: 'var(--mac-shadow-sm)',
-          border: '1px solid var(--mac-border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-          cursor: 'pointer'
-        }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
+        background: 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-xl)',
+        padding: '24px',
+        boxShadow: 'var(--mac-shadow-sm)',
+        border: '1px solid var(--mac-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+        cursor: 'default'
+      }}>
           <div>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-secondary)',
-              marginBottom: '4px'
-            }}>Записей сегодня</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-secondary)',
+            marginBottom: '4px'
+          }}>Записей сегодня</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-3xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)'
-            }}>{stats.todayAppointments}</p>
+            fontSize: 'var(--mac-font-size-3xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
+            color: 'var(--mac-text-primary)'
+          }}>{stats.todayAppointments}</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-accent-blue)',
-              marginTop: '4px'
-            }}>8 из 12 слотов</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-accent-blue)',
+            marginTop: '4px'
+          }}>8 из 12 слотов</p>
           </div>
           <div style={{
-            width: '56px',
-            height: '56px',
-            background: 'var(--mac-success)',
-            borderRadius: 'var(--mac-radius-xl)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--mac-shadow-lg)'
-          }}>
+          width: '56px',
+          height: '56px',
+          background: 'var(--mac-success)',
+          borderRadius: 'var(--mac-radius-xl)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 'var(--mac-shadow-lg)'
+        }}>
             <Calendar style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
 
         <div style={{
-          background: 'var(--mac-bg-primary)',
-          borderRadius: 'var(--mac-radius-xl)',
-          padding: '24px',
-          boxShadow: 'var(--mac-shadow-sm)',
-          border: '1px solid var(--mac-border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-          cursor: 'pointer'
-        }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
+        background: 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-xl)',
+        padding: '24px',
+        boxShadow: 'var(--mac-shadow-sm)',
+        border: '1px solid var(--mac-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+        cursor: 'default'
+      }}>
           <div>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-secondary)',
-              marginBottom: '4px'
-            }}>Активные планы</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-secondary)',
+            marginBottom: '4px'
+          }}>Активные планы</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-3xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)'
-            }}>{stats.activeTreatmentPlans}</p>
+            fontSize: 'var(--mac-font-size-3xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
+            color: 'var(--mac-text-primary)'
+          }}>{stats.activeTreatmentPlans}</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-accent-purple)',
-              marginTop: '4px'
-            }}>+8% к прошлому месяцу</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-accent-purple)',
+            marginTop: '4px'
+          }}>+8% к прошлому месяцу</p>
           </div>
           <div style={{
-            width: '56px',
-            height: '56px',
-            background: 'var(--mac-accent-purple)',
-            borderRadius: 'var(--mac-radius-xl)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--mac-shadow-lg)'
-          }}>
+          width: '56px',
+          height: '56px',
+          background: 'var(--mac-accent-purple)',
+          borderRadius: 'var(--mac-radius-xl)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 'var(--mac-shadow-lg)'
+        }}>
             <FileText style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
 
         <div style={{
-          background: 'var(--mac-bg-primary)',
-          borderRadius: 'var(--mac-radius-xl)',
-          padding: '24px',
-          boxShadow: 'var(--mac-shadow-sm)',
-          border: '1px solid var(--mac-border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-          cursor: 'pointer'
-        }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
+        background: 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-xl)',
+        padding: '24px',
+        boxShadow: 'var(--mac-shadow-sm)',
+        border: '1px solid var(--mac-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+        cursor: 'default'
+      }}>
           <div>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-text-secondary)',
-              marginBottom: '4px'
-            }}>Протезы</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-text-secondary)',
+            marginBottom: '4px'
+          }}>Протезы</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-3xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-text-primary)'
-            }}>{stats.completedProsthetics}</p>
+            fontSize: 'var(--mac-font-size-3xl)',
+            fontWeight: 'var(--mac-font-weight-bold)',
+            color: 'var(--mac-text-primary)'
+          }}>{stats.completedProsthetics}</p>
             <p style={{
-              fontSize: 'var(--mac-font-size-xs)',
-              color: 'var(--mac-warning)',
-              marginTop: '4px'
-            }}>+15% к прошлому месяцу</p>
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-warning)',
+            marginTop: '4px'
+          }}>+15% к прошлому месяцу</p>
           </div>
           <div style={{
-            width: '56px',
-            height: '56px',
-            background: 'var(--mac-warning)',
-            borderRadius: 'var(--mac-radius-xl)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--mac-shadow-lg)'
-          }}>
+          width: '56px',
+          height: '56px',
+          background: 'var(--mac-warning)',
+          borderRadius: 'var(--mac-radius-xl)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 'var(--mac-shadow-lg)'
+        }}>
             <Smile style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
@@ -1014,117 +989,117 @@ const DentistPanelUnified = () => {
 
       {/* Быстрые действия */}
       <div style={{
-        background: 'var(--mac-bg-primary)',
-        borderRadius: 'var(--mac-radius-xl)',
-        padding: '24px',
-        boxShadow: 'var(--mac-shadow-sm)',
-        border: '1px solid var(--mac-border)'
-      }}>
+      background: 'var(--mac-bg-primary)',
+      borderRadius: 'var(--mac-radius-xl)',
+      padding: '24px',
+      boxShadow: 'var(--mac-shadow-sm)',
+      border: '1px solid var(--mac-border)'
+    }}>
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px'
-        }}>
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '24px'
+      }}>
           <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)'
-          }}>Быстрые действия</h3>
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          color: 'var(--mac-text-primary)'
+        }}>Быстрые действия</h3>
           <Button
-            variant="text"
-            size="sm"
-            onClick={() => { }}
-            style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-accent-blue)'
-            }}
-          >
+          variant="text"
+          size="sm"
+          onClick={() => {}}
+          style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-accent-blue)'
+          }}>
+
             Показать все
           </Button>
         </div>
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '24px'
-        }}>
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '24px'
+      }}>
           <Button
-            onClick={() => handleTabChange('patients')}
-            variant="primary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '16px 24px',
-              borderRadius: 'var(--mac-radius-lg)',
-              boxShadow: 'var(--mac-shadow-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-              background: 'var(--mac-accent-blue)',
-              color: 'white',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
+          onClick={() => handleTabChange('patients')}
+          variant="primary"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '16px 24px',
+            borderRadius: 'var(--mac-radius-lg)',
+            boxShadow: 'var(--mac-shadow-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            background: 'var(--mac-accent-blue)',
+            color: 'white',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
+
             <Plus style={{ height: '20px', width: '20px' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Новый пациент</span>
           </Button>
           <Button
-            onClick={() => handleTabChange('appointments')}
-            variant="outline"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '16px 24px',
-              borderRadius: 'var(--mac-radius-lg)',
-              boxShadow: 'var(--mac-shadow-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-              border: '1px solid var(--mac-border)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
+          onClick={() => handleTabChange('appointments')}
+          variant="outline"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '16px 24px',
+            borderRadius: 'var(--mac-radius-lg)',
+            boxShadow: 'var(--mac-shadow-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            border: '1px solid var(--mac-border)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
+
             <Calendar style={{ height: '20px', width: '20px' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Записать на прием</span>
           </Button>
           <Button
-            onClick={() => handleTabChange('dental-chart')}
-            variant="outline"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '16px 24px',
-              borderRadius: 'var(--mac-radius-lg)',
-              boxShadow: 'var(--mac-shadow-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-              border: '1px solid var(--mac-border)',
-              fontWeight: 'var(--mac-font-weight-medium)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
+          onClick={() => handleTabChange('dental-chart')}
+          variant="outline"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '16px 24px',
+            borderRadius: 'var(--mac-radius-lg)',
+            boxShadow: 'var(--mac-shadow-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            border: '1px solid var(--mac-border)',
+            fontWeight: 'var(--mac-font-weight-medium)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}>
+
             <Tooth style={{ height: '20px', width: '20px' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Схема зубов</span>
           </Button>
@@ -1133,177 +1108,171 @@ const DentistPanelUnified = () => {
 
       {/* Последние записи */}
       <div style={{
-        background: 'var(--mac-bg-primary)',
-        borderRadius: 'var(--mac-radius-xl)',
-        padding: '24px',
-        boxShadow: 'var(--mac-shadow-sm)',
-        border: '1px solid var(--mac-border)'
-      }}>
+      background: 'var(--mac-bg-primary)',
+      borderRadius: 'var(--mac-radius-xl)',
+      padding: '24px',
+      boxShadow: 'var(--mac-shadow-sm)',
+      border: '1px solid var(--mac-border)'
+    }}>
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px'
-        }}>
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '24px'
+      }}>
           <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)'
-          }}>Последние записи</h3>
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          color: 'var(--mac-text-primary)'
+        }}>Последние записи</h3>
           <Button
-            variant="text"
-            size="sm"
-            onClick={() => { }}
-            style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              fontWeight: 'var(--mac-font-weight-medium)',
-              color: 'var(--mac-accent-blue)'
-            }}
-          >
+          variant="text"
+          size="sm"
+          onClick={() => {}}
+          style={{
+            fontSize: 'var(--mac-font-size-sm)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: 'var(--mac-accent-blue)'
+          }}>
+
             Показать все
           </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {appointmentsTableData.slice(0, 5).map(appointment => (
-            <div
-              key={appointment.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '24px',
-                background: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-lg)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-                cursor: 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-            >
+          {appointmentsTableData.slice(0, 5).map((appointment) =>
+        <div
+          key={appointment.id}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '24px',
+            background: 'var(--mac-bg-secondary)',
+            borderRadius: 'var(--mac-radius-lg)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            cursor: 'default'
+          }}>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
-                  background: 'var(--mac-accent-blue)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: 'var(--mac-shadow-sm)'
-                }}>
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-accent-blue)',
+              borderRadius: 'var(--mac-radius-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'var(--mac-shadow-sm)'
+            }}>
                   <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-bold)'
-                  }}>
+                color: 'white',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-bold)'
+              }}>
                     {appointment.patientName?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{appointment.patientName}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{appointment.patientName}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>{appointment.date} {appointment.time}</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>{appointment.date} {appointment.time}</p>
                 </div>
               </div>
               <div style={{
-                padding: '4px 12px',
-                borderRadius: 'var(--mac-radius-full)',
-                fontSize: 'var(--mac-font-size-xs)',
-                fontWeight: 'var(--mac-font-weight-medium)',
-                background: appointment.status === 'confirmed' ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
-                color: appointment.status === 'confirmed' ? 'var(--mac-success)' : 'var(--mac-warning)'
-              }}>
+            padding: '4px 12px',
+            borderRadius: 'var(--mac-radius-full)',
+            fontSize: 'var(--mac-font-size-xs)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            background: appointment.status === 'confirmed' ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
+            color: appointment.status === 'confirmed' ? 'var(--mac-success)' : 'var(--mac-warning)'
+          }}>
                 {appointment.status}
               </div>
             </div>
-          ))}
+        )}
         </div>
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Рендер пациентов
-  const renderPatients = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderPatients = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Поиск и фильтры */}
       <Card padding="lg">
         <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ position: 'relative' }}>
               <Search style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                height: '16px',
-                width: '16px',
-                color: 'var(--mac-text-tertiary)'
-              }} />
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              height: '16px',
+              width: '16px',
+              color: 'var(--mac-text-tertiary)'
+            }} />
               <input
-                type="text"
-                placeholder="Поиск пациентов..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  paddingLeft: '40px',
-                  paddingRight: '16px',
-                  paddingTop: '8px',
-                  paddingBottom: '8px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  fontFamily: 'inherit',
-                  backgroundColor: 'var(--mac-bg-primary)',
-                  color: 'var(--mac-text-primary)',
-                  transition: 'all var(--mac-duration-fast) var(--mac-ease)'
-                }}
-                onFocus={(e) => {
-                  e.target.style.outline = 'var(--mac-focus-ring)';
-                  e.target.style.outlineOffset = '2px';
-                  e.target.style.borderColor = 'var(--mac-accent-blue)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.outline = 'none';
-                  e.target.style.borderColor = 'var(--mac-border)';
-                }}
-              />
+              type="text"
+              placeholder="Поиск пациентов..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                paddingLeft: '40px',
+                paddingRight: '16px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-lg)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontFamily: 'inherit',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                transition: 'all var(--mac-duration-fast) var(--mac-ease)'
+              }}
+              onFocus={(e) => {
+                e.target.style.outline = 'var(--mac-focus-ring)';
+                e.target.style.outlineOffset = '2px';
+                e.target.style.borderColor = 'var(--mac-accent-blue)';
+              }}
+              onBlur={(e) => {
+                e.target.style.outline = 'none';
+                e.target.style.borderColor = 'var(--mac-border)';
+              }} />
+
             </div>
           </div>
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              fontSize: 'var(--mac-font-size-base)',
-              fontFamily: 'inherit',
-              backgroundColor: 'var(--mac-bg-primary)',
-              color: 'var(--mac-text-primary)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-fast) var(--mac-ease)'
-            }}
-            onFocus={(e) => {
-              e.target.style.outline = 'var(--mac-focus-ring)';
-              e.target.style.outlineOffset = '2px';
-              e.target.style.borderColor = 'var(--mac-accent-blue)';
-            }}
-            onBlur={(e) => {
-              e.target.style.outline = 'none';
-              e.target.style.borderColor = 'var(--mac-border)';
-            }}
-          >
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          style={{
+            padding: '8px 16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            fontSize: 'var(--mac-font-size-base)',
+            fontFamily: 'inherit',
+            backgroundColor: 'var(--mac-bg-primary)',
+            color: 'var(--mac-text-primary)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-fast) var(--mac-ease)'
+          }}
+          onFocus={(e) => {
+            e.target.style.outline = 'var(--mac-focus-ring)';
+            e.target.style.outlineOffset = '2px';
+            e.target.style.borderColor = 'var(--mac-accent-blue)';
+          }}
+          onBlur={(e) => {
+            e.target.style.outline = 'none';
+            e.target.style.borderColor = 'var(--mac-border)';
+          }}>
+
             <option value="all">Все статусы</option>
             <option value="active">Активные</option>
             <option value="inactive">Неактивные</option>
@@ -1313,57 +1282,57 @@ const DentistPanelUnified = () => {
 
       {/* Список пациентов */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-        gap: '24px'
-      }}>
-        {filteredPatients.map(patient => (
-          <Card
-            key={patient.id}
-            padding="lg"
-            style={{
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-lg)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+      gap: '24px'
+    }}>
+        {filteredPatients.map((patient) =>
+      <Card
+        key={patient.id}
+        padding="lg"
+        style={{
+          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-lg)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}>
+
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '48px',
-                  height: '48px',
-                  background: 'var(--mac-accent-blue)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              width: '48px',
+              height: '48px',
+              background: 'var(--mac-accent-blue)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
                   <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-lg)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                color: 'white',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <h3 style={{
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    fontSize: 'var(--mac-font-size-lg)',
-                    color: 'var(--mac-text-primary)',
-                    marginBottom: '4px'
-                  }}>{patient.name}</h3>
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-lg)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '4px'
+              }}>{patient.name}</h3>
                   <p style={{
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-sm)'
-                  }}>{patient.phone}</p>
+                color: 'var(--mac-text-secondary)',
+                fontSize: 'var(--mac-font-size-sm)'
+              }}>{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -1373,142 +1342,142 @@ const DentistPanelUnified = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
               <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
+          }}>
                 <strong style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Возраст:</strong> {patient.age} лет
               </p>
               <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)'
+          }}>
                 <strong style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Последний визит:</strong> {patient.lastVisit || 'Не было'}
               </p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               <Button
-                size="sm"
-                onClick={() => handlePatientSelect(patient)}
-                style={{ gridColumn: 'span 2', marginBottom: '8px' }}
-              >
+            size="sm"
+            onClick={() => handlePatientSelect(patient)}
+            style={{ gridColumn: 'span 2', marginBottom: '8px' }}>
+
                 <Edit style={{ height: '16px', width: '16px', marginRight: '4px' }} />
                 Карточка пациента
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleExamination(patient)}
-                title="Осмотр"
-                style={{ padding: '8px' }}
-              >
+            size="sm"
+            variant="outline"
+            onClick={() => handleExamination(patient)}
+            title="Осмотр"
+            style={{ padding: '8px' }}>
+
                 <Eye style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleDiagnosis(patient)}
-                title="Диагнозы"
-                style={{ padding: '8px' }}
-              >
+            size="sm"
+            variant="outline"
+            onClick={() => handleDiagnosis(patient)}
+            title="Диагнозы"
+            style={{ padding: '8px' }}>
+
                 <Stethoscope style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleVisitProtocol(patient)}
-                title="Протокол визита"
-                style={{ padding: '8px' }}
-              >
+            size="sm"
+            variant="outline"
+            onClick={() => handleVisitProtocol(patient)}
+            title="Протокол визита"
+            style={{ padding: '8px' }}>
+
                 <FileText style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleDentalChart(patient)}
-                title="Схема зубов"
-                style={{ padding: '8px' }}
-              >
+            size="sm"
+            variant="outline"
+            onClick={() => handleDentalChart(patient)}
+            title="Схема зубов"
+            style={{ padding: '8px' }}>
+
                 <Tooth style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleTreatment(patient)}
-                title="Лечение"
-                style={{ padding: '8px' }}
-              >
+            size="sm"
+            variant="outline"
+            onClick={() => handleTreatment(patient)}
+            title="Лечение"
+            style={{ padding: '8px' }}>
+
                 <Scissors style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleProsthetic(patient)}
-                title="Протезирование"
-                style={{ padding: '8px' }}
-              >
+            size="sm"
+            variant="outline"
+            onClick={() => handleProsthetic(patient)}
+            title="Протезирование"
+            style={{ padding: '8px' }}>
+
                 <Smile style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </Card>
-        ))}
+      )}
       </div>
-    </div>
-  );
+    </div>;
+
 
   // Рендер записей
-  const renderAppointments = () => (
-    <div style={{
-      width: '100%',
-      maxWidth: 'none',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '24px'
-    }}>
+  const renderAppointments = () =>
+  <div style={{
+    width: '100%',
+    maxWidth: 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
+  }}>
       <Card padding="lg" style={{
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      }}>
+      width: '100%',
+      maxWidth: '100%',
+      minWidth: 0,
+      boxSizing: 'border-box',
+      overflow: 'hidden'
+    }}>
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px'
+      }}>
           <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            display: 'flex',
-            alignItems: 'center',
-            color: 'var(--mac-text-primary)'
-          }}>
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          display: 'flex',
+          alignItems: 'center',
+          color: 'var(--mac-text-primary)'
+        }}>
             <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-success)' }} />
             Записи к стоматологу
           </h3>
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
             <Badge variant="info">Всего: {appointmentsTableData.length}</Badge>
             <Badge variant="warning">
-              Ожидают: {appointmentsTableData.filter(a => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
+              Ожидают: {appointmentsTableData.filter((a) => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
             </Badge>
             <Badge variant="primary">
-              Вызваны: {appointmentsTableData.filter(a => a.status === 'called' || a.status === 'in_progress').length}
+              Вызваны: {appointmentsTableData.filter((a) => a.status === 'called' || a.status === 'in_progress').length}
             </Badge>
             <Badge variant="success">
-              Приняты: {appointmentsTableData.filter(a => a.status === 'completed' || a.status === 'done').length}
+              Приняты: {appointmentsTableData.filter((a) => a.status === 'completed' || a.status === 'done').length}
             </Badge>
             <Button
-              variant="secondary"
-              size="sm"
-              onClick={loadDentistryAppointments}
-              disabled={appointmentsLoading}
-            >
+            variant="secondary"
+            size="sm"
+            onClick={loadDentistryAppointments}
+            disabled={appointmentsLoading}>
+
               <RefreshCw size={16} style={{ marginRight: '4px' }} />
               Обновить
             </Button>
@@ -1516,178 +1485,184 @@ const DentistPanelUnified = () => {
         </div>
 
         <EnhancedAppointmentsTable
-          data={appointmentsTableData}
-          loading={appointmentsLoading}
-          theme="light"
-          language="ru"
-          view="doctor"
-          selectedRows={new Set()}
-          outerBorder={false}
-          services={services}
-          showCheckboxes={false}
-          onRowSelect={() => { }}
-          onRowClick={handleAppointmentRowClick}
-          onActionClick={handleAppointmentActionClick}
-        />
+        data={appointmentsTableData}
+        loading={appointmentsLoading}
+        theme="light"
+        language="ru"
+        view="doctor"
+        selectedRows={new Set()}
+        outerBorder={false}
+        services={services}
+        showCheckboxes={false}
+        onRowSelect={() => {}}
+        onRowClick={handleAppointmentRowClick}
+        onActionClick={handleAppointmentActionClick} />
+
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер осмотров
-  const renderExaminations = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderExaminations = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Объективные осмотры</h3>
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>Объективные осмотры</h3>
         <p style={{
-          color: 'var(--mac-text-secondary)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
+        color: 'var(--mac-text-secondary)',
+        marginBottom: '16px',
+        fontSize: 'var(--mac-font-size-base)'
+      }}>
           Выберите пациента для проведения или просмотра объективного осмотра
         </p>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
-          {patients.map(patient => (
-            <div
-              key={patient.id}
-              style={{
-                padding: '24px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-lg)',
-                cursor: 'pointer',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-              onClick={() => handleExamination(patient)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '16px'
+      }}>
+          {patients.map((patient) =>
+        <div
+          key={patient.id}
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '24px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={() => handleExamination(patient)}
+          onKeyDown={(event) => handleCardKeyDown(event, () => handleExamination(patient))}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'var(--mac-success)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              width: '32px',
+              height: '32px',
+              background: 'var(--mac-success)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
                   <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                color: 'white',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{patient.name}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{patient.name}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>Провести осмотр</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Провести осмотр</p>
                 </div>
               </div>
             </div>
-          ))}
+        )}
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер диагнозов
-  const renderDiagnoses = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderDiagnoses = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Диагнозы и назначения</h3>
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>Диагнозы и назначения</h3>
         <p style={{
-          color: 'var(--mac-text-secondary)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
+        color: 'var(--mac-text-secondary)',
+        marginBottom: '16px',
+        fontSize: 'var(--mac-font-size-base)'
+      }}>
           Выберите пациента для постановки диагнозов и назначений
         </p>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
-          {patients.map(patient => (
-            <div
-              key={patient.id}
-              style={{
-                padding: '24px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-lg)',
-                cursor: 'pointer',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-              onClick={() => handleDiagnosis(patient)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '16px'
+      }}>
+          {patients.map((patient) =>
+        <div
+          key={patient.id}
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '24px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={() => handleDiagnosis(patient)}
+          onKeyDown={(event) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'var(--mac-accent-blue)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              width: '32px',
+              height: '32px',
+              background: 'var(--mac-accent-blue)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
                   <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                color: 'white',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{patient.name}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{patient.name}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>Поставить диагноз</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Поставить диагноз</p>
                 </div>
               </div>
             </div>
-          ))}
+        )}
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер протоколов визитов
   const renderVisits = () => {
@@ -1713,28 +1688,21 @@ const DentistPanelUnified = () => {
                 onClick={() => {
                   setSelectedPatient(null);
                   handleTabChange('queue');
-                }}
-              >
+                }}>
+
                 Вернуться в очередь
               </Button>
             </div>
 
             {/* EMR System */}
-            <EMRSystem
-              appointment={{
-                id: selectedPatient.id,
-                patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
-                patient_name: selectedPatient.patient_name || selectedPatient.name,
-                specialty: 'dentist',
-                status: selectedPatient.status || 'in_visit'
-              }}
-              emr={emr}
-              onSave={saveEMR}
-              onComplete={handleCompleteVisit}
-            />
+            <EMRContainerV2
+              visitId={selectedPatient.id}
+              patientId={selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id}
+              specialty="dentistry" />
+
           </Card>
-        </div>
-      );
+        </div>);
+
     }
 
     // Иначе показываем список пациентов для выбора протокола
@@ -1760,88 +1728,11 @@ const DentistPanelUnified = () => {
             gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
             gap: '16px'
           }}>
-            {patients.map(patient => (
-              <div
-                key={patient.id}
-                style={{
-                  padding: '24px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  cursor: 'pointer',
-                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                }}
-                onClick={() => handleVisitProtocol(patient)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    background: 'var(--mac-accent-purple)',
-                    borderRadius: 'var(--mac-radius-full)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <span style={{
-                      color: 'white',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      fontWeight: 'var(--mac-font-weight-medium)'
-                    }}>
-                      {patient.name?.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <p style={{
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)',
-                      fontSize: 'var(--mac-font-size-base)'
-                    }}>{patient.name}</p>
-                    <p style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Создать протокол</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    );
-  };
-
-  // Рендер фото архива
-  const renderPhotos = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <Card padding="lg">
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Фото и рентген архив</h3>
-        <p style={{
-          color: 'var(--mac-text-secondary)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
-          Выберите пациента для просмотра и управления фото и рентгеновскими снимками
-        </p>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
-          {patients.map(patient => (
+            {patients.map((patient) =>
             <div
               key={patient.id}
+              role="button"
+              tabIndex={0}
               style={{
                 padding: '24px',
                 border: '1px solid var(--mac-border)',
@@ -1849,142 +1740,219 @@ const DentistPanelUnified = () => {
                 cursor: 'pointer',
                 transition: 'all var(--mac-duration-normal) var(--mac-ease)'
               }}
-              onClick={() => handlePhotoArchive(patient)}
+              onClick={() => handleVisitProtocol(patient)}
+              onKeyDown={(event) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--mac-bg-secondary)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
+              }}>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
                   width: '32px',
                   height: '32px',
-                  background: 'var(--mac-warning)',
+                  background: 'var(--mac-accent-purple)',
                   borderRadius: 'var(--mac-radius-full)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <span style={{
+                    <span style={{
                     color: 'white',
                     fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: 'var(--mac-font-weight-medium)'
                   }}>
+                      {patient.name?.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{patient.name}</p>
+                    <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>Создать протокол</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>);
+
+  };
+
+  // Рендер фото архива
+  const renderPhotos = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>Фото и рентген архив</h3>
+        <p style={{
+        color: 'var(--mac-text-secondary)',
+        marginBottom: '16px',
+        fontSize: 'var(--mac-font-size-base)'
+      }}>
+          Выберите пациента для просмотра и управления фото и рентгеновскими снимками
+        </p>
+
+        <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '16px'
+      }}>
+          {patients.map((patient) =>
+        <div
+          key={patient.id}
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '24px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={() => handlePhotoArchive(patient)}
+          onKeyDown={(event) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+              width: '32px',
+              height: '32px',
+              background: 'var(--mac-warning)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+                  <span style={{
+                color: 'white',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{patient.name}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{patient.name}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>Открыть архив</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Открыть архив</p>
                 </div>
               </div>
             </div>
-          ))}
+        )}
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер шаблонов
-  const renderTemplates = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderTemplates = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px'
-        }}>
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '16px'
+      }}>
           <div>
             <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
-            }}>Шаблоны протоколов</h3>
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '4px'
+          }}>Шаблоны протоколов</h3>
             <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
           <Button
-            onClick={handleProtocolTemplates}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
+          onClick={handleProtocolTemplates}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+
             <FileText style={{ height: '16px', width: '16px' }} />
             Управление шаблонами
           </Button>
         </div>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '16px'
-        }}>
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '16px'
+      }}>
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'default',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-accent-blue-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-accent-blue-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <Scissors style={{ height: '20px', width: '20px', color: 'var(--mac-accent-blue)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>Лечение кариеса</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>Лечение кариеса</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>60 мин</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>60 мин</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '12px'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '12px'
+          }}>
               Стандартный протокол лечения кариеса с анестезией и пломбированием
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -1998,54 +1966,48 @@ const DentistPanelUnified = () => {
           </div>
 
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'default',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-danger-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-danger-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <Scissors style={{ height: '20px', width: '20px', color: 'var(--mac-danger)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>Эндодонтическое лечение</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>Эндодонтическое лечение</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>120 мин</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>120 мин</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '12px'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '12px'
+          }}>
               Протокол лечения корневых каналов с инструментальной обработкой
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -2059,54 +2021,48 @@ const DentistPanelUnified = () => {
           </div>
 
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'default',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-success-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-success-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <Scissors style={{ height: '20px', width: '20px', color: 'var(--mac-success)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>Профессиональная гигиена</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>Профессиональная гигиена</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>75 мин</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>75 мин</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '12px'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '12px'
+          }}>
               Протокол профессиональной гигиены полости рта
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -2120,506 +2076,518 @@ const DentistPanelUnified = () => {
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер отчетов
-  const renderReports = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderReports = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px'
-        }}>
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '16px'
+      }}>
           <div>
             <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              marginBottom: '4px'
-            }}>Отчеты и аналитика</h3>
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-text-primary)',
+            marginBottom: '4px'
+          }}>Отчеты и аналитика</h3>
             <p style={{
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-sm)'
-            }}>
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
           <Button
-            onClick={handleReports}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
+          onClick={handleReports}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+
             <BarChart3 style={{ height: '16px', width: '16px' }} />
             Открыть отчеты
           </Button>
         </div>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-          gap: '16px'
-        }}>
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+        gap: '16px'
+      }}>
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onClick={handleReports}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={handleReports}
+          onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-accent-blue-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-accent-blue-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <BarChart3 style={{ height: '20px', width: '20px', color: 'var(--mac-accent-blue)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>Общий обзор</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>Общий обзор</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>Основные показатели</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Основные показатели</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)'
+          }}>
               Общая статистика по всем направлениям деятельности
             </p>
           </div>
 
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onClick={handleReports}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={handleReports}
+          onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-success-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-success-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <Users style={{ height: '20px', width: '20px', color: 'var(--mac-success)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>По пациентам</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>По пациентам</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>Демография и активность</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Демография и активность</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)'
+          }}>
               Анализ пациентской базы и их активности
             </p>
           </div>
 
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onClick={handleReports}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={handleReports}
+          onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-accent-purple-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-accent-purple-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <Stethoscope style={{ height: '20px', width: '20px', color: 'var(--mac-accent-purple)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>По врачам</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>По врачам</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>Производительность</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Производительность</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)'
+          }}>
               Статистика работы врачей и их специализаций
             </p>
           </div>
 
           <div
-            style={{
-              padding: '16px',
-              border: '1px solid var(--mac-border)',
-              borderRadius: 'var(--mac-radius-lg)',
-              cursor: 'pointer',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}
-            onClick={handleReports}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '16px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={handleReports}
+          onKeyDown={(event) => handleCardKeyDown(event, handleReports)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
             <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+              <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-warning-bg)',
+              borderRadius: 'var(--mac-radius-lg)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              marginBottom: '12px'
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'var(--mac-warning-bg)',
-                borderRadius: 'var(--mac-radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
                 <Building style={{ height: '20px', width: '20px', color: 'var(--mac-warning)' }} />
               </div>
               <div>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)'
-                }}>По клинике</h4>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>По клинике</h4>
                 <p style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  color: 'var(--mac-text-secondary)'
-                }}>Оборудование и загруженность</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Оборудование и загруженность</p>
               </div>
             </div>
             <p style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-primary)'
-            }}>
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-primary)'
+          }}>
               Анализ работы клиники и состояния оборудования
             </p>
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер схем зубов
-  const renderDentalChart = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderDentalChart = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Схемы зубов</h3>
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>Схемы зубов</h3>
         <p style={{
-          color: 'var(--mac-text-secondary)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
+        color: 'var(--mac-text-secondary)',
+        marginBottom: '16px',
+        fontSize: 'var(--mac-font-size-base)'
+      }}>
           Выберите пациента для просмотра и редактирования схемы зубов
         </p>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
-          {patients.map(patient => (
-            <div
-              key={patient.id}
-              style={{
-                padding: '24px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-lg)',
-                cursor: 'pointer',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-              onClick={() => handleDentalChart(patient)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '16px'
+      }}>
+          {patients.map((patient) =>
+        <div
+          key={patient.id}
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '24px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={() => handleDentalChart(patient)}
+          onKeyDown={(event) => handleCardKeyDown(event, () => handleDentalChart(patient))}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'var(--mac-accent-blue)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              width: '32px',
+              height: '32px',
+              background: 'var(--mac-accent-blue)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
                   <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                color: 'white',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{patient.name}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{patient.name}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>Открыть схему</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Открыть схему</p>
                 </div>
               </div>
             </div>
-          ))}
+        )}
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер планов лечения
-  const renderTreatmentPlans = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderTreatmentPlans = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Планы лечения</h3>
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>Планы лечения</h3>
         <p style={{
-          color: 'var(--mac-text-secondary)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
+        color: 'var(--mac-text-secondary)',
+        marginBottom: '16px',
+        fontSize: 'var(--mac-font-size-base)'
+      }}>
           Выберите пациента для создания или редактирования плана лечения
         </p>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
-          {patients.map(patient => (
-            <div
-              key={patient.id}
-              style={{
-                padding: '24px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-lg)',
-                cursor: 'pointer',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-              onClick={() => handleTreatmentPlanner(patient)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '16px'
+      }}>
+          {patients.map((patient) =>
+        <div
+          key={patient.id}
+          role="button"
+          tabIndex={0}
+          style={{
+            padding: '24px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-lg)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}
+          onClick={() => handleTreatmentPlanner(patient)}
+          onKeyDown={(event) => handleCardKeyDown(event, () => handleTreatmentPlanner(patient))}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'var(--mac-success)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              width: '32px',
+              height: '32px',
+              background: 'var(--mac-success)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
                   <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
-                  }}>
+                color: 'white',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{patient.name}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{patient.name}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>Открыть план</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>Открыть план</p>
                 </div>
               </div>
             </div>
-          ))}
+        )}
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер протезирования
-  const renderProsthetics = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderProsthetics = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Протезирование</h3>
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>Протезирование</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {prosthetics.map(prosthetic => (
-            <div
-              key={prosthetic.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px',
-                background: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-lg)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-            >
+          {prosthetics.map((prosthetic) =>
+        <div
+          key={prosthetic.id}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            background: 'var(--mac-bg-secondary)',
+            borderRadius: 'var(--mac-radius-lg)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+          }}>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
-                  background: 'var(--mac-warning)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              width: '40px',
+              height: '40px',
+              background: 'var(--mac-warning)',
+              borderRadius: 'var(--mac-radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
                   <Smile style={{ height: '20px', width: '20px', color: 'white' }} />
                 </div>
                 <div>
                   <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{prosthetic.patientName}</p>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)'
+              }}>{prosthetic.patientName}</p>
                   <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>{prosthetic.type}</p>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>{prosthetic.type}</p>
                 </div>
               </div>
               <Badge variant={prosthetic.status === 'completed' ? 'success' : 'warning'}>
                 {prosthetic.status}
               </Badge>
             </div>
-          ))}
+        )}
         </div>
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер AI помощника
-  const renderAIAssistant = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  const renderAIAssistant = () =>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card padding="lg">
         <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>AI Помощник</h3>
+        fontSize: 'var(--mac-font-size-lg)',
+        fontWeight: 'var(--mac-font-weight-semibold)',
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)'
+      }}>AI Помощник</h3>
         <AIAssistant
-          context="dental"
-          onSuggestion={(suggestion) => {
-            logger.info('AI предложение:', suggestion);
-          }}
-        />
+        context="dental"
+        onSuggestion={(suggestion) => {
+          logger.info('AI предложение:', suggestion);
+        }} />
+
       </Card>
-    </div>
-  );
+    </div>;
+
 
   // Рендер контента
   const renderContent = () => {
@@ -2634,9 +2602,9 @@ const DentistPanelUnified = () => {
             onStartVisit={(appointment) => {
               setSelectedPatient(appointment);
               handleTabChange('visits');
-            }}
-          />
-        );
+            }} />);
+
+
       case 'patients':
         return renderPatients();
       case 'appointments':
@@ -2687,18 +2655,18 @@ const DentistPanelUnified = () => {
             gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
             gap: '24px'
           }}>
-            {[...Array(4)].map((_, i) => (
-              <div key={i} style={{
-                height: '96px',
-                background: 'var(--mac-bg-secondary)',
-                borderRadius: 'var(--mac-radius-md)',
-                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-              }}></div>
-            ))}
+            {[...Array(4)].map((_, i) =>
+            <div key={i} style={{
+              height: '96px',
+              background: 'var(--mac-bg-secondary)',
+              borderRadius: 'var(--mac-radius-md)',
+              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+            }}></div>
+            )}
           </div>
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -2720,240 +2688,240 @@ const DentistPanelUnified = () => {
       {renderContent()}
 
       {/* Модальные окна */}
-      {showPatientCard && selectedPatient && (
-        <PatientCard
-          patient={selectedPatient}
-          onSave={(updatedPatient) => {
-            logger.info('Сохранение пациента:', updatedPatient);
-            setShowPatientCard(false);
-          }}
-          onClose={() => setShowPatientCard(false)}
-        />
-      )}
+      {showPatientCard && selectedPatient &&
+      <PatientCard
+        patient={selectedPatient}
+        onSave={(updatedPatient) => {
+          logger.info('Сохранение пациента:', updatedPatient);
+          setShowPatientCard(false);
+        }}
+        onClose={() => setShowPatientCard(false)} />
 
-      {showExaminationForm && selectedPatient && (
-        <ExaminationForm
-          patientId={selectedPatient.id}
-          initialData={selectedPatient.examinationData}
-          onSave={(examinationData) => {
-            logger.info('Сохранение осмотра:', examinationData);
-            setShowExaminationForm(false);
-          }}
-          onClose={() => setShowExaminationForm(false)}
-        />
-      )}
+      }
 
-      {showDiagnosisForm && selectedPatient && (
-        <DiagnosisForm
-          patientId={selectedPatient.id}
-          patientName={selectedPatient.name}
-          initialData={selectedPatient.diagnosisData}
-          onSave={(diagnosisData) => {
-            logger.info('Сохранение диагнозов:', diagnosisData);
-            setShowDiagnosisForm(false);
-          }}
-          onClose={() => setShowDiagnosisForm(false)}
-        />
-      )}
+      {showExaminationForm && selectedPatient &&
+      <ExaminationForm
+        patientId={selectedPatient.id}
+        initialData={selectedPatient.examinationData}
+        onSave={(examinationData) => {
+          logger.info('Сохранение осмотра:', examinationData);
+          setShowExaminationForm(false);
+        }}
+        onClose={() => setShowExaminationForm(false)} />
 
-      {showVisitProtocol && selectedPatient && (
-        <VisitProtocol
-          patientId={selectedPatient.id}
-          patientName={selectedPatient.name}
-          visitId={Date.now()}
-          initialData={selectedPatient.visitData}
-          onSave={(visitData) => {
-            logger.info('Сохранение протокола визита:', visitData);
-            setShowVisitProtocol(false);
-          }}
-          onClose={() => setShowVisitProtocol(false)}
-        />
-      )}
+      }
 
-      {showPhotoArchive && selectedPatient && (
-        <PhotoArchive
-          patientId={selectedPatient.id}
-          patientName={selectedPatient.name}
-          initialData={selectedPatient.photoArchive}
-          onSave={(archiveData) => {
-            logger.info('Сохранение фото архива:', archiveData);
-            setShowPhotoArchive(false);
-          }}
-          onClose={() => setShowPhotoArchive(false)}
-        />
-      )}
+      {showDiagnosisForm && selectedPatient &&
+      <DiagnosisForm
+        patientId={selectedPatient.id}
+        patientName={selectedPatient.name}
+        initialData={selectedPatient.diagnosisData}
+        onSave={(diagnosisData) => {
+          logger.info('Сохранение диагнозов:', diagnosisData);
+          setShowDiagnosisForm(false);
+        }}
+        onClose={() => setShowDiagnosisForm(false)} />
 
-      {showProtocolTemplates && (
-        <ProtocolTemplates
-          onSelectTemplate={(template) => {
-            logger.info('Выбран шаблон:', template);
-            // Здесь можно открыть протокол визита с выбранным шаблоном
-          }}
-          onClose={() => setShowProtocolTemplates(false)}
-        />
-      )}
+      }
 
-      {showReports && (
-        <ReportsAndAnalytics
-          patientId={selectedPatient?.id}
-          doctorId={user?.id}
-          clinicId={user?.clinic_id}
-          initialData={null}
-          onSave={(reportData) => {
-            logger.info('Сохранение отчета:', reportData);
-            setShowReports(false);
-          }}
-          onClose={() => setShowReports(false)}
-        />
-      )}
+      {showVisitProtocol && selectedPatient &&
+      <VisitProtocol
+        patientId={selectedPatient.id}
+        patientName={selectedPatient.name}
+        visitId={Date.now()}
+        initialData={selectedPatient.visitData}
+        onSave={(visitData) => {
+          logger.info('Сохранение протокола визита:', visitData);
+          setShowVisitProtocol(false);
+        }}
+        onClose={() => setShowVisitProtocol(false)} />
 
-      {showDentalChart && selectedPatient && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }}>
+      }
+
+      {showPhotoArchive && selectedPatient &&
+      <PhotoArchive
+        patientId={selectedPatient.id}
+        patientName={selectedPatient.name}
+        initialData={selectedPatient.photoArchive}
+        onSave={(archiveData) => {
+          logger.info('Сохранение фото архива:', archiveData);
+          setShowPhotoArchive(false);
+        }}
+        onClose={() => setShowPhotoArchive(false)} />
+
+      }
+
+      {showProtocolTemplates &&
+      <ProtocolTemplates
+        onSelectTemplate={(template) => {
+          logger.info('Выбран шаблон:', template);
+          // Здесь можно открыть протокол визита с выбранным шаблоном
+        }}
+        onClose={() => setShowProtocolTemplates(false)} />
+
+      }
+
+      {showReports &&
+      <ReportsAndAnalytics
+        patientId={selectedPatient?.id}
+        doctorId={user?.id}
+        clinicId={user?.clinic_id}
+        initialData={null}
+        onSave={(reportData) => {
+          logger.info('Сохранение отчета:', reportData);
+          setShowReports(false);
+        }}
+        onClose={() => setShowReports(false)} />
+
+      }
+
+      {showDentalChart && selectedPatient &&
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 50
+      }}>
           <div style={{
-            background: 'var(--mac-bg-primary)',
-            borderRadius: 'var(--mac-radius-xl)',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '1152px',
-            height: '100%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: 'var(--mac-shadow-xl)',
-            border: '1px solid var(--mac-border)'
-          }}>
+          background: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-xl)',
+          padding: '24px',
+          width: '100%',
+          maxWidth: '1152px',
+          height: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          boxShadow: 'var(--mac-shadow-xl)',
+          border: '1px solid var(--mac-border)'
+        }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px'
-            }}>
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px'
+          }}>
               <h2 style={{
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)'
+            }}>
                 Схема зубов: {selectedPatient.name}
               </h2>
               <button
-                onClick={() => setShowDentalChart(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--mac-text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all var(--mac-duration-fast) var(--mac-ease)',
-                  padding: '4px',
-                  borderRadius: 'var(--mac-radius-sm)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.color = 'var(--mac-text-primary)';
-                  e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.color = 'var(--mac-text-secondary)';
-                  e.target.style.backgroundColor = 'transparent';
-                }}
-              >
+              onClick={() => setShowDentalChart(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--mac-text-secondary)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-fast) var(--mac-ease)',
+                padding: '4px',
+                borderRadius: 'var(--mac-radius-sm)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.color = 'var(--mac-text-primary)';
+                e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.color = 'var(--mac-text-secondary)';
+                e.target.style.backgroundColor = 'transparent';
+              }}>
+
                 <XCircle style={{ height: '24px', width: '24px' }} />
               </button>
             </div>
             <TeethChart
-              patientId={selectedPatient.id}
-              initialData={dentalChartData}
-              onToothClick={(toothNumber, toothData) => {
-                logger.info('Клик по зубу:', toothNumber, toothData);
-                setSelectedTooth({ number: toothNumber, data: toothData });
-                setToothModalOpen(true);
-              }}
-              readOnly={false}
-            />
+            patientId={selectedPatient.id}
+            initialData={dentalChartData}
+            onToothClick={(toothNumber, toothData) => {
+              logger.info('Клик по зубу:', toothNumber, toothData);
+              setSelectedTooth({ number: toothNumber, data: toothData });
+              setToothModalOpen(true);
+            }}
+            readOnly={false} />
+
           </div>
         </div>
-      )}
+      }
 
-      {showTreatmentPlanner && selectedPatient && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }}>
+      {showTreatmentPlanner && selectedPatient &&
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 50
+      }}>
           <div style={{
-            background: 'var(--mac-bg-primary)',
-            borderRadius: 'var(--mac-radius-xl)',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '1152px',
-            height: '100%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: 'var(--mac-shadow-xl)',
-            border: '1px solid var(--mac-border)'
-          }}>
+          background: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-xl)',
+          padding: '24px',
+          width: '100%',
+          maxWidth: '1152px',
+          height: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          boxShadow: 'var(--mac-shadow-xl)',
+          border: '1px solid var(--mac-border)'
+        }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px'
-            }}>
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px'
+          }}>
               <h2 style={{
-                fontSize: 'var(--mac-font-size-xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)'
-              }}>
+              fontSize: 'var(--mac-font-size-xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)'
+            }}>
                 План лечения: {selectedPatient.name}
               </h2>
               <button
-                onClick={() => setShowTreatmentPlanner(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--mac-text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all var(--mac-duration-fast) var(--mac-ease)',
-                  padding: '4px',
-                  borderRadius: 'var(--mac-radius-sm)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.color = 'var(--mac-text-primary)';
-                  e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.color = 'var(--mac-text-secondary)';
-                  e.target.style.backgroundColor = 'transparent';
-                }}
-              >
+              onClick={() => setShowTreatmentPlanner(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--mac-text-secondary)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-fast) var(--mac-ease)',
+                padding: '4px',
+                borderRadius: 'var(--mac-radius-sm)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.color = 'var(--mac-text-primary)';
+                e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.color = 'var(--mac-text-secondary)';
+                e.target.style.backgroundColor = 'transparent';
+              }}>
+
                 <XCircle style={{ height: '24px', width: '24px' }} />
               </button>
             </div>
             <TreatmentPlanner
-              patientId={selectedPatient.id}
-              visitId={selectedPatient.visitId || 'demo-visit-1'}
-              teethData={dentalChartData || {}}
-              onUpdate={(plan) => {
-                logger.info('План лечения обновлен:', plan);
-              }}
-            />
+            patientId={selectedPatient.id}
+            visitId={selectedPatient.visitId || 'demo-visit-1'}
+            teethData={dentalChartData || {}}
+            onUpdate={(plan) => {
+              logger.info('План лечения обновлен:', plan);
+            }} />
+
           </div>
         </div>
-      )}
+      }
 
       {/* Форма осмотра */}
-      {showExaminationForm && selectedPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {showExaminationForm && selectedPatient &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
@@ -2966,20 +2934,20 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата осмотра *</label>
                     <input
-                      type="date"
-                      value={examinationForm.examination_date}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="date"
+                    value={examinationForm.examination_date}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Гигиена полости рта</label>
                     <select
-                      value={examinationForm.oral_hygiene}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={examinationForm.oral_hygiene}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="excellent">Отличная</option>
                       <option value="good">Хорошая</option>
@@ -2993,10 +2961,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Статус кариеса</label>
                     <select
-                      value={examinationForm.caries_status}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={examinationForm.caries_status}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="none">Нет кариеса</option>
                       <option value="initial">Начальный</option>
@@ -3008,10 +2976,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Статус пародонта</label>
                     <select
-                      value={examinationForm.periodontal_status}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={examinationForm.periodontal_status}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="healthy">Здоровый</option>
                       <option value="gingivitis">Гингивит</option>
@@ -3025,10 +2993,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Прикус</label>
                     <select
-                      value={examinationForm.occlusion}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={examinationForm.occlusion}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="normal">Нормальный</option>
                       <option value="open_bite">Открытый</option>
@@ -3040,12 +3008,12 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Отсутствующие зубы</label>
                     <input
-                      type="text"
-                      value={examinationForm.missing_teeth}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
-                      placeholder="Номера отсутствующих зубов"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="text"
+                    value={examinationForm.missing_teeth}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
+                    placeholder="Номера отсутствующих зубов"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                 </div>
 
@@ -3053,10 +3021,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Зубной налет</label>
                     <select
-                      value={examinationForm.dental_plaque}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={examinationForm.dental_plaque}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="none">Нет</option>
                       <option value="minimal">Минимальный</option>
@@ -3067,10 +3035,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Кровоточивость десен</label>
                     <select
-                      value={examinationForm.gingival_bleeding}
-                      onChange={(e) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={examinationForm.gingival_bleeding}
+                    onChange={(e) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="none">Нет</option>
                       <option value="mild">Легкая</option>
@@ -3083,23 +3051,23 @@ const DentistPanelUnified = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Диагноз</label>
                   <textarea
-                    value={examinationForm.diagnosis}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
-                    placeholder="Стоматологический диагноз"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  value={examinationForm.diagnosis}
+                  onChange={(e) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
+                  placeholder="Стоматологический диагноз"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Рекомендации</label>
                   <textarea
-                    value={examinationForm.recommendations}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
-                    placeholder="Рекомендации по лечению и уходу"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  value={examinationForm.recommendations}
+                  onChange={(e) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
+                  placeholder="Рекомендации по лечению и уходу"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                 </div>
 
                 <div className="flex gap-2">
@@ -3108,10 +3076,10 @@ const DentistPanelUnified = () => {
                     Сохранить осмотр
                   </Button>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowExaminationForm(false)}
-                  >
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowExaminationForm(false)}>
+
                     Отмена
                   </Button>
                 </div>
@@ -3119,11 +3087,11 @@ const DentistPanelUnified = () => {
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Форма лечения */}
-      {showTreatmentForm && selectedPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {showTreatmentForm && selectedPatient &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
@@ -3136,21 +3104,21 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата лечения *</label>
                     <input
-                      type="date"
-                      value={treatmentForm.treatment_date}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_date: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="date"
+                    value={treatmentForm.treatment_date}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Тип лечения *</label>
                     <select
-                      value={treatmentForm.treatment_type}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_type: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={treatmentForm.treatment_type}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, treatment_type: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите тип</option>
                       <option value="filling">Пломбирование</option>
                       <option value="root_canal">Каналы</option>
@@ -3166,54 +3134,54 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Вовлеченные зубы</label>
                     <input
-                      type="text"
-                      value={treatmentForm.teeth_involved}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, teeth_involved: e.target.value })}
-                      placeholder="Номера зубов"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="text"
+                    value={treatmentForm.teeth_involved}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, teeth_involved: e.target.value })}
+                    placeholder="Номера зубов"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
                     <input
-                      type="number"
-                      value={treatmentForm.cost}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, cost: e.target.value })}
-                      placeholder="Сумма"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="number"
+                    value={treatmentForm.cost}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, cost: e.target.value })}
+                    placeholder="Сумма"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Описание процедуры</label>
                   <textarea
-                    value={treatmentForm.procedure_description}
-                    onChange={(e) => setTreatmentForm({ ...treatmentForm, procedure_description: e.target.value })}
-                    placeholder="Подробное описание"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  value={treatmentForm.procedure_description}
+                  onChange={(e) => setTreatmentForm({ ...treatmentForm, procedure_description: e.target.value })}
+                  placeholder="Подробное описание"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Материалы</label>
                     <input
-                      type="text"
-                      value={treatmentForm.materials_used}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, materials_used: e.target.value })}
-                      placeholder="Названия материалов"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="text"
+                    value={treatmentForm.materials_used}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, materials_used: e.target.value })}
+                    placeholder="Названия материалов"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Анестезия</label>
                     <select
-                      value={treatmentForm.anesthesia}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, anesthesia: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={treatmentForm.anesthesia}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, anesthesia: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="none">Не требуется</option>
                       <option value="local">Местная</option>
@@ -3227,21 +3195,21 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Осложнения</label>
                     <input
-                      type="text"
-                      value={treatmentForm.complications}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, complications: e.target.value })}
-                      placeholder="Описание осложнений"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="text"
+                    value={treatmentForm.complications}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, complications: e.target.value })}
+                    placeholder="Описание осложнений"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата контроля</label>
                     <input
-                      type="date"
-                      value={treatmentForm.follow_up_date}
-                      onChange={(e) => setTreatmentForm({ ...treatmentForm, follow_up_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="date"
+                    value={treatmentForm.follow_up_date}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, follow_up_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                 </div>
 
@@ -3251,27 +3219,27 @@ const DentistPanelUnified = () => {
                     Сохранить лечение
                   </Button>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      // Открываем менеджер цен для указания итоговой стоимости
-                      setSelectedServiceForPrice({
-                        id: 1, // ID услуги - в реальном приложении получать из формы
-                        name: treatmentForm.procedure_type || 'Стоматологическое лечение',
-                        price: Number(treatmentForm.cost) || 50000
-                      });
-                      setShowPriceManager(true);
-                    }}
-                    className="flex items-center gap-2"
-                  >
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    // Открываем менеджер цен для указания итоговой стоимости
+                    setSelectedServiceForPrice({
+                      id: 1, // ID услуги - в реальном приложении получать из формы
+                      name: treatmentForm.procedure_type || 'Стоматологическое лечение',
+                      price: Number(treatmentForm.cost) || 50000
+                    });
+                    setShowPriceManager(true);
+                  }}
+                  className="flex items-center gap-2">
+
                     <DollarSign className="h-4 w-4" />
                     Указать цену
                   </Button>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowTreatmentForm(false)}
-                  >
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowTreatmentForm(false)}>
+
                     Отмена
                   </Button>
                 </div>
@@ -3279,11 +3247,11 @@ const DentistPanelUnified = () => {
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Форма протезирования */}
-      {showProstheticForm && selectedPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {showProstheticForm && selectedPatient &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
@@ -3296,21 +3264,21 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Дата протезирования *</label>
                     <input
-                      type="date"
-                      value={prostheticForm.prosthetic_date}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_date: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="date"
+                    value={prostheticForm.prosthetic_date}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Тип протеза *</label>
                     <select
-                      value={prostheticForm.prosthetic_type}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_type: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={prostheticForm.prosthetic_type}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, prosthetic_type: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите тип</option>
                       <option value="crown">Коронка</option>
                       <option value="bridge">Мост</option>
@@ -3326,20 +3294,20 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Заменяемые зубы</label>
                     <input
-                      type="text"
-                      value={prostheticForm.teeth_replaced}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, teeth_replaced: e.target.value })}
-                      placeholder="Номера зубов"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="text"
+                    value={prostheticForm.teeth_replaced}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, teeth_replaced: e.target.value })}
+                    placeholder="Номера зубов"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Материал</label>
                     <select
-                      value={prostheticForm.material}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, material: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={prostheticForm.material}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, material: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите материал</option>
                       <option value="porcelain">Фарфор</option>
                       <option value="metal">Металл</option>
@@ -3354,22 +3322,22 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Оттенок</label>
                     <input
-                      type="text"
-                      value={prostheticForm.shade}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, shade: e.target.value })}
-                      placeholder="A1, B2, C3 и т.д."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="text"
+                    value={prostheticForm.shade}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, shade: e.target.value })}
+                    placeholder="A1, B2, C3 и т.д."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Стоимость</label>
                     <input
-                      type="number"
-                      value={prostheticForm.cost}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, cost: e.target.value })}
-                      placeholder="Сумма"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    type="number"
+                    value={prostheticForm.cost}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, cost: e.target.value })}
+                    placeholder="Сумма"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                   </div>
                 </div>
 
@@ -3377,10 +3345,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Качество посадки</label>
                     <select
-                      value={prostheticForm.fit_quality}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, fit_quality: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={prostheticForm.fit_quality}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, fit_quality: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="excellent">Отличная</option>
                       <option value="good">Хорошая</option>
@@ -3391,10 +3359,10 @@ const DentistPanelUnified = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Удовлетворенность пациента</label>
                     <select
-                      value={prostheticForm.patient_satisfaction}
-                      onChange={(e) => setProstheticForm({ ...prostheticForm, patient_satisfaction: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
+                    value={prostheticForm.patient_satisfaction}
+                    onChange={(e) => setProstheticForm({ ...prostheticForm, patient_satisfaction: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
                       <option value="">Выберите</option>
                       <option value="very_satisfied">Очень доволен</option>
                       <option value="satisfied">Доволен</option>
@@ -3408,12 +3376,12 @@ const DentistPanelUnified = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Гарантийный период</label>
                   <input
-                    type="text"
-                    value={prostheticForm.warranty_period}
-                    onChange={(e) => setProstheticForm({ ...prostheticForm, warranty_period: e.target.value })}
-                    placeholder="Например: 2 года"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  type="text"
+                  value={prostheticForm.warranty_period}
+                  onChange={(e) => setProstheticForm({ ...prostheticForm, warranty_period: e.target.value })}
+                  placeholder="Например: 2 года"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
                 </div>
 
                 <div className="flex gap-2">
@@ -3422,10 +3390,10 @@ const DentistPanelUnified = () => {
                     Сохранить протез
                   </Button>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowProstheticForm(false)}
-                  >
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowProstheticForm(false)}>
+
                     Отмена
                   </Button>
                 </div>
@@ -3433,71 +3401,71 @@ const DentistPanelUnified = () => {
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Модальное окно для работы с зубом */}
-      {toothModalOpen && selectedTooth && (
-        <ToothModal
-          open={toothModalOpen}
-          onClose={() => {
-            setToothModalOpen(false);
-            setSelectedTooth(null);
-          }}
-          toothNumber={selectedTooth.number}
-          toothData={selectedTooth.data}
-          onSave={(toothNumber, data) => {
-            logger.info('Сохранение данных зуба:', toothNumber, data);
-            // Обновляем данные зубной карты
-            setDentalChartData(prev => ({
-              ...prev,
-              [toothNumber]: data
-            }));
-            setToothModalOpen(false);
-          }}
-          patientId={selectedPatient?.id}
-          visitId={selectedPatient?.visitId || 'demo-visit-1'}
-        />
-      )}
+      {toothModalOpen && selectedTooth &&
+      <ToothModal
+        open={toothModalOpen}
+        onClose={() => {
+          setToothModalOpen(false);
+          setSelectedTooth(null);
+        }}
+        toothNumber={selectedTooth.number}
+        toothData={selectedTooth.data}
+        onSave={(toothNumber, data) => {
+          logger.info('Сохранение данных зуба:', toothNumber, data);
+          // Обновляем данные зубной карты
+          setDentalChartData((prev) => ({
+            ...prev,
+            [toothNumber]: data
+          }));
+          setToothModalOpen(false);
+        }}
+        patientId={selectedPatient?.id}
+        visitId={selectedPatient?.visitId || 'demo-visit-1'} />
+
+      }
 
       {/* DentalPriceManager Modal */}
-      {showPriceManager && selectedServiceForPrice && (
-        <DentalPriceManager
-          visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
-          serviceId={selectedServiceForPrice.id}
-          serviceName={selectedServiceForPrice.name}
-          originalPrice={selectedServiceForPrice.price}
-          isOpen={showPriceManager}
-          onClose={() => {
-            setShowPriceManager(false);
-            setSelectedServiceForPrice(null);
-          }}
-          onPriceSet={(priceData) => {
-            logger.info('Price set:', priceData);
-            // Можно добавить логику обновления состояния
-          }}
-        />
-      )}
+      {showPriceManager && selectedServiceForPrice &&
+      <DentalPriceManager
+        visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
+        serviceId={selectedServiceForPrice.id}
+        serviceName={selectedServiceForPrice.name}
+        originalPrice={selectedServiceForPrice.price}
+        isOpen={showPriceManager}
+        onClose={() => {
+          setShowPriceManager(false);
+          setSelectedServiceForPrice(null);
+        }}
+        onPriceSet={(priceData) => {
+          logger.info('Price set:', priceData);
+          // Можно добавить логику обновления состояния
+        }} />
+
+      }
 
       {/* Модальное окно Schedule Next */}
-      {scheduleNextModal.open && (
-        <ScheduleNextModal
-          isOpen={scheduleNextModal.open}
-          onClose={() => setScheduleNextModal({ open: false, patient: null })}
-          patient={scheduleNextModal.patient}
-          theme={{ isDark, getColor, getSpacing, getFontSize }}
-          specialtyFilter="dentistry"
-        />
-      )}
+      {scheduleNextModal.open &&
+      <ScheduleNextModal
+        isOpen={scheduleNextModal.open}
+        onClose={() => setScheduleNextModal({ open: false, patient: null })}
+        patient={scheduleNextModal.patient}
+        theme={{ isDark, getColor, getSpacing, getFontSize }}
+        specialtyFilter="dentistry" />
+
+      }
 
       {/* AI Chat Widget */}
       <AIChatWidget
         contextType="general"
         specialty="dentistry"
         useWebSocket={false}
-        position="bottom-right"
-      />
-    </div>
-  );
+        position="bottom-right" />
+
+    </div>);
+
 };
 
 export default DentistPanelUnified;

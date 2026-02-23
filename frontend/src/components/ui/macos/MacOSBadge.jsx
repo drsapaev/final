@@ -1,5 +1,3 @@
-import React from 'react';
-
 const MacOSBadge = ({
   children,
   variant = 'default',
@@ -9,6 +7,7 @@ const MacOSBadge = ({
   outline, // Destructure to prevent passing boolean to DOM
   ...props
 }) => {
+  void outline;
   // Размеры бейджей
   const sizeStyles = {
     sm: {

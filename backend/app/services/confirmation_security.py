@@ -8,13 +8,11 @@ import logging
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.models.patient import Patient
 from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
@@ -26,8 +24,8 @@ class SecurityCheckResult:
 
     allowed: bool
     reason: str
-    retry_after: Optional[int] = None
-    remaining_attempts: Optional[int] = None
+    retry_after: int | None = None
+    remaining_attempts: int | None = None
 
 
 @dataclass
@@ -61,8 +59,8 @@ class ConfirmationSecurityService:
     def validate_confirmation_request(
         self,
         token: str,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        source_ip: str | None = None,
+        user_agent: str | None = None,
         channel: str = "unknown",
     ) -> SecurityCheckResult:
         """
@@ -94,7 +92,7 @@ class ConfirmationSecurityService:
                 return SecurityCheckResult(
                     allowed=False, reason="Недействительный токен подтверждения"
                 )
-            
+
             print(f"DEBUG: Visit found: ID={visit.id}, Status={visit.status}, Expires={visit.confirmation_expires_at}, Now={datetime.utcnow()}")
 
             # 2. Проверяем срок действия токена
@@ -188,8 +186,8 @@ class ConfirmationSecurityService:
     def validate_token_generation_request(
         self,
         patient_id: int,
-        source_ip: Optional[str] = None,
-        user_id: Optional[int] = None,
+        source_ip: str | None = None,
+        user_id: int | None = None,
     ) -> SecurityCheckResult:
         """
         Валидирует запрос на генерацию нового токена подтверждения
@@ -261,10 +259,10 @@ class ConfirmationSecurityService:
         self,
         visit_id: int,
         success: bool,
-        source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        source_ip: str | None = None,
+        user_agent: str | None = None,
         channel: str = "unknown",
-        error_reason: Optional[str] = None,
+        error_reason: str | None = None,
     ):
         """
         Записывает попытку подтверждения для аудита и rate limiting
@@ -359,7 +357,7 @@ class ConfirmationSecurityService:
             self.db.rollback()
             return 0
 
-    def get_security_stats(self, hours: int = 24) -> Dict[str, Any]:
+    def get_security_stats(self, hours: int = 24) -> dict[str, Any]:
         """
         Получает статистику безопасности за указанный период
         """
@@ -387,7 +385,7 @@ class ConfirmationSecurityService:
 
     # Приватные методы
 
-    def _get_visit_by_token(self, token: str) -> Optional[Visit]:
+    def _get_visit_by_token(self, token: str) -> Visit | None:
         """Получает визит по токену подтверждения"""
         return self.db.query(Visit).filter(Visit.confirmation_token == token).first()
 
@@ -412,8 +410,8 @@ class ConfirmationSecurityService:
     def _check_suspicious_activity(
         self,
         visit: Visit,
-        source_ip: Optional[str],
-        user_agent: Optional[str],
+        source_ip: str | None,
+        user_agent: str | None,
         channel: str,
     ) -> SecurityCheckResult:
         """Проверяет подозрительную активность"""
@@ -436,7 +434,7 @@ class ConfirmationSecurityService:
                         },
                     )
                     return SecurityCheckResult(
-                        allowed=False, reason="Подозрительный User-Agent"
+                        allowed=False, reason="подозрительный User-Agent"
                     )
 
             # 3. Проверяем временные аномалии
@@ -453,8 +451,9 @@ class ConfirmationSecurityService:
                             "source_ip": source_ip,
                         },
                     )
+                    # Не блокируем подтверждение: пациент может подтвердить сразу после получения ссылки.
                     return SecurityCheckResult(
-                        allowed=False, reason="Слишком быстрая попытка подтверждения"
+                        allowed=True, reason="Подозрительная активность не обнаружена"
                     )
 
             return SecurityCheckResult(
@@ -473,7 +472,7 @@ class ConfirmationSecurityService:
         # Пока просто логируем
         logger.debug(f"Rate limit counter updated: {key}:{action}")
 
-    def _log_security_event(self, event_type: str, data: Dict[str, Any]):
+    def _log_security_event(self, event_type: str, data: dict[str, Any]):
         """Логирует событие безопасности"""
         event = {
             "timestamp": datetime.utcnow().isoformat(),

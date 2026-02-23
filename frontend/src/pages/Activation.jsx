@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function Activation() {
-  const { isDark, isLight, getColor, getSpacing } = useTheme();
+export default function Activation() {void
+  useTheme();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
   const [rows, setRows] = useState([]);
@@ -25,13 +25,13 @@ export default function Activation() {
     setErr('');
     try {
       const [st, lst] = await Promise.all([
-        getActivationStatus(), // 404/405 -> null
-        api
-          .get('/activation/list', { params: { status: filterStatus || undefined, limit: 200 } })
-          .catch(() => ({ items: [] })),
-      ]);
+      getActivationStatus(), // 404/405 -> null
+      api.
+      get('/activation/list', { params: { status: filterStatus || undefined, limit: 200 } }).
+      catch(() => ({ items: [] }))]
+      );
       setStatus(st || null);
-      setRows((lst && lst.items) || []);
+      setRows(lst && lst.items || []);
     } catch (e) {
       setErr(e?.data?.detail || e?.message || 'Ошибка загрузки');
     } finally {
@@ -45,7 +45,7 @@ export default function Activation() {
       await loadAll();
       if (!mounted) return;
     })();
-    return () => { mounted = false; };
+    return () => {mounted = false;};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -59,8 +59,8 @@ export default function Activation() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="border rounded px-2 py-1 text-sm"
-            >
+              className="border rounded px-2 py-1 text-sm">
+              
               <option value="">Все</option>
               <option value="active">Активные</option>
               <option value="pending">Ожидают</option>
@@ -72,34 +72,34 @@ export default function Activation() {
           </div>
         </div>
 
-        {err && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-4">
+        {err &&
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-4">
             {err}
           </div>
-        )}
+        }
 
         <section className="mb-6">
           <h2 className="text-lg font-medium mb-2">Статус</h2>
-          {loading ? (
-            <div>Загрузка статуса…</div>
-          ) : status ? (
-            <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+          {loading ?
+          <div>Загрузка статуса…</div> :
+          status ?
+          <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
               {typeof status === 'string' ? status : JSON.stringify(status, null, 2)}
-            </pre>
-          ) : (
-            <div className="text-sm text-gray-700">
+            </pre> :
+
+          <div className="text-sm text-gray-700">
               Эндпоинт статуса активации на сервере не найден. Вероятно, функция не используется — всё в порядке.
             </div>
-          )}
+          }
         </section>
 
         <RoleGate roles={['Admin']}>
           <section>
             <h2 className="text-lg font-medium mb-2">Список</h2>
-            {loading ? (
-              <div>Загрузка…</div>
-            ) : filtered.length ? (
-              <div className="overflow-auto border border-gray-200 rounded">
+            {loading ?
+            <div>Загрузка…</div> :
+            filtered.length ?
+            <div className="overflow-auto border border-gray-200 rounded">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
@@ -110,8 +110,8 @@ export default function Activation() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((r) => (
-                      <tr key={r.id}>
+                    {filtered.map((r) =>
+                  <tr key={r.id}>
                         <td className="px-3 py-2 border-b">{r.id}</td>
                         <td className="px-3 py-2 border-b">{r.name || r.title || '—'}</td>
                         <td className="px-3 py-2 border-b">{r.status || '—'}</td>
@@ -119,17 +119,16 @@ export default function Activation() {
                           {r.updated_at ? new Date(r.updated_at).toLocaleString() : '—'}
                         </td>
                       </tr>
-                    ))}
+                  )}
                   </tbody>
                 </table>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-700">Нет данных.</div>
-            )}
+              </div> :
+
+            <div className="text-sm text-gray-700">Нет данных.</div>
+            }
           </section>
         </RoleGate>
       </main>
-    </div>
-  );
-}
+    </div>);
 
+}

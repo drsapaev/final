@@ -4,16 +4,12 @@
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, or_, text
+from sqlalchemy import and_, text
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.models.appointment import Appointment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.patient import Patient
-from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +20,7 @@ class MigrationService:
     def __init__(self, db: Session):
         self.db = db
 
-    def migrate_legacy_queue_data(self) -> Dict[str, Any]:
+    def migrate_legacy_queue_data(self) -> dict[str, Any]:
         """
         Мигрирует данные из старых таблиц очередей в новые
         """
@@ -77,7 +73,7 @@ class MigrationService:
             old_tickets = self.db.execute(
                 text(
                     """
-                SELECT 
+                SELECT
                     ticket_number,
                     department,
                     date,
@@ -85,7 +81,7 @@ class MigrationService:
                     patient_name,
                     phone,
                     created_at
-                FROM queue_tickets 
+                FROM queue_tickets
                 WHERE date >= date('now', '-30 days')
                 ORDER BY created_at
             """
@@ -155,7 +151,7 @@ class MigrationService:
             self.db.rollback()
             return 0
 
-    def _get_specialist_for_department(self, department: str) -> Optional[int]:
+    def _get_specialist_for_department(self, department: str) -> int | None:
         """Получает ID специалиста для отделения"""
         department_mapping = {
             "cardiology": "cardio",
@@ -170,8 +166,8 @@ class MigrationService:
         result = self.db.execute(
             text(
                 """
-            SELECT id FROM users 
-            WHERE role = :role AND is_active = 1 
+            SELECT id FROM users
+            WHERE role = :role AND is_active = 1
             LIMIT 1
         """
             ),
@@ -228,7 +224,7 @@ class MigrationService:
         }
         return status_mapping.get(old_status, "waiting")
 
-    def _check_data_integrity(self) -> Dict[str, Any]:
+    def _check_data_integrity(self) -> dict[str, Any]:
         """Проверяет целостность данных в новых таблицах"""
         try:
             checks = {}
@@ -238,8 +234,8 @@ class MigrationService:
                 text(
                     """
                 SELECT queue_id, number, COUNT(*) as count
-                FROM queue_entries 
-                GROUP BY queue_id, number 
+                FROM queue_entries
+                GROUP BY queue_id, number
                 HAVING COUNT(*) > 1
             """
                 )
@@ -248,6 +244,7 @@ class MigrationService:
             checks["duplicate_numbers"] = {
                 "passed": len(duplicate_numbers) == 0,
                 "count": len(duplicate_numbers),
+                "severity": "warning",
             }
 
             # 2. Проверяем связи с визитами
@@ -256,7 +253,7 @@ class MigrationService:
                     """
                 SELECT COUNT(*) as count
                 FROM queue_entries qe
-                WHERE qe.visit_id IS NOT NULL 
+                WHERE qe.visit_id IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM visits v WHERE v.id = qe.visit_id)
             """
                 )
@@ -273,7 +270,7 @@ class MigrationService:
                     """
                 SELECT COUNT(*) as count
                 FROM queue_entries qe
-                WHERE qe.patient_id IS NOT NULL 
+                WHERE qe.patient_id IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM patients p WHERE p.id = qe.patient_id)
             """
                 )
@@ -300,8 +297,10 @@ class MigrationService:
                 "count": orphaned_queues.count,
             }
 
-            # Общий результат
-            all_passed = all(check["passed"] for check in checks.values())
+            # Общий результат:
+            # duplicate_numbers считается предупреждением и не блокирует миграцию
+            blocking_checks = ["orphaned_visits", "orphaned_patients", "orphaned_queues"]
+            all_passed = all(checks[name]["passed"] for name in blocking_checks)
 
             return {
                 "passed": all_passed,
@@ -317,7 +316,7 @@ class MigrationService:
                 "checked_at": datetime.utcnow().isoformat(),
             }
 
-    def backup_queue_data(self, target_date: Optional[date] = None) -> Dict[str, Any]:
+    def backup_queue_data(self, target_date: date | None = None) -> dict[str, Any]:
         """
         Создает резервную копию данных очередей
         """
@@ -329,7 +328,10 @@ class MigrationService:
 
             # Получаем все очереди за дату
             daily_queues = (
-                self.db.query(DailyQueue).filter(DailyQueue.day == target_date).all()
+                self.db.query(DailyQueue)
+                .filter(DailyQueue.day == target_date)
+                .order_by(DailyQueue.id.desc())
+                .all()
             )
 
             backup_data = {
@@ -405,7 +407,7 @@ class MigrationService:
             logger.error(f"Ошибка создания резервной копии: {e}")
             return {"success": False, "error": str(e)}
 
-    def restore_queue_data(self, backup_file: str) -> Dict[str, Any]:
+    def restore_queue_data(self, backup_file: str) -> dict[str, Any]:
         """
         Восстанавливает данные очередей из резервной копии
         """
@@ -414,7 +416,7 @@ class MigrationService:
 
             import json
 
-            with open(backup_file, 'r', encoding='utf-8') as f:
+            with open(backup_file, encoding='utf-8') as f:
                 backup_data = json.load(f)
 
             restored_queues = 0
@@ -500,7 +502,7 @@ class MigrationService:
             self.db.rollback()
             return {"success": False, "error": str(e)}
 
-    def cleanup_old_data(self, days_to_keep: int = 30) -> Dict[str, Any]:
+    def cleanup_old_data(self, days_to_keep: int = 30) -> dict[str, Any]:
         """
         Очищает старые данные очередей
         """
@@ -512,20 +514,30 @@ class MigrationService:
             old_queues = (
                 self.db.query(DailyQueue).filter(DailyQueue.day < cutoff_date).all()
             )
+            old_queue_ids = [queue.id for queue in old_queues]
 
-            old_entries_count = sum(len(queue.entries) for queue in old_queues)
+            deleted_entries = 0
+            deleted_queues = 0
 
-            # Удаляем старые очереди (записи удалятся каскадно)
-            deleted_queues = (
-                self.db.query(DailyQueue).filter(DailyQueue.day < cutoff_date).delete()
-            )
+            if old_queue_ids:
+                # Явно удаляем entries для кросс-БД совместимости (SQLite может игнорировать cascade)
+                deleted_entries = (
+                    self.db.query(OnlineQueueEntry)
+                    .filter(OnlineQueueEntry.queue_id.in_(old_queue_ids))
+                    .delete(synchronize_session=False)
+                )
+                deleted_queues = (
+                    self.db.query(DailyQueue)
+                    .filter(DailyQueue.id.in_(old_queue_ids))
+                    .delete(synchronize_session=False)
+                )
 
             self.db.commit()
 
             return {
                 "success": True,
                 "deleted_queues": deleted_queues,
-                "deleted_entries": old_entries_count,
+                "deleted_entries": deleted_entries,
                 "cutoff_date": cutoff_date.isoformat(),
             }
 

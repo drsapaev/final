@@ -5,25 +5,23 @@
  * - Clicking "Apply" MUST go through parent's setField
  * - AI only suggests, doctor confirms
  */
-
-import React from 'react';
 import './AISuggestionCard.css';
 
 /**
  * Format confidence as percentage
  */
 function formatConfidence(confidence) {
-    if (typeof confidence !== 'number') return '';
-    return `${Math.round(confidence * 100)}%`;
+  if (typeof confidence !== 'number') return '';
+  return `${Math.round(confidence * 100)}%`;
 }
 
 /**
  * Get confidence color class
  */
 function getConfidenceClass(confidence) {
-    if (confidence >= 0.8) return 'ai-suggestion-card__confidence--high';
-    if (confidence >= 0.5) return 'ai-suggestion-card__confidence--medium';
-    return 'ai-suggestion-card__confidence--low';
+  if (confidence >= 0.8) return 'ai-suggestion-card__confidence--high';
+  if (confidence >= 0.5) return 'ai-suggestion-card__confidence--medium';
+  return 'ai-suggestion-card__confidence--low';
 }
 
 /**
@@ -36,41 +34,41 @@ function getConfidenceClass(confidence) {
  * @param {boolean} props.disabled - Disable apply button
  */
 export function AISuggestionCard({
-    suggestion,
-    onApply,
-    onDismiss,
-    disabled = false,
+  suggestion,
+  onApply,
+  onDismiss,
+  disabled = false
 }) {
-    const { id, targetField, content, confidence, explanation, model } = suggestion;
+  const { id, content, confidence, explanation } = suggestion;
 
-    const handleApply = () => {
-        if (!disabled && onApply) {
-            onApply(suggestion);
-        }
-    };
+  const handleApply = () => {
+    if (!disabled && onApply) {
+      onApply(suggestion);
+    }
+  };
 
-    const handleDismiss = () => {
-        if (onDismiss) {
-            onDismiss(id);
-        }
-    };
+  const handleDismiss = () => {
+    if (onDismiss) {
+      onDismiss(id);
+    }
+  };
 
-    return (
-        <div className="ai-suggestion-card">
+  return (
+    <div className="ai-suggestion-card">
             {/* Header */}
             <div className="ai-suggestion-card__header">
                 <span className="ai-suggestion-card__icon">🤖</span>
                 <span className="ai-suggestion-card__label">AI предлагает</span>
-                {confidence && (
-                    <span className={`ai-suggestion-card__confidence ${getConfidenceClass(confidence)}`}>
+                {confidence &&
+        <span className={`ai-suggestion-card__confidence ${getConfidenceClass(confidence)}`}>
                         {formatConfidence(confidence)}
                     </span>
-                )}
+        }
                 <button
-                    className="ai-suggestion-card__close"
-                    onClick={handleDismiss}
-                    title="Закрыть"
-                >
+          className="ai-suggestion-card__close"
+          onClick={handleDismiss}
+          title="Закрыть">
+          
                     ×
                 </button>
             </div>
@@ -81,25 +79,25 @@ export function AISuggestionCard({
             </div>
 
             {/* Explanation (if available) */}
-            {explanation && (
-                <div className="ai-suggestion-card__explanation">
+            {explanation &&
+      <div className="ai-suggestion-card__explanation">
                     💡 {explanation}
                 </div>
-            )}
+      }
 
             {/* Actions */}
             <div className="ai-suggestion-card__actions">
                 <button
-                    className="ai-suggestion-card__apply"
-                    onClick={handleApply}
-                    disabled={disabled}
-                >
+          className="ai-suggestion-card__apply"
+          onClick={handleApply}
+          disabled={disabled}>
+          
                     ✓ Применить
                 </button>
                 <button
-                    className="ai-suggestion-card__dismiss"
-                    onClick={handleDismiss}
-                >
+          className="ai-suggestion-card__dismiss"
+          onClick={handleDismiss}>
+          
                     Отклонить
                 </button>
             </div>
@@ -108,8 +106,8 @@ export function AISuggestionCard({
             <div className="ai-suggestion-card__disclaimer">
                 AI не ставит диагнозы. Решение принимает врач.
             </div>
-        </div>
-    );
+        </div>);
+
 }
 
 export default AISuggestionCard;

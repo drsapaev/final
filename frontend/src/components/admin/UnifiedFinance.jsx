@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import BillingManager from './BillingManager';
@@ -28,30 +28,30 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
       border: `1px solid ${colors.border}`,
       marginBottom: '20px'
     }}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            background: activeTab === tab.id ? colors.active : 'transparent',
-            color: activeTab === tab.id ? colors.activeText : colors.text,
-            fontSize: '14px',
-            fontWeight: activeTab === tab.id ? '600' : '400',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
+      {tabs.map((tab) =>
+      <button
+        key={tab.id}
+        onClick={() => onTabChange(tab.id)}
+        style={{
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '6px',
+          background: activeTab === tab.id ? colors.active : 'transparent',
+          color: activeTab === tab.id ? colors.activeText : colors.text,
+          fontSize: '14px',
+          fontWeight: activeTab === tab.id ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+        
           {tab.label}
         </button>
-      ))}
-    </div>
-  );
+      )}
+    </div>);
+
 };
 
 AdminTabs.propTypes = {
@@ -65,16 +65,16 @@ AdminTabs.propTypes = {
 
 const UnifiedFinance = ({ renderFinance }) => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'finance';
-  const { isDark } = useTheme();
+  const section = searchParams.get('section') || 'finance';void
+  useTheme();
 
   const getActiveTab = (section) => {
     switch (section) {
-      case 'finance': return 'overview';
-      case 'billing': return 'billing';
-      case 'dynamic-pricing': return 'pricing';
-      case 'discount-benefits': return 'discounts';
-      default: return 'overview';
+      case 'finance':return 'overview';
+      case 'billing':return 'billing';
+      case 'dynamic-pricing':return 'pricing';
+      case 'discount-benefits':return 'discounts';
+      default:return 'overview';
     }
   };
 
@@ -86,11 +86,11 @@ const UnifiedFinance = ({ renderFinance }) => {
   }, [section]);
 
   const tabs = [
-    { id: 'overview', label: 'Finance Overview', icon: 'DollarSign' },
-    { id: 'billing', label: 'Billing', icon: 'Receipt' },
-    { id: 'pricing', label: 'Dynamic Pricing', icon: 'TrendingUp' },
-    { id: 'discounts', label: 'Discount Benefits', icon: 'Percent' }
-  ];
+  { id: 'overview', label: 'Finance Overview', icon: 'DollarSign' },
+  { id: 'billing', label: 'Billing', icon: 'Receipt' },
+  { id: 'pricing', label: 'Dynamic Pricing', icon: 'TrendingUp' },
+  { id: 'discounts', label: 'Discount Benefits', icon: 'Percent' }];
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -112,13 +112,13 @@ const UnifiedFinance = ({ renderFinance }) => {
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+        onTabChange={setActiveTab} />
+      
       <div style={{ flex: 1, overflow: 'auto' }}>
         {renderContent()}
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 UnifiedFinance.propTypes = {

@@ -3,7 +3,7 @@
  * Компонент для выбора иконки из набора lucide-react иконок
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
     Heart,
     Activity,
@@ -63,6 +63,12 @@ export const iconMetadata = [
 const IconSelector = ({ value, onChange, label = 'Выберите иконку' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const selectedIcon = iconMetadata.find(icon => icon.name === value);
+    const handleActivationKeyDown = (event, action) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            action();
+        }
+    };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -117,7 +123,10 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                                 bottom: 0,
                                 zIndex: 1000
                             }}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setIsOpen(false)}
+                            onKeyDown={(event) => handleActivationKeyDown(event, () => setIsOpen(false))}
                         />
                         <div style={{
                             position: 'absolute',

@@ -5,10 +5,7 @@
  * - Shows when field has content
  * - Click to get AI suggestions
  * - Positioned near the field
- */
-
-import React from 'react';
-import './SmartAssistButton.css';
+ */import './SmartAssistButton.css';
 
 /**
  * SmartAssistButton Component

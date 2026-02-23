@@ -12,8 +12,8 @@ const Badge = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
 
   // Size mapping
   const sizeMap = {
@@ -99,14 +99,13 @@ const Badge = React.forwardRef(({
       ref={ref}
       className={`mac-badge ${className}`}
       style={badgeStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </span>
-  );
+    </span>);
+
 });
 
 Badge.displayName = 'macOS Badge';
 
 export default Badge;
-

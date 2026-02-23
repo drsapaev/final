@@ -58,8 +58,6 @@ export default {
         name: 'Ism',
         email: 'Email',
         phone: 'Telefon',
-        cancel: 'Bekor qilish',
-        save: 'Saqlash',
     },
 
     // ===========================================

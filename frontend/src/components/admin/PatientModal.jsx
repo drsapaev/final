@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle, Heart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle, Heart } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-  MacOSCard,
+
   MacOSButton,
   MacOSInput,
   MacOSSelect,
   MacOSTextarea,
-  MacOSModal
-} from '../ui/macos';
+  MacOSModal } from
+'../ui/macos';
 
 const PatientModal = ({
   isOpen,
@@ -168,10 +168,10 @@ const PatientModal = ({
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     setIsDirty(true);
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
+      setErrors((prev) => ({ ...prev, [field]: null }));
     }
   };
 
@@ -208,8 +208,8 @@ const PatientModal = ({
       isOpen={isOpen}
       onClose={handleClose}
       title={patient ? 'Редактировать пациента' : 'Добавить пациента'}
-      size="lg"
-    >
+      size="lg">
+
 
       {/* Форма */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -236,21 +236,21 @@ const PatientModal = ({
                 onChange={(e) => handleChange('lastName', e.target.value)}
                 placeholder="Иванов"
                 error={errors.lastName}
-                icon={User}
-              />
-              {errors.lastName && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                icon={User} />
+
+              {errors.lastName &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.lastName}
                 </p>
-              )}
+              }
             </div>
 
             {/* Имя */}
@@ -269,21 +269,21 @@ const PatientModal = ({
                 value={formData.firstName}
                 onChange={(e) => handleChange('firstName', e.target.value)}
                 placeholder="Иван"
-                error={errors.firstName}
-              />
-              {errors.firstName && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                error={errors.firstName} />
+
+              {errors.firstName &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.firstName}
                 </p>
-              )}
+              }
             </div>
 
             {/* Отчество */}
@@ -301,8 +301,8 @@ const PatientModal = ({
                 type="text"
                 value={formData.middleName}
                 onChange={(e) => handleChange('middleName', e.target.value)}
-                placeholder="Иванович"
-              />
+                placeholder="Иванович" />
+
             </div>
           </div>
 
@@ -323,31 +323,31 @@ const PatientModal = ({
                 value={formData.birthDate}
                 onChange={(e) => handleChange('birthDate', e.target.value)}
                 error={errors.birthDate}
-                icon={Calendar}
-              />
-              {formData.birthDate && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-text-secondary)',
-                  marginTop: '4px',
-                  marginLeft: '2px'
-                }}>
+                icon={Calendar} />
+
+              {formData.birthDate &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-text-secondary)',
+                marginTop: '4px',
+                marginLeft: '2px'
+              }}>
                   Возраст: {new Date().getFullYear() - new Date(formData.birthDate).getFullYear()} лет
                 </p>
-              )}
-              {errors.birthDate && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+              }
+              {errors.birthDate &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.birthDate}
                 </p>
-              )}
+              }
             </div>
 
             {/* Пол */}
@@ -365,25 +365,25 @@ const PatientModal = ({
                 value={formData.gender}
                 onChange={(e) => handleChange('gender', e.target.value)}
                 options={[
-                  { value: '', label: 'Выберите пол' },
-                  { value: 'male', label: 'Мужской' },
-                  { value: 'female', label: 'Женский' }
-                ]}
-                error={errors.gender}
-              />
-              {errors.gender && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                { value: '', label: 'Выберите пол' },
+                { value: 'male', label: 'Мужской' },
+                { value: 'female', label: 'Женский' }]
+                }
+                error={errors.gender} />
+
+              {errors.gender &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.gender}
                 </p>
-              )}
+              }
             </div>
           </div>
         </div>
@@ -411,21 +411,21 @@ const PatientModal = ({
                 onChange={handlePhoneChange}
                 placeholder="+998 90 123 45 67"
                 error={errors.phone}
-                icon={Phone}
-              />
-              {errors.phone && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                icon={Phone} />
+
+              {errors.phone &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.phone}
                 </p>
-              )}
+              }
             </div>
 
             {/* Email */}
@@ -445,21 +445,21 @@ const PatientModal = ({
                 onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="ivan@example.com"
                 error={errors.email}
-                icon={Mail}
-              />
-              {errors.email && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                icon={Mail} />
+
+              {errors.email &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.email}
                 </p>
-              )}
+              }
             </div>
           </div>
 
@@ -479,8 +479,8 @@ const PatientModal = ({
               value={formData.address}
               onChange={(e) => handleChange('address', e.target.value)}
               placeholder="г. Ташкент, ул. Навои, д. 1"
-              icon={MapPin}
-            />
+              icon={MapPin} />
+
           </div>
         </div>
 
@@ -507,21 +507,21 @@ const PatientModal = ({
                 onChange={(e) => handleChange('passport', e.target.value)}
                 placeholder="AA1234567"
                 error={errors.passport}
-                icon={IdCard}
-              />
-              {errors.passport && (
-                <p style={{
-                  fontSize: 'var(--mac-font-size-xs)',
-                  color: 'var(--mac-error)',
-                  marginTop: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                icon={IdCard} />
+
+              {errors.passport &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.passport}
                 </p>
-              )}
+              }
             </div>
 
             {/* Страховой номер */}
@@ -539,8 +539,8 @@ const PatientModal = ({
                 type="text"
                 value={formData.insuranceNumber}
                 onChange={(e) => handleChange('insuranceNumber', e.target.value)}
-                placeholder="12345678901234"
-              />
+                placeholder="12345678901234" />
+
             </div>
           </div>
         </div>
@@ -565,8 +565,8 @@ const PatientModal = ({
                 type="text"
                 value={formData.emergencyContact}
                 onChange={(e) => handleChange('emergencyContact', e.target.value)}
-                placeholder="Иванова Мария Ивановна"
-              />
+                placeholder="Иванова Мария Ивановна" />
+
             </div>
             <div>
               <label style={{
@@ -583,8 +583,8 @@ const PatientModal = ({
                 value={formData.emergencyPhone}
                 onChange={(e) => handleChange('emergencyPhone', e.target.value)}
                 placeholder="+998 90 987 65 43"
-                icon={Phone}
-              />
+                icon={Phone} />
+
             </div>
           </div>
         </div>
@@ -609,18 +609,18 @@ const PatientModal = ({
                 value={formData.bloodType}
                 onChange={(e) => handleChange('bloodType', e.target.value)}
                 options={[
-                  { value: '', label: 'Не указано' },
-                  { value: 'A+', label: 'A+' },
-                  { value: 'A-', label: 'A-' },
-                  { value: 'B+', label: 'B+' },
-                  { value: 'B-', label: 'B-' },
-                  { value: 'AB+', label: 'AB+' },
-                  { value: 'AB-', label: 'AB-' },
-                  { value: 'O+', label: 'O+' },
-                  { value: 'O-', label: 'O-' }
-                ]}
-                icon={Heart}
-              />
+                { value: '', label: 'Не указано' },
+                { value: 'A+', label: 'A+' },
+                { value: 'A-', label: 'A-' },
+                { value: 'B+', label: 'B+' },
+                { value: 'B-', label: 'B-' },
+                { value: 'AB+', label: 'AB+' },
+                { value: 'AB-', label: 'AB-' },
+                { value: 'O+', label: 'O+' },
+                { value: 'O-', label: 'O-' }]
+                }
+                icon={Heart} />
+
             </div>
             <div>
               <label style={{
@@ -636,8 +636,8 @@ const PatientModal = ({
                 type="text"
                 value={formData.allergies}
                 onChange={(e) => handleChange('allergies', e.target.value)}
-                placeholder="Пенициллин, пыльца"
-              />
+                placeholder="Пенициллин, пыльца" />
+
             </div>
           </div>
           <div>
@@ -654,8 +654,8 @@ const PatientModal = ({
               value={formData.chronicDiseases}
               onChange={(e) => handleChange('chronicDiseases', e.target.value)}
               placeholder="Гипертония, диабет"
-              rows={3}
-            />
+              rows={3} />
+
           </div>
         </div>
 
@@ -678,8 +678,8 @@ const PatientModal = ({
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               placeholder="Дополнительная информация о пациенте..."
-              rows={3}
-            />
+              rows={3} />
+
           </div>
         </div>
 
@@ -688,27 +688,27 @@ const PatientModal = ({
           <MacOSButton
             type="submit"
             disabled={isSubmitting || loading}
-            style={{ flex: 1 }}
-          >
-            {isSubmitting ? (
-              <>
+            style={{ flex: 1 }}>
+
+            {isSubmitting ?
+            <>
                 <div style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid transparent',
-                  borderTop: '2px solid currentColor',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                  marginRight: '8px'
-                }} />
+                width: '16px',
+                height: '16px',
+                border: '2px solid transparent',
+                borderTop: '2px solid currentColor',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginRight: '8px'
+              }} />
                 Сохранение...
-              </>
-            ) : (
-              <>
+              </> :
+
+            <>
                 <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 {patient ? 'Сохранить изменения' : 'Добавить пациента'}
               </>
-            )}
+            }
           </MacOSButton>
           <MacOSButton
             type="button"
@@ -716,15 +716,14 @@ const PatientModal = ({
 
             onClick={handleClose}
             disabled={isSubmitting}
-            style={{ flex: 1 }}
-          >
+            style={{ flex: 1 }}>
+
             Отмена
           </MacOSButton>
         </div>
       </form>
-    </MacOSModal>
-  );
+    </MacOSModal>);
+
 };
 
 export default PatientModal;
-

@@ -131,12 +131,12 @@ const useUsers = () => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, filterRole, filterStatus]);
+  }, [searchTerm, filterRole, filterStatus, loadUsers]);
 
   // Загрузка при монтировании
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   // Функция для смены страницы
   const changePage = useCallback((newPage) => {

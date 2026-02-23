@@ -1,5 +1,5 @@
-import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSStatCard = ({
   title,
@@ -148,6 +148,12 @@ const MacOSStatCard = ({
       onClick();
     }
   };
+  const handleKeyDown = (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && onClick) {
+      e.preventDefault();
+      onClick();
+    }
+  };
 
   const handleMouseEnter = (e) => {
     if (onClick) {
@@ -217,14 +223,8 @@ const MacOSStatCard = ({
     return renderLoading();
   }
 
-  return (
-    <div
-      className={className}
-      style={cardStyle}
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+  const content = (
+    <>
       <div style={headerStyle}>
         <h3 style={titleStyle}>{title}</h3>
         {Icon && <Icon style={iconStyle} />}
@@ -237,8 +237,48 @@ const MacOSStatCard = ({
       )}
       
       {renderTrend()}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <div
+        className={className}
+        style={cardStyle}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className={className} style={cardStyle}>
+      {content}
     </div>
   );
+};
+
+MacOSStatCard.propTypes = {
+  title: PropTypes.node,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.node]),
+  subtitle: PropTypes.node,
+  icon: PropTypes.elementType,
+  trend: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  trendType: PropTypes.oneOf(['positive', 'negative', 'neutral']),
+  trendLabel: PropTypes.node,
+  color: PropTypes.oneOf(['blue', 'green', 'orange', 'red', 'purple', 'gray']),
+  size: PropTypes.oneOf(['sm', 'md', 'lg']),
+  variant: PropTypes.oneOf(['default', 'filled', 'elevated']),
+  loading: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default MacOSStatCard;

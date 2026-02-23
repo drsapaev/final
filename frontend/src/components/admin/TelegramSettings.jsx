@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   MessageSquare,
   Bot,
   Key,
   Send,
-  Users,
+
   Bell,
   Save,
   RefreshCw,
@@ -14,11 +14,11 @@ import {
   Eye,
   EyeOff,
   Globe,
-  Settings,
-  Webhook,
-  BarChart3
-} from 'lucide-react';
-import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
+
+  Webhook } from
+
+'lucide-react';
+import { Card, Button, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -54,16 +54,16 @@ const TelegramSettings = () => {
 
       // Загружаем настройки, информацию о боте и статистику
       const [settingsRes, webhookRes, statsRes] = await Promise.all([
-        fetch('/api/v1/admin/telegram/settings', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        }),
-        fetch('/api/v1/admin/telegram/webhook-info', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        }),
-        fetch('/api/v1/admin/telegram/stats?days_back=7', {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        })
-      ]);
+      fetch('/api/v1/admin/telegram/settings', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      }),
+      fetch('/api/v1/admin/telegram/webhook-info', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      }),
+      fetch('/api/v1/admin/telegram/stats?days_back=7', {
+        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+      })]
+      );
 
       if (settingsRes.ok) {
         const settingsData = await settingsRes.json();
@@ -89,7 +89,7 @@ const TelegramSettings = () => {
   };
 
   const handleSettingChange = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
   const saveSettings = async () => {
@@ -216,8 +216,8 @@ const TelegramSettings = () => {
           }} />
           <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка Telegram настроек...</span>
         </div>
-      </Card>
-    );
+      </Card>);
+
   }
 
   return (
@@ -249,41 +249,41 @@ const TelegramSettings = () => {
             Обновить
           </Button>
           <Button onClick={saveSettings} disabled={saving}>
-            {saving ? (
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px', animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-            )}
+            {saving ?
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px', animation: 'spin 1s linear infinite' }} /> :
+
+            <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            }
             Сохранить
           </Button>
         </div>
       </div>
 
       {/* Сообщения */}
-      {message.text && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px',
-          borderRadius: 'var(--mac-radius-md)',
-          backgroundColor: message.type === 'success'
-            ? 'var(--mac-success-bg)'
-            : 'var(--mac-error-bg)',
-          color: message.type === 'success'
-            ? 'var(--mac-success)'
-            : 'var(--mac-error)',
-          border: `1px solid ${message.type === 'success'
-            ? 'var(--mac-success-border)'
-            : 'var(--mac-error-border)'}`
-        }}>
-          {message.type === 'success' ? (
-            <CheckCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
-          ) : (
-            <AlertCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
-          )}
+      {message.text &&
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '16px',
+        borderRadius: 'var(--mac-radius-md)',
+        backgroundColor: message.type === 'success' ?
+        'var(--mac-success-bg)' :
+        'var(--mac-error-bg)',
+        color: message.type === 'success' ?
+        'var(--mac-success)' :
+        'var(--mac-error)',
+        border: `1px solid ${message.type === 'success' ?
+        'var(--mac-success-border)' :
+        'var(--mac-error-border)'}`
+      }}>
+          {message.type === 'success' ?
+        <CheckCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} /> :
+
+        <AlertCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
+        }
           {message.text}
         </div>
-      )}
+      }
 
       {/* Статистика */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -387,13 +387,13 @@ const TelegramSettings = () => {
                   value={settings.bot_token}
                   onChange={(e) => handleSettingChange('bot_token', e.target.value)}
                   placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                  style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-                />
+                  style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }} />
+                
                 <Button
                   variant="outline"
                   onClick={() => setShowToken(!showToken)}
-                  style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
-                >
+                  style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
+                  
                   {showToken ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
                 </Button>
               </div>
@@ -408,34 +408,34 @@ const TelegramSettings = () => {
             </div>
 
             {/* Информация о боте */}
-            {botInfo && (
-              <div style={{
-                padding: '12px',
-                backgroundColor: 'var(--mac-success-bg)',
-                border: '1px solid var(--mac-success-border)',
-                borderRadius: 'var(--mac-radius-md)'
-              }}>
+            {botInfo &&
+            <div style={{
+              padding: '12px',
+              backgroundColor: 'var(--mac-success-bg)',
+              border: '1px solid var(--mac-success-border)',
+              borderRadius: 'var(--mac-radius-md)'
+            }}>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  color: 'var(--mac-success)',
-                  marginBottom: '8px',
-                  margin: 0
-                }}>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-success)',
+                marginBottom: '8px',
+                margin: 0
+              }}>
                   Информация о боте:
                 </h4>
                 <div style={{
-                  fontSize: 'var(--mac-font-size-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
-                }}>
+                fontSize: 'var(--mac-font-size-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
                   <div style={{ color: 'var(--mac-text-primary)' }}><strong>Username:</strong> @{botInfo.username}</div>
                   <div style={{ color: 'var(--mac-text-primary)' }}><strong>Имя:</strong> {botInfo.first_name}</div>
                   <div style={{ color: 'var(--mac-text-primary)' }}><strong>ID:</strong> {botInfo.id}</div>
                   <div style={{ color: 'var(--mac-text-primary)' }}><strong>Группы:</strong> {botInfo.can_join_groups ? 'Да' : 'Нет'}</div>
                 </div>
               </div>
-            )}
+            }
 
             <div>
               <label style={{
@@ -449,10 +449,10 @@ const TelegramSettings = () => {
               </label>
               <MacOSInput
                 value={settings.admin_chat_ids?.join(', ') || ''}
-                onChange={(e) => handleSettingChange('admin_chat_ids', e.target.value.split(',').map(id => id.trim()).filter(id => id))}
+                onChange={(e) => handleSettingChange('admin_chat_ids', e.target.value.split(',').map((id) => id.trim()).filter((id) => id))}
                 placeholder="123456789, 987654321"
-                style={{ width: '100%', minHeight: '60px' }}
-              />
+                style={{ width: '100%', minHeight: '60px' }} />
+              
               <p style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-secondary)',
@@ -497,8 +497,8 @@ const TelegramSettings = () => {
                 <MacOSCheckbox
                   checked={settings.notifications_enabled}
                   onChange={(e) => handleSettingChange('notifications_enabled', e.target.checked)}
-                  style={{ marginRight: '12px' }}
-                />
+                  style={{ marginRight: '12px' }} />
+                
                 <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Уведомления включены</span>
               </label>
 
@@ -506,8 +506,8 @@ const TelegramSettings = () => {
                 <MacOSCheckbox
                   checked={settings.appointment_reminders}
                   onChange={(e) => handleSettingChange('appointment_reminders', e.target.checked)}
-                  style={{ marginRight: '12px' }}
-                />
+                  style={{ marginRight: '12px' }} />
+                
                 <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Напоминания о приемах</span>
               </label>
 
@@ -515,8 +515,8 @@ const TelegramSettings = () => {
                 <MacOSCheckbox
                   checked={settings.lab_results_notifications}
                   onChange={(e) => handleSettingChange('lab_results_notifications', e.target.checked)}
-                  style={{ marginRight: '12px' }}
-                />
+                  style={{ marginRight: '12px' }} />
+                
                 <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Готовность анализов</span>
               </label>
 
@@ -524,8 +524,8 @@ const TelegramSettings = () => {
                 <MacOSCheckbox
                   checked={settings.payment_notifications}
                   onChange={(e) => handleSettingChange('payment_notifications', e.target.checked)}
-                  style={{ marginRight: '12px' }}
-                />
+                  style={{ marginRight: '12px' }} />
+                
                 <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Уведомления об оплате</span>
               </label>
             </div>
@@ -545,50 +545,50 @@ const TelegramSettings = () => {
                 value={settings.default_language}
                 onChange={(e) => handleSettingChange('default_language', e.target.value)}
                 options={[
-                  { value: 'ru', label: 'Русский' },
-                  { value: 'uz', label: 'O\'zbekcha' },
-                  { value: 'en', label: 'English' }
-                ]}
-                style={{ width: '100%' }}
-              />
+                { value: 'ru', label: 'Русский' },
+                { value: 'uz', label: 'O\'zbekcha' },
+                { value: 'en', label: 'English' }]
+                }
+                style={{ width: '100%' }} />
+              
             </div>
 
             {/* Информация о webhook */}
-            {webhookInfo && (
-              <div style={{
-                padding: '12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid',
-                backgroundColor: webhookInfo.webhook_set
-                  ? 'var(--mac-success-bg)'
-                  : 'var(--mac-warning-bg)',
-                borderColor: webhookInfo.webhook_set
-                  ? 'var(--mac-success-border)'
-                  : 'var(--mac-warning-border)'
-              }}>
+            {webhookInfo &&
+            <div style={{
+              padding: '12px',
+              borderRadius: 'var(--mac-radius-md)',
+              border: '1px solid',
+              backgroundColor: webhookInfo.webhook_set ?
+              'var(--mac-success-bg)' :
+              'var(--mac-warning-bg)',
+              borderColor: webhookInfo.webhook_set ?
+              'var(--mac-success-border)' :
+              'var(--mac-warning-border)'
+            }}>
                 <h4 style={{
-                  fontWeight: 'var(--mac-font-weight-medium)',
-                  marginBottom: '8px',
-                  color: webhookInfo.webhook_set
-                    ? 'var(--mac-success)'
-                    : 'var(--mac-warning)',
-                  margin: 0
-                }}>
+                fontWeight: 'var(--mac-font-weight-medium)',
+                marginBottom: '8px',
+                color: webhookInfo.webhook_set ?
+                'var(--mac-success)' :
+                'var(--mac-warning)',
+                margin: 0
+              }}>
                   Webhook: {webhookInfo.webhook_set ? 'Настроен' : 'Не настроен'}
                 </h4>
-                {webhookInfo.webhook_info && (
-                  <div style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}>
+                {webhookInfo.webhook_info &&
+              <div style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
                     <div style={{ color: 'var(--mac-text-primary)' }}><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
                     <div style={{ color: 'var(--mac-text-primary)' }}><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
                   </div>
-                )}
+              }
               </div>
-            )}
+            }
           </div>
         </Card>
       </div>
@@ -624,8 +624,8 @@ const TelegramSettings = () => {
               value={testChatId}
               onChange={(e) => setTestChatId(e.target.value)}
               placeholder="123456789"
-              style={{ width: '100%' }}
-            />
+              style={{ width: '100%' }} />
+            
             <p style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
@@ -650,16 +650,16 @@ const TelegramSettings = () => {
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
               placeholder="Введите текст сообщения..."
-              style={{ width: '100%', minHeight: '80px' }}
-            />
+              style={{ width: '100%', minHeight: '80px' }} />
+            
           </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
           <Button
             onClick={sendTestMessage}
-            disabled={!settings.bot_token || !testChatId || !testMessage}
-          >
+            disabled={!settings.bot_token || !testChatId || !testMessage}>
+            
             <Send style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Отправить тест
           </Button>
@@ -693,14 +693,13 @@ const TelegramSettings = () => {
         }}>
           <p style={{ margin: 0 }}>1. Создайте бота через @BotFather в Telegram</p>
           <p style={{ margin: 0 }}>2. Получите токен бота и вставьте его выше</p>
-          <p style={{ margin: 0 }}>3. Нажмите "Тест бота" для проверки подключения</p>
+          <p style={{ margin: 0 }}>3. Нажмите «Тест бота» для проверки подключения</p>
           <p style={{ margin: 0 }}>4. Установите webhook для получения сообщений</p>
           <p style={{ margin: 0 }}>5. Добавьте ID чатов администраторов для служебных уведомлений</p>
         </div>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default TelegramSettings;
-

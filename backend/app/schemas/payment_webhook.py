@@ -1,6 +1,6 @@
 # app/schemas/payment_webhook.py
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -13,30 +13,30 @@ class PaymentWebhookBase(BaseModel):
     transaction_id: str = Field(..., description="ID транзакции")
     amount: int = Field(..., description="Сумма в тийинах")
     currency: str = Field(default="UZS", description="Валюта")
-    visit_id: Optional[int] = Field(None, description="ID визита")
-    patient_id: Optional[int] = Field(None, description="ID пациента")
+    visit_id: int | None = Field(None, description="ID визита")
+    patient_id: int | None = Field(None, description="ID пациента")
 
 
 class PaymentWebhookCreate(PaymentWebhookBase):
-    raw_data: Dict[str, Any] = Field(..., description="Сырые данные от провайдера")
-    signature: Optional[str] = Field(None, description="Подпись для верификации")
+    raw_data: dict[str, Any] = Field(..., description="Сырые данные от провайдера")
+    signature: str | None = Field(None, description="Подпись для верификации")
     status: str = Field(default="pending", description="Статус обработки")
 
 
 class PaymentWebhookUpdate(BaseModel):
-    status: Optional[str] = Field(None, description="Статус обработки")
-    processed_at: Optional[datetime] = Field(None, description="Время обработки")
-    error_message: Optional[str] = Field(None, description="Сообщение об ошибке")
+    status: str | None = Field(None, description="Статус обработки")
+    processed_at: datetime | None = Field(None, description="Время обработки")
+    error_message: str | None = Field(None, description="Сообщение об ошибке")
 
 
 class PaymentWebhookOut(PaymentWebhookBase, ORMModel):
     id: int
     status: str
-    raw_data: Dict[str, Any]
-    signature: Optional[str]
+    raw_data: dict[str, Any]
+    signature: str | None
     created_at: datetime
-    processed_at: Optional[datetime]
-    error_message: Optional[str]
+    processed_at: datetime | None
+    error_message: str | None
 
 
 class PaymentTransactionBase(BaseModel):
@@ -46,21 +46,21 @@ class PaymentTransactionBase(BaseModel):
     currency: str = Field(default="UZS", description="Валюта")
     commission: int = Field(default=0, description="Комиссия провайдера")
     status: str = Field(default="pending", description="Статус транзакции")
-    visit_id: Optional[int] = Field(None, description="ID визита")
+    visit_id: int | None = Field(None, description="ID визита")
 
 
 class PaymentTransactionCreate(PaymentTransactionBase):
-    webhook_id: Optional[int] = Field(None, description="ID вебхука")
+    webhook_id: int | None = Field(None, description="ID вебхука")
 
 
 class PaymentTransactionUpdate(BaseModel):
-    status: Optional[str] = Field(None, description="Статус транзакции")
-    commission: Optional[int] = Field(None, description="Комиссия провайдера")
+    status: str | None = Field(None, description="Статус транзакции")
+    commission: int | None = Field(None, description="Комиссия провайдера")
 
 
 class PaymentTransactionOut(PaymentTransactionBase, ORMModel):
     id: int
-    webhook_id: Optional[int]
+    webhook_id: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -69,27 +69,27 @@ class PaymentProviderBase(BaseModel):
     name: str = Field(..., description="Название провайдера")
     code: str = Field(..., description="Код провайдера")
     is_active: bool = Field(default=True, description="Активен ли провайдер")
-    webhook_url: Optional[str] = Field(None, description="URL для вебхуков")
+    webhook_url: str | None = Field(None, description="URL для вебхуков")
     commission_percent: int = Field(default=0, description="Комиссия в процентах")
     min_amount: int = Field(default=0, description="Минимальная сумма")
     max_amount: int = Field(default=100000000, description="Максимальная сумма")
 
 
 class PaymentProviderCreate(PaymentProviderBase):
-    api_key: Optional[str] = Field(None, description="API ключ")
-    secret_key: Optional[str] = Field(None, description="Секретный ключ")
-    created_at: Optional[datetime] = Field(None, description="Время создания")
-    updated_at: Optional[datetime] = Field(None, description="Время обновления")
+    api_key: str | None = Field(None, description="API ключ")
+    secret_key: str | None = Field(None, description="Секретный ключ")
+    created_at: datetime | None = Field(None, description="Время создания")
+    updated_at: datetime | None = Field(None, description="Время обновления")
 
 
 class PaymentProviderUpdate(BaseModel):
-    is_active: Optional[bool] = Field(None, description="Активен ли провайдер")
-    webhook_url: Optional[str] = Field(None, description="URL для вебхуков")
-    api_key: Optional[str] = Field(None, description="API ключ")
-    secret_key: Optional[str] = Field(None, description="Секретный ключ")
-    commission_percent: Optional[int] = Field(None, description="Комиссия в процентах")
-    min_amount: Optional[int] = Field(None, description="Минимальная сумма")
-    max_amount: Optional[int] = Field(None, description="Максимальная сумма")
+    is_active: bool | None = Field(None, description="Активен ли провайдер")
+    webhook_url: str | None = Field(None, description="URL для вебхуков")
+    api_key: str | None = Field(None, description="API ключ")
+    secret_key: str | None = Field(None, description="Секретный ключ")
+    commission_percent: int | None = Field(None, description="Комиссия в процентах")
+    min_amount: int | None = Field(None, description="Минимальная сумма")
+    max_amount: int | None = Field(None, description="Максимальная сумма")
 
 
 class PaymentProviderOut(PaymentProviderBase, ORMModel):
@@ -107,13 +107,13 @@ class PaymeWebhookData(BaseModel):
         ..., description="1 - pending, 2 - paid, -1 - cancelled, -2 - failed"
     )
     amount: int = Field(..., description="Сумма в тийинах")
-    time: Optional[int] = Field(None, description="Время транзакции")
-    account: Optional[Dict[str, Any]] = Field(None, description="Данные аккаунта")
-    create_time: Optional[int] = Field(None, description="Время создания")
-    perform_time: Optional[int] = Field(None, description="Время выполнения")
-    cancel_time: Optional[int] = Field(None, description="Время отмены")
-    reason: Optional[int] = Field(None, description="Причина")
-    receivers: Optional[list] = Field(None, description="Получатели")
+    time: int | None = Field(None, description="Время транзакции")
+    account: dict[str, Any] | None = Field(None, description="Данные аккаунта")
+    create_time: int | None = Field(None, description="Время создания")
+    perform_time: int | None = Field(None, description="Время выполнения")
+    cancel_time: int | None = Field(None, description="Время отмены")
+    reason: int | None = Field(None, description="Причина")
+    receivers: list | None = Field(None, description="Получатели")
 
 
 class ClickWebhookData(BaseModel):
@@ -125,7 +125,7 @@ class ClickWebhookData(BaseModel):
     action: str = Field(..., description="Действие")
     sign_time: str = Field(..., description="Время подписи")
     sign_string: str = Field(..., description="Подпись")
-    service_id: Optional[str] = Field(None, description="ID сервиса")
-    click_paydoc_id: Optional[str] = Field(None, description="ID документа Click")
-    error: Optional[str] = Field(None, description="Ошибка")
-    error_note: Optional[str] = Field(None, description="Примечание об ошибке")
+    service_id: str | None = Field(None, description="ID сервиса")
+    click_paydoc_id: str | None = Field(None, description="ID документа Click")
+    error: str | None = Field(None, description="Ошибка")
+    error_note: str | None = Field(None, description="Примечание об ошибке")

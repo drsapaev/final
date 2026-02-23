@@ -1,18 +1,17 @@
-import React from 'react';
 import {
   Box,
   Typography,
-  Badge,
+
   Alert,
-  Paper,
-} from '../ui/macos';
+  Paper } from
+'../ui/macos';
 import { Divider } from '../ui/macos/List';
 import {
   Hospital,
   Info,
-  AlertTriangle,
-  CheckCircle,
-} from 'lucide-react';
+
+  CheckCircle } from
+'lucide-react';
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI
@@ -27,7 +26,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
     let currentSection = null;
 
     const lines = text.split('\n');
-    
+
     lines.forEach((line) => {
       // Заголовки с ### или **
       if (line.match(/^###\s+(.+)$/)) {
@@ -87,19 +86,19 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
     switch (item.type) {
       case 'diagnosis':
         return (
-          <Alert 
-            key={idx} 
-            severity="success" 
-            style={{ marginTop: '8px', marginBottom: '8px' }}
-          >
+          <Alert
+            key={idx}
+            severity="success"
+            style={{ marginTop: '8px', marginBottom: '8px' }}>
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Hospital size={18} />
               <Typography variant="body1" style={{ fontWeight: 'bold' }}>
                 {item.content}
               </Typography>
             </div>
-          </Alert>
-        );
+          </Alert>);
+
 
       case 'subheading':
         return (
@@ -107,16 +106,16 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
             <Typography variant="subtitle1" style={{ fontWeight: 'bold', color: 'var(--mac-accent-blue)' }}>
               {item.content}
             </Typography>
-          </Box>
-        );
+          </Box>);
+
 
       case 'list':
         return (
           <Box key={idx} display="flex" alignItems="flex-start" gap={1} style={{ marginLeft: '16px', marginTop: '4px', marginBottom: '4px' }}>
             <CheckCircle size={16} style={{ marginTop: '4px', color: 'var(--mac-success)' }} />
             <Typography variant="body2">{item.content}</Typography>
-          </Box>
-        );
+          </Box>);
+
 
       case 'text':
         // Обнаруживаем специальные форматы
@@ -124,13 +123,13 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
           const parts = item.content.split(/\*\*(.+?)\*\*/);
           return (
             <Typography key={idx} variant="body2" paragraph>
-              {parts.map((part, i) => 
-                i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+              {parts.map((part, i) =>
+              i % 2 === 1 ? <strong key={i}>{part}</strong> : part
               )}
-            </Typography>
-          );
+            </Typography>);
+
         }
-        
+
         // Обнаруживаем "Когда использовать:"
         if (item.content.startsWith('Когда использовать:')) {
           return (
@@ -139,8 +138,8 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
                 <Info size={16} style={{ verticalAlign: 'middle', marginRight: '4px', display: 'inline-block' }} />
                 {item.content}
               </Typography>
-            </Box>
-          );
+            </Box>);
+
         }
 
         // Обнаруживаем "Формулировка:"
@@ -150,15 +149,15 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
               <Typography variant="body2" style={{ fontStyle: 'italic' }}>
                 {item.content.replace('Формулировка:', '').trim()}
               </Typography>
-            </Paper>
-          );
+            </Paper>);
+
         }
 
         return (
           <Typography key={idx} variant="body2" paragraph>
             {item.content}
-          </Typography>
-        );
+          </Typography>);
+
 
       case 'break':
         return <Divider key={idx} style={{ marginTop: '16px', marginBottom: '16px' }} />;
@@ -171,40 +170,39 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
 
   const variantBgColor = {
     'success': 'var(--mac-success)',
-    'warning': 'var(--mac-warning)', 
+    'warning': 'var(--mac-warning)',
     'error': 'var(--mac-error)',
     'info': 'var(--mac-info)'
   }[variant] || 'var(--mac-bg-primary)';
 
   return (
-    <Paper 
-      elevation={0} 
-      style={{ 
-        padding: '24px', 
+    <Paper
+      elevation={0}
+      style={{
+        padding: '24px',
         backgroundColor: variantBgColor,
         border: '1px solid var(--mac-border)',
         borderRadius: '8px'
-      }}
-    >
-      {sections.map((section, sectionIdx) => (
-        <Box key={sectionIdx} mb={sectionIdx < sections.length - 1 ? 3 : 0}>
+      }}>
+      
+      {sections.map((section, sectionIdx) =>
+      <Box key={sectionIdx} mb={sectionIdx < sections.length - 1 ? 3 : 0}>
           {/* Заголовок секции */}
-          {section.type === 'heading' && (
-            <Box mb={2}>
+          {section.type === 'heading' &&
+        <Box mb={2}>
               <Typography variant="h6" style={{ fontWeight: 'bold', marginBottom: '8px' }}>
                 {section.content}
               </Typography>
               <Divider />
             </Box>
-          )}
+        }
 
           {/* Элементы секции */}
           {section.items.map((item, itemIdx) => renderItem(item, itemIdx))}
         </Box>
-      ))}
-    </Paper>
-  );
+      )}
+    </Paper>);
+
 };
 
 export default AIClinicalText;
-

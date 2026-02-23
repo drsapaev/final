@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 export const useBreakpoint = () => {
   const [breakpoint, setBreakpoint] = useState(() => {
     if (typeof window === 'undefined') return 'md';
-    
+
     const width = window.innerWidth;
     if (width < 640) return 'xs';
     if (width < 768) return 'sm';
@@ -23,14 +23,14 @@ export const useBreakpoint = () => {
     const handleResize = () => {
       const width = window.innerWidth;
       let newBreakpoint = 'md';
-      
-      if (width < 640) newBreakpoint = 'xs';
-      else if (width < 768) newBreakpoint = 'sm';
-      else if (width < 1024) newBreakpoint = 'md';
-      else if (width < 1280) newBreakpoint = 'lg';
-      else if (width < 1536) newBreakpoint = 'xl';
-      else newBreakpoint = '2xl';
-      
+
+      if (width < 640) newBreakpoint = 'xs';else
+      if (width < 768) newBreakpoint = 'sm';else
+      if (width < 1024) newBreakpoint = 'md';else
+      if (width < 1280) newBreakpoint = 'lg';else
+      if (width < 1536) newBreakpoint = 'xl';else
+      newBreakpoint = '2xl';
+
       setBreakpoint(newBreakpoint);
     };
 
@@ -54,13 +54,13 @@ export const useBreakpoint = () => {
 
 // Хук для определения устройства
 export const useDevice = () => {
-  const [device, setDevice] = useState(() => {
+  const [device] = useState(() => {
     if (typeof window === 'undefined') return 'desktop';
-    
+
     const userAgent = navigator.userAgent.toLowerCase();
     const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
     const isTablet = /ipad|android(?!.*mobile)/i.test(userAgent);
-    
+
     if (isMobile) return 'mobile';
     if (isTablet) return 'tablet';
     return 'desktop';
@@ -99,7 +99,7 @@ export const useOrientation = () => {
 
 // Хук для определения поддержки touch
 export const useTouchDevice = () => {
-  const [isTouchDevice, setIsTouchDevice] = useState(() => {
+  const [isTouchDevice] = useState(() => {
     if (typeof window === 'undefined') return false;
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   });
@@ -117,7 +117,7 @@ export const useHoverSupport = () => {
   useEffect(() => {
     const mediaQuery = window.matchMedia('(hover: hover)');
     const handleChange = (e) => setHasHoverSupport(e.matches);
-    
+
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
@@ -135,7 +135,7 @@ export const useReducedMotion = () => {
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const handleChange = (e) => setPrefersReducedMotion(e.matches);
-    
+
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
@@ -153,7 +153,7 @@ export const useHighContrast = () => {
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-contrast: high)');
     const handleChange = (e) => setPrefersHighContrast(e.matches);
-    
+
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);

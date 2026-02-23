@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
@@ -26,7 +26,7 @@ class CRUDNotificationTemplate(
 ):
     def get_by_type_and_channel(
         self, db: Session, *, type: str, channel: str
-    ) -> Optional[NotificationTemplate]:
+    ) -> NotificationTemplate | None:
         return (
             db.query(NotificationTemplate)
             .filter(
@@ -39,7 +39,7 @@ class CRUDNotificationTemplate(
             .first()
         )
 
-    def get_active_templates(self, db: Session) -> List[NotificationTemplate]:
+    def get_active_templates(self, db: Session) -> list[NotificationTemplate]:
         return (
             db.query(NotificationTemplate)
             .filter(NotificationTemplate.is_active)
@@ -53,7 +53,7 @@ class CRUDNotificationHistory(
 ):
     def get_by_recipient(
         self, db: Session, *, recipient_id: int, recipient_type: str, limit: int = 100
-    ) -> List[NotificationHistory]:
+    ) -> list[NotificationHistory]:
         return (
             db.query(NotificationHistory)
             .filter(
@@ -69,7 +69,7 @@ class CRUDNotificationHistory(
 
     def get_by_status(
         self, db: Session, *, status: str, limit: int = 100
-    ) -> List[NotificationHistory]:
+    ) -> list[NotificationHistory]:
         return (
             db.query(NotificationHistory)
             .filter(NotificationHistory.status == status)
@@ -80,7 +80,7 @@ class CRUDNotificationHistory(
 
     def get_recent(
         self, db: Session, *, hours: int = 24, limit: int = 100
-    ) -> List[NotificationHistory]:
+    ) -> list[NotificationHistory]:
         since = datetime.utcnow() - timedelta(hours=hours)
         return (
             db.query(NotificationHistory)
@@ -90,7 +90,7 @@ class CRUDNotificationHistory(
             .all()
         )
 
-    def get_stats(self, db: Session, *, days: int = 7) -> Dict[str, Any]:
+    def get_stats(self, db: Session, *, days: int = 7) -> dict[str, Any]:
         since = datetime.utcnow() - timedelta(days=days)
 
         # Общая статистика
@@ -150,8 +150,8 @@ class CRUDNotificationHistory(
         *,
         notification_id: int,
         status: str,
-        error_message: Optional[str] = None,
-    ) -> Optional[NotificationHistory]:
+        error_message: str | None = None,
+    ) -> NotificationHistory | None:
         notification = (
             db.query(NotificationHistory)
             .filter(NotificationHistory.id == notification_id)
@@ -183,7 +183,7 @@ class CRUDNotificationSettings(
 ):
     def get_by_user(
         self, db: Session, *, user_id: int, user_type: str
-    ) -> Optional[NotificationSettings]:
+    ) -> NotificationSettings | None:
         return (
             db.query(NotificationSettings)
             .filter(
@@ -210,7 +210,7 @@ class CRUDNotificationSettings(
 
     def get_users_for_notification(
         self, db: Session, *, notification_type: str, channel: str
-    ) -> List[NotificationSettings]:
+    ) -> list[NotificationSettings]:
         """Получить пользователей, которые должны получить уведомление определенного типа"""
         filters = [getattr(NotificationSettings, f"{channel}_enabled")]
 
@@ -247,7 +247,7 @@ def create_notification(db: Session, notification_data: dict) -> NotificationHis
 
 def get_user_notifications(
     db: Session, user_id: int, limit: int = 50
-) -> List[NotificationHistory]:
+) -> list[NotificationHistory]:
     """Получить уведомления пользователя"""
     return (
         db.query(NotificationHistory)
@@ -260,7 +260,7 @@ def get_user_notifications(
 
 def get_notification(
     db: Session, notification_id: int
-) -> Optional[NotificationHistory]:
+) -> NotificationHistory | None:
     """Получить уведомление по ID"""
     return (
         db.query(NotificationHistory)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Package,
   Heart,
@@ -7,15 +7,15 @@ import {
   TestTube,
   Plus,
   Minus,
-  Edit,
-  DollarSign,
+
+
   Clock,
   CheckCircle,
   Circle,
-  RefreshCw,
-  AlertCircle
-} from 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSBadge, MacOSLoadingSkeleton } from '../ui/macos';
+
+  AlertCircle } from
+'lucide-react';
+import { MacOSCard, MacOSButton, MacOSLoadingSkeleton } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -32,12 +32,6 @@ const DoctorServiceSelector = ({
 }) => {
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    logger.log('DoctorServiceSelector: Skipping render in demo mode');
-    return null;
-  }
 
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState({});
@@ -65,11 +59,7 @@ const DoctorServiceSelector = ({
     'laboratory.blood': 'Анализы крови'
   };
 
-  useEffect(() => {
-    loadServices();
-  }, [specialty]);
-
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     // Проверяем демо-режим только по пути
     const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
@@ -101,10 +91,14 @@ const DoctorServiceSelector = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [specialty]);
+
+  useEffect(() => {
+    loadServices();
+  }, [loadServices]);
 
   const handleServiceToggle = (service) => {
-    const existingIndex = selectedServices.findIndex(s => s.id === service.id);
+    const existingIndex = selectedServices.findIndex((s) => s.id === service.id);
 
     if (existingIndex >= 0) {
       // Убираем услугу
@@ -128,7 +122,7 @@ const DoctorServiceSelector = ({
   };
 
   const handleQuantityChange = (serviceId, quantity) => {
-    const newServices = selectedServices.map(service => {
+    const newServices = selectedServices.map((service) => {
       if (service.id === serviceId) {
         return {
           ...service,
@@ -145,7 +139,7 @@ const DoctorServiceSelector = ({
   const handlePriceChange = (serviceId, newPrice) => {
     if (!canEditPrices) return;
 
-    const newServices = selectedServices.map(service => {
+    const newServices = selectedServices.map((service) => {
       if (service.id === serviceId) {
         return {
           ...service,
@@ -160,7 +154,7 @@ const DoctorServiceSelector = ({
   };
 
   const isServiceSelected = (serviceId) => {
-    return selectedServices.some(s => s.id === serviceId);
+    return selectedServices.some((s) => s.id === serviceId);
   };
 
   const getTotalCost = () => {
@@ -168,15 +162,26 @@ const DoctorServiceSelector = ({
   };
 
   const getTotalDuration = () => {
-    return selectedServices.reduce((total, service) => total + (service.duration_minutes * service.quantity), 0);
+    return selectedServices.reduce((total, service) => total + service.duration_minutes * service.quantity, 0);
   };
+  const handleActivationKeyDown = (event, onActivate) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onActivate();
+    }
+  };
+
+  if (isDemoMode) {
+    logger.log('DoctorServiceSelector: Skipping render in demo mode');
+    return null;
+  }
 
   if (loading) {
     return (
       <MacOSCard style={{ padding: '24px' }}>
         <MacOSLoadingSkeleton />
-      </MacOSCard>
-    );
+      </MacOSCard>);
+
   }
 
   if (error) {
@@ -184,202 +189,192 @@ const DoctorServiceSelector = ({
       <MacOSCard style={{ padding: '24px', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
         <AlertCircle size={20} style={{ marginRight: '8px' }} />
         <span>{error}</span>
-      </MacOSCard>
-    );
+      </MacOSCard>);
+
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Итоговая информация */}
-      {selectedServices.length > 0 && (
-        <MacOSCard style={{
-          padding: '16px',
-          background: 'linear-gradient(135deg, var(--mac-success-bg) 0%, var(--mac-success-bg-light) 100%)',
-          border: '1px solid var(--mac-success-border)'
-        }}>
+      {selectedServices.length > 0 &&
+      <MacOSCard style={{
+        padding: '16px',
+        background: 'linear-gradient(135deg, var(--mac-success-bg) 0%, var(--mac-success-bg-light) 100%)',
+        border: '1px solid var(--mac-success-border)'
+      }}>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-            gap: '16px',
-            textAlign: 'center'
-          }}>
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+          gap: '16px',
+          textAlign: 'center'
+        }}>
             <div>
               <div style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-bold)',
-                color: 'var(--mac-success)'
-              }}>{selectedServices.length}</div>
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-success)'
+            }}>{selectedServices.length}</div>
               <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>Услуг</div>
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>Услуг</div>
             </div>
             <div>
               <div style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-bold)',
-                color: 'var(--mac-info)'
-              }}>{getTotalDuration()}</div>
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-info)'
+            }}>{getTotalDuration()}</div>
               <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>Минут</div>
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>Минут</div>
             </div>
             <div>
               <div style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-bold)',
-                color: 'var(--mac-purple)'
-              }}>
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-purple)'
+            }}>
                 {getTotalCost().toLocaleString()} UZS
               </div>
               <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>Стоимость</div>
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>Стоимость</div>
             </div>
           </div>
         </MacOSCard>
-      )}
+      }
 
       {/* Выбранные услуги */}
-      {selectedServices.length > 0 && (
-        <MacOSCard style={{ padding: '16px' }}>
+      {selectedServices.length > 0 &&
+      <MacOSCard style={{ padding: '16px' }}>
           <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            marginBottom: '12px',
-            color: 'var(--mac-text-primary)'
-          }}>Выбранные услуги:</h3>
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          marginBottom: '12px',
+          color: 'var(--mac-text-primary)'
+        }}>Выбранные услуги:</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {selectedServices.map((service, index) => (
-              <div
-                key={service.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px',
-                  background: 'var(--mac-bg-secondary)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  transition: 'all var(--mac-duration-fast) var(--mac-ease)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--mac-bg-hover)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
+            {selectedServices.map((service) =>
+          <div
+            key={service.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px',
+              background: 'var(--mac-bg-secondary)',
+              borderRadius: 'var(--mac-radius-lg)',
+              transition: 'all var(--mac-duration-fast) var(--mac-ease)'
+            }}>
+            
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <CheckCircle size={16} style={{ marginRight: '12px', color: 'var(--mac-success)' }} />
                   <div>
                     <div style={{
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)'
-                    }}>{service.name}</div>
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)'
+                }}>{service.name}</div>
                     <div style={{
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-tertiary)'
-                    }}>
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-tertiary)'
+                }}>
                       {service.duration_minutes} мин
                     </div>
                   </div>
                 </div>
 
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
                   {/* Количество */}
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
                     <MacOSButton
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleQuantityChange(service.id, service.quantity - 1)}
-                      disabled={service.quantity <= 1}
-                    >
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleQuantityChange(service.id, service.quantity - 1)}
+                  disabled={service.quantity <= 1}>
+                  
                       <Minus size={14} />
                     </MacOSButton>
                     <span style={{
-                      width: '32px',
-                      textAlign: 'center',
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)'
-                    }}>{service.quantity}</span>
+                  width: '32px',
+                  textAlign: 'center',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)'
+                }}>{service.quantity}</span>
                     <MacOSButton
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleQuantityChange(service.id, service.quantity + 1)}
-                    >
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleQuantityChange(service.id, service.quantity + 1)}>
+                  
                       <Plus size={14} />
                     </MacOSButton>
                   </div>
 
                   {/* Цена */}
-                  {canEditPrices ? (
-                    <input
-                      type="number"
-                      value={service.price}
-                      onChange={(e) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
-                      style={{
-                        width: '96px',
-                        paddingLeft: '8px',
-                        paddingRight: '8px',
-                        paddingTop: '4px',
-                        paddingBottom: '4px',
-                        fontSize: 'var(--mac-font-size-sm)',
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 'var(--mac-radius-md)',
-                        backgroundColor: 'var(--mac-bg-primary)',
-                        color: 'var(--mac-text-primary)',
-                        transition: 'all var(--mac-duration-fast) var(--mac-ease)'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--mac-accent)';
-                        e.target.style.boxShadow = 'var(--mac-focus-ring)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--mac-border)';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                      min="0"
-                    />
-                  ) : (
-                    <span style={{
-                      fontWeight: 'var(--mac-font-weight-medium)',
-                      color: 'var(--mac-text-primary)'
-                    }}>{service.price.toLocaleString()}</span>
-                  )}
+                  {canEditPrices ?
+              <input
+                type="number"
+                value={service.price}
+                onChange={(e) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
+                style={{
+                  width: '96px',
+                  paddingLeft: '8px',
+                  paddingRight: '8px',
+                  paddingTop: '4px',
+                  paddingBottom: '4px',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  transition: 'all var(--mac-duration-fast) var(--mac-ease)'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'var(--mac-accent)';
+                  e.target.style.boxShadow = 'var(--mac-focus-ring)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'var(--mac-border)';
+                  e.target.style.boxShadow = 'none';
+                }}
+                min="0" /> :
+
+
+              <span style={{
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)'
+              }}>{service.price.toLocaleString()}</span>
+              }
 
                   <span style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-tertiary)'
-                  }}>{service.currency}</span>
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-tertiary)'
+              }}>{service.currency}</span>
 
                   {/* Убрать услугу */}
                   <MacOSButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleServiceToggle(service)}
-                  >
+                size="sm"
+                variant="ghost"
+                onClick={() => handleServiceToggle(service)}>
+                
                     <Minus size={14} />
                   </MacOSButton>
                 </div>
               </div>
-            ))}
+          )}
           </div>
         </MacOSCard>
-      )}
+      }
 
       {/* Доступные услуги */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -402,12 +397,14 @@ const DoctorServiceSelector = ({
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {categoryData.services.map(service => {
+                {categoryData.services.map((service) => {
                   const isSelected = isServiceSelected(service.id);
 
                   return (
                     <div
                       key={service.id}
+                      role="button"
+                      tabIndex={0}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -420,6 +417,7 @@ const DoctorServiceSelector = ({
                         transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                       }}
                       onClick={() => handleServiceToggle(service)}
+                      onKeyDown={(event) => handleActivationKeyDown(event, () => handleServiceToggle(service))}
                       onMouseEnter={(e) => {
                         if (!isSelected) {
                           e.currentTarget.style.backgroundColor = 'var(--mac-bg-hover)';
@@ -433,14 +431,14 @@ const DoctorServiceSelector = ({
                           e.currentTarget.style.transform = 'translateX(0)';
                           e.currentTarget.style.boxShadow = 'none';
                         }
-                      }}
-                    >
+                      }}>
+                      
                       <div style={{ display: 'flex', alignItems: 'center' }}>
-                        {isSelected ? (
-                          <CheckCircle size={20} style={{ marginRight: '12px', color: 'var(--mac-info)' }} />
-                        ) : (
-                          <Circle size={20} style={{ marginRight: '12px', color: 'var(--mac-text-tertiary)' }} />
-                        )}
+                        {isSelected ?
+                        <CheckCircle size={20} style={{ marginRight: '12px', color: 'var(--mac-info)' }} /> :
+
+                        <Circle size={20} style={{ marginRight: '12px', color: 'var(--mac-text-tertiary)' }} />
+                        }
                         <div>
                           <div style={{
                             fontWeight: 'var(--mac-font-weight-medium)',
@@ -448,14 +446,14 @@ const DoctorServiceSelector = ({
                           }}>
                             {service.name}
                           </div>
-                          {service.code && (
-                            <div style={{
-                              fontSize: 'var(--mac-font-size-sm)',
-                              color: 'var(--mac-text-tertiary)'
-                            }}>
+                          {service.code &&
+                          <div style={{
+                            fontSize: 'var(--mac-font-size-sm)',
+                            color: 'var(--mac-text-tertiary)'
+                          }}>
                               Код: {service.code}
                             </div>
-                          )}
+                          }
                         </div>
                       </div>
 
@@ -479,39 +477,38 @@ const DoctorServiceSelector = ({
                           {service.duration_minutes} мин
                         </div>
                       </div>
-                    </div>
-                  );
+                    </div>);
+
                 })}
               </div>
-            </MacOSCard>
-          );
+            </MacOSCard>);
+
         })}
       </div>
 
-      {Object.keys(services).length === 0 && (
-        <MacOSCard style={{ padding: '32px', textAlign: 'center' }}>
+      {Object.keys(services).length === 0 &&
+      <MacOSCard style={{ padding: '32px', textAlign: 'center' }}>
           <Package size={48} style={{
-            margin: '0 auto 16px auto',
-            color: 'var(--mac-text-tertiary)'
-          }} />
+          margin: '0 auto 16px auto',
+          color: 'var(--mac-text-tertiary)'
+        }} />
           <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-primary)',
-            marginBottom: '8px'
-          }}>
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)',
+          marginBottom: '8px'
+        }}>
             Услуги не найдены
           </h3>
           <p style={{
-            color: 'var(--mac-text-secondary)'
-          }}>
-            Добавьте услуги для специальности "{specialty}" в админ панели
+          color: 'var(--mac-text-secondary)'
+        }}>
+            Добавьте услуги для специальности «{specialty}» в админ панели
           </p>
         </MacOSCard>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default DoctorServiceSelector;
-

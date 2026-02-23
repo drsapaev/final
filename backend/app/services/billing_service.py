@@ -2,13 +2,11 @@
 Сервис для автоматического выставления счетов
 """
 
-import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from jinja2 import Template
-from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -30,7 +28,6 @@ from app.models.enums import PaymentStatus, VisitStatus
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
 from app.services.service_mapping import normalize_service_code
@@ -49,7 +46,7 @@ class BillingService:
     def create_invoice(
         self,
         patient_id: int,
-        services: List[Dict[str, Any]],
+        services: list[dict[str, Any]],
         visit_id: int = None,
         appointment_id: int = None,
         invoice_type: InvoiceType = InvoiceType.STANDARD,
@@ -131,7 +128,7 @@ class BillingService:
 
         return invoice
 
-    def auto_generate_invoice_for_visit(self, visit_id: int) -> Optional[Invoice]:
+    def auto_generate_invoice_for_visit(self, visit_id: int) -> Invoice | None:
         """Автоматически создать счет для визита"""
 
         visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
@@ -180,7 +177,7 @@ class BillingService:
 
     def auto_generate_invoice_for_appointment(
         self, appointment_id: int
-    ) -> Optional[Invoice]:
+    ) -> Invoice | None:
         """Автоматически создать счет для записи"""
 
         appointment = (
@@ -240,10 +237,10 @@ class BillingService:
         currency: str = "UZS",
         method: str = "cash",
         status: str = "paid",
-        receipt_no: Optional[str] = None,
-        note: Optional[str] = None,
-        provider: Optional[str] = None,
-        provider_payment_id: Optional[str] = None,
+        receipt_no: str | None = None,
+        note: str | None = None,
+        provider: str | None = None,
+        provider_payment_id: str | None = None,
         commit: bool = True,
     ) -> Payment:
         """
@@ -307,12 +304,12 @@ class BillingService:
 
     def get_payments_list(
         self,
-        visit_id: Optional[int] = None,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None,
+        visit_id: int | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Получить список платежей с обогащением данными (SSOT).
 
@@ -331,7 +328,6 @@ class BillingService:
         import logging
 
         from app.crud.payment import list_payments as crud_list_payments
-        from app.models.service import Service
 
         logger = logging.getLogger(__name__)
 
@@ -391,8 +387,6 @@ class BillingService:
             patient_name = None
             all_service_codes = []
             all_service_names = []
-            appointment_time = None
-
             # ✅ НОВОЕ: Проверяем, связан ли платёж с несколькими визитами через payment_visits
             payment_visits = (
                 self.db.query(PaymentVisit)
@@ -607,10 +601,10 @@ class BillingService:
 
     def calculate_total(
         self,
-        visit_id: Optional[int] = None,
-        services: Optional[List[Dict[str, Any]]] = None,
+        visit_id: int | None = None,
+        services: list[dict[str, Any]] | None = None,
         discount_mode: str = "none",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Расчёт общей суммы визита с учётом скидок (SSOT).
 
@@ -760,7 +754,7 @@ class BillingService:
         self,
         payment_id: int,
         new_status: str,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
         commit: bool = True,
     ) -> Payment:
         """
@@ -1210,7 +1204,7 @@ class BillingService:
 
     def _get_applicable_billing_rules(
         self, trigger_event: str, entity
-    ) -> List[BillingRule]:
+    ) -> list[BillingRule]:
         """Получить применимые правила биллинга"""
         rules = (
             self.db.query(BillingRule)
@@ -1318,14 +1312,14 @@ class BillingService:
                 <p>{{ company.address }}</p>
                 <p>Тел: {{ company.phone }}, Email: {{ company.email }}</p>
             </div>
-            
+
             <div class="invoice-info">
                 <h2>Счет № {{ invoice.invoice_number }}</h2>
                 <p>Дата: {{ invoice.issue_date.strftime('%d.%m.%Y') }}</p>
                 <p>Срок оплаты: {{ invoice.due_date.strftime('%d.%m.%Y') }}</p>
                 <p>Пациент: {{ patient.full_name }}</p>
             </div>
-            
+
             <table class="table">
                 <thead>
                     <tr>
@@ -1346,7 +1340,7 @@ class BillingService:
                     {% endfor %}
                 </tbody>
             </table>
-            
+
             <div class="total">
                 <p>Итого: {{ invoice.total_amount }} {{ settings.currency_symbol }}</p>
                 <p>{{ total_in_words }}</p>

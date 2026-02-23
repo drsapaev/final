@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,11 +19,11 @@ from sqlalchemy.sql import func
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
-    from app.models.patient import Patient
-    from app.models.visit import Visit
     from app.models.appointment import Appointment
-    from app.models.user import User
+    from app.models.patient import Patient
     from app.models.service import Service
+    from app.models.user import User
+    from app.models.visit import Visit
 
 
 class InvoiceStatus(str, enum.Enum):
@@ -80,10 +80,10 @@ class Invoice(Base):
     patient_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
-    visit_id: Mapped[Optional[int]] = mapped_column(
+    visit_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True
     )
-    appointment_id: Mapped[Optional[int]] = mapped_column(
+    appointment_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
 
@@ -105,16 +105,16 @@ class Invoice(Base):
     balance: Mapped[float] = mapped_column(Float, default=0.0)  # Остаток к доплате
 
     # Даты
-    issue_date: Mapped[Optional[datetime]] = mapped_column(
+    issue_date: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now()
     )  # Дата выставления
-    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime)  # Срок оплаты
-    paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime)  # Дата оплаты
+    due_date: Mapped[datetime | None] = mapped_column(DateTime)  # Срок оплаты
+    paid_date: Mapped[datetime | None] = mapped_column(DateTime)  # Дата оплаты
 
     # Дополнительная информация
-    description: Mapped[Optional[str]] = mapped_column(Text)  # Описание
-    notes: Mapped[Optional[str]] = mapped_column(Text)  # Примечания
-    payment_terms: Mapped[Optional[str]] = mapped_column(String(255))  # Условия оплаты
+    description: Mapped[str | None] = mapped_column(Text)  # Описание
+    notes: Mapped[str | None] = mapped_column(Text)  # Примечания
+    payment_terms: Mapped[str | None] = mapped_column(String(255))  # Условия оплаты
 
     # Автоматизация
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)  # Автоматически создан
@@ -123,33 +123,33 @@ class Invoice(Base):
 
     # Периодические счета
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
-    recurrence_type: Mapped[Optional[RecurrenceType]] = mapped_column(Enum(RecurrenceType))
+    recurrence_type: Mapped[RecurrenceType | None] = mapped_column(Enum(RecurrenceType))
     recurrence_interval: Mapped[int] = mapped_column(Integer, default=1)  # Интервал повторения
-    next_invoice_date: Mapped[Optional[datetime]] = mapped_column(DateTime)  # Дата следующего счета
-    parent_invoice_id: Mapped[Optional[int]] = mapped_column(
+    next_invoice_date: Mapped[datetime | None] = mapped_column(DateTime)  # Дата следующего счета
+    parent_invoice_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True
     )  # Родительский счет
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи (без прямой связи c payments: используйте Payment через Visit)
-    patient: Mapped["Patient"] = relationship("Patient")
-    visit: Mapped[Optional["Visit"]] = relationship("Visit")
-    appointment: Mapped[Optional["Appointment"]] = relationship("Appointment")
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    parent_invoice: Mapped[Optional["Invoice"]] = relationship("Invoice", remote_side=[id])
-    child_invoices: Mapped[List["Invoice"]] = relationship("Invoice", back_populates="parent_invoice")
-    invoice_items: Mapped[List["InvoiceItem"]] = relationship(
+    patient: Mapped[Patient] = relationship("Patient")
+    visit: Mapped[Visit | None] = relationship("Visit")
+    appointment: Mapped[Appointment | None] = relationship("Appointment")
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    parent_invoice: Mapped[Invoice | None] = relationship("Invoice", remote_side=[id])
+    child_invoices: Mapped[list[Invoice]] = relationship("Invoice", back_populates="parent_invoice")
+    invoice_items: Mapped[list[InvoiceItem]] = relationship(
         "InvoiceItem", back_populates="invoice", cascade="all, delete-orphan"
     )
-    payment_reminders: Mapped[List["PaymentReminder"]] = relationship(
+    payment_reminders: Mapped[list[PaymentReminder]] = relationship(
         "PaymentReminder", back_populates="invoice"
     )
 
@@ -165,7 +165,7 @@ class InvoiceItem(Base):
     )
 
     # Информация о позиции
-    service_id: Mapped[Optional[int]] = mapped_column(
+    service_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("services.id", ondelete="SET NULL"), nullable=True
     )
     description: Mapped[str] = mapped_column(String(500), nullable=False)  # Описание услуги/товара
@@ -178,12 +178,12 @@ class InvoiceItem(Base):
     total_amount: Mapped[float] = mapped_column(Float, nullable=False)  # Итоговая сумма позиции
 
     # Дополнительная информация
-    notes: Mapped[Optional[str]] = mapped_column(Text)  # Примечания к позиции
+    notes: Mapped[str | None] = mapped_column(Text)  # Примечания к позиции
     sort_order: Mapped[int] = mapped_column(Integer, default=0)  # Порядок сортировки
 
     # Связи
-    invoice: Mapped["Invoice"] = relationship("Invoice", back_populates="invoice_items")
-    service: Mapped[Optional["Service"]] = relationship("Service")
+    invoice: Mapped[Invoice] = relationship("Invoice", back_populates="invoice_items")
+    service: Mapped[Service | None] = relationship("Service")
 
 
 class InvoiceTemplate(Base):
@@ -193,7 +193,7 @@ class InvoiceTemplate(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
     # Настройки шаблона
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -201,7 +201,7 @@ class InvoiceTemplate(Base):
 
     # Шаблон
     template_content: Mapped[str] = mapped_column(Text, nullable=False)  # HTML шаблон
-    css_styles: Mapped[Optional[str]] = mapped_column(Text)  # CSS стили
+    css_styles: Mapped[str | None] = mapped_column(Text)  # CSS стили
 
     # Настройки автоматизации
     auto_generate_for_visits: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -210,23 +210,23 @@ class InvoiceTemplate(Base):
     auto_send_sms: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Условия применения
-    service_types: Mapped[Optional[str]] = mapped_column(String(500))  # Типы услуг (JSON)
-    patient_categories: Mapped[Optional[str]] = mapped_column(String(500))  # Категории пациентов (JSON)
-    amount_threshold_min: Mapped[Optional[float]] = mapped_column(Float)  # Минимальная сумма
-    amount_threshold_max: Mapped[Optional[float]] = mapped_column(Float)  # Максимальная сумма
+    service_types: Mapped[str | None] = mapped_column(String(500))  # Типы услуг (JSON)
+    patient_categories: Mapped[str | None] = mapped_column(String(500))  # Категории пациентов (JSON)
+    amount_threshold_min: Mapped[float | None] = mapped_column(Float)  # Минимальная сумма
+    amount_threshold_max: Mapped[float | None] = mapped_column(Float)  # Максимальная сумма
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    billing_rules: Mapped[List["BillingRule"]] = relationship("BillingRule", back_populates="template")
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
+    billing_rules: Mapped[list[BillingRule]] = relationship("BillingRule", back_populates="template")
 
 
 class BillingRule(Base):
@@ -236,17 +236,17 @@ class BillingRule(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Условия срабатывания
     trigger_event: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # visit_completed, appointment_created, etc.
-    service_types: Mapped[Optional[str]] = mapped_column(String(500))  # Типы услуг (JSON)
-    patient_categories: Mapped[Optional[str]] = mapped_column(String(500))  # Категории пациентов (JSON)
-    amount_threshold_min: Mapped[Optional[float]] = mapped_column(Float)  # Минимальная сумма
-    amount_threshold_max: Mapped[Optional[float]] = mapped_column(Float)  # Максимальная сумма
+    service_types: Mapped[str | None] = mapped_column(String(500))  # Типы услуг (JSON)
+    patient_categories: Mapped[str | None] = mapped_column(String(500))  # Категории пациентов (JSON)
+    amount_threshold_min: Mapped[float | None] = mapped_column(Float)  # Минимальная сумма
+    amount_threshold_max: Mapped[float | None] = mapped_column(Float)  # Максимальная сумма
 
     # Настройки счета
     invoice_type: Mapped[InvoiceType] = mapped_column(
@@ -257,12 +257,12 @@ class BillingRule(Base):
     send_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Шаблон
-    template_id: Mapped[Optional[int]] = mapped_column(
+    template_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("invoice_templates.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    template: Mapped[Optional["InvoiceTemplate"]] = relationship(
+    template: Mapped[InvoiceTemplate | None] = relationship(
         "InvoiceTemplate", back_populates="billing_rules"
     )
 
@@ -270,16 +270,16 @@ class BillingRule(Base):
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Чем больше, тем выше приоритет
 
     # Метаданные
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
 
 
 class PaymentReminder(Base):
@@ -298,20 +298,20 @@ class PaymentReminder(Base):
     days_after_due: Mapped[int] = mapped_column(Integer, default=0)  # Через сколько дней после срока
 
     # Содержимое
-    subject: Mapped[Optional[str]] = mapped_column(String(255))  # Тема (для email)
+    subject: Mapped[str | None] = mapped_column(String(255))  # Тема (для email)
     message: Mapped[str] = mapped_column(Text, nullable=False)  # Текст сообщения
 
     # Статус
     is_sent: Mapped[bool] = mapped_column(Boolean, default=False)
-    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    delivery_status: Mapped[Optional[str]] = mapped_column(String(50))  # delivered, failed, pending
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    delivery_status: Mapped[str | None] = mapped_column(String(50))  # delivered, failed, pending
 
     # Метаданные
     scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # Когда отправить
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
 
     # Связи
-    invoice: Mapped["Invoice"] = relationship("Invoice", back_populates="payment_reminders")
+    invoice: Mapped[Invoice] = relationship("Invoice", back_populates="payment_reminders")
 
 
 class BillingSettings(Base):
@@ -357,25 +357,25 @@ class BillingSettings(Base):
     decimal_places: Mapped[int] = mapped_column(Integer, default=0)
 
     # Компания
-    company_name: Mapped[Optional[str]] = mapped_column(String(255))
-    company_address: Mapped[Optional[str]] = mapped_column(Text)
-    company_phone: Mapped[Optional[str]] = mapped_column(String(50))
-    company_email: Mapped[Optional[str]] = mapped_column(String(100))
-    company_website: Mapped[Optional[str]] = mapped_column(String(100))
-    company_logo_url: Mapped[Optional[str]] = mapped_column(String(500))
+    company_name: Mapped[str | None] = mapped_column(String(255))
+    company_address: Mapped[str | None] = mapped_column(Text)
+    company_phone: Mapped[str | None] = mapped_column(String(50))
+    company_email: Mapped[str | None] = mapped_column(String(100))
+    company_website: Mapped[str | None] = mapped_column(String(100))
+    company_logo_url: Mapped[str | None] = mapped_column(String(500))
 
     # Банковские реквизиты
-    bank_name: Mapped[Optional[str]] = mapped_column(String(255))
-    bank_account: Mapped[Optional[str]] = mapped_column(String(50))
-    bank_routing: Mapped[Optional[str]] = mapped_column(String(50))
+    bank_name: Mapped[str | None] = mapped_column(String(255))
+    bank_account: Mapped[str | None] = mapped_column(String(50))
+    bank_routing: Mapped[str | None] = mapped_column(String(50))
 
     # Метаданные
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
-    updated_by: Mapped[Optional[int]] = mapped_column(
+    updated_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Связи
-    updater: Mapped[Optional["User"]] = relationship("User", foreign_keys=[updated_by])
+    updater: Mapped[User | None] = relationship("User", foreign_keys=[updated_by])

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import Boolean, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -48,7 +46,7 @@ class OnlineDay(Base):
     date_str: Mapped[str] = mapped_column(
         String(16), nullable=False, index=True
     )  # YYYY-MM-DD
-    start_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    start_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_open: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="1"
     )

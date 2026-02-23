@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 import auth from '../../stores/auth.js';
 import '../../styles/sidebar-buttons.css';
 import '../../styles/cursor-effects.css';
+import logger from '../../utils/logger';
 
 /**
  * Унифицированный сайдбар в стиле MediLab
@@ -13,7 +14,7 @@ import '../../styles/cursor-effects.css';
 const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   const asideRef = useRef(null);
   const location = useLocation();
-  const { isDark, getColor, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const [language, setLanguage] = useState('en');
 
   // Локально дублируем активную схему на контейнер сайдбара, чтобы исключить зависимость от <html>
@@ -29,7 +30,9 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         } else {
           el.removeAttribute('data-color-scheme');
         }
-      } catch (_) { }
+      } catch (error) {
+        logger.debug('Failed to apply local color scheme for sidebar', error);
+      }
     };
     applyLocalScheme();
     const handler = () => applyLocalScheme();
@@ -55,7 +58,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   };
 
   const handleLanguageToggle = () => {
-    setLanguage(prev => prev === 'en' ? 'ru' : 'en');
+    setLanguage((prev) => prev === 'en' ? 'ru' : 'en');
   };
 
   const st = auth.getState();
@@ -67,88 +70,88 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 
   // Основные навигационные элементы
   const mainNavItems = [
-    {
-      id: 'dashboard',
-      label: 'Dashboard',
-      iconName: 'LayoutDashboard',
-      path: '/dashboard',
-      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
-    },
-    {
-      id: 'search',
-      label: 'Поиск',
-      iconName: 'Search',
-      path: '/search',
-      roles: ['admin', 'doctor', 'registrar', 'receptionist', 'cashier', 'lab', 'cardio', 'derma', 'dentist']
-    },
-    {
-      id: 'patients',
-      label: 'Patients',
-      iconName: 'Users',
-      path: '/patients',
-      roles: ['admin', 'doctor', 'registrar']
-    },
-    {
-      id: 'appointments',
-      label: 'Appointments',
-      iconName: 'Calendar',
-      path: '/appointments',
-      roles: ['admin', 'doctor', 'registrar']
-    },
-    {
-      id: 'staff-schedule',
-      label: 'Staff Schedule',
-      iconName: 'Clock',
-      path: '/staff-schedule',
-      roles: ['admin', 'registrar']
-    },
-    {
-      id: 'doctors',
-      label: 'Doctors',
-      iconName: 'Stethoscope',
-      path: '/doctors',
-      roles: ['admin', 'registrar']
-    },
-    {
-      id: 'departments',
-      label: 'Departments',
-      iconName: 'Building',
-      path: '/departments',
-      roles: ['admin']
-    },
-    {
-      id: 'stock',
-      label: 'Stock',
-      iconName: 'Package',
-      path: '/stock',
-      roles: ['admin', 'lab', 'cashier']
-    }
-  ];
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    iconName: 'LayoutDashboard',
+    path: '/dashboard',
+    roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+  },
+  {
+    id: 'search',
+    label: 'Поиск',
+    iconName: 'Search',
+    path: '/search',
+    roles: ['admin', 'doctor', 'registrar', 'receptionist', 'cashier', 'lab', 'cardio', 'derma', 'dentist']
+  },
+  {
+    id: 'patients',
+    label: 'Patients',
+    iconName: 'Users',
+    path: '/patients',
+    roles: ['admin', 'doctor', 'registrar']
+  },
+  {
+    id: 'appointments',
+    label: 'Appointments',
+    iconName: 'Calendar',
+    path: '/appointments',
+    roles: ['admin', 'doctor', 'registrar']
+  },
+  {
+    id: 'staff-schedule',
+    label: 'Staff Schedule',
+    iconName: 'Clock',
+    path: '/staff-schedule',
+    roles: ['admin', 'registrar']
+  },
+  {
+    id: 'doctors',
+    label: 'Doctors',
+    iconName: 'Stethoscope',
+    path: '/doctors',
+    roles: ['admin', 'registrar']
+  },
+  {
+    id: 'departments',
+    label: 'Departments',
+    iconName: 'Building',
+    path: '/departments',
+    roles: ['admin']
+  },
+  {
+    id: 'stock',
+    label: 'Stock',
+    iconName: 'Package',
+    path: '/stock',
+    roles: ['admin', 'lab', 'cashier']
+  }];
+
 
   // Дополнительные элементы
   const additionalItems = [
-    {
-      id: 'emr-system',
-      label: 'EMR System',
-      iconName: 'FileText',
-      path: '/advanced-emr',
-      roles: ['admin', 'doctor', 'nurse']
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      iconName: 'Settings',
-      path: '/settings',
-      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
-    },
-    {
-      id: 'help',
-      label: 'Help Center',
-      iconName: 'HelpCircle',
-      path: '/help',
-      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
-    }
-  ];
+  {
+    id: 'emr-system',
+    label: 'EMR System',
+    iconName: 'FileText',
+    path: '/advanced-emr',
+    roles: ['admin', 'doctor', 'nurse']
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    iconName: 'Settings',
+    path: '/settings',
+    roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+  },
+  {
+    id: 'help',
+    label: 'Help Center',
+    iconName: 'HelpCircle',
+    path: '/help',
+    roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+  }];
+
 
   // Фильтруем элементы по роли пользователя
   const getVisibleItems = (items) => {
@@ -157,8 +160,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       return items;
     }
 
-    const filtered = items.filter(item =>
-      item.roles.includes(role) || item.roles.includes('all')
+    const filtered = items.filter((item) =>
+    item.roles.includes(role) || item.roles.includes('all')
     );
 
     return filtered;
@@ -241,8 +244,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         top: 0,
         zIndex: 1000,
         boxShadow: 'var(--shadow)'
-      }}
-    >
+      }}>
+
       {/* Имя пользователя и кнопка сворачивания */}
       <div
         style={{
@@ -251,39 +254,39 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
-        }}
-      >
+        }}>
+
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          {!isCollapsed && (
-            <h1
-              style={{
-                fontSize: '24px',
-                fontWeight: '700',
-                color: isDark ? '#f8fafc' : '#1e293b',
-                margin: 0
-              }}
-            >
+          {!isCollapsed &&
+          <h1
+            style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: isDark ? '#f8fafc' : '#1e293b',
+              margin: 0
+            }}>
+
               {profile.name || 'Dr. User'}
             </h1>
-          )}
-          {isCollapsed && (
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                backgroundColor: '#3b82f6',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
+          }
+          {isCollapsed &&
+          <div
+            style={{
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#3b82f6',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}>
+
               {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
             </div>
-          )}
+          }
         </div>
 
         {/* Кнопка сворачивания */}
@@ -307,8 +310,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.color = isDark ? '#9ca3af' : '#6b7280';
             e.target.style.filter = 'brightness(1)';
           }}
-          title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
-        >
+          title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}>
+
           <Icon name={isCollapsed ? 'ChevronRight' : 'ChevronLeft'} size={16} />
         </button>
       </div>
@@ -323,15 +326,15 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           flexDirection: 'column',
           alignItems: isCollapsed ? 'center' : 'stretch',
           gap: isCollapsed ? '4px' : '0'
-        }}
-      >
+        }}>
+
         {visibleMainItems.map((item) => {
           const active = isActive(item.path);
 
           // Для демо-страницы используем специальные маршруты
-          const demoPath = location.pathname.startsWith('/medilab-demo')
-            ? item.path.replace('/', '/medilab-demo')
-            : item.path;
+          const demoPath = location.pathname.startsWith('/medilab-demo') ?
+          item.path.replace('/', '/medilab-demo') :
+          item.path;
 
           const inlineStyle = isCollapsed ? {
             width: '40px',
@@ -354,12 +357,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
                 ...(isHovered && !active ? hoverStyle : {}),
                 ...inlineStyle
               })}
-              title={isCollapsed ? item.label : ''}
-            >
+              title={isCollapsed ? item.label : ''}>
+
               <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
               {!isCollapsed && <span>{item.label}</span>}
-            </NavLink>
-          );
+            </NavLink>);
+
         })}
 
         {/* Разделитель */}
@@ -368,8 +371,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             height: '1px',
             backgroundColor: 'var(--mac-separator)',
             margin: '16px 0'
-          }}
-        />
+          }} />
+
 
         {/* Дополнительные элементы */}
         {visibleAdditionalItems.map((item) => {
@@ -396,12 +399,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
                 ...(isHovered && !active ? hoverStyle : {}),
                 ...inlineStyle
               })}
-              title={isCollapsed ? item.label : ''}
-            >
+              title={isCollapsed ? item.label : ''}>
+
               <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
               {!isCollapsed && <span>{item.label}</span>}
-            </NavLink>
-          );
+            </NavLink>);
+
         })}
       </nav>
 
@@ -414,8 +417,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           flexDirection: isCollapsed ? 'column' : 'row',
           gap: isCollapsed ? '2px' : '8px',
           alignItems: isCollapsed ? 'center' : 'stretch'
-        }}
-      >
+        }}>
+
         {/* Кнопка переключения темы */}
         <button
           className="sidebar-theme-button"
@@ -441,8 +444,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.color = isDark ? '#f8fafb' : '#374151';
             e.target.style.filter = 'brightness(1)';
           }}
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+
           <Icon name={isDark ? 'Sun' : 'Moon'} size={isCollapsed ? 16 : 16} />
           {!isCollapsed && (isDark ? 'Light' : 'Dark')}
         </button>
@@ -472,8 +475,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.color = isDark ? '#f8fafb' : '#374151';
             e.target.style.filter = 'brightness(1)';
           }}
-          title={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}
-        >
+          title={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}>
+
           <Icon name="Globe" size={isCollapsed ? 16 : 16} />
           {!isCollapsed && (language === 'en' ? 'EN' : 'RU')}
         </button>
@@ -486,8 +489,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
           borderTop: '1px solid var(--mac-separator)',
           display: 'flex',
           justifyContent: isCollapsed ? 'center' : 'flex-start'
-        }}
-      >
+        }}>
+
         <button
           className="logout-button"
           style={{
@@ -514,15 +517,14 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             auth.logout();
           }}
           aria-label="Log out of account"
-          title={isCollapsed ? 'Log out' : ''}
-        >
+          title={isCollapsed ? 'Log out' : ''}>
+
           <Icon name="LogOut" size={isCollapsed ? 16 : 16} />
           {!isCollapsed && <span>Log out</span>}
         </button>
       </div>
-    </aside>
-  );
+    </aside>);
+
 };
 
 export default UnifiedSidebar;
-

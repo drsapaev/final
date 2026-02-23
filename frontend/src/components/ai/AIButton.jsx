@@ -1,17 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '../../components/ui/macos';
 import { Brain, Sparkles, Bot } from 'lucide-react';
 
-const AIButton = ({ 
-  onClick, 
-  loading = false, 
+const AIButton = ({
+  onClick,
+  loading = false,
   variant = 'default',
   size = 'medium',
   fullWidth = false,
   tooltip = 'AI анализ',
   icon = true,
   text = 'AI анализ',
-  color = 'primary',
   providers = null,
   onProviderSelect = null,
   disabled = false
@@ -29,7 +28,7 @@ const AIButton = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleClick = (event) => {
+  const handleClick = () => {
     if (providers && providers.length > 0) {
       setOpen((v) => !v);
     } else {
@@ -77,42 +76,41 @@ const AIButton = ({
         fullWidth={fullWidth}
         onClick={handleClick}
         disabled={loading || disabled}
-        style={{ minWidth: fullWidth ? '100%' : undefined }}
-      >
-        {loading ? (
-          'Анализ...'
-        ) : (
-          <>
+        style={{ minWidth: fullWidth ? '100%' : undefined }}>
+        
+        {loading ?
+        'Анализ...' :
+
+        <>
             {icon && <Brain style={{ width: 16, height: 16, marginRight: 8 }} />}
             {text}
           </>
-        )}
+        }
       </Button>
 
-      {providers && open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 6, minWidth: 220,
-          background: 'var(--mac-bg-primary)', border: '1px solid var(--mac-border)', borderRadius: 8,
-          boxShadow: 'var(--mac-shadow-lg)', zIndex: 20
-        }}>
-          {providers.map((provider) => (
-            <button
-              key={provider}
-              onClick={() => handleProviderClick(provider)}
-              style={{
-                display: 'flex', alignItems: 'center', width: '100%', padding: '8px 12px',
-                background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left'
-              }}
-            >
+      {providers && open &&
+      <div style={{
+        position: 'absolute', top: '100%', left: 0, marginTop: 6, minWidth: 220,
+        background: 'var(--mac-bg-primary)', border: '1px solid var(--mac-border)', borderRadius: 8,
+        boxShadow: 'var(--mac-shadow-lg)', zIndex: 20
+      }}>
+          {providers.map((provider) =>
+        <button
+          key={provider}
+          onClick={() => handleProviderClick(provider)}
+          style={{
+            display: 'flex', alignItems: 'center', width: '100%', padding: '8px 12px',
+            background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left'
+          }}>
+          
               <span style={{ marginRight: 8 }}>{getProviderIcon(provider)}</span>
               <span>{getProviderName(provider)}</span>
             </button>
-          ))}
+        )}
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default AIButton;
-

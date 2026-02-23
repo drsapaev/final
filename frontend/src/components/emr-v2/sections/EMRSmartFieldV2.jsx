@@ -18,7 +18,8 @@
  * - Explicit commit required (Tab/Enter)
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { SmartAssistButton } from '../ai/SmartAssistButton';
 import { AISuggestionPopover } from '../ai/AISuggestionPopover';
 import './EMRSmartFieldV2.css';
@@ -129,7 +130,7 @@ export function EMRSmartFieldV2({
             onTelemetry?.({ type: 'ai_popover.accepted', payload: { suggestionId: suggestion.id, source: suggestion.source } });
         }
         setShowPopover(false);
-    }, [value, onChange, onApplySuggestion]);
+    }, [value, onChange, onApplySuggestion, experimentalGhostMode, onTelemetry]);
 
     // Handle dismiss
     const handleDismiss = useCallback((suggestionId) => {
@@ -138,7 +139,7 @@ export function EMRSmartFieldV2({
         if (suggestions.length <= 1) {
             setShowPopover(false);
         }
-    }, [onDismissSuggestion, suggestions.length]);
+    }, [onDismissSuggestion, suggestions.length, onTelemetry]);
 
     // Show popover when suggestions arrive and field is focused
     useEffect(() => {
@@ -247,5 +248,31 @@ export function EMRSmartFieldV2({
         </div>
     );
 }
+
+const suggestionShape = PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    content: PropTypes.string,
+    source: PropTypes.string,
+    confidence: PropTypes.number,
+});
+
+EMRSmartFieldV2.propTypes = {
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    placeholder: PropTypes.string,
+    multiline: PropTypes.bool,
+    rows: PropTypes.number,
+    disabled: PropTypes.bool,
+    id: PropTypes.string,
+    fieldName: PropTypes.string,
+    suggestions: PropTypes.arrayOf(suggestionShape),
+    aiLoading: PropTypes.bool,
+    onApplySuggestion: PropTypes.func,
+    onDismissSuggestion: PropTypes.func,
+    onRequestAI: PropTypes.func,
+    showAIButton: PropTypes.bool,
+    experimentalGhostMode: PropTypes.bool,
+    onTelemetry: PropTypes.func,
+};
 
 export default EMRSmartFieldV2;

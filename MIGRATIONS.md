@@ -1,5 +1,11 @@
 # MIGRATIONS — стратегия без потери данных
 
+## Baseline (2026-02-11)
+- Clean baseline migration is `backend/alembic/versions/0001_baseline.py`.
+- Legacy migrations moved to `archives/alembic_versions_legacy` for reference only.
+- Fresh Postgres bootstrap: `alembic upgrade head`.
+- Existing DB that already matches schema: verify, then `alembic stamp 0001_baseline`.
+
 ## B.1 (2025-08-17): Индексы производительности
 ...
 

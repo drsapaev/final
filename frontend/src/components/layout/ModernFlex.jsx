@@ -1,5 +1,5 @@
-import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 import './ModernFlex.css';
 
 const ModernFlex = ({
@@ -12,8 +12,8 @@ const ModernFlex = ({
   responsive = true,
   className = '',
   ...props
-}) => {
-  const { theme } = useTheme();
+}) => {void
+  useTheme();
 
   const gapValues = {
     none: '0',
@@ -36,11 +36,11 @@ const ModernFlex = ({
     <div
       className={`modern-flex ${responsive ? 'responsive' : ''} ${className}`}
       style={flexStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
 };
 
 // Компонент элемента flex
@@ -62,13 +62,34 @@ export const FlexItem = ({
     <div
       className={`flex-item ${className}`}
       style={itemStyles}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </div>
-  );
+    </div>);
+
+};
+
+ModernFlex.propTypes = {
+  children: PropTypes.node,
+  direction: PropTypes.string,
+  wrap: PropTypes.string,
+  justify: PropTypes.string,
+  align: PropTypes.string,
+  gap: PropTypes.oneOfType([
+    PropTypes.oneOf(['none', 'small', 'medium', 'large', 'xl']),
+    PropTypes.string,
+    PropTypes.number
+  ]),
+  responsive: PropTypes.bool,
+  className: PropTypes.string
+};
+
+FlexItem.propTypes = {
+  children: PropTypes.node,
+  flex: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  alignSelf: PropTypes.string,
+  order: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  className: PropTypes.string
 };
 
 export default ModernFlex;
-
-

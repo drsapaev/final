@@ -30,9 +30,7 @@ class PaymentReconciliationService:
     ):
         self.db = db
         self.repository = repository or PaymentReconciliationRepository(db)
-        self.payment_manager = (
-            payment_manager or PaymentProviderManager({})
-        )  # Will be initialized with config
+        self.payment_manager = payment_manager or PaymentProviderManager({})
 
     def reconcile_provider(
         self, provider_name: str, start_date: date, end_date: date
@@ -49,14 +47,11 @@ class PaymentReconciliationService:
             Reconciliation report with discrepancies
         """
         try:
-            start_at = datetime.combine(start_date, datetime.min.time())
-            end_at = datetime.combine(end_date, datetime.max.time())
-
             # Get all internal transactions for the period
             internal_transactions = self.repository.list_transactions_for_provider(
                 provider_name=provider_name,
-                start_at=start_at,
-                end_at=end_at,
+                start_at=datetime.combine(start_date, datetime.min.time()),
+                end_at=datetime.combine(end_date, datetime.max.time()),
             )
 
             # Get provider statement (if available)

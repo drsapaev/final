@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { Button } from './Button';
 import { Icon } from './Icon';
@@ -20,8 +21,9 @@ const Header = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {
-  const { theme } = useTheme();
+}, ref) => {void
+  useTheme();
+  void variant;
 
   const headerStyles = {
     height: '44px',
@@ -90,96 +92,96 @@ const Header = React.forwardRef(({
       ref={ref}
       className={`mac-header ${className}`}
       style={headerStyles}
-      {...props}
-    >
+      {...props}>
+      
       {/* Left Section - Navigation */}
-      {(navigation || title) && (
-        <div className="mac-header-left" style={titleSectionStyles}>
-          {navigation && (
-            <nav className="mac-header-navigation" style={navigationStyles}>
+      {(navigation || title) &&
+      <div className="mac-header-left" style={titleSectionStyles}>
+          {navigation &&
+        <nav className="mac-header-navigation" style={navigationStyles}>
               {navigation}
             </nav>
-          )}
+        }
 
-          {title && (
-            <div className="mac-header-title-section">
+          {title &&
+        <div className="mac-header-title-section">
               <h1 className="mac-header-title" style={titleStyles}>
                 {title}
               </h1>
-              {subtitle && (
-                <p className="mac-header-subtitle" style={subtitleStyles}>
+              {subtitle &&
+          <p className="mac-header-subtitle" style={subtitleStyles}>
                   {subtitle}
                 </p>
-              )}
+          }
             </div>
-          )}
+        }
         </div>
-      )}
+      }
 
       {/* Center Section - Actions */}
-      {actions && (
-        <div className="mac-header-center" style={actionsStyles}>
+      {actions &&
+      <div className="mac-header-center" style={actionsStyles}>
           {actions}
         </div>
-      )}
+      }
 
       {/* Right Section - User Controls */}
       <div className="mac-header-right" style={controlsSectionStyles}>
         {/* Settings Button */}
-        {onSettingsClick && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={onSettingsClick}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
+        {onSettingsClick &&
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={onSettingsClick}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+          
           <Icon name="gear" size="small" color="accent" />
           </Button>
-        )}
+        }
 
         {/* User Avatar */}
-        {user && (
-          <Button
-            variant="ghost"
-            size="small"
-            onClick={onUserClick}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '4px 8px',
-              height: '32px'
-            }}
-          >
+        {user &&
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={onUserClick}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '4px 8px',
+            height: '32px'
+          }}>
+          
             <Avatar
-              src={user.avatar}
-              name={user.name}
-              size="small"
-              status={user.status}
-            />
+            src={user.avatar}
+            name={user.name}
+            size="small"
+            status={user.status} />
+          
             <span style={{
-              fontSize: '13px',
-              fontWeight: '500',
-              color: 'var(--mac-text-primary)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '120px'
-            }}>
+            fontSize: '13px',
+            fontWeight: '500',
+            color: 'var(--mac-text-primary)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '120px'
+          }}>
               {user.name}
             </span>
           </Button>
-        )}
+        }
       </div>
 
-      <style jsx>{`
+      <style>{`
         .mac-header {
           box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
         }
@@ -225,8 +227,8 @@ const Header = React.forwardRef(({
           }
         }
       `}</style>
-    </header>
-  );
+    </header>);
+
 });
 
 Header.displayName = 'macOS Header';
@@ -261,11 +263,11 @@ export const HeaderNavItem = React.forwardRef(({
         ...style
       }}
       onClick={onClick}
-      {...props}
-    >
+      {...props}>
+      
       {children}
-    </button>
-  );
+    </button>);
+
 });
 
 HeaderNavItem.displayName = 'macOS Header Navigation Item';
@@ -282,9 +284,9 @@ export const HeaderSearch = React.forwardRef(({
   style = {},
   ...props
 }, ref) => {
-  const [isFocused, setIsFocused] = React.useState(false);
+  const [isFocused, setIsFocused] = React.useState(false);void
 
-  const searchStyles = {
+  {
     display: 'flex',
     alignItems: 'center',
     backgroundColor: isFocused ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)',
@@ -307,8 +309,8 @@ export const HeaderSearch = React.forwardRef(({
           color: 'var(--mac-text-tertiary)',
           marginRight: '4px',
           flexShrink: 0
-        }}
-      />
+        }} />
+      
 
       <input
         ref={ref}
@@ -327,30 +329,30 @@ export const HeaderSearch = React.forwardRef(({
           color: 'var(--mac-text-primary)',
           fontFamily: 'inherit'
         }}
-        {...props}
-      />
+        {...props} />
+      
 
-      {value && onClear && (
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={onClear}
-          style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '3px',
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginLeft: '4px'
-          }}
-        >
+      {value && onClear &&
+      <Button
+        variant="ghost"
+        size="small"
+        onClick={onClear}
+        style={{
+          width: '16px',
+          height: '16px',
+          borderRadius: '3px',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: '4px'
+        }}>
+        
           <Icon name="xmark" size="small" />
         </Button>
-      )}
+      }
 
-      <style jsx>{`
+      <style>{`
         .mac-header-search:focus-within {
           background-color: var(--mac-bg-primary) !important;
           border-color: var(--mac-accent-blue) !important;
@@ -371,8 +373,8 @@ export const HeaderSearch = React.forwardRef(({
           }
         }
       `}</style>
-    </div>
-  );
+    </div>);
+
 });
 
 HeaderSearch.displayName = 'macOS Header Search';
@@ -422,8 +424,8 @@ export const HeaderBreadcrumb = React.forwardRef(({
       className={`mac-header-breadcrumb ${className}`}
       style={breadcrumbStyles}
       aria-label="Breadcrumb"
-      {...props}
-    >
+      {...props}>
+      
       {items.map((item, index) => {
         const isLast = index === items.length - 1;
         const itemStyle = isLast ? lastItemStyles : itemStyles;
@@ -432,27 +434,64 @@ export const HeaderBreadcrumb = React.forwardRef(({
           <React.Fragment key={item.id || index}>
             <span
               className={`mac-header-breadcrumb-item ${isLast ? 'mac-header-breadcrumb-item--current' : ''}`}
-              style={itemStyle}
-            >
+              style={itemStyle}>
+              
               {item.label}
             </span>
 
-            {!isLast && (
-              <span
-                className="mac-header-breadcrumb-separator"
-                style={separatorStyles}
-                aria-hidden="true"
-              >
+            {!isLast &&
+            <span
+              className="mac-header-breadcrumb-separator"
+              style={separatorStyles}
+              aria-hidden="true">
+              
                 {separator}
               </span>
-            )}
-          </React.Fragment>
-        );
+            }
+          </React.Fragment>);
+
       })}
-    </nav>
-  );
+    </nav>);
+
 });
 
 HeaderBreadcrumb.displayName = 'macOS Header Breadcrumb';
+
+Header.propTypes = {
+  title: PropTypes.node,
+  subtitle: PropTypes.node,
+  actions: PropTypes.node,
+  navigation: PropTypes.node,
+  user: PropTypes.object,
+  onUserClick: PropTypes.func,
+  onSettingsClick: PropTypes.func,
+  variant: PropTypes.string,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+HeaderNavItem.propTypes = {
+  children: PropTypes.node,
+  active: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+HeaderSearch.propTypes = {
+  placeholder: PropTypes.string,
+  value: PropTypes.any,
+  onChange: PropTypes.func,
+  onClear: PropTypes.func,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
+
+HeaderBreadcrumb.propTypes = {
+  items: PropTypes.array,
+  separator: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object
+};
 
 export default Header;

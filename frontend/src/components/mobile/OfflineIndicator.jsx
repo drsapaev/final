@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button } from '../ui/native';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
@@ -71,17 +71,17 @@ const OfflineIndicator = () => {
     try {
       // Синхронизируем данные с сервером
       const promises = [
-        fetch('/api/v1/mobile/appointments', {
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-          }
-        }),
-        fetch('/api/v1/mobile/notifications', {
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-          }
-        })
-      ];
+      fetch('/api/v1/mobile/appointments', {
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+        }
+      }),
+      fetch('/api/v1/mobile/notifications', {
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+        }
+      })];
+
 
       const responses = await Promise.allSettled(promises);
 
@@ -89,7 +89,7 @@ const OfflineIndicator = () => {
       responses.forEach((response, index) => {
         if (response.status === 'fulfilled' && response.value.ok) {
           const dataKey = index === 0 ? 'cached_appointments' : 'cached_notifications';
-          response.value.json().then(data => {
+          response.value.json().then((data) => {
             localStorage.setItem(dataKey, JSON.stringify(data));
           });
         }
@@ -128,82 +128,81 @@ const OfflineIndicator = () => {
 
   return (
     <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-sm">
-      <Card className={`transition-all duration-300 ${isOnline
-          ? 'bg-green-50 border-green-200'
-          : 'bg-orange-50 border-orange-200'
-        }`}>
+      <Card className={`transition-all duration-300 ${isOnline ?
+      'bg-green-50 border-green-200' :
+      'bg-orange-50 border-orange-200'}`
+      }>
         <div className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              {isOnline ? (
-                <Wifi className="w-4 h-4 text-green-600" />
-              ) : (
-                <WifiOff className="w-4 h-4 text-orange-600" />
-              )}
+              {isOnline ?
+              <Wifi className="w-4 h-4 text-green-600" /> :
 
-              <span className={`font-medium text-sm ${isOnline ? 'text-green-800' : 'text-orange-800'
-                }`}>
+              <WifiOff className="w-4 h-4 text-orange-600" />
+              }
+
+              <span className={`font-medium text-sm ${isOnline ? 'text-green-800' : 'text-orange-800'}`
+              }>
                 {isOnline ? 'Подключение восстановлено' : 'Офлайн режим'}
               </span>
 
-              {syncStatus === 'syncing' && (
-                <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
-              )}
+              {syncStatus === 'syncing' &&
+              <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
+              }
 
-              {syncStatus === 'success' && (
-                <CheckCircle className="w-3 h-3 text-green-600" />
-              )}
+              {syncStatus === 'success' &&
+              <CheckCircle className="w-3 h-3 text-green-600" />
+              }
 
-              {syncStatus === 'error' && (
-                <AlertCircle className="w-3 h-3 text-red-600" />
-              )}
+              {syncStatus === 'error' &&
+              <AlertCircle className="w-3 h-3 text-red-600" />
+              }
             </div>
 
-            {!isOnline && (
-              <Button
-                onClick={retryConnection}
-                size="sm"
-                variant="outline"
-                className="text-xs"
-              >
+            {!isOnline &&
+            <Button
+              onClick={retryConnection}
+              size="sm"
+              variant="outline"
+              className="text-xs">
+              
                 Повторить
               </Button>
-            )}
+            }
           </div>
 
-          {!isOnline && (
-            <div className="mt-2 text-xs text-orange-700">
+          {!isOnline &&
+          <div className="mt-2 text-xs text-orange-700">
               <p className="mb-1">Доступные данные в офлайн режиме:</p>
               <div className="flex space-x-4">
-                {cachedData.appointments > 0 && (
-                  <span>📅 {cachedData.appointments} записей</span>
-                )}
-                {cachedData.patients > 0 && (
-                  <span>👥 {cachedData.patients} пациентов</span>
-                )}
-                {cachedData.notifications > 0 && (
-                  <span>🔔 {cachedData.notifications} уведомлений</span>
-                )}
+                {cachedData.appointments > 0 &&
+              <span>📅 {cachedData.appointments} записей</span>
+              }
+                {cachedData.patients > 0 &&
+              <span>👥 {cachedData.patients} пациентов</span>
+              }
+                {cachedData.notifications > 0 &&
+              <span>🔔 {cachedData.notifications} уведомлений</span>
+              }
               </div>
             </div>
-          )}
+          }
 
-          {isOnline && syncStatus === 'success' && (
-            <p className="mt-1 text-xs text-green-700">
+          {isOnline && syncStatus === 'success' &&
+          <p className="mt-1 text-xs text-green-700">
               Данные синхронизированы
             </p>
-          )}
+          }
 
-          {syncStatus === 'error' && (
-            <p className="mt-1 text-xs text-red-700">
+          {syncStatus === 'error' &&
+          <p className="mt-1 text-xs text-red-700">
               Ошибка синхронизации
             </p>
-          )}
+          }
         </div>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default OfflineIndicator;
-

@@ -5,10 +5,9 @@ Type stubs for AIManager - полная типизация AI сервисов.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base_provider import AIResponse, BaseAIProvider
-
 
 class AIProviderType(Enum):
     """Типы AI провайдеров."""
@@ -21,76 +20,76 @@ class AIProviderType(Enum):
 class AIManager:
     """
     Менеджер для работы с AI провайдерами.
-    
+
     Attributes:
         providers: Словарь доступных провайдеров
         default_provider: Провайдер по умолчанию
     """
-    
-    providers: Dict[AIProviderType, BaseAIProvider]
-    default_provider: Optional[AIProviderType]
-    
+
+    providers: dict[AIProviderType, BaseAIProvider]
+    default_provider: AIProviderType | None
+
     def __init__(self) -> None: ...
-    
+
     def _initialize_providers(self) -> None: ...
-    
+
     def get_provider(
-        self, 
-        provider_type: Optional[AIProviderType] = None
+        self,
+        provider_type: AIProviderType | None = None
     ) -> BaseAIProvider: ...
-    
+
     def set_default_provider(self, provider_type: AIProviderType) -> None: ...
-    
-    def get_available_providers(self) -> List[AIProviderType]: ...
-    
+
+    def get_available_providers(self) -> list[AIProviderType]: ...
+
     async def generate(
-        self, 
-        prompt: str, 
-        provider_type: Optional[AIProviderType] = None, 
+        self,
+        prompt: str,
+        provider_type: AIProviderType | None = None,
         **kwargs: Any
     ) -> AIResponse: ...
-    
+
     async def analyze_complaint(
         self,
         complaint: str,
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider_type: Optional[AIProviderType] = None,
+        patient_info: dict[str, Any] | None = None,
+        provider_type: AIProviderType | None = None,
     ) -> AIResponse: ...
-    
+
     async def suggest_icd10(
         self,
-        symptoms: List[str],
-        diagnosis: Optional[str] = None,
-        provider_type: Optional[AIProviderType] = None,
+        symptoms: list[str],
+        diagnosis: str | None = None,
+        provider_type: AIProviderType | None = None,
     ) -> AIResponse: ...
-    
+
     async def interpret_lab_results(
         self,
-        results: List[Dict[str, Any]],
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider_type: Optional[AIProviderType] = None,
+        results: list[dict[str, Any]],
+        patient_info: dict[str, Any] | None = None,
+        provider_type: AIProviderType | None = None,
     ) -> AIResponse: ...
-    
+
     async def analyze_skin(
         self,
         image_data: bytes,
-        metadata: Optional[Dict[str, Any]] = None,
-        provider_type: Optional[AIProviderType] = None,
+        metadata: dict[str, Any] | None = None,
+        provider_type: AIProviderType | None = None,
     ) -> AIResponse: ...
-    
+
     async def interpret_ecg(
         self,
-        ecg_data: Dict[str, Any],
-        patient_info: Optional[Dict[str, Any]] = None,
-        provider_type: Optional[AIProviderType] = None,
+        ecg_data: dict[str, Any],
+        patient_info: dict[str, Any] | None = None,
+        provider_type: AIProviderType | None = None,
     ) -> AIResponse: ...
-    
+
     async def analyze_medical_trends(
         self,
-        medical_data: List[Dict[str, Any]],
+        medical_data: list[dict[str, Any]],
         time_period: str,
         analysis_type: str,
-        provider: Optional[AIProviderType] = None,
+        provider: AIProviderType | None = None,
     ) -> AIResponse: ...
 
 
