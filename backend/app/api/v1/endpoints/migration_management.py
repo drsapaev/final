@@ -165,7 +165,11 @@ def backup_queue_data(
 
 @router.post("/admin/migration/restore-queue-data", response_model=RestoreResult)
 def restore_queue_data(
-    backup_file: str = Query(..., description="Путь к файлу резервной копии"),
+    backup_file: str = Query(
+        ...,
+        min_length=1,
+        description="Путь к файлу резервной копии",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -175,6 +179,12 @@ def restore_queue_data(
     """
     try:
         result = MigrationManagementApiService(db).restore_queue_data(backup_file)
+
+        if not result.get("success", False):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка восстановления данных: {result.get('error', 'Неизвестная ошибка')}",
+            )
 
         return RestoreResult(
             success=result["success"],
