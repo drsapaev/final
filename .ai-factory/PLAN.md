@@ -239,7 +239,7 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
   - cover missing `SECRET_KEY` + production validation path,
   - assert no `UnboundLocalError` for `env`,
   - file: `backend/tests/test_settings.py`.
-- [ ] Add deterministic fallback checker script for role integrity workflow:
+- [x] Add deterministic fallback checker script for role integrity workflow:
   - file: `backend/scripts/ci/validate_role_integrity.py`,
   - checks required RBAC routes + `validate_critical_user_roles()` with clear exit codes.
 - [ ] Refactor `.github/workflows/role-system-check.yml`:
