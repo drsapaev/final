@@ -9,6 +9,10 @@ from pydantic import ValidationError
 from app.core.config import Settings, get_settings
 
 
+def _reset_settings_cache() -> None:
+    get_settings.cache_clear()
+
+
 def test_secret_key_min_length():
     """Test that SECRET_KEY must be at least 32 characters"""
     # Valid key (32+ chars)
@@ -111,4 +115,37 @@ def test_env_file_loading():
     # If env_file is configured, Pydantic will attempt to load it
     # The actual loading is tested by using a real .env file in integration tests
     assert settings.model_config.get("env_file") == ".env"
+
+
+def test_get_settings_prod_without_secret_key_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Regression: production path must fail with ValueError, not UnboundLocalError."""
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    _reset_settings_cache()
+    try:
+        with pytest.raises(ValueError) as exc_info:
+            get_settings()
+    finally:
+        _reset_settings_cache()
+    assert "SECRET_KEY must be set via environment variable in production" in str(
+        exc_info.value
+    )
+
+
+def test_get_settings_prod_validation_path_uses_env_without_unboundlocal(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Regression: env-dependent production checks should run without local var errors."""
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "b" * 64)
+    monkeypatch.setenv("CORS_ALLOW_ALL", "1")
+    _reset_settings_cache()
+    try:
+        with pytest.raises(ValueError) as exc_info:
+            get_settings()
+    finally:
+        _reset_settings_cache()
+    assert "CORS_ALLOW_ALL must be False in production" in str(exc_info.value)
 

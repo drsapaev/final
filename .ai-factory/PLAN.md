@@ -235,17 +235,17 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
 
 ### Tasks
 
-- [ ] Add targeted regression test for `get_settings()`:
+- [x] Add targeted regression test for `get_settings()`:
   - cover missing `SECRET_KEY` + production validation path,
   - assert no `UnboundLocalError` for `env`,
   - file: `backend/tests/test_settings.py`.
-- [ ] Add deterministic fallback checker script for role integrity workflow:
+- [x] Add deterministic fallback checker script for role integrity workflow:
   - file: `backend/scripts/ci/validate_role_integrity.py`,
   - checks required RBAC routes + `validate_critical_user_roles()` with clear exit codes.
-- [ ] Refactor `.github/workflows/role-system-check.yml`:
+- [x] Refactor `.github/workflows/role-system-check.yml`:
   - call new fallback script instead of inline heredoc Python,
   - keep blocking behavior and clearer failure logs.
-- [ ] Add CI evidence note updates:
+- [x] Add CI evidence note updates:
   - append latest green run IDs to `docs/PLAN_CHECKLIST.md`,
   - ensure references stay current after each hotfix merge.
 
