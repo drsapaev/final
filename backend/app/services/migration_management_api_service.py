@@ -1,329 +1,59 @@
-"""
-API endpoints для управления миграциями и совместимостью данных
-Доступны только администраторам
-"""
+"""Service layer for migration_management endpoints."""
+
+from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Callable
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
-from app.models.user import User
+from app.repositories.migration_management_repository import MigrationManagementRepository
 from app.services.migration_service import MigrationService
-from app.repositories.migration_management_api_repository import MigrationManagementApiRepository
-
-router = APIRouter()
 
 
-def _repo(db: Session) -> MigrationManagementApiRepository:
-    return MigrationManagementApiRepository(db)
+class MigrationManagementApiService:
+    """Orchestrates migration actions and SQL-based health/statistics payloads."""
 
-# ===================== МОДЕЛИ ДАННЫХ =====================
+    def __init__(
+        self,
+        db: Session,
+        repository: MigrationManagementRepository | None = None,
+        migration_service_factory: Callable[[Session], MigrationService] | None = None,
+    ):
+        self.db = db
+        self.repository = repository or MigrationManagementRepository(db)
+        self._migration_service_factory = migration_service_factory or MigrationService
 
+    def _migration_service(self) -> MigrationService:
+        return self._migration_service_factory(self.db)
 
-class MigrationResult(BaseModel):
-    """Результат миграции"""
+    @staticmethod
+    def parse_date(value: str | None):
+        if not value:
+            return None
+        return datetime.strptime(value, "%Y-%m-%d").date()
 
-    success: bool
-    migrated_records: int
-    errors: list[str]
-    integrity_check: dict[str, Any]
+    def migrate_legacy_queue_data(self) -> dict:
+        return self._migration_service().migrate_legacy_queue_data()
 
+    def check_data_integrity(self) -> dict:
+        return self._migration_service()._check_data_integrity()
 
-class BackupResult(BaseModel):
-    """Результат создания резервной копии"""
+    def backup_queue_data(self, target_date: str | None) -> dict:
+        parsed_date = self.parse_date(target_date)
+        return self._migration_service().backup_queue_data(parsed_date)
 
-    success: bool
-    backup_file: str | None = None
-    queues_count: int | None = None
-    total_entries: int | None = None
-    error: str | None = None
+    def restore_queue_data(self, backup_file: str) -> dict:
+        return self._migration_service().restore_queue_data(backup_file)
 
+    def cleanup_old_data(self, days_to_keep: int) -> dict:
+        return self._migration_service().cleanup_old_data(days_to_keep)
 
-class RestoreResult(BaseModel):
-    """Результат восстановления"""
-
-    success: bool
-    restored_queues: int | None = None
-    restored_entries: int | None = None
-    error: str | None = None
-
-
-class CleanupResult(BaseModel):
-    """Результат очистки"""
-
-    success: bool
-    deleted_queues: int | None = None
-    deleted_entries: int | None = None
-    cutoff_date: str | None = None
-    error: str | None = None
-
-
-class IntegrityCheckResult(BaseModel):
-    """Результат проверки целостности"""
-
-    passed: bool
-    checks: dict[str, Any]
-    checked_at: str
-    error: str | None = None
-
-
-# ===================== МИГРАЦИЯ ДАННЫХ =====================
-
-
-@router.post("/admin/migration/migrate-legacy-data", response_model=MigrationResult)
-def migrate_legacy_queue_data(
-    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
-):
-    """
-    Мигрирует данные из старых таблиц очередей в новые
-    Доступно только администраторам
-    """
-    try:
-        migration_service = MigrationService(db)
-        result = migration_service.migrate_legacy_queue_data()
-
-        return MigrationResult(
-            success=result["success"],
-            migrated_records=result["migrated_records"],
-            errors=result["errors"],
-            integrity_check=result["integrity_check"],
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка миграции данных: {str(e)}",
-        )
-
-
-# ===================== ПРОВЕРКА ЦЕЛОСТНОСТИ =====================
-
-
-@router.get("/admin/migration/check-integrity", response_model=IntegrityCheckResult)
-def check_data_integrity(
-    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
-):
-    """
-    Проверяет целостность данных в таблицах очередей
-    Доступно только администраторам
-    """
-    try:
-        migration_service = MigrationService(db)
-        result = migration_service._check_data_integrity()
-
-        return IntegrityCheckResult(
-            passed=result["passed"],
-            checks=result["checks"],
-            checked_at=result["checked_at"],
-            error=result.get("error"),
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки целостности: {str(e)}",
-        )
-
-
-# ===================== РЕЗЕРВНОЕ КОПИРОВАНИЕ =====================
-
-
-@router.post("/admin/migration/backup-queue-data", response_model=BackupResult)
-def backup_queue_data(
-    target_date: str | None = Query(None, description="Дата в формате YYYY-MM-DD"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Создает резервную копию данных очередей за указанную дату
-    Доступно только администраторам
-    """
-    try:
-        migration_service = MigrationService(db)
-
-        # Парсим дату если указана
-        parsed_date = None
-        if target_date:
-            try:
-                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
-
-        result = migration_service.backup_queue_data(parsed_date)
-
-        return BackupResult(
-            success=result["success"],
-            backup_file=result.get("backup_file"),
-            queues_count=result.get("queues_count"),
-            total_entries=result.get("total_entries"),
-            error=result.get("error"),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания резервной копии: {str(e)}",
-        )
-
-
-# ===================== ВОССТАНОВЛЕНИЕ =====================
-
-
-@router.post("/admin/migration/restore-queue-data", response_model=RestoreResult)
-def restore_queue_data(
-    backup_file: str = Query(
-        ..., min_length=1, description="Путь к файлу резервной копии"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Восстанавливает данные очередей из резервной копии
-    Доступно только администраторам
-    """
-    try:
-        migration_service = MigrationService(db)
-        result = migration_service.restore_queue_data(backup_file)
-
-        if not result.get("success"):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка восстановления данных: {result.get('error', 'неизвестная ошибка')}",
-            )
-
-        return RestoreResult(
-            success=result["success"],
-            restored_queues=result.get("restored_queues"),
-            restored_entries=result.get("restored_entries"),
-            error=result.get("error"),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка восстановления данных: {str(e)}",
-        )
-
-
-# ===================== ОЧИСТКА СТАРЫХ ДАННЫХ =====================
-
-
-@router.post("/admin/migration/cleanup-old-data", response_model=CleanupResult)
-def cleanup_old_queue_data(
-    days_to_keep: int = Query(
-        30, ge=1, le=365, description="Количество дней для хранения"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Очищает старые данные очередей
-    Доступно только администраторам
-    """
-    try:
-        migration_service = MigrationService(db)
-        result = migration_service.cleanup_old_data(days_to_keep)
-
-        return CleanupResult(
-            success=result["success"],
-            deleted_queues=result.get("deleted_queues"),
-            deleted_entries=result.get("deleted_entries"),
-            cutoff_date=result.get("cutoff_date"),
-            error=result.get("error"),
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка очистки данных: {str(e)}",
-        )
-
-
-# ===================== СТАТИСТИКА МИГРАЦИЙ =====================
-
-
-@router.get("/admin/migration/stats")
-def get_migration_stats(
-    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
-):
-    """
-    Получает статистику по миграциям и данным очередей
-    Доступно только администраторам
-    """
-    try:
-        from sqlalchemy import text
-
-        # Статистика по очередям
-        queue_stats = _repo(db).execute(
-            text(
-                """
-            SELECT
-                COUNT(*) as total_queues,
-                COUNT(CASE WHEN active = 1 THEN 1 END) as active_queues,
-                COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened_queues,
-                MIN(day) as earliest_date,
-                MAX(day) as latest_date
-            FROM daily_queues
-        """
-            )
-        ).fetchone()
-
-        # Статистика по записям в очередях
-        entry_stats = _repo(db).execute(
-            text(
-                """
-            SELECT
-                COUNT(*) as total_entries,
-                COUNT(CASE WHEN status = 'waiting' THEN 1 END) as waiting_entries,
-                COUNT(CASE WHEN status = 'called' THEN 1 END) as called_entries,
-                COUNT(CASE WHEN status = 'served' THEN 1 END) as served_entries,
-                COUNT(CASE WHEN visit_id IS NOT NULL THEN 1 END) as linked_to_visits,
-                COUNT(CASE WHEN source = 'migration' THEN 1 END) as migrated_entries
-            FROM queue_entries
-        """
-            )
-        ).fetchone()
-
-        # Статистика по источникам записей
-        source_stats = _repo(db).execute(
-            text(
-                """
-            SELECT
-                source,
-                COUNT(*) as count
-            FROM queue_entries
-            GROUP BY source
-            ORDER BY count DESC
-        """
-            )
-        ).fetchall()
-
-        # Статистика по тегам очередей
-        tag_stats = _repo(db).execute(
-            text(
-                """
-            SELECT
-                queue_tag,
-                COUNT(*) as queue_count,
-                SUM((SELECT COUNT(*) FROM queue_entries WHERE queue_id = daily_queues.id)) as total_entries
-            FROM daily_queues
-            WHERE queue_tag IS NOT NULL
-            GROUP BY queue_tag
-            ORDER BY queue_count DESC
-        """
-            )
-        ).fetchall()
+    def get_migration_stats(self) -> dict:
+        queue_stats = self.repository.get_queue_stats()
+        entry_stats = self.repository.get_entry_stats()
+        source_stats = self.repository.get_source_stats()
+        tag_stats = self.repository.get_tag_stats()
 
         return {
             "queue_statistics": {
@@ -355,111 +85,47 @@ def get_migration_stats(
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
+    def check_migration_health(self) -> dict:
+        health_checks: dict = {}
+        tables_to_check = ["daily_queues", "queue_entries", "queue_tokens"]
 
-
-# ===================== ПРОВЕРКА МИГРАЦИЙ =====================
-
-
-@router.get("/admin/migration/health")
-def check_migration_health(
-    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
-):
-    """
-    Проверяет состояние системы миграций
-    Доступно только администраторам
-    """
-    try:
-        from sqlalchemy import inspect, text
-
-        health_checks = {}
-        inspector = inspect(db.get_bind())
-
-        # 1. Проверяем существование ключевых таблиц
-        required_tables = ['daily_queues', 'queue_entries']
-        optional_tables = ['queue_tokens']
-
-        all_tables = required_tables + optional_tables
-        required_ok = True
-
-        # Безопасно: используем предопределенный whitelist таблиц
-        tables_to_check = all_tables
         for table in tables_to_check:
-            # Валидация: проверяем, что имя таблицы в whitelist и содержит только безопасные символы
-            if table not in tables_to_check or not all(
-                c.isalnum() or c == '_' for c in table
-            ):
+            if not all(c.isalnum() or c == "_" for c in table):
                 health_checks[f"table_{table}"] = {
                     "exists": False,
                     "error": "Invalid table name",
                 }
                 continue
             try:
-                table_exists = inspector.has_table(table)
-                table_check = {"exists": table_exists}
+                health_checks[f"table_{table}"] = {
+                    "exists": True,
+                    "record_count": self.repository.get_table_record_count(table),
+                }
+            except Exception as exc:  # noqa: BLE001
+                health_checks[f"table_{table}"] = {"exists": False, "error": str(exc)}
 
-                if table_exists:
-                    # Безопасно: table из whitelist
-                    result = _repo(db).execute(text(f"SELECT COUNT(*) FROM {table}"))
-                    table_check["record_count"] = result.fetchone()[0]
-                elif table in required_tables:
-                    required_ok = False
-                else:
-                    table_check["optional"] = True
-
-                health_checks[f"table_{table}"] = table_check
-            except Exception as e:
-                if table in required_tables:
-                    required_ok = False
-                health_checks[f"table_{table}"] = {"exists": False, "error": str(e)}
-
-        # 2. Проверяем индексы (database-agnostic)
         try:
-            indexes = []
-            for table in required_tables:
-                if inspector.has_table(table):
-                    indexes.extend(inspector.get_indexes(table))
-
+            indexes = self.repository.get_queue_indexes()
             health_checks["indexes"] = {
                 "count": len(indexes),
-                "names": [idx.get("name") for idx in indexes if idx.get("name")],
+                "names": [idx.name for idx in indexes],
             }
-        except Exception as e:
-            health_checks["indexes"] = {"warning": str(e)}
+        except Exception as exc:  # noqa: BLE001
+            health_checks["indexes"] = {"error": str(exc)}
 
-        # 3. Проверяем миграции Alembic (optional для test DB)
         try:
-            if inspector.has_table("alembic_version"):
-                current_revision = _repo(db).execute(
-                    text(
-                        """
-                    SELECT version_num FROM alembic_version
-                """
-                    )
-                ).fetchone()
+            current_revision = self.repository.get_alembic_revision()
+            health_checks["alembic"] = {
+                "current_revision": (
+                    current_revision.version_num if current_revision else None
+                )
+            }
+        except Exception as exc:  # noqa: BLE001
+            health_checks["alembic"] = {"error": str(exc)}
 
-                health_checks["alembic"] = {
-                    "available": True,
-                    "current_revision": (
-                        current_revision.version_num if current_revision else None
-                    ),
-                }
-            else:
-                health_checks["alembic"] = {
-                    "available": False,
-                    "current_revision": None,
-                }
-        except Exception as e:
-            health_checks["alembic"] = {"warning": str(e)}
-
-        # Общий статус
-        all_healthy = required_ok and all(
-            "error" not in health_checks.get(f"table_{table}", {})
-            for table in required_tables
+        all_healthy = all(
+            check.get("exists", True) and "error" not in check
+            for check in health_checks.values()
         )
 
         return {
@@ -468,8 +134,3 @@ def check_migration_health(
             "checked_at": datetime.utcnow().isoformat(),
         }
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки состояния миграций: {str(e)}",
-        )

@@ -1,356 +1,89 @@
-"""
-API endpoints для Push-уведомлений о позиции в очереди
-согласно ONLINE_QUEUE_SYSTEM_V2.md раздел 16
+"""Service layer for queue_position endpoints."""
 
-Реализует:
-1. Получение позиции в очереди
-2. Ручная отправка уведомлений
-3. Настройки уведомлений
-"""
+from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from datetime import date
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
-from app.db.session import get_db
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.user import User
-from app.services.queue_position_notifications import get_queue_position_service
 from app.repositories.queue_position_api_repository import QueuePositionApiRepository
 
-router = APIRouter()
+
+@dataclass
+class QueuePositionApiDomainError(Exception):
+    status_code: int
+    detail: str
 
 
+class QueuePositionApiService:
+    """Orchestrates queue position lookups and notification preconditions."""
 
-def _repo(db: Session) -> QueuePositionApiRepository:
-    return QueuePositionApiRepository(db)
+    def __init__(
+        self,
+        db: Session,
+        repository: QueuePositionApiRepository | None = None,
+    ):
+        self.repository = repository or QueuePositionApiRepository(db)
 
-# ========================= СХЕМЫ =========================
+    def _get_entry_or_error(self, entry_id: int):
+        entry = self.repository.get_entry(entry_id)
+        if not entry:
+            raise QueuePositionApiDomainError(404, "Запись в очереди не найдена")
+        return entry
 
-class QueuePositionResponse(BaseModel):
-    """Ответ с информацией о позиции в очереди"""
-    entry_id: int
-    queue_number: int
-    status: str
-    people_ahead: int
-    priority: int
-    queue_time: str | None = None
-    queue_info: dict[str, Any] = Field(default_factory=dict)
+    def get_position_entry(self, *, entry_id: int):
+        return self._get_entry_or_error(entry_id)
 
-
-class NotificationResult(BaseModel):
-    """Результат отправки уведомления"""
-    success: bool
-    sent: bool
-    message_id: str | None = None
-    reason: str | None = None
-    error: str | None = None
-
-
-class BatchNotificationResult(BaseModel):
-    """Результат массовой отправки уведомлений"""
-    success: bool
-    total_notified: int
-    details: list[dict[str, Any]] = Field(default_factory=list)
-
-
-class SendPositionNotificationRequest(BaseModel):
-    """Запрос на отправку уведомления о позиции"""
-    entry_id: int = Field(..., description="ID записи в очереди")
-
-
-class SendCallNotificationRequest(BaseModel):
-    """Запрос на отправку уведомления о вызове"""
-    entry_id: int = Field(..., description="ID записи в очереди")
-    cabinet_number: str | None = Field(None, description="Номер кабинета")
-
-
-# ========================= ЭНДПОИНТЫ =========================
-
-@router.get("/{entry_id}", response_model=QueuePositionResponse)
-async def get_queue_position(
-    entry_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Получить информацию о позиции в очереди
-
-    Публичный эндпоинт для отображения позиции на дисплее
-    или в мобильном приложении.
-    """
-    entry = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == entry_id
-    ).first()
-
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
+    def get_position_entry_by_number(
+        self,
+        *,
+        queue_number: int,
+        specialist_id: int,
+    ):
+        queue = self.repository.get_today_queue_by_specialist(
+            specialist_id=specialist_id,
+            day=date.today(),
         )
-
-    service = get_queue_position_service(db)
-    position_info = service.get_queue_position_info(entry)
-
-    return QueuePositionResponse(**position_info)
-
-
-@router.get("/by-number/{queue_number}", response_model=QueuePositionResponse)
-async def get_queue_position_by_number(
-    queue_number: int,
-    specialist_id: int = Query(..., description="ID специалиста"),
-    db: Session = Depends(get_db)
-):
-    """
-    Получить информацию о позиции по номеру в очереди
-
-    Используется для поиска позиции по талону.
-    """
-    # Находим очередь на сегодня
-    from datetime import date as date_type
-    today = date_type.today()
-
-    queue = _repo(db).query(DailyQueue).filter(
-        DailyQueue.specialist_id == specialist_id,
-        DailyQueue.day == today
-    ).first()
-
-    if not queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Очередь не найдена"
+        if not queue:
+            raise QueuePositionApiDomainError(404, "Очередь не найдена")
+        entry = self.repository.get_queue_entry_by_number(
+            queue_id=queue.id,
+            queue_number=queue_number,
         )
+        if not entry:
+            raise QueuePositionApiDomainError(
+                404,
+                f"Номер {queue_number} не найден в очереди",
+            )
+        return entry
 
-    entry = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.queue_id == queue.id,
-        OnlineQueueEntry.number == queue_number,
-        OnlineQueueEntry.status != "cancelled"
-    ).first()
+    def get_queue_or_error(self, *, queue_id: int):
+        queue = self.repository.get_queue(queue_id)
+        if not queue:
+            raise QueuePositionApiDomainError(404, "Очередь не найдена")
+        return queue
 
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Номер {queue_number} не найден в очереди"
-        )
+    def get_diagnostics_entry_or_error(self, *, entry_id: int):
+        entry = self.repository.get_diagnostics_entry(entry_id)
+        if not entry:
+            raise QueuePositionApiDomainError(
+                404,
+                "Запись в статусе 'diagnostics' не найдена",
+            )
+        return entry
 
-    service = get_queue_position_service(db)
-    position_info = service.get_queue_position_info(entry)
+    def get_waiting_entry_or_error(self, *, entry_id: int):
+        entry = self.repository.get_waiting_entry(entry_id)
+        if not entry:
+            raise QueuePositionApiDomainError(
+                404,
+                "Запись в статусе 'waiting' не найдена",
+            )
+        return entry
 
-    return QueuePositionResponse(**position_info)
+    def get_queue_entries_stats(self, *, queue_id: int) -> tuple[object, list]:
+        queue = self.get_queue_or_error(queue_id=queue_id)
+        entries = self.repository.list_position_entries(queue_id=queue_id)
+        return queue, entries
 
-
-@router.post("/notify/position", response_model=NotificationResult)
-async def send_position_notification(
-    request: SendPositionNotificationRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
-):
-    """
-    Отправить уведомление о позиции в очереди
-
-    Используется для ручной отправки уведомления пациенту.
-
-    Доступно: Admin, Registrar, Doctor
-    """
-    entry = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == request.entry_id
-    ).first()
-
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
-        )
-
-    service = get_queue_position_service(db)
-    people_ahead = service._count_people_ahead(entry)
-
-    result = await service.notify_position_update(
-        entry=entry,
-        people_ahead=people_ahead
-    )
-
-    return NotificationResult(**result)
-
-
-@router.post("/notify/call", response_model=NotificationResult)
-async def send_call_notification(
-    request: SendCallNotificationRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
-):
-    """
-    Отправить уведомление о вызове пациента
-
-    Отправляется когда врач вызывает пациента.
-
-    Доступно: Admin, Registrar, Doctor
-    """
-    entry = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == request.entry_id
-    ).first()
-
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
-        )
-
-    result = await get_queue_position_service(db).notify_patient_called(
-        entry=entry,
-        cabinet_number=request.cabinet_number
-    )
-
-    return NotificationResult(**result)
-
-
-@router.post("/notify/queue-update/{queue_id}", response_model=BatchNotificationResult)
-async def send_queue_update_notifications(
-    queue_id: int,
-    changed_after_number: int = Query(0, description="Номер, после которого изменились позиции"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
-):
-    """
-    Массовое уведомление об изменении очереди
-
-    Отправляет уведомления всем пациентам после указанного номера.
-    Используется после обслуживания пациента или его удаления из очереди.
-
-    Доступно: Admin, Registrar
-    """
-    queue = _repo(db).query(DailyQueue).filter(
-        DailyQueue.id == queue_id
-    ).first()
-
-    if not queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Очередь не найдена"
-        )
-
-    service = get_queue_position_service(db)
-    result = await service.notify_queue_changes_batch(
-        queue_id=queue_id,
-        changed_after_number=changed_after_number
-    )
-
-    return BatchNotificationResult(**result)
-
-
-@router.post("/notify/diagnostics-return/{entry_id}", response_model=NotificationResult)
-async def send_diagnostics_return_notification(
-    entry_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor"))
-):
-    """
-    Отправить уведомление о возврате после диагностики
-
-    Отправляется когда врач ожидает возвращения пациента с обследования.
-
-    Доступно: Admin, Doctor
-    """
-    entry = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == entry_id,
-        OnlineQueueEntry.status == "diagnostics"
-    ).first()
-
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в статусе 'diagnostics' не найдена"
-        )
-
-    # Получаем имя специалиста
-    specialist_name = "врач"
-    if entry.queue and entry.queue.specialist:
-        specialist = entry.queue.specialist
-        specialist_name = f"{specialist.last_name} {specialist.first_name}"
-
-    result = await get_queue_position_service(db).notify_diagnostics_return_needed(
-        entry=entry,
-        specialist_name=specialist_name
-    )
-
-    return NotificationResult(**result)
-
-
-@router.post("/notify/reminder/{entry_id}", response_model=NotificationResult)
-async def send_waiting_reminder(
-    entry_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
-):
-    """
-    Отправить напоминание о нахождении в очереди
-
-    Периодическое напоминание для пациентов, долго ожидающих в очереди.
-
-    Доступно: Admin, Registrar
-    """
-    entry = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.id == entry_id,
-        OnlineQueueEntry.status == "waiting"
-    ).first()
-
-    if not entry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в статусе 'waiting' не найдена"
-        )
-
-    result = await get_queue_position_service(db).send_waiting_reminder(entry=entry)
-
-    return NotificationResult(**result)
-
-
-# ========================= СТАТИСТИКА =========================
-
-@router.get("/stats/queue/{queue_id}")
-async def get_queue_positions_stats(
-    queue_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Получить статистику позиций в очереди
-
-    Возвращает список всех записей с их позициями.
-    """
-    queue = _repo(db).query(DailyQueue).filter(
-        DailyQueue.id == queue_id
-    ).first()
-
-    if not queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Очередь не найдена"
-        )
-
-    entries = _repo(db).query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.queue_id == queue_id,
-        OnlineQueueEntry.status.in_(["waiting", "called", "in_service", "diagnostics"])
-    ).order_by(
-        OnlineQueueEntry.priority.desc(),
-        OnlineQueueEntry.queue_time
-    ).all()
-
-    service = get_queue_position_service(db)
-
-    result = []
-    for i, entry in enumerate(entries):
-        position_info = service.get_queue_position_info(entry)
-        position_info["position_in_list"] = i + 1
-        result.append(position_info)
-
-    return {
-        "queue_id": queue_id,
-        "queue_day": str(queue.day),
-        "total_entries": len(entries),
-        "entries": result
-    }

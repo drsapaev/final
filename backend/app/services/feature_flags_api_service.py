@@ -1,495 +1,121 @@
-"""
-API эндпоинты для управления фича-флагами
-"""
+"""Service layer for feature_flags API endpoints."""
 
-from typing import Any
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
-from pydantic import ConfigDict
+from dataclasses import dataclass
+
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
 from app.models.feature_flags import FeatureFlag
-from app.models.user import User
-from app.services.feature_flags import get_feature_flag_service
 from app.repositories.feature_flags_api_repository import FeatureFlagsApiRepository
-
-router = APIRouter()
-
-
-def _repo(db: Session) -> FeatureFlagsApiRepository:
-    return FeatureFlagsApiRepository(db)
-
-# ===================== МОДЕЛИ ДАННЫХ =====================
+from app.services.feature_flags import FeatureFlagService, get_feature_flag_service
 
 
-class FeatureFlagResponse(BaseModel):
-    """Ответ с информацией о фича-флаге"""
-
-    id: int
-    key: str
-    name: str
-    description: str | None = None
-    enabled: bool
-    config: dict[str, Any]
-    category: str
-    environment: str
-    created_at: str
-    updated_at: str | None = None
-    created_by: str | None = None
-    updated_by: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
+@dataclass
+class FeatureFlagsApiDomainError(Exception):
+    status_code: int
+    detail: str
 
 
-class FeatureFlagCreateRequest(BaseModel):
-    """Запрос на создание фича-флага"""
+class FeatureFlagsApiService:
+    """Orchestrates endpoint-level FeatureFlag operations."""
 
-    key: str = Field(..., min_length=1, max_length=100, pattern="^[a-z0-9_]+$")
-    name: str = Field(..., min_length=1, max_length=200)
-    description: str | None = Field(None, max_length=1000)
-    enabled: bool = False
-    config: dict[str, Any] = Field(default_factory=dict)
-    category: str = Field(default="general", max_length=50)
-    environment: str = Field(
-        default="all", pattern="^(production|staging|development|all)$"
-    )
+    def __init__(
+        self,
+        db: Session,
+        repository: FeatureFlagsApiRepository | None = None,
+        feature_service: FeatureFlagService | None = None,
+    ):
+        self.repository = repository or FeatureFlagsApiRepository(db)
+        self.feature_service = feature_service or get_feature_flag_service(db)
 
+    def get_flag_or_error(self, flag_key: str) -> FeatureFlag:
+        flag = self.repository.get_by_key(flag_key)
+        if not flag:
+            raise FeatureFlagsApiDomainError(
+                status_code=404,
+                detail=f"Фича-флаг '{flag_key}' не найден",
+            )
+        return flag
 
-class FeatureFlagUpdateRequest(BaseModel):
-    """Запрос на обновление фича-флага"""
-
-    name: str | None = Field(None, min_length=1, max_length=200)
-    description: str | None = Field(None, max_length=1000)
-    enabled: bool | None = None
-    config: dict[str, Any] | None = None
-    category: str | None = Field(None, max_length=50)
-    environment: str | None = Field(
-        None, pattern="^(production|staging|development|all)$"
-    )
-    reason: str | None = Field(None, max_length=500)
-
-
-class FeatureFlagToggleRequest(BaseModel):
-    """Запрос на переключение состояния флага"""
-
-    enabled: bool
-    reason: str | None = Field(None, max_length=500)
-
-
-class FeatureFlagHistoryResponse(BaseModel):
-    """Ответ с историей изменений флага"""
-
-    id: int
-    flag_key: str
-    action: str
-    old_value: dict[str, Any] | None = None
-    new_value: dict[str, Any] | None = None
-    changed_by: str | None = None
-    changed_at: str
-    ip_address: str | None = None
-    user_agent: str | None = None
-    reason: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class FeatureFlagStatusResponse(BaseModel):
-    """Ответ с состоянием флага"""
-
-    key: str
-    enabled: bool
-    config: dict[str, Any]
-
-
-class BulkToggleRequest(BaseModel):
-    """Запрос на массовое переключение флагов"""
-
-    flag_keys: list[str]
-    enabled: bool
-    reason: str | None = Field(None, max_length=500)
-
-
-# ===================== ЭНДПОИНТЫ =====================
-
-
-@router.get("/admin/feature-flags", response_model=list[FeatureFlagResponse])
-def get_all_feature_flags(
-    category: str | None = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Получает все фича-флаги
-    Доступно только администраторам
-    """
-    service = get_feature_flag_service(db)
-    flags = service.get_all_flags(category=category)
-
-    return [
-        FeatureFlagResponse(
-            id=flag.id,
-            key=flag.key,
-            name=flag.name,
-            description=flag.description,
-            enabled=flag.enabled,
-            config=flag.config or {},
-            category=flag.category,
-            environment=flag.environment,
-            created_at=flag.created_at.isoformat() if flag.created_at else "",
-            updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
-            created_by=flag.created_by,
-            updated_by=flag.updated_by,
-        )
-        for flag in flags
-    ]
-
-
-@router.get("/admin/feature-flags/{flag_key}", response_model=FeatureFlagResponse)
-def get_feature_flag(
-    flag_key: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Получает конкретный фича-флаг по ключу
-    Доступно только администраторам
-    """
-    flag = _repo(db).query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
-
-    if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Фича-флаг '{flag_key}' не найден",
-        )
-
-    return FeatureFlagResponse(
-        id=flag.id,
-        key=flag.key,
-        name=flag.name,
-        description=flag.description,
-        enabled=flag.enabled,
-        config=flag.config or {},
-        category=flag.category,
-        environment=flag.environment,
-        created_at=flag.created_at.isoformat() if flag.created_at else "",
-        updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
-        created_by=flag.created_by,
-        updated_by=flag.updated_by,
-    )
-
-
-@router.post("/admin/feature-flags", response_model=FeatureFlagResponse)
-def create_feature_flag(
-    request: FeatureFlagCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Создает новый фича-флаг
-    Доступно только администраторам
-    """
-    # Проверяем что флаг с таким ключом не существует
-    existing = _repo(db).query(FeatureFlag).filter(FeatureFlag.key == request.key).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Фича-флаг с ключом '{request.key}' уже существует",
-        )
-
-    service = get_feature_flag_service(db)
-
-    try:
-        flag = service.create_flag(
-            key=request.key,
-            name=request.name,
-            description=request.description,
-            enabled=request.enabled,
-            config=request.config,
-            category=request.category,
-            environment=request.environment,
-            user_id=current_user.username,
-        )
-
-        return FeatureFlagResponse(
-            id=flag.id,
-            key=flag.key,
-            name=flag.name,
-            description=flag.description,
-            enabled=flag.enabled,
-            config=flag.config or {},
-            category=flag.category,
-            environment=flag.environment,
-            created_at=flag.created_at.isoformat() if flag.created_at else "",
-            updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
-            created_by=flag.created_by,
-            updated_by=flag.updated_by,
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания фича-флага: {str(e)}",
-        )
-
-
-@router.put("/admin/feature-flags/{flag_key}", response_model=FeatureFlagResponse)
-def update_feature_flag(
-    flag_key: str,
-    request: FeatureFlagUpdateRequest,
-    http_request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Обновляет фича-флаг
-    Доступно только администраторам
-    """
-    flag = _repo(db).query(FeatureFlag).filter(FeatureFlag.key == flag_key).first()
-
-    if not flag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Фича-флаг '{flag_key}' не найден",
-        )
-
-    service = get_feature_flag_service(db)
-
-    try:
-        # Обновляем поля
-        if request.name is not None:
-            flag.name = request.name
-        if request.description is not None:
-            flag.description = request.description
-        if request.category is not None:
-            flag.category = request.category
-        if request.environment is not None:
-            flag.environment = request.environment
-
-        # Обновляем состояние если указано
-        if request.enabled is not None:
-            service.set_flag(
-                flag_key=flag_key,
-                enabled=request.enabled,
-                user_id=current_user.username,
-                reason=request.reason,
-                ip_address=http_request.client.host if http_request.client else None,
-                user_agent=http_request.headers.get("User-Agent"),
+    def ensure_flag_not_exists(self, flag_key: str) -> None:
+        if self.repository.exists(flag_key):
+            raise FeatureFlagsApiDomainError(
+                status_code=400,
+                detail=f"Фича-флаг с ключом '{flag_key}' уже существует",
             )
 
-        # Обновляем конфигурацию если указана
-        if request.config is not None:
-            service.update_flag_config(
+    def create_flag(
+        self,
+        *,
+        key: str,
+        name: str,
+        description: str | None,
+        enabled: bool,
+        config: dict,
+        category: str,
+        environment: str,
+        user_id: str,
+    ) -> FeatureFlag:
+        self.ensure_flag_not_exists(key)
+        return self.feature_service.create_flag(
+            key=key,
+            name=name,
+            description=description,
+            enabled=enabled,
+            config=config,
+            category=category,
+            environment=environment,
+            user_id=user_id,
+        )
+
+    def update_flag(
+        self,
+        *,
+        flag_key: str,
+        name: str | None,
+        description: str | None,
+        category: str | None,
+        environment: str | None,
+        enabled: bool | None,
+        config: dict | None,
+        reason: str | None,
+        user_id: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> FeatureFlag:
+        flag = self.get_flag_or_error(flag_key)
+
+        if name is not None:
+            flag.name = name
+        if description is not None:
+            flag.description = description
+        if category is not None:
+            flag.category = category
+        if environment is not None:
+            flag.environment = environment
+
+        if enabled is not None:
+            self.feature_service.set_flag(
                 flag_key=flag_key,
-                config=request.config,
-                user_id=current_user.username,
-                reason=request.reason,
+                enabled=enabled,
+                user_id=user_id,
+                reason=reason,
+                ip_address=ip_address,
+                user_agent=user_agent,
             )
 
-        flag.updated_by = current_user.username
-        _repo(db).commit()
-        _repo(db).refresh(flag)
+        if config is not None:
+            self.feature_service.update_flag_config(
+                flag_key=flag_key,
+                config=config,
+                user_id=user_id,
+                reason=reason,
+            )
 
-        return FeatureFlagResponse(
-            id=flag.id,
-            key=flag.key,
-            name=flag.name,
-            description=flag.description,
-            enabled=flag.enabled,
-            config=flag.config or {},
-            category=flag.category,
-            environment=flag.environment,
-            created_at=flag.created_at.isoformat() if flag.created_at else "",
-            updated_at=flag.updated_at.isoformat() if flag.updated_at else None,
-            created_by=flag.created_by,
-            updated_by=flag.updated_by,
-        )
+        flag.updated_by = user_id
+        return self.repository.save(flag)
 
-    except Exception as e:
-        _repo(db).rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления фича-флага: {str(e)}",
-        )
+    def rollback(self) -> None:
+        self.repository.rollback()
 
-
-@router.post(
-    "/admin/feature-flags/{flag_key}/toggle", response_model=FeatureFlagStatusResponse
-)
-def toggle_feature_flag(
-    flag_key: str,
-    request: FeatureFlagToggleRequest,
-    http_request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Переключает состояние фича-флага
-    Доступно только администраторам
-    """
-    service = get_feature_flag_service(db)
-
-    success = service.set_flag(
-        flag_key=flag_key,
-        enabled=request.enabled,
-        user_id=current_user.username,
-        reason=request.reason,
-        ip_address=http_request.client.host if http_request.client else None,
-        user_agent=http_request.headers.get("User-Agent"),
-    )
-
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Фича-флаг '{flag_key}' не найден",
-        )
-
-    config = service.get_flag_config(flag_key)
-
-    return FeatureFlagStatusResponse(
-        key=flag_key, enabled=request.enabled, config=config
-    )
-
-
-@router.post("/admin/feature-flags/bulk-toggle")
-def bulk_toggle_feature_flags(
-    request: BulkToggleRequest,
-    http_request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Массовое переключение состояния фича-флагов
-    Доступно только администраторам
-    """
-    service = get_feature_flag_service(db)
-    results = []
-
-    for flag_key in request.flag_keys:
-        success = service.set_flag(
-            flag_key=flag_key,
-            enabled=request.enabled,
-            user_id=current_user.username,
-            reason=request.reason,
-            ip_address=http_request.client.host if http_request.client else None,
-            user_agent=http_request.headers.get("User-Agent"),
-        )
-
-        results.append(
-            {
-                "flag_key": flag_key,
-                "success": success,
-                "enabled": request.enabled if success else None,
-            }
-        )
-
-    return {
-        "results": results,
-        "total": len(request.flag_keys),
-        "successful": sum(1 for r in results if r["success"]),
-        "failed": sum(1 for r in results if not r["success"]),
-    }
-
-
-@router.delete("/admin/feature-flags/{flag_key}")
-def delete_feature_flag(
-    flag_key: str,
-    reason: str | None = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Удаляет фича-флаг
-    Доступно только администраторам
-    """
-    service = get_feature_flag_service(db)
-
-    success = service.delete_flag(
-        flag_key=flag_key, user_id=current_user.username, reason=reason
-    )
-
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Фича-флаг '{flag_key}' не найден",
-        )
-
-    return {"message": f"Фича-флаг '{flag_key}' успешно удален"}
-
-
-@router.get(
-    "/admin/feature-flags/{flag_key}/history",
-    response_model=list[FeatureFlagHistoryResponse],
-)
-def get_feature_flag_history(
-    flag_key: str,
-    limit: int = 50,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Получает историю изменений фича-флага
-    Доступно только администраторам
-    """
-    service = get_feature_flag_service(db)
-    history = service.get_flag_history(flag_key, limit)
-
-    return [
-        FeatureFlagHistoryResponse(
-            id=record.id,
-            flag_key=record.flag_key,
-            action=record.action,
-            old_value=record.old_value,
-            new_value=record.new_value,
-            changed_by=record.changed_by,
-            changed_at=record.changed_at.isoformat() if record.changed_at else "",
-            ip_address=record.ip_address,
-            user_agent=record.user_agent,
-            reason=record.reason,
-        )
-        for record in history
-    ]
-
-
-# ===================== ПУБЛИЧНЫЕ ЭНДПОИНТЫ =====================
-
-
-@router.get(
-    "/feature-flags/status/{flag_key}", response_model=FeatureFlagStatusResponse
-)
-def get_feature_flag_status(flag_key: str, db: Session = Depends(get_db)):
-    """
-    Получает статус фича-флага (публичный эндпоинт)
-    Доступно всем авторизованным пользователям
-    """
-    service = get_feature_flag_service(db)
-
-    enabled = service.is_enabled(flag_key)
-    config = service.get_flag_config(flag_key)
-
-    return FeatureFlagStatusResponse(key=flag_key, enabled=enabled, config=config)
-
-
-@router.get("/feature-flags/status")
-def get_multiple_feature_flags_status(
-    keys: str, db: Session = Depends(get_db)  # Comma-separated list of flag keys
-):
-    """
-    Получает статус нескольких фича-флагов
-    Доступно всем авторизованным пользователям
-
-    Args:
-        keys: Список ключей флагов через запятую (например: "flag1,flag2,flag3")
-    """
-    service = get_feature_flag_service(db)
-    flag_keys = [key.strip() for key in keys.split(",") if key.strip()]
-
-    results = {}
-    for flag_key in flag_keys:
-        results[flag_key] = {
-            "enabled": service.is_enabled(flag_key),
-            "config": service.get_flag_config(flag_key),
-        }
-
-    return results

@@ -1,230 +1,126 @@
-"""
-API endpoints для управления информацией о кабинетах в очередях
-"""
+"""Service layer for queue cabinet management endpoints."""
 
-import logging
+from __future__ import annotations
+
+from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
-from app.models.online_queue import DailyQueue
-from app.models.user import User
 from app.repositories.queue_cabinet_management_api_repository import (
     QueueCabinetManagementApiRepository,
 )
 
-logger = logging.getLogger(__name__)
 
-router = APIRouter()
-
-# ===================== МОДЕЛИ ДАННЫХ =====================
-
-
-class CabinetInfo(BaseModel):
-    cabinet_number: str | None = None
-    cabinet_floor: int | None = None
-    cabinet_building: str | None = None
+@dataclass
+class QueueCabinetManagementDomainError(Exception):
+    status_code: int
+    detail: str
 
 
-class QueueCabinetUpdateRequest(BaseModel):
-    queue_id: int
-    cabinet_info: CabinetInfo
+class QueueCabinetManagementApiService:
+    """Handles payload generation and updates for queue cabinet management."""
 
+    def __init__(
+        self,
+        db: Session,
+        repository: QueueCabinetManagementApiRepository | None = None,
+    ):
+        self.repository = repository or QueueCabinetManagementApiRepository(db)
 
-class QueueCabinetResponse(BaseModel):
-    id: int
-    day: str
-    specialist_id: int
-    specialist_name: str
-    queue_tag: str | None
-    cabinet_number: str | None
-    cabinet_floor: int | None
-    cabinet_building: str | None
-    entries_count: int
-    active: bool
+    @staticmethod
+    def _parse_date(value: str, *, error_detail: str) -> date:
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise QueueCabinetManagementDomainError(400, error_detail) from exc
 
+    def _resolve_specialist_name(self, specialist_id: int) -> str:
+        specialist = self.repository.get_doctor(specialist_id)
+        if specialist and specialist.user:
+            return specialist.user.full_name
+        return f"Специалист #{specialist_id}"
 
-class BulkCabinetUpdateRequest(BaseModel):
-    updates: list[QueueCabinetUpdateRequest]
-
-
-# ===================== ПОЛУЧЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
-
-
-@router.get("/queues/cabinet-info", response_model=list[QueueCabinetResponse])
-def get_queues_cabinet_info(
-    day: str | None = Query(None, description="Дата в формате YYYY-MM-DD"),
-    specialist_id: int | None = Query(None, description="ID специалиста"),
-    cabinet_number: str | None = Query(None, description="Номер кабинета"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """
-    Получить информацию о кабинетах для очередей
-    """
-    repository = QueueCabinetManagementApiRepository(db)
-    try:
-        # Строим запрос
-        query = repository.query_daily_queues()
-
-        # Фильтры
+    def get_queues_cabinet_info(
+        self,
+        *,
+        day: str | None,
+        specialist_id: int | None,
+        cabinet_number: str | None,
+    ) -> list[dict[str, Any]]:
+        day_obj = None
         if day:
-            try:
-                day_obj = datetime.strptime(day, "%Y-%m-%d").date()
-                query = query.filter(DailyQueue.day == day_obj)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
-
-        if specialist_id:
-            query = query.filter(DailyQueue.specialist_id == specialist_id)
-
-        if cabinet_number:
-            query = query.filter(DailyQueue.cabinet_number == cabinet_number)
-
-        # Получаем очереди
-        queues = query.order_by(DailyQueue.day.desc(), DailyQueue.specialist_id).all()
-
-        result = []
-        for queue in queues:
-            # Получаем информацию о специалисте
-            specialist = repository.get_doctor_by_id(queue.specialist_id)
-            specialist_name = (
-                specialist.user.full_name
-                if (specialist and specialist.user)
-                else f"Специалист #{queue.specialist_id}"
+            day_obj = self._parse_date(
+                day,
+                error_detail="Неверный формат даты. Используйте YYYY-MM-DD",
             )
 
-            # Подсчитываем записи в очереди
-            entries_count = repository.count_entries_for_queue(queue.id)
-
-            result.append(
-                QueueCabinetResponse(
-                    id=queue.id,
-                    day=queue.day.isoformat(),
-                    specialist_id=queue.specialist_id,
-                    specialist_name=specialist_name,
-                    queue_tag=queue.queue_tag,
-                    cabinet_number=queue.cabinet_number,
-                    cabinet_floor=queue.cabinet_floor,
-                    cabinet_building=queue.cabinet_building,
-                    entries_count=entries_count,
-                    active=queue.active,
-                )
-            )
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Ошибка получения информации о кабинетах: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о кабинетах: {str(e)}",
+        queues = self.repository.list_daily_queues(
+            day_obj=day_obj,
+            specialist_id=specialist_id,
+            cabinet_number=cabinet_number,
         )
 
+        return [
+            {
+                "id": queue.id,
+                "day": queue.day.isoformat(),
+                "specialist_id": queue.specialist_id,
+                "specialist_name": self._resolve_specialist_name(queue.specialist_id),
+                "queue_tag": queue.queue_tag,
+                "cabinet_number": queue.cabinet_number,
+                "cabinet_floor": queue.cabinet_floor,
+                "cabinet_building": queue.cabinet_building,
+                "entries_count": self.repository.count_entries(queue_id=queue.id),
+                "active": queue.active,
+            }
+            for queue in queues
+        ]
 
-@router.get("/queues/{queue_id}/cabinet-info")
-def get_queue_cabinet_info(
-    queue_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """
-    Получить информацию о кабинете для конкретной очереди
-    """
-    repository = QueueCabinetManagementApiRepository(db)
-    try:
-        queue = repository.get_daily_queue_by_id(queue_id)
-
+    def get_queue_cabinet_info(self, *, queue_id: int) -> dict[str, Any]:
+        queue = self.repository.get_daily_queue(queue_id)
         if not queue:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
-            )
+            raise QueueCabinetManagementDomainError(404, "Очередь не найдена")
 
-        # Получаем информацию о специалисте
-        specialist = repository.get_doctor_by_id(queue.specialist_id)
-        specialist_name = (
-            specialist.user.full_name
-            if (specialist and specialist.user)
-            else f"Специалист #{queue.specialist_id}"
-        )
+        return {
+            "id": queue.id,
+            "day": queue.day.isoformat(),
+            "specialist_id": queue.specialist_id,
+            "specialist_name": self._resolve_specialist_name(queue.specialist_id),
+            "queue_tag": queue.queue_tag,
+            "cabinet_number": queue.cabinet_number,
+            "cabinet_floor": queue.cabinet_floor,
+            "cabinet_building": queue.cabinet_building,
+            "entries_count": self.repository.count_entries(queue_id=queue.id),
+            "active": queue.active,
+        }
 
-        # Подсчитываем записи в очереди
-        entries_count = repository.count_entries_for_queue(queue.id)
-
-        return QueueCabinetResponse(
-            id=queue.id,
-            day=queue.day.isoformat(),
-            specialist_id=queue.specialist_id,
-            specialist_name=specialist_name,
-            queue_tag=queue.queue_tag,
-            cabinet_number=queue.cabinet_number,
-            cabinet_floor=queue.cabinet_floor,
-            cabinet_building=queue.cabinet_building,
-            entries_count=entries_count,
-            active=queue.active,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Ошибка получения информации о кабинете для очереди {queue_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о кабинете: {str(e)}",
-        )
-
-
-# ===================== ОБНОВЛЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
-
-
-@router.put("/queues/{queue_id}/cabinet-info")
-def update_queue_cabinet_info(
-    queue_id: int,
-    cabinet_info: CabinetInfo,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
-    """
-    Обновить информацию о кабинете для очереди
-    Доступно только администраторам и регистраторам
-    """
-    repository = QueueCabinetManagementApiRepository(db)
-    try:
-        queue = repository.get_daily_queue_by_id(queue_id)
-
+    def update_queue_cabinet_info(
+        self,
+        *,
+        queue_id: int,
+        cabinet_info: dict[str, Any],
+        updated_by: str,
+    ) -> dict[str, Any]:
+        queue = self.repository.get_daily_queue(queue_id)
         if not queue:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
-            )
+            raise QueueCabinetManagementDomainError(404, "Очередь не найдена")
 
-        # Обновляем информацию о кабинете
         updated = False
-
-        if cabinet_info.cabinet_number is not None:
-            queue.cabinet_number = cabinet_info.cabinet_number
+        if cabinet_info.get("cabinet_number") is not None:
+            queue.cabinet_number = cabinet_info["cabinet_number"]
             updated = True
-
-        if cabinet_info.cabinet_floor is not None:
-            queue.cabinet_floor = cabinet_info.cabinet_floor
+        if cabinet_info.get("cabinet_floor") is not None:
+            queue.cabinet_floor = cabinet_info["cabinet_floor"]
             updated = True
-
-        if cabinet_info.cabinet_building is not None:
-            queue.cabinet_building = cabinet_info.cabinet_building
+        if cabinet_info.get("cabinet_building") is not None:
+            queue.cabinet_building = cabinet_info["cabinet_building"]
             updated = True
 
         if updated:
-            repository.commit()
-            repository.refresh(queue)
+            self.repository.commit()
+            self.repository.refresh(queue)
 
         return {
             "success": True,
@@ -235,163 +131,102 @@ def update_queue_cabinet_info(
                 "cabinet_floor": queue.cabinet_floor,
                 "cabinet_building": queue.cabinet_building,
             },
-            "updated_by": current_user.username,
+            "updated_by": updated_by,
             "updated_at": datetime.utcnow().isoformat(),
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        repository.rollback()
-        logger.error(
-            f"Ошибка обновления информации о кабинете для очереди {queue_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления информации о кабинете: {str(e)}",
-        )
-
-
-@router.put("/queues/cabinet-info/bulk")
-def bulk_update_cabinet_info(
-    request: BulkCabinetUpdateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
-    """
-    Массовое обновление информации о кабинетах для нескольких очередей
-    """
-    repository = QueueCabinetManagementApiRepository(db)
-    try:
+    def bulk_update_cabinet_info(
+        self,
+        *,
+        updates: list[dict[str, Any]],
+        updated_by: str,
+    ) -> dict[str, Any]:
         updated_queues = []
         errors = []
 
-        for update in request.updates:
-            try:
-                queue = repository.get_daily_queue_by_id(update.queue_id)
+        for update in updates:
+            queue = self.repository.get_daily_queue(update["queue_id"])
+            if not queue:
+                errors.append({"queue_id": update["queue_id"], "error": "Очередь не найдена"})
+                continue
 
-                if not queue:
-                    errors.append(
-                        {"queue_id": update.queue_id, "error": "Очередь не найдена"}
-                    )
-                    continue
+            cabinet_info = update["cabinet_info"]
+            updated = False
 
-                # Обновляем информацию о кабинете
-                updated = False
+            if cabinet_info.get("cabinet_number") is not None:
+                queue.cabinet_number = cabinet_info["cabinet_number"]
+                updated = True
+            if cabinet_info.get("cabinet_floor") is not None:
+                queue.cabinet_floor = cabinet_info["cabinet_floor"]
+                updated = True
+            if cabinet_info.get("cabinet_building") is not None:
+                queue.cabinet_building = cabinet_info["cabinet_building"]
+                updated = True
 
-                if update.cabinet_info.cabinet_number is not None:
-                    queue.cabinet_number = update.cabinet_info.cabinet_number
-                    updated = True
+            if updated:
+                updated_queues.append(
+                    {
+                        "queue_id": update["queue_id"],
+                        "cabinet_info": {
+                            "cabinet_number": queue.cabinet_number,
+                            "cabinet_floor": queue.cabinet_floor,
+                            "cabinet_building": queue.cabinet_building,
+                        },
+                    }
+                )
 
-                if update.cabinet_info.cabinet_floor is not None:
-                    queue.cabinet_floor = update.cabinet_info.cabinet_floor
-                    updated = True
-
-                if update.cabinet_info.cabinet_building is not None:
-                    queue.cabinet_building = update.cabinet_info.cabinet_building
-                    updated = True
-
-                if updated:
-                    updated_queues.append(
-                        {
-                            "queue_id": update.queue_id,
-                            "cabinet_info": {
-                                "cabinet_number": queue.cabinet_number,
-                                "cabinet_floor": queue.cabinet_floor,
-                                "cabinet_building": queue.cabinet_building,
-                            },
-                        }
-                    )
-
-            except Exception as e:
-                errors.append({"queue_id": update.queue_id, "error": str(e)})
-
-        # Сохраняем изменения
         if updated_queues:
-            repository.commit()
+            self.repository.commit()
 
         return {
             "success": True,
             "message": f"Обновлено {len(updated_queues)} очередей",
             "updated_queues": updated_queues,
             "errors": errors,
-            "updated_by": current_user.username,
+            "updated_by": updated_by,
             "updated_at": datetime.utcnow().isoformat(),
         }
 
-    except Exception as e:
-        repository.rollback()
-        logger.error(f"Ошибка массового обновления информации о кабинетах: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массового обновления: {str(e)}",
-        )
-
-
-# ===================== СИНХРОНИЗАЦИЯ С ТАБЛИЦЕЙ DOCTORS =====================
-
-
-@router.post("/queues/sync-cabinet-info")
-def sync_cabinet_info_from_doctors(
-    day: str | None = Query(
-        None, description="Дата для синхронизации (по умолчанию сегодня)"
-    ),
-    specialist_id: int | None = Query(
-        None, description="ID конкретного специалиста"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
-    """
-    Синхронизировать информацию о кабинетах из таблицы doctors
-    Доступно только администраторам
-    """
-    repository = QueueCabinetManagementApiRepository(db)
-    try:
-        # Определяем дату
+    def sync_cabinet_info_from_doctors(
+        self,
+        *,
+        day: str | None,
+        specialist_id: int | None,
+        synced_by: str,
+    ) -> dict[str, Any]:
         if day:
-            try:
-                day_obj = datetime.strptime(day, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
+            day_obj = self._parse_date(
+                day,
+                error_detail="Неверный формат даты. Используйте YYYY-MM-DD",
+            )
         else:
             day_obj = date.today()
 
-        # Строим запрос для очередей
-        query = repository.query_daily_queues().filter(DailyQueue.day == day_obj)
-
-        if specialist_id:
-            query = query.filter(DailyQueue.specialist_id == specialist_id)
-
-        queues = query.all()
+        queues = self.repository.list_queues_for_day(
+            day_obj=day_obj,
+            specialist_id=specialist_id,
+        )
 
         updated_count = 0
         errors = []
 
         for queue in queues:
             try:
-                # Получаем информацию о враче
-                doctor = repository.get_doctor_by_id(queue.specialist_id)
-
+                doctor = self.repository.get_doctor(queue.specialist_id)
                 if doctor and doctor.cabinet and queue.cabinet_number != doctor.cabinet:
                     queue.cabinet_number = doctor.cabinet
                     updated_count += 1
-
-            except Exception as e:
+            except Exception as exc:  # noqa: BLE001
                 errors.append(
                     {
                         "queue_id": queue.id,
                         "specialist_id": queue.specialist_id,
-                        "error": str(e),
+                        "error": str(exc),
                     }
                 )
 
-        # Сохраняем изменения
         if updated_count > 0:
-            repository.commit()
+            self.repository.commit()
 
         return {
             "success": True,
@@ -400,103 +235,65 @@ def sync_cabinet_info_from_doctors(
             "total_queues": len(queues),
             "errors": errors,
             "sync_date": day_obj.isoformat(),
-            "synced_by": current_user.username,
+            "synced_by": synced_by,
             "synced_at": datetime.utcnow().isoformat(),
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        repository.rollback()
-        logger.error(f"Ошибка синхронизации информации о кабинетах: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка синхронизации: {str(e)}",
+    def get_cabinet_statistics(
+        self,
+        *,
+        date_from: str | None,
+        date_to: str | None,
+    ) -> dict[str, Any]:
+        date_from_obj = None
+        date_to_obj = None
+        if date_from:
+            date_from_obj = self._parse_date(
+                date_from,
+                error_detail="Неверный формат даты начала. Используйте YYYY-MM-DD",
+            )
+        if date_to:
+            date_to_obj = self._parse_date(
+                date_to,
+                error_detail="Неверный формат даты окончания. Используйте YYYY-MM-DD",
+            )
+
+        queues = self.repository.list_queues_for_period(
+            date_from=date_from_obj,
+            date_to=date_to_obj,
         )
 
-
-# ===================== СТАТИСТИКА ПО КАБИНЕТАМ =====================
-
-
-@router.get("/queues/cabinet-statistics")
-def get_cabinet_statistics(
-    date_from: str | None = Query(
-        None, description="Дата начала в формате YYYY-MM-DD"
-    ),
-    date_to: str | None = Query(
-        None, description="Дата окончания в формате YYYY-MM-DD"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
-    """
-    Получить статистику использования кабинетов
-    """
-    repository = QueueCabinetManagementApiRepository(db)
-    try:
-        # Строим запрос
-        query = repository.query_daily_queues()
-
-        # Фильтры по датам
-        if date_from:
-            try:
-                date_from_obj = datetime.strptime(date_from, "%Y-%m-%d").date()
-                query = query.filter(DailyQueue.day >= date_from_obj)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты начала. Используйте YYYY-MM-DD",
-                )
-
-        if date_to:
-            try:
-                date_to_obj = datetime.strptime(date_to, "%Y-%m-%d").date()
-                query = query.filter(DailyQueue.day <= date_to_obj)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты окончания. Используйте YYYY-MM-DD",
-                )
-
-        queues = query.all()
-
-        # Собираем статистику
-        cabinet_stats = {}
+        cabinet_stats: dict[str, dict[str, Any]] = {}
         total_queues = len(queues)
         queues_with_cabinet = 0
 
         for queue in queues:
-            if queue.cabinet_number:
-                queues_with_cabinet += 1
+            if not queue.cabinet_number:
+                continue
 
-                if queue.cabinet_number not in cabinet_stats:
-                    cabinet_stats[queue.cabinet_number] = {
-                        "cabinet_number": queue.cabinet_number,
-                        "cabinet_floor": queue.cabinet_floor,
-                        "cabinet_building": queue.cabinet_building,
-                        "queue_count": 0,
-                        "total_entries": 0,
-                        "specialists": set(),
-                    }
+            queues_with_cabinet += 1
+            if queue.cabinet_number not in cabinet_stats:
+                cabinet_stats[queue.cabinet_number] = {
+                    "cabinet_number": queue.cabinet_number,
+                    "cabinet_floor": queue.cabinet_floor,
+                    "cabinet_building": queue.cabinet_building,
+                    "queue_count": 0,
+                    "total_entries": 0,
+                    "specialists": set(),
+                }
 
-                cabinet_stats[queue.cabinet_number]["queue_count"] += 1
-                cabinet_stats[queue.cabinet_number]["specialists"].add(
-                    queue.specialist_id
-                )
+            cabinet_stats[queue.cabinet_number]["queue_count"] += 1
+            cabinet_stats[queue.cabinet_number]["specialists"].add(queue.specialist_id)
+            cabinet_stats[queue.cabinet_number]["total_entries"] += self.repository.count_entries(
+                queue_id=queue.id
+            )
 
-                # Подсчитываем записи
-                entries_count = repository.count_entries_for_queue(queue.id)
-                cabinet_stats[queue.cabinet_number]["total_entries"] += entries_count
-
-        # Преобразуем в список и убираем set
         cabinet_list = []
-        for _cabinet_number, stats in cabinet_stats.items():
+        for stats in cabinet_stats.values():
             stats["specialists_count"] = len(stats["specialists"])
-            del stats["specialists"]  # Удаляем set, так как он не сериализуется в JSON
+            del stats["specialists"]
             cabinet_list.append(stats)
-
-        # Сортируем по количеству очередей
-        cabinet_list.sort(key=lambda x: x["queue_count"], reverse=True)
+        cabinet_list.sort(key=lambda item: item["queue_count"], reverse=True)
 
         return {
             "success": True,
@@ -505,11 +302,7 @@ def get_cabinet_statistics(
                 "queues_with_cabinet": queues_with_cabinet,
                 "queues_without_cabinet": total_queues - queues_with_cabinet,
                 "cabinet_coverage": round(
-                    (
-                        (queues_with_cabinet / total_queues * 100)
-                        if total_queues > 0
-                        else 0
-                    ),
+                    (queues_with_cabinet / total_queues * 100) if total_queues else 0,
                     2,
                 ),
                 "unique_cabinets": len(cabinet_stats),
@@ -518,11 +311,5 @@ def get_cabinet_statistics(
             "period": {"date_from": date_from, "date_to": date_to},
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Ошибка получения статистики по кабинетам: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
+    def rollback(self) -> None:
+        self.repository.rollback()

@@ -1,508 +1,151 @@
-"""
-AI Chat Endpoints - REST и WebSocket API для AI чата.
+"""Service layer for ai_chat endpoints."""
 
-Функции:
-- REST API для управления сессиями
-- WebSocket для real-time streaming
-"""
+from __future__ import annotations
 
-import asyncio
-import logging
+from dataclasses import dataclass
+from typing import Any, Callable
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-    WebSocket,
-    WebSocketDisconnect,
-)
-from pydantic import BaseModel, Field
-from pydantic import ConfigDict
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
-from app.core.rbac import AIPermission, has_permission, require_ai_permission
-from app.models.ai_chat import AIChatMessage, AIChatSession
 from app.models.user import User
-from app.services.ai.chat_service import get_chat_service
-from app.repositories.ai_chat_api_repository import AiChatApiRepository
-
-logger = logging.getLogger(__name__)
-
-router = APIRouter()
+from app.repositories.ai_chat_api_repository import AIChatApiRepository
+from app.services.ai.chat_service import AIChatService, get_chat_service
 
 
-
-def _repo(db: Session) -> AiChatApiRepository:
-    return AiChatApiRepository(db)
-
-# =============================================================================
-# Pydantic Schemas
-# =============================================================================
-
-class ChatSessionCreate(BaseModel):
-    """Создание новой сессии"""
-    context_type: str | None = Field(None, description="emr, lab, general, triage")
-    context_id: int | None = Field(None, description="ID связанной сущности")
-    specialty: str | None = Field(None, description="Специализация для персонализации")
+@dataclass
+class AIChatApiDomainError(Exception):
+    status_code: int
+    detail: str
 
 
-class ChatSessionResponse(BaseModel):
-    """Ответ с информацией о сессии"""
-    id: int
-    title: str | None
-    context_type: str | None
-    specialty: str | None
-    is_active: bool
-    message_count: int
-    created_at: str
-    updated_at: str
+class AIChatApiService:
+    """Builds payloads for AI chat REST/WebSocket endpoint handlers."""
 
-    model_config = ConfigDict(from_attributes=True)
+    def __init__(
+        self,
+        db: Session,
+        repository: AIChatApiRepository | None = None,
+        chat_service_factory: Callable[[Session], AIChatService] | None = None,
+    ):
+        self.db = db
+        self.repository = repository or AIChatApiRepository(db)
+        self._chat_service_factory = chat_service_factory or get_chat_service
 
+    def _chat_service(self) -> AIChatService:
+        return self._chat_service_factory(self.db)
 
-class ChatMessageCreate(BaseModel):
-    """Отправка сообщения"""
-    content: str = Field(..., min_length=1, max_length=10000)
-    include_history: bool = Field(True, description="Включить контекст истории")
+    @staticmethod
+    def _session_payload(session) -> dict:
+        return {
+            "id": session.id,
+            "title": session.title,
+            "context_type": session.context_type,
+            "specialty": session.specialty,
+            "is_active": session.is_active,
+            "message_count": len(session.messages),
+            "created_at": session.created_at.isoformat(),
+            "updated_at": session.updated_at.isoformat(),
+        }
 
+    @staticmethod
+    def _message_payload(message) -> dict:
+        return {
+            "id": message.id,
+            "role": message.role,
+            "content": message.content,
+            "provider": message.provider,
+            "model": message.model,
+            "tokens_used": message.tokens_used,
+            "latency_ms": message.latency_ms,
+            "is_error": message.is_error,
+            "was_cached": message.was_cached,
+            "created_at": message.created_at.isoformat(),
+        }
 
-class ChatMessageResponse(BaseModel):
-    """Ответ с сообщением"""
-    id: int
-    role: str
-    content: str
-    provider: str | None
-    model: str | None
-    tokens_used: int | None
-    latency_ms: int | None
-    is_error: bool
-    was_cached: bool
-    created_at: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ChatFeedbackCreate(BaseModel):
-    """Feedback на сообщение AI"""
-    feedback_type: str = Field(..., description="helpful, not_helpful, incorrect, inappropriate")
-    comment: str | None = Field(None, max_length=1000)
-    correction: str | None = Field(None, max_length=5000)
-
-
-# =============================================================================
-# REST API Endpoints
-# =============================================================================
-
-@router.post("/sessions", response_model=ChatSessionResponse)
-async def create_session(
-    request: ChatSessionCreate,
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Создать новую чат-сессию.
-
-    Requires: CHAT permission
-    """
-    service = get_chat_service(db)
-
-    session = await service.get_or_create_session(
-        user_id=current_user.id,
-        context_type=request.context_type,
-        context_id=request.context_id,
-        specialty=request.specialty
-    )
-
-    return ChatSessionResponse(
-        id=session.id,
-        title=session.title,
-        context_type=session.context_type,
-        specialty=session.specialty,
-        is_active=session.is_active,
-        message_count=len(session.messages),
-        created_at=session.created_at.isoformat(),
-        updated_at=session.updated_at.isoformat()
-    )
-
-
-@router.get("/sessions", response_model=list[ChatSessionResponse])
-async def list_sessions(
-    limit: int = Query(20, ge=1, le=100),
-    include_inactive: bool = Query(False),
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Получить список чат-сессий пользователя.
-    """
-    service = get_chat_service(db)
-
-    sessions = await service.get_user_sessions(
-        user_id=current_user.id,
-        limit=limit,
-        include_inactive=include_inactive
-    )
-
-    return [
-        ChatSessionResponse(
-            id=s.id,
-            title=s.title,
-            context_type=s.context_type,
-            specialty=s.specialty,
-            is_active=s.is_active,
-            message_count=len(s.messages),
-            created_at=s.created_at.isoformat(),
-            updated_at=s.updated_at.isoformat()
-        )
-        for s in sessions
-    ]
-
-
-@router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
-async def get_session(
-    session_id: int,
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Получить информацию о сессии.
-    """
-    session = _repo(db).query(AIChatSession).filter(
-        AIChatSession.id == session_id,
-        AIChatSession.user_id == current_user.id
-    ).first()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    return ChatSessionResponse(
-        id=session.id,
-        title=session.title,
-        context_type=session.context_type,
-        specialty=session.specialty,
-        is_active=session.is_active,
-        message_count=len(session.messages),
-        created_at=session.created_at.isoformat(),
-        updated_at=session.updated_at.isoformat()
-    )
-
-
-@router.delete("/sessions/{session_id}")
-async def delete_session(
-    session_id: int,
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Удалить сессию и все сообщения.
-    """
-    service = get_chat_service(db)
-
-    deleted = await service.delete_session(session_id, current_user.id)
-
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    return {"message": "Session deleted", "session_id": session_id}
-
-
-@router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageResponse])
-async def get_messages(
-    session_id: int,
-    limit: int = Query(50, ge=1, le=200),
-    before_id: int | None = Query(None, description="Pagination: get messages before this ID"),
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Получить историю сообщений сессии.
-    """
-    # Проверяем доступ
-    session = _repo(db).query(AIChatSession).filter(
-        AIChatSession.id == session_id,
-        AIChatSession.user_id == current_user.id
-    ).first()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    service = get_chat_service(db)
-    messages = await service.get_history(session_id, limit=limit, before_id=before_id)
-
-    return [
-        ChatMessageResponse(
-            id=m.id,
-            role=m.role,
-            content=m.content,
-            provider=m.provider,
-            model=m.model,
-            tokens_used=m.tokens_used,
-            latency_ms=m.latency_ms,
-            is_error=m.is_error,
-            was_cached=m.was_cached,
-            created_at=m.created_at.isoformat()
-        )
-        for m in messages
-    ]
-
-
-@router.post("/sessions/{session_id}/messages", response_model=ChatMessageResponse)
-async def send_message(
-    session_id: int,
-    request: ChatMessageCreate,
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Отправить сообщение и получить ответ AI.
-
-    Синхронный endpoint (ждет полного ответа).
-    Для streaming используйте WebSocket.
-    """
-    service = get_chat_service(db)
-
-    try:
-        response = await service.send_message(
+    def get_session_payload(self, *, session_id: int, user_id: int) -> dict:
+        session = self.repository.get_session_for_user(
             session_id=session_id,
-            user_id=current_user.id,
-            content=request.content,
-            include_history=request.include_history
+            user_id=user_id,
         )
+        if not session:
+            raise AIChatApiDomainError(status_code=404, detail="Session not found")
+        return self._session_payload(session)
 
-        return ChatMessageResponse(
-            id=response.id,
-            role=response.role,
-            content=response.content,
-            provider=response.provider,
-            model=response.model,
-            tokens_used=response.tokens_used,
-            latency_ms=response.latency_ms,
-            is_error=response.is_error,
-            was_cached=response.was_cached,
-            created_at=response.created_at.isoformat()
+    async def get_messages_payload(
+        self,
+        *,
+        session_id: int,
+        user_id: int,
+        limit: int,
+        before_id: int | None,
+    ) -> list[dict]:
+        session = self.repository.get_session_for_user(
+            session_id=session_id,
+            user_id=user_id,
         )
+        if not session:
+            raise AIChatApiDomainError(status_code=404, detail="Session not found")
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        messages = await self._chat_service().get_history(
+            session_id,
+            limit=limit,
+            before_id=before_id,
+        )
+        return [self._message_payload(message) for message in messages]
 
-
-@router.post("/messages/{message_id}/feedback")
-async def add_feedback(
-    message_id: int,
-    request: ChatFeedbackCreate,
-    current_user: User = Depends(require_ai_permission(AIPermission.CHAT)),
-    db: Session = Depends(get_db)
-):
-    """
-    Добавить feedback на сообщение AI.
-
-    Используется для улучшения качества AI.
-    """
-    # Проверяем что сообщение принадлежит пользователю
-    message = _repo(db).query(AIChatMessage).join(AIChatSession).filter(
-        AIChatMessage.id == message_id,
-        AIChatSession.user_id == current_user.id
-    ).first()
-
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    service = get_chat_service(db)
-
-    try:
-        feedback = await service.add_feedback(
+    async def add_feedback_payload(
+        self,
+        *,
+        message_id: int,
+        user_id: int,
+        feedback_type: str,
+        comment: str | None,
+        correction: str | None,
+    ) -> dict[str, Any]:
+        message = self.repository.get_message_for_user(
             message_id=message_id,
-            user_id=current_user.id,
-            feedback_type=request.feedback_type,
-            comment=request.comment,
-            correction=request.correction
+            user_id=user_id,
         )
+        if not message:
+            raise AIChatApiDomainError(status_code=404, detail="Message not found")
+
+        try:
+            feedback = await self._chat_service().add_feedback(
+                message_id=message_id,
+                user_id=user_id,
+                feedback_type=feedback_type,
+                comment=comment,
+                correction=correction,
+            )
+        except ValueError as exc:
+            raise AIChatApiDomainError(status_code=400, detail=str(exc)) from exc
 
         return {
             "message": "Feedback recorded",
             "feedback_id": feedback.id,
-            "feedback_type": feedback.feedback_type
+            "feedback_type": feedback.feedback_type,
         }
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    def authenticate_websocket_user(
+        self,
+        *,
+        token: str,
+        secret_key: str,
+        algorithm: str,
+    ) -> User | None:
+        try:
+            payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+        except JWTError:
+            return None
 
-
-# =============================================================================
-# WebSocket Endpoint for Streaming
-# =============================================================================
-
-async def authenticate_websocket(token: str, db: Session) -> User | None:
-    """
-    Аутентификация WebSocket по JWT token.
-    """
-    from jose import JWTError, jwt
-
-    from app.core.config import settings
-
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: int = payload.get("sub")
-
+        user_id = payload.get("sub")
         if user_id is None:
             return None
 
-        user = _repo(db).query(User).filter(User.id == user_id).first()
-        return user
-
-    except JWTError:
-        return None
-
-
-@router.websocket("/ws")
-async def chat_websocket(
-    websocket: WebSocket,
-    token: str = Query(..., description="JWT token for authentication"),
-    db: Session = Depends(get_db)
-):
-    """
-    WebSocket для real-time AI чата с streaming.
-
-    Protocol:
-
-    Client -> Server:
-    ```json
-    {
-        "type": "message",
-        "session_id": 123,  // Optional, creates new if not provided
-        "content": "Привет!",
-        "context_type": "general",  // Optional
-        "specialty": "cardio"  // Optional
-    }
-    ```
-
-    Server -> Client (streaming):
-    ```json
-    {"type": "session", "session_id": 123}
-    {"type": "chunk", "content": "Здравст"}
-    {"type": "chunk", "content": "вуйте!"}
-    {"type": "done", "message_id": 456, "provider": "deepseek", "tokens": 42}
-    ```
-
-    Server -> Client (error):
-    ```json
-    {"type": "error", "message": "Rate limit exceeded"}
-    ```
-    """
-    await websocket.accept()
-
-    # Аутентификация
-    user = await authenticate_websocket(token, db)
-
-    if not user:
-        await websocket.close(code=4001, reason="Invalid token")
-        return
-
-    # Проверка permission
-    if not has_permission(user.role, AIPermission.CHAT):
-        await websocket.close(code=4003, reason="Permission denied")
-        return
-
-    logger.info(f"WebSocket chat connected: user={user.id}")
-
-    service = get_chat_service(db)
-    current_session_id: int | None = None
-
-    try:
-        async for message in websocket.iter_json():
-            msg_type = message.get("type", "message")
-
-            if msg_type == "ping":
-                await websocket.send_json({"type": "pong"})
-                continue
-
-            if msg_type == "message":
-                content = message.get("content", "").strip()
-
-                if not content:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "Empty message"
-                    })
-                    continue
-
-                # Получаем или создаем сессию
-                session_id = message.get("session_id") or current_session_id
-
-                if not session_id:
-                    session = await service.get_or_create_session(
-                        user_id=user.id,
-                        context_type=message.get("context_type"),
-                        specialty=message.get("specialty")
-                    )
-                    session_id = session.id
-                    current_session_id = session_id
-
-                    await websocket.send_json({
-                        "type": "session",
-                        "session_id": session_id
-                    })
-
-                # Отправляем сообщение
-                try:
-                    response = await service.send_message(
-                        session_id=session_id,
-                        user_id=user.id,
-                        content=content,
-                        include_history=True
-                    )
-
-                    # Симулируем streaming (отправляем по частям)
-                    # TODO: Реализовать настоящий streaming когда провайдеры поддержат
-                    chunk_size = 20
-                    full_content = response.content
-
-                    for i in range(0, len(full_content), chunk_size):
-                        chunk = full_content[i:i + chunk_size]
-                        await websocket.send_json({
-                            "type": "chunk",
-                            "content": chunk
-                        })
-                        await asyncio.sleep(0.03)  # Небольшая задержка для эффекта typing
-
-                    await websocket.send_json({
-                        "type": "done",
-                        "message_id": response.id,
-                        "provider": response.provider,
-                        "model": response.model,
-                        "tokens": response.tokens_used,
-                        "latency_ms": response.latency_ms,
-                        "cached": response.was_cached
-                    })
-
-                except ValueError as e:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": str(e)
-                    })
-                except Exception as e:
-                    logger.exception(f"Chat error: {e}")
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "Internal error occurred"
-                    })
-
-            elif msg_type == "close_session":
-                if current_session_id:
-                    await service.close_session(current_session_id, user.id)
-                    await websocket.send_json({
-                        "type": "session_closed",
-                        "session_id": current_session_id
-                    })
-                    current_session_id = None
-
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket chat disconnected: user={user.id}")
-    except Exception as e:
-        logger.exception(f"WebSocket error: {e}")
         try:
-            await websocket.close(code=1011, reason=str(e))
-        except:
-            pass
+            parsed_user_id = int(user_id)
+        except (TypeError, ValueError):
+            return None
+
+        return self.repository.get_user(parsed_user_id)

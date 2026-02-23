@@ -1,39 +1,68 @@
-"""Repository helpers for display websocket API."""
+"""Repository helpers for display_websocket endpoints."""
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
-class DisplayWebsocketApiRepository:
-    """Shared DB session adapter for display websocket service."""
+
+class DisplayWebSocketApiRepository:
+    """Encapsulates queue/doctor lookups used by display websocket API."""
 
     def __init__(self, db: Session):
         self.db = db
 
+    def get_queue_entry(self, entry_id: int) -> OnlineQueueEntry | None:
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .first()
+        )
 
-    def query(self, *entities):
-        return self.db.query(*entities)
-
-    def add(self, obj) -> None:
-        self.db.add(obj)
-
-    def delete(self, obj) -> None:
-        self.db.delete(obj)
-
-    def commit(self) -> None:
+    def save(self) -> None:
         self.db.commit()
 
-    def refresh(self, obj) -> None:
-        self.db.refresh(obj)
+    def list_active_entries_for_day(self, *, day: date) -> list[OnlineQueueEntry]:
+        return (
+            self.db.query(OnlineQueueEntry)
+            .join(DailyQueue)
+            .filter(DailyQueue.day == day, DailyQueue.active.is_(True))
+            .all()
+        )
 
-    def rollback(self) -> None:
-        self.db.rollback()
+    def get_active_doctor_by_specialty(self, specialty: str) -> Doctor | None:
+        return (
+            self.db.query(Doctor)
+            .filter(Doctor.specialty == specialty, Doctor.active.is_(True))
+            .first()
+        )
 
-    def flush(self) -> None:
-        self.db.flush()
+    def get_daily_queue_for_specialist(
+        self,
+        *,
+        day: date,
+        specialist_id: int,
+    ) -> DailyQueue | None:
+        return (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.specialist_id == specialist_id,
+            )
+            .first()
+        )
 
-    def execute(self, statement, params=None):
-        if params is None:
-            return self.db.execute(statement)
-        return self.db.execute(statement, params)
+    def get_next_waiting_entry(self, *, queue_id: int) -> OnlineQueueEntry | None:
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id == queue_id,
+                OnlineQueueEntry.status == "waiting",
+            )
+            .order_by(OnlineQueueEntry.number)
+            .first()
+        )

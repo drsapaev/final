@@ -1,172 +1,34 @@
-"""
-API endpoints для изменения порядка очереди
-"""
+"""Service layer for queue_reorder endpoints."""
 
-import logging
+from __future__ import annotations
+
+from dataclasses import dataclass
 from datetime import date
-from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
-from app.db.session import get_db
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.user import User
 from app.repositories.queue_reorder_api_repository import QueueReorderApiRepository
 
-logger = logging.getLogger(__name__)
-router = APIRouter()
+
+@dataclass
+class QueueReorderApiDomainError(Exception):
+    status_code: int
+    detail: str
 
 
+class QueueReorderApiService:
+    """Handles queue reorder business logic and persistence."""
 
-def _repo(db: Session) -> QueueReorderApiRepository:
-    return QueueReorderApiRepository(db)
+    def __init__(
+        self,
+        db: Session,
+        repository: QueueReorderApiRepository | None = None,
+    ):
+        self.repository = repository or QueueReorderApiRepository(db)
 
-class QueueReorderRequest(BaseModel):
-    """Запрос на изменение порядка очереди"""
-
-    queue_id: int
-    entry_orders: list[dict[str, int]]  # [{"entry_id": 1, "new_position": 2}, ...]
-
-    @field_validator('entry_orders')
-    @classmethod
-    def validate_entry_orders(cls, v: list[dict[str, int]]) -> list[dict[str, int]]:
-        if not v:
-            raise ValueError('Список изменений не может быть пустым')
-
-        # Проверяем, что все позиции уникальны
-        positions = [item.get('new_position') for item in v]
-        if len(positions) != len(set(positions)):
-            raise ValueError('Позиции должны быть уникальными')
-
-        # Проверяем, что позиции начинаются с 1
-        if min(positions) < 1:
-            raise ValueError('Позиции должны начинаться с 1')
-
-        return v
-
-
-class QueueReorderResponse(BaseModel):
-    """Ответ на изменение порядка очереди"""
-
-    success: bool
-    message: str
-    updated_entries: int
-    queue_info: dict[str, Any]
-
-
-class QueueEntryMoveRequest(BaseModel):
-    """Запрос на перемещение одной записи в очереди"""
-
-    entry_id: int
-    new_position: int
-
-    @field_validator('new_position')
-    @classmethod
-    def validate_new_position(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError('Позиция должна быть больше 0')
-        return v
-
-
-@router.put("/reorder", response_model=QueueReorderResponse)
-async def reorder_queue(
-    request: QueueReorderRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
-):
-    """
-    Изменение порядка нескольких записей в очереди
-    Доступно администраторам, регистраторам и врачам
-    """
-    try:
-        # Проверяем существование очереди
-        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == request.queue_id).first()
-        if not queue:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
-            )
-
-        # Проверяем права доступа к очереди
-        if current_user.role == "Doctor" and queue.specialist_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет прав для изменения этой очереди",
-            )
-
-        # Получаем все записи очереди
-        entries = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == request.queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .order_by(OnlineQueueEntry.number)
-            .all()
-        )
-
-        if not entries:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="В очереди нет активных записей",
-            )
-
-        # Создаем мапу entry_id -> entry
-        entry_map = {entry.id: entry for entry in entries}
-
-        # Проверяем, что все entry_id из запроса существуют
-        request_entry_ids = {item['entry_id'] for item in request.entry_orders}
-        existing_entry_ids = set(entry_map.keys())
-
-        if not request_entry_ids.issubset(existing_entry_ids):
-            missing_ids = request_entry_ids - existing_entry_ids
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Записи с ID {missing_ids} не найдены в очереди",
-            )
-
-        # Проверяем диапазон позиций
-        max_position = len(entries)
-        for item in request.entry_orders:
-            if item['new_position'] > max_position:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Позиция {item['new_position']} превышает размер очереди ({max_position})",
-                )
-
-        # Применяем изменения
-        updated_count = 0
-        for item in request.entry_orders:
-            entry = entry_map[item['entry_id']]
-            old_position = entry.number
-            new_position = item['new_position']
-
-            if old_position != new_position:
-                entry.number = new_position
-                updated_count += 1
-
-                logger.info(
-                    f"Queue reorder: Entry {entry.id} moved from position {old_position} "
-                    f"to {new_position} by user {current_user.id}"
-                )
-
-        # Сохраняем изменения
-        _repo(db).commit()
-
-        # Обновляем информацию об очереди
-        updated_entries = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == request.queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .order_by(OnlineQueueEntry.number)
-            .all()
-        )
-
-        queue_info = {
+    @staticmethod
+    def _queue_info(queue, entries: list) -> dict:
+        return {
             "queue_id": queue.id,
             "day": queue.day.isoformat(),
             "specialist_name": (
@@ -174,7 +36,10 @@ async def reorder_queue(
                 if (queue.specialist and queue.specialist.user)
                 else "Неизвестно"
             ),
-            "total_entries": len(updated_entries),
+            "specialist_id": queue.specialist_id,
+            "is_active": queue.active,
+            "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
+            "total_entries": len(entries),
             "entries": [
                 {
                     "id": entry.id,
@@ -183,107 +48,102 @@ async def reorder_queue(
                     "phone": entry.phone,
                     "status": entry.status,
                     "source": entry.source,
+                    "created_at": entry.created_at.isoformat(),
+                    "called_at": (
+                        entry.called_at.isoformat() if entry.called_at else None
+                    ),
                 }
-                for entry in updated_entries
+                for entry in entries
             ],
         }
 
-        return QueueReorderResponse(
-            success=True,
-            message=f"Порядок очереди обновлен. Изменено записей: {updated_count}",
-            updated_entries=updated_count,
-            queue_info=queue_info,
-        )
+    def reorder_queue(
+        self,
+        *,
+        queue_id: int,
+        entry_orders: list[dict[str, int]],
+        current_user,
+    ) -> tuple[int, dict]:
+        queue = self.repository.get_queue(queue_id)
+        if not queue:
+            raise QueueReorderApiDomainError(404, "Очередь не найдена")
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error reordering queue: {e}")
-        _repo(db).rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка изменения порядка очереди: {str(e)}",
-        )
-
-
-@router.put("/move-entry", response_model=QueueReorderResponse)
-async def move_queue_entry(
-    request: QueueEntryMoveRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
-):
-    """
-    Перемещение одной записи в очереди на новую позицию
-    Автоматически сдвигает остальные записи
-    """
-    try:
-        # Находим запись
-        entry = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.id == request.entry_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .first()
-        )
-
-        if not entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись в очереди не найдена",
-            )
-
-        # Проверяем права доступа к очереди
-        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
         if current_user.role == "Doctor" and queue.specialist_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет прав для изменения этой очереди",
+            raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
+
+        entries = self.repository.list_active_entries(queue_id=queue_id)
+        if not entries:
+            raise QueueReorderApiDomainError(404, "В очереди нет активных записей")
+
+        entry_map = {entry.id: entry for entry in entries}
+        request_entry_ids = {item["entry_id"] for item in entry_orders}
+        existing_entry_ids = set(entry_map.keys())
+        if not request_entry_ids.issubset(existing_entry_ids):
+            missing_ids = request_entry_ids - existing_entry_ids
+            raise QueueReorderApiDomainError(
+                400,
+                f"Записи с ID {missing_ids} не найдены в очереди",
             )
 
-        # Получаем все записи очереди
-        all_entries = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == entry.queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .order_by(OnlineQueueEntry.number)
-            .all()
-        )
+        max_position = len(entries)
+        for item in entry_orders:
+            if item["new_position"] > max_position:
+                raise QueueReorderApiDomainError(
+                    400,
+                    (
+                        f"Позиция {item['new_position']} превышает размер очереди "
+                        f"({max_position})"
+                    ),
+                )
 
-        if request.new_position > len(all_entries):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Позиция {request.new_position} превышает размер очереди ({len(all_entries)})",
+        updated_count = 0
+        for item in entry_orders:
+            entry = entry_map[item["entry_id"]]
+            new_position = item["new_position"]
+            if entry.number != new_position:
+                entry.number = new_position
+                updated_count += 1
+
+        self.repository.commit()
+        updated_entries = self.repository.list_active_entries(queue_id=queue_id)
+        queue_info = self._queue_info(queue, updated_entries)
+        return updated_count, queue_info
+
+    def move_queue_entry(
+        self,
+        *,
+        entry_id: int,
+        new_position: int,
+        current_user,
+    ) -> tuple[str, int, dict]:
+        entry = self.repository.get_active_entry(entry_id)
+        if not entry:
+            raise QueueReorderApiDomainError(404, "Запись в очереди не найдена")
+
+        queue = self.repository.get_queue(entry.queue_id)
+        if not queue:
+            raise QueueReorderApiDomainError(404, "Очередь не найдена")
+
+        if current_user.role == "Doctor" and queue.specialist_id != current_user.id:
+            raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
+
+        all_entries = self.repository.list_active_entries(queue_id=entry.queue_id)
+        if new_position > len(all_entries):
+            raise QueueReorderApiDomainError(
+                400,
+                f"Позиция {new_position} превышает размер очереди ({len(all_entries)})",
             )
 
         old_position = entry.number
-        new_position = request.new_position
-
         if old_position == new_position:
-            return QueueReorderResponse(
-                success=True,
-                message="Позиция не изменилась",
-                updated_entries=0,
-                queue_info={
-                    "queue_id": queue.id,
-                    "day": queue.day.isoformat(),
-                    "specialist_name": (
-                        queue.specialist.user.full_name
-                        if (queue.specialist and queue.specialist.user)
-                        else "Неизвестно"
-                    ),
-                    "total_entries": len(all_entries),
-                    "entries": [],
-                },
+            return (
+                "Позиция не изменилась",
+                0,
+                self._queue_info(queue, all_entries),
             )
 
-        # Логика перемещения
         updated_count = 0
-
         if old_position < new_position:
-            # Перемещение вниз: сдвигаем записи между old_position+1 и new_position вверх
             for other_entry in all_entries:
                 if other_entry.id == entry.id:
                     continue
@@ -291,7 +151,6 @@ async def move_queue_entry(
                     other_entry.number -= 1
                     updated_count += 1
         else:
-            # Перемещение вверх: сдвигаем записи между new_position и old_position-1 вниз
             for other_entry in all_entries:
                 if other_entry.id == entry.id:
                     continue
@@ -299,204 +158,36 @@ async def move_queue_entry(
                     other_entry.number += 1
                     updated_count += 1
 
-        # Устанавливаем новую позицию для перемещаемой записи
         entry.number = new_position
         updated_count += 1
+        self.repository.commit()
 
-        # Сохраняем изменения
-        _repo(db).commit()
-
-        logger.info(
-            f"Queue entry move: Entry {entry.id} moved from position {old_position} "
-            f"to {new_position} by user {current_user.id}"
+        updated_entries = self.repository.list_active_entries(queue_id=entry.queue_id)
+        queue_info = self._queue_info(queue, updated_entries)
+        return (
+            f"Запись перемещена с позиции {old_position} на позицию {new_position}",
+            updated_count,
+            queue_info,
         )
 
-        # Получаем обновленную информацию об очереди
-        updated_entries = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == entry.queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .order_by(OnlineQueueEntry.number)
-            .all()
+    def get_queue_status_by_specialist(self, *, specialist_id: int, day: date) -> dict:
+        queue = self.repository.get_queue_by_specialist_day(
+            specialist_id=specialist_id,
+            day=day,
         )
-
-        queue_info = {
-            "queue_id": queue.id,
-            "day": queue.day.isoformat(),
-            "specialist_name": (
-                queue.specialist.user.full_name
-                if (queue.specialist and queue.specialist.user)
-                else "Неизвестно"
-            ),
-            "total_entries": len(updated_entries),
-            "entries": [
-                {
-                    "id": entry.id,
-                    "number": entry.number,
-                    "patient_name": entry.patient_name,
-                    "phone": entry.phone,
-                    "status": entry.status,
-                    "source": entry.source,
-                }
-                for entry in updated_entries
-            ],
-        }
-
-        return QueueReorderResponse(
-            success=True,
-            message=f"Запись перемещена с позиции {old_position} на позицию {new_position}",
-            updated_entries=updated_count,
-            queue_info=queue_info,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error moving queue entry: {e}")
-        _repo(db).rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка перемещения записи в очереди: {str(e)}",
-        )
-
-
-@router.get("/status/by-specialist/")
-async def get_queue_status_by_specialist(
-    specialist_id: int,
-    day: date,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Получение текущего состояния очереди по специалисту и дню
-    """
-    try:
-        # Находим очередь
-        queue = (
-            _repo(db).query(DailyQueue)
-            .filter(DailyQueue.specialist_id == specialist_id, DailyQueue.day == day)
-            .first()
-        )
-
         if not queue:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
-            )
+            raise QueueReorderApiDomainError(404, "Очередь не найдена")
 
-        # Получаем записи очереди
-        entries = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == queue.id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .order_by(OnlineQueueEntry.number)
-            .all()
-        )
+        entries = self.repository.list_active_entries(queue_id=queue.id)
+        return self._queue_info(queue, entries)
 
-        return {
-            "queue_id": queue.id,
-            "day": queue.day.isoformat(),
-            "specialist_name": (
-                queue.specialist.user.full_name
-                if (queue.specialist and queue.specialist.user)
-                else "Неизвестно"
-            ),
-            "specialist_id": queue.specialist_id,
-            "is_active": queue.active,
-            "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
-            "total_entries": len(entries),
-            "entries": [
-                {
-                    "id": entry.id,
-                    "number": entry.number,
-                    "patient_name": entry.patient_name,
-                    "phone": entry.phone,
-                    "status": entry.status,
-                    "source": entry.source,
-                    "created_at": entry.created_at.isoformat(),
-                    "called_at": (
-                        entry.called_at.isoformat() if entry.called_at else None
-                    ),
-                }
-                for entry in entries
-            ],
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting queue status by specialist: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения состояния очереди: {str(e)}",
-        )
-
-
-@router.get("/status/{queue_id}")
-async def get_queue_status(
-    queue_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Получение текущего состояния очереди по ID
-    """
-    try:
-        # Проверяем существование очереди
-        queue = _repo(db).query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+    def get_queue_status(self, *, queue_id: int) -> dict:
+        queue = self.repository.get_queue(queue_id)
         if not queue:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Очередь не найдена"
-            )
+            raise QueueReorderApiDomainError(404, "Очередь не найдена")
 
-        # Получаем записи очереди
-        entries = (
-            _repo(db).query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .order_by(OnlineQueueEntry.number)
-            .all()
-        )
+        entries = self.repository.list_active_entries(queue_id=queue_id)
+        return self._queue_info(queue, entries)
 
-        return {
-            "queue_id": queue.id,
-            "day": queue.day.isoformat(),
-            "specialist_name": (
-                queue.specialist.user.full_name
-                if (queue.specialist and queue.specialist.user)
-                else "Неизвестно"
-            ),
-            "specialist_id": queue.specialist_id,
-            "is_active": queue.active,
-            "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
-            "total_entries": len(entries),
-            "entries": [
-                {
-                    "id": entry.id,
-                    "number": entry.number,
-                    "patient_name": entry.patient_name,
-                    "phone": entry.phone,
-                    "status": entry.status,
-                    "source": entry.source,
-                    "created_at": entry.created_at.isoformat(),
-                    "called_at": (
-                        entry.called_at.isoformat() if entry.called_at else None
-                    ),
-                }
-                for entry in entries
-            ],
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting queue status: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения состояния очереди: {str(e)}",
-        )
+    def rollback(self) -> None:
+        self.repository.rollback()

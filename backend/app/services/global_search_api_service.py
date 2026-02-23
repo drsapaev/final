@@ -1,342 +1,185 @@
-"""
-Global Search API endpoint.
-Aggregated search across patients, visits, and lab results.
-"""
+"""Service layer for global_search endpoints."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
-from app.models.global_search_audit import GlobalSearchAudit
-from app.models.lab import LabOrder
-from app.models.patient import Patient
-from app.models.user import User
-from app.models.visit import Visit
 from app.repositories.global_search_api_repository import GlobalSearchApiRepository
 
-router = APIRouter(tags=["search"])
 
+class GlobalSearchApiService:
+    """Aggregates global search results and handles audit logging."""
 
+    def __init__(
+        self,
+        db: Session,
+        repository: GlobalSearchApiRepository | None = None,
+    ):
+        self.repository = repository or GlobalSearchApiRepository(db)
 
-def _repo(db: Session) -> GlobalSearchApiRepository:
-    return GlobalSearchApiRepository(db)
-
-def log_search_query(
-    db: Session,
-    user: User,
-    query: str,
-    result_types: list[str],
-    result_count: int
-):
-    """Log search query to audit table."""
-    try:
-        role = getattr(user, 'role', None) or getattr(user, 'role_name', 'unknown')
-        audit = GlobalSearchAudit(
-            user_id=user.id,
-            role=str(role),
-            query=query[:255],  # Truncate to max length
-            result_types=result_types,
-            result_count=result_count,
-            opened_type=None,
-            opened_id=None,
-            created_at=datetime.utcnow()
-        )
-        _repo(db).add(audit)
-        _repo(db).commit()
-    except Exception as e:
-        # Don't fail search if logging fails
-        _repo(db).rollback()
-        print(f"Audit logging error: {e}")
-
-
-# ============== Response Schemas ==============
-
-class PatientSearchResult(BaseModel):
-    id: int
-    first_name: str | None = None
-    last_name: str | None = None
-    middle_name: str | None = None
-    phone: str | None = None
-    birth_date: date | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class VisitSearchResult(BaseModel):
-    id: int
-    patient_id: int
-    patient_name: str | None = None
-    status: str | None = None
-    visit_date: date | None = None
-    visit_time: str | None = None
-    specialist_name: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LabResultSearchResult(BaseModel):
-    id: int
-    patient_id: int | None = None
-    patient_name: str | None = None
-    status: str
-    test_type: str | None = None
-    created_at: datetime | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class GlobalSearchResponse(BaseModel):
-    patients: list[PatientSearchResult] = []
-    visits: list[VisitSearchResult] = []
-    labResults: list[LabResultSearchResult] = []
-    query: str
-    total: int = 0
-
-
-# ============== Search Logic ==============
-
-def search_patients(db: Session, query: str, limit: int = 5) -> list[PatientSearchResult]:
-    """Search patients by FIO, phone, or ID."""
-    results = []
-
-    # Try exact ID match first
-    if query.isdigit():
-        patient = _repo(db).query(Patient).filter(Patient.id == int(query)).first()
-        if patient:
-            results.append(PatientSearchResult(
-                id=patient.id,
-                first_name=patient.first_name,
-                last_name=patient.last_name,
-                middle_name=getattr(patient, 'middle_name', None),
-                phone=getattr(patient, 'phone', None),
-                birth_date=getattr(patient, 'birth_date', None)
-            ))
-
-    # Search by name/phone
-    search_term = f"%{query}%"
-    stmt = _repo(db).query(Patient).filter(
-        or_(
-            Patient.first_name.ilike(search_term),
-            Patient.last_name.ilike(search_term),
-            Patient.phone.ilike(search_term) if hasattr(Patient, 'phone') else False
-        )
-    ).limit(limit)
-
-    for p in stmt.all():
-        if not any(r.id == p.id for r in results):  # Avoid duplicates
-            results.append(PatientSearchResult(
-                id=p.id,
-                first_name=p.first_name,
-                last_name=p.last_name,
-                middle_name=getattr(p, 'middle_name', None),
-                phone=getattr(p, 'phone', None),
-                birth_date=getattr(p, 'birth_date', None)
-            ))
-
-    return results[:limit]
-
-
-def search_visits(db: Session, query: str, limit: int = 5) -> list[VisitSearchResult]:
-    """Search visits by patient name, visit ID, or today's date."""
-    results = []
-    today = date.today()
-
-    # Try exact visit ID match
-    if query.isdigit():
-        visit = _repo(db).query(Visit).filter(Visit.id == int(query)).first()
-        if visit:
-            patient = _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
-            patient_name = None
+    def search_patients(self, *, query: str, limit: int) -> list[dict]:
+        results = []
+        if query.isdigit():
+            patient = self.repository.get_patient(int(query))
             if patient:
-                patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
+                results.append(self._patient_payload(patient))
 
-            results.append(VisitSearchResult(
-                id=visit.id,
-                patient_id=visit.patient_id,
-                patient_name=patient_name,
-                status=visit.status,
-                visit_date=getattr(visit, 'visit_date', None),
-                visit_time=str(getattr(visit, 'visit_time', '')) if hasattr(visit, 'visit_time') else None,
-                specialist_name=getattr(visit, 'specialist_name', None)
-            ))
+        for patient in self.repository.search_patients(query=query, limit=limit):
+            if not any(result["id"] == patient.id for result in results):
+                results.append(self._patient_payload(patient))
 
-    # Search by patient name in recent visits
-    search_term = f"%{query}%"
-    stmt = (
-        _repo(db).query(Visit)
-        .join(Patient, Visit.patient_id == Patient.id)
-        .filter(
-            or_(
-                Patient.first_name.ilike(search_term),
-                Patient.last_name.ilike(search_term)
-            ),
-            Visit.created_at >= today - timedelta(days=7)  # Last 7 days
-        )
-        .order_by(Visit.created_at.desc())
-        .limit(limit)
-    )
+        return results[:limit]
 
-    for v in stmt.all():
-        if not any(r.id == v.id for r in results):
-            patient = _repo(db).query(Patient).filter(Patient.id == v.patient_id).first()
-            patient_name = None
-            if patient:
-                patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
+    def search_visits(self, *, query: str, limit: int) -> list[dict]:
+        results = []
+        if query.isdigit():
+            visit = self.repository.get_visit(int(query))
+            if visit:
+                patient = self.repository.get_patient(visit.patient_id)
+                results.append(self._visit_payload(visit, patient))
 
-            results.append(VisitSearchResult(
-                id=v.id,
-                patient_id=v.patient_id,
-                patient_name=patient_name,
-                status=v.status,
-                visit_date=getattr(v, 'visit_date', None),
-                visit_time=str(getattr(v, 'visit_time', '')) if hasattr(v, 'visit_time') else None,
-                specialist_name=getattr(v, 'specialist_name', None)
-            ))
+        for visit in self.repository.search_recent_visits_by_patient_name(
+            query=query,
+            since_date=date.today() - timedelta(days=7),
+            limit=limit,
+        ):
+            if not any(result["id"] == visit.id for result in results):
+                patient = self.repository.get_patient(visit.patient_id)
+                results.append(self._visit_payload(visit, patient))
 
-    return results[:limit]
+        return results[:limit]
 
+    def search_lab_results(self, *, query: str, limit: int) -> list[dict]:
+        results = []
+        if query.isdigit():
+            order = self.repository.get_lab_order(int(query))
+            if order:
+                patient = (
+                    self.repository.get_patient(order.patient_id)
+                    if order.patient_id
+                    else None
+                )
+                results.append(self._lab_payload(order, patient))
 
-def search_lab_results(db: Session, query: str, limit: int = 5) -> list[LabResultSearchResult]:
-    """Search lab orders by patient name or order ID."""
-    results = []
+        for order in self.repository.search_lab_orders_by_patient_name(query=query, limit=limit):
+            if not any(result["id"] == order.id for result in results):
+                patient = (
+                    self.repository.get_patient(order.patient_id)
+                    if order.patient_id
+                    else None
+                )
+                results.append(self._lab_payload(order, patient))
 
-    # Try exact order ID match
-    if query.isdigit():
-        order = _repo(db).query(LabOrder).filter(LabOrder.id == int(query)).first()
-        if order:
-            patient = None
-            if order.patient_id:
-                patient = _repo(db).query(Patient).filter(Patient.id == order.patient_id).first()
-            patient_name = None
-            if patient:
-                patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
+        return results[:limit]
 
-            results.append(LabResultSearchResult(
-                id=order.id,
-                patient_id=order.patient_id,
-                patient_name=patient_name,
-                status=order.status,
-                test_type=getattr(order, 'notes', None),
-                created_at=order.created_at
-            ))
+    def search_all(self, *, query: str, limit: int):
+        patients = self.search_patients(query=query, limit=limit)
+        visits = self.search_visits(query=query, limit=limit)
+        lab_results = self.search_lab_results(query=query, limit=limit)
+        return patients, visits, lab_results
 
-    # Search by patient name
-    search_term = f"%{query}%"
-    stmt = (
-        _repo(db).query(LabOrder)
-        .join(Patient, LabOrder.patient_id == Patient.id)
-        .filter(
-            or_(
-                Patient.first_name.ilike(search_term),
-                Patient.last_name.ilike(search_term)
+    def log_search_query(
+        self,
+        *,
+        user,
+        query: str,
+        patients: list[dict],
+        visits: list[dict],
+        lab_results: list[dict],
+        total: int,
+    ) -> None:
+        result_types = []
+        if patients:
+            result_types.append("patient")
+        if visits:
+            result_types.append("visit")
+        if lab_results:
+            result_types.append("lab")
+
+        role = getattr(user, "role", None) or getattr(user, "role_name", "unknown")
+        try:
+            self.repository.create_audit(
+                user_id=user.id,
+                role=str(role),
+                query=query[:255],
+                result_types=result_types,
+                result_count=total,
+                opened_type=None,
+                opened_id=None,
+                created_at=datetime.utcnow(),
             )
-        )
-        .order_by(LabOrder.created_at.desc())
-        .limit(limit)
-    )
+        except Exception:
+            self.repository.rollback()
 
-    for o in stmt.all():
-        if not any(r.id == o.id for r in results):
-            patient = _repo(db).query(Patient).filter(Patient.id == o.patient_id).first()
-            patient_name = None
-            if patient:
-                patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
+    def log_search_click(
+        self,
+        *,
+        user,
+        query: str,
+        opened_type: str,
+        opened_id: int,
+    ) -> dict:
+        role = getattr(user, "role", None) or getattr(user, "role_name", "unknown")
+        try:
+            self.repository.create_audit(
+                user_id=user.id,
+                role=str(role),
+                query=query[:255],
+                result_types=None,
+                result_count=None,
+                opened_type=opened_type,
+                opened_id=opened_id,
+                created_at=datetime.utcnow(),
+            )
+            return {"status": "ok"}
+        except Exception as exc:
+            self.repository.rollback()
+            return {"status": "error", "message": str(exc)}
 
-            results.append(LabResultSearchResult(
-                id=o.id,
-                patient_id=o.patient_id,
-                patient_name=patient_name,
-                status=o.status,
-                test_type=getattr(o, 'notes', None),
-                created_at=o.created_at
-            ))
+    @staticmethod
+    def _patient_payload(patient) -> dict:
+        return {
+            "id": patient.id,
+            "first_name": patient.first_name,
+            "last_name": patient.last_name,
+            "middle_name": getattr(patient, "middle_name", None),
+            "phone": getattr(patient, "phone", None),
+            "birth_date": getattr(patient, "birth_date", None),
+        }
 
-    return results[:limit]
+    @staticmethod
+    def _visit_payload(visit, patient) -> dict:
+        patient_name = None
+        if patient:
+            patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
 
+        return {
+            "id": visit.id,
+            "patient_id": visit.patient_id,
+            "patient_name": patient_name,
+            "status": visit.status,
+            "visit_date": getattr(visit, "visit_date", None),
+            "visit_time": (
+                str(getattr(visit, "visit_time", ""))
+                if hasattr(visit, "visit_time")
+                else None
+            ),
+            "specialist_name": getattr(visit, "specialist_name", None),
+        }
 
-# ============== API Endpoint ==============
+    @staticmethod
+    def _lab_payload(order, patient) -> dict:
+        patient_name = None
+        if patient:
+            patient_name = f"{patient.last_name or ''} {patient.first_name or ''}".strip()
 
-@router.get("/global-search", response_model=GlobalSearchResponse)
-async def global_search(
-    q: str = Query(..., min_length=2, max_length=100, description="Search query"),
-    limit: int = Query(default=5, ge=1, le=20, description="Max results per domain"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Global search across patients, visits, and lab results.
-
-    - **q**: Search query (min 2 characters)
-    - **limit**: Max results per domain (default 5)
-
-    Returns grouped results from all domains.
-    """
-    query = q.strip()
-
-    # Search all domains
-    patients = search_patients(db, query, limit)
-    visits = search_visits(db, query, limit)
-    lab_results = search_lab_results(db, query, limit)
-
-    total = len(patients) + len(visits) + len(lab_results)
-
-    # Audit logging - log the search query
-    result_types = []
-    if patients:
-        result_types.append("patient")
-    if visits:
-        result_types.append("visit")
-    if lab_results:
-        result_types.append("lab")
-
-    log_search_query(db, current_user, query, result_types, total)
-
-    return GlobalSearchResponse(
-        patients=patients,
-        visits=visits,
-        labResults=lab_results,
-        query=query,
-        total=total
-    )
-
-
-class LogClickRequest(BaseModel):
-    opened_type: str  # "patient" | "visit" | "lab"
-    opened_id: int
-    query: str
-
-
-@router.post("/global-search/log-click")
-async def log_search_click(
-    request: LogClickRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Log when user clicks on a search result.
-    Required for audit compliance.
-    """
-    try:
-        role = getattr(current_user, 'role', None) or getattr(current_user, 'role_name', 'unknown')
-        audit = GlobalSearchAudit(
-            user_id=current_user.id,
-            role=str(role),
-            query=request.query[:255],
-            result_types=None,
-            result_count=None,
-            opened_type=request.opened_type,
-            opened_id=request.opened_id,
-            created_at=datetime.utcnow()
-        )
-        _repo(db).add(audit)
-        _repo(db).commit()
-        return {"status": "ok"}
-    except Exception as e:
-        _repo(db).rollback()
-        return {"status": "error", "message": str(e)}
+        return {
+            "id": order.id,
+            "patient_id": order.patient_id,
+            "patient_name": patient_name,
+            "status": order.status,
+            "test_type": getattr(order, "notes", None),
+            "created_at": order.created_at,
+        }

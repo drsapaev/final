@@ -1,39 +1,66 @@
-"""Repository helpers for queue API."""
+"""Repository helpers for queue legacy endpoints."""
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 from sqlalchemy.orm import Session
+
+from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.user import User
 
 
 class QueueApiRepository:
-    """Shared DB session adapter for queue service."""
+    """Encapsulates ORM operations used by legacy queue endpoints."""
 
     def __init__(self, db: Session):
         self.db = db
 
+    def get_doctor_user(self, specialist_id: int) -> User | None:
+        return (
+            self.db.query(User)
+            .filter(User.id == specialist_id, User.role == "Doctor")
+            .first()
+        )
 
-    def query(self, *entities):
-        return self.db.query(*entities)
+    def get_daily_queue(self, *, day: date, specialist_id: int) -> DailyQueue | None:
+        return (
+            self.db.query(DailyQueue)
+            .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
+            .first()
+        )
 
-    def add(self, obj) -> None:
-        self.db.add(obj)
+    def create_daily_queue(self, *, day: date, specialist_id: int) -> DailyQueue:
+        daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
+        self.db.add(daily_queue)
+        self.db.commit()
+        self.db.refresh(daily_queue)
+        return daily_queue
 
-    def delete(self, obj) -> None:
-        self.db.delete(obj)
-
-    def commit(self) -> None:
+    def set_opened_at_now(self, daily_queue: DailyQueue) -> None:
+        daily_queue.opened_at = datetime.now()
         self.db.commit()
 
-    def refresh(self, obj) -> None:
-        self.db.refresh(obj)
+    def get_doctor(self, specialist_id: int) -> Doctor | None:
+        return self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
 
-    def rollback(self) -> None:
-        self.db.rollback()
+    def list_queue_entries(self, *, queue_id: int) -> list[OnlineQueueEntry]:
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == queue_id)
+            .order_by(OnlineQueueEntry.number)
+            .all()
+        )
 
-    def flush(self) -> None:
-        self.db.flush()
+    def get_queue_entry(self, entry_id: int) -> OnlineQueueEntry | None:
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .first()
+        )
 
-    def execute(self, statement, params=None):
-        if params is None:
-            return self.db.execute(statement)
-        return self.db.execute(statement, params)
+    def mark_entry_called(self, entry: OnlineQueueEntry) -> None:
+        entry.status = "called"
+        entry.called_at = datetime.now()
+        self.db.commit()

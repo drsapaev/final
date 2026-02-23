@@ -1,160 +1,50 @@
-"""
-API endpoints для утренней сборки и управления присвоением номеров
-"""
+"""Service layer for morning_assignment endpoints."""
+
+from __future__ import annotations
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
-from app.models.user import User
+from app.repositories.morning_assignment_api_repository import (
+    MorningAssignmentApiRepository,
+)
 from app.services.morning_assignment import (
     MorningAssignmentService,
+    get_assignment_stats,
+    run_morning_assignment,
 )
-from app.repositories.morning_assignment_api_repository import MorningAssignmentApiRepository
-
-router = APIRouter()
 
 
-def _repo(db: Session) -> MorningAssignmentApiRepository:
-    return MorningAssignmentApiRepository(db)
+class MorningAssignmentApiService:
+    """Builds payloads for morning assignment API endpoints."""
 
-# ===================== МОДЕЛИ ДАННЫХ =====================
+    def __init__(
+        self,
+        db: Session,
+        repository: MorningAssignmentApiRepository | None = None,
+    ):
+        self.repository = repository or MorningAssignmentApiRepository(db)
 
+    @staticmethod
+    def parse_target_date(target_date: str | None) -> date:
+        if not target_date:
+            return date.today()
+        return datetime.strptime(target_date, "%Y-%m-%d").date()
 
-class MorningAssignmentResponse(BaseModel):
-    success: bool
-    message: str
-    processed_visits: int
-    assigned_queues: int
-    assigned_visits: int | None = None
-    total_queue_entries: int | None = None
-    errors: list
-    date: str
+    def run_assignment_for_date(self, *, target_date: date) -> dict:
+        return run_morning_assignment(target_date)
 
+    def get_stats_for_date(self, *, target_date: date) -> dict:
+        return get_assignment_stats(target_date)
 
-class AssignmentStatsResponse(BaseModel):
-    date: str
-    confirmed_visits: int
-    processed_visits: int
-    queue_entries: int
-    pending_processing: int
-
-
-class ManualAssignmentRequest(BaseModel):
-    visit_ids: list[int] = Field(..., description="Список ID визитов для обработки")
-    force: bool = Field(
-        default=False, description="Принудительная обработка даже если уже есть номера"
-    )
-
-
-# ===================== УТРЕННЯЯ СБОРКА =====================
-
-
-@router.post("/admin/morning-assignment/run", response_model=MorningAssignmentResponse)
-def run_morning_assignment_manual(
-    target_date: str | None = Query(
-        None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
-    """
-    Ручной запуск утренней сборки для присвоения номеров в очередях
-    Обрабатывает все подтвержденные визиты на указанную дату
-    """
-    try:
-        # Парсим дату
-        if target_date:
-            try:
-                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
-        else:
-            parsed_date = date.today()
-
-        # Запускаем утреннюю сборку
-        service = MorningAssignmentService(db)
-        result = service.run_assignment_job(parsed_date)
-
-        return MorningAssignmentResponse(**result)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запуска утренней сборки: {str(e)}",
-        )
-
-
-@router.get("/admin/morning-assignment/stats", response_model=AssignmentStatsResponse)
-def get_morning_assignment_stats(
-    target_date: str | None = Query(
-        None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """
-    Получение статистики утренней сборки
-    Показывает количество обработанных визитов и записей в очередях
-    """
-    try:
-        # Парсим дату
-        if target_date:
-            try:
-                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
-        else:
-            parsed_date = date.today()
-
-        # Получаем статистику
-        service = MorningAssignmentService(db)
-        stats = service.get_morning_assignment_stats(parsed_date)
-
-        return AssignmentStatsResponse(**stats)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
-
-
-@router.post("/admin/morning-assignment/manual")
-def manual_assignment_for_visits(
-    request: ManualAssignmentRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
-    """
-    Ручное присвоение номеров для конкретных визитов
-    Полезно для исправления ошибок или обработки отдельных случаев
-    """
-    try:
+    def manual_assignment_for_visits(self, *, visit_ids: list[int], force: bool) -> dict:
         with MorningAssignmentService() as service:
-            service.db = db
-
+            service.db = self.repository.db
             results = []
 
-            for visit_id in request.visit_ids:
-                # Получаем визит
-                from app.models.visit import Visit
-
-                visit = _repo(db).query(Visit).filter(Visit.id == visit_id).first()
-
+            for visit_id in visit_ids:
+                visit = self.repository.get_visit(visit_id)
                 if not visit:
                     results.append(
                         {
@@ -165,22 +55,24 @@ def manual_assignment_for_visits(
                     )
                     continue
 
-                if visit.status not in ["confirmed", "open"] and not request.force:
+                if visit.status not in ["confirmed", "open"] and not force:
                     results.append(
                         {
                             "visit_id": visit_id,
                             "success": False,
-                            "message": f"Визит имеет статус {visit.status}, используйте force=true для принудительной обработки",
+                            "message": (
+                                f"Визит имеет статус {visit.status}, "
+                                "используйте force=true для принудительной обработки"
+                            ),
                         }
                     )
                     continue
 
                 try:
-                    # Присваиваем номера для визита
                     queue_assignments = service._assign_queues_for_visit(
-                        visit, visit.visit_date
+                        visit,
+                        visit.visit_date,
                     )
-
                     if queue_assignments:
                         visit.status = "open"
                         results.append(
@@ -199,75 +91,31 @@ def manual_assignment_for_visits(
                                 "message": "Не удалось присвоить номера",
                             }
                         )
-
-                except Exception as e:
+                except Exception as exc:  # noqa: BLE001
                     results.append(
                         {
                             "visit_id": visit_id,
                             "success": False,
-                            "message": f"Ошибка: {str(e)}",
+                            "message": f"Ошибка: {str(exc)}",
                         }
                     )
 
-            _repo(db).commit()
-
+            self.repository.commit()
             return {
                 "success": True,
-                "message": f"Обработано {len(request.visit_ids)} визитов",
+                "message": f"Обработано {len(visit_ids)} визитов",
                 "results": results,
             }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        _repo(db).rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка ручного присвоения: {str(e)}",
-        )
-
-
-# ===================== ИНФОРМАЦИОННЫЕ ЭНДПОИНТЫ =====================
-
-
-@router.get("/admin/morning-assignment/pending-visits")
-def get_pending_visits(
-    target_date: str | None = Query(
-        None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """
-    Получение списка визитов, ожидающих присвоения номеров
-    """
-    try:
-        # Парсим дату
-        if target_date:
-            try:
-                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
-        else:
-            parsed_date = date.today()
-
+    def get_pending_visits_payload(self, *, target_date: date) -> dict:
         with MorningAssignmentService() as service:
-            service.db = db
-            pending_visits = service._get_confirmed_visits_without_queues(parsed_date)
+            service.db = self.repository.db
+            pending_visits = service._get_confirmed_visits_without_queues(target_date)
 
             visits_info = []
             for visit in pending_visits:
-                from app.models.patient import Patient
-
-                patient = (
-                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
-                )
-
+                patient = self.repository.get_patient(visit.patient_id)
                 queue_tags = service._get_visit_queue_tags(visit)
-
                 visits_info.append(
                     {
                         "visit_id": visit.id,
@@ -279,9 +127,7 @@ def get_pending_visits(
                         "visit_time": visit.visit_time,
                         "status": visit.status,
                         "confirmed_at": (
-                            visit.confirmed_at.isoformat()
-                            if visit.confirmed_at
-                            else None
+                            visit.confirmed_at.isoformat() if visit.confirmed_at else None
                         ),
                         "queue_tags": list(queue_tags),
                         "department": visit.department,
@@ -290,67 +136,23 @@ def get_pending_visits(
 
             return {
                 "success": True,
-                "date": parsed_date.isoformat(),
+                "date": target_date.isoformat(),
                 "pending_visits_count": len(pending_visits),
                 "pending_visits": visits_info,
             }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения ожидающих визитов: {str(e)}",
-        )
-
-
-@router.get("/admin/morning-assignment/queue-summary")
-def get_queue_summary(
-    target_date: str | None = Query(
-        None, description="Дата в формате YYYY-MM-DD, по умолчанию сегодня"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """
-    Получение сводки по очередям на указанную дату
-    """
-    try:
-        # Парсим дату
-        if target_date:
-            try:
-                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат даты. Используйте YYYY-MM-DD",
-                )
-        else:
-            parsed_date = date.today()
-
-        from app.models.clinic import Doctor
-        from app.models.online_queue import DailyQueue, OnlineQueueEntry
-
-        # Получаем все очереди на дату
-        queues = _repo(db).query(DailyQueue).filter(DailyQueue.day == parsed_date).all()
-
+    def get_queue_summary_payload(self, *, target_date: date) -> dict:
+        queues = self.repository.list_daily_queues(day=target_date)
         queue_summary = []
-        for queue in queues:
-            # Подсчитываем записи в очереди
-            entries_count = (
-                _repo(db).query(OnlineQueueEntry)
-                .filter(OnlineQueueEntry.queue_id == queue.id)
-                .count()
-            )
 
-            # Получаем информацию о враче
-            doctor = _repo(db).query(Doctor).filter(Doctor.id == queue.specialist_id).first()
+        for queue in queues:
+            entries_count = self.repository.count_queue_entries(queue_id=queue.id)
+            doctor = self.repository.get_doctor(queue.specialist_id)
             doctor_name = (
                 doctor.user.full_name
                 if doctor and doctor.user
                 else f"ID:{queue.specialist_id}"
             )
-
             queue_summary.append(
                 {
                     "queue_id": queue.id,
@@ -359,24 +161,17 @@ def get_queue_summary(
                     "doctor_id": queue.specialist_id,
                     "entries_count": entries_count,
                     "active": queue.active,
-                    "opened_at": (
-                        queue.opened_at.isoformat() if queue.opened_at else None
-                    ),
+                    "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
                 }
             )
 
         return {
             "success": True,
-            "date": parsed_date.isoformat(),
+            "date": target_date.isoformat(),
             "queues_count": len(queues),
-            "total_entries": sum(q["entries_count"] for q in queue_summary),
+            "total_entries": sum(item["entries_count"] for item in queue_summary),
             "queues": queue_summary,
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки очередей: {str(e)}",
-        )
+    def rollback(self) -> None:
+        self.repository.rollback()

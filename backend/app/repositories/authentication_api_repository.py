@@ -1,39 +1,26 @@
-"""Repository helpers for authentication API."""
+"""Repository helpers for authentication endpoints."""
 
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.models.authentication import UserSession
+
 
 class AuthenticationApiRepository:
-    """Shared DB session adapter for authentication service."""
+    """Encapsulates ORM operations used directly by authentication endpoints."""
 
     def __init__(self, db: Session):
         self.db = db
 
-
-    def query(self, *entities):
-        return self.db.query(*entities)
-
-    def add(self, obj) -> None:
-        self.db.add(obj)
-
-    def delete(self, obj) -> None:
-        self.db.delete(obj)
-
     def commit(self) -> None:
         self.db.commit()
 
-    def refresh(self, obj) -> None:
-        self.db.refresh(obj)
+    def refresh_user(self, user) -> None:
+        self.db.refresh(user)
 
     def rollback(self) -> None:
         self.db.rollback()
 
-    def flush(self) -> None:
-        self.db.flush()
-
-    def execute(self, statement, params=None):
-        if params is None:
-            return self.db.execute(statement)
-        return self.db.execute(statement, params)
+    def get_user_session(self, session_id: int) -> UserSession | None:
+        return self.db.query(UserSession).filter(UserSession.id == session_id).first()

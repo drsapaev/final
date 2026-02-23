@@ -1,155 +1,93 @@
-from datetime import datetime, timedelta
+"""Service layer for lightweight analytics endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from __future__ import annotations
 
-from app.api.deps import get_db, require_roles
-from app.repositories.analytics_simple_api_repository import AnalyticsSimpleApiRepository
+from dataclasses import dataclass
+from datetime import date, timedelta
+from typing import Any
 
-router = APIRouter()
-
+from app.repositories.analytics_simple_repository import AnalyticsSimpleRepository
 
 
-def _repo(db: Session) -> AnalyticsSimpleApiRepository:
-    return AnalyticsSimpleApiRepository(db)
-
-@router.get("/quick-stats")
-async def get_quick_stats(
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
-    db: Session = Depends(get_db),
-):
-    """Получение быстрой статистики"""
-    try:
-        # Простые подсчеты без сложных запросов
-        today = datetime.now().date()
-
-        # Импортируем модели здесь
-        from app.models.appointment import Appointment
-        from app.models.patient import Patient
-        from app.models.payment_webhook import PaymentWebhook
-
-        # Подсчитываем пациентов
-        total_patients = _repo(db).query(Patient).count()
-
-        # Подсчитываем записи на сегодня
-        today_appointments = (
-            _repo(db).query(Appointment)
-            .filter(func.date(Appointment.appointment_date) == today)
-            .count()
-        )
-
-        # Подсчитываем общие записи
-        total_appointments = _repo(db).query(Appointment).count()
-
-        # Подсчитываем платежи
-        total_payments = _repo(db).query(PaymentWebhook).count()
-
-        return {
-            "total_patients": total_patients,
-            "today_appointments": today_appointments,
-            "total_appointments": total_appointments,
-            "total_payments": total_payments,
-            "date": today.isoformat(),
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
-        )
+@dataclass
+class AnalyticsSimpleDomainError(Exception):
+    status_code: int
+    detail: str
 
 
-@router.get("/dashboard")
-async def get_dashboard_data(
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
-    db: Session = Depends(get_db),
-):
-    """Получение данных для дашборда"""
-    try:
-        today = datetime.now().date()
+class AnalyticsSimpleApiService:
+    """Orchestrates simple analytics payloads for API controllers."""
 
-        # Импортируем модели
-        from app.models.appointment import Appointment
-        from app.models.patient import Patient
-        from app.models.payment_webhook import PaymentWebhook
+    def __init__(
+        self,
+        db,  # type: ignore[no-untyped-def]
+        repository: AnalyticsSimpleRepository | None = None,
+    ):
+        self.repository = repository or AnalyticsSimpleRepository(db)
 
-        # Базовые метрики
-        total_patients = _repo(db).query(Patient).count()
-        total_appointments = _repo(db).query(Appointment).count()
-        total_payments = _repo(db).query(PaymentWebhook).count()
+    def get_quick_stats(self) -> dict[str, Any]:
+        try:
+            today = date.today()
+            return {
+                "total_patients": self.repository.count_patients(),
+                "today_appointments": self.repository.count_appointments_for_date(today),
+                "total_appointments": self.repository.count_appointments(),
+                "total_payments": self.repository.count_payments(),
+                "date": today.isoformat(),
+            }
+        except Exception as exc:
+            raise AnalyticsSimpleDomainError(
+                status_code=500,
+                detail=f"Ошибка получения статистики: {exc}",
+            ) from exc
 
-        # Записи на сегодня
-        today_appointments = (
-            _repo(db).query(Appointment)
-            .filter(func.date(Appointment.appointment_date) == today)
-            .count()
-        )
+    def get_dashboard_data(self) -> dict[str, Any]:
+        try:
+            today = date.today()
+            tomorrow = today + timedelta(days=1)
 
-        # Записи на завтра
-        tomorrow = today + timedelta(days=1)
-        tomorrow_appointments = (
-            _repo(db).query(Appointment)
-            .filter(func.date(Appointment.appointment_date) == tomorrow)
-            .count()
-        )
+            return {
+                "overview": {
+                    "total_patients": self.repository.count_patients(),
+                    "total_appointments": self.repository.count_appointments(),
+                    "total_payments": self.repository.count_payments(),
+                },
+                "today": {
+                    "appointments": self.repository.count_appointments_for_date(today),
+                    "date": today.isoformat(),
+                },
+                "tomorrow": {
+                    "appointments": self.repository.count_appointments_for_date(tomorrow),
+                    "date": tomorrow.isoformat(),
+                },
+            }
+        except Exception as exc:
+            raise AnalyticsSimpleDomainError(
+                status_code=500,
+                detail=f"Ошибка получения данных дашборда: {exc}",
+            ) from exc
 
-        return {
-            "overview": {
-                "total_patients": total_patients,
-                "total_appointments": total_appointments,
-                "total_payments": total_payments,
-            },
-            "today": {"appointments": today_appointments, "date": today.isoformat()},
-            "tomorrow": {
-                "appointments": tomorrow_appointments,
-                "date": tomorrow.isoformat(),
-            },
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения данных дашборда: {str(e)}"
-        )
+    def get_trends_analytics(self, *, days: int) -> dict[str, Any]:
+        try:
+            end_date = date.today()
+            start_date = end_date - timedelta(days=days)
 
-
-@router.get("/trends")
-async def get_trends_analytics(
-    days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
-    db: Session = Depends(get_db),
-):
-    """Получение трендов за последние N дней"""
-    try:
-        from app.models.appointment import Appointment
-
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=days)
-
-        # Простой подсчет записей по дням
-        appointments_by_day = (
-            _repo(db).query(
-                func.date(Appointment.appointment_date).label('date'),
-                func.count(Appointment.id).label('count'),
+            trends = self.repository.list_appointment_trends(
+                start_date=start_date,
+                end_date=end_date,
             )
-            .filter(
-                func.date(Appointment.appointment_date) >= start_date,
-                func.date(Appointment.appointment_date) <= end_date,
-            )
-            .group_by(func.date(Appointment.appointment_date))
-            .all()
-        )
+            trends_data = [
+                {"date": row.date.isoformat(), "appointments": row.count} for row in trends
+            ]
 
-        trends_data = []
-        for row in appointments_by_day:
-            trends_data.append(
-                {"date": row.date.isoformat(), "appointments": row.count}
-            )
-
-        return {
-            "period_days": days,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "trends": trends_data,
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения трендов: {str(e)}"
-        )
+            return {
+                "period_days": days,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "trends": trends_data,
+            }
+        except Exception as exc:
+            raise AnalyticsSimpleDomainError(
+                status_code=500,
+                detail=f"Ошибка получения трендов: {exc}",
+            ) from exc

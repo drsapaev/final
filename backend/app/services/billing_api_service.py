@@ -1,616 +1,168 @@
-"""
-API endpoints для автоматического выставления счетов
-"""
+"""Service layer for billing endpoints."""
 
-from datetime import date, datetime
+from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from pydantic import ConfigDict
+from dataclasses import dataclass
+from datetime import date
+from typing import Callable
+
 from sqlalchemy.orm import Session
 
-from app.api import deps
-from app.models.billing import InvoiceStatus, InvoiceType, PaymentMethod, RecurrenceType
-from app.models.user import User
-from app.services.billing_service import BillingService
+from app.models.billing import InvoiceStatus
 from app.repositories.billing_api_repository import BillingApiRepository
 
-router = APIRouter()
+
+@dataclass
+class BillingApiDomainError(Exception):
+    status_code: int
+    detail: str
 
 
+class BillingApiService:
+    """Handles endpoint-level DB logic for billing APIs."""
 
-def _repo(db: Session) -> BillingApiRepository:
-    return BillingApiRepository(db)
+    def __init__(
+        self,
+        db: Session,
+        repository: BillingApiRepository | None = None,
+    ):
+        self.repository = repository or BillingApiRepository(db)
 
-# === Pydantic схемы ===
+    def configure_recurring_invoice(
+        self,
+        *,
+        invoice,
+        recurrence_type,
+        recurrence_interval: int,
+        next_date_calculator: Callable,
+    ) -> None:
+        invoice.is_recurring = True
+        invoice.recurrence_type = recurrence_type
+        invoice.recurrence_interval = recurrence_interval
+        invoice.next_invoice_date = next_date_calculator(
+            invoice.issue_date,
+            recurrence_type,
+            recurrence_interval,
+        )
+        self.repository.commit()
 
-
-class InvoiceItemCreate(BaseModel):
-    service_id: int | None = None
-    description: str = Field(..., min_length=1, max_length=500)
-    quantity: float = Field(..., gt=0)
-    unit_price: float = Field(..., ge=0)
-    discount_rate: float = Field(0, ge=0, le=100)
-    notes: str | None = None
-
-
-class InvoiceCreate(BaseModel):
-    patient_id: int
-    visit_id: int | None = None
-    appointment_id: int | None = None
-    invoice_type: InvoiceType = InvoiceType.STANDARD
-    items: list[InvoiceItemCreate] = Field(..., min_length=1)
-    description: str | None = None
-    notes: str | None = None
-    payment_terms: str | None = None
-    due_days: int = Field(30, ge=1, le=365)
-    auto_send: bool = False
-    send_reminders: bool = True
-    # Периодические счета
-    is_recurring: bool = False
-    recurrence_type: RecurrenceType | None = None
-    recurrence_interval: int = Field(1, ge=1)
-
-
-class InvoiceUpdate(BaseModel):
-    description: str | None = None
-    notes: str | None = None
-    payment_terms: str | None = None
-    due_date: datetime | None = None
-    auto_send: bool | None = None
-    send_reminders: bool | None = None
-    status: InvoiceStatus | None = None
-
-
-class PaymentCreate(BaseModel):
-    invoice_id: int
-    amount: float = Field(..., gt=0)
-    payment_method: PaymentMethod
-    reference_number: str | None = Field(None, max_length=100)
-    description: str | None = None
-    notes: str | None = None
-
-
-class InvoiceTemplateCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    description: str | None = None
-    template_content: str = Field(..., min_length=1)
-    css_styles: str | None = None
-    is_default: bool = False
-    auto_generate_for_visits: bool = False
-    auto_generate_for_appointments: bool = False
-    auto_send_email: bool = False
-    auto_send_sms: bool = False
-
-
-class BillingRuleCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    description: str | None = None
-    trigger_event: str = Field(
-        ..., pattern=r'^(visit_completed|appointment_created|service_added)$'
-    )
-    service_types: str | None = None  # JSON строка
-    patient_categories: str | None = None  # JSON строка
-    amount_threshold_min: float | None = Field(None, ge=0)
-    amount_threshold_max: float | None = Field(None, ge=0)
-    invoice_type: InvoiceType = InvoiceType.STANDARD
-    payment_terms_days: int = Field(30, ge=1, le=365)
-    auto_send: bool = False
-    send_reminders: bool = True
-    template_id: int | None = None
-    priority: int = Field(0, ge=0)
-
-
-class BillingSettingsUpdate(BaseModel):
-    invoice_number_prefix: str | None = Field(None, max_length=10)
-    default_tax_rate: float | None = Field(None, ge=0, le=100)
-    tax_included_in_price: bool | None = None
-    default_payment_terms_days: int | None = Field(None, ge=1, le=365)
-    overdue_threshold_days: int | None = Field(None, ge=1, le=365)
-    auto_generate_invoices: bool | None = None
-    auto_send_invoices: bool | None = None
-    auto_send_reminders: bool | None = None
-    reminder_days_before: str | None = None
-    reminder_days_after: str | None = None
-    currency_code: str | None = Field(None, max_length=3)
-    currency_symbol: str | None = Field(None, max_length=5)
-    company_name: str | None = Field(None, max_length=255)
-    company_address: str | None = None
-    company_phone: str | None = Field(None, max_length=50)
-    company_email: str | None = Field(None, max_length=100)
-    company_website: str | None = Field(None, max_length=100)
-
-
-class InvoiceResponse(BaseModel):
-    id: int
-    invoice_number: str
-    patient_id: int
-    visit_id: int | None
-    appointment_id: int | None
-    invoice_type: str
-    status: str
-    subtotal: float
-    tax_rate: float
-    tax_amount: float
-    discount_amount: float
-    total_amount: float
-    paid_amount: float
-    balance: float
-    issue_date: datetime
-    due_date: datetime | None
-    paid_date: datetime | None
-    description: str | None
-    notes: str | None
-    is_auto_generated: bool
-    is_recurring: bool
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class PaymentResponse(BaseModel):
-    id: int
-    payment_number: str
-    invoice_id: int
-    patient_id: int
-    amount: float
-    payment_method: str
-    payment_date: datetime
-    reference_number: str | None
-    description: str | None
-    is_confirmed: bool
-    confirmed_at: datetime | None
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# === API endpoints ===
-
-
-@router.post("/invoices", response_model=InvoiceResponse)
-def create_invoice(
-    invoice_data: InvoiceCreate,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Создать счет"""
-    service = BillingService(db)
-
-    try:
-        # Преобразуем данные позиций
-        services = []
-        for item in invoice_data.items:
-            services.append(
-                {
-                    'service_id': item.service_id,
-                    'description': item.description,
-                    'quantity': item.quantity,
-                    'unit_price': item.unit_price,
-                    'discount_rate': item.discount_rate,
-                    'notes': item.notes,
-                }
-            )
-
-        invoice = service.create_invoice(
-            patient_id=invoice_data.patient_id,
-            services=services,
-            visit_id=invoice_data.visit_id,
-            appointment_id=invoice_data.appointment_id,
-            invoice_type=invoice_data.invoice_type,
-            due_days=invoice_data.due_days,
-            auto_send=invoice_data.auto_send,
-            created_by=current_user.id,
+    def list_invoices(
+        self,
+        *,
+        skip: int,
+        limit: int,
+        patient_id: int | None,
+        status,
+        invoice_type,
+        date_from: date | None,
+        date_to: date | None,
+    ):
+        return self.repository.list_invoices(
+            skip=skip,
+            limit=limit,
+            patient_id=patient_id,
+            status=status,
+            invoice_type=invoice_type,
+            date_from=date_from,
+            date_to=date_to,
         )
 
-        # Настраиваем периодичность если нужно
-        if invoice_data.is_recurring:
-            invoice.is_recurring = True
-            invoice.recurrence_type = invoice_data.recurrence_type
-            invoice.recurrence_interval = invoice_data.recurrence_interval
-            invoice.next_invoice_date = service._calculate_next_recurrence_date(
-                invoice.issue_date,
-                invoice_data.recurrence_type,
-                invoice_data.recurrence_interval,
-            )
-            _repo(db).commit()
-
-        # Создаем напоминания
-        if invoice_data.send_reminders:
-            service.create_payment_reminders(invoice.id)
-
+    def get_invoice_or_error(self, *, invoice_id: int):
+        invoice = self.repository.get_invoice(invoice_id)
+        if not invoice:
+            raise BillingApiDomainError(404, "Счет не найден")
         return invoice
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
+    def update_invoice(self, *, invoice_id: int, update_data: dict):
+        invoice = self.get_invoice_or_error(invoice_id=invoice_id)
+        for field, value in update_data.items():
+            setattr(invoice, field, value)
+        self.repository.commit()
+        self.repository.refresh(invoice)
+        return invoice
 
-@router.get("/invoices", response_model=list[InvoiceResponse])
-def get_invoices(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    patient_id: int | None = None,
-    status: InvoiceStatus | None = None,
-    invoice_type: InvoiceType | None = None,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Получить список счетов"""
-    from app.models.billing import Invoice
+    def delete_invoice(self, *, invoice_id: int) -> None:
+        invoice = self.get_invoice_or_error(invoice_id=invoice_id)
+        if invoice.status != InvoiceStatus.DRAFT:
+            raise BillingApiDomainError(400, "Можно удалять только черновики")
+        self.repository.delete(invoice)
 
-    query = _repo(db).query(Invoice)
-
-    if patient_id:
-        query = query.filter(Invoice.patient_id == patient_id)
-    if status:
-        query = query.filter(Invoice.status == status)
-    if invoice_type:
-        query = query.filter(Invoice.invoice_type == invoice_type)
-    if date_from:
-        query = query.filter(Invoice.issue_date >= date_from)
-    if date_to:
-        query = query.filter(Invoice.issue_date <= date_to)
-
-    invoices = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
-    return invoices
-
-
-@router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
-def get_invoice(
-    invoice_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Получить счет по ID"""
-    from app.models.billing import Invoice
-
-    invoice = _repo(db).query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Счет не найден")
-
-    return invoice
-
-
-@router.put("/invoices/{invoice_id}", response_model=InvoiceResponse)
-def update_invoice(
-    invoice_id: int,
-    invoice_data: InvoiceUpdate,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Обновить счет"""
-    from app.models.billing import Invoice
-
-    invoice = _repo(db).query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Счет не найден")
-
-    # Обновляем поля
-    for field, value in invoice_data.dict(exclude_unset=True).items():
-        setattr(invoice, field, value)
-
-    _repo(db).commit()
-    _repo(db).refresh(invoice)
-    return invoice
-
-
-@router.delete("/invoices/{invoice_id}")
-def delete_invoice(
-    invoice_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Удалить счет"""
-    from app.models.billing import Invoice
-
-    invoice = _repo(db).query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Счет не найден")
-
-    # Можно удалять только черновики
-    if invoice.status != InvoiceStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Можно удалять только черновики")
-
-    _repo(db).delete(invoice)
-    _repo(db).commit()
-    return {"message": "Счет удален"}
-
-
-@router.get("/invoices/{invoice_id}/html")
-def get_invoice_html(
-    invoice_id: int,
-    template_id: int | None = None,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Получить HTML счета"""
-    service = BillingService(db)
-
-    try:
-        html_content = service.generate_invoice_html(invoice_id, template_id)
-        return {"html": html_content}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/invoices/{invoice_id}/send")
-def send_invoice(
-    invoice_id: int,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Отправить счет пациенту"""
-    service = BillingService(db)
-
-    # Добавляем задачу в фон
-    background_tasks.add_task(service.send_invoice, invoice_id)
-
-    return {"message": "Счет добавлен в очередь отправки"}
-
-
-@router.post("/payments", response_model=PaymentResponse)
-def record_payment(
-    payment_data: PaymentCreate,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Записать платеж"""
-    service = BillingService(db)
-
-    try:
-        payment = service.record_payment(
-            invoice_id=payment_data.invoice_id,
-            amount=payment_data.amount,
-            payment_method=payment_data.payment_method,
-            reference_number=payment_data.reference_number,
-            description=payment_data.description,
-            created_by=current_user.id,
+    def list_payments(
+        self,
+        *,
+        skip: int,
+        limit: int,
+        date_from: date | None,
+        date_to: date | None,
+    ):
+        return self.repository.list_payments(
+            skip=skip,
+            limit=limit,
+            date_from=date_from,
+            date_to=date_to,
         )
-        return payment
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
+    @staticmethod
+    def serialize_payments(payments) -> list[dict]:
+        return [
+            {
+                "id": payment.id,
+                "visit_id": payment.visit_id,
+                "amount": float(payment.amount),
+                "method": payment.method,
+                "status": payment.status,
+                "receipt_no": payment.receipt_no,
+                "note": payment.note,
+                "created_at": payment.created_at,
+                "paid_at": payment.paid_at,
+            }
+            for payment in payments
+        ]
 
-@router.get("/payments")
-def get_payments(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    date_from: date | None = None,
-    date_to: date | None = None,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Получить список платежей"""
-    from app.models.payment import Payment
+    def update_billing_settings(
+        self,
+        *,
+        settings,
+        update_data: dict,
+        updated_by: int,
+    ) -> None:
+        for field, value in update_data.items():
+            setattr(settings, field, value)
+        settings.updated_by = updated_by
+        self.repository.commit()
 
-    query = _repo(db).query(Payment)
-
-    if date_from:
-        query = query.filter(Payment.created_at >= date_from)
-    if date_to:
-        query = query.filter(Payment.created_at <= date_to)
-
-    payments = query.order_by(Payment.created_at.desc()).offset(skip).limit(limit).all()
-
-    # Return compatible response structure
-    return [
-        {
-            "id": p.id,
-            "visit_id": p.visit_id,
-            "amount": float(p.amount),
-            "method": p.method,
-            "status": p.status,
-            "receipt_no": p.receipt_no,
-            "note": p.note,
-            "created_at": p.created_at,
-            "paid_at": p.paid_at,
-        }
-        for p in payments
-    ]
-
-
-@router.post("/auto-generate/visit/{visit_id}")
-def auto_generate_invoice_for_visit(
-    visit_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Автоматически создать счет для визита"""
-    service = BillingService(db)
-
-    invoice = service.auto_generate_invoice_for_visit(visit_id)
-
-    if invoice:
-        return {
-            "message": f"Счет {invoice.invoice_number} создан",
-            "invoice_id": invoice.id,
-        }
-    else:
-        return {"message": "Счет не создан - нет подходящих правил или услуг"}
-
-
-@router.post("/auto-generate/appointment/{appointment_id}")
-def auto_generate_invoice_for_appointment(
-    appointment_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Автоматически создать счет для записи"""
-    service = BillingService(db)
-
-    invoice = service.auto_generate_invoice_for_appointment(appointment_id)
-
-    if invoice:
-        return {
-            "message": f"Счет {invoice.invoice_number} создан",
-            "invoice_id": invoice.id,
-        }
-    else:
-        return {"message": "Счет не создан - нет подходящих правил или услуг"}
-
-
-@router.post("/process-recurring")
-def process_recurring_invoices(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Обработать периодические счета"""
-    service = BillingService(db)
-
-    # Добавляем задачу в фон
-    background_tasks.add_task(service.create_recurring_invoices)
-
-    return {"message": "Обработка периодических счетов запущена"}
-
-
-@router.post("/send-reminders")
-def send_payment_reminders(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Отправить напоминания об оплате"""
-    service = BillingService(db)
-
-    # Добавляем задачу в фон
-    background_tasks.add_task(service.send_due_reminders)
-
-    return {"message": "Отправка напоминаний запущена"}
-
-
-@router.get("/settings")
-def get_billing_settings(
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Получить настройки биллинга"""
-    service = BillingService(db)
-    settings = service.get_billing_settings()
-
-    return {
-        "invoice_number_prefix": settings.invoice_number_prefix,
-        "invoice_number_format": settings.invoice_number_format,
-        "next_invoice_number": settings.next_invoice_number,
-        "default_tax_rate": settings.default_tax_rate,
-        "tax_included_in_price": settings.tax_included_in_price,
-        "default_payment_terms_days": settings.default_payment_terms_days,
-        "overdue_threshold_days": settings.overdue_threshold_days,
-        "auto_generate_invoices": settings.auto_generate_invoices,
-        "auto_send_invoices": settings.auto_send_invoices,
-        "auto_send_reminders": settings.auto_send_reminders,
-        "reminder_days_before": settings.reminder_days_before,
-        "reminder_days_after": settings.reminder_days_after,
-        "currency_code": settings.currency_code,
-        "currency_symbol": settings.currency_symbol,
-        "company_name": settings.company_name,
-        "company_address": settings.company_address,
-        "company_phone": settings.company_phone,
-        "company_email": settings.company_email,
-        "company_website": settings.company_website,
-    }
-
-
-@router.put("/settings")
-def update_billing_settings(
-    settings_data: BillingSettingsUpdate,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Обновить настройки биллинга"""
-    service = BillingService(db)
-    settings = service.get_billing_settings()
-
-    # Обновляем поля
-    for field, value in settings_data.dict(exclude_unset=True).items():
-        setattr(settings, field, value)
-
-    settings.updated_by = current_user.id
-
-    _repo(db).commit()
-    return {"message": "Настройки обновлены"}
-
-
-@router.get("/analytics")
-def get_billing_analytics(
-    date_from: date | None = None,
-    date_to: date | None = None,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Получить аналитику по счетам"""
-    from sqlalchemy import func
-
-    from app.models.billing import Invoice
-    from app.models.payment import Payment
-
-    # Базовые фильтры
-    invoice_query = _repo(db).query(Invoice)
-    payment_query = _repo(db).query(Payment)
-
-    if date_from:
-        invoice_query = invoice_query.filter(Invoice.issue_date >= date_from)
-        payment_query = payment_query.filter(Payment.payment_date >= date_from)
-    if date_to:
-        invoice_query = invoice_query.filter(Invoice.issue_date <= date_to)
-        payment_query = payment_query.filter(Payment.payment_date <= date_to)
-
-    # Статистика по счетам
-    total_invoices = invoice_query.count()
-    total_amount = (
-        invoice_query.with_entities(func.sum(Invoice.total_amount)).scalar() or 0
-    )
-    paid_amount = (
-        invoice_query.filter(Invoice.status == InvoiceStatus.PAID)
-        .with_entities(func.sum(Invoice.total_amount))
-        .scalar()
-        or 0
-    )
-    overdue_amount = (
-        invoice_query.filter(Invoice.status == InvoiceStatus.OVERDUE)
-        .with_entities(func.sum(Invoice.balance))
-        .scalar()
-        or 0
-    )
-
-    # Статистика по платежам
-    total_payments = payment_query.count()
-    payments_amount = (
-        payment_query.with_entities(func.sum(Payment.amount)).scalar() or 0
-    )
-
-    # Статистика по статусам
-    status_stats = (
-        _repo(db).query(
-            Invoice.status,
-            func.count(Invoice.id).label('count'),
-            func.sum(Invoice.total_amount).label('amount'),
+    def get_billing_analytics(
+        self,
+        *,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> dict:
+        data = self.repository.get_billing_analytics_data(
+            date_from=date_from,
+            date_to=date_to,
         )
-        .group_by(Invoice.status)
-        .all()
-    )
 
-    return {
-        "period": {"date_from": date_from, "date_to": date_to},
-        "summary": {
-            "total_invoices": total_invoices,
-            "total_amount": total_amount,
-            "paid_amount": paid_amount,
-            "overdue_amount": overdue_amount,
-            "total_payments": total_payments,
-            "payments_amount": payments_amount,
-            "collection_rate": (
-                (paid_amount / total_amount * 100) if total_amount > 0 else 0
-            ),
-        },
-        "status_breakdown": [
-            {"status": stat.status, "count": stat.count, "amount": stat.amount or 0}
-            for stat in status_stats
-        ],
-    }
+        return {
+            "period": {"date_from": date_from, "date_to": date_to},
+            "summary": {
+                "total_invoices": data["total_invoices"],
+                "total_amount": data["total_amount"],
+                "paid_amount": data["paid_amount"],
+                "overdue_amount": data["overdue_amount"],
+                "total_payments": data["total_payments"],
+                "payments_amount": data["payments_amount"],
+                "collection_rate": (
+                    (data["paid_amount"] / data["total_amount"] * 100)
+                    if data["total_amount"] > 0
+                    else 0
+                ),
+            },
+            "status_breakdown": [
+                {
+                    "status": stat.status,
+                    "count": stat.count,
+                    "amount": stat.amount or 0,
+                }
+                for stat in data["status_stats"]
+            ],
+        }
