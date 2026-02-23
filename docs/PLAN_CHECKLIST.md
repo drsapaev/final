@@ -44,6 +44,8 @@
 - [x] Revalidated on `2026-02-23`: main CI run `22317029325` is green (`Frontend`, `Backend`, `Integration`, `Security`, `Docker`, `Load Tests`).
 - [x] Role integrity gate restored on `2026-02-23`: `Role System Integrity Check` run `22317032171` is green after config hotfix.
 - [x] Load artifacts re-confirmed in run `22317029325` (`load-test-report` with `k6-summary.json` and `load-regression-report.md`).
+- [x] Revalidated after checklist/plan refresh merge on `2026-02-23`: main CI run `22318194384` is green; `Role System Integrity Check` run `22318193792` is green; `Security` run `22318193982` is green.
+- [x] Latest load gate evidence: run `22318194384` includes successful `Load Tests (k6)` job and uploaded `load-test-report` artifacts (`k6-summary.json`, `load-regression-report.md`).
 
 ## P2 Architecture Finish
 - [x] Controllers free of business logic.

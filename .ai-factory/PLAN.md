@@ -245,7 +245,7 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
 - [x] Refactor `.github/workflows/role-system-check.yml`:
   - call new fallback script instead of inline heredoc Python,
   - keep blocking behavior and clearer failure logs.
-- [ ] Add CI evidence note updates:
+- [x] Add CI evidence note updates:
   - append latest green run IDs to `docs/PLAN_CHECKLIST.md`,
   - ensure references stay current after each hotfix merge.
 
