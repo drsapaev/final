@@ -235,7 +235,7 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
 
 ### Tasks
 
-- [ ] Add targeted regression test for `get_settings()`:
+- [x] Add targeted regression test for `get_settings()`:
   - cover missing `SECRET_KEY` + production validation path,
   - assert no `UnboundLocalError` for `env`,
   - file: `backend/tests/test_settings.py`.
