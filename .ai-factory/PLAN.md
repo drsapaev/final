@@ -254,3 +254,10 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
 - `python -m pytest backend/tests/test_settings.py backend/tests/integration/test_rbac_matrix.py -q`
 - `python backend/scripts/ci/validate_role_integrity.py` (local dry-run)
 - Trigger `Role System Integrity Check` and verify green on `main`.
+
+### CI Evidence
+
+- `https://github.com/drsapaev/final/actions/runs/22321183829` (Unified CI on `main`, green)
+- `https://github.com/drsapaev/final/actions/runs/22321183830` (Role System Integrity Check on `main`, green)
+- `https://github.com/drsapaev/final/actions/runs/22321183816` (Security scan on `main`, green)
+- `load-test-report` artifact verified in run `22321183829` with `k6-summary.json` and `load-regression-report.md`.
