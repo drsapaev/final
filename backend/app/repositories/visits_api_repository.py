@@ -39,6 +39,7 @@ class VisitsApiRepository:
         doctor_id: int | None,
         visit_date,
         notes: str | None,
+        source: str | None = None,
     ):
         return crud_create_visit(
             db=self.db,
@@ -46,6 +47,7 @@ class VisitsApiRepository:
             doctor_id=doctor_id,
             visit_date=visit_date,
             notes=notes,
+            source=source or "desk",
             status="open",
             auto_status=False,
             notify=False,

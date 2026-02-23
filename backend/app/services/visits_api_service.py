@@ -76,6 +76,7 @@ class VisitsApiService:
                 doctor_id=payload.doctor_id,
                 visit_date=payload.planned_date,
                 notes=payload.notes,
+                source=payload.source,
             )
 
             _, new_data = extract_model_changes(None, visit)

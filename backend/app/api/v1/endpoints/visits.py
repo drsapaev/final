@@ -23,6 +23,7 @@ class VisitCreate(BaseModel):
     doctor_id: Optional[int] = None
     notes: Optional[str] = None
     planned_date: Optional[date] = None  # <-- новая поддержка
+    source: Optional[str] = Field(default="desk", max_length=20)
 
 
 class VisitOut(BaseModel):
@@ -35,6 +36,7 @@ class VisitOut(BaseModel):
     finished_at: Optional[datetime] = None
     notes: Optional[str] = None
     planned_date: Optional[date] = None  # <-- новая поддержка
+    source: Optional[str] = None
 
 
 class VisitServiceIn(BaseModel):
@@ -124,6 +126,7 @@ def create_visit(
             doctor_id=payload.doctor_id,
             visit_date=payload.planned_date,  # planned_date -> visit_date
             notes=payload.notes,
+            source=payload.source or "desk",
             status="open",
             auto_status=False,  # Статус уже установлен
             notify=False,
@@ -155,6 +158,7 @@ def create_visit(
             finished_at=None,
             notes=visit.notes,
             planned_date=visit.visit_date,
+            source=getattr(visit, "source", None) or payload.source or "desk",
         )
     else:
         # Старая реализация через Table API (для обратной совместимости)
@@ -171,6 +175,8 @@ def create_visit(
         # если передали planned_date — добавим в insert (если колонка есть)
         if hasattr(t.c, "planned_date") and payload.planned_date is not None:
             ins_values["planned_date"] = payload.planned_date
+        if hasattr(t.c, "source"):
+            ins_values["source"] = payload.source or "desk"
 
         ins = t.insert().values(**ins_values).returning(t)
         row = db.execute(ins).mappings().first()
