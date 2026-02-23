@@ -41,6 +41,9 @@
 - [x] GO only if: DR test passes; alerts wired; E2E critical flows green; load metrics within targets.
 - [x] Evidence (2026-02-22): unified CI run `22278770795` is green; includes `Frontend`, `Integration`, `Security`, `DAST`, `Load Tests`.
 - [x] Load artifacts present: `k6-summary.json`, `load-regression-report.md` (`p95=4.07ms`, `error_rate=0.0000`).
+- [x] Revalidated on `2026-02-23`: main CI run `22317029325` is green (`Frontend`, `Backend`, `Integration`, `Security`, `Docker`, `Load Tests`).
+- [x] Role integrity gate restored on `2026-02-23`: `Role System Integrity Check` run `22317032171` is green after config hotfix.
+- [x] Load artifacts re-confirmed in run `22317029325` (`load-test-report` with `k6-summary.json` and `load-regression-report.md`).
 
 ## P2 Architecture Finish
 - [x] Controllers free of business logic.
