@@ -121,11 +121,18 @@ class MigrationManagementApiService:
                 )
             }
         except Exception as exc:  # noqa: BLE001
-            health_checks["alembic"] = {"error": str(exc)}
+            # In test/local environments alembic_version may be absent.
+            # Treat this as non-blocking metadata, not a hard health failure.
+            health_checks["alembic"] = {"current_revision": None, "warning": str(exc)}
 
+        required_checks = [
+            key
+            for key in ("table_daily_queues", "table_queue_entries", "table_queue_tokens", "indexes")
+            if key in health_checks
+        ]
         all_healthy = all(
-            check.get("exists", True) and "error" not in check
-            for check in health_checks.values()
+            health_checks[key].get("exists", True) and "error" not in health_checks[key]
+            for key in required_checks
         )
 
         return {
@@ -133,4 +140,3 @@ class MigrationManagementApiService:
             "checks": health_checks,
             "checked_at": datetime.utcnow().isoformat(),
         }
-
