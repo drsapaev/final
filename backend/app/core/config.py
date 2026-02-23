@@ -322,11 +322,11 @@ def get_settings() -> Settings:
     else:
         # Fallback для dev mode - используем default или persistent key
         s = Settings(SECRET_KEY=_DEFAULT_SECRET_KEY)
+    env = (s.ENV or os.getenv("ENV", "dev")).lower()
 
     # Validate SECRET_KEY on load
     if not s.SECRET_KEY or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
         # In production, this should fail - but for dev we allow it with warning
-        env = os.getenv("ENV", "dev").lower()
         if env in ("prod", "production"):
             raise ValueError(
                 "SECRET_KEY must be set via environment variable in production. "
