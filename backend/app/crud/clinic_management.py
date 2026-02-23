@@ -20,6 +20,12 @@ from app.models.clinic import (
     LicenseStatus,
     SystemInfo,
 )
+from app.repositories.branch_scope_repository import (
+    BranchScopeViolationError,
+    ensure_entity_within_branch_scope,
+    require_branch_scope_id,
+    resolve_scoped_branch_id,
+)
 from app.schemas.clinic import (
     BackupCreate,
     BackupUpdate,
@@ -193,9 +199,42 @@ class CRUDEquipment:
         db.refresh(db_obj)
         return db_obj
 
+    def create_scoped(
+        self,
+        db: Session,
+        *,
+        obj_in: EquipmentCreate,
+        branch_scope_id: int,
+    ) -> Equipment:
+        """Создать оборудование в рамках branch scope."""
+        ensure_entity_within_branch_scope(
+            entity_branch_id=obj_in.branch_id,
+            scoped_branch_id=branch_scope_id,
+            entity_name="Equipment",
+        )
+        return self.create(db=db, obj_in=obj_in)
+
     def get(self, db: Session, *, id: int) -> Equipment | None:
         """Получить оборудование по ID"""
         return db.query(Equipment).filter(Equipment.id == id).first()
+
+    def get_scoped(
+        self,
+        db: Session,
+        *,
+        id: int,
+        branch_scope_id: int,
+    ) -> Equipment | None:
+        """Получить оборудование по ID только внутри branch scope."""
+        scope = require_branch_scope_id(
+            branch_scope_id,
+            source="equipment.get_scoped",
+        )
+        return (
+            db.query(Equipment)
+            .filter(Equipment.id == id, Equipment.branch_id == scope)
+            .first()
+        )
 
     def get_by_serial(self, db: Session, *, serial_number: str) -> Equipment | None:
         """Получить оборудование по серийному номеру"""
@@ -237,6 +276,34 @@ class CRUDEquipment:
 
         return query.offset(skip).limit(limit).all()
 
+    def get_multi_scoped(
+        self,
+        db: Session,
+        *,
+        branch_scope_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        branch_id: int | None = None,
+        equipment_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[Equipment]:
+        """Получить список оборудования внутри branch scope."""
+        scoped_branch_id = resolve_scoped_branch_id(
+            request_branch_id=branch_scope_id,
+            explicit_branch_id=branch_id,
+            require_scope=True,
+        )
+        return self.get_multi(
+            db=db,
+            skip=skip,
+            limit=limit,
+            branch_id=scoped_branch_id,
+            equipment_type=equipment_type,
+            status=status,
+            search=search,
+        )
+
     def update(
         self, db: Session, *, db_obj: Equipment, obj_in: EquipmentUpdate
     ) -> Equipment:
@@ -250,9 +317,47 @@ class CRUDEquipment:
         db.refresh(db_obj)
         return db_obj
 
+    def update_scoped(
+        self,
+        db: Session,
+        *,
+        db_obj: Equipment,
+        obj_in: EquipmentUpdate,
+        branch_scope_id: int,
+    ) -> Equipment:
+        """Обновить оборудование в рамках branch scope."""
+        ensure_entity_within_branch_scope(
+            entity_branch_id=db_obj.branch_id,
+            scoped_branch_id=branch_scope_id,
+            entity_name="Equipment",
+            entity_id=db_obj.id,
+        )
+        if (
+            obj_in.branch_id is not None
+            and obj_in.branch_id != branch_scope_id
+        ):
+            raise BranchScopeViolationError(
+                "Cannot reassign equipment to another branch outside current scope"
+            )
+        return self.update(db=db, db_obj=db_obj, obj_in=obj_in)
+
     def delete(self, db: Session, *, id: int) -> Equipment | None:
         """Удалить оборудование"""
         obj = db.query(Equipment).filter(Equipment.id == id).first()
+        if obj:
+            db.delete(obj)
+            db.commit()
+        return obj
+
+    def delete_scoped(
+        self,
+        db: Session,
+        *,
+        id: int,
+        branch_scope_id: int,
+    ) -> Equipment | None:
+        """Удалить оборудование внутри branch scope."""
+        obj = self.get_scoped(db=db, id=id, branch_scope_id=branch_scope_id)
         if obj:
             db.delete(obj)
             db.commit()

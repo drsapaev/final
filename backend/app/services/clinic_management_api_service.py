@@ -4,11 +4,15 @@ API endpoints для управления клиникой
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_admin
 from app.models.user import User
+from app.repositories.branch_scope_repository import (
+    BranchScopeRequiredError,
+    BranchScopeViolationError,
+)
 from app.schemas.clinic import (
     BackupCreate,
     BackupOut,
@@ -40,6 +44,13 @@ from app.services.clinic_management_service import (
 )
 
 router = APIRouter()
+
+
+def _request_branch_scope(request: Request) -> int | None:
+    branch_scope_id = getattr(request.state, "branch_id", None)
+    if isinstance(branch_scope_id, int):
+        return branch_scope_id
+    return None
 
 # ===================== ФИЛИАЛЫ =====================
 
@@ -153,6 +164,7 @@ def get_branch_stats(
 )
 def create_equipment(
     *,
+    request: Request,
     db: Session = Depends(get_db),
     equipment_data: EquipmentCreate,
     current_user: User = Depends(require_admin),
@@ -160,8 +172,20 @@ def create_equipment(
     """Создать оборудование"""
     try:
         return equipment_management.create_equipment(
-            db=db, equipment_data=equipment_data
+            db=db,
+            equipment_data=equipment_data,
+            branch_scope_id=_request_branch_scope(request),
         )
+    except BranchScopeRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except BranchScopeViolationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        ) from error
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -172,38 +196,56 @@ def create_equipment(
 @router.get("/equipment", response_model=list[EquipmentOut])
 def get_equipment(
     *,
+    request: Request,
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     branch_id: int | None = Query(None, description="Фильтр по филиалу"),
     equipment_type: str | None = Query(None, description="Фильтр по типу"),
-    status: str | None = Query(None, description="Фильтр по статусу"),
+    equipment_status: str | None = Query(None, alias="status", description="Фильтр по статусу"),
     search: str | None = Query(
         None, description="Поиск по названию, модели или серийному номеру"
     ),
     current_user: User = Depends(require_admin),
 ):
     """Получить список оборудования"""
-    return equipment_management.get_equipment_list(
-        db=db,
-        skip=skip,
-        limit=limit,
-        branch_id=branch_id,
-        equipment_type=equipment_type,
-        status=status,
-        search=search,
-    )
+    try:
+        return equipment_management.get_equipment_list(
+            db=db,
+            skip=skip,
+            limit=limit,
+            branch_id=branch_id,
+            branch_scope_id=_request_branch_scope(request),
+            equipment_type=equipment_type,
+            status=equipment_status,
+            search=search,
+        )
+    except BranchScopeRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except BranchScopeViolationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        ) from error
 
 
 @router.get("/equipment/{equipment_id}", response_model=EquipmentOut)
 def get_equipment_by_id(
     *,
+    request: Request,
     db: Session = Depends(get_db),
     equipment_id: int,
     current_user: User = Depends(require_admin),
 ):
     """Получить оборудование по ID"""
-    equipment = equipment_management.get_equipment(db=db, equipment_id=equipment_id)
+    equipment = equipment_management.get_equipment(
+        db=db,
+        equipment_id=equipment_id,
+        branch_scope_id=_request_branch_scope(request),
+    )
     if not equipment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Оборудование не найдено"
@@ -214,15 +256,30 @@ def get_equipment_by_id(
 @router.put("/equipment/{equipment_id}", response_model=EquipmentOut)
 def update_equipment(
     *,
+    request: Request,
     db: Session = Depends(get_db),
     equipment_id: int,
     equipment_data: EquipmentUpdate,
     current_user: User = Depends(require_admin),
 ):
     """Обновить оборудование"""
-    equipment = equipment_management.update_equipment(
-        db=db, equipment_id=equipment_id, equipment_data=equipment_data
-    )
+    try:
+        equipment = equipment_management.update_equipment(
+            db=db,
+            equipment_id=equipment_id,
+            equipment_data=equipment_data,
+            branch_scope_id=_request_branch_scope(request),
+        )
+    except BranchScopeRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except BranchScopeViolationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        ) from error
     if not equipment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Оборудование не найдено"
@@ -233,12 +290,28 @@ def update_equipment(
 @router.delete("/equipment/{equipment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_equipment(
     *,
+    request: Request,
     db: Session = Depends(get_db),
     equipment_id: int,
     current_user: User = Depends(require_admin),
 ):
     """Удалить оборудование"""
-    success = equipment_management.delete_equipment(db=db, equipment_id=equipment_id)
+    try:
+        success = equipment_management.delete_equipment(
+            db=db,
+            equipment_id=equipment_id,
+            branch_scope_id=_request_branch_scope(request),
+        )
+    except BranchScopeRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except BranchScopeViolationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        ) from error
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Оборудование не найдено"

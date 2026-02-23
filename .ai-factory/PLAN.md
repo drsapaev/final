@@ -190,10 +190,20 @@ Start the final roadmap milestone with contract-first interoperability and branc
 - [x] Enforce tenant scope on selected write flows (`billing`, `queue`, `emr`) under feature flag.
   - `backend/app/middleware/tenant_scope_middleware.py`
   - `backend/app/core/config.py` (`TENANT_SCOPE_ENFORCE_WRITES`, `TENANT_SCOPE_WRITE_PREFIXES`)
+  - protected write prefixes include branch-owned `/api/v1/clinic/equipment`.
   - `backend/app/main.py` middleware registration.
 - [x] Add CI architecture guard against direct API imports of concrete integration provider classes:
   - `backend/tests/architecture/test_interoperability_import_boundaries.py`
   - `.github/workflows/ci-cd-unified.yml` (`architecture-boundary` runs both architecture tests).
+- [x] Add repository-level branch scope helpers for branch-owned models:
+  - `backend/app/repositories/branch_scope_repository.py`
+  - scoped CRUD methods in `backend/app/crud/clinic_management.py` for `Equipment`.
+  - equipment service/api wiring:
+  - `backend/app/services/clinic_management_service.py`
+  - `backend/app/services/clinic_management_api_service.py`.
+  - tests:
+  - `backend/tests/unit/test_branch_scope_repository.py`
+  - `backend/tests/unit/test_clinic_management_equipment_scoped_crud.py`.
 
 ### Local Validation
 
@@ -201,3 +211,4 @@ Start the final roadmap milestone with contract-first interoperability and branc
 - `pytest backend/tests/unit/test_interoperability_gateway_service.py backend/tests/unit/test_tenant_scope.py backend/tests/unit/test_endpoint_shims.py backend/tests/architecture/test_interoperability_import_boundaries.py -q`
 - `pytest backend/tests/architecture/test_context_boundaries.py backend/tests/architecture/test_interoperability_import_boundaries.py -q`
 - `pytest backend/tests/test_tenant_scope_middleware.py backend/tests/unit/test_tenant_scope.py backend/tests/test_settings.py -q`
+- `pytest backend/tests/unit/test_branch_scope_repository.py backend/tests/unit/test_clinic_management_equipment_scoped_crud.py backend/tests/test_tenant_scope_middleware.py backend/tests/test_settings.py -q`

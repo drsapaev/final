@@ -96,15 +96,37 @@ class EquipmentManagementService:
     """Сервис управления оборудованием"""
 
     def create_equipment(
-        self, db: Session, equipment_data: EquipmentCreate
+        self,
+        db: Session,
+        equipment_data: EquipmentCreate,
+        branch_scope_id: int | None = None,
     ) -> EquipmentOut:
         """Создать оборудование"""
-        db_equipment = equipment.create(db=db, obj_in=equipment_data)
+        if branch_scope_id is not None:
+            db_equipment = equipment.create_scoped(
+                db=db,
+                obj_in=equipment_data,
+                branch_scope_id=branch_scope_id,
+            )
+        else:
+            db_equipment = equipment.create(db=db, obj_in=equipment_data)
         return EquipmentOut.from_orm(db_equipment)
 
-    def get_equipment(self, db: Session, equipment_id: int) -> EquipmentOut | None:
+    def get_equipment(
+        self,
+        db: Session,
+        equipment_id: int,
+        branch_scope_id: int | None = None,
+    ) -> EquipmentOut | None:
         """Получить оборудование"""
-        db_equipment = equipment.get(db=db, id=equipment_id)
+        if branch_scope_id is not None:
+            db_equipment = equipment.get_scoped(
+                db=db,
+                id=equipment_id,
+                branch_scope_id=branch_scope_id,
+            )
+        else:
+            db_equipment = equipment.get(db=db, id=equipment_id)
         if not db_equipment:
             return None
         return EquipmentOut.from_orm(db_equipment)
@@ -115,38 +137,82 @@ class EquipmentManagementService:
         skip: int = 0,
         limit: int = 100,
         branch_id: int | None = None,
+        branch_scope_id: int | None = None,
         equipment_type: str | None = None,
         status: str | None = None,
         search: str | None = None,
     ) -> list[EquipmentOut]:
         """Получить список оборудования"""
-        db_equipment = equipment.get_multi(
-            db=db,
-            skip=skip,
-            limit=limit,
-            branch_id=branch_id,
-            equipment_type=equipment_type,
-            status=status,
-            search=search,
-        )
+        if branch_scope_id is not None:
+            db_equipment = equipment.get_multi_scoped(
+                db=db,
+                branch_scope_id=branch_scope_id,
+                skip=skip,
+                limit=limit,
+                branch_id=branch_id,
+                equipment_type=equipment_type,
+                status=status,
+                search=search,
+            )
+        else:
+            db_equipment = equipment.get_multi(
+                db=db,
+                skip=skip,
+                limit=limit,
+                branch_id=branch_id,
+                equipment_type=equipment_type,
+                status=status,
+                search=search,
+            )
         return [EquipmentOut.from_orm(e) for e in db_equipment]
 
     def update_equipment(
-        self, db: Session, equipment_id: int, equipment_data: EquipmentUpdate
+        self,
+        db: Session,
+        equipment_id: int,
+        equipment_data: EquipmentUpdate,
+        branch_scope_id: int | None = None,
     ) -> EquipmentOut | None:
         """Обновить оборудование"""
-        db_equipment = equipment.get(db=db, id=equipment_id)
+        if branch_scope_id is not None:
+            db_equipment = equipment.get_scoped(
+                db=db,
+                id=equipment_id,
+                branch_scope_id=branch_scope_id,
+            )
+        else:
+            db_equipment = equipment.get(db=db, id=equipment_id)
         if not db_equipment:
             return None
 
-        updated_equipment = equipment.update(
-            db=db, db_obj=db_equipment, obj_in=equipment_data
-        )
+        if branch_scope_id is not None:
+            updated_equipment = equipment.update_scoped(
+                db=db,
+                db_obj=db_equipment,
+                obj_in=equipment_data,
+                branch_scope_id=branch_scope_id,
+            )
+        else:
+            updated_equipment = equipment.update(
+                db=db, db_obj=db_equipment, obj_in=equipment_data
+            )
         return EquipmentOut.from_orm(updated_equipment)
 
-    def delete_equipment(self, db: Session, equipment_id: int) -> bool:
+    def delete_equipment(
+        self,
+        db: Session,
+        equipment_id: int,
+        branch_scope_id: int | None = None,
+    ) -> bool:
         """Удалить оборудование"""
-        db_equipment = equipment.delete(db=db, id=equipment_id)
+        if branch_scope_id is not None:
+            db_equipment = equipment.delete_scoped(
+                db=db,
+                id=equipment_id,
+                branch_scope_id=branch_scope_id,
+            )
+        else:
+            db_equipment = equipment.delete(db=db, id=equipment_id)
         return db_equipment is not None
 
     def get_maintenance_due(

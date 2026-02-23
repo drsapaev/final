@@ -145,7 +145,7 @@ class Settings(BaseSettings):
         description="Require branch scope for high-risk write endpoints"
     )
     TENANT_SCOPE_WRITE_PREFIXES: str = Field(
-        default="/api/v1/billing,/api/v1/queue,/api/v1/emr,/api/v1/v2/emr",
+        default="/api/v1/billing,/api/v1/queue,/api/v1/emr,/api/v1/v2/emr,/api/v1/clinic/equipment",
         description="Comma-separated URL prefixes protected by tenant write-scope enforcement"
     )
 

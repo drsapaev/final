@@ -47,7 +47,9 @@ Use a single deterministic source for branch scope with clear precedence:
 
 1. Wire `TenantScope` resolution into selected high-risk write endpoints (`billing`, `queue`, `emr`) behind a feature flag.
    - Status: baseline implemented via middleware guard over write methods (`POST/PUT/PATCH/DELETE`) and configurable protected prefixes.
+   - Current protected prefixes include `billing`, `queue`, `emr` and branch-owned `clinic/equipment` writes.
 2. Add repository helpers that require branch scope for branch-owned models.
+   - Status: baseline implemented for `Equipment` with scoped repository helpers and scoped CRUD methods.
 3. Expand integration contract tests with provider stubs and failure-mode matrix.
 4. Add CI guard to fail on direct imports of concrete integration providers from API layer.
 
