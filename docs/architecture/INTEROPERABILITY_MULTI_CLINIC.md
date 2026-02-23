@@ -51,6 +51,7 @@ Use a single deterministic source for branch scope with clear precedence:
 2. Add repository helpers that require branch scope for branch-owned models.
    - Status: baseline implemented for `Equipment` with scoped repository helpers and scoped CRUD methods.
 3. Expand integration contract tests with provider stubs and failure-mode matrix.
+   - Status: baseline implemented (gateway capability matrix + API error mapping matrix).
 4. Add CI guard to fail on direct imports of concrete integration providers from API layer.
 
 ## Guardrails

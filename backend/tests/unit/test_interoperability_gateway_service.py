@@ -47,6 +47,21 @@ class _VerifyOnlyIntegration:
         return {"verified": True, "identifier": identifier}
 
 
+class _NonDictIntegration:
+    async def verify_patient(self, identifier: str) -> list[str]:
+        return [identifier]
+
+
+class _ExplodingIntegration:
+    async def verify_patient(self, identifier: str) -> dict[str, Any]:
+        raise RuntimeError(f"provider exploded for {identifier}")
+
+
+class _SyncIntegration:
+    def verify_patient(self, identifier: str) -> dict[str, Any]:
+        return {"verified": True, "identifier": identifier, "mode": "sync"}
+
+
 class _FakeManager:
     def __init__(self, integrations: dict[IntegrationType, Any]) -> None:
         self._integrations = integrations
@@ -133,3 +148,96 @@ async def test_submit_insurance_claim_uses_claim_capability() -> None:
 
     assert result["success"] is True
     assert result["payload"]["policy_number"] == "P-1"
+
+
+@pytest.mark.asyncio
+async def test_get_egov_benefits_uses_capability_contract() -> None:
+    gateway = _gateway_with(integrations={IntegrationType.EGOV: _FakeIntegration()})
+
+    result = await gateway.get_egov_benefits(
+        pinfl="9900112233",
+        request_id="req-6",
+    )
+
+    assert result["success"] is True
+    assert result["benefits_for"] == "9900112233"
+
+
+@pytest.mark.asyncio
+async def test_authorize_insurance_service_uses_capability_contract() -> None:
+    gateway = _gateway_with(
+        integrations={IntegrationType.INSURANCE: _FakeIntegration()}
+    )
+
+    result = await gateway.authorize_insurance_service(
+        policy_number="POL-1",
+        service_code="CONSULT",
+        estimated_cost=120.0,
+        request_id="req-7",
+    )
+
+    assert result["authorized"] is True
+    assert result["policy_number"] == "POL-1"
+    assert result["service_code"] == "CONSULT"
+
+
+@pytest.mark.asyncio
+async def test_get_insurance_claim_status_uses_capability_contract() -> None:
+    gateway = _gateway_with(
+        integrations={IntegrationType.INSURANCE: _FakeIntegration()}
+    )
+
+    result = await gateway.get_insurance_claim_status(
+        claim_id="claim-42",
+        request_id="req-8",
+    )
+
+    assert result["success"] is True
+    assert result["claim_id"] == "claim-42"
+    assert result["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_verify_patient_normalizes_non_dict_provider_response() -> None:
+    gateway = _gateway_with(
+        integrations={IntegrationType.DMED: _NonDictIntegration()}
+    )
+
+    result = await gateway.verify_patient(
+        integration_type=IntegrationType.DMED,
+        identifier="12345",
+        request_id="req-9",
+    )
+
+    assert result == {"success": False, "error": "Invalid integration response"}
+
+
+@pytest.mark.asyncio
+async def test_verify_patient_propagates_provider_exception() -> None:
+    gateway = _gateway_with(
+        integrations={IntegrationType.DMED: _ExplodingIntegration()}
+    )
+
+    with pytest.raises(RuntimeError, match="provider exploded"):
+        await gateway.verify_patient(
+            integration_type=IntegrationType.DMED,
+            identifier="12345",
+            request_id="req-10",
+        )
+
+
+@pytest.mark.asyncio
+async def test_verify_patient_supports_sync_provider_method() -> None:
+    gateway = _gateway_with(
+        integrations={IntegrationType.DMED: _SyncIntegration()}
+    )
+
+    result = await gateway.verify_patient(
+        integration_type=IntegrationType.DMED,
+        identifier="888",
+        request_id="req-11",
+    )
+
+    assert result["verified"] is True
+    assert result["identifier"] == "888"
+    assert result["mode"] == "sync"
