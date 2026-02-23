@@ -14,7 +14,7 @@ from app.services.queue_service import queue_service
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass
 class VisitConfirmationDomainError(Exception):
     status_code: int
     detail: str
@@ -304,14 +304,13 @@ class VisitConfirmationService:
         self.repository.refresh(visit)
 
         patient = self.repository.get_patient(visit.patient_id)
-        queue_numbers_list = list(queue_numbers.values())
         return {
             "success": True,
             "message": (
                 "✅ Визит подтвержден! "
                 + (
                     "Номера в очередях присвоены."
-                    if queue_numbers_list
+                    if queue_numbers
                     else "Номера будут присвоены утром в день визита."
                 )
             ),
@@ -320,9 +319,8 @@ class VisitConfirmationService:
             "patient_name": patient.short_name() if patient else "Неизвестный пациент",
             "visit_date": visit.visit_date.isoformat(),
             "visit_time": visit.visit_time,
-            "queue_numbers": queue_numbers_list,
+            "queue_numbers": queue_numbers,
             "print_tickets": print_tickets,
-            "channel": channel,
         }
 
     def _assign_queue_numbers_on_confirmation(
@@ -356,25 +354,29 @@ class VisitConfirmationService:
         print_tickets: list[dict[str, Any]] = []
 
         for queue_tag in unique_queue_tags:
-            doctor_id = visit.doctor_id
+            specialist_user_id: int | None = None
+            if visit.doctor_id:
+                visit_doctor = self.repository.get_doctor(visit.doctor_id)
+                if visit_doctor:
+                    specialist_user_id = visit_doctor.user_id
 
-            if queue_tag == "ecg" and not doctor_id:
+            if queue_tag == "ecg" and not specialist_user_id:
                 ecg_resource = self.repository.get_active_user_by_username("ecg_resource")
                 if ecg_resource:
-                    doctor_id = ecg_resource.id
+                    specialist_user_id = ecg_resource.id
                 else:
                     continue
-            elif queue_tag == "lab" and not doctor_id:
+            elif queue_tag == "lab" and not specialist_user_id:
                 lab_resource = self.repository.get_active_user_by_username("lab_resource")
                 if not lab_resource:
                     continue
                 lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
                 if lab_doctor:
-                    doctor_id = lab_doctor.id
+                    specialist_user_id = lab_doctor.user_id
                     logger.info(
-                        "For queue_tag=%s using lab resource doctor id=%s",
+                        "For queue_tag=%s using lab resource user id=%s",
                         queue_tag,
-                        doctor_id,
+                        specialist_user_id,
                     )
                 else:
                     logger.warning(
@@ -383,12 +385,12 @@ class VisitConfirmationService:
                     )
                     continue
 
-            if not doctor_id:
+            if not specialist_user_id:
                 continue
 
             daily_queue = self.repository.get_or_create_daily_queue(
                 day=today,
-                specialist_id=doctor_id,
+                specialist_id=specialist_user_id,
                 queue_tag=queue_tag,
             )
 

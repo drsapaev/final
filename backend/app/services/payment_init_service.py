@@ -21,7 +21,7 @@ from app.services.queue_service import queue_service
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass
 class PaymentInitDomainError(Exception):
     status_code: int
     detail: str
