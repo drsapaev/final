@@ -12,6 +12,18 @@ from app.models.enums import AppointmentStatus
 from app.repositories.appointment_flow_api_repository import (
     AppointmentFlowApiRepository,
 )
+from app.services.context_facades.emr_facade import (
+    EmrContextFacade,
+    EmrServiceContractAdapter,
+)
+from app.services.context_facades.iam_facade import (
+    IamContextFacade,
+    IamServiceContractAdapter,
+)
+from app.services.context_facades.patient_facade import (
+    PatientContextFacade,
+    PatientServiceContractAdapter,
+)
 
 
 @dataclass
@@ -27,8 +39,27 @@ class AppointmentFlowApiService:
         self,
         db: Session,
         repository: AppointmentFlowApiRepository | None = None,
+        patient_facade: PatientContextFacade | None = None,
+        emr_facade: EmrContextFacade | None = None,
+        iam_facade: IamContextFacade | None = None,
     ):
         self.repository = repository or AppointmentFlowApiRepository(db)
+        effective_db = getattr(self.repository, "db", db)
+
+        self.patient_facade = patient_facade
+        if self.patient_facade is None and effective_db is not None:
+            self.patient_facade = PatientContextFacade(
+                PatientServiceContractAdapter(effective_db)
+            )
+
+        self.emr_facade = emr_facade
+        if self.emr_facade is None and effective_db is not None:
+            self.emr_facade = EmrContextFacade(
+                EmrServiceContractAdapter(effective_db)
+            )
+
+        # Built lazily per request actor if not injected explicitly.
+        self.iam_facade = iam_facade
 
     def resolve_appointment_from_visit(self, *, appointment_id: int, emr_data):
         visit = self.repository.get_visit(appointment_id)
@@ -47,6 +78,56 @@ class AppointmentFlowApiService:
         appointment.status = AppointmentStatus.IN_VISIT
         self.repository.commit()
         self.repository.refresh(appointment)
+
+    def ensure_emr_write_allowed(
+        self,
+        *,
+        actor_user: Any,
+        correlation_id: str | None = None,
+    ) -> None:
+        if self.iam_facade is None:
+            self.iam_facade = IamContextFacade(IamServiceContractAdapter(actor_user))
+
+        decision = self.iam_facade.check_permission(
+            actor_user_id=actor_user.id,
+            permission_code="emr.write",
+            correlation_id=correlation_id,
+        )
+        if not decision.allowed:
+            raise AppointmentFlowApiDomainError(
+                403,
+                f"Недостаточно прав для записи EMR ({decision.reason or 'denied'})",
+            )
+
+    def lookup_patient_summary(
+        self,
+        *,
+        patient_id: int,
+        correlation_id: str | None = None,
+    ):
+        if not self.patient_facade:
+            return None
+        return self.patient_facade.lookup_patient_summary(
+            patient_id=patient_id,
+            correlation_id=correlation_id,
+        )
+
+    def index_emr_phrases(
+        self,
+        *,
+        emr_id: int,
+        doctor_id: int,
+        specialty: str | None = None,
+        correlation_id: str | None = None,
+    ) -> int:
+        if not self.emr_facade:
+            return 0
+        return self.emr_facade.index_emr_phrases(
+            emr_id=emr_id,
+            doctor_id=doctor_id,
+            specialty=specialty,
+            correlation_id=correlation_id,
+        )
 
     def finalize_emr_update_audit(
         self,

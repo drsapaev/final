@@ -39,7 +39,7 @@ class ConfirmationResponse(BaseModel):
     patient_name: str
     visit_date: str
     visit_time: Optional[str]
-    queue_numbers: Optional[Dict[str, Any]] = None
+    queue_numbers: Optional[List[Dict[str, Any]]] = None
     print_tickets: Optional[List[Dict[str, Any]]] = None
 
 

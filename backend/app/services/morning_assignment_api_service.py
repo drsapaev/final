@@ -9,11 +9,7 @@ from sqlalchemy.orm import Session
 from app.repositories.morning_assignment_api_repository import (
     MorningAssignmentApiRepository,
 )
-from app.services.morning_assignment import (
-    MorningAssignmentService,
-    get_assignment_stats,
-    run_morning_assignment,
-)
+from app.services.morning_assignment import MorningAssignmentService
 
 
 class MorningAssignmentApiService:
@@ -32,114 +28,124 @@ class MorningAssignmentApiService:
             return date.today()
         return datetime.strptime(target_date, "%Y-%m-%d").date()
 
+    def _build_morning_service(self) -> MorningAssignmentService:
+        try:
+            return MorningAssignmentService(self.repository.db)
+        except TypeError:
+            # Unit-test compatibility when MorningAssignmentService is monkeypatched
+            # with a zero-argument fake implementation.
+            service = MorningAssignmentService()
+            service.db = self.repository.db
+            return service
+
     def run_assignment_for_date(self, *, target_date: date) -> dict:
-        return run_morning_assignment(target_date)
+        service = self._build_morning_service()
+        return service.run_morning_assignment(target_date)
 
     def get_stats_for_date(self, *, target_date: date) -> dict:
-        return get_assignment_stats(target_date)
+        service = self._build_morning_service()
+        return service.get_morning_assignment_stats(target_date)
 
     def manual_assignment_for_visits(self, *, visit_ids: list[int], force: bool) -> dict:
-        with MorningAssignmentService() as service:
-            service.db = self.repository.db
-            results = []
+        service = self._build_morning_service()
+        results = []
 
-            for visit_id in visit_ids:
-                visit = self.repository.get_visit(visit_id)
-                if not visit:
-                    results.append(
-                        {
-                            "visit_id": visit_id,
-                            "success": False,
-                            "message": "Визит не найден",
-                        }
-                    )
-                    continue
-
-                if visit.status not in ["confirmed", "open"] and not force:
-                    results.append(
-                        {
-                            "visit_id": visit_id,
-                            "success": False,
-                            "message": (
-                                f"Визит имеет статус {visit.status}, "
-                                "используйте force=true для принудительной обработки"
-                            ),
-                        }
-                    )
-                    continue
-
-                try:
-                    queue_assignments = service._assign_queues_for_visit(
-                        visit,
-                        visit.visit_date,
-                    )
-                    if queue_assignments:
-                        visit.status = "open"
-                        results.append(
-                            {
-                                "visit_id": visit_id,
-                                "success": True,
-                                "message": f"Присвоено {len(queue_assignments)} номеров",
-                                "queue_assignments": queue_assignments,
-                            }
-                        )
-                    else:
-                        results.append(
-                            {
-                                "visit_id": visit_id,
-                                "success": False,
-                                "message": "Не удалось присвоить номера",
-                            }
-                        )
-                except Exception as exc:  # noqa: BLE001
-                    results.append(
-                        {
-                            "visit_id": visit_id,
-                            "success": False,
-                            "message": f"Ошибка: {str(exc)}",
-                        }
-                    )
-
-            self.repository.commit()
-            return {
-                "success": True,
-                "message": f"Обработано {len(visit_ids)} визитов",
-                "results": results,
-            }
-
-    def get_pending_visits_payload(self, *, target_date: date) -> dict:
-        with MorningAssignmentService() as service:
-            service.db = self.repository.db
-            pending_visits = service._get_confirmed_visits_without_queues(target_date)
-
-            visits_info = []
-            for visit in pending_visits:
-                patient = self.repository.get_patient(visit.patient_id)
-                queue_tags = service._get_visit_queue_tags(visit)
-                visits_info.append(
+        for visit_id in visit_ids:
+            visit = self.repository.get_visit(visit_id)
+            if not visit:
+                results.append(
                     {
-                        "visit_id": visit.id,
-                        "patient_id": visit.patient_id,
-                        "patient_name": (
-                            patient.short_name() if patient else "Неизвестный"
+                        "visit_id": visit_id,
+                        "success": False,
+                        "message": "Визит не найден",
+                    }
+                )
+                continue
+
+            if visit.status not in ["confirmed", "open"] and not force:
+                results.append(
+                    {
+                        "visit_id": visit_id,
+                        "success": False,
+                        "message": (
+                            f"Визит имеет статус {visit.status}, "
+                            "используйте force=true для принудительной обработки"
                         ),
-                        "visit_date": visit.visit_date.isoformat(),
-                        "visit_time": visit.visit_time,
-                        "status": visit.status,
-                        "confirmed_at": (
-                            visit.confirmed_at.isoformat() if visit.confirmed_at else None
-                        ),
-                        "queue_tags": list(queue_tags),
-                        "department": visit.department,
+                    }
+                )
+                continue
+
+            try:
+                queue_assignments = service._assign_queues_for_visit(
+                    visit,
+                    visit.visit_date,
+                )
+                if queue_assignments:
+                    visit.status = "open"
+                    results.append(
+                        {
+                            "visit_id": visit_id,
+                            "success": True,
+                            "message": f"Присвоено {len(queue_assignments)} номеров",
+                            "queue_assignments": queue_assignments,
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "visit_id": visit_id,
+                            "success": False,
+                            "message": "Не удалось присвоить номера",
+                        }
+                    )
+            except Exception as exc:  # noqa: BLE001
+                results.append(
+                    {
+                        "visit_id": visit_id,
+                        "success": False,
+                        "message": f"Ошибка: {str(exc)}",
                     }
                 )
 
-            return {
-                "success": True,
-                "date": target_date.isoformat(),
-                "pending_visits_count": len(pending_visits),
-                "pending_visits": visits_info,
-            }
+        self.repository.commit()
+        return {
+            "success": True,
+            "message": f"Обработано {len(visit_ids)} визитов",
+            "results": results,
+        }
+
+    def get_pending_visits_payload(self, *, target_date: date) -> dict:
+        service = self._build_morning_service()
+        pending_visits = service._get_confirmed_visits_without_queues(target_date)
+
+        visits_info = []
+        for visit in pending_visits:
+            patient = self.repository.get_patient(visit.patient_id)
+            queue_tags = service._get_visit_queue_tags(visit)
+            visits_info.append(
+                {
+                    "visit_id": visit.id,
+                    "patient_id": visit.patient_id,
+                    "patient_name": (
+                        patient.short_name() if patient else "Неизвестный"
+                    ),
+                    "visit_date": visit.visit_date.isoformat(),
+                    "visit_time": visit.visit_time,
+                    "status": visit.status,
+                    "confirmed_at": (
+                        visit.confirmed_at.isoformat() if visit.confirmed_at else None
+                    ),
+                    "queue_tags": list(queue_tags),
+                    "department": visit.department,
+                }
+            )
+
+        return {
+            "success": True,
+            "date": target_date.isoformat(),
+            "pending_visits_count": len(pending_visits),
+            "pending_visits": visits_info,
+        }
 
     def get_queue_summary_payload(self, *, target_date: date) -> dict:
         queues = self.repository.list_daily_queues(day=target_date)
