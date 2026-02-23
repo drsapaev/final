@@ -563,7 +563,9 @@ jobs:
         )
 
         set +e
-        pytest -q tests/architecture/test_context_boundaries.py | tee /tmp/context-boundary.log
+        pytest -q \
+          tests/architecture/test_context_boundaries.py \
+          tests/architecture/test_interoperability_import_boundaries.py | tee /tmp/context-boundary.log
         TEST_EXIT=${PIPESTATUS[0]}
         set -e
 

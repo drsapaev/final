@@ -160,3 +160,40 @@ Scale load regression control from one baseline run to profile-based capacity bu
 
 - `ruff check ops/scripts/check_load_regression.py ops/scripts/run_load_profiles.py backend/tests/unit/test_load_regression_profiles.py`
 - `pytest backend/tests/unit/test_load_regression_profiles.py -q`
+
+---
+
+## Implementation Plan: Interoperability + Multi-Clinic Scale (Phase 7)
+
+Created: 2026-02-23
+
+### Scope
+
+Start the final roadmap milestone with contract-first interoperability and branch-scope isolation primitives.
+
+### Tasks
+
+- [x] Add interoperability contracts:
+  - `backend/app/domain/contracts/interoperability_contracts.py`
+  - export from `backend/app/domain/contracts/__init__.py`.
+- [x] Add gateway service over external integration registry:
+  - `backend/app/services/interoperability_gateway_service.py`.
+- [x] Refactor integration endpoints to consume gateway contract instead of concrete provider classes:
+  - `backend/app/services/integrations_api_service.py`.
+- [x] Add tenant-scope isolation utilities:
+  - `backend/app/core/tenant_scope.py`.
+- [x] Add unit tests:
+  - `backend/tests/unit/test_interoperability_gateway_service.py`
+  - `backend/tests/unit/test_tenant_scope.py`.
+- [x] Add architecture baseline doc:
+  - `docs/architecture/INTEROPERABILITY_MULTI_CLINIC.md`.
+- [ ] Next increment: enforce tenant scope on selected write flows (`billing`, `queue`, `emr`) under feature flag.
+- [x] Add CI architecture guard against direct API imports of concrete integration provider classes:
+  - `backend/tests/architecture/test_interoperability_import_boundaries.py`
+  - `.github/workflows/ci-cd-unified.yml` (`architecture-boundary` runs both architecture tests).
+
+### Local Validation
+
+- `ruff check backend/app/domain/contracts/interoperability_contracts.py backend/app/domain/contracts/__init__.py backend/app/services/interoperability_gateway_service.py backend/app/services/integrations_api_service.py backend/app/core/tenant_scope.py backend/tests/unit/test_interoperability_gateway_service.py backend/tests/unit/test_tenant_scope.py`
+- `pytest backend/tests/unit/test_interoperability_gateway_service.py backend/tests/unit/test_tenant_scope.py backend/tests/unit/test_endpoint_shims.py backend/tests/architecture/test_interoperability_import_boundaries.py -q`
+- `pytest backend/tests/architecture/test_context_boundaries.py backend/tests/architecture/test_interoperability_import_boundaries.py -q`

@@ -16,7 +16,7 @@
 - [x] **Domain Modules (Phase 4)** — formalize bounded contexts (Patient, Scheduling, Queue, Billing, EMR, IAM) with explicit cross-module contracts. (Completed; CI evidence: run `22278770795`)
 - [x] **Clinical Security Maturity** — add PHI data lifecycle controls (retention, encryption posture, access reporting, break-glass policy validation). (Baseline service + tests implemented on 2026-02-22)
 - [x] **SLO and Capacity Engineering** — automate regression budgets for latency/error rate and scale test profiles per critical endpoint group. (k6 profile matrix + aggregated regression gate implemented on 2026-02-22)
-- [ ] **Interoperability and Multi-Clinic Scale** — standardize adapter contracts for external systems and prepare tenant/branch isolation strategy.
+- [ ] **Interoperability and Multi-Clinic Scale** — standardize adapter contracts for external systems and prepare tenant/branch isolation strategy. (In progress: contract gateway + tenant scope baseline, 2026-02-23)
 
 ## Completed
 

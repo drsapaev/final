@@ -15,6 +15,14 @@ from app.domain.contracts.iam_contracts import (
     IamContract,
     IamContractFacade,
 )
+from app.domain.contracts.interoperability_contracts import (
+    DmedCapabilityContract,
+    EgovCapabilityContract,
+    ExternalIntegrationContract,
+    InsuranceCapabilityContract,
+    IntegrationRegistryContract,
+    IntegrationRegistryContractFacade,
+)
 from app.domain.contracts.patient_contracts import (
     PatientContract,
     PatientContractFacade,
@@ -36,10 +44,16 @@ __all__ = [
     "AppointmentSnapshot",
     "BillingContract",
     "BillingContractFacade",
+    "DmedCapabilityContract",
     "EmrContract",
     "EmrContractFacade",
+    "EgovCapabilityContract",
+    "ExternalIntegrationContract",
     "IamContract",
     "IamContractFacade",
+    "InsuranceCapabilityContract",
+    "IntegrationRegistryContract",
+    "IntegrationRegistryContractFacade",
     "PatientContract",
     "PatientContractFacade",
     "PatientSummary",
@@ -51,4 +65,3 @@ __all__ = [
     "SchedulingContractFacade",
     "VisitClinicalSnapshot",
 ]
-

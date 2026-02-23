@@ -10,9 +10,11 @@ from pydantic import BaseModel
 
 from app.api import deps
 from app.models.user import User
-from app.services.external_integration_service import (
+from app.services.interoperability_gateway_service import (
+    IntegrationCapabilityError,
     IntegrationType,
-    get_integration_manager,
+    IntegrationUnavailableError,
+    get_interoperability_gateway_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,42 @@ class ClaimSubmitRequest(BaseModel):
     diagnosis_code: str | None = None
 
 
+def _build_request_id(user: User, operation: str) -> str:
+    return f"integrations:{operation}:user-{getattr(user, 'id', 'unknown')}"
+
+
+def _map_gateway_error(error: Exception) -> HTTPException:
+    if isinstance(error, IntegrationUnavailableError):
+        integration_code = error.integration_type.value
+        unavailable_messages = {
+            "dmed": "DMED интеграция недоступна",
+            "egov": "eGOV интеграция недоступна",
+            "insurance": "Страховая интеграция недоступна",
+        }
+        detail = unavailable_messages.get(
+            integration_code,
+            f"Интеграция {integration_code} недоступна",
+        )
+        return HTTPException(status_code=503, detail=detail)
+
+    if isinstance(error, IntegrationCapabilityError):
+        integration_code = error.integration_type.value
+        invalid_messages = {
+            ("dmed", "get_patient_history"): "DMED интеграция некорректна",
+            ("egov", "check_benefits"): "eGOV интеграция некорректна",
+            ("insurance", "authorize_service"): "Страховая интеграция некорректна",
+            ("insurance", "submit_claim"): "Страховая интеграция некорректна",
+            ("insurance", "get_claim_status"): "Страховая интеграция некорректна",
+        }
+        detail = invalid_messages.get(
+            (integration_code, error.capability),
+            f"Интеграция {integration_code} не поддерживает {error.capability}",
+        )
+        return HTTPException(status_code=503, detail=detail)
+
+    return HTTPException(status_code=500, detail=str(error))
+
+
 # ===================== ОБЩИЕ =====================
 
 
@@ -53,9 +91,10 @@ async def get_available_integrations(
     """
     Получить список доступных внешних интеграций
     """
-    manager = get_integration_manager()
+    gateway = get_interoperability_gateway_service()
+    request_id = _build_request_id(user, "available")
     return {
-        "available": manager.get_available_integrations(),
+        "available": gateway.get_available_integrations(request_id=request_id),
     }
 
 
@@ -72,8 +111,12 @@ async def verify_patient(
         if not identifier:
             raise HTTPException(status_code=400, detail="Укажите ПИНФЛ или номер полиса")
 
-        manager = get_integration_manager()
-        results = await manager.verify_patient_all(identifier)
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "verify-patient")
+        results = await gateway.verify_patient_all(
+            identifier=identifier,
+            request_id=request_id,
+        )
 
         return {
             "identifier": identifier,
@@ -81,9 +124,9 @@ async def verify_patient(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Patient verification error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("Patient verification error")
+        raise _map_gateway_error(error) from error
 
 
 # ===================== DMED =====================
@@ -98,19 +141,19 @@ async def get_dmed_patient(
     Получить данные пациента из DMED по ПИНФЛ
     """
     try:
-        manager = get_integration_manager()
-        dmed = manager.get_integration(IntegrationType.DMED)
-
-        if not dmed:
-            raise HTTPException(status_code=503, detail="DMED интеграция недоступна")
-
-        result = await dmed.verify_patient(pinfl)
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "dmed-patient")
+        result = await gateway.verify_patient(
+            integration_type=IntegrationType.DMED,
+            identifier=pinfl,
+            request_id=request_id,
+        )
         return result
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"DMED patient error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("DMED patient error")
+        raise _map_gateway_error(error) from error
 
 
 @router.get("/dmed/history/{pinfl}", summary="История болезни из DMED")
@@ -122,23 +165,17 @@ async def get_dmed_history(
     Получить историю болезни пациента из DMED
     """
     try:
-        manager = get_integration_manager()
-        dmed = manager.get_integration(IntegrationType.DMED)
-
-        if not dmed:
-            raise HTTPException(status_code=503, detail="DMED интеграция недоступна")
-
-        from app.services.external_integration_service import DMEDIntegration
-        if isinstance(dmed, DMEDIntegration):
-            result = await dmed.get_patient_history(pinfl)
-            return result
-
-        raise HTTPException(status_code=503, detail="DMED интеграция некорректна")
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "dmed-history")
+        return await gateway.get_dmed_history(
+            pinfl=pinfl,
+            request_id=request_id,
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"DMED history error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("DMED history error")
+        raise _map_gateway_error(error) from error
 
 
 # ===================== eGOV =====================
@@ -153,19 +190,19 @@ async def get_egov_citizen(
     Верификация гражданина через eGOV
     """
     try:
-        manager = get_integration_manager()
-        egov = manager.get_integration(IntegrationType.EGOV)
-
-        if not egov:
-            raise HTTPException(status_code=503, detail="eGOV интеграция недоступна")
-
-        result = await egov.verify_patient(pinfl)
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "egov-citizen")
+        result = await gateway.verify_patient(
+            integration_type=IntegrationType.EGOV,
+            identifier=pinfl,
+            request_id=request_id,
+        )
         return result
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"eGOV citizen error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("eGOV citizen error")
+        raise _map_gateway_error(error) from error
 
 
 @router.get("/egov/benefits/{pinfl}", summary="Льготы гражданина")
@@ -177,23 +214,17 @@ async def get_egov_benefits(
     Проверить льготы гражданина через eGOV
     """
     try:
-        manager = get_integration_manager()
-        egov = manager.get_integration(IntegrationType.EGOV)
-
-        if not egov:
-            raise HTTPException(status_code=503, detail="eGOV интеграция недоступна")
-
-        from app.services.external_integration_service import EGOVIntegration
-        if isinstance(egov, EGOVIntegration):
-            result = await egov.check_benefits(pinfl)
-            return result
-
-        raise HTTPException(status_code=503, detail="eGOV интеграция некорректна")
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "egov-benefits")
+        return await gateway.get_egov_benefits(
+            pinfl=pinfl,
+            request_id=request_id,
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"eGOV benefits error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("eGOV benefits error")
+        raise _map_gateway_error(error) from error
 
 
 # ===================== СТРАХОВАНИЕ =====================
@@ -208,19 +239,19 @@ async def check_insurance_policy(
     Проверить статус страхового полиса
     """
     try:
-        manager = get_integration_manager()
-        insurance = manager.get_integration(IntegrationType.INSURANCE)
-
-        if not insurance:
-            raise HTTPException(status_code=503, detail="Страховая интеграция недоступна")
-
-        result = await insurance.verify_patient(policy_number)
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "insurance-policy")
+        result = await gateway.verify_patient(
+            integration_type=IntegrationType.INSURANCE,
+            identifier=policy_number,
+            request_id=request_id,
+        )
         return result
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Insurance policy error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("Insurance policy error")
+        raise _map_gateway_error(error) from error
 
 
 @router.post("/insurance/authorize", summary="Авторизация услуги")
@@ -232,27 +263,19 @@ async def authorize_insurance_service(
     Авторизовать медицинскую услугу в страховой компании
     """
     try:
-        manager = get_integration_manager()
-        insurance = manager.get_integration(IntegrationType.INSURANCE)
-
-        if not insurance:
-            raise HTTPException(status_code=503, detail="Страховая интеграция недоступна")
-
-        from app.services.external_integration_service import InsuranceIntegration
-        if isinstance(insurance, InsuranceIntegration):
-            result = await insurance.authorize_service(
-                policy_number=data.policy_number,
-                service_code=data.service_code,
-                estimated_cost=data.estimated_cost,
-            )
-            return result
-
-        raise HTTPException(status_code=503, detail="Страховая интеграция некорректна")
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "insurance-authorize")
+        return await gateway.authorize_insurance_service(
+            policy_number=data.policy_number,
+            service_code=data.service_code,
+            estimated_cost=data.estimated_cost,
+            request_id=request_id,
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Insurance authorization error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("Insurance authorization error")
+        raise _map_gateway_error(error) from error
 
 
 @router.post("/insurance/claim", summary="Отправить страховой случай")
@@ -264,12 +287,6 @@ async def submit_insurance_claim(
     Отправить страховой случай (claim) в страховую компанию
     """
     try:
-        manager = get_integration_manager()
-        insurance = manager.get_integration(IntegrationType.INSURANCE)
-
-        if not insurance:
-            raise HTTPException(status_code=503, detail="Страховая интеграция недоступна")
-
         claim_data = {
             "policy_number": data.policy_number,
             "patient_id": data.patient_id,
@@ -279,13 +296,17 @@ async def submit_insurance_claim(
             "diagnosis_code": data.diagnosis_code,
         }
 
-        result = await insurance.submit_visit(claim_data)
-        return result
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "insurance-claim-submit")
+        return await gateway.submit_insurance_claim(
+            claim_data=claim_data,
+            request_id=request_id,
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Insurance claim error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("Insurance claim error")
+        raise _map_gateway_error(error) from error
 
 
 @router.get("/insurance/claim/{claim_id}", summary="Статус страхового случая")
@@ -297,20 +318,14 @@ async def get_insurance_claim_status(
     Получить статус страхового случая
     """
     try:
-        manager = get_integration_manager()
-        insurance = manager.get_integration(IntegrationType.INSURANCE)
-
-        if not insurance:
-            raise HTTPException(status_code=503, detail="Страховая интеграция недоступна")
-
-        from app.services.external_integration_service import InsuranceIntegration
-        if isinstance(insurance, InsuranceIntegration):
-            result = await insurance.get_claim_status(claim_id)
-            return result
-
-        raise HTTPException(status_code=503, detail="Страховая интеграция некорректна")
+        gateway = get_interoperability_gateway_service()
+        request_id = _build_request_id(user, "insurance-claim-status")
+        return await gateway.get_insurance_claim_status(
+            claim_id=claim_id,
+            request_id=request_id,
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Insurance claim status error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        logger.exception("Insurance claim status error")
+        raise _map_gateway_error(error) from error
