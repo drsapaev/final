@@ -29,12 +29,16 @@ class PaymentReadService:
         if not payment:
             raise PaymentReadDomainError(status_code=404, detail="Платеж не найден")
 
+        provider_payment_id = payment.provider_payment_id or ""
+        is_test_provider_payment = provider_payment_id.startswith("test_")
+
         if (
             self.payment_manager
             and payment.provider
             and payment.provider_payment_id
             and payment.status
             in [PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value]
+            and not is_test_provider_payment
         ):
             result = self.payment_manager.check_payment_status(
                 payment.provider, payment.provider_payment_id
