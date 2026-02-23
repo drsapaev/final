@@ -2,6 +2,7 @@
 Unit tests for application settings validation
 """
 import os
+
 import pytest
 from pydantic import ValidationError
 
