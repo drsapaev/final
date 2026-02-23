@@ -34,6 +34,7 @@
     "@tanstack/react-virtual": "^3.13.18",
     "axios": "^1.13.2",
     "chart.js": "4.5.0",
+    "clsx": "^2.1.1",
     "dompurify": "^3.3.0",
     "heic2any": "^0.0.4",
     "isomorphic-dompurify": "^2.33.0",

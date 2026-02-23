@@ -1,0 +1,3 @@
+## 2026-02-23 - Form Accessibility Fundamentals
+**Learning:** The application's form system was missing basic ARIA attributes (`aria-invalid`, `aria-describedby`, `aria-required`), making validation errors invisible to screen reader users. Visual indicators like red borders and asterisks are insufficient for accessibility.
+**Action:** When building or auditing form components, always verify that: 1) Error messages are associated with inputs via `aria-describedby` and `role="alert"`, 2) Invalid states are programmatic (`aria-invalid`), and 3) Required fields are explicitly marked in the accessibility tree (`aria-required`).
