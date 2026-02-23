@@ -103,12 +103,19 @@ log.info("Audit middleware registered")
 # Security Middleware (rate limiting, brute force protection, IP logging)
 # -----------------------------------------------------------------------------
 from app.middleware.security_middleware import SecurityMiddleware  # noqa: E402
+from app.middleware.tenant_scope_middleware import TenantScopeMiddleware  # noqa: E402
 
 if TESTING:
     log.info("Security middleware skipped in testing mode (TESTING=1)")
 else:
     app.add_middleware(SecurityMiddleware)
     log.info("Security middleware registered")
+
+# -----------------------------------------------------------------------------
+# Tenant Scope Middleware (feature-flagged, multi-clinic rollout)
+# -----------------------------------------------------------------------------
+app.add_middleware(TenantScopeMiddleware)
+log.info("Tenant scope middleware registered")
 
 # -----------------------------------------------------------------------------
 # Observability Middleware (SLIs, trace-id, structured request logs)

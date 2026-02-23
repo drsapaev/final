@@ -187,7 +187,10 @@ Start the final roadmap milestone with contract-first interoperability and branc
   - `backend/tests/unit/test_tenant_scope.py`.
 - [x] Add architecture baseline doc:
   - `docs/architecture/INTEROPERABILITY_MULTI_CLINIC.md`.
-- [ ] Next increment: enforce tenant scope on selected write flows (`billing`, `queue`, `emr`) under feature flag.
+- [x] Enforce tenant scope on selected write flows (`billing`, `queue`, `emr`) under feature flag.
+  - `backend/app/middleware/tenant_scope_middleware.py`
+  - `backend/app/core/config.py` (`TENANT_SCOPE_ENFORCE_WRITES`, `TENANT_SCOPE_WRITE_PREFIXES`)
+  - `backend/app/main.py` middleware registration.
 - [x] Add CI architecture guard against direct API imports of concrete integration provider classes:
   - `backend/tests/architecture/test_interoperability_import_boundaries.py`
   - `.github/workflows/ci-cd-unified.yml` (`architecture-boundary` runs both architecture tests).
@@ -197,3 +200,4 @@ Start the final roadmap milestone with contract-first interoperability and branc
 - `ruff check backend/app/domain/contracts/interoperability_contracts.py backend/app/domain/contracts/__init__.py backend/app/services/interoperability_gateway_service.py backend/app/services/integrations_api_service.py backend/app/core/tenant_scope.py backend/tests/unit/test_interoperability_gateway_service.py backend/tests/unit/test_tenant_scope.py`
 - `pytest backend/tests/unit/test_interoperability_gateway_service.py backend/tests/unit/test_tenant_scope.py backend/tests/unit/test_endpoint_shims.py backend/tests/architecture/test_interoperability_import_boundaries.py -q`
 - `pytest backend/tests/architecture/test_context_boundaries.py backend/tests/architecture/test_interoperability_import_boundaries.py -q`
+- `pytest backend/tests/test_tenant_scope_middleware.py backend/tests/unit/test_tenant_scope.py backend/tests/test_settings.py -q`

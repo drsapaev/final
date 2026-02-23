@@ -14,6 +14,11 @@ Prepare the platform for external ecosystem integrations and safe branch-level i
   - `backend/app/services/integrations_api_service.py`
 - Tenant scope utilities for branch-aware request context resolution:
   - `backend/app/core/tenant_scope.py`
+- Feature-flagged tenant-scope enforcement middleware for high-risk write routes:
+  - `backend/app/middleware/tenant_scope_middleware.py`
+  - config keys in `backend/app/core/config.py`:
+  - `TENANT_SCOPE_ENFORCE_WRITES`
+  - `TENANT_SCOPE_WRITE_PREFIXES`
 
 ## Adapter Contract Surface
 
@@ -41,6 +46,7 @@ Use a single deterministic source for branch scope with clear precedence:
 ## Rollout Plan
 
 1. Wire `TenantScope` resolution into selected high-risk write endpoints (`billing`, `queue`, `emr`) behind a feature flag.
+   - Status: baseline implemented via middleware guard over write methods (`POST/PUT/PATCH/DELETE`) and configurable protected prefixes.
 2. Add repository helpers that require branch scope for branch-owned models.
 3. Expand integration contract tests with provider stubs and failure-mode matrix.
 4. Add CI guard to fail on direct imports of concrete integration providers from API layer.

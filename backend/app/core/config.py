@@ -139,6 +139,16 @@ class Settings(BaseSettings):
         description="Comma-separated list of roles allowed to use break-glass"
     )
 
+    # --- Tenant Scope Enforcement (multi-clinic rollout) ---
+    TENANT_SCOPE_ENFORCE_WRITES: bool = Field(
+        default=False,
+        description="Require branch scope for high-risk write endpoints"
+    )
+    TENANT_SCOPE_WRITE_PREFIXES: str = Field(
+        default="/api/v1/billing,/api/v1/queue,/api/v1/emr,/api/v1/v2/emr",
+        description="Comma-separated URL prefixes protected by tenant write-scope enforcement"
+    )
+
     # --- MCP Settings ---
     MCP_ENABLED: bool = True
     MCP_LOG_REQUESTS: bool = True
