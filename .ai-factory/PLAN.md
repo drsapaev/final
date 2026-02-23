@@ -218,3 +218,7 @@ Start the final roadmap milestone with contract-first interoperability and branc
 - `pytest backend/tests/test_tenant_scope_middleware.py backend/tests/unit/test_tenant_scope.py backend/tests/test_settings.py -q`
 - `pytest backend/tests/unit/test_branch_scope_repository.py backend/tests/unit/test_clinic_management_equipment_scoped_crud.py backend/tests/test_tenant_scope_middleware.py backend/tests/test_settings.py -q`
 - `pytest backend/tests/unit/test_interoperability_gateway_service.py backend/tests/unit/test_integrations_api_error_mapping.py backend/tests/unit/test_endpoint_shims.py -q`
+
+### CI Evidence
+
+- Unified workflow (green): `https://github.com/drsapaev/final/actions/runs/22298766412`
