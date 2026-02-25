@@ -19,9 +19,11 @@ import {
   MacOSSelect,
   MacOSCheckbox
 } from '../ui/macos';
-import tokenManager from '../../utils/tokenManager';
-
-const API_BASE = '/api/v1';
+import {
+  fetchPaymentProviderSettings,
+  savePaymentProviderSettings,
+  testPaymentProviderConfig,
+} from '../../api/adminSettings';
 
 const PaymentProviderSettings = () => {
   const { executeAction, loading } = useAsyncAction();
@@ -57,16 +59,8 @@ const PaymentProviderSettings = () => {
   const loadSettings = useCallback(async () => {
     await executeAction(
       async () => {
-        const response = await fetch(`${API_BASE}/admin/payment-provider-settings`, {
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSettings(prev => ({ ...prev, ...data }));
-        }
+        const data = await fetchPaymentProviderSettings();
+        setSettings((prev) => ({ ...prev, ...data }));
       },
       {
         loadingMessage: 'Загрузка настроек...',
@@ -83,20 +77,7 @@ const PaymentProviderSettings = () => {
   const saveSettings = async () => {
     await executeAction(
       async () => {
-        const response = await fetch(`${API_BASE}/admin/payment-provider-settings`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(settings)
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.detail || 'Ошибка сохранения настроек');
-        }
-
+        await savePaymentProviderSettings(settings);
         toast.success('Настройки сохранены успешно');
       },
       {
@@ -109,30 +90,18 @@ const PaymentProviderSettings = () => {
   const testProvider = async (providerName) => {
     await executeAction(
       async () => {
-        const response = await fetch(`${API_BASE}/admin/test-payment-provider`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            provider: providerName,
-            config: settings[providerName]
-          })
-        });
-
-        const result = await response.json();
+        const result = await testPaymentProviderConfig(providerName, settings[providerName]);
 
         setTestResults(prev => ({
           ...prev,
           [providerName]: {
-            success: response.ok && result.success,
+            success: Boolean(result?.success),
             message: result.message || result.detail || 'Тест завершён',
             timestamp: new Date().toLocaleString()
           }
         }));
 
-        if (response.ok && result.success) {
+        if (result?.success) {
           toast.success(`${providerName.toUpperCase()}: Тест прошёл успешно`);
         } else {
           toast.error(`${providerName.toUpperCase()}: ${result.message || result.detail}`);

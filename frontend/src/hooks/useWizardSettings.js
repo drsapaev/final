@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { fetchWizardSettings } from '../api/adminSettings';
 const useWizardSettings = () => {
   const [settings, setSettings] = useState({
     use_new_wizard: true,  // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
@@ -27,16 +28,17 @@ const useWizardSettings = () => {
         return;
       }
 
-      // Используем абсолютный URL для обхода dev proxy
-      const response = await fetch('http://localhost:8000/api/v1/admin/wizard-settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      try {
+        const data = await fetchWizardSettings();
 
-      if (!response.ok) {
-        if (response.status === 401) {
+        setSettings({
+          use_new_wizard: data.use_new_wizard !== undefined ? data.use_new_wizard : true,
+          loading: false,
+          error: null
+        });
+      } catch (error) {
+        const status = error?.response?.status;
+        if (status === 401) {
           logger.warn('Unauthorized access to wizard settings, using default');
           setSettings({
             use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
@@ -45,16 +47,8 @@ const useWizardSettings = () => {
           });
           return;
         }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw error;
       }
-
-      const data = await response.json();
-
-      setSettings({
-        use_new_wizard: data.use_new_wizard !== undefined ? data.use_new_wizard : true, // 🎯 Дефолт - НОВЫЙ мастер
-        loading: false,
-        error: null
-      });
     } catch (error) {
       logger.error('Error fetching wizard settings:', error);
       setSettings({

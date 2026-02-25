@@ -58,6 +58,8 @@
 - [x] A11y: WCAG contrast, focus, ARIA validated on key flows.
 - [x] UX polish: save states, clear errors/recovery, meaningful empty states.
 - [x] OpenAPI complete; contract tests; onboarding/runbooks current.
+- [x] Frontend↔Backend parity reports generated (`frontend_backend_parity.json`, `FRONTEND_BACKEND_PARITY_REPORT.md`, `FRONTEND_UX_CORRECTNESS_SCORECARD.md`).
+- [x] Blocking parity gate added to unified CI (`frontend-backend-parity` job) with artifacts upload and thresholds: critical flows pass, RBAC pass, UX >= 4/5.
 
 ## P4 Clinical Security Maturity (Phase 4)
 - [x] PHI retention inventory implemented for core PHI-bearing tables (`emr_revisions`, `emr_audit_logs`, `user_audit_logs`, `messages`).

@@ -54,11 +54,12 @@ export function useRoles({ includeAll = false } = {}) {
             const fallbackRoles = [
                 { value: 'Admin', label: 'Администратор' },
                 { value: 'Doctor', label: 'Врач' },
-                { value: 'Nurse', label: 'Медсестра' },
-                { value: 'Receptionist', label: 'Регистратор' },
+                { value: 'Registrar', label: 'Регистратор' },
                 { value: 'Cashier', label: 'Кассир' },
                 { value: 'Lab', label: 'Лаборант' },
-                { value: 'Patient', label: 'Пациент' }
+                { value: 'cardio', label: 'Кардиолог' },
+                { value: 'derma', label: 'Дерматолог' },
+                { value: 'dentist', label: 'Стоматолог' }
             ];
 
             if (includeAll) {

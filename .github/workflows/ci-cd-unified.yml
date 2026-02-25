@@ -586,12 +586,86 @@ jobs:
 
         exit $TEST_EXIT
 
+  # --- Frontend ↔ Backend parity gate ---
+  frontend-backend-parity:
+    name: 🔄 Frontend-Backend Parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [frontend-tests, backend-tests, architecture-boundary]
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: 📊 Build parity reports
+      run: |
+        python ops/scripts/extract_frontend_api_usage.py --log-level INFO
+        python ops/scripts/build_frontend_backend_parity.py --log-level INFO
+        python ops/scripts/evaluate_frontend_ux_scorecard.py --log-level INFO
+
+    - name: 🚦 Enforce parity gate
+      run: |
+        python ops/scripts/check_frontend_backend_parity.py \
+          --min-correctness 4.0 \
+          --min-usability 4.0 \
+          --log-level INFO
+
+    - name: 📝 Add parity summary
+      if: always()
+      run: |
+        python - <<'PY'
+        import json
+        from pathlib import Path
+
+        parity = json.loads(Path("docs/reports/frontend_backend_parity.json").read_text(encoding="utf-8"))
+        ux = json.loads(Path("docs/reports/frontend_ux_correctness_scorecard.json").read_text(encoding="utf-8"))
+
+        summary = parity["summary"]
+        flows = parity["critical_flows"]["summary"]
+        rbac = parity["rbac_alignment"]["status"]
+
+        lines = [
+            "## 🔄 Frontend-Backend Parity",
+            "",
+            f"- Coverage: {summary['coverage_pct']}%",
+            f"- Implemented: {summary['implemented']}",
+            f"- Partial: {summary['partial']}",
+            f"- Missing: {summary['missing_in_frontend']}",
+            f"- Orphan: {summary['frontend_orphan']}",
+            f"- Critical flows passed: {flows['passed_flows']}/{flows['total_flows']}",
+            f"- RBAC alignment: {rbac}",
+            f"- UX Correctness: {ux['summary']['avg_correctness']}/5",
+            f"- UX Usability: {ux['summary']['avg_usability']}/5",
+        ]
+        with open(Path.cwd() / "parity-summary.md", "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines))
+        PY
+        cat parity-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: 📤 Upload parity artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-backend-parity-report
+        path: |
+          docs/reports/frontend_api_usage_inventory.json
+          docs/reports/frontend_backend_parity.json
+          docs/reports/FRONTEND_BACKEND_PARITY_REPORT.md
+          docs/reports/FRONTEND_UX_CORRECTNESS_SCORECARD.md
+          docs/reports/frontend_ux_correctness_scorecard.json
+        if-no-files-found: error
+
   # --- Security сканирование ---
   security:
     name: 🔒 Security сканирование
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary]
+    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary, frontend-backend-parity]
     
     steps:
     - uses: actions/checkout@v4
@@ -676,7 +750,7 @@ jobs:
     name: 🐳 Docker сборка
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary]
+    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary, frontend-backend-parity]
     
     steps:
     - uses: actions/checkout@v4
@@ -727,7 +801,7 @@ jobs:
     name: 🔗 Интеграционные тесты
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [backend-tests, frontend-tests, architecture-boundary]
+    needs: [backend-tests, frontend-tests, architecture-boundary, frontend-backend-parity]
     if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
     services:
       postgres:

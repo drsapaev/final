@@ -156,11 +156,19 @@ import logger from './utils/logger';
 function hasRole(profile, roles) {
   if (!roles || roles.length === 0) return true;
   if (!profile) return true;
-  const need = new Set(roles.map((r) => String(r).toLowerCase()));
+  const roleAliases = {
+    receptionist: 'registrar',
+    nurse: 'doctor'
+  };
+  const normalizeRole = (value) => {
+    const role = String(value || '').toLowerCase();
+    return roleAliases[role] || role;
+  };
+  const need = new Set(roles.map((r) => normalizeRole(r)));
   const have = new Set();
-  if (profile?.role) have.add(String(profile.role).toLowerCase());
-  if (profile?.role_name) have.add(String(profile.role_name).toLowerCase());
-  if (Array.isArray(profile?.roles)) profile.roles.forEach((r) => have.add(String(r).toLowerCase()));
+  if (profile?.role) have.add(normalizeRole(profile.role));
+  if (profile?.role_name) have.add(normalizeRole(profile.role_name));
+  if (Array.isArray(profile?.roles)) profile.roles.forEach((r) => have.add(normalizeRole(r)));
   if (profile?.is_superuser || profile?.is_admin || profile?.admin) have.add('admin');
   for (const n of need) if (have.has(n)) return true;
   if (have.size === 0) return true;
@@ -1198,41 +1206,41 @@ function AppContent() {
               <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist']}><RegistrarPanel /></RequireAuth>} />
+              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar']}><RegistrarPanel /></RequireAuth>} />
               <Route path="doctor-panel" element={<RequireAuth roles={['Admin', 'Doctor']}><DoctorPanel /></RequireAuth>} />
               <Route path="cardiologist" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio']}><CardiologistPanelUnified /></RequireAuth>} />
               <Route path="dermatologist" element={<RequireAuth roles={['Admin', 'Doctor', 'derma']}><DermatologistPanelUnified /></RequireAuth>} />
               <Route path="dentist" element={<RequireAuth roles={['Admin', 'Doctor', 'dentist']}><DentistPanelUnified /></RequireAuth>} />
               <Route path="lab-panel" element={<RequireAuth roles={['Admin', 'Lab']}><LabPanel /></RequireAuth>} />
-              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Patient', 'Registrar', 'Receptionist', 'Doctor']}><PatientPanel /></RequireAuth>} />
+              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Registrar', 'Doctor']}><PatientPanel /></RequireAuth>} />
               <Route path="queue-board" element={<DisplayBoardUnified />} />
               <Route path="display-board" element={<DisplayBoardUnified />} />
               <Route path="display-board/:role" element={<DisplayBoardUnified />} />
               <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
               <Route path="security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
               <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
-              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist']}><Scheduler /></RequireAuth>} />
-              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist']}><Appointments /></RequireAuth>} />
+              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar']}><Scheduler /></RequireAuth>} />
+              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar']}><Appointments /></RequireAuth>} />
               <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
               {/* Visit details - Medical staff only (security fix - contains PHI) */}
-              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
+              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
               {/* Search - Medical staff only (security fix) */}
-              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'Receptionist', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
+              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
 
               {/* Patient Pickup View - For all medical staff to view patient info */}
-              <Route path="pickup/:patientId" element={<RequireAuth roles={['Admin', 'Registrar', 'Receptionist', 'Cashier', 'Lab', 'Doctor', 'cardio', 'derma', 'dentist']}><PatientPickupView /></RequireAuth>} />
+              <Route path="pickup/:patientId" element={<RequireAuth roles={['Admin', 'Registrar', 'Cashier', 'Lab', 'Doctor', 'cardio', 'derma', 'dentist']}><PatientPickupView /></RequireAuth>} />
 
               {/* Интегрированные скрытые компоненты */}
               <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
-              <Route path="advanced-emr" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><EMRInterface /></RequireAuth>} />
+              <Route path="advanced-emr" element={<RequireAuth roles={['Admin', 'Doctor']}><EMRInterface /></RequireAuth>} />
               {/* EMR Demo - Medical staff only (security fix - contains PHI) */}
               <Route path="emr-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRDemo /></RequireAuth>} />
               <Route path="emr-single-sheet" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><SingleSheetEMRDemo /></RequireAuth>} />
               <Route path="emr-v2-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRv2Demo /></RequireAuth>} />
-              <Route path="file-management" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><FileManager /></RequireAuth>} />
+              <Route path="file-management" element={<RequireAuth roles={['Admin', 'Doctor']}><FileManager /></RequireAuth>} />
               <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
               <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
-              <Route path="security-settings" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><TwoFactorManager /></RequireAuth>} />
+              <Route path="security-settings" element={<RequireAuth roles={['Admin', 'Doctor']}><TwoFactorManager /></RequireAuth>} />
 
               {/* Демо интеграции - Admin only (security fix) */}
               <Route path="integration-demo" element={<RequireAuth roles={['Admin']}><IntegrationDemo /></RequireAuth>} />

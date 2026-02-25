@@ -87,7 +87,7 @@ const AppointmentWizardV2 = ({
 }) => {
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
-  const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(1);

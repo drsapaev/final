@@ -3,66 +3,48 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const queueApiMocks = vi.hoisted(() => ({
+  fetchAvailableSpecialists: vi.fn(),
+  fetchPublicQueueProfiles: vi.fn(),
+  fetchQrTokenInfo: vi.fn(),
+  startQueueJoinSession: vi.fn(),
+  completeQueueJoinSession: vi.fn(),
+}));
+
+vi.mock('../../api/queue', () => queueApiMocks);
+
 import QueueJoin from '../QueueJoin';
 
-function createResponse(payload, ok = true, status = 200) {
-  return {
-    ok,
-    status,
-    statusText: ok ? 'OK' : 'Error',
-    json: async () => payload,
-    text: async () => JSON.stringify(payload),
-  };
-}
-
-function setupFetchMock({
+function setupQueueApiMock({
   specialists = [
     { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
   ],
   clinicWide = false,
 } = {}) {
-  global.fetch = vi.fn(async (input, options = {}) => {
-    const url = String(input);
-
-    if (url === '/api/v1/queues/profiles/public') {
-      return createResponse({
-        specialists,
-      });
-    }
-
-    if (url.includes('/api/v1/queue/qr-tokens/')) {
-      return createResponse({
-        queue_active: true,
-        allowed: true,
-        queue_length: 2,
-        department_name: 'Кардиология',
-        specialist_name: 'Кардиолог',
-        target_date: '2026-02-21',
-      });
-    }
-
-    if (url === '/api/v1/queue/join/start' && options.method === 'POST') {
-      return createResponse({
-        session_token: 'session-token',
-        queue_info: {
-          is_clinic_wide: clinicWide,
-          queue_length: 2,
-          department_name: 'Кардиология',
-          specialist_name: 'Кардиолог',
-          target_date: '2026-02-21',
-        },
-      });
-    }
-
-    if (url === '/api/v1/queue/join/complete' && options.method === 'POST') {
-      return createResponse({
-        success: true,
-        queue_number: 3,
-        entries: [{ number: 3, department: 'cardiology' }],
-      });
-    }
-
-    return createResponse({ detail: `Unhandled URL: ${url}` }, false, 404);
+  queueApiMocks.fetchPublicQueueProfiles.mockResolvedValue({ specialists });
+  queueApiMocks.fetchAvailableSpecialists.mockResolvedValue(specialists);
+  queueApiMocks.fetchQrTokenInfo.mockResolvedValue({
+    queue_active: true,
+    allowed: true,
+    queue_length: 2,
+    department_name: 'Кардиология',
+    specialist_name: 'Кардиолог',
+    target_date: '2026-02-21',
+  });
+  queueApiMocks.startQueueJoinSession.mockResolvedValue({
+    session_token: 'session-token',
+    queue_info: {
+      is_clinic_wide: clinicWide,
+      queue_length: 2,
+      department_name: 'Кардиология',
+      specialist_name: 'Кардиолог',
+      target_date: '2026-02-21',
+    },
+  });
+  queueApiMocks.completeQueueJoinSession.mockResolvedValue({
+    success: true,
+    queue_number: 3,
+    entries: [{ number: 3, department: 'cardiology' }],
   });
 }
 
@@ -79,7 +61,7 @@ function renderQueueJoin(token = 'test-token') {
 describe('QueueJoin Accessibility & UX', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupFetchMock();
+    setupQueueApiMock();
 
     const storage = new Map();
     window.localStorage.getItem = vi.fn((key) => (storage.has(key) ? storage.get(key) : null));
@@ -134,7 +116,7 @@ describe('QueueJoin Accessibility & UX', () => {
   });
 
   it('shows meaningful empty state when no specialists are available for clinic-wide QR', async () => {
-    setupFetchMock({ specialists: [], clinicWide: true });
+    setupQueueApiMock({ specialists: [], clinicWide: true });
     renderQueueJoin('clinic-wide-token');
 
     expect(await screen.findByText(/ҳозирча qr орқали танлаш учун мутахассислар мавжуд эмас/i)).toBeInTheDocument();
@@ -142,55 +124,25 @@ describe('QueueJoin Accessibility & UX', () => {
   });
 
   it('provides retry action from error state and recovers to info step', async () => {
-    let tokenInfoCalls = 0;
-    global.fetch = vi.fn(async (input, options = {}) => {
-      const url = String(input);
-
-      if (url === '/api/v1/queues/profiles/public') {
-        return createResponse({
-          specialists: [
-            { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-          ],
-        });
-      }
-
-      if (url.includes('/api/v1/queue/qr-tokens/')) {
-        tokenInfoCalls += 1;
-        if (tokenInfoCalls === 1) {
-          return createResponse({ detail: 'network fail' }, false, 500);
-        }
-        return createResponse({
-          queue_active: true,
-          allowed: true,
-          queue_length: 1,
-          department_name: 'Кардиология',
-          specialist_name: 'Кардиолог',
-          target_date: '2026-02-21',
-        });
-      }
-
-      if (url === '/api/v1/queue/join/start' && options.method === 'POST') {
-        return createResponse({
-          session_token: 'session-token',
-          queue_info: {
-            is_clinic_wide: false,
-            queue_length: 1,
-            department_name: 'Кардиология',
-            specialist_name: 'Кардиолог',
-            target_date: '2026-02-21',
-          },
-        });
-      }
-
-      if (url === '/api/v1/queue/join/complete' && options.method === 'POST') {
-        return createResponse({
-          success: true,
-          queue_number: 2,
-          entries: [{ number: 2, department: 'cardiology' }],
-        });
-      }
-
-      return createResponse({ detail: `Unhandled URL: ${url}` }, false, 404);
+    queueApiMocks.fetchQrTokenInfo
+      .mockRejectedValueOnce(new Error('network fail'))
+      .mockResolvedValueOnce({
+        queue_active: true,
+        allowed: true,
+        queue_length: 1,
+        department_name: 'Кардиология',
+        specialist_name: 'Кардиолог',
+        target_date: '2026-02-21',
+      });
+    queueApiMocks.startQueueJoinSession.mockResolvedValue({
+      session_token: 'session-token',
+      queue_info: {
+        is_clinic_wide: false,
+        queue_length: 1,
+        department_name: 'Кардиология',
+        specialist_name: 'Кардиолог',
+        target_date: '2026-02-21',
+      },
     });
 
     renderQueueJoin('retry-token');

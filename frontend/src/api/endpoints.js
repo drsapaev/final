@@ -21,6 +21,9 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/users',
     CREATE: '/users',
+    GET: (id) => `/users/${id}`,
+    UPDATE: (id) => `/users/${id}`,
+    DELETE: (id) => `/users/${id}`,
     ROLES: '/users/roles',
     PERMISSIONS: '/users/permissions'
   },
@@ -29,6 +32,9 @@ export const API_ENDPOINTS = {
   PATIENTS: {
     LIST: '/patients',
     CREATE: '/patients',
+    GET: (id) => `/patients/${id}`,
+    UPDATE: (id) => `/patients/${id}`,
+    DELETE: (id) => `/patients/${id}`,
     SEARCH: '/patients/',
     STATS: '/patients/stats'
   },
@@ -37,6 +43,11 @@ export const API_ENDPOINTS = {
   DOCTORS: {
     LIST: '/doctors',
     CREATE: '/doctors',
+    GET: (id) => `/doctors/${id}`,
+    UPDATE: (id) => `/doctors/${id}`,
+    DELETE: (id) => `/doctors/${id}`,
+    SCHEDULE: (id) => `/doctors/${id}/schedule`,
+    AVAILABILITY: (id) => `/doctors/${id}/availability`,
     SPECIALIZATIONS: '/doctors/specializations',
     DEPARTMENTS: '/doctors/departments'
   },
@@ -45,6 +56,13 @@ export const API_ENDPOINTS = {
   APPOINTMENTS: {
     LIST: '/appointments',
     CREATE: '/appointments',
+    GET: (id) => `/appointments/${id}`,
+    UPDATE: (id) => `/appointments/${id}`,
+    DELETE: (id) => `/appointments/${id}`,
+    BY_PATIENT: (patientId) => `/appointments/patient/${patientId}`,
+    BY_DOCTOR: (doctorId) => `/appointments/doctor/${doctorId}`,
+    CANCEL: (id) => `/appointments/${id}/cancel`,
+    CONFIRM: (id) => `/appointments/${id}/confirm`,
     STATS: '/appointments/stats',
     BY_DATE: '/appointments/by-date'
   },
@@ -53,6 +71,11 @@ export const API_ENDPOINTS = {
   QUEUE: {
     LIST: '/queue',
     CREATE: '/queue',
+    GET: (id) => `/queue/${id}`,
+    UPDATE: (id) => `/queue/${id}`,
+    DELETE: (id) => `/queue/${id}`,
+    SKIP: (id) => `/queue/${id}/skip`,
+    COMPLETE: (id) => `/queue/${id}/complete`,
     STATS: '/queue/stats',
     BY_DEPARTMENT: '/queue/by-department',
     CALL_NEXT: '/queue/call-next',
@@ -69,6 +92,9 @@ export const API_ENDPOINTS = {
   SERVICES: {
     LIST: '/services',
     CREATE: '/services',
+    GET: (id) => `/services/${id}`,
+    UPDATE: (id) => `/services/${id}`,
+    DELETE: (id) => `/services/${id}`,
     BY_DEPARTMENT: '/services/by-department',
     PRICING: '/services/pricing'
   },
@@ -77,6 +103,9 @@ export const API_ENDPOINTS = {
   REPORTS: {
     LIST: '/reports',
     CREATE: '/reports',
+    GET: (id) => `/reports/${id}`,
+    DELETE: (id) => `/reports/${id}`,
+    EXPORT_BY_ID: (id) => `/reports/${id}/export`,
     GENERATE: '/reports/generate',
     TYPES: '/reports/types'
   },
@@ -84,6 +113,8 @@ export const API_ENDPOINTS = {
   // Настройки
   SETTINGS: {
     LIST: '/settings',
+    GET: (key) => `/settings/${key}`,
+    UPDATE: (key) => `/settings/${key}`,
     BULK_UPDATE: '/settings/bulk-update',
     CATEGORIES: '/settings/categories'
   },
@@ -91,6 +122,8 @@ export const API_ENDPOINTS = {
   // Уведомления
   NOTIFICATIONS: {
     LIST: '/notifications',
+    GET: (id) => `/notifications/${id}`,
+    MARK_READ: (id) => `/notifications/${id}/read`,
     MARK_ALL_READ: '/notifications/mark-all-read',
     SEND: '/notifications/send',
     TYPES: '/notifications/types'
@@ -99,7 +132,10 @@ export const API_ENDPOINTS = {
   // Файлы
   FILES: {
     UPLOAD: '/files/upload',
-    LIST: '/files'
+    LIST: '/files',
+    GET: (id) => `/files/${id}`,
+    DELETE: (id) => `/files/${id}`,
+    DOWNLOAD: (id) => `/files/${id}/download`
   },
 
   // Платежи (новое)

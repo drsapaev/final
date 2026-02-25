@@ -261,3 +261,137 @@ Close post-merge reliability gaps discovered on `main` and lock the fixes with d
 - `https://github.com/drsapaev/final/actions/runs/22321183830` (Role System Integrity Check on `main`, green)
 - `https://github.com/drsapaev/final/actions/runs/22321183816` (Security scan on `main`, green)
 - `load-test-report` artifact verified in run `22321183829` with `k6-summary.json` and `load-regression-report.md`.
+
+---
+
+## Implementation Plan: Frontend ↔ Backend Feature Parity + UX Fit (Phase 9)
+
+Created: 2026-02-24
+Branch: main (fast plan)
+
+### Settings
+
+- Testing: yes
+- Logging: verbose
+- Docs: yes
+
+### Scope
+
+Проверить, все ли реализованные backend-функции покрыты во frontend, и оценить:
+- функциональную корректность соответствия контрактам API,
+- удобство и предсказуемость UX (loading/error/empty/access states) на ключевых ролях.
+
+### Deliverables
+
+- Машиночитаемая матрица соответствия: `docs/reports/frontend_backend_parity.json`
+- Человекочитаемый отчёт: `docs/reports/FRONTEND_BACKEND_PARITY_REPORT.md`
+- Scorecard корректности/удобства: `docs/reports/FRONTEND_UX_CORRECTNESS_SCORECARD.md`
+- CI-проверка, блокирующая drift между backend API и frontend клиентом.
+
+### Commit Plan
+
+- **Commit 1** (после задач 1-3): `feat(parity): add backend-frontend API inventory and baseline matrix`
+- **Commit 2** (после задач 4-6): `test(parity): validate critical role flows and UX correctness scorecard`
+- **Commit 3** (после задач 7-9): `ci(parity): enforce contract drift checks and publish parity report`
+
+### Tasks
+
+#### Phase 1: Контрактная инвентаризация
+
+- [x] **Task 1: Зафиксировать backend API контракт (SSOT)**
+  - Обновить snapshot OpenAPI из текущего backend:
+  - `backend/generate_openapi.py`
+  - `backend/openapi.json`
+  - Логирование: `INFO` начало/конец генерации, `DEBUG` количество путей/операций.
+
+- [x] **Task 2: Построить инвентаризацию frontend API-вызовов**
+  - Создать анализатор frontend вызовов API:
+  - `ops/scripts/extract_frontend_api_usage.py`
+  - Источники: `frontend/src/api/*.js`, `frontend/src/services/*.js`, ключевые `frontend/src/hooks/**/*.js`
+  - Артефакт: `docs/reports/frontend_api_usage_inventory.json`
+  - Логирование: `INFO` по модулям, `DEBUG` по endpoint/method/source-file.
+
+- [x] **Task 3: Сформировать baseline parity matrix**
+  - Сопоставить `backend/openapi.json` и frontend inventory:
+  - `ops/scripts/build_frontend_backend_parity.py`
+  - Выгрузить:
+  - `docs/reports/frontend_backend_parity.json`
+  - `docs/reports/FRONTEND_BACKEND_PARITY_REPORT.md`
+  - Категории: `implemented`, `partial`, `missing_in_frontend`, `frontend_orphan`.
+  - Логирование: `INFO` coverage %, `WARNING` по критичным пропускам (`auth/queue/billing/emr`).
+  - Depends on: Task 1, Task 2.
+
+#### Phase 2: Проверка корректности и удобства
+
+- [x] **Task 4: Проверить критические role-flows на контрактную корректность**
+  - Проверить сценарии: registrar queue, doctor EMR read/write, cashier payment status/receipt, admin settings.
+  - Точки интеграции:
+  - `frontend/src/pages/**/*`
+  - `frontend/src/components/**/*`
+  - `backend/tests/integration/*` (переиспользование проверок контрактов)
+  - Артефакт: секция `critical_flows` в `docs/reports/frontend_backend_parity.json`.
+  - Логирование: `INFO` по каждому сценарию (pass/fail), `ERROR` с endpoint+payload mismatch.
+  - Depends on: Task 3.
+
+- [x] **Task 5: Проверить RBAC-соответствие UI vs backend**
+  - Найти frontend role-guards и сравнить с backend permission surface:
+  - `frontend/src/App.jsx`, `frontend/src/components/**/*Guard*`, `frontend/src/contexts/*`
+  - `backend/app/core/permissions.py`, `backend/app/core/role_validation.py`
+  - Артефакт: секция `rbac_alignment` в `docs/reports/FRONTEND_BACKEND_PARITY_REPORT.md`.
+  - Логирование: `INFO` по ролям, `WARNING` при “UI allows / backend denies” и наоборот.
+  - Depends on: Task 3.
+
+- [x] **Task 6: Оценить UX корректность и удобство по matched-фичам**
+  - Оценить для ключевых страниц наличие и качество:
+  - loading, empty, error recovery, form validation feedback, keyboard/a11y.
+  - Источники:
+  - `frontend/src/pages/**/*`
+  - `frontend/src/components/**/*`
+  - Итог: `docs/reports/FRONTEND_UX_CORRECTNESS_SCORECARD.md` (оценка 0-5: Correctness, Usability).
+  - Логирование: `INFO` итоговый score по модулю, `DEBUG` конкретные UX gaps и приоритет.
+  - Depends on: Task 4, Task 5.
+
+#### Phase 3: Закрытие разрывов и CI gate
+
+- [x] **Task 7: Исправить high-impact parity gaps во frontend**
+  - Поправить endpoint/method/path/query-body расхождения в:
+  - `frontend/src/api/*.js`
+  - `frontend/src/services/*.js`
+  - `frontend/src/pages/**/*` (если есть неправильные вызовы/обработка)
+  - Логирование: `INFO` migrated endpoint map, `WARNING` временные backward shims (с TODO-датой удаления).
+  - Depends on: Task 3, Task 4.
+
+- [x] **Task 8: Добавить regression-тесты parity и UX-критериев**
+  - Добавить/обновить тесты:
+  - `frontend/src/test/**/*` (unit/integration по API клиентам и состояниям UI)
+  - `backend/tests/test_openapi_contract.py` (если нужен экспорт метаданных для parity)
+  - Логирование: тестовые сообщения должны явно показывать `missing/partial/orphan`.
+  - Depends on: Task 7.
+
+- [x] **Task 9: Включить CI gate и обновить checklist evidence**
+  - Включить генерацию parity-отчётов и fail condition в:
+  - `.github/workflows/ci-cd-unified.yml`
+  - Артефакты CI: parity JSON/MD + UX scorecard MD.
+  - Обновить:
+  - `docs/PLAN_CHECKLIST.md`
+  - `.ai-factory/ROADMAP.md` (если критерии milestone закрыты)
+  - Логирование: `INFO` summary в CI (`coverage`, `missing_critical`, `ux_score`).
+  - Depends on: Task 8.
+
+### Exit Criteria
+
+- Critical role-flows (`registrar_queue`, `doctor_emr_rw`, `cashier_payment`, `admin_settings`) pass in parity matrix.
+- UI RBAC не конфликтует с backend RBAC (`rbac_alignment=pass`).
+- Scorecard показывает приемлемый уровень:
+  - Correctness >= 4/5
+  - Usability >= 4/5
+- CI включает blocking parity gate и публикует артефакты parity/UX.
+
+### Validation Evidence
+
+- `python ops/scripts/extract_frontend_api_usage.py --log-level INFO`
+- `python ops/scripts/build_frontend_backend_parity.py --log-level INFO`
+- `python ops/scripts/evaluate_frontend_ux_scorecard.py --log-level INFO`
+- `python ops/scripts/check_frontend_backend_parity.py --log-level INFO` (pass)
+- `python -m pytest backend/tests/unit/test_frontend_backend_parity.py backend/tests/unit/test_frontend_backend_parity_gate.py backend/tests/test_openapi_contract.py -q` (15 passed)
+- `npm --prefix frontend run test:run -- src/api/__tests__/adminSettings.test.js src/api/__tests__/queue.test.js src/test/parity/rbacRouteParity.test.js src/pages/__tests__/QueueJoin.accessibility.test.jsx` (16 passed)

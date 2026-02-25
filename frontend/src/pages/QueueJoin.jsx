@@ -12,6 +12,13 @@ import {
   Timer
 } from 'lucide-react';
 import { A11Y_COLORS } from '../constants/a11yTokens';
+import {
+  fetchAvailableSpecialists,
+  fetchPublicQueueProfiles,
+  fetchQrTokenInfo,
+  startQueueJoinSession,
+  completeQueueJoinSession,
+} from '../api/queue';
 
 const FALLBACK_SPECIALISTS = [
   { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
@@ -45,6 +52,25 @@ const QueueJoin = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(null);
+
+  const getApiErrorMessage = useCallback((err, fallbackMessage) => {
+    const responseData = err?.response?.data;
+    if (typeof responseData?.detail === 'string') {
+      return responseData.detail;
+    }
+    if (Array.isArray(responseData?.detail)) {
+      return responseData.detail
+        .map((item) => item?.msg || String(item))
+        .join(', ');
+    }
+    if (typeof responseData?.message === 'string') {
+      return responseData.message;
+    }
+    if (typeof err?.message === 'string' && err.message.trim()) {
+      return err.message;
+    }
+    return fallbackMessage;
+  }, []);
 
   useEffect(() => {
     if (!formStorageKey) {
@@ -85,29 +111,21 @@ const QueueJoin = () => {
     try {
       // ⭐ NEW: Используем публичный endpoint из QueueProfiles (SSOT)
       // Управляется из Admin Panel -> Вкладки регистратуры -> "Показывать на QR-странице"
-      const response = await fetch('/api/v1/queues/profiles/public');
-      if (response.ok) {
-        const data = await response.json();
-        // API возвращает specialists уже отфильтрованные по show_on_qr_page
-        setAvailableSpecialists(data.specialists || []);
-      } else {
-        // Fallback: try old endpoint
-        const fallbackResponse = await fetch('/api/v1/queue/available-specialists');
-        if (fallbackResponse.ok) {
-          const data = await fallbackResponse.json();
-          const filteredSpecialists = (data.specialists || []).filter(specialist => {
-            const specialty = (specialist.specialty || '').toLowerCase();
-            return specialty !== 'ecg' && specialty !== 'general';
-          });
-          setAvailableSpecialists(filteredSpecialists);
-        } else {
-          // Fallback на статический список
-          setAvailableSpecialists(FALLBACK_SPECIALISTS);
-        }
-      }
+      const data = await fetchPublicQueueProfiles();
+      setAvailableSpecialists(data?.specialists || []);
     } catch {
-      // Fallback на статический список
-      setAvailableSpecialists(FALLBACK_SPECIALISTS);
+      try {
+        // Fallback: старый endpoint специалистов
+        const specialists = await fetchAvailableSpecialists();
+        const filteredSpecialists = specialists.filter((specialist) => {
+          const specialty = (specialist.specialty || '').toLowerCase();
+          return specialty !== 'ecg' && specialty !== 'general';
+        });
+        setAvailableSpecialists(filteredSpecialists);
+      } catch {
+        // Fallback на статический список
+        setAvailableSpecialists(FALLBACK_SPECIALISTS);
+      }
     } finally {
       setIsSpecialistsLoading(false);
     }
@@ -120,31 +138,7 @@ const QueueJoin = () => {
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
     try {
-      // Используем относительный путь для проксирования через Vite
-      const response = await fetch('/api/v1/queue/join/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          const text = await response.text();
-          throw new Error(
-            text || `Ошибка сервера: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const errorMessage = errorData.detail || errorData.message || 'Сессияни бошлашда хатолик';
-        throw new Error(errorMessage);
-      }
-
-      const sessionData = await response.json();
+      const sessionData = await startQueueJoinSession(token);
 
       setSessionToken(sessionData.session_token);
       localStorage.setItem(`queue_session_${token}`, sessionData.session_token);
@@ -156,24 +150,16 @@ const QueueJoin = () => {
         setStep('info');
       }
 
-    } catch (err) {
-      setError(err.message || 'Сессияни бошлашда хатолик');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Сессияни бошлашда хатолик'));
       setStep('error');
     }
-  }, [token]);
+  }, [getApiErrorMessage, token]);
 
   const loadTokenInfo = useCallback(async () => {
     try {
       setStep('loading');
-
-      // Используем относительный путь для проксирования через Vite
-      const response = await fetch(`/api/v1/queue/qr-tokens/${token}/info`);
-
-      if (!response.ok) {
-        throw new Error('QR токен топилмади ёки муддати тугаган');
-      }
-
-      const tokenInfo = await response.json();
+      const tokenInfo = await fetchQrTokenInfo(token);
       setQueueInfo(tokenInfo);
 
       if (!tokenInfo.queue_active) {
@@ -206,11 +192,11 @@ const QueueJoin = () => {
 
       await startJoinSession();
 
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'QR токен топилмади ёки муддати тугаган'));
       setStep('error');
     }
-  }, [startJoinSession, token]);
+  }, [getApiErrorMessage, startJoinSession, token]);
 
   // Загрузка информации о токене при монтировании
   useEffect(() => {
@@ -347,33 +333,7 @@ const QueueJoin = () => {
         requestBody.specialist_ids = selectedSpecialists;
       }
 
-      // Используем относительный путь для проксирования через Vite
-      const response = await fetch('/api/v1/queue/join/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          const errorText = await response.text();
-          throw new Error(errorText || `Ошибка сервера: ${response.status} ${response.statusText}`);
-        }
-
-        // Обрабатываем разные форматы ошибок
-        const errorMessage = errorData.detail ||
-          (Array.isArray(errorData.detail) ? errorData.detail.map(e => e.msg || e).join(', ') : null) ||
-          errorData.message ||
-          'Навбатга қўшилишда хатолик';
-        throw new Error(errorMessage);
-      }
-
-      const joinResult = await response.json();
+      const joinResult = await completeQueueJoinSession(requestBody);
       setResult(joinResult);
       // ✅ Очищаем session_token из localStorage после успешного присоединения
       localStorage.removeItem(`queue_session_${token}`);
@@ -448,8 +408,8 @@ const QueueJoin = () => {
 
       setStep('success');
 
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Навбатга қўшилишда хатолик'));
     } finally {
       setLoading(false);
     }

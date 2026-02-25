@@ -8,6 +8,7 @@ export * from './visits';
 export * from './setting';
 export * from './ws';
 export * from './health';
+export * from './adminSettings';
 
 // Совместимость со старыми импортами (`./api/queue`):
 export * from './queue';
