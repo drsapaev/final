@@ -1,0 +1,3 @@
+## 2025-01-26 - [Clearable MacOSInput]
+**Learning:** Adding a clear button directly inside the input field significantly improves usability for search and filter inputs, preventing users from having to manually delete text. However, care must be taken to prevent focus loss when clicking the clear button, which disrupts the typing flow. Using `onMouseDown={(e) => e.preventDefault()}` solves this.
+**Action:** When implementing clearable inputs in the future, always ensure the clear action does not steal focus from the input, especially for search fields where the user might want to immediately type a new query.
