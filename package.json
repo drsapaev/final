@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@mui/material": "^7.3.8",
     "@vitejs/plugin-react": "^4.7.0",
     "lucide-react": "^0.543.0",
     "prop-types": "^15.8.1",
