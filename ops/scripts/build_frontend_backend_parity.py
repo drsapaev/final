@@ -543,7 +543,8 @@ def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
 
 
 def load_backend_role_surface() -> tuple[set[str], dict[str, str]]:
-    role_validation_path = Path("backend/app/core/role_validation.py")
+    repo_root = Path(__file__).resolve().parents[2]
+    role_validation_path = repo_root / "backend" / "app" / "core" / "role_validation.py"
     spec = importlib.util.spec_from_file_location("parity_role_validation", role_validation_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load role validation module: {role_validation_path}")
