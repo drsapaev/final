@@ -93,6 +93,7 @@ const Sidebar = React.forwardRef(({
         <Button
           variant="ghost"
           size="small"
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           onClick={toggleCollapsed}
           style={{
             width: '32px',
@@ -146,6 +147,7 @@ const Sidebar = React.forwardRef(({
           return (
             <button
               key={item.id}
+              aria-label={item.label}
               className={`mac-sidebar-item ${isActive ? 'mac-sidebar-item--active' : ''}`}
               style={itemStyles}
               onClick={handleItemClick}
@@ -284,6 +286,7 @@ export const SidebarItem = React.forwardRef(({
   return (
     <button
       ref={ref}
+      aria-label={label}
       className={`mac-sidebar-item ${active ? 'mac-sidebar-item--active' : ''} ${className}`}
       style={{
         display: 'flex',
