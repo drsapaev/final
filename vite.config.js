@@ -2,14 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react({
-    jsxImportSource: '@emotion/react',
-    babel: {
-      plugins: [
-        ['@emotion/babel-plugin', { sourceMap: true }]
-      ]
-    }
-  })],
+  plugins: [react()],
   server: {
     port: 5173,
     host: '127.0.0.1',
@@ -55,6 +48,6 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === 'development'
   },
   optimizeDeps: {
-    include: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled']
+    include: ['@mui/material']
   }
 });
