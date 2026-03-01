@@ -37,26 +37,6 @@ export default defineConfig({
       },
     },
   },
-    watch: {
-      usePolling: true,
-      interval: 1000
-    },
-    proxy: {
-      // HTTP API -> http://localhost:8000
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: false,
-      },
-      // WebSocket -> ws://localhost:8000
-      "/ws": {
-        target: "ws://localhost:8000",
-        ws: true,
-        changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
   build: {
     // PWA оптимизации
     rollupOptions: {
