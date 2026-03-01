@@ -1,7 +1,11 @@
 {
   "dependencies": {
+    "@babel/parser": "^7.29.0",
+    "@mui/material": "^7.3.8",
     "@vitejs/plugin-react": "^4.7.0",
+    "glob": "^13.0.6",
     "lucide-react": "^0.543.0",
+    "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.6.0",
@@ -21,8 +25,11 @@
     "vitest": "^1.6.0"
   },
   "scripts": {
-    "test": "vitest run",
-    "test:frontend": "vitest run",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "test": "cd frontend && npm run test:run",
+    "test:frontend": "cd frontend && npm run test:run",
     "check-auth": "cd backend && python test_role_routing.py",
     "check-system": "cd backend && python check_system_integrity.py",
     "remind-rules": "python scripts/remind_auth_rules.py",

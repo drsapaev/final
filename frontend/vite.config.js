@@ -2,28 +2,17 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react({
-    // Исправляем проблемы с Material-UI
-    jsxImportSource: '@emotion/react',
-    babel: {
-      plugins: [
-        ['@emotion/babel-plugin', { sourceMap: true }]
-      ]
-    }
-  })],
+  plugins: [react()],
   server: {
     port: 5173,
-    host: '0.0.0.0',
-    strictPort: true,
-    hmr: {
-      port: 5173,
-      host: 'localhost',
-      clientPort: 5173
-    },
+    host: '127.0.0.1',
+    strictPort: false,
+    hmr: false,
     watch: {
       usePolling: true,
       interval: 1000
     },
+    allowedHosts: ['localhost', '127.0.0.1'],
     proxy: {
       // HTTP API -> http://localhost:8000
       "/api": {
@@ -161,8 +150,8 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === 'development'
   },
   optimizeDeps: {
-    // Принудительно предварительно собираем Material-UI
-    include: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled']
+    // Only include packages that are in frontend/package.json dependencies
+    include: ['@mui/material']
   },
   // PWA настройки
   define: {
