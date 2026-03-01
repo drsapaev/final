@@ -4,7 +4,8 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
+    # PR guardrails are enforced for merges into main.
+    branches: [ main ]
   schedule:
     - cron: '0 2 * * *'  # Ежедневно в 2:00
   workflow_dispatch:  # Ручной запуск
@@ -17,6 +18,53 @@ env:
   WS_DEV_ALLOW: '1'
 
 jobs:
+  # GitHub-native merge blockers for PRs into `main`:
+  # - `🐍 Backend тесты`
+  # - `🎨 Frontend тесты`
+  # - `🧱 Context Boundary Integrity`
+  # - `🔄 Frontend-Backend Parity`
+  #
+  # External providers such as Vercel are intentionally NOT treated as required
+  # CI gates in this workflow.
+  ci-scope:
+    name: 🧭 CI Scope
+    runs-on: ubuntu-latest
+    outputs:
+      guardrails_required: ${{ steps.scope.outputs.guardrails_required }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔎 Detect PR-relevant changes
+      if: github.event_name == 'pull_request'
+      id: changes
+      uses: dorny/paths-filter@v3
+      with:
+        filters: |
+          guardrails:
+            - 'backend/**'
+            - 'frontend/**'
+            - 'ops/**'
+            - '.github/workflows/**'
+
+    - name: 📌 Resolve guardrail scope
+      id: scope
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        PR_GUARDRAILS: ${{ steps.changes.outputs.guardrails }}
+      run: |
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          REQUIRED="${PR_GUARDRAILS:-false}"
+        else
+          REQUIRED="true"
+        fi
+
+        echo "guardrails_required=${REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "guardrails_required=${REQUIRED}"
+
   # --- Проверка качества кода ---
   code-quality:
     name: 🔍 Качество кода
@@ -534,7 +582,16 @@ jobs:
     name: 🧱 Context Boundary Integrity
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    needs: [ci-scope]
+    # Required for PRs into `main` when application/workflow code changes.
+    # Skips docs-only / non-app PRs to keep the pipeline efficient.
+    if: |
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'pull_request' && github.base_ref == 'main')
+      ) &&
+      needs.ci-scope.outputs.guardrails_required == 'true'
 
     steps:
     - uses: actions/checkout@v4
@@ -591,8 +648,16 @@ jobs:
     name: 🔄 Frontend-Backend Parity
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [frontend-tests, backend-tests, architecture-boundary]
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    needs: [ci-scope, frontend-tests, backend-tests, architecture-boundary]
+    # Required for PRs into `main` after the core test jobs pass.
+    # This job is the contract/UX/RBAC guardrail for frontend↔backend drift.
+    if: |
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'pull_request' && github.base_ref == 'main')
+      ) &&
+      needs.ci-scope.outputs.guardrails_required == 'true'
 
     steps:
     - uses: actions/checkout@v4
@@ -665,7 +730,10 @@ jobs:
     name: 🔒 Security сканирование
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary, frontend-backend-parity]
+    needs: [code-quality, frontend-tests, backend-tests]
+    # Security scanning stays GitHub-native, but is not part of the lightweight
+    # PR blocker set for every pull request. Run it on branch pushes and manual dispatch.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     
     steps:
     - uses: actions/checkout@v4
@@ -750,7 +818,10 @@ jobs:
     name: 🐳 Docker сборка
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [code-quality, frontend-tests, backend-tests, architecture-boundary, frontend-backend-parity]
+    needs: [code-quality, frontend-tests, backend-tests]
+    # Image build verification is useful before branch/main pushes, but it is not
+    # required on every PR once the GitHub-native test/parity guardrails are green.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     
     steps:
     - uses: actions/checkout@v4
@@ -802,7 +873,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [backend-tests, frontend-tests, architecture-boundary, frontend-backend-parity]
-    if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    # Integration remains a heavier gate: manual runs and push-to-main only.
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     services:
       postgres:
         image: postgres:16
