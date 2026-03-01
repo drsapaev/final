@@ -25,7 +25,7 @@ import {
   MacOSStatCard
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../api/client';
+import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
 /**
@@ -52,8 +52,7 @@ const BenefitSettings = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/admin/benefit-settings');
-      const data = response.data;
+      const data = await fetchBenefitSettings();
       setSettings(data);
       setOriginalSettings(data);
       setLastUpdated(new Date(data.updated_at));
@@ -85,8 +84,8 @@ const BenefitSettings = () => {
     setSaving(true);
     setShowConfirmModal(false);
     try {
-      const response = await api.post('/admin/benefit-settings', settings);
-      toast.success(response.data?.message || 'Настройки сохранены');
+      const response = await saveBenefitSettings(settings);
+      toast.success(response?.message || 'Настройки сохранены');
       setOriginalSettings(settings);
       setLastUpdated(new Date());
     } catch (error) {

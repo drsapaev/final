@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
+import { fetchClinicSettings, saveClinicSettings } from '../../api/adminSettings';
 import logger from '../../utils/logger';
 import {
   Building2,
@@ -54,11 +55,7 @@ const ClinicSettings = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/clinic/settings', {
-        params: { category: 'clinic' }
-      });
-
-      const data = response.data;
+      const data = await fetchClinicSettings('clinic');
       const settingsObj = {};
 
       if (Array.isArray(data)) {
@@ -143,7 +140,7 @@ const ClinicSettings = () => {
         logo_url: logoUrl
       };
 
-      await api.put('/admin/clinic/settings', {
+      await saveClinicSettings({
         settings: settingsToSave
       });
 
@@ -562,4 +559,3 @@ const ClinicSettings = () => {
 };
 
 export default ClinicSettings;
-

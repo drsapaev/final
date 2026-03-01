@@ -49,22 +49,22 @@ export function routeToRoles(route) {
     '/admin/reports': ['Admin'],
     '/admin/settings': ['Admin'],
     '/admin/security': ['Admin'],
-    '/registrar-panel': ['Admin', 'Registrar', 'Receptionist'],
+    '/registrar-panel': ['Admin', 'Registrar'],
     '/doctor-panel': ['Admin', 'Doctor'],
     '/cardiologist': ['Admin', 'Doctor', 'cardio'],
     '/dermatologist': ['Admin', 'Doctor', 'derma'],
     '/dentist': ['Admin', 'Doctor', 'dentist'],
     '/lab-panel': ['Admin', 'Lab'],
     '/cashier-panel': ['Admin', 'Cashier'],
-    '/patient-panel': ['Admin', 'Patient', 'Registrar', 'Receptionist', 'Doctor'],
+    '/patient-panel': ['Admin', 'Registrar', 'Doctor'],
     '/queue-board': [], // Публичный маршрут
     '/display-board': [], // Публичный маршрут
     '/settings': ['Admin'],
     '/audit': ['Admin'],
-    '/scheduler': ['Admin', 'Doctor', 'Registrar', 'Receptionist'],
-    '/appointments': ['Admin', 'Registrar', 'Receptionist'],
+    '/scheduler': ['Admin', 'Doctor', 'Registrar'],
+    '/appointments': ['Admin', 'Registrar'],
     '/analytics': ['Admin'],
-    '/search': ['Admin', 'Doctor', 'Registrar', 'Receptionist', 'Lab', 'Cashier'],
+    '/search': ['Admin', 'Doctor', 'Registrar', 'Lab', 'Cashier'],
   };
 
   return routeMap[route] || [];
@@ -82,13 +82,22 @@ export function hasRouteAccess(profile, route) {
   const requiredRoles = routeToRoles(route);
   if (requiredRoles.length === 0) return true; // Публичный маршрут
 
+  const roleAliases = {
+    receptionist: 'registrar',
+    nurse: 'doctor'
+  };
+  const normalizeRole = (role) => {
+    const normalized = String(role || '').toLowerCase();
+    return roleAliases[normalized] || normalized;
+  };
+
   const userRoles = [];
 
   // Собираем роли пользователя
-  if (profile.role) userRoles.push(String(profile.role).toLowerCase());
-  if (profile.role_name) userRoles.push(String(profile.role_name).toLowerCase());
+  if (profile.role) userRoles.push(normalizeRole(profile.role));
+  if (profile.role_name) userRoles.push(normalizeRole(profile.role_name));
   if (Array.isArray(profile.roles)) {
-    profile.roles.forEach(r => userRoles.push(String(r).toLowerCase()));
+    profile.roles.forEach(r => userRoles.push(normalizeRole(r)));
   }
   if (profile.is_superuser || profile.is_admin || profile.admin) {
     userRoles.push('admin');
@@ -96,7 +105,7 @@ export function hasRouteAccess(profile, route) {
 
   // Проверяем совпадение ролей
   return requiredRoles.some(requiredRole =>
-    userRoles.includes(String(requiredRole).toLowerCase())
+    userRoles.includes(normalizeRole(requiredRole))
   );
 }
 

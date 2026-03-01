@@ -154,10 +154,29 @@ npx playwright test
 - E2E тестами
 - Проверкой документации
 
+### Branch protection для `main`
+
+Require these GitHub-native checks:
+
+- `🔍 Качество кода`
+- `🐍 Backend тесты`
+- `🎨 Frontend тесты`
+- `🧱 Context Boundary Integrity`
+- `🔄 Frontend-Backend Parity`
+- `role-system-check`
+
+Не делать обязательными:
+
+- `Vercel` и `Vercel Preview Comments` — это внешний preview/deploy signal, а не repository-owned CI gate
+- `🔒 Security сканирование` — выполняется на `push` в `main` и `workflow_dispatch`
+- `🐳 Docker сборка` — выполняется на `push` в `main` и `workflow_dispatch`
+- `🔗 Интеграционные тесты` — тяжелая проверка для `push` в `main` и ручных запусков
+
 ## 📚 Документация
 
 - [Документация API](docs/README.md) - подробное описание API
 - [Система ролей](docs/ROLES_AND_ROUTING.md) - управление доступом
+- [CI Guardrails](docs/CI_GUARDRAILS.md) - какие проверки реально блокируют merge в `main`
 - [CI/CD](CI-CD-README.md) - настройка и использование
 - [Специализированные панели](SPECIALIZED_PANELS_README.md) - панели врачей
 

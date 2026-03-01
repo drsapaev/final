@@ -13,6 +13,26 @@ export async function fetchAvailableSpecialists() {
   return Array.isArray(payload) ? payload : [];
 }
 
+export async function fetchPublicQueueProfiles() {
+  const response = await api.get('/queues/profiles/public');
+  return response.data;
+}
+
+export async function fetchQrTokenInfo(token) {
+  const response = await api.get(`/queue/qr-tokens/${token}/info`);
+  return response.data;
+}
+
+export async function startQueueJoinSession(token) {
+  const response = await api.post('/queue/join/start', { token });
+  return response.data;
+}
+
+export async function completeQueueJoinSession(payload) {
+  const response = await api.post('/queue/join/complete', payload);
+  return response.data;
+}
+
 export async function fetchQueuesToday(targetDate) {
   const response = await api.get('/registrar/queues/today', {
     params: withParams({ target_date: targetDate }),

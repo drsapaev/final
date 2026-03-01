@@ -15,7 +15,7 @@ import {
 '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { api } from '../../api/client';
+import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
 const WizardSettings = () => {
@@ -37,8 +37,8 @@ const WizardSettings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/wizard-settings');
-      setSettings(response.data);
+      const data = await fetchWizardSettings();
+      setSettings(data);
       setHasChanges(false);
     } catch (error) {
       logger.error('Error fetching wizard settings:', error);
@@ -71,16 +71,16 @@ const WizardSettings = () => {
     try {
       setSaving(true);
       setShowConfirmModal(false);
-      const response = await api.post('/admin/wizard-settings', {
+      const response = await saveWizardSettings({
         use_new_wizard: settings.use_new_wizard
       });
 
-      if (response.data.success) {
-        toast.success(response.data.message);
-        setSettings(response.data.settings);
+      if (response.success) {
+        toast.success(response.message);
+        setSettings(response.settings);
         setHasChanges(false);
       } else {
-        throw new Error(response.data.message || 'Ошибка сохранения');
+        throw new Error(response.message || 'Ошибка сохранения');
       }
     } catch (error) {
       logger.error('Error saving wizard settings:', error);
