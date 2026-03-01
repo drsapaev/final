@@ -159,6 +159,7 @@ const Button = React.forwardRef(({
       style={buttonStyles}
       disabled={disabled || loading}
       onClick={handleClick}
+      aria-busy={loading}
       {...props}>
 
       {/* Loading spinner */}
