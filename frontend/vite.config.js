@@ -13,13 +13,30 @@ export default defineConfig({
   })],
   server: {
     port: 5173,
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     strictPort: false,
-    hmr: {
-      host: 'localhost',
-      port: 5173,
-      protocol: 'ws'
+    hmr: false,
+    watch: {
+      usePolling: true,
+      interval: 1000
     },
+    allowedHosts: ['localhost', '127.0.0.1'],
+    proxy: {
+      // HTTP API -> http://localhost:8000
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      // WebSocket -> ws://localhost:8000
+      "/ws": {
+        target: "ws://localhost:8000",
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
     watch: {
       usePolling: true,
       interval: 1000
