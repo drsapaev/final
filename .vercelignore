@@ -1,0 +1,5 @@
+backend/
+docs/
+.git/
+.env.local
+node_modules/

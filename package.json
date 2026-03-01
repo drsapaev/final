@@ -25,11 +25,11 @@
     "vitest": "^1.6.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:frontend": "vitest run",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "test": "cd frontend && npm run test:run",
+    "test:frontend": "cd frontend && npm run test:run",
     "check-auth": "cd backend && python test_role_routing.py",
     "check-system": "cd backend && python check_system_integrity.py",
     "remind-rules": "python scripts/remind_auth_rules.py",
