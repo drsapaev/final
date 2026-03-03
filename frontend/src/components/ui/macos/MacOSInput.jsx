@@ -1,4 +1,5 @@
 import React from 'react';
+import { XCircle } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -13,8 +14,6 @@ const MacOSInput = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -55,10 +54,12 @@ const MacOSInput = React.forwardRef(({
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
+  const hasRightIcon = (Icon && iconPosition === 'right') || clearable;
+
   const inputStyle = {
     width: '100%',
     paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingRight: hasRightIcon ? '40px' : currentSize.padding.split(' ')[1],
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -99,20 +100,97 @@ const MacOSInput = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
+  const [internalValue, setInternalValue] = React.useState(props.defaultValue || '');
+
+  // Keep internal value in sync with external value if controlled
+  const isControlled = props.value !== undefined;
+  const currentValue = isControlled ? props.value : internalValue;
+
+  const handleChange = (e) => {
+    if (!isControlled) {
+      setInternalValue(e.target.value);
+    }
+    if (props.onChange) {
+      props.onChange(e);
+    }
+  };
+
+  const inputRef = React.useRef(null);
+
+  // Expose both ref and internal ref
+  React.useImperativeHandle(ref, () => inputRef.current);
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+
+    // Focus the input back after clearing
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+
+    if (onClear) {
+      onClear();
+    } else {
+      if (!isControlled) {
+        setInternalValue('');
+      }
+      if (props.onChange) {
+        const syntheticEvent = {
+          target: { value: '', name: props.name },
+          currentTarget: { value: '', name: props.name }
+        };
+        props.onChange(syntheticEvent);
+      }
+    }
+  };
+
+  const showClearButton = clearable && !disabled && Boolean(currentValue);
+
+  // We need to omit defaultValue from props passed to input to avoid React warnings when we control it
+  const { defaultValue, onChange, ...restProps } = props;
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      {Icon && (
+      {Icon && iconPosition === 'left' && (
         <Icon style={iconStyle} />
       )}
       <input
-        ref={ref}
+        ref={inputRef}
         className={className}
         style={inputStyle}
         disabled={disabled}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        {...props}
+        value={currentValue}
+        onChange={handleChange}
+        {...restProps}
       />
+      {Icon && iconPosition === 'right' && !showClearButton && (
+        <Icon style={{ ...iconStyle, right: '12px' }} />
+      )}
+      {showClearButton && (
+        <button
+          type="button"
+          onClick={handleClear}
+          aria-label="Clear input"
+          style={{
+            position: 'absolute',
+            right: '12px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--mac-text-tertiary)'
+          }}
+        >
+          <XCircle size={16} />
+        </button>
+      )}
     </div>
   );
 });
