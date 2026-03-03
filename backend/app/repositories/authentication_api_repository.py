@@ -19,6 +19,9 @@ class AuthenticationApiRepository:
     def refresh_user(self, user) -> None:
         self.db.refresh(user)
 
+    def refresh(self, instance) -> None:
+        self.db.refresh(instance)
+
     def rollback(self) -> None:
         self.db.rollback()
 

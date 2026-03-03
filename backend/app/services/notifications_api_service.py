@@ -29,6 +29,7 @@ from app.schemas.user_management import (
     UserNotificationSettingsUpdate,
 )
 from app.services.notifications import notification_sender_service
+from app.services.user_management_service import get_user_management_service
 
 router = APIRouter()
 
@@ -384,11 +385,9 @@ async def get_user_notification_settings(
     ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
 
-    # Используем UserNotificationSettings
+    get_user_management_service().ensure_user_support_records(db, user_id)
     settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
     if not settings:
-        # Если настроек нет, можно попробовать создать дефолтные или вернуть 404
-        # Лучше 404, а создание должно быть при регистрации
         raise HTTPException(status_code=404, detail="Настройки уведомлений не найдены")
 
     return settings
@@ -408,6 +407,7 @@ async def update_user_notification_settings(
     ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
 
+    get_user_management_service().ensure_user_support_records(db, user_id)
     settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
     if not settings:
         raise HTTPException(status_code=404, detail="Настройки уведомлений не найдены")

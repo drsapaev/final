@@ -145,16 +145,20 @@ async def chat_websocket_handler(
     Подключение: ws://localhost:8000/ws/chat?token=<JWT_TOKEN>
     """
 
-    logger.info(f"🔌 Chat WebSocket connection attempt. Token provided: {bool(token)}")
+    logger.info("Chat WebSocket connection attempt. Token provided: %s", bool(token))
 
     # Аутентификация
     db = SessionLocal()
     try:
         user = await authenticate_websocket(websocket, token, db)
         if user:
-            logger.info(f"✅ Chat WebSocket authenticated: user_id={user.id}, username={user.username}")
+            logger.info(
+                "Chat WebSocket authenticated: user_id=%s, username=%s",
+                user.id,
+                user.username,
+            )
         else:
-            logger.warning("❌ Chat WebSocket authentication failed")
+            logger.warning("Chat WebSocket authentication failed")
     finally:
         db.close()
 

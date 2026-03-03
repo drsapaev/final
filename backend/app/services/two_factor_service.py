@@ -168,6 +168,7 @@ class TwoFactorService:
                 existing_2fa.totp_verified = False
                 existing_2fa.recovery_email = recovery_email
                 existing_2fa.recovery_phone = recovery_phone
+                existing_2fa.recovery_enabled = bool(recovery_email or recovery_phone)
                 two_factor_auth = existing_2fa
             else:
                 two_factor_auth = TwoFactorAuth(
@@ -181,6 +182,21 @@ class TwoFactorService:
                 )
                 db.add(two_factor_auth)
 
+            db.flush()
+            logger.info(
+                "[FIX:2FA] Creating setup artifacts for user_id=%s two_factor_auth_id=%s",
+                user_id,
+                two_factor_auth.id,
+            )
+
+            # Удаляем старые backup/recovery артефакты при повторной настройке.
+            db.query(TwoFactorBackupCode).filter(
+                TwoFactorBackupCode.two_factor_auth_id == two_factor_auth.id
+            ).delete()
+            db.query(TwoFactorRecovery).filter(
+                TwoFactorRecovery.two_factor_auth_id == two_factor_auth.id
+            ).delete()
+
             # Генерируем backup коды
             backup_codes = self.generate_backup_codes()
 
@@ -191,20 +207,30 @@ class TwoFactorService:
                 )
                 db.add(backup_code)
 
-            # Генерируем токен восстановления
-            recovery_token = self.generate_recovery_token()
-            recovery_expires = datetime.utcnow() + timedelta(
-                hours=self.recovery_expiry_hours
-            )
+            two_factor_auth.backup_codes_generated = True
+            two_factor_auth.backup_codes_count = len(backup_codes)
 
-            recovery = TwoFactorRecovery(
-                two_factor_auth_id=two_factor_auth.id,
-                recovery_type="email" if recovery_email else "phone",
-                recovery_value=recovery_email or recovery_phone,
-                recovery_token=recovery_token,
-                expires_at=recovery_expires,
-            )
-            db.add(recovery)
+            recovery_token = None
+            recovery_expires = None
+            if recovery_email or recovery_phone:
+                recovery_token = self.generate_recovery_token()
+                recovery_expires = datetime.utcnow() + timedelta(
+                    hours=self.recovery_expiry_hours
+                )
+
+                recovery = TwoFactorRecovery(
+                    two_factor_auth_id=two_factor_auth.id,
+                    recovery_type="email" if recovery_email else "phone",
+                    recovery_value=recovery_email or recovery_phone,
+                    recovery_token=recovery_token,
+                    expires_at=recovery_expires,
+                )
+                db.add(recovery)
+            else:
+                logger.info(
+                    "[FIX:2FA] No recovery contact provided for user_id=%s; skipping recovery token",
+                    user_id,
+                )
 
             db.commit()
 
@@ -216,7 +242,7 @@ class TwoFactorService:
                 "secret_key": secret,
                 "backup_codes": backup_codes,
                 "recovery_token": recovery_token,
-                "expires_at": recovery_expires.isoformat(),
+                "expires_at": recovery_expires.isoformat() if recovery_expires else None,
             }
 
         except Exception as e:
@@ -535,6 +561,93 @@ class TwoFactorService:
                 "trusted_devices_count": 0,
                 "last_used": None,
             }
+
+    def get_security_logs(
+        self, db: Session, user_id: int, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """Возвращает журнал действий 2FA для UI."""
+        logs: list[dict[str, Any]] = []
+
+        sessions = (
+            db.query(TwoFactorSession)
+            .filter(TwoFactorSession.user_id == user_id)
+            .order_by(TwoFactorSession.created_at.desc())
+            .all()
+        )
+        for session in sessions:
+            logs.append(
+                {
+                    "type": "success" if session.two_factor_verified else "warning",
+                    "action": "Верификация 2FA",
+                    "description": (
+                        f"Вход подтвержден методом {session.two_factor_method or 'unknown'}"
+                    ),
+                    "timestamp": session.created_at,
+                    "ip_address": session.ip_address or "unknown",
+                    "user_agent": session.user_agent or "unknown",
+                }
+            )
+
+        two_factor_auth = (
+            db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+        )
+        if two_factor_auth:
+            recovery_attempts = (
+                db.query(TwoFactorRecovery)
+                .filter(TwoFactorRecovery.two_factor_auth_id == two_factor_auth.id)
+                .order_by(TwoFactorRecovery.created_at.desc())
+                .all()
+            )
+            for recovery in recovery_attempts:
+                logs.append(
+                    {
+                        "type": "success" if recovery.verified else "warning",
+                        "action": "Восстановление 2FA",
+                        "description": (
+                            f"Запрос через {recovery.recovery_type}"
+                            if recovery.verified
+                            else f"Ожидает подтверждения через {recovery.recovery_type}"
+                        ),
+                        "timestamp": recovery.created_at,
+                        "ip_address": recovery.ip_address or "unknown",
+                        "user_agent": recovery.user_agent or "unknown",
+                    }
+                )
+
+        logs.sort(
+            key=lambda item: item["timestamp"] or datetime.min,
+            reverse=True,
+        )
+        return logs[offset : offset + limit]
+
+    def get_recovery_methods(self, db: Session, user_id: int) -> list[dict[str, Any]]:
+        """Возвращает методы восстановления 2FA для UI."""
+        two_factor_auth = (
+            db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
+        )
+        if not two_factor_auth:
+            return []
+
+        methods: list[dict[str, Any]] = []
+        if two_factor_auth.recovery_email:
+            methods.append(
+                {
+                    "type": "email",
+                    "label": "Email",
+                    "value": two_factor_auth.recovery_email,
+                    "verified": bool(two_factor_auth.recovery_enabled),
+                }
+            )
+        if two_factor_auth.recovery_phone:
+            methods.append(
+                {
+                    "type": "phone",
+                    "label": "Телефон",
+                    "value": two_factor_auth.recovery_phone,
+                    "verified": bool(two_factor_auth.recovery_enabled),
+                }
+            )
+        return methods
 
     def regenerate_backup_codes(self, db: Session, user_id: int) -> list[str]:
         """Перегенерирует backup коды"""

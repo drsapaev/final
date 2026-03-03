@@ -24,6 +24,32 @@ router = APIRouter()
 # ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
 
 
+def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
+    """Resolve JWT subject to a user record for WebSocket authentication."""
+    subject = payload.get("sub")
+    if subject is None:
+        logger.warning("WebSocket auth rejected: token is missing 'sub'")
+        return None
+
+    if isinstance(subject, int):
+        user = crud_user.get(db, id=subject)
+    elif isinstance(subject, str):
+        if subject.isdigit():
+            user = crud_user.get(db, id=int(subject))
+        else:
+            user = db.query(User).filter(User.username == subject).first()
+    else:
+        logger.warning(
+            "WebSocket auth rejected: unsupported 'sub' type %s", type(subject).__name__
+        )
+        return None
+
+    if user is None:
+        logger.warning("WebSocket auth rejected: no user matched token subject %r", subject)
+
+    return user
+
+
 async def authenticate_websocket_token(
     token: str | None, db: Session
 ) -> User | None:
@@ -37,14 +63,10 @@ async def authenticate_websocket_token(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        user_id: int = payload.get("sub")
-        if user_id is None:
-            return None
     except JWTError:
         return None
 
-    user = crud_user.get(db, id=user_id)
-    return user
+    return _resolve_websocket_user(payload, db)
 
 
 # ===================== АУТЕНТИФИЦИРОВАННЫЕ WEBSOCKET ENDPOINTS =====================

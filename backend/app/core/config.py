@@ -1,26 +1,46 @@
 # app/core/config.py
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSource, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
 # Calculate absolute path to clinic.db (relative to backend directory)
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> backend/
+_DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
 _DEFAULT_DB_PATH = _BACKEND_DIR / "clinic.db"
 _DEFAULT_DATABASE_URL = f"sqlite:///{_DEFAULT_DB_PATH.as_posix()}"
 
 
+class _CompatibleCorsEnvSettingsSource(EnvSettingsSource):
+    """Allow comma-separated CORS origin strings instead of JSON arrays."""
+
+    def prepare_field_value(self, field_name, field, value, value_is_complex):  # type: ignore[no-untyped-def]
+        if field_name == "BACKEND_CORS_ORIGINS" and isinstance(value, str):
+            return value
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
+
+
+class _CompatibleCorsDotEnvSettingsSource(DotEnvSettingsSource):
+    """Allow comma-separated CORS origin strings in backend/.env."""
+
+    def prepare_field_value(self, field_name, field, value, value_is_complex):  # type: ignore[no-untyped-def]
+        if field_name == "BACKEND_CORS_ORIGINS" and isinstance(value, str):
+            return value
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_DEFAULT_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -48,8 +68,25 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
             "http://localhost:8080",
             "http://127.0.0.1:8080",
-        ]
+        ],
+        validation_alias=AliasChoices("BACKEND_CORS_ORIGINS", "CORS_ORIGINS"),
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return (
+            init_settings,
+            _CompatibleCorsEnvSettingsSource(settings_cls),
+            _CompatibleCorsDotEnvSettingsSource(settings_cls),
+            file_secret_settings,
+        )
     CORS_DISABLE: bool = False
     CORS_ALLOW_ALL: bool = Field(default=False, description="Allow all CORS origins (dev only)")
 
@@ -305,6 +342,21 @@ class Settings(BaseSettings):
             return None
         return v
 
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value):  # type: ignore[no-untyped-def]
+        if value is None:
+            return value
+        if isinstance(value, str):
+            if value.strip().startswith("["):
+                origins = json.loads(value)
+                logger.info("[FIX:CORS] Parsed %d CORS origins from JSON env string", len(origins))
+                return origins
+            origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+            logger.info("[FIX:CORS] Parsed %d CORS origins from env string", len(origins))
+            return origins
+        return value
+
 
 # Default SECRET_KEY for development only (will be validated on startup)
 _DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-production"
@@ -395,6 +447,9 @@ def get_settings() -> Settings:
         raise ValueError(
             f"SECRET_KEY must be at least 32 characters long. Current length: {len(s.SECRET_KEY)}"
         )
+
+    if os.getenv("CORS_ORIGINS") and not os.getenv("BACKEND_CORS_ORIGINS"):
+        logger.info("[FIX:CORS] Using legacy CORS_ORIGINS env variable for backend CORS config")
 
     # ✅ SECURITY: Production-specific validations
     if env in ("prod", "production"):

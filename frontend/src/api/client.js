@@ -13,6 +13,7 @@ import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP === '1';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -107,10 +108,20 @@ function getCookie(name) {
 
 // ✅ SECURITY: Fetch CSRF token from server if not in cookie
 let csrfTokenPromise = null;
+let csrfEndpointUnavailable = false;
+let csrfBootstrapSkippedLogged = false;
 async function ensureCSRFToken() {
   // Check cookie first
   const cookieToken = getCookie('csrf_token');
   if (cookieToken) return cookieToken;
+  if (!CSRF_BOOTSTRAP_ENABLED) {
+    if (!csrfBootstrapSkippedLogged) {
+      logger.info('[FIX:CSRF] CSRF bootstrap endpoint disabled; using cookie-only mode');
+      csrfBootstrapSkippedLogged = true;
+    }
+    return null;
+  }
+  if (csrfEndpointUnavailable) return null;
 
   // Single-flight pattern for CSRF token fetch
   if (csrfTokenPromise) return csrfTokenPromise;
@@ -122,6 +133,11 @@ async function ensureCSRFToken() {
       });
       return response.data?.csrf_token || getCookie('csrf_token');
     } catch (err) {
+      if (err?.response?.status === 404) {
+        csrfEndpointUnavailable = true;
+        logger.info('[FIX:CSRF] Backend does not expose /auth/csrf-token; skipping CSRF header bootstrap');
+        return null;
+      }
       logger.warn('Failed to get CSRF token:', err);
       return null;
     } finally {

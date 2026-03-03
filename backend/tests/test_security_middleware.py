@@ -19,6 +19,14 @@ def app_with_security():
     async def test_login():
         return {"message": "Login successful"}
 
+    @app.post("/api/v1/auth/minimal-login")
+    async def test_minimal_login():
+        return {"message": "Minimal login successful"}
+
+    @app.options("/api/v1/auth/minimal-login")
+    async def test_minimal_login_options():
+        return {"message": "OK"}
+
     @app.post("/api/v1/2fa/verify")
     async def test_2fa_verify():
         return {"message": "2FA verified"}
@@ -26,6 +34,14 @@ def app_with_security():
     @app.post("/api/v1/authentication/password-reset")
     async def test_password_reset():
         return {"message": "Password reset requested"}
+
+    @app.get("/api/v1/auth/me")
+    async def test_auth_me():
+        return {"id": 1, "username": "tester"}
+
+    @app.get("/api/v1/authentication/profile")
+    async def test_authentication_profile():
+        return {"id": 1, "username": "tester"}
 
     @app.get("/api/v1/health")
     async def test_health():
@@ -107,6 +123,55 @@ class TestRateLimiting:
 
             assert response.headers["X-RateLimit-Limit"] == "5"
             assert response.headers["X-RateLimit-Window"] == "300"
+
+    def test_minimal_login_uses_login_rate_limit(self, app_with_security):
+        """Тест: /auth/minimal-login попадает под login rate limit, а не общий api."""
+        client = TestClient(app_with_security)
+
+        for _ in range(5):
+            response = client.post("/api/v1/auth/minimal-login")
+            assert response.status_code == 200
+
+        response = client.post("/api/v1/auth/minimal-login")
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        assert "5 за 300 секунд" in response.json()["detail"]
+
+    def test_options_preflight_does_not_consume_login_rate_limit(self, app_with_security):
+        """Тест: CORS preflight OPTIONS не должен расходовать лимит логина."""
+        client = TestClient(app_with_security)
+
+        for _ in range(20):
+            response = client.options("/api/v1/auth/minimal-login")
+            assert response.status_code == 200
+
+        for _ in range(5):
+            response = client.post("/api/v1/auth/minimal-login")
+            assert response.status_code == 200
+
+        response = client.post("/api/v1/auth/minimal-login")
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+    def test_auth_me_uses_session_rate_limit(self, app_with_security):
+        """Тест: /auth/me не должен попадать под общий api лимит 100/3600."""
+        client = TestClient(app_with_security)
+
+        for _ in range(101):
+            response = client.get("/api/v1/auth/me")
+            assert response.status_code == 200
+
+        response = client.get("/api/v1/auth/me")
+        assert response.status_code == 200
+        assert response.headers["X-RateLimit-Limit"] == "600"
+        assert response.headers["X-RateLimit-Window"] == "3600"
+
+    def test_authentication_profile_uses_session_rate_limit(self, app_with_security):
+        """Тест: /authentication/profile получает session bucket."""
+        client = TestClient(app_with_security)
+
+        response = client.get("/api/v1/authentication/profile")
+        assert response.status_code == 200
+        assert response.headers["X-RateLimit-Limit"] == "600"
+        assert response.headers["X-RateLimit-Window"] == "3600"
 
     def test_rate_limit_public_endpoints(self, client: TestClient):
         """Тест: публичные эндпоинты не ограничиваются"""
@@ -253,4 +318,19 @@ class TestSecurityMiddlewareIntegration:
         # Используем обычный dict вместо defaultdict для проверки
         if "test:127.0.0.1" in middleware.request_counts:
             assert len(middleware.request_counts["test:127.0.0.1"]) == 0
+
+    def test_minimal_login_path_is_classified_as_login(self):
+        """Тест: classifier распознает minimal-login как login endpoint."""
+        middleware = SecurityMiddleware(None)
+        assert middleware._get_endpoint_type("/api/v1/auth/minimal-login") == "login"
+
+    def test_auth_me_path_is_classified_as_session(self):
+        """Тест: classifier распознает auth/me как session endpoint."""
+        middleware = SecurityMiddleware(None)
+        assert middleware._get_endpoint_type("/api/v1/auth/me") == "session"
+
+    def test_authentication_profile_path_is_classified_as_session(self):
+        """Тест: classifier распознает authentication/profile как session endpoint."""
+        middleware = SecurityMiddleware(None)
+        assert middleware._get_endpoint_type("/api/v1/authentication/profile") == "session"
 

@@ -2,8 +2,12 @@
 MCP Configuration Settings
 """
 
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
 
 
 class MCPSettings(BaseSettings):
@@ -11,7 +15,9 @@ class MCPSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
-        env_file=".env",
+        env_file=_DEFAULT_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     # Основные настройки

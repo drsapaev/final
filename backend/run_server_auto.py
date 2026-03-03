@@ -57,7 +57,7 @@ def main():
 
     # Устанавливаем переменные окружения
     os.environ.setdefault("WS_DEV_ALLOW", "1")
-    os.environ.setdefault("CORS_DISABLE", "1")
+    os.environ.setdefault("CORS_DISABLE", "0")
     os.environ.setdefault("REQUIRE_LICENSE", "0")
 
     # Запускаем сервер в отдельном потоке

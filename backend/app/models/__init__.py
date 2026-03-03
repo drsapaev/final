@@ -47,6 +47,12 @@ from .department import (
 )
 from .doctor_phrase_history import DoctorPhraseHistory
 from .doctor_price_override import DoctorPriceOverride
+from .doctor_templates import (
+    DoctorTreatmentTemplate,
+    DoctorTreatmentTemplateBase,
+    DoctorTreatmentTemplateResponse,
+    DoctorTreatmentTemplatesListResponse,
+)
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
 from .emr_v2 import SYSTEM_USER_ID, EMRAuditLog, EMRRecord, EMRRevision
@@ -233,6 +239,10 @@ __all__ = [
     "TelegramMessage",
     "DoctorPriceOverride",
     "DoctorPhraseHistory",
+    "DoctorTreatmentTemplate",
+    "DoctorTreatmentTemplateBase",
+    "DoctorTreatmentTemplateResponse",
+    "DoctorTreatmentTemplatesListResponse",
     "PaymentInvoice",
     "PaymentInvoiceVisit",
     "Department",

@@ -149,8 +149,12 @@ if not CORS_DISABLE:
     }
     if CORS_ALLOW_ALL:
         app.add_middleware(CORSMiddleware, allow_origins=["*"], **cfg)
+        log.info("[FIX:CORS] CORS middleware enabled for all origins in development mode")
     else:
         app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, **cfg)
+        log.info("[FIX:CORS] CORS middleware enabled for origins: %s", CORS_ORIGINS)
+else:
+    log.warning("[FIX:CORS] CORS middleware is disabled via CORS_DISABLE=1")
 
 # -----------------------------------------------------------------------------
 # Попытка импортировать реальную аутентификацию.

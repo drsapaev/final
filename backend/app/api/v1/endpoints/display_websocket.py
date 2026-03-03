@@ -21,14 +21,15 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.config import settings
-from app.crud import display_config as crud_display, user as crud_user
+from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 from app.models.user import User
-from app.services.display_websocket import DisplayWebSocketManager, get_display_manager
+from app.services.display_websocket import get_display_manager
 from app.services.display_websocket_api_service import (
     DisplayWebSocketApiDomainError,
     DisplayWebSocketApiService,
 )
+from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +51,10 @@ async def authenticate_websocket_token(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        user_id: int = payload.get("sub")
-        if user_id is None:
-            return None
     except JWTError:
         return None
 
-    user = crud_user.get(db, id=user_id)
-    return user
+    return _resolve_websocket_user(payload, db)
 
 
 # ===================== WEBSOCKET ПОДКЛЮЧЕНИЯ =====================

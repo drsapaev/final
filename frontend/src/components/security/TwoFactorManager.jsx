@@ -1,134 +1,367 @@
-import { useState, useEffect } from 'react';
-import { Card, Button } from '../ui/native';
+import { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import {
+  AlertTriangle,
+  CheckCircle,
+  Clock3,
+  Copy,
+  Download,
+  Key,
+  Mail,
+  RefreshCw,
+  Shield,
+  ShieldCheck,
+  Smartphone,
+  Trash2,
+} from 'lucide-react';
+
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import {
-  Shield,
-  Smartphone,
-  Mail,
-  Key,
-  Settings,
-  Trash2,
-  Download,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
+  Alert,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  MacOSButton,
+  MacOSInput,
+} from '../ui/macos';
 
+function MetricCard({ accent, icon: Icon, label, value }) {
+  return (
+    <div
+      style={{
+        border: '1px solid var(--mac-border)',
+        borderRadius: 14,
+        padding: 16,
+        background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
+      }}
+    >
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          background: accent,
+          color: 'white',
+          marginBottom: 12,
+        }}
+      >
+        <Icon size={18} />
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>{value}</div>
+    </div>
+  );
+}
 
-  Copy,
+MetricCard.propTypes = {
+  accent: PropTypes.string.isRequired,
+  icon: PropTypes.elementType.isRequired,
+  label: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+};
 
+function SectionShell({ title, description, action, children }) {
+  return (
+    <Card shadow="default">
+      <CardHeader style={{ paddingBottom: 12 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <CardTitle>{title}</CardTitle>
+            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+              {description}
+            </div>
+          </div>
+          {action}
+        </div>
+      </CardHeader>
+      <CardContent style={{ display: 'grid', gap: 16 }}>{children}</CardContent>
+    </Card>
+  );
+}
 
-  Clock,
+SectionShell.propTypes = {
+  action: PropTypes.node,
+  children: PropTypes.node.isRequired,
+  description: PropTypes.string.isRequired,
+  title: PropTypes.string.isRequired,
+};
 
+function EmptyState({ icon: Icon, title, description, action }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        justifyItems: 'center',
+        textAlign: 'center',
+        gap: 12,
+        padding: '28px 20px',
+        border: '1px dashed var(--mac-border)',
+        borderRadius: 16,
+        background: 'var(--mac-bg-secondary)',
+      }}
+    >
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 18,
+          background: 'rgba(148, 163, 184, 0.14)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--mac-text-secondary)',
+        }}
+      >
+        <Icon size={22} />
+      </div>
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--mac-text-primary)' }}>{title}</div>
+        <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>{description}</div>
+      </div>
+      {action}
+    </div>
+  );
+}
 
-  Smartphone as Phone,
+EmptyState.propTypes = {
+  action: PropTypes.node,
+  description: PropTypes.string.isRequired,
+  icon: PropTypes.elementType.isRequired,
+  title: PropTypes.string.isRequired,
+};
 
-  AlertTriangle } from
-'lucide-react';
+function formatDate(dateString) {
+  if (!dateString) return 'Не указано';
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return 'Не указано';
+  return parsed.toLocaleString('ru-RU');
+}
 
-/**
- * Расширенный менеджер Two-Factor Authentication
- * Включает все методы 2FA и управление безопасностью
- */
-const TwoFactorManager = () => {
+function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }) {
+  return (
+    <Card shadow="none" style={{ borderStyle: 'solid' }}>
+      <CardContent style={{ display: 'grid', gap: 12 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{name}</div>
+            <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{details}</div>
+            <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>Последний вход: {lastUsed}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            {badgeLabel && (
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  background: 'rgba(10,132,255,0.12)',
+                  color: '#0a84ff',
+                }}
+              >
+                {badgeLabel}
+              </span>
+            )}
+            <MacOSButton variant="ghost" onClick={onToggle} startIcon={<Trash2 size={16} />}>
+              Отозвать доступ
+            </MacOSButton>
+          </div>
+        </div>
+
+        {pending && (
+          <Alert severity="warning">
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div>После отзыва доступа при следующем входе снова потребуется подтверждение 2FA.</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <MacOSButton variant="danger" onClick={onConfirm} startIcon={<Trash2 size={16} />}>
+                  Подтвердить отзыв
+                </MacOSButton>
+                <MacOSButton variant="ghost" onClick={onCancel}>
+                  Отмена
+                </MacOSButton>
+              </div>
+            </div>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+DeviceCard.propTypes = {
+  badgeLabel: PropTypes.string,
+  details: PropTypes.string.isRequired,
+  lastUsed: PropTypes.string.isRequired,
+  name: PropTypes.string.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  onToggle: PropTypes.func.isRequired,
+  pending: PropTypes.bool,
+};
+
+export default function TwoFactorManager() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [status, setStatus] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [, setShowBackupCodes] = useState(false);
+  const [setupData, setSetupData] = useState(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+  const [showDisableForm, setShowDisableForm] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [backupCodes, setBackupCodes] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [deviceToRevoke, setDeviceToRevoke] = useState(null);
   const [securityLogs, setSecurityLogs] = useState([]);
   const [recoveryMethods, setRecoveryMethods] = useState([]);
 
   useEffect(() => {
-    loadStatus();
-    loadDevices();
-    loadSecurityLogs();
-    loadRecoveryMethods();
+    void (async () => {
+      setError('');
+      try {
+        await Promise.all([loadStatus(), loadDevices(), loadSecurityLogs(), loadRecoveryMethods()]);
+      } catch (err) {
+        logger.error('[FIX:2FA] Failed to refresh full security state', err);
+      }
+    })();
   }, []);
 
-  const loadStatus = async () => {
+  async function loadAll() {
+    setError('');
+    try {
+      await Promise.all([loadStatus(), loadDevices(), loadSecurityLogs(), loadRecoveryMethods()]);
+    } catch (err) {
+      logger.error('[FIX:2FA] Failed to refresh full security state', err);
+    }
+  }
+
+  async function loadStatus() {
     try {
       const response = await fetch('/api/v1/2fa/status', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
       });
       const data = await response.json();
       setStatus(data);
+      if (data?.enabled) {
+        setSetupData(null);
+        setVerificationCode('');
+      }
     } catch {
       setError('Ошибка загрузки статуса 2FA');
     }
-  };
+  }
 
-  const loadDevices = async () => {
+  async function loadDevices() {
     try {
       const response = await fetch('/api/v1/2fa/devices', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
       });
       const data = await response.json();
       setDevices(data.devices || []);
     } catch (err) {
       logger.error('Error loading devices:', err);
     }
-  };
+  }
 
-  const loadSecurityLogs = async () => {
+  async function loadSecurityLogs() {
     try {
       const response = await fetch('/api/v1/2fa/security-logs', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
       });
       const data = await response.json();
       setSecurityLogs(data.logs || []);
     } catch (err) {
       logger.error('Error loading security logs:', err);
     }
-  };
+  }
 
-  const loadRecoveryMethods = async () => {
+  async function loadRecoveryMethods() {
     try {
       const response = await fetch('/api/v1/2fa/recovery-methods', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
       });
       const data = await response.json();
       setRecoveryMethods(data.methods || []);
     } catch (err) {
       logger.error('Error loading recovery methods:', err);
     }
-  };
+  }
 
-  const handleEnable2FA = async (method = 'totp') => {
+  async function loadBackupCodes() {
+    if (!status?.enabled) {
+      setError('Сначала завершите настройку 2FA и подтвердите код из приложения.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      const response = await fetch('/api/v1/2fa/backup-codes', {
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setBackupCodes(data.backup_codes || []);
+        logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
+      } else {
+        setError(data.detail || 'Ошибка загрузки резервных кодов');
+      }
+    } catch (err) {
+      logger.error('Error loading backup codes:', err);
+      setError('Ошибка загрузки резервных кодов');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEnable2FA() {
     setLoading(true);
     setError('');
+    setSuccess('');
+    setConfirmRegenerate(false);
 
     try {
       const response = await fetch('/api/v1/2fa/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
         },
         body: JSON.stringify({
-          method: method,
+          method: 'totp',
           recovery_email: status?.recovery_email || '',
-          recovery_phone: status?.recovery_phone || ''
-        })
+          recovery_phone: status?.recovery_phone || '',
+        }),
       });
-
       const data = await response.json();
-
       if (response.ok) {
-        setStatus(data);
-        setSuccess('2FA успешно настроен');
-        loadStatus();
+        setSetupData(data);
+        setBackupCodes(data.backup_codes || []);
+        setVerificationCode('');
+        setSuccess('Сканируйте QR-код и подтвердите 6-значный код из приложения, чтобы включить 2FA.');
+        logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
       } else {
         setError(data.detail || 'Ошибка настройки 2FA');
       }
@@ -137,37 +370,70 @@ const TwoFactorManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleDisable2FA = async () => {
-    const password = prompt('Введите пароль для отключения 2FA:');
-    if (!password) return;
-
-    const totpCode = prompt('Введите код из приложения аутентификатора:');
-    if (!totpCode) return;
+  async function handleVerify2FASetup() {
+    if (verificationCode.length !== 6) {
+      setError('Введите 6-значный код из приложения-аутентификатора');
+      return;
+    }
 
     setLoading(true);
     setError('');
+    setSuccess('');
+
+    try {
+      const params = new URLSearchParams({ totp_code: verificationCode });
+      logger.info('[FIX:2FA] Verifying 2FA setup');
+      const response = await fetch(`/api/v1/2fa/verify-setup?${params.toString()}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSuccess('2FA успешно включена');
+        await loadStatus();
+      } else {
+        setError(data.detail || data.message || 'Неверный код подтверждения');
+      }
+    } catch (err) {
+      logger.error('Error verifying 2FA setup:', err);
+      setError('Ошибка подтверждения 2FA');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDisable2FA() {
+    if (!disablePassword || !disableCode) {
+      setError('Введите пароль и код из приложения, чтобы отключить 2FA.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
       const response = await fetch('/api/v1/2fa/disable', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
         },
         body: JSON.stringify({
-          password: password,
-          totp_code: totpCode
-        })
+          password: disablePassword,
+          totp_code: disableCode,
+        }),
       });
-
       const data = await response.json();
-
       if (response.ok) {
-        setStatus(data);
-        setSuccess('2FA успешно отключен');
-        loadStatus();
+        setDisablePassword('');
+        setDisableCode('');
+        setShowDisableForm(false);
+        setBackupCodes([]);
+        setSuccess('2FA успешно отключена');
+        await loadAll();
       } else {
         setError(data.detail || 'Ошибка отключения 2FA');
       }
@@ -176,26 +442,29 @@ const TwoFactorManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleRegenerateBackupCodes = async () => {
+  async function handleRegenerateBackupCodes() {
+    if (!status?.enabled) {
+      setError('Нельзя обновить резервные коды, пока 2FA не включена и не подтверждена.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
-      const response = await fetch('/api/v1/2fa/regenerate-backup-codes', {
+      logger.info('[FIX:2FA] Regenerating backup codes via supported endpoint');
+      const response = await fetch('/api/v1/2fa/backup-codes/regenerate', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
       });
-
       const data = await response.json();
-
       if (response.ok) {
-        setBackupCodes(data.backup_codes);
-        setShowBackupCodes(true);
-        setSuccess('Резервные коды обновлены');
+        setBackupCodes(data.backup_codes || []);
+        setConfirmRegenerate(false);
+        setSuccess('Резервные коды обновлены. Старый комплект больше недействителен.');
       } else {
         setError(data.detail || 'Ошибка генерации резервных кодов');
       }
@@ -204,27 +473,22 @@ const TwoFactorManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleRevokeDevice = async (deviceId) => {
-    if (!confirm('Вы уверены, что хотите отозвать доступ для этого устройства?')) {
-      return;
-    }
-
+  async function handleRevokeDevice(deviceId) {
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
-      const response = await fetch(`/api/v1/2fa/devices/${deviceId}/revoke`, {
+      const response = await fetch(`/api/v1/2fa/devices/${deviceId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
       });
-
       if (response.ok) {
+        setDeviceToRevoke(null);
         setSuccess('Доступ устройства отозван');
-        loadDevices();
+        await loadDevices();
       } else {
         const data = await response.json();
         setError(data.detail || 'Ошибка отзыва доступа');
@@ -234,435 +498,526 @@ const TwoFactorManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setSuccess('Скопировано в буфер обмена');
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('ru-RU');
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'enabled':return 'text-green-600 bg-green-50';
-      case 'disabled':return 'text-red-600 bg-red-50';
-      case 'pending':return 'text-yellow-600 bg-yellow-50';
-      default:return 'text-gray-600 bg-gray-50';
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setSuccess('Скопировано в буфер обмена');
+    } catch (err) {
+      logger.error('[FIX:2FA] Failed to copy to clipboard', err);
+      setError('Не удалось скопировать в буфер обмена');
     }
-  };
+  }
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'enabled':return 'Включен';
-      case 'disabled':return 'Отключен';
-      case 'pending':return 'Ожидает настройки';
-      default:return 'Неизвестно';
-    }
-  };
-
-  const renderOverview = () =>
-  <div className="space-y-6">
-      {/* Статус 2FA */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <Shield className="w-6 h-6 text-blue-600" />
-            <h3 className="text-lg font-semibold">Статус двухфакторной аутентификации</h3>
-          </div>
-          <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status?.enabled ? 'enabled' : 'disabled')}`}>
-            {getStatusLabel(status?.enabled ? 'enabled' : 'disabled')}
-          </div>
-        </div>
-
-        {status?.enabled ?
-      <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                <div className="text-sm font-medium text-green-800">TOTP</div>
-                <div className="text-xs text-green-600">Активен</div>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <Key className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                <div className="text-sm font-medium text-blue-800">Резервные коды</div>
-                <div className="text-xs text-blue-600">{status.backup_codes_remaining || 0} осталось</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <Smartphone className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                <div className="text-sm font-medium text-purple-800">Устройства</div>
-                <div className="text-xs text-purple-600">{devices.length} доверенных</div>
-              </div>
-            </div>
-
-            <div className="flex space-x-2">
-              <Button
-            onClick={() => setShowBackupCodes(true)}
-            variant="outline"
-            size="sm">
-            
-                <Key className="w-4 h-4 mr-2" />
-                Показать резервные коды
-              </Button>
-              <Button
-            onClick={handleRegenerateBackupCodes}
-            variant="outline"
-            size="sm"
-            disabled={loading}>
-            
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Обновить коды
-              </Button>
-              <Button
-            onClick={handleDisable2FA}
-            variant="outline"
-            size="sm"
-            className="text-red-600 hover:text-red-700"
-            disabled={loading}>
-            
-                <Trash2 className="w-4 h-4 mr-2" />
-                Отключить 2FA
-              </Button>
-            </div>
-          </div> :
-
-      <div className="text-center py-8">
-            <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h4 className="text-lg font-medium text-gray-900 mb-2">
-              Двухфакторная аутентификация отключена
-            </h4>
-            <p className="text-gray-600 mb-4">
-              Включите 2FA для дополнительной защиты вашего аккаунта
-            </p>
-            <Button
-          onClick={() => handleEnable2FA('totp')}
-          disabled={loading}>
-          
-              <Shield className="w-4 h-4 mr-2" />
-              Включить 2FA
-            </Button>
-          </div>
-      }
-      </Card>
-
-      {/* Методы восстановления */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Методы восстановления</h3>
-        <div className="space-y-3">
-          {recoveryMethods.map((method, index) =>
-        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                {method.type === 'email' ?
-            <Mail className="w-5 h-5 text-blue-600" /> :
-
-            <Phone className="w-5 h-5 text-green-600" />
-            }
-                <div>
-                  <div className="font-medium">{method.label}</div>
-                  <div className="text-sm text-gray-600">{method.value}</div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className={`text-xs px-2 py-1 rounded-full ${method.verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`
-            }>
-                  {method.verified ? 'Подтвержден' : 'Не подтвержден'}
-                </span>
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-        )}
-        </div>
-      </Card>
-    </div>;
-
-
-  const renderDevices = () =>
-  <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Доверенные устройства</h3>
-        <Button
-        onClick={loadDevices}
-        variant="outline"
-        size="sm"
-        disabled={loading}>
-        
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Обновить
-        </Button>
-      </div>
-
-      {devices.length === 0 ?
-    <Card className="p-8 text-center">
-          <Smartphone className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">
-            Нет доверенных устройств
-          </h4>
-          <p className="text-gray-600">
-            Устройства появятся здесь после первого входа с 2FA
-          </p>
-        </Card> :
-
-    <div className="space-y-3">
-          {devices.map((device) =>
-      <Card key={device.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Smartphone className="w-5 h-5 text-gray-600" />
-                  <div>
-                    <div className="font-medium">{device.name || 'Неизвестное устройство'}</div>
-                    <div className="text-sm text-gray-600">
-                      {device.browser} • {device.os} • {device.location}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Последний вход: {formatDate(device.last_used)}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {device.current &&
-            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                      Текущее
-                    </span>
-            }
-                  <Button
-              onClick={() => handleRevokeDevice(device.id)}
-              variant="ghost"
-              size="sm"
-              className="text-red-600 hover:text-red-700"
-              disabled={loading}>
-              
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-      )}
-        </div>
-    }
-    </div>;
-
-
-  const renderSecurityLogs = () =>
-  <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Журнал безопасности</h3>
-        <Button
-        onClick={loadSecurityLogs}
-        variant="outline"
-        size="sm"
-        disabled={loading}>
-        
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Обновить
-        </Button>
-      </div>
-
-      {securityLogs.length === 0 ?
-    <Card className="p-8 text-center">
-          <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">
-            Нет записей в журнале
-          </h4>
-          <p className="text-gray-600">
-            Записи о действиях с 2FA появятся здесь
-          </p>
-        </Card> :
-
-    <div className="space-y-3">
-          {securityLogs.map((log, index) =>
-      <Card key={index} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-full ${log.type === 'success' ? 'bg-green-100' :
-            log.type === 'warning' ? 'bg-yellow-100' : 'bg-red-100'}`
-            }>
-                    {log.type === 'success' ?
-              <CheckCircle className="w-4 h-4 text-green-600" /> :
-              log.type === 'warning' ?
-              <AlertTriangle className="w-4 h-4 text-yellow-600" /> :
-
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              }
-                  </div>
-                  <div>
-                    <div className="font-medium">{log.action}</div>
-                    <div className="text-sm text-gray-600">{log.description}</div>
-                    <div className="text-xs text-gray-500">
-                      {formatDate(log.timestamp)} • {log.ip_address} • {log.user_agent}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-      )}
-        </div>
-    }
-    </div>;
-
-
-  const renderBackupCodes = () =>
-  <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Резервные коды</h3>
-        <Button
-        onClick={handleRegenerateBackupCodes}
-        variant="outline"
-        size="sm"
-        disabled={loading}>
-        
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Обновить коды
-        </Button>
-      </div>
-
-      {backupCodes.length > 0 ?
-    <Card className="p-6">
-          <div className="mb-4">
-            <AlertTriangle className="w-6 h-6 text-yellow-600 mb-2" />
-            <h4 className="font-semibold text-yellow-800">Важно!</h4>
-            <p className="text-sm text-yellow-700">
-              Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-            {backupCodes.map((code, index) =>
-        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <code className="font-mono text-sm">{code}</code>
-                <Button
-            onClick={() => copyToClipboard(code)}
-            variant="ghost"
-            size="sm">
-            
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-        )}
-          </div>
-
-          <div className="flex space-x-2">
-            <Button
-          onClick={() => copyToClipboard(backupCodes.join('\n'))}
-          variant="outline"
-          size="sm">
-          
-              <Copy className="w-4 h-4 mr-2" />
-              Копировать все
-            </Button>
-            <Button
-          onClick={() => {
-            const blob = new Blob([backupCodes.join('\n')], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'backup-codes.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          variant="outline"
-          size="sm">
-          
-              <Download className="w-4 h-4 mr-2" />
-              Скачать
-            </Button>
-          </div>
-        </Card> :
-
-    <Card className="p-8 text-center">
-          <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">
-            Нет резервных кодов
-          </h4>
-          <p className="text-gray-600 mb-4">
-            Сгенерируйте резервные коды для восстановления доступа
-          </p>
-          <Button
-        onClick={handleRegenerateBackupCodes}
-        disabled={loading}>
-        
-            <Key className="w-4 h-4 mr-2" />
-            Сгенерировать коды
-          </Button>
-        </Card>
-    }
-    </div>;
-
+  function downloadBackupCodes() {
+    const blob = new Blob([backupCodes.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'backup-codes.txt';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Заголовок */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Безопасность аккаунта</h2>
-          <p className="text-gray-600">Управление двухфакторной аутентификацией</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={loadStatus}
+    <div style={{ display: 'grid', gap: 20 }}>
+      {error && <Alert severity="error">{error}</Alert>}
+      {success && <Alert severity="success">{success}</Alert>}
+
+      <SectionShell
+        title="Защита входа"
+        description="Управляйте двухфакторной аутентификацией без вложенных экранов и всплывающих системных prompt."
+        action={(
+          <MacOSButton
             variant="outline"
-            size="sm"
-            disabled={loading}>
-            
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Обновить
-          </Button>
+            onClick={loadAll}
+            disabled={loading}
+            startIcon={<RefreshCw size={16} />}
+          >
+            Обновить данные
+          </MacOSButton>
+        )}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 12,
+          }}
+        >
+          <MetricCard
+            accent="linear-gradient(135deg, #7c3aed, #0ea5e9)"
+            icon={ShieldCheck}
+            label="Статус 2FA"
+            value={status?.enabled ? 'Включена' : 'Отключена'}
+          />
+          <MetricCard
+            accent="linear-gradient(135deg, #0a84ff, #30b0c7)"
+            icon={Key}
+            label="Резервные коды"
+            value={status?.enabled ? `${status?.backup_codes_count || 0} доступно` : 'Недоступны'}
+          />
+          <MetricCard
+            accent="linear-gradient(135deg, #34c759, #10b981)"
+            icon={Smartphone}
+            label="Доверенные устройства"
+            value={`${status?.trusted_devices_count ?? devices.length} шт.`}
+          />
+          <MetricCard
+            accent="linear-gradient(135deg, #ff9f0a, #f97316)"
+            icon={Clock3}
+            label="Последнее использование"
+            value={formatDate(status?.last_used)}
+          />
         </div>
-      </div>
 
-      {/* Навигация */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
-          {[
-          { id: 'overview', label: 'Обзор', icon: Shield },
-          { id: 'devices', label: 'Устройства', icon: Smartphone },
-          { id: 'backup', label: 'Резервные коды', icon: Key },
-          { id: 'logs', label: 'Журнал', icon: Clock }].
-          map((tab) =>
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ?
-            'border-blue-500 text-blue-600' :
-            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
-            }>
-            
-              <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          )}
-        </nav>
-      </div>
+        {status?.enabled ? (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <Alert severity="info">
+              2FA уже включена. Здесь можно загрузить резервные коды, проверить связанные устройства и безопасно отключить защиту.
+            </Alert>
 
-      {/* Уведомления */}
-      {error &&
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <span className="text-red-800">{error}</span>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <MacOSButton
+                variant="outline"
+                onClick={loadBackupCodes}
+                disabled={loading}
+                startIcon={<Key size={16} />}
+              >
+                Показать резервные коды
+              </MacOSButton>
+              <MacOSButton
+                variant="ghost"
+                onClick={() => setConfirmRegenerate(true)}
+                disabled={loading}
+                startIcon={<RefreshCw size={16} />}
+              >
+                Создать новый комплект кодов
+              </MacOSButton>
+              <MacOSButton
+                variant="danger"
+                onClick={() => setShowDisableForm((prev) => !prev)}
+                disabled={loading}
+                startIcon={<Trash2 size={16} />}
+              >
+                {showDisableForm ? 'Скрыть форму отключения' : 'Отключить 2FA'}
+              </MacOSButton>
+            </div>
+
+            {confirmRegenerate && (
+              <Alert severity="warning">
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <div>
+                    Новый комплект резервных кодов немедленно сделает старый недействительным. Сначала сохраните действующие коды, если они ещё нужны.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <MacOSButton
+                      variant="primary"
+                      onClick={handleRegenerateBackupCodes}
+                      disabled={loading}
+                      startIcon={<RefreshCw size={16} />}
+                    >
+                      Подтвердить обновление кодов
+                    </MacOSButton>
+                    <MacOSButton variant="ghost" onClick={() => setConfirmRegenerate(false)}>
+                      Отмена
+                    </MacOSButton>
+                  </div>
+                </div>
+              </Alert>
+            )}
+
+            {showDisableForm && (
+              <Card shadow="none" style={{ borderStyle: 'dashed' }}>
+                <CardHeader style={{ paddingBottom: 12 }}>
+                  <CardTitle>Отключение 2FA</CardTitle>
+                </CardHeader>
+                <CardContent style={{ display: 'grid', gap: 14 }}>
+                  <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+                    Для отключения нужен текущий пароль и 6-значный код из приложения-аутентификатора.
+                  </div>
+                  <MacOSInput
+                    type="password"
+                    value={disablePassword}
+                    onChange={(event) => setDisablePassword(event.target.value)}
+                    placeholder="Текущий пароль"
+                  />
+                  <MacOSInput
+                    type="text"
+                    value={disableCode}
+                    onChange={(event) => setDisableCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Код из приложения"
+                  />
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <MacOSButton
+                      variant="danger"
+                      onClick={handleDisable2FA}
+                      disabled={loading}
+                      startIcon={<Trash2 size={16} />}
+                    >
+                      Подтвердить отключение
+                    </MacOSButton>
+                    <MacOSButton
+                      variant="ghost"
+                      onClick={() => {
+                        setShowDisableForm(false);
+                        setDisablePassword('');
+                        setDisableCode('');
+                      }}
+                    >
+                      Отмена
+                    </MacOSButton>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        </div>
-      }
+        ) : (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <EmptyState
+              icon={Shield}
+              title="2FA ещё не активирована"
+              description="Сначала создайте QR-код и секрет, затем подтвердите код из приложения-аутентификатора."
+              action={(
+                <MacOSButton
+                  variant="primary"
+                  onClick={handleEnable2FA}
+                  disabled={loading}
+                  startIcon={<ShieldCheck size={16} />}
+                >
+                  Включить 2FA
+                </MacOSButton>
+              )}
+            />
 
-      {success &&
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-green-800">{success}</span>
+            {setupData && (
+              <Card shadow="none" style={{ borderStyle: 'dashed' }}>
+                <CardHeader style={{ paddingBottom: 12 }}>
+                  <CardTitle>Подтверждение настройки 2FA</CardTitle>
+                </CardHeader>
+                <CardContent style={{ display: 'grid', gap: 18 }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(220px, 280px) minmax(0, 1fr)',
+                      gap: 18,
+                    }}
+                  >
+                    <div
+                      style={{
+                        border: '1px solid var(--mac-border)',
+                        borderRadius: 16,
+                        background: 'white',
+                        padding: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 220,
+                      }}
+                    >
+                      {setupData.qr_code_url ? (
+                        <img
+                          src={setupData.qr_code_url}
+                          alt="QR code for 2FA setup"
+                          style={{ maxWidth: '100%', borderRadius: 12 }}
+                        />
+                      ) : (
+                        <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>QR код недоступен</div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+                      <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+                        Отсканируйте QR-код любым TOTP-приложением или введите секрет вручную.
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          border: '1px solid var(--mac-border)',
+                          borderRadius: 14,
+                          padding: '12px 14px',
+                          background: 'var(--mac-bg-secondary)',
+                        }}
+                      >
+                        <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{setupData.secret_key}</code>
+                        <MacOSButton
+                          variant="ghost"
+                          onClick={() => copyToClipboard(setupData.secret_key)}
+                          startIcon={<Copy size={16} />}
+                        >
+                          Копировать
+                        </MacOSButton>
+                      </div>
+                      <MacOSInput
+                        type="text"
+                        value={verificationCode}
+                        onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Введите 6-значный код"
+                      />
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <MacOSButton
+                          variant="primary"
+                          onClick={handleVerify2FASetup}
+                          disabled={loading || verificationCode.length !== 6}
+                          startIcon={<CheckCircle size={16} />}
+                        >
+                          Подтвердить и включить 2FA
+                        </MacOSButton>
+                        <MacOSButton
+                          variant="ghost"
+                          onClick={() => {
+                            setSetupData(null);
+                            setVerificationCode('');
+                          }}
+                        >
+                          Отменить настройку
+                        </MacOSButton>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        </div>
-      }
+        )}
+      </SectionShell>
 
-      {/* Контент */}
-      {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'devices' && renderDevices()}
-      {activeTab === 'backup' && renderBackupCodes()}
-      {activeTab === 'logs' && renderSecurityLogs()}
-    </div>);
+      <SectionShell
+        title="Методы восстановления"
+        description="Каналы, которые помогут вернуть доступ к аккаунту, если устройство с TOTP будет потеряно."
+      >
+        {recoveryMethods.length > 0 ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {recoveryMethods.map((method) => (
+              <div
+                key={`${method.type}-${method.value}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: 12,
+                  alignItems: 'center',
+                  padding: '14px 16px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 14,
+                  background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 12,
+                      background: method.type === 'email' ? 'rgba(10,132,255,0.12)' : 'rgba(52,199,89,0.12)',
+                      color: method.type === 'email' ? '#0a84ff' : '#10b981',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {method.type === 'email' ? <Mail size={16} /> : <Smartphone size={16} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{method.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{method.value}</div>
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 999,
+                    padding: '6px 10px',
+                    background: method.verified ? 'rgba(52,199,89,0.12)' : 'rgba(255,159,10,0.12)',
+                    color: method.verified ? '#22863a' : '#b26b00',
+                  }}
+                >
+                  {method.verified ? 'Подтверждён' : 'Не подтверждён'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Mail}
+            title="Методы восстановления не настроены"
+            description="Сейчас доступ возможен только через приложение-аутентификатор и резервные коды."
+          />
+        )}
+      </SectionShell>
 
-};
+      <SectionShell
+        title="Доверенные устройства"
+        description="Устройства, на которых вход уже подтверждался через 2FA."
+      >
+        {devices.length > 0 ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {devices.map((device) => (
+              <DeviceCard
+                key={device.id}
+                badgeLabel={device.trusted ? 'Доверено' : device.active ? 'Активно' : ''}
+                details={[
+                  device.device_type ? `Тип: ${device.device_type}` : null,
+                  device.ip_address,
+                  device.user_agent,
+                ].filter(Boolean).join(' • ') || 'Нет дополнительной информации'}
+                lastUsed={formatDate(device.last_used)}
+                name={device.device_name || 'Неизвестное устройство'}
+                pending={deviceToRevoke === device.id}
+                onToggle={() => setDeviceToRevoke(deviceToRevoke === device.id ? null : device.id)}
+                onCancel={() => setDeviceToRevoke(null)}
+                onConfirm={() => handleRevokeDevice(device.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Smartphone}
+            title="Нет доверенных устройств"
+            description="Список заполнится после входов, подтверждённых через 2FA."
+          />
+        )}
+      </SectionShell>
 
-export default TwoFactorManager;
+      <SectionShell
+        title="Резервные коды"
+        description="Аварийный способ входа, если доступ к приложению-аутентификатору временно потерян."
+        action={status?.enabled ? (
+          <MacOSButton
+            variant="outline"
+            onClick={loadBackupCodes}
+            disabled={loading}
+            startIcon={<Download size={16} />}
+          >
+            Загрузить текущие коды
+          </MacOSButton>
+        ) : null}
+      >
+        {!status?.enabled ? (
+          <EmptyState
+            icon={Key}
+            title="Резервные коды пока недоступны"
+            description="Они появятся только после завершения настройки и подтверждения 2FA."
+          />
+        ) : backupCodes.length > 0 ? (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <Alert severity="warning">
+              Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.
+            </Alert>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                gap: 12,
+              }}
+            >
+              {backupCodes.map((code) => (
+                <div
+                  key={code}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    padding: '12px 14px',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 14,
+                    background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
+                  }}
+                >
+                  <code style={{ fontSize: 13 }}>{code}</code>
+                  <MacOSButton variant="ghost" onClick={() => copyToClipboard(code)} startIcon={<Copy size={16} />}>
+                    Копия
+                  </MacOSButton>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <MacOSButton variant="outline" onClick={() => copyToClipboard(backupCodes.join('\n'))} startIcon={<Copy size={16} />}>
+                Копировать все
+              </MacOSButton>
+              <MacOSButton variant="outline" onClick={downloadBackupCodes} startIcon={<Download size={16} />}>
+                Скачать TXT
+              </MacOSButton>
+              <MacOSButton variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
+                Создать новый комплект
+              </MacOSButton>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            icon={Key}
+            title="Коды ещё не загружены"
+            description="Можно загрузить текущий набор или создать новый комплект кодов."
+            action={(
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <MacOSButton variant="outline" onClick={loadBackupCodes} disabled={loading} startIcon={<Download size={16} />}>
+                  Загрузить текущие коды
+                </MacOSButton>
+                <MacOSButton variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
+                  Создать новый комплект
+                </MacOSButton>
+              </div>
+            )}
+          />
+        )}
+      </SectionShell>
+
+      <SectionShell
+        title="Журнал безопасности"
+        description="Последние события, связанные с 2FA, доверенными сессиями и восстановлением доступа."
+      >
+        {securityLogs.length > 0 ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {securityLogs.map((log, index) => (
+              <div
+                key={`${log.timestamp}-${index}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr',
+                  gap: 14,
+                  padding: '14px 16px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 14,
+                  background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
+                }}
+              >
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 12,
+                    background: log.type === 'success' ? 'rgba(52,199,89,0.12)' : log.type === 'warning' ? 'rgba(255,159,10,0.12)' : 'rgba(255,69,58,0.12)',
+                    color: log.type === 'success' ? '#22863a' : log.type === 'warning' ? '#b26b00' : '#b42318',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {log.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{log.action}</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>{log.description}</div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                    {formatDate(log.timestamp)} • {log.ip_address || 'unknown'} • {log.user_agent || 'unknown'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Clock3}
+            title="Пока нет событий безопасности"
+            description="История заполнится после действий с 2FA, доверенными устройствами и восстановлением доступа."
+          />
+        )}
+      </SectionShell>
+    </div>
+  );
+}

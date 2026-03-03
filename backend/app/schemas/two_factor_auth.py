@@ -259,8 +259,8 @@ class TwoFactorSetupResponse(BaseModel):
     qr_code_url: str
     secret_key: str
     backup_codes: list[str]
-    recovery_token: str
-    expires_at: datetime
+    recovery_token: str | None = None
+    expires_at: datetime | None = None
 
 
 class TwoFactorVerifyResponse(BaseModel):

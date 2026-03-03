@@ -2,11 +2,13 @@
 Unit tests for application settings validation
 """
 import os
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from app.core.config import Settings, get_settings
+from app.core.mcp_config import MCPSettings
 
 
 def _reset_settings_cache() -> None:
@@ -84,10 +86,39 @@ def test_cors_settings_defaults(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("CORS_DISABLE", raising=False)
     monkeypatch.delenv("CORS_ALLOW_ALL", raising=False)
     monkeypatch.delenv("BACKEND_CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
     settings = Settings(SECRET_KEY="a" * 32)
     assert settings.CORS_DISABLE is False
     assert settings.CORS_ALLOW_ALL is False
     assert len(settings.BACKEND_CORS_ORIGINS) > 0
+
+
+def test_cors_settings_parse_backend_env_string(monkeypatch: pytest.MonkeyPatch):
+    """BACKEND_CORS_ORIGINS must accept comma-separated env strings."""
+    monkeypatch.setenv(
+        "BACKEND_CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    )
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    settings = Settings(SECRET_KEY="a" * 32)
+    assert settings.BACKEND_CORS_ORIGINS == [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+
+def test_cors_settings_support_legacy_env_alias(monkeypatch: pytest.MonkeyPatch):
+    """Legacy CORS_ORIGINS env var should still populate backend CORS origins."""
+    monkeypatch.delenv("BACKEND_CORS_ORIGINS", raising=False)
+    monkeypatch.setenv(
+        "CORS_ORIGINS",
+        "http://localhost:4173,http://127.0.0.1:4173",
+    )
+    settings = Settings(SECRET_KEY="a" * 32)
+    assert settings.BACKEND_CORS_ORIGINS == [
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ]
 
 
 def test_get_settings_validation():
@@ -108,13 +139,20 @@ def test_get_settings_validation():
 
 
 def test_env_file_loading():
-    """Test that settings can load from .env file"""
-    # This is tested implicitly by the SettingsConfigDict(env_file=".env")
-    # We verify the config is set correctly
+    """Settings must resolve backend/.env independently of current working directory."""
     settings = Settings(SECRET_KEY="a" * 32)
-    # If env_file is configured, Pydantic will attempt to load it
-    # The actual loading is tested by using a real .env file in integration tests
-    assert settings.model_config.get("env_file") == ".env"
+    env_file = Path(str(settings.model_config.get("env_file")))
+    assert env_file.is_absolute()
+    assert env_file.name == ".env"
+    assert env_file.parent.name == "backend"
+
+
+def test_mcp_settings_env_file_loading():
+    """MCP settings must use the same backend-scoped env file resolution."""
+    env_file = Path(str(MCPSettings.model_config.get("env_file")))
+    assert env_file.is_absolute()
+    assert env_file.name == ".env"
+    assert env_file.parent.name == "backend"
 
 
 def test_get_settings_prod_without_secret_key_fails_closed(

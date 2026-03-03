@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import auth from '../stores/auth';
 import * as messagesApi from '../api/messages';
 import { pushNotifications } from '../services/pushNotifications';
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
 
 const ChatContext = createContext(null);
 
@@ -131,9 +133,28 @@ export const ChatProvider = ({ children }) => {
   // WebSocket подключение (Один раз на приложение!)
   // Зависит ТОЛЬКО от токена. User и функции исключены для стабильности.
   useEffect(() => {
-    if (!token) return;
+    const initialToken = tokenManager.getAccessToken() || token;
+    if (!initialToken) return;
+
+    let isMounted = true;
+    let activeSocket = null;
 
     const connect = () => {
+      if (!isMounted) {
+        return;
+      }
+
+      const latestToken = tokenManager.getAccessToken() || token;
+      if (!latestToken) {
+        return;
+      }
+
+      if (!tokenManager.isTokenValid()) {
+        logger.info('[FIX:WS] Chat WebSocket is waiting for a valid auth token');
+        reconnectTimeoutRef.current = setTimeout(connect, 1500);
+        return;
+      }
+
       if (wsRef.current) {
         // Если сокет открыт или соединяется - пропускаем
         if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
@@ -155,14 +176,20 @@ export const ChatProvider = ({ children }) => {
         }
       }
       wsHost = wsHost || 'localhost:8000';
-      const wsUrl = `${wsProtocol}//${wsHost}/ws/chat?token=${token}`;
+      const wsUrl = `${wsProtocol}//${wsHost}/ws/chat?token=${latestToken}`;
 
       // console.log('🔌 [Context] Connecting WS...', wsUrl);
       const ws = new WebSocket(wsUrl);
+      activeSocket = ws;
 
       ws.onopen = () => {
+        if (!isMounted) {
+          ws.close(1000, 'Unmount before open');
+          return;
+        }
         setIsConnected(true);
         retryCountRef.current = 0;
+        logger.info('[FIX:WS] Chat WebSocket connected');
         // console.log('✅ [Context] WS Connected');
       };
 
@@ -204,11 +231,21 @@ export const ChatProvider = ({ children }) => {
       };
 
       ws.onclose = (e) => {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
         setIsConnected(false);
+        if (!isMounted) {
+          return;
+        }
         // Если не нормальное закрытие (1000) - пробуем переподключиться
         if (e.code !== 1000) {
           const delay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
           retryCountRef.current += 1;
+          logger.info('[FIX:WS] Chat WebSocket closed, scheduling reconnect', {
+            code: e.code,
+            delay,
+          });
           // console.log(`❌ [Context] WS Disconnected (abnormal), retrying in ${delay}ms...`, e.code);
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         } else {
@@ -223,11 +260,18 @@ export const ChatProvider = ({ children }) => {
     connect();
 
     return () => {
-      if (wsRef.current) {
-        // console.log('🧹 [Context] Cleaning up WS...');
-        wsRef.current.close(1000, 'Unmount');
-      }
+      isMounted = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (activeSocket) {
+        if (activeSocket.readyState === WebSocket.OPEN) {
+          activeSocket.close(1000, 'Unmount');
+        } else if (activeSocket.readyState === WebSocket.CONNECTING) {
+          activeSocket.onopen = () => activeSocket.close(1000, 'Unmount before open');
+          activeSocket.onclose = null;
+          activeSocket.onerror = null;
+          activeSocket.onmessage = null;
+        }
+      }
     };
   }, [token]); // <-- Ключевое изменение: только token!
 
@@ -396,6 +440,10 @@ export const ChatProvider = ({ children }) => {
             {children}
         </ChatContext.Provider>);
 
+};
+
+ChatProvider.propTypes = {
+  children: PropTypes.node.isRequired
 };
 
 export const useChat = () => {

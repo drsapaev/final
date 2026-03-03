@@ -111,7 +111,7 @@ const RegistrarPanel = () => {
   const [queueProfiles, setQueueProfiles] = useState([]);
 
   // Состояния для печати
-  const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });void
+  const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });void
   useState(null);
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
@@ -4114,8 +4114,8 @@ const RegistrarPanel = () => {
 
       <PrintDialog
         isOpen={printDialog.open}
-        onClose={() => setPrintDialog({ open: false, type: '', data: null })}
-        documentType={printDialog.type}
+        onClose={() => setPrintDialog({ open: false, type: 'ticket', data: null })}
+        documentType={printDialog.type || 'ticket'}
         documentData={printDialog.data}
         onPrint={async (printerName, docType, docData) => {
           logger.info('Printing:', { printerName, docType, docData });

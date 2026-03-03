@@ -147,8 +147,18 @@ class UserProfileUpdateRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     full_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    middle_name: str | None = Field(None, min_length=1, max_length=50)
     email: EmailStr | None = None
     phone: str | None = Field(None, min_length=10, max_length=20)
+    date_of_birth: datetime | None = None
+    gender: str | None = Field(None, max_length=10)
+    nationality: str | None = Field(None, max_length=50)
+    language: str | None = Field(None, max_length=10)
+    timezone: str | None = Field(None, max_length=50)
+    bio: str | None = Field(None, max_length=1000)
+    website: str | None = Field(None, max_length=200)
     avatar_url: str | None = Field(None, max_length=500)
 
 
@@ -160,15 +170,26 @@ class UserProfileResponse(BaseModel):
     id: int
     username: str
     full_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    middle_name: str | None = None
     email: str | None = None
     phone: str | None = None
     avatar_url: str | None = None
+    bio: str | None = None
+    website: str | None = None
+    language: str | None = None
+    timezone: str | None = None
+    nationality: str | None = None
+    date_of_birth: datetime | None = None
+    gender: str | None = None
     role: str
     is_active: bool
     is_superuser: bool
     email_verified: bool
     phone_verified: bool
     created_at: datetime | None = None
+    updated_at: datetime | None = None
     last_login: datetime | None = None
     two_factor_enabled: bool = False
 

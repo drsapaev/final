@@ -20,6 +20,7 @@ from app.services.authentication_api_service import (
     AuthenticationApiDomainError,
     AuthenticationApiService,
 )
+from app.services.user_management_service import get_user_management_service
 
 logger = logging.getLogger(__name__)
 from app.crud.authentication import (
@@ -391,8 +392,11 @@ async def update_user_profile(
         service = get_authentication_service()
         profile = api_service.update_user_profile(
             current_user=current_user,
-            update_data=request_data.dict(exclude_unset=True),
+            update_data=request_data.model_dump(exclude_unset=True),
             profile_loader=lambda user_id: service.get_user_profile(db, user_id),
+            support_records_loader=lambda: get_user_management_service().ensure_user_support_records(
+                db, current_user
+            ),
         )
 
         return UserProfileResponse(**profile)

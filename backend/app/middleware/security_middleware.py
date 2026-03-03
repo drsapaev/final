@@ -34,6 +34,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "2fa_verify": {"requests": 10, "window": 300},  # 10 попыток за 5 минут
             "password_reset": {"requests": 3, "window": 3600},  # 3 попытки за час
             "password_change": {"requests": 5, "window": 3600},  # 5 попыток за час
+            "session": {"requests": 600, "window": 3600},  # auth/session checks
             "api": {"requests": 100, "window": 3600},  # 100 запросов за час
         }
 
@@ -78,7 +79,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         path_lower = path.lower()
 
         # Проверяем более специфичные пути первыми
-        if "/authentication/login" in path_lower or path_lower.endswith("/login"):
+        if (
+            "/authentication/login" in path_lower
+            or "/auth/minimal-login" in path_lower
+            or "/auth/json-login" in path_lower
+            or path_lower.endswith("/login")
+        ):
             return "login"
         elif "/2fa/verify" in path_lower or (path_lower.endswith("/verify") and "/2fa" in path_lower):
             return "2fa_verify"
@@ -86,6 +92,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             return "password_reset"
         elif "/password-change" in path_lower or "/change-password" in path_lower:
             return "password_change"
+        elif (
+            "/auth/me" in path_lower
+            or "/authentication/profile" in path_lower
+            or "/authentication/status" in path_lower
+            or "/authentication/sessions/current" in path_lower
+        ):
+            return "session"
         else:
             return "api"
 
@@ -245,11 +258,26 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if path == "/" or any(path.startswith(prefix) for prefix in public_paths):
             return await call_next(request)
 
+        if request.method.upper() == "OPTIONS":
+            logger.debug(
+                "[FIX:RATE_LIMIT] Skipping rate-limit accounting for preflight request %s",
+                path,
+            )
+            return await call_next(request)
+
         # Получаем IP адрес
         ip_address = self._get_client_ip(request)
 
         # Определяем тип эндпоинта
         endpoint_type = self._get_endpoint_type(request.url.path)
+        if endpoint_type in {"login", "session"}:
+            logger.info(
+                "[FIX:RATE_LIMIT] Classified %s %s as %s endpoint for IP %s",
+                request.method,
+                path,
+                endpoint_type,
+                ip_address,
+            )
 
         # Очистка старых записей
         self._cleanup_old_records()

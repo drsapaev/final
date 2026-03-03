@@ -90,6 +90,83 @@ class UserManagementService:
             ],
         }
 
+    def ensure_user_support_records(
+        self, db: Session, user_or_id: User | int
+    ) -> tuple[UserProfile, UserPreferences, UserNotificationSettings]:
+        """Создает профиль и настройки пользователя, если они отсутствуют."""
+        user = user_or_id
+        if isinstance(user_or_id, int):
+            user = db.query(User).filter(User.id == user_or_id).first()
+
+        if not user:
+            raise ValueError("Пользователь не найден")
+
+        changed = False
+        target_status = UserStatus.ACTIVE if user.is_active else UserStatus.INACTIVE
+
+        profile = user.profile
+        if not profile:
+            profile = UserProfile(
+                user_id=user.id,
+                full_name=user.full_name,
+                status=target_status,
+            )
+            db.add(profile)
+            db.flush()
+            changed = True
+            logger.info(
+                "[FIX:USER-BOOTSTRAP] Created missing user_profile for user_id=%s",
+                user.id,
+            )
+        else:
+            if not profile.full_name and user.full_name:
+                profile.full_name = user.full_name
+                changed = True
+            if profile.status != target_status:
+                profile.status = target_status
+                changed = True
+
+        preferences = user.preferences
+        if not preferences:
+            preferences = UserPreferences(
+                user_id=user.id,
+                profile_id=profile.id,
+            )
+            db.add(preferences)
+            changed = True
+            logger.info(
+                "[FIX:USER-BOOTSTRAP] Created missing user_preferences for user_id=%s",
+                user.id,
+            )
+        elif preferences.profile_id != profile.id:
+            preferences.profile_id = profile.id
+            changed = True
+
+        notification_settings = user.notification_settings
+        if not notification_settings:
+            notification_settings = UserNotificationSettings(
+                user_id=user.id,
+                profile_id=profile.id,
+            )
+            db.add(notification_settings)
+            changed = True
+            logger.info(
+                "[FIX:USER-BOOTSTRAP] Created missing user_notification_settings for user_id=%s",
+                user.id,
+            )
+        elif notification_settings.profile_id != profile.id:
+            notification_settings.profile_id = profile.id
+            changed = True
+
+        if changed:
+            db.commit()
+            db.refresh(user)
+            profile = user.profile
+            preferences = user.preferences
+            notification_settings = user.notification_settings
+
+        return profile, preferences, notification_settings
+
     def create_user(
         self, db: Session, user_data: UserCreateRequest, created_by: int
     ) -> tuple[bool, str, User | None]:
@@ -671,19 +748,13 @@ class UserManagementService:
             if not user:
                 return False, "Пользователь не найден"
 
-            if not user.preferences:
-                # Создаем настройки, если их нет
-                user.preferences = UserPreferences(
-                    user_id=user_id,
-                    profile_id=user.profile.id if user.profile else None,
-                )
-                db.add(user.preferences)
+            _, preferences, _ = self.ensure_user_support_records(db, user)
 
             # Обновляем настройки
             update_data = preferences_data.dict(exclude_unset=True)
             for field, value in update_data.items():
-                if hasattr(user.preferences, field):
-                    setattr(user.preferences, field, value)
+                if hasattr(preferences, field):
+                    setattr(preferences, field, value)
 
             # Логируем обновление
             self._log_user_action(
@@ -707,19 +778,13 @@ class UserManagementService:
             if not user:
                 return False, "Пользователь не найден"
 
-            if not user.notification_settings:
-                # Создаем настройки, если их нет
-                user.notification_settings = UserNotificationSettings(
-                    user_id=user_id,
-                    profile_id=user.profile.id if user.profile else None,
-                )
-                db.add(user.notification_settings)
+            _, _, notification_settings = self.ensure_user_support_records(db, user)
 
             # Обновляем настройки
             update_data = settings_data.dict(exclude_unset=True)
             for field, value in update_data.items():
-                if hasattr(user.notification_settings, field):
-                    setattr(user.notification_settings, field, value)
+                if hasattr(notification_settings, field):
+                    setattr(notification_settings, field, value)
 
             # Логируем обновление
             self._log_user_action(

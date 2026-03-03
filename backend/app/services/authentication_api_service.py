@@ -31,13 +31,74 @@ class AuthenticationApiService:
         current_user,
         update_data: dict,
         profile_loader,
+        support_records_loader=None,
     ) -> dict:
+        profile = None
+        if support_records_loader is not None:
+            profile, _, _ = support_records_loader()
+        else:
+            profile = getattr(current_user, "profile", None)
+
+        profile_fields = {
+            "full_name",
+            "first_name",
+            "last_name",
+            "middle_name",
+            "phone",
+            "avatar_url",
+            "bio",
+            "website",
+            "language",
+            "timezone",
+            "nationality",
+            "date_of_birth",
+            "gender",
+        }
+        user_fields = {"full_name", "email"}
+
+        phone_updated = False
+        email_updated = False
+
         for field, value in update_data.items():
-            if hasattr(current_user, field):
+            if field in user_fields and hasattr(current_user, field):
                 setattr(current_user, field, value)
+                if field == "email":
+                    email_updated = True
+
+            if profile is not None and field in profile_fields and hasattr(profile, field):
+                setattr(profile, field, value)
+                if field == "phone":
+                    phone_updated = True
+
+        if profile is not None:
+            if (
+                "full_name" not in update_data
+                and any(key in update_data for key in ("first_name", "last_name", "middle_name"))
+            ):
+                composed_name = " ".join(
+                    part
+                    for part in [
+                        getattr(profile, "first_name", None),
+                        getattr(profile, "last_name", None),
+                        getattr(profile, "middle_name", None),
+                    ]
+                    if part
+                ).strip()
+                if composed_name:
+                    profile.full_name = composed_name
+
+            if getattr(profile, "full_name", None):
+                current_user.full_name = profile.full_name
+
+            if phone_updated:
+                profile.phone_verified = False
+            if email_updated:
+                profile.email_verified = False
 
         self.repository.commit()
         self.repository.refresh_user(current_user)
+        if profile is not None:
+            self.repository.refresh(profile)
         profile = profile_loader(current_user.id)
         if not profile:
             raise AuthenticationApiDomainError(

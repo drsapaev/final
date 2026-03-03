@@ -1,32 +1,37 @@
 #!/usr/bin/env python3
 """
-Скрипт для запуска сервера с правильными настройками
+Скрипт для запуска backend без принудительного отката на SQLite.
 """
+from pathlib import Path
 import os
 import sys
+
 import uvicorn
 
-# Получаем текущую директорию
-current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Устанавливаем правильные переменные окружения
-os.environ["DATABASE_URL"] = "sqlite:///./clinic.db"
-os.environ["PYTHONPATH"] = current_dir
+current_dir = Path(__file__).resolve().parent
+os.chdir(current_dir)
+os.environ["PYTHONPATH"] = str(current_dir)
+os.environ.setdefault("WS_DEV_ALLOW", "1")
+os.environ.setdefault("CORS_DISABLE", "0")
+os.environ.setdefault("REQUIRE_LICENSE", "0")
 
-# Добавляем путь к проекту
-sys.path.insert(0, current_dir)
+sys.path.insert(0, str(current_dir))
+
 
 if __name__ == "__main__":
-    print("🚀 Запуск сервера с правильными настройками...")
-    print(f"📁 Рабочая директория: {os.getcwd()}")
-    print(f"🗄️ База данных: {os.environ['DATABASE_URL']}")
-    print(f"🐍 Python path: {os.environ['PYTHONPATH']}")
-    
+    env_file = current_dir / ".env"
+    print("Starting backend server with project settings...")
+    print(f"Working directory: {current_dir}")
+    print(f"Env file: {env_file}")
+    print(f"DATABASE_URL env: {os.environ.get('DATABASE_URL', '<loaded by backend settings>')}")
+    print(f"Python path: {os.environ['PYTHONPATH']}")
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True, # Включаем авто-перезагрузку при изменениях в коде
+        reload=True,
         log_level="info",
-        access_log=True  # Включаем логи доступа
+        access_log=True,
     )

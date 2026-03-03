@@ -175,30 +175,54 @@ function hasRole(profile, roles) {
   return false;
 }
 
+function isSameAuthState(prev, next) {
+  return prev.token === next.token &&
+    JSON.stringify(prev.profile || null) === JSON.stringify(next.profile || null);
+}
+
 function RequireAuth({ roles, children }) {
-  const [st, setSt] = useState(auth.getState());
-  const [isChecking, setIsChecking] = useState(true);
+  const [st, setSt] = useState(() => auth.getState());
+  const [isChecking, setIsChecking] = useState(() => Boolean(auth.getToken()));
   const loc = useLocation();
 
   useEffect(() => {
-    // Подписываемся на изменения auth
-    const unsubscribe = auth.subscribe(setSt);
+    let isActive = true;
 
-    // Проверяем токен при монтировании
-    const token = auth.getToken();
-    if (token && !st.profile) {
-      // Если есть токен, но нет профиля, пытаемся загрузить профиль
-      auth.getProfile().then(() => {
-        setIsChecking(false);
-      }).catch(() => {
-        setIsChecking(false);
-      });
-    } else {
-      setIsChecking(false);
-    }
+    const syncState = (nextState) => {
+      if (!isActive) return;
+      setSt((prevState) => isSameAuthState(prevState, nextState) ? prevState : nextState);
+    };
 
-    return unsubscribe;
-  }, [st.profile]);
+    const unsubscribe = auth.subscribe(syncState);
+
+    const validateAccess = async () => {
+      const token = auth.getToken();
+      if (!token) {
+        if (isActive) setIsChecking(false);
+        return;
+      }
+
+      try {
+        logger.info('[FIX:AUTH] RequireAuth validating session', { path: loc.pathname });
+        const nextState = await auth.validateSession();
+        syncState(nextState);
+      } catch (error) {
+        logger.warn('[FIX:AUTH] RequireAuth validation failed', {
+          path: loc.pathname,
+          error: error?.message || 'unknown error',
+        });
+      } finally {
+        if (isActive) setIsChecking(false);
+      }
+    };
+
+    void validateAccess();
+
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, [loc.pathname]);
 
   // Показываем загрузку при проверке
   if (isChecking) {

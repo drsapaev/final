@@ -9,9 +9,10 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -89,6 +90,33 @@ class JSONLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: Dict[str, Any]
+
+
+class CSRFTokenResponse(BaseModel):
+    """Ответ для bootstrap CSRF-токена во frontend."""
+
+    csrf_token: str
+
+
+@router.get("/csrf-token", response_model=CSRFTokenResponse)
+async def get_csrf_token(request: Request, response: Response) -> CSRFTokenResponse:
+    """
+    Возвращает CSRF-токен и дублирует его в cookie для frontend bootstrap.
+
+    Даже если CSRF middleware отключен, endpoint нужен frontend-клиенту,
+    чтобы не шуметь 404 в консоли при state-changing запросах.
+    """
+    token = request.cookies.get("csrf_token") or secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="csrf_token",
+        value=token,
+        httponly=False,
+        secure=False,
+        samesite="lax",
+        path="/",
+        max_age=60 * 60 * 8,
+    )
+    return CSRFTokenResponse(csrf_token=token)
 
 
 @router.post("/json-login", response_model=JSONLoginResponse)

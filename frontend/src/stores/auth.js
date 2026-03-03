@@ -18,12 +18,17 @@
 // Keep changes minimal and additive — don't remove existing exported names.
 
 import { me, setToken as setClientToken } from '../api/client.js';
-
+import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 const TOKEN_KEY = 'auth_token';
 const PROFILE_KEY = 'auth_profile';
+const SESSION_VALIDATION_CACHE_MS = 30_000;
 
 const subscribers = new Set();
+let profileLoadPromise = null;
+let sessionValidationPromise = null;
+let lastValidatedAt = 0;
+let lastValidatedToken = null;
 
 function notify() {
   const state = getState();
@@ -79,11 +84,21 @@ export function getState() {
   };
 }
 
+function clearProfileStorageOnly() {
+  try {
+    localStorage.removeItem(PROFILE_KEY);
+  } catch (e) {
+    logger.warn('clearProfileStorageOnly failed:', e);
+  }
+}
+
 /**
  * Set auth token locally and inform client (if compatible)
  * @param {string|null} token
  */
 export function setToken(token) {
+  const previousToken = getToken();
+
   try {
     if (token === null || token === undefined) {
       localStorage.removeItem(TOKEN_KEY);
@@ -104,6 +119,13 @@ export function setToken(token) {
     logger.warn('client.setToken call failed:', e);
   }
 
+  if (previousToken !== token) {
+    profileLoadPromise = null;
+    sessionValidationPromise = null;
+    lastValidatedAt = 0;
+    lastValidatedToken = token || null;
+  }
+
   // notify subscribers
   notify();
 }
@@ -112,8 +134,29 @@ export function setToken(token) {
  * Clear token & profile.
  */
 export function clearToken() {
-  setToken(null);
-  setProfile(null);
+  profileLoadPromise = null;
+  sessionValidationPromise = null;
+  lastValidatedAt = 0;
+  lastValidatedToken = null;
+
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (e) {
+    logger.warn('clearToken localStorage failed:', e);
+  }
+  clearProfileStorageOnly();
+  tokenManager.setUserData(null);
+
+  try {
+    if (typeof setClientToken === 'function') {
+      setClientToken(null);
+    }
+  } catch (e) {
+    logger.warn('client.setToken(null) call failed:', e);
+  }
+
+  logger.info('[FIX:AUTH] Cleared auth token and profile from local storage');
+  notify();
 }
 
 /**
@@ -122,25 +165,116 @@ export function clearToken() {
  * @param {boolean} force - if true, refetch from server even if profile exists
  */
 export async function getProfile(force = false) {
+  const token = getToken();
   const stored = getProfileFromStorage();
+  if (!token) {
+    if (stored) {
+      logger.warn('[FIX:AUTH] Profile exists without token, clearing stale auth state');
+      clearToken();
+    }
+    return null;
+  }
   if (!force && stored) return stored;
+  if (profileLoadPromise) return profileLoadPromise;
 
   // Используем централизованный API клиент
-  try {
-    if (typeof me === 'function') {
-      const res = await me();
-      if (res) {
-        setProfile(res);
-        return res;
+  profileLoadPromise = (async () => {
+    try {
+      if (typeof me === 'function') {
+        const res = await me();
+        if (res) {
+          setProfile(res);
+          logger.info('[FIX:AUTH] Loaded auth profile from backend');
+          return res;
+        }
       }
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        logger.warn('[FIX:AUTH] Backend rejected current session, clearing auth state', {
+          status,
+        });
+        clearToken();
+        return null;
+      }
+      if (status === 429) {
+        logger.warn('[FIX:AUTH] Auth profile check hit rate limit, keeping cached auth state', {
+          status,
+        });
+        return stored;
+      }
+      // don't throw — return local stored profile or null
+      logger.warn('getProfile: API call failed:', err);
+    } finally {
+      profileLoadPromise = null;
     }
-  } catch (err) {
-    // don't throw — return local stored profile or null
+    return stored;
+  })();
 
-    logger.warn('getProfile: API call failed:', err);
+  return profileLoadPromise;
+}
+
+export async function validateSession(force = false) {
+  const token = getToken();
+  if (!token) {
+    lastValidatedAt = 0;
+    lastValidatedToken = null;
+    return getState();
   }
 
-  return stored;
+  if (!tokenManager.isTokenValid()) {
+    logger.warn('[FIX:AUTH] Detected expired or malformed token before route render');
+    clearToken();
+    return getState();
+  }
+
+  const storedProfile = getProfileFromStorage();
+  const now = Date.now();
+  const hasRecentValidation = (
+    !force &&
+    Boolean(storedProfile) &&
+    lastValidatedToken === token &&
+    now - lastValidatedAt < SESSION_VALIDATION_CACHE_MS
+  );
+
+  if (hasRecentValidation) {
+    logger.info('[FIX:AUTH] Reusing recent auth session validation', {
+      ageMs: now - lastValidatedAt,
+    });
+    return {
+      token,
+      profile: storedProfile,
+    };
+  }
+
+  if (sessionValidationPromise) {
+    return sessionValidationPromise;
+  }
+
+  sessionValidationPromise = (async () => {
+    const shouldRefetch = force || !storedProfile;
+    const profile = await getProfile(shouldRefetch);
+    const nextToken = getToken();
+
+    if (nextToken) {
+      lastValidatedAt = Date.now();
+      lastValidatedToken = nextToken;
+    } else {
+      lastValidatedAt = 0;
+      lastValidatedToken = null;
+    }
+
+    return {
+      token: nextToken,
+      profile,
+    };
+  })();
+
+  try {
+    return await sessionValidationPromise;
+  } finally {
+    sessionValidationPromise = null;
+  }
 }
 
 /**
@@ -151,8 +285,10 @@ export function setProfile(profile) {
   try {
     if (profile === null || profile === undefined) {
       localStorage.removeItem(PROFILE_KEY);
+      tokenManager.setUserData(null);
     } else {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+      tokenManager.setUserData(profile);
     }
   } catch (e) {
     logger.warn('setProfile localStorage failed:', e);
@@ -175,6 +311,7 @@ const auth = {
   setToken,
   clearToken,
   getProfile,
+  validateSession,
   setProfile,
 };
 

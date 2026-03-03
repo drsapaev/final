@@ -14,7 +14,7 @@ Write-Host "🔧 Активируем виртуальное окружение.
 
 # Установить переменные окружения
 $env:WS_DEV_ALLOW = "1"
-$env:CORS_DISABLE = "1"
+if (-not $env:CORS_DISABLE) { $env:CORS_DISABLE = "0" }
 $env:REQUIRE_LICENSE = "0"
 
 Write-Host "🚀 Запускаем сервер с автоматической проверкой..." -ForegroundColor Green

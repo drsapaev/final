@@ -23,6 +23,7 @@ from app.models.authentication import (
     UserSession,
 )
 from app.models.user import User
+from app.services.user_management_service import get_user_management_service
 
 logger = logging.getLogger(__name__)
 
@@ -703,6 +704,10 @@ class AuthenticationService:
             if not user:
                 return None
 
+            profile, _, _ = get_user_management_service().ensure_user_support_records(
+                db, user
+            )
+
             # Получаем последний вход
             last_login = (
                 db.query(LoginAttempt)
@@ -714,7 +719,7 @@ class AuthenticationService:
             )
 
             # Проверяем верификацию email
-            email_verified = (
+            token_email_verified = (
                 db.query(EmailVerificationToken)
                 .filter(
                     and_(
@@ -725,6 +730,7 @@ class AuthenticationService:
                 .first()
                 is not None
             )
+            email_verified = bool(getattr(profile, "email_verified", False) or token_email_verified)
 
             # Проверяем 2FA (строго булево значение)
             two_factor_enabled = bool(
@@ -735,15 +741,32 @@ class AuthenticationService:
             return {
                 "id": user.id,
                 "username": user.username,
-                "full_name": user.full_name,
+                "full_name": profile.full_name or user.full_name,
+                "first_name": profile.first_name,
+                "last_name": profile.last_name,
+                "middle_name": profile.middle_name,
                 "email": user.email,
+                "phone": profile.phone,
+                "avatar_url": profile.avatar_url,
+                "bio": profile.bio,
+                "website": profile.website,
+                "language": profile.language,
+                "timezone": profile.timezone,
+                "nationality": profile.nationality,
+                "date_of_birth": profile.date_of_birth,
+                "gender": profile.gender,
                 "role": user.role,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
                 "email_verified": email_verified,
-                "phone_verified": False,  # TODO: реализовать верификацию телефона
+                "phone_verified": bool(getattr(profile, "phone_verified", False)),
                 "created_at": user.created_at if hasattr(user, 'created_at') else None,
-                "last_login": last_login.attempted_at if last_login else None,
+                "updated_at": (
+                    profile.updated_at
+                    if getattr(profile, "updated_at", None)
+                    else getattr(user, "updated_at", None)
+                ),
+                "last_login": profile.last_login or (last_login.attempted_at if last_login else None),
                 "two_factor_enabled": two_factor_enabled,
             }
 
