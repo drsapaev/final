@@ -1,4 +1,5 @@
 import React from 'react';
+import { XCircle } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -9,12 +10,10 @@ const MacOSInput = React.forwardRef(({
   variant = 'default',
   error,
   disabled,
-  clearable, // Extract to prevent passing to input
-  onClear,   // Extract to prevent passing to input
+  clearable,
+  onClear,
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -58,7 +57,7 @@ const MacOSInput = React.forwardRef(({
   const inputStyle = {
     width: '100%',
     paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingRight: (Icon && iconPosition === 'right') || clearable ? '40px' : currentSize.padding.split(' ')[1],
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -87,6 +86,24 @@ const MacOSInput = React.forwardRef(({
     ...(iconPosition === 'left' ? { left: '12px' } : { right: '12px' })
   };
 
+  const clearButtonStyle = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    right: '12px',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    color: 'var(--mac-text-tertiary)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    outline: 'none',
+    opacity: 0.6,
+    transition: 'opacity 0.2s',
+  };
+
   const handleFocus = (e) => {
     if (!disabled) {
       e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
@@ -101,7 +118,7 @@ const MacOSInput = React.forwardRef(({
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      {Icon && (
+      {Icon && iconPosition === 'left' && (
         <Icon style={iconStyle} />
       )}
       <input
@@ -113,6 +130,21 @@ const MacOSInput = React.forwardRef(({
         onBlur={handleBlur}
         {...props}
       />
+      {Icon && iconPosition === 'right' && !clearable && (
+        <Icon style={iconStyle} />
+      )}
+      {clearable && props.value && !disabled && (
+        <button
+          type="button"
+          aria-label="Clear input"
+          onClick={onClear}
+          style={clearButtonStyle}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+        >
+          <XCircle size={16} />
+        </button>
+      )}
     </div>
   );
 });
