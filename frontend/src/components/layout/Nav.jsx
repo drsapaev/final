@@ -34,29 +34,8 @@ export default function Nav() {void
   { key: 'Activation', to: '/activation', label: 'Activation', roles: ['Admin'] },
   { key: 'Settings', to: '/settings', label: 'Настройки', roles: ['Admin'] }];
 
-
-  const barStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    borderBottom: '1px solid #eee',
-    background: '#fafafa',
-    position: 'sticky',
-    top: 0,
-    zIndex: 10
-  };
-
-  const linkBase = {
-    padding: '8px 12px',
-    borderRadius: 10,
-    border: '1px solid #ddd',
-    marginRight: 6,
-    textDecoration: 'none'
-  };
-
   return (
-    <div style={barStyle}>
+    <div className="legacy-nav-bar">
       {/* Заголовок приложения вынесён в AppShell — чтобы не дублировать */}
       <div style={{ fontWeight: 700, marginRight: 12, opacity: 0.85 }} aria-hidden="true"> </div>
 
@@ -66,9 +45,14 @@ export default function Nav() {void
             <NavLink
             to={it.to}
             style={({ isActive }) => ({
-              ...linkBase,
-              background: isActive ? '#111' : '#fff',
-              color: isActive ? '#fff' : '#111'
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: `1px solid ${isActive ? 'var(--mac-nav-item-active-border)' : 'var(--mac-border)'}`,
+              marginRight: 6,
+              textDecoration: 'none',
+              background: isActive ? 'var(--mac-nav-item-active)' : 'var(--mac-bg-primary)',
+              color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
+              boxShadow: isActive ? 'var(--mac-shadow-sm)' : 'none'
             })}
             aria-current={pathname === it.to ? 'page' : undefined}>
             
@@ -90,7 +74,7 @@ export default function Nav() {void
               setProfile(null);
               navigate('/login');
             }}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' }}>
+            className="legacy-button">
             
               Выйти
             </button>
@@ -98,7 +82,7 @@ export default function Nav() {void
 
         <button
           onClick={() => navigate('/login')}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' }}>
+          className="legacy-button">
           
             Войти
           </button>

@@ -14,7 +14,9 @@
 }
 
 .payment-manager-modal {
-  background: white;
+  background: var(--mac-card-bg);
+  color: var(--mac-text-primary);
+  border: 1px solid var(--mac-card-border);
   border-radius: 12px;
   width: 90%;
   max-width: 800px;
@@ -28,7 +30,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--mac-separator);
 }
 
 .payment-manager-header h2 {
@@ -38,7 +40,7 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--mac-text-primary);
 }
 
 .close-btn {
@@ -46,15 +48,15 @@
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   padding: 4px;
   border-radius: 4px;
   transition: all 0.2s;
 }
 
 .close-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--mac-nav-item-hover);
+  color: var(--mac-text-primary);
 }
 
 .payment-manager-content {
@@ -65,8 +67,8 @@
 }
 
 .payment-section {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
+  border: 1px solid var(--mac-border);
   border-radius: 8px;
   padding: 20px;
 }
@@ -78,7 +80,7 @@
   margin: 0 0 16px 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--mac-text-primary);
 }
 
 .payment-form {
@@ -95,21 +97,23 @@
 
 .form-row label {
   font-weight: 500;
-  color: #374151;
+  color: var(--mac-text-secondary);
 }
 
 .form-row input[type="number"] {
   padding: 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--mac-border);
   border-radius: 6px;
   font-size: 16px;
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
   transition: border-color 0.2s;
 }
 
 .form-row input[type="number"]:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--mac-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%);
 }
 
 .provider-options {
@@ -123,14 +127,14 @@
   gap: 8px;
   cursor: pointer;
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--mac-border);
   border-radius: 6px;
   transition: all 0.2s;
 }
 
 .radio-option:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
+  background: var(--mac-nav-item-hover);
+  border-color: var(--mac-border-secondary);
 }
 
 .radio-option input[type="radio"] {
@@ -138,8 +142,8 @@
 }
 
 .patient-info {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: var(--mac-accent-bg);
+  border: 1px solid var(--mac-accent-border);
   border-radius: 6px;
   padding: 12px;
   font-size: 14px;
@@ -147,12 +151,12 @@
 
 .patient-info p {
   margin: 4px 0;
-  color: #1e40af;
+  color: var(--mac-text-primary);
 }
 
 .create-payment-btn {
-  background: #3b82f6;
-  color: white;
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent);
   border: none;
   padding: 12px 24px;
   border-radius: 6px;
@@ -162,17 +166,17 @@
 }
 
 .create-payment-btn:hover:not(:disabled) {
-  background: #2563eb;
+  background: color-mix(in srgb, var(--mac-accent), black 14%);
 }
 
 .create-payment-btn:disabled {
-  background: #9ca3af;
+  background: color-mix(in srgb, var(--mac-bg-tertiary), black 10%);
   cursor: not-allowed;
 }
 
 .invoices-section {
-  background: #fefefe;
-  border: 1px solid #e2e8f0;
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
   border-radius: 8px;
   padding: 20px;
 }
@@ -183,7 +187,7 @@
   justify-content: center;
   gap: 8px;
   padding: 40px;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   font-style: italic;
 }
 
@@ -200,14 +204,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--mac-border);
   border-radius: 8px;
-  background: white;
+  background: var(--mac-bg-primary);
   transition: border-color 0.2s;
 }
 
 .invoice-item:hover {
-  border-color: #3b82f6;
+  border-color: var(--mac-accent);
 }
 
 .invoice-info {
@@ -217,7 +221,7 @@
 .invoice-amount {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--mac-text-primary);
   margin-bottom: 4px;
 }
 
@@ -225,7 +229,7 @@
   display: flex;
   gap: 12px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
 }
 
 .invoice-id {
@@ -235,7 +239,7 @@
 .invoice-provider {
   text-transform: uppercase;
   font-weight: 500;
-  color: #3b82f6;
+  color: var(--mac-accent);
 }
 
 .invoice-status {
@@ -243,19 +247,19 @@
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--mac-warning-bg);
+  color: var(--mac-warning);
 }
 
 .invoice-description {
   font-size: 13px;
-  color: #4b5563;
+  color: var(--mac-text-secondary);
   margin-top: 4px;
 }
 
 .pay-invoice-btn {
-  background: #10b981;
-  color: white;
+  background: var(--mac-success);
+  color: var(--mac-text-on-accent);
   border: none;
   padding: 8px 16px;
   border-radius: 6px;
@@ -265,11 +269,11 @@
 }
 
 .pay-invoice-btn:hover:not(:disabled) {
-  background: #059669;
+  background: color-mix(in srgb, var(--mac-success), black 14%);
 }
 
 .pay-invoice-btn:disabled {
-  background: #9ca3af;
+  background: color-mix(in srgb, var(--mac-bg-tertiary), black 10%);
   cursor: not-allowed;
 }
 
@@ -288,3 +292,4 @@
   .provider-options {
     flex-direction: column;
   }
+}

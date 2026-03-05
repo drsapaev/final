@@ -64,6 +64,8 @@ const RESULT_STATUS = {
   abnormal: { label: 'Отклонения', color: 'error' }
 };
 
+const tabButtonClassName = (isActive) => `theme-tab-button${isActive ? ' theme-tab-button--active' : ''}`;
+
 const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [results, setResults] = useState([]);
@@ -325,18 +327,9 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           </Box>
 
           {/* Табы категорий */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--mac-border)', marginBottom: 16 }}>
+          <div className="theme-tab-strip" style={{ marginBottom: 16 }}>
             <button
-              style={{
-                padding: '12px 24px',
-                border: 'none',
-                background: activeTab === 'all' ? 'var(--mac-accent-blue)' : 'transparent',
-                color: activeTab === 'all' ? 'white' : 'var(--mac-text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
+              className={tabButtonClassName(activeTab === 'all')}
               onClick={() => setActiveTab('all')}>
               
               Все
@@ -345,16 +338,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
             {Object.entries(LAB_CATEGORIES).map(([key, category]) =>
             <button
               key={key}
-              style={{
-                padding: '12px 24px',
-                border: 'none',
-                background: activeTab === key ? 'var(--mac-accent-blue)' : 'transparent',
-                color: activeTab === key ? 'white' : 'var(--mac-text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
+              className={tabButtonClassName(activeTab === key)}
               onClick={() => setActiveTab(key)}>
               
                 {category.icon}
@@ -368,22 +352,22 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           {loading ?
           <Progress /> :
           filteredResults.length > 0 ?
-          <div style={{ overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="legacy-table-wrap">
+              <table className="legacy-table">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--mac-border)' }}>
-                    <th style={{ padding: 12, textAlign: 'left' }}>Исследование</th>
-                    <th style={{ padding: 12, textAlign: 'left' }}>Результат</th>
-                    <th style={{ padding: 12, textAlign: 'left' }}>Норма</th>
-                    <th style={{ padding: 12, textAlign: 'left' }}>Статус</th>
-                    <th style={{ padding: 12, textAlign: 'left' }}>Дата</th>
-                    <th style={{ padding: 12, textAlign: 'right' }}>Действия</th>
+                  <tr>
+                    <th style={{ textAlign: 'left' }}>Исследование</th>
+                    <th style={{ textAlign: 'left' }}>Результат</th>
+                    <th style={{ textAlign: 'left' }}>Норма</th>
+                    <th style={{ textAlign: 'left' }}>Статус</th>
+                    <th style={{ textAlign: 'left' }}>Дата</th>
+                    <th style={{ textAlign: 'right' }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredResults.map((result) =>
-                <tr key={result.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
-                      <td style={{ padding: 12 }}>
+                <tr key={result.id}>
+                      <td>
                         <Typography variant="body2" style={{ fontWeight: 500 }}>
                           {result.test_name}
                         </Typography>
@@ -392,15 +376,15 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                         </Typography>
                       </td>
                       
-                      <td style={{ padding: 12 }}>{renderValue(result)}</td>
+                      <td>{renderValue(result)}</td>
                       
-                      <td style={{ padding: 12 }}>
+                      <td>
                         <Typography variant="caption">
                           {result.reference_min} - {result.reference_max} {result.unit}
                         </Typography>
                       </td>
                       
-                      <td style={{ padding: 12 }}>
+                      <td>
                         <Badge
                       variant={RESULT_STATUS[result.status]?.color}>
                       
@@ -408,13 +392,13 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                         </Badge>
                       </td>
                       
-                      <td style={{ padding: 12 }}>
+                      <td>
                         <Typography variant="caption">
                           {new Date(result.performed_date).toLocaleDateString()}
                         </Typography>
                       </td>
                       
-                      <td style={{ padding: 12, textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <Button
                       size="small"
                       onClick={() => {

@@ -16,16 +16,16 @@
             tabIndex={0}
             onClick={onClose}
             onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
-            <div className="emr-v2-modal-content" onClickCapture={e => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: '12px' }}>
-                <header className="emr-v2-modal-header" style={{ borderBottom: '1px solid #eee', paddingBottom: '16px', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1a73e8' }}>
+            <div className="emr-v2-modal-content theme-soft-surface" onClickCapture={e => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: '12px' }}>
+                <header className="emr-v2-modal-header" style={{ borderBottom: '1px solid var(--mac-border)', paddingBottom: '16px', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--mac-accent)' }}>
                         🛡️ AI-ассистент: Важная информация
                     </h3>
                     <button className="emr-v2-btn-close" onClick={onClose}>✕</button>
                 </header>
 
-                <div className="emr-v2-modal-body" style={{ lineHeight: 1.6, color: '#333' }}>
-                    <div style={{ marginBottom: '20px', padding: '12px', background: '#e3f2fd', borderRadius: '8px', borderLeft: '4px solid #1a73e8' }}>
+                <div className="emr-v2-modal-body" style={{ lineHeight: 1.6, color: 'var(--mac-text-primary)' }}>
+                    <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--mac-accent-bg)', borderRadius: '8px', borderLeft: '4px solid var(--mac-accent)' }}>
                         <strong>Главный принцип:</strong> Искусственный интеллект — это помощник, а не врач.
                         Врач всегда принимает окончательное решение.
                     </div>
@@ -53,7 +53,7 @@
                         </li>
                     </ul>
 
-                    <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #eee', fontSize: '0.9rem', color: '#666' }}>
+                    <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--mac-border)', fontSize: '0.9rem', color: 'var(--mac-text-secondary)' }}>
                         <em>
                             Для включения экспериментального режима «Ghost Mode» (ввод серым текстом)
                             нажмите кнопку 👻 в панели инструментов. Этот режим работает только в неподписанных картах.

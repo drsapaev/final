@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
+import { api } from '../../api/client';
 import {
   Alert,
   Card,
@@ -27,14 +27,42 @@ import {
   MacOSInput,
 } from '../ui/macos';
 
+const accentGradients = {
+  info: 'linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 18%))',
+  success: 'linear-gradient(135deg, var(--mac-success), color-mix(in srgb, var(--mac-success), white 18%))',
+  warning: 'linear-gradient(135deg, var(--mac-warning), color-mix(in srgb, var(--mac-warning), white 18%))',
+  purple: 'linear-gradient(135deg, var(--mac-accent-purple), color-mix(in srgb, var(--mac-accent), white 12%))',
+};
+
+const toneChipStyles = {
+  success: {
+    background: 'var(--mac-success-bg)',
+    color: 'var(--mac-success)',
+    border: '1px solid var(--mac-success-border)',
+  },
+  warning: {
+    background: 'var(--mac-warning-bg)',
+    color: 'var(--mac-warning)',
+    border: '1px solid var(--mac-warning-border)',
+  },
+  error: {
+    background: 'var(--mac-error-bg)',
+    color: 'var(--mac-error)',
+    border: '1px solid var(--mac-error-border)',
+  },
+  info: {
+    background: 'var(--mac-accent-bg)',
+    color: 'var(--mac-accent)',
+    border: '1px solid var(--mac-accent-border)',
+  },
+};
+
 function MetricCard({ accent, icon: Icon, label, value }) {
   return (
     <div
+      className="theme-soft-surface"
       style={{
-        border: '1px solid var(--mac-border)',
-        borderRadius: 14,
         padding: 16,
-        background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
       }}
     >
       <div
@@ -102,15 +130,13 @@ SectionShell.propTypes = {
 function EmptyState({ icon: Icon, title, description, action }) {
   return (
     <div
+      className="theme-empty-state"
       style={{
         display: 'grid',
         justifyItems: 'center',
         textAlign: 'center',
         gap: 12,
         padding: '28px 20px',
-        border: '1px dashed var(--mac-border)',
-        borderRadius: 16,
-        background: 'var(--mac-bg-secondary)',
       }}
     >
       <div
@@ -118,7 +144,7 @@ function EmptyState({ icon: Icon, title, description, action }) {
           width: 52,
           height: 52,
           borderRadius: 18,
-          background: 'rgba(148, 163, 184, 0.14)',
+          background: 'color-mix(in srgb, var(--mac-text-secondary), transparent 86%)',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -150,6 +176,10 @@ function formatDate(dateString) {
   return parsed.toLocaleString('ru-RU');
 }
 
+function resolveApiError(error, fallbackMessage) {
+  return error?.response?.data?.detail || fallbackMessage;
+}
+
 function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }) {
   return (
     <Card shadow="none" style={{ borderStyle: 'solid' }}>
@@ -170,16 +200,15 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             {badgeLabel && (
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 999,
-                  padding: '6px 10px',
-                  background: 'rgba(10,132,255,0.12)',
-                  color: '#0a84ff',
-                }}
-              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 999,
+                    padding: '6px 10px',
+                    ...toneChipStyles.info,
+                  }}
+                >
                 {badgeLabel}
               </span>
             )}
@@ -259,27 +288,22 @@ export default function TwoFactorManager() {
 
   async function loadStatus() {
     try {
-      const response = await fetch('/api/v1/2fa/status', {
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      const data = await response.json();
+      const response = await api.get('/2fa/status');
+      const data = response.data;
       setStatus(data);
       if (data?.enabled) {
         setSetupData(null);
         setVerificationCode('');
       }
-    } catch {
-      setError('Ошибка загрузки статуса 2FA');
+    } catch (err) {
+      setError(resolveApiError(err, 'Ошибка загрузки статуса 2FA'));
     }
   }
 
   async function loadDevices() {
     try {
-      const response = await fetch('/api/v1/2fa/devices', {
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      const data = await response.json();
-      setDevices(data.devices || []);
+      const response = await api.get('/2fa/devices');
+      setDevices(response.data?.devices || []);
     } catch (err) {
       logger.error('Error loading devices:', err);
     }
@@ -287,11 +311,8 @@ export default function TwoFactorManager() {
 
   async function loadSecurityLogs() {
     try {
-      const response = await fetch('/api/v1/2fa/security-logs', {
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      const data = await response.json();
-      setSecurityLogs(data.logs || []);
+      const response = await api.get('/2fa/security-logs');
+      setSecurityLogs(response.data?.logs || []);
     } catch (err) {
       logger.error('Error loading security logs:', err);
     }
@@ -299,11 +320,8 @@ export default function TwoFactorManager() {
 
   async function loadRecoveryMethods() {
     try {
-      const response = await fetch('/api/v1/2fa/recovery-methods', {
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      const data = await response.json();
-      setRecoveryMethods(data.methods || []);
+      const response = await api.get('/2fa/recovery-methods');
+      setRecoveryMethods(response.data?.methods || []);
     } catch (err) {
       logger.error('Error loading recovery methods:', err);
     }
@@ -318,19 +336,12 @@ export default function TwoFactorManager() {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch('/api/v1/2fa/backup-codes', {
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setBackupCodes(data.backup_codes || []);
-        logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
-      } else {
-        setError(data.detail || 'Ошибка загрузки резервных кодов');
-      }
+      const response = await api.get('/2fa/backup-codes');
+      setBackupCodes(response.data?.backup_codes || []);
+      logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
     } catch (err) {
       logger.error('Error loading backup codes:', err);
-      setError('Ошибка загрузки резервных кодов');
+      setError(resolveApiError(err, 'Ошибка загрузки резервных кодов'));
     } finally {
       setLoading(false);
     }
@@ -343,30 +354,17 @@ export default function TwoFactorManager() {
     setConfirmRegenerate(false);
 
     try {
-      const response = await fetch('/api/v1/2fa/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
-        },
-        body: JSON.stringify({
-          method: 'totp',
-          recovery_email: status?.recovery_email || '',
-          recovery_phone: status?.recovery_phone || '',
-        }),
+      const response = await api.post('/2fa/setup', {
+        recovery_email: status?.recovery_email || '',
+        recovery_phone: status?.recovery_phone || '',
       });
-      const data = await response.json();
-      if (response.ok) {
-        setSetupData(data);
-        setBackupCodes(data.backup_codes || []);
-        setVerificationCode('');
-        setSuccess('Сканируйте QR-код и подтвердите 6-значный код из приложения, чтобы включить 2FA.');
-        logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
-      } else {
-        setError(data.detail || 'Ошибка настройки 2FA');
-      }
-    } catch {
-      setError('Ошибка настройки 2FA');
+      setSetupData(response.data);
+      setBackupCodes(response.data?.backup_codes || []);
+      setVerificationCode('');
+      setSuccess('Сканируйте QR-код и подтвердите 6-значный код из приложения, чтобы включить 2FA.');
+      logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
+    } catch (err) {
+      setError(resolveApiError(err, 'Ошибка настройки 2FA'));
     } finally {
       setLoading(false);
     }
@@ -383,22 +381,19 @@ export default function TwoFactorManager() {
     setSuccess('');
 
     try {
-      const params = new URLSearchParams({ totp_code: verificationCode });
       logger.info('[FIX:2FA] Verifying 2FA setup');
-      const response = await fetch(`/api/v1/2fa/verify-setup?${params.toString()}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
+      const response = await api.post('/2fa/verify-setup', null, {
+        params: { totp_code: verificationCode },
       });
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (response.data?.success) {
         setSuccess('2FA успешно включена');
         await loadStatus();
       } else {
-        setError(data.detail || data.message || 'Неверный код подтверждения');
+        setError(response.data?.detail || response.data?.message || 'Неверный код подтверждения');
       }
     } catch (err) {
       logger.error('Error verifying 2FA setup:', err);
-      setError('Ошибка подтверждения 2FA');
+      setError(resolveApiError(err, 'Ошибка подтверждения 2FA'));
     } finally {
       setLoading(false);
     }
@@ -415,30 +410,18 @@ export default function TwoFactorManager() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/v1/2fa/disable', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
-        },
-        body: JSON.stringify({
-          password: disablePassword,
-          totp_code: disableCode,
-        }),
+      await api.post('/2fa/disable', {
+        password: disablePassword,
+        totp_code: disableCode,
       });
-      const data = await response.json();
-      if (response.ok) {
-        setDisablePassword('');
-        setDisableCode('');
-        setShowDisableForm(false);
-        setBackupCodes([]);
-        setSuccess('2FA успешно отключена');
-        await loadAll();
-      } else {
-        setError(data.detail || 'Ошибка отключения 2FA');
-      }
-    } catch {
-      setError('Ошибка отключения 2FA');
+      setDisablePassword('');
+      setDisableCode('');
+      setShowDisableForm(false);
+      setBackupCodes([]);
+      setSuccess('2FA успешно отключена');
+      await loadAll();
+    } catch (err) {
+      setError(resolveApiError(err, 'Ошибка отключения 2FA'));
     } finally {
       setLoading(false);
     }
@@ -456,20 +439,12 @@ export default function TwoFactorManager() {
 
     try {
       logger.info('[FIX:2FA] Regenerating backup codes via supported endpoint');
-      const response = await fetch('/api/v1/2fa/backup-codes/regenerate', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setBackupCodes(data.backup_codes || []);
-        setConfirmRegenerate(false);
-        setSuccess('Резервные коды обновлены. Старый комплект больше недействителен.');
-      } else {
-        setError(data.detail || 'Ошибка генерации резервных кодов');
-      }
-    } catch {
-      setError('Ошибка генерации резервных кодов');
+      const response = await api.post('/2fa/backup-codes/regenerate');
+      setBackupCodes(response.data?.backup_codes || []);
+      setConfirmRegenerate(false);
+      setSuccess('Резервные коды обновлены. Старый комплект больше недействителен.');
+    } catch (err) {
+      setError(resolveApiError(err, 'Ошибка генерации резервных кодов'));
     } finally {
       setLoading(false);
     }
@@ -481,20 +456,12 @@ export default function TwoFactorManager() {
     setSuccess('');
 
     try {
-      const response = await fetch(`/api/v1/2fa/devices/${deviceId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` },
-      });
-      if (response.ok) {
-        setDeviceToRevoke(null);
-        setSuccess('Доступ устройства отозван');
-        await loadDevices();
-      } else {
-        const data = await response.json();
-        setError(data.detail || 'Ошибка отзыва доступа');
-      }
-    } catch {
-      setError('Ошибка отзыва доступа');
+      await api.delete(`/2fa/devices/${deviceId}`);
+      setDeviceToRevoke(null);
+      setSuccess('Доступ устройства отозван');
+      await loadDevices();
+    } catch (err) {
+      setError(resolveApiError(err, 'Ошибка отзыва доступа'));
     } finally {
       setLoading(false);
     }
@@ -547,25 +514,25 @@ export default function TwoFactorManager() {
           }}
         >
           <MetricCard
-            accent="linear-gradient(135deg, #7c3aed, #0ea5e9)"
+            accent={accentGradients.purple}
             icon={ShieldCheck}
             label="Статус 2FA"
             value={status?.enabled ? 'Включена' : 'Отключена'}
           />
           <MetricCard
-            accent="linear-gradient(135deg, #0a84ff, #30b0c7)"
+            accent={accentGradients.info}
             icon={Key}
             label="Резервные коды"
             value={status?.enabled ? `${status?.backup_codes_count || 0} доступно` : 'Недоступны'}
           />
           <MetricCard
-            accent="linear-gradient(135deg, #34c759, #10b981)"
+            accent={accentGradients.success}
             icon={Smartphone}
             label="Доверенные устройства"
             value={`${status?.trusted_devices_count ?? devices.length} шт.`}
           />
           <MetricCard
-            accent="linear-gradient(135deg, #ff9f0a, #f97316)"
+            accent={accentGradients.warning}
             icon={Clock3}
             label="Последнее использование"
             value={formatDate(status?.last_used)}
@@ -705,10 +672,8 @@ export default function TwoFactorManager() {
                     }}
                   >
                     <div
+                      className="theme-soft-surface"
                       style={{
-                        border: '1px solid var(--mac-border)',
-                        borderRadius: 16,
-                        background: 'white',
                         padding: 16,
                         display: 'flex',
                         alignItems: 'center',
@@ -795,15 +760,13 @@ export default function TwoFactorManager() {
             {recoveryMethods.map((method) => (
               <div
                 key={`${method.type}-${method.value}`}
+                className="theme-soft-surface"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr auto',
                   gap: 12,
                   alignItems: 'center',
                   padding: '14px 16px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 14,
-                  background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -812,8 +775,8 @@ export default function TwoFactorManager() {
                       width: 34,
                       height: 34,
                       borderRadius: 12,
-                      background: method.type === 'email' ? 'rgba(10,132,255,0.12)' : 'rgba(52,199,89,0.12)',
-                      color: method.type === 'email' ? '#0a84ff' : '#10b981',
+                      background: method.type === 'email' ? 'var(--mac-accent-bg)' : 'var(--mac-success-bg)',
+                      color: method.type === 'email' ? 'var(--mac-accent)' : 'var(--mac-success)',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -832,8 +795,7 @@ export default function TwoFactorManager() {
                     fontWeight: 600,
                     borderRadius: 999,
                     padding: '6px 10px',
-                    background: method.verified ? 'rgba(52,199,89,0.12)' : 'rgba(255,159,10,0.12)',
-                    color: method.verified ? '#22863a' : '#b26b00',
+                    ...(method.verified ? toneChipStyles.success : toneChipStyles.warning),
                   }}
                 >
                   {method.verified ? 'Подтверждён' : 'Не подтверждён'}
@@ -918,15 +880,13 @@ export default function TwoFactorManager() {
               {backupCodes.map((code) => (
                 <div
                   key={code}
+                  className="theme-soft-surface"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: 10,
                     padding: '12px 14px',
-                    border: '1px solid var(--mac-border)',
-                    borderRadius: 14,
-                    background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
                   }}
                 >
                   <code style={{ fontSize: 13 }}>{code}</code>
@@ -976,14 +936,12 @@ export default function TwoFactorManager() {
             {securityLogs.map((log, index) => (
               <div
                 key={`${log.timestamp}-${index}`}
+                className="theme-soft-surface"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'auto 1fr',
                   gap: 14,
                   padding: '14px 16px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 14,
-                  background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
                 }}
               >
                 <div
@@ -991,8 +949,8 @@ export default function TwoFactorManager() {
                     width: 34,
                     height: 34,
                     borderRadius: 12,
-                    background: log.type === 'success' ? 'rgba(52,199,89,0.12)' : log.type === 'warning' ? 'rgba(255,159,10,0.12)' : 'rgba(255,69,58,0.12)',
-                    color: log.type === 'success' ? '#22863a' : log.type === 'warning' ? '#b26b00' : '#b42318',
+                    background: log.type === 'success' ? 'var(--mac-success-bg)' : log.type === 'warning' ? 'var(--mac-warning-bg)' : 'var(--mac-error-bg)',
+                    color: log.type === 'success' ? 'var(--mac-success)' : log.type === 'warning' ? 'var(--mac-warning)' : 'var(--mac-error)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',

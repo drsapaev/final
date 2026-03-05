@@ -10,7 +10,10 @@ from app.crud.notification import (
     crud_notification_history,
     crud_notification_template,
 )
-from app.crud.user_management import user_notification_settings as crud_user_notification_settings
+from app.crud.user_management import (
+    user_notification_settings as crud_user_notification_settings,
+    user_profile as crud_user_profile,
+)
 from app.models.user import User
 from app.schemas.notification import (
     BulkNotificationRequest,
@@ -22,12 +25,26 @@ from app.schemas.notification import (
     SendNotificationRequest,
 )
 from app.schemas.user_management import (
+    UserNotificationSettingsCreate,
     UserNotificationSettingsResponse,
     UserNotificationSettingsUpdate,
 )
 from app.services.notifications import notification_sender_service
 
 router = APIRouter()
+
+
+def get_or_create_notification_settings(db: Session, user_id: int):
+    settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
+    if settings:
+        return settings
+
+    profile = crud_user_profile.get_by_user_id(db, user_id=user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Профиль пользователя не найден")
+
+    create_data = UserNotificationSettingsCreate(user_id=user_id, profile_id=profile.id)
+    return crud_user_notification_settings.create(db, obj_in=create_data)
 
 
 @router.post("/send-appointment-reminder")
@@ -382,13 +399,7 @@ async def get_user_notification_settings(
         raise HTTPException(status_code=403, detail="Нет прав доступа")
     
     # Используем UserNotificationSettings
-    settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
-    if not settings:
-        # Если настроек нет, можно попробовать создать дефолтные или вернуть 404
-        # Лучше 404, а создание должно быть при регистрации
-        raise HTTPException(status_code=404, detail="Настройки уведомлений не найдены")
-        
-    return settings
+    return get_or_create_notification_settings(db, user_id)
 
 
 @router.put("/settings/{user_id}", response_model=UserNotificationSettingsResponse)
@@ -405,9 +416,7 @@ async def update_user_notification_settings(
     ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
 
-    settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
-    if not settings:
-        raise HTTPException(status_code=404, detail="Настройки уведомлений не найдены")
+    settings = get_or_create_notification_settings(db, user_id)
 
     return crud_user_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
 

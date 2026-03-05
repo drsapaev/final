@@ -6,6 +6,18 @@
 }
 
 .payment-click-container {
+  --payment-accent: var(--mac-accent);
+  --payment-accent-strong: color-mix(in srgb, var(--mac-accent), black 14%);
+  --payment-accent-soft: var(--mac-accent-bg);
+  --payment-accent-border: var(--mac-accent-border);
+  --payment-surface: color-mix(in srgb, var(--mac-bg-secondary), transparent 10%);
+  --payment-surface-hover: color-mix(in srgb, var(--mac-bg-secondary), white 8%);
+  --payment-border: var(--mac-border);
+  --payment-text: var(--mac-text-primary);
+  --payment-text-secondary: var(--mac-text-secondary);
+  --payment-success: var(--mac-success);
+  --payment-warning: var(--mac-warning);
+  --payment-error: var(--mac-error);
   padding: 0;
   min-height: 300px;
 }
@@ -22,25 +34,25 @@
 }
 
 .payment-icon {
-  color: #0078d4;
+  color: var(--payment-accent);
   flex-shrink: 0;
 }
 
 .payment-icon.processing {
-  color: #f59e0b;
+  color: var(--payment-warning);
 }
 
 .payment-icon.polling {
-  color: #8b5cf6;
+  color: var(--mac-accent-purple, var(--payment-accent));
   animation: pulse 2s infinite;
 }
 
 .payment-icon.success {
-  color: #10b981;
+  color: var(--payment-success);
 }
 
 .payment-icon.failed {
-  color: #ef4444;
+  color: var(--payment-error);
 }
 
 @keyframes pulse {
@@ -56,7 +68,7 @@
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--payment-text);
   text-align: center;
 }
 
@@ -67,14 +79,14 @@
 
 .payment-info p {
   margin: 0 0 12px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
   line-height: 1.5;
 }
 
 .payment-info ul {
   margin: 12px 0;
   padding-left: 20px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 .payment-info li {
@@ -85,8 +97,8 @@
 /* ===================== ИНИЦИАЦИЯ ===================== */
 
 .payment-details {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--payment-surface);
+  border: 1px solid var(--payment-border);
   border-radius: 8px;
   padding: 16px;
   margin: 0 24px 20px;
@@ -97,7 +109,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--payment-border);
 }
 
 .detail-row:last-child {
@@ -106,13 +118,13 @@
 
 .detail-label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 .detail-value {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--payment-text);
 }
 
 /* ===================== ОБРАБОТКА ===================== */
@@ -128,8 +140,8 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--payment-accent) 0%, var(--payment-accent-strong) 100%);
+  color: var(--mac-text-on-accent);
   text-decoration: none;
   border-radius: 8px;
   font-weight: 500;
@@ -138,12 +150,12 @@
 
 .payment-url:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--payment-accent), transparent 65%);
 }
 
 .payment-instructions {
-  background: #f0f9ff;
-  border: 1px solid #0ea5e9;
+  background: var(--payment-accent-soft);
+  border: 1px solid var(--payment-accent-border);
   border-radius: 8px;
   padding: 16px;
   margin: 0 24px;
@@ -151,14 +163,14 @@
 
 .payment-instructions p {
   margin: 0 0 8px;
-  color: #0c4a6e;
+  color: var(--payment-text);
   font-weight: 500;
 }
 
 .payment-instructions ul {
   margin: 8px 0 0;
   padding-left: 20px;
-  color: #0c4a6e;
+  color: var(--payment-text);
 }
 
 /* ===================== POLLING ===================== */
@@ -173,7 +185,7 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: #f3f4f6;
+  background: var(--payment-surface);
   border-radius: 8px;
   margin-bottom: 16px;
 }
@@ -181,8 +193,8 @@
 .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #e5e7eb;
-  border-top: 2px solid #8b5cf6;
+  border: 2px solid var(--payment-border);
+  border-top: 2px solid var(--mac-accent-purple, var(--payment-accent));
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -197,7 +209,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 /* ===================== УСПЕХ ===================== */
@@ -210,7 +222,7 @@
 
 .success-info p {
   margin: 0 0 8px;
-  color: #059669;
+  color: var(--payment-success);
   font-weight: 500;
 }
 
@@ -222,7 +234,7 @@
   margin: 0 0 16px;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--payment-text);
 }
 
 .tickets-list {
@@ -236,15 +248,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--payment-surface);
+  border: 1px solid var(--payment-border);
   border-radius: 6px;
   transition: all 0.2s ease;
 }
 
 .ticket-item:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--payment-surface-hover);
+  border-color: var(--mac-border-secondary);
 }
 
 .ticket-info {
@@ -254,33 +266,33 @@
 .ticket-patient {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--payment-text);
   margin-bottom: 4px;
 }
 
 .ticket-details {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 .print-ticket-btn {
   width: 36px;
   height: 36px;
-  border: 1px solid #d1d5db;
-  background: white;
+  border: 1px solid var(--payment-border);
+  background: var(--mac-bg-primary);
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 .print-ticket-btn:hover {
-  background: #0078d4;
-  border-color: #0078d4;
-  color: white;
+  background: var(--payment-accent);
+  border-color: var(--payment-accent);
+  color: var(--mac-text-on-accent);
 }
 
 /* ===================== ОШИБКА ===================== */
@@ -290,10 +302,10 @@
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--mac-error-bg);
+  border: 1px solid var(--mac-error-border);
   border-radius: 6px;
-  color: #dc2626;
+  color: var(--payment-error);
   margin: 0 24px 20px;
   font-size: 14px;
 }
@@ -304,13 +316,13 @@
 
 .failure-info p {
   margin: 0 0 12px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 .failure-info ul {
   margin: 8px 0;
   padding-left: 20px;
-  color: #6b7280;
+  color: var(--payment-text-secondary);
 }
 
 /* ===================== АДАПТИВНОСТЬ ===================== */
@@ -343,75 +355,4 @@
     gap: 4px;
     align-items: flex-start;
   }
-}
-
-/* ===================== ТЕМНАЯ ТЕМА ===================== */
-
-[data-theme="dark"] .payment-click-container {
-  color: #e2e8f0;
-}
-
-[data-theme="dark"] .payment-header h3 {
-  color: #f1f5f9;
-}
-
-[data-theme="dark"] .payment-details {
-  background: #334155;
-  border-color: #475569;
-}
-
-[data-theme="dark"] .detail-row {
-  border-bottom-color: #475569;
-}
-
-[data-theme="dark"] .detail-label {
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .detail-value {
-  color: #f1f5f9;
-}
-
-[data-theme="dark"] .payment-instructions {
-  background: #1e3a8a;
-  border-color: #3b82f6;
-}
-
-[data-theme="dark"] .payment-instructions p,
-[data-theme="dark"] .payment-instructions ul {
-  color: #dbeafe;
-}
-
-[data-theme="dark"] .polling-indicator {
-  background: #334155;
-}
-
-[data-theme="dark"] .ticket-item {
-  background: #334155;
-  border-color: #475569;
-}
-
-[data-theme="dark"] .ticket-item:hover {
-  background: #475569;
-  border-color: #64748b;
-}
-
-[data-theme="dark"] .ticket-patient {
-  color: #f1f5f9;
-}
-
-[data-theme="dark"] .ticket-details {
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .print-ticket-btn {
-  background: #475569;
-  border-color: #64748b;
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .error-info {
-  background: #7f1d1d;
-  border-color: #dc2626;
-  color: #fecaca;
 }

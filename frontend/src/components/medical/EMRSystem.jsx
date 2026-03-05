@@ -25,7 +25,7 @@ const AttachmentImage = ({ file, alt, style }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'var(--mac-background-secondary)'
+        backgroundColor: 'var(--mac-bg-secondary)'
       }}>
         <CircularProgress size={24} />
       </div>);
@@ -1132,7 +1132,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
                   padding: '8px 12px',
                   border: '1px solid var(--mac-border)',
                   borderRadius: 6,
-                  backgroundColor: 'var(--mac-background)',
+                  backgroundColor: 'var(--mac-bg-primary)',
                   color: 'var(--mac-text-primary)',
                   fontSize: 14
                 }}
@@ -1224,7 +1224,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
                   height: 120,
                   objectFit: 'cover',
                   borderRadius: 6,
-                  backgroundColor: 'var(--mac-background-secondary)'
+                  backgroundColor: 'var(--mac-bg-secondary)'
                 }} />
 
                   </div> :
@@ -1232,7 +1232,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
             <div style={{
               width: '100%',
               height: 120,
-              backgroundColor: 'var(--mac-background-secondary)',
+              backgroundColor: 'var(--mac-bg-secondary)',
               borderRadius: 6,
               display: 'flex',
               alignItems: 'center',
@@ -1371,7 +1371,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
 
       {showAIAssistant &&
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ backgroundColor: 'white', borderRadius: 8, maxWidth: '64rem', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'var(--mac-card-bg)', color: 'var(--mac-text-primary)', border: '1px solid var(--mac-card-border)', borderRadius: 12, boxShadow: 'var(--mac-shadow-md)', maxWidth: '64rem', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Typography variant="h4">AI Анализ жалоб</Typography>

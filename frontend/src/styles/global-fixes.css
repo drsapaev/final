@@ -16,8 +16,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background-color: var(--bg-primary, #ffffff);
-  color: var(--text-primary, #1e293b);
+  background: var(--mac-gradient-window, var(--bg-primary, #ffffff));
+  color: var(--mac-text-primary, var(--text-primary, #1e293b));
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -82,8 +82,8 @@ body {
   flex-direction: column !important;
   min-height: 100vh !important;
   width: 100% !important;
-  background-color: var(--bg-primary, #ffffff) !important;
-  color: var(--text-primary, #1e293b) !important;
+  background-color: var(--mac-bg-primary, var(--bg-primary, #ffffff)) !important;
+  color: var(--mac-text-primary, var(--text-primary, #1e293b)) !important;
 }
 
 /* Исправления для панелей */
@@ -92,14 +92,14 @@ body {
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  background-color: var(--bg-primary, #ffffff);
-  color: var(--text-primary, #1e293b);
+  background-color: var(--mac-bg-primary, var(--bg-primary, #ffffff));
+  color: var(--mac-text-primary, var(--text-primary, #1e293b));
 }
 
 /* Исправления для карточек */
 .card-container {
-  background-color: var(--bg-secondary, #f8fafc);
-  border: 1px solid var(--border-color, #e2e8f0);
+  background-color: var(--mac-card-bg, var(--mac-bg-secondary, var(--bg-secondary, #f8fafc)));
+  border: 1px solid var(--mac-card-border, var(--mac-border, var(--border-color, #e2e8f0)));
   border-radius: 8px;
   padding: 16px;
   margin: 8px 0;
@@ -141,15 +141,15 @@ body {
 }
 
 /* Исправления для темной темы */
-[data-theme="dark"] {
+[data-theme="dark"][data-color-scheme="dark"] {
   background-color: var(--bg-primary, #0f172a);
   color: var(--text-primary, #f8fafc);
 }
 
-[data-theme="dark"] .MuiBox-root,
-[data-theme="dark"] .css-axw7ok,
-[data-theme="dark"] .css-1uqhpru,
-[data-theme="dark"] .css-k008qs {
+[data-theme="dark"][data-color-scheme="dark"] .MuiBox-root,
+[data-theme="dark"][data-color-scheme="dark"] .css-axw7ok,
+[data-theme="dark"][data-color-scheme="dark"] .css-1uqhpru,
+[data-theme="dark"][data-color-scheme="dark"] .css-k008qs {
   background-color: var(--bg-primary, #0f172a) !important;
   color: var(--text-primary, #f8fafc) !important;
 }
@@ -206,16 +206,9 @@ body {
 
 /* Предотвращение конфликтов border shorthand */
 .modern-tabs .tabs-container {
-  border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-bottom: none !important;
-}
-
-.modern-tabs.dark .tabs-container {
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid color-mix(in srgb, var(--mac-border), transparent 8%) !important;
+  border-left: 1px solid color-mix(in srgb, var(--mac-border), transparent 8%) !important;
+  border-right: 1px solid color-mix(in srgb, var(--mac-border), transparent 8%) !important;
   border-bottom: none !important;
 }
 

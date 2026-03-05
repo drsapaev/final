@@ -18,7 +18,6 @@ import {
   Sparkles,
   Users } from
 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './ModernTabs.css';
@@ -42,6 +41,11 @@ const iconMap = {
   Sparkle: Sparkles, // Alias for backend compatibility
   Users
 };
+
+const defaultTabColor = 'var(--mac-accent)';
+
+const toGradient = (color) =>
+  `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color}, white 14%))`;
 
 const ModernTabs = ({
   activeTab,
@@ -89,8 +93,8 @@ const ModernTabs = ({
         // ⭐ SSOT: queue_tags используются для фильтрации записей на вкладке
         queue_tags: profile.queue_tags || [profile.key],
         icon: iconMap[profile.icon] || Package, // Fallback на Package если иконка не найдена
-        color: profile.color || '#6b7280',
-        gradient: `linear-gradient(135deg, ${profile.color || '#6b7280'}, ${profile.color || '#6b7280'})`
+        color: profile.color || defaultTabColor,
+        gradient: profile.gradient || toGradient(profile.color || defaultTabColor)
       }));
 
       logger.info(`✅ SSOT: Loaded ${profilesData.length} queue profiles from API (source: ${response.data.source})`);
@@ -111,48 +115,48 @@ const ModernTabs = ({
         label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
         queue_tags: ['cardio', 'cardiology', 'cardiology_common'],
         icon: Heart,
-        color: '#ef4444',
-        gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
+        color: 'var(--mac-error)',
+        gradient: toGradient('var(--mac-error)')
       },
       {
         key: 'ecg',
         label: language === 'uz' ? 'EKG' : 'ЭКГ',
         queue_tags: ['ecg', 'echokg'],
         icon: Activity,
-        color: '#ec4899',
-        gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
+        color: 'var(--mac-accent-purple)',
+        gradient: toGradient('var(--mac-accent-purple)')
       },
       {
         key: 'dermatology',
         label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
         queue_tags: ['derma', 'dermatology'],
         icon: UserCheck,
-        color: '#f59e0b',
-        gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
+        color: 'var(--mac-warning)',
+        gradient: toGradient('var(--mac-warning)')
       },
       {
         key: 'stomatology',
         label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
         queue_tags: ['dental', 'stomatology', 'dentist'],
         icon: Smile,
-        color: '#3b82f6',
-        gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
+        color: 'var(--mac-accent)',
+        gradient: toGradient('var(--mac-accent)')
       },
       {
         key: 'lab',
         label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
         queue_tags: ['lab', 'laboratory'],
         icon: FlaskConical,
-        color: '#10b981',
-        gradient: 'linear-gradient(135deg, #10b981, #059669)'
+        color: 'var(--mac-success)',
+        gradient: toGradient('var(--mac-success)')
       },
       {
         key: 'procedures',
         label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
         queue_tags: ['procedures', 'physio', 'therapy'],
         icon: Syringe,
-        color: '#8b5cf6',
-        gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+        color: 'var(--mac-accent-purple)',
+        gradient: toGradient('var(--mac-accent-purple)')
       }]
       );
     } finally {
@@ -181,17 +185,11 @@ const ModernTabs = ({
     };
   }, [loadQueueProfiles]);
 
-  // Используем ту же систему цветов, что и таблица
-  const { isDark } = useTheme();
-
   const colors = {
-    bg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.98)',
-    bgSecondary: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.98)',
-    border: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.3)',
-    text: isDark ? '#f8fafc' : '#0f172a',
-    textSecondary: isDark ? '#cbd5e1' : '#64748b',
-    hover: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.1)',
-    active: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.15)'
+    bg: 'color-mix(in srgb, var(--mac-bg-primary), transparent 2%)',
+    border: 'var(--mac-border)',
+    text: 'var(--mac-text-primary)',
+    textSecondary: 'var(--mac-text-secondary)'
   };
 
   // Обновление позиции индикатора
@@ -270,7 +268,7 @@ const ModernTabs = ({
   // Показываем заглушку пока загружаются вкладки
   if (loading) {
     return (
-      <div className={`modern-tabs ${isDark ? 'dark' : 'light'}`}>
+      <div className="modern-tabs">
         <div
           className="tabs-container"
           style={{
@@ -294,7 +292,7 @@ const ModernTabs = ({
   }
 
   return (
-    <div className={`modern-tabs ${isDark ? 'dark' : 'light'}`}>
+    <div className="modern-tabs">
       <div
         className="tabs-container"
         style={{
@@ -314,7 +312,7 @@ const ModernTabs = ({
           className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
           onClick={() => onTabChange(null)}
           style={{
-            color: !activeTab ? '#3b82f6' : colors.text
+            color: !activeTab ? 'var(--mac-accent)' : colors.text
           }}>
 
           <div className="tab-icon">
@@ -343,8 +341,7 @@ const ModernTabs = ({
           {/* Вкладки отделений */}
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            const isActive = activeTab === tab.key;void
-            getStats(tab.key);
+            const isActive = activeTab === tab.key;
 
             return (
               <button
@@ -353,8 +350,8 @@ const ModernTabs = ({
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange(isActive ? null : tab.key)}
                 style={{
-                  color: isActive ? isDark ? '#ffffff' : '#0f172a' : colors.text,
-                  backgroundColor: isActive ? isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' : 'transparent',
+                  color: isActive ? 'var(--mac-text-primary)' : colors.text,
+                  backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
                   '--tab-color': tab.color,
                   '--tab-gradient': tab.gradient
                 }}>

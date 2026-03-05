@@ -65,6 +65,12 @@ from app.services.user_management_api_service import UserManagementApiService
 router = APIRouter()
 
 
+def _normalize_theme(theme: str | None) -> str:
+    if theme == "system":
+        return "auto"
+    return theme or "auto"
+
+
 # ============================================
 # CURRENT USER SELF-SERVICE ENDPOINTS
 # IMPORTANT: These must be BEFORE /users/{user_id} routes!
@@ -85,7 +91,7 @@ async def get_current_user_preferences(
         if not preferences:
             # Возвращаем дефолтные настройки если нет записи
             return {
-                "theme": "system",
+                "theme": "auto",
                 "language": "ru",
                 "compact_mode": False,
                 "emr_smart_field_mode": "ghost",
@@ -101,7 +107,7 @@ async def get_current_user_preferences(
         result = {
             "id": preferences.id,
             "user_id": preferences.user_id,
-            "theme": preferences.theme or "system",
+            "theme": _normalize_theme(preferences.theme),
             "language": preferences.language or "ru",
             "timezone": preferences.timezone,
             "compact_mode": preferences.compact_mode or False,
@@ -134,7 +140,7 @@ async def get_current_user_preferences(
         import logging
         logging.warning(f"Failed to get preferences for user {current_user.id}: {e}")
         return {
-            "theme": "system",
+            "theme": "auto",
             "language": "ru",
             "compact_mode": False,
             "emr_smart_field_mode": "ghost",

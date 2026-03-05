@@ -10,88 +10,9 @@ import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
 import './styles/macos.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
+import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
 
-// Global color scheme initializer - синхронизировано с ColorSchemeSelector
-function initializeColorScheme() {
-  const customScheme = localStorage.getItem('customColorScheme');
-  const schemeId = localStorage.getItem('activeColorSchemeId');
-
-  if (customScheme === 'true' && schemeId) {
-    const root = document.documentElement;
-    // Полная нормализация: убираем светлую/тёмную тему и их атрибуты
-    document.body.classList.remove('light-theme', 'dark-theme');
-    document.documentElement.removeAttribute('data-theme');
-
-    if (schemeId === 'vibrant') {
-      // Матовые приглушённые цвета
-      root.style.setProperty('--mac-bg-primary', '#6b8db3'); /* Приглушённый синий */
-      root.style.setProperty('--mac-bg-secondary', '#7fa899'); /* Приглушённый бирюзовый */
-      root.style.setProperty('--mac-accent-blue', '#d4a063'); /* Приглушённый оранжевый */
-      root.style.setProperty('--mac-text-primary', '#ffffff');
-      root.style.setProperty('--mac-text-secondary', 'rgba(255,255,255,0.92)');
-      root.style.setProperty('--mac-gradient-window', 'linear-gradient(135deg, rgba(107, 141, 179, 0.75) 0%, rgba(127, 168, 153, 0.7) 40%, rgba(212, 160, 99, 0.65) 80%), linear-gradient(135deg, rgba(120, 130, 145, 0.3) 0%, rgba(130, 140, 150, 0.25) 100%)');
-      root.style.setProperty('--mac-gradient-sidebar', 'linear-gradient(135deg, rgba(100, 130, 165, 0.7) 0%, rgba(115, 155, 140, 0.65) 45%, rgba(200, 150, 90, 0.6) 100%), linear-gradient(135deg, rgba(130, 140, 150, 0.25) 0%, rgba(140, 150, 160, 0.2) 100%)');
-      root.style.setProperty('--bg', '#6b8db3');
-      root.style.setProperty('--mac-bg-toolbar', 'rgba(30, 35, 45, 0.4)');
-      root.style.setProperty('--mac-separator', 'rgba(255,255,255,0.22)');
-      root.style.setProperty('--mac-border', 'rgba(255,255,255,0.22)');
-      root.style.setProperty('--mac-border-secondary', 'rgba(255,255,255,0.18)');
-      root.setAttribute('data-color-scheme', 'vibrant');
-    } else if (schemeId === 'glass') {
-      // Синхронизировано с macos.css [data-color-scheme="glass"]
-      // Улучшенные значения для лучшей видимости карточек
-      root.style.setProperty('--mac-bg-primary', 'rgba(50, 55, 65, 0.75)');
-      root.style.setProperty('--mac-bg-secondary', 'rgba(60, 65, 75, 0.65)');
-      root.style.setProperty('--mac-bg-toolbar', 'rgba(50, 55, 65, 0.85)'); /* Увеличенная непрозрачность для хедера */
-      root.style.setProperty('--mac-bg-tertiary', 'rgba(70, 75, 85, 0.55)');
-      root.style.setProperty('--mac-accent-blue', 'rgba(0,122,255,0.8)');
-      root.style.setProperty('--mac-text-primary', '#f0f1f5');
-      root.style.setProperty('--mac-text-secondary', 'rgba(240,240,245,0.9)');
-      root.style.setProperty('--mac-border', 'rgba(255, 255, 255, 0.2)');
-      root.style.setProperty('--mac-border-secondary', 'rgba(255, 255, 255, 0.15)');
-      root.style.setProperty('--mac-blur-light', 'saturate(180%) blur(22px)');
-      root.style.setProperty('--surface', 'rgba(255,255,255,0.25)');
-      root.style.setProperty('--bg', '#f6f7f9');
-      // Очищаем градиент из предыдущих тем
-      root.style.setProperty('--mac-gradient-window', 'none');
-      // Для стеклянной темы задаём фон и фильтр на html и body
-      document.documentElement.style.background = 'rgba(20, 20, 25, 0.3)';
-      document.documentElement.style.backdropFilter = 'blur(22px) saturate(160%)';
-      document.documentElement.style.webkitBackdropFilter = 'blur(22px) saturate(160%)';
-      document.body.style.background = 'rgba(20, 20, 25, 0.3)';
-      document.body.style.backdropFilter = 'blur(22px) saturate(160%)';
-      document.body.style.webkitBackdropFilter = 'blur(22px) saturate(160%)';
-      root.setAttribute('data-color-scheme', 'glass');
-    } else if (schemeId === 'gradient') {
-      // Синхронизация с предпросмотром в Settings → Gradient
-      root.style.setProperty('--mac-bg-primary', '#667eea');
-      root.style.setProperty('--mac-bg-secondary', '#764ba2');
-      root.style.setProperty('--mac-bg-tertiary', '#8e7cc3');
-      root.style.setProperty('--mac-accent-blue', '#f093fb');
-      root.style.setProperty('--mac-text-primary', '#ffffff');
-      root.style.setProperty('--mac-text-secondary', 'rgba(255,255,255,0.9)');
-      root.style.setProperty('--mac-border', 'rgba(255, 255, 255, 0.18)');
-      root.style.setProperty('--mac-border-secondary', 'rgba(255, 255, 255, 0.14)');
-      root.style.setProperty('--mac-separator', 'rgba(255, 255, 255, 0.16)');
-      root.style.setProperty('--mac-gradient-window', 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)');
-      root.style.setProperty('--bg', 'transparent');
-      // Прозрачные слои для бесшовного градиента
-      root.style.setProperty('--mac-bg-toolbar', 'transparent');
-      root.style.setProperty('--mac-gradient-sidebar', 'transparent');
-      // Сброс эффектов стекла
-      document.documentElement.style.background = '';
-      document.documentElement.style.backdropFilter = '';
-      document.documentElement.style.webkitBackdropFilter = '';
-      document.body.style.background = '';
-      document.body.style.backdropFilter = '';
-      document.body.style.webkitBackdropFilter = '';
-      root.setAttribute('data-color-scheme', 'gradient');
-    }
-  }
-}
-
-// Initialize on load
-initializeColorScheme();
+bootstrapStoredColorScheme();
 
 // macOS UI компоненты
 import { Sidebar } from './components/ui/macos';
@@ -1013,39 +934,10 @@ function AppShell() {
   const path = location.pathname;
   const { theme } = useTheme(); // Добавляем доступ к теме
 
-  // Переприменяем кастомную схему при навигации между страницами
-  useEffect(() => {
-    const reapplyCustomScheme = () => {
-      const customScheme = localStorage.getItem('customColorScheme');
-      const schemeId = localStorage.getItem('activeColorSchemeId');
-      if (customScheme === 'true' && schemeId) {
-        initializeColorScheme();
-      }
-    };
-
-    // Применить сразу при монтировании и при изменении location
-    reapplyCustomScheme();
-
-    // Слушать события изменения цветовой схемы
-    const handleSchemeChange = () => reapplyCustomScheme();
-    window.addEventListener('colorSchemeChanged', handleSchemeChange);
-    // Восстановление после блокировки/фонового режима/перезагрузки из BFCache
-    const handleVisibilityOrFocus = () => reapplyCustomScheme();
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    window.addEventListener('pageshow', handleVisibilityOrFocus);
-
-    return () => {
-      window.removeEventListener('colorSchemeChanged', handleSchemeChange);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      window.removeEventListener('pageshow', handleVisibilityOrFocus);
-    };
-  }, [location.pathname]);
-
   const hideSidebar = path === '/registrar-panel' ||
     path === '/doctor-panel' ||
-    path === '/cashier-panel';
+    path === '/cashier-panel' ||
+    path === '/profile';
 
   // Полноэкранный режим для специализированных панелей
   const isFullscreen = path === '/cardiologist' || path === '/dermatologist' || path === '/dentist';
@@ -1054,7 +946,7 @@ function AppShell() {
   const hideHeader = path === '/';
 
   return (
-    <div style={macOSWrapStyle}>
+    <div className="app-shell" style={macOSWrapStyle}>
       {/* macOS Header - скрыт для лендинга */}
       {!hideHeader && (
         <div style={{
@@ -1066,7 +958,7 @@ function AppShell() {
         </div>
       )}
 
-      <div style={{
+      <div className="app-shell-grid" style={{
         display: 'grid', // Используем CSS Grid для правильного распределения пространства
         gridTemplateColumns: hideSidebar ? '1fr' : 'auto 1fr', // auto для сайдбара, 1fr для контента
         gap: '16px', // Возвращаем gap для правильных отступов между сайдбаром и контентом
@@ -1139,11 +1031,17 @@ function AppShell() {
           </div>
         )}
 
-        <main style={{
+        <main className={`app-main${hideSidebar || isFullscreen ? ' app-main--frameless' : ''}`} style={{
           ...macOSMainStyle,
           marginTop: '0', // Убираем top margin, gap Grid обеспечит выравнивание
           ...(theme === 'light' && {
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' // Добавляем тень для светлой темы
+            boxShadow: 'var(--mac-main-shell-shadow)'
+          }),
+          ...(hideSidebar && {
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 0,
+            boxShadow: 'none'
           }),
           ...(hideSidebar && { maxWidth: 'none', marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0, padding: 0 }),
           ...(isFullscreen && {
@@ -1155,7 +1053,11 @@ function AppShell() {
             padding: 0,
             width: '100%',
             minWidth: '100%',
-            overflow: 'visible'
+            overflow: 'visible',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 0,
+            boxShadow: 'none'
           })
         }}>
           <Outlet />
@@ -1189,7 +1091,6 @@ function AppContent() {
           <Route path="/" element={<Landing />} />
           <Route path="/medilab-demo" element={<MediLabDemo />} />
           <Route path="/macos-demo" element={<MacOSDemoPage />} />
-          <Route path="/profile" element={<RequireAuth roles={[]}><UserProfile /></RequireAuth>} />
           {/* Test pages - Admin only (security fix) */}
           <Route path="/css-test" element={<RequireAuth roles={['Admin']}><CSSTestPage /></RequireAuth>} />
           <Route path="/buttons" element={<RequireAuth roles={['Admin']}><ButtonShowcase /></RequireAuth>} />
@@ -1241,6 +1142,7 @@ function AppContent() {
               <Route path="display-board" element={<DisplayBoardUnified />} />
               <Route path="display-board/:role" element={<DisplayBoardUnified />} />
               <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
+              <Route path="profile" element={<UserProfile />} />
               <Route path="security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
               <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
               <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar']}><Scheduler /></RequireAuth>} />
@@ -1293,7 +1195,7 @@ export default function App() {
 
 const macOSWrapStyle = {
   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-  background: 'var(--mac-gradient-window)',
+  background: 'transparent',
   minHeight: '100vh',
   color: 'var(--mac-text-primary)',
   width: '100%',
@@ -1314,5 +1216,7 @@ const macOSMainStyle = {
   width: '100%',
   minWidth: 0, // Добавляем minWidth для правильной работы flex
   boxSizing: 'border-box',
-  overflow: 'auto'
+  overflow: 'auto',
+  position: 'relative',
+  isolation: 'isolate'
 };

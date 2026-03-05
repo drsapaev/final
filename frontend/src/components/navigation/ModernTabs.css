@@ -22,8 +22,7 @@
   margin-bottom: 0; /* плотное прилегание */
   background-color: var(--mac-bg-primary) !important;
   color: var(--mac-text-primary) !important;
-  /* Чёрная тонкая линия-рамка вокруг контейнера вкладок */
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.6) inset !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 12%) inset !important;
 }
 
 .tabs-container::-webkit-scrollbar {
@@ -176,21 +175,21 @@
 }
 
 .status-indicator.queue {
-  background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: var(--mac-warning-bg);
+  color: var(--mac-warning);
+  border: 1px solid var(--mac-warning-border);
 }
 
 .status-indicator.pending {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--mac-error-bg);
+  color: var(--mac-error);
+  border: 1px solid var(--mac-error-border);
 }
 
 .status-indicator.count {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: var(--mac-success-bg);
+  color: var(--mac-success);
+  border: 1px solid var(--mac-success-border);
   min-width: 20px;
 }
 
@@ -214,7 +213,7 @@
   width: 0;
   height: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--mac-text-primary), transparent 80%);
   transform: translate(-50%, -50%);
   animation: ripple 0.6s ease-out;
 }
@@ -246,53 +245,8 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--mac-text-secondary);
   opacity: 0.8;
-}
-
-/* Темная тема в стиле Edge */
-.modern-tabs.dark .tabs-container {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-.modern-tabs.dark .tab-button.all-departments:hover {
-  background: rgba(59, 130, 246, 0.1);
-  border-bottom-color: rgba(59, 130, 246, 0.5);
-}
-
-.modern-tabs.dark .tab-button.all-departments.active {
-  background: rgba(59, 130, 246, 0.15);
-  border-bottom-color: #3b82f6;
-}
-
-.modern-tabs.dark .tab-button.department:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.05);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modern-tabs.dark .tab-button.department.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--tab-color, #3b82f6);
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.modern-tabs.dark .status-indicator.queue {
-  background: rgba(245, 158, 11, 0.3);
-  border-color: rgba(245, 158, 11, 0.4);
-}
-
-.modern-tabs.dark .status-indicator.pending {
-  background: rgba(239, 68, 68, 0.3);
-  border-color: rgba(239, 68, 68, 0.4);
-}
-
-.modern-tabs.dark .status-indicator.count {
-  background: rgba(16, 185, 129, 0.3);
-  border-color: rgba(16, 185, 129, 0.4);
 }
 
 /* Адаптивные стили */

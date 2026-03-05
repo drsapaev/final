@@ -97,6 +97,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             or "/authentication/profile" in path_lower
             or "/authentication/status" in path_lower
             or "/authentication/sessions/current" in path_lower
+            or "/users/me/preferences" in path_lower
         ):
             return "session"
         else:

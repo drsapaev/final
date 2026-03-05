@@ -697,7 +697,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     borderRadius: 6,
                     border: '1px solid var(--mac-border)',
                     fontSize: 13,
-                    background: 'var(--mac-background-secondary)'
+                    background: 'var(--mac-bg-secondary)'
                   }} />
                 
                                 </div>
@@ -810,7 +810,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 position: 'sticky',
                 top: 0,
                 zIndex: 10,
-                background: 'var(--mac-background)',
+                background: 'var(--mac-bg-primary)',
                 borderBottom: '1px solid var(--mac-border)'
               }}>
                                         <input

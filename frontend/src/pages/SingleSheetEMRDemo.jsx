@@ -129,7 +129,7 @@ const SingleSheetEMRDemo = () => {
                     width: '350px',
                     padding: '16px',
                     overflow: 'auto',
-                    background: 'var(--mac-background, #ffffff)',
+                    background: 'var(--mac-bg-primary)',
                     borderLeft: '1px solid var(--mac-border, rgba(0,0,0,0.1))'
                 }}>
                     <div style={{

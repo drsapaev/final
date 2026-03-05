@@ -1,199 +1,134 @@
-/* 
- * КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ВИДИМОСТИ В ТЕМНОЙ ТЕМЕ
- * Этот файл исправляет проблемы с прозрачными фонами и слабыми границами
+/*
+ * Legacy dark visibility fixes.
+ * IMPORTANT: apply only to the classic dark scheme.
+ * Custom schemes (vibrant/glass/gradient) must keep their own palette.
  */
 
-/* Основные переменные для улучшенной видимости */
-:root[data-theme="dark"] {
-  /* Непрозрачные фоны вместо прозрачных */
+:root[data-theme="dark"][data-color-scheme="dark"],
+body[data-theme="dark"][data-color-scheme="dark"] {
   --dark-card-bg: #1e293b;
   --dark-panel-bg: #334155;
   --dark-modal-bg: #0f172a;
-  
-  /* Видимые границы */
   --dark-border: #475569;
   --dark-border-light: #64748b;
   --dark-border-strong: #94a3b8;
-  
-  /* Контрастный текст */
   --dark-text-primary: #f8fafc;
   --dark-text-secondary: #e2e8f0;
   --dark-text-muted: #cbd5e1;
-
-  /* Современный UI‑шрифт */
   --ui-font: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
 }
 
-/* БАЗОВЫЙ СОВРЕМЕННЫЙ СТИЛЬ ДЛЯ UI-ТЕКСТА И КНОПОК */
-[data-theme="dark"] body, 
-[data-theme="dark"] button, 
-[data-theme="dark"] input, 
-[data-theme="dark"] select, 
-[data-theme="dark"] textarea {
+[data-theme="dark"][data-color-scheme="dark"] body,
+[data-theme="dark"][data-color-scheme="dark"] button,
+[data-theme="dark"][data-color-scheme="dark"] input,
+[data-theme="dark"][data-color-scheme="dark"] select,
+[data-theme="dark"][data-color-scheme="dark"] textarea {
   font-family: var(--ui-font);
 }
 
-/* В тёмной теме делаем дефолтные не-градиентные кнопки контрастными */
-[data-theme="dark"] button:not([style*="linear-gradient"]) {
+/* Keep generic buttons readable in classic dark mode */
+[data-theme="dark"][data-color-scheme="dark"] button:not([style*="linear-gradient"]) {
   background-color: #374151;
   border-color: var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
 
-/* Улучшаем читаемость контента внутри кнопок */
-[data-theme="dark"] button * {
+[data-theme="dark"][data-color-scheme="dark"] button * {
   color: inherit !important;
 }
 
-/* ИСПРАВЛЕНИЕ 1: Замена всех прозрачных фонов */
-[data-theme="dark"] div[style*="rgba(15, 23, 42, 0.8)"],
-[data-theme="dark"] div[style*="rgba(15,23,42,0.8)"],
-[data-theme="dark"] .registrar-panel [style*="rgba(15, 23, 42, 0.8)"],
-[data-theme="dark"] .admin-panel [style*="rgba(15, 23, 42, 0.8)"] {
+/* Legacy inline style patching for classic dark mode only */
+[data-theme="dark"][data-color-scheme="dark"] div[style*="rgba(15, 23, 42, 0.8)"],
+[data-theme="dark"][data-color-scheme="dark"] div[style*="rgba(15,23,42,0.8)"],
+[data-theme="dark"][data-color-scheme="dark"] .registrar-panel [style*="rgba(15, 23, 42, 0.8)"],
+[data-theme="dark"][data-color-scheme="dark"] .admin-panel [style*="rgba(15, 23, 42, 0.8)"] {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
 }
 
-[data-theme="dark"] div[style*="rgba(255, 255, 255, 0.8)"],
-[data-theme="dark"] div[style*="rgba(255,255,255,0.8)"] {
+[data-theme="dark"][data-color-scheme="dark"] div[style*="rgba(255, 255, 255, 0.8)"],
+[data-theme="dark"][data-color-scheme="dark"] div[style*="rgba(255,255,255,0.8)"] {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 2: Замена слабых границ */
-[data-theme="dark"] [style*="rgba(255, 255, 255, 0.1)"],
-[data-theme="dark"] [style*="rgba(255,255,255,0.1)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.1)"],
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255,255,255,0.1)"] {
   border-color: var(--dark-border) !important;
 }
 
-[data-theme="dark"] [style*="rgba(255, 255, 255, 0.2)"],
-[data-theme="dark"] [style*="rgba(255,255,255,0.2)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.2)"],
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255,255,255,0.2)"] {
   border-color: var(--dark-border-light) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 3: Отключение backdrop-filter в темной теме */
-[data-theme="dark"] [style*="backdrop-filter: blur"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="backdrop-filter: blur"] {
   backdrop-filter: none !important;
 }
 
-/* ИСПРАВЛЕНИЕ 4: Специальные стили для панелей */
-[data-theme="dark"] .registrar-panel,
-[data-theme="dark"] .admin-panel,
-[data-theme="dark"] .analytics-panel {
+[data-theme="dark"][data-color-scheme="dark"] .registrar-panel,
+[data-theme="dark"][data-color-scheme="dark"] .admin-panel,
+[data-theme="dark"][data-color-scheme="dark"] .analytics-panel {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 5: Карточки и контейнеры */
-[data-theme="dark"] .card-container,
-[data-theme="dark"] .table-container,
-[data-theme="dark"] .modal-container {
+[data-theme="dark"][data-color-scheme="dark"] .card-container,
+[data-theme="dark"][data-color-scheme="dark"] .table-container,
+[data-theme="dark"][data-color-scheme="dark"] .modal-container {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 6: Таблицы */
-[data-theme="dark"] table,
-[data-theme="dark"] .table-wrapper,
-[data-theme="dark"] .data-table {
+[data-theme="dark"][data-color-scheme="dark"] table,
+[data-theme="dark"][data-color-scheme="dark"] .table-wrapper,
+[data-theme="dark"][data-color-scheme="dark"] .data-table {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
 }
 
-[data-theme="dark"] th,
-[data-theme="dark"] td {
+[data-theme="dark"][data-color-scheme="dark"] th,
+[data-theme="dark"][data-color-scheme="dark"] td {
   border-color: var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 7: Модальные окна */
-[data-theme="dark"] .modal,
-[data-theme="dark"] .dialog,
-[data-theme="dark"] .popup {
+[data-theme="dark"][data-color-scheme="dark"] .modal,
+[data-theme="dark"][data-color-scheme="dark"] .dialog,
+[data-theme="dark"][data-color-scheme="dark"] .popup {
   background: var(--dark-modal-bg) !important;
   border: 2px solid var(--dark-border-strong) !important;
   color: var(--dark-text-primary) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 8: Вкладки */
-[data-theme="dark"] .tabs,
-[data-theme="dark"] .tab-container {
-  background: var(--dark-panel-bg) !important;
-  border: 1px solid var(--dark-border) !important;
-}
-
-[data-theme="dark"] .tab-button {
-  background: transparent !important;
-  color: var(--dark-text-secondary) !important;
-  border: 1px solid var(--dark-border) !important;
-}
-
-[data-theme="dark"] .tab-button.active,
-[data-theme="dark"] .tab-button:hover {
-  background: var(--dark-card-bg) !important;
-  color: var(--dark-text-primary) !important;
-  border-color: var(--dark-border-light) !important;
-}
-
-/* ИСПРАВЛЕНИЕ 9: Формы */
-[data-theme="dark"] input,
-[data-theme="dark"] textarea,
-[data-theme="dark"] select {
+[data-theme="dark"][data-color-scheme="dark"] input,
+[data-theme="dark"][data-color-scheme="dark"] textarea,
+[data-theme="dark"][data-color-scheme="dark"] select {
   background: var(--dark-panel-bg) !important;
   border: 1px solid var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
 
-[data-theme="dark"] input:focus,
-[data-theme="dark"] textarea:focus,
-[data-theme="dark"] select:focus {
+[data-theme="dark"][data-color-scheme="dark"] input:focus,
+[data-theme="dark"][data-color-scheme="dark"] textarea:focus,
+[data-theme="dark"][data-color-scheme="dark"] select:focus {
   border-color: var(--dark-border-strong) !important;
   box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.3) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 10: Кнопки */
-[data-theme="dark"] .btn-secondary,
-[data-theme="dark"] .button-secondary {
+[data-theme="dark"][data-color-scheme="dark"] .btn-secondary,
+[data-theme="dark"][data-color-scheme="dark"] .button-secondary {
   background: var(--dark-panel-bg) !important;
   border: 1px solid var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
 
-[data-theme="dark"] .btn-secondary:hover,
-[data-theme="dark"] .button-secondary:hover {
+[data-theme="dark"][data-color-scheme="dark"] .btn-secondary:hover,
+[data-theme="dark"][data-color-scheme="dark"] .button-secondary:hover {
   background: var(--dark-card-bg) !important;
   border-color: var(--dark-border-light) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 11: Специфичные селекторы для inline стилей */
-[data-theme="dark"] div[style*="background: rgba(15, 23, 42, 0.8)"] {
-  background: var(--dark-card-bg) !important;
-}
-
-[data-theme="dark"] div[style*="background: rgba(255, 255, 255, 0.8)"] {
-  background: var(--dark-card-bg) !important;
-}
-
-[data-theme="dark"] div[style*="border: 1px solid rgba(255, 255, 255, 0.1)"] {
-  border: 1px solid var(--dark-border) !important;
-}
-
-[data-theme="dark"] div[style*="border: 1px solid rgba(255, 255, 255, 0.2)"] {
-  border: 1px solid var(--dark-border-light) !important;
-}
-
-/* ИСПРАВЛЕНИЕ 12: Принудительное исправление для всех элементов с проблемными стилями */
-[data-theme="dark"] * {
-  /* Исправляем любые элементы с очень низкой непрозрачностью */
-}
-
-[data-theme="dark"] *[style*="opacity: 0.1"],
-[data-theme="dark"] *[style*="opacity: 0.2"],
-[data-theme="dark"] *[style*="opacity: 0.3"] {
-  opacity: 0.8 !important;
-}
-
-/* ИСПРАВЛЕНИЕ 13: Дополнительные утилитарные классы */
 .dark-theme-visible {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
@@ -212,30 +147,18 @@
   color: var(--dark-text-primary) !important;
 }
 
-/* ИСПРАВЛЕНИЕ 14: Медиа-запросы для мобильных устройств */
-@media (max-width: 768px) {
-  [data-theme="dark"] .mobile-card,
-  [data-theme="dark"] .mobile-panel {
-    background: var(--dark-card-bg) !important;
-    border: 1px solid var(--dark-border) !important;
-  }
-}
-
-/* ИСКЛЮЧЕНИЯ: не вмешиваемся в стили хедера 2025, чтобы не ломать его типографику/контраст */
-[data-theme="dark"] .app-header-2025 button,
-[data-theme="dark"] .app-header-2025 select,
-[data-theme="dark"] .app-header-2025 input {
-  background: inherit;
-  border-color: inherit !important;
-  color: inherit !important;
-}
-
-/* ИСПРАВЛЕНИЕ 15: Анимации и переходы */
-[data-theme="dark"] .fade-in,
-[data-theme="dark"] .slide-in,
-[data-theme="dark"] .scale-in {
+[data-theme="dark"][data-color-scheme="dark"] .fade-in,
+[data-theme="dark"][data-color-scheme="dark"] .slide-in,
+[data-theme="dark"][data-color-scheme="dark"] .scale-in {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
 }
 
-/* ВАЖНО: Этот файл должен загружаться ПОСЛЕ всех остальных CSS файлов */
+/* Do not touch the 2025 header styles */
+[data-theme="dark"][data-color-scheme="dark"] .app-header-2025 button,
+[data-theme="dark"][data-color-scheme="dark"] .app-header-2025 select,
+[data-theme="dark"][data-color-scheme="dark"] .app-header-2025 input {
+  background: inherit;
+  border-color: inherit !important;
+  color: inherit !important;
+}

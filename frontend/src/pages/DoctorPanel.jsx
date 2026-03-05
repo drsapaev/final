@@ -151,6 +151,10 @@ const DoctorPanel = () => {
   const warningColor = getColor('warning', 500);
   const dangerColor = getColor('danger', 500);
   const accentColor = getColor('info', 500);
+  const interactiveSurface = 'var(--mac-nav-item-bg)';
+  const interactiveSurfaceHover = 'var(--mac-card-hover-bg)';
+  const panelSurface = 'var(--mac-card-bg)';
+  const panelBorder = 'var(--mac-card-border)';
   // Используем централизованные функции темизации вместо прямых designTokens
 
   // Загрузка данных
@@ -339,7 +343,7 @@ const DoctorPanel = () => {
     display: 'flex',
     alignItems: 'center',
     gap: getSpacing('sm'),
-    color: 'white',
+    color: 'var(--mac-text-on-accent)',
     fontSize: isMobile ? getFontSize('lg') : getFontSize('xl'),
     fontWeight: '700',
     textDecoration: 'none'
@@ -369,9 +373,9 @@ const DoctorPanel = () => {
   const tabStyle = {
     padding: isMobile ? `${getSpacing('sm')} ${getSpacing('md')}` : `${getSpacing('md')} ${getSpacing('lg')}`,
     borderRadius: '12px',
-    background: 'rgba(255, 255, 255, 0.8)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    color: getColor('secondary', 700),
+    background: interactiveSurface,
+    border: `1px solid ${panelBorder}`,
+    color: 'var(--mac-text-secondary)',
     fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
     fontWeight: '500',
     cursor: 'pointer',
@@ -387,8 +391,8 @@ const DoctorPanel = () => {
   const activeTabStyle = {
     ...tabStyle,
     background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
-    color: 'white',
-    boxShadow: `0 4px 14px 0 ${primaryColor}30`,
+    color: 'var(--mac-text-on-accent)',
+    boxShadow: '0 4px 14px 0 color-mix(in srgb, var(--mac-accent), transparent 70%)',
     transform: 'translateY(-2px)'
   };
 
@@ -400,12 +404,12 @@ const DoctorPanel = () => {
   };
 
   const statCardStyle = {
-    background: 'rgba(255, 255, 255, 0.9)',
+    background: panelSurface,
     borderRadius: '20px',
     padding: getSpacing('lg'),
     boxShadow: getShadow('lg'),
     backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
+    border: `1px solid ${panelBorder}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     cursor: 'pointer'
   };
@@ -416,18 +420,18 @@ const DoctorPanel = () => {
   };
 
   const patientsTableStyle = {
-    background: 'rgba(255, 255, 255, 0.9)',
+    background: panelSurface,
     borderRadius: '20px',
     overflow: 'hidden',
     boxShadow: getShadow('lg'),
     backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.2)'
+    border: `1px solid ${panelBorder}`
   };
 
   const tableHeaderStyle = {
-    background: `linear-gradient(135deg, ${getColor('secondary', 50)} 0%, ${getColor('secondary', 100)} 100%)`,
+    background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-bg-secondary), white 8%) 0%, color-mix(in srgb, var(--mac-bg-secondary), transparent 10%) 100%)',
     padding: getSpacing('lg'),
-    borderBottom: `1px solid ${getColor('secondary', 200)}`
+    borderBottom: '1px solid var(--mac-separator)'
   };
 
   const tableStyle = {
@@ -446,9 +450,9 @@ const DoctorPanel = () => {
 
   const tdStyle = {
     padding: getSpacing('md'),
-    borderBottom: `1px solid ${getColor('secondary', 100)}`,
+    borderBottom: '1px solid color-mix(in srgb, var(--mac-separator), transparent 30%)',
     fontSize: getFontSize('sm'),
-    color: getColor('secondary', 600)
+    color: 'var(--mac-text-secondary)'
   };
 
   const actionButtonStyle = {
@@ -524,6 +528,15 @@ const DoctorPanel = () => {
     return matchesSearch && matchesFilter;
   });
 
+  const handleInactiveTabHover = (event, isActive, hovered) => {
+    if (isActive) {
+      return;
+    }
+
+    event.currentTarget.style.background = hovered ? interactiveSurfaceHover : interactiveSurface;
+    event.currentTarget.style.transform = hovered ? 'translateY(-2px)' : 'translateY(0)';
+  };
+
   // Рендер
   return (
     <div style={pageStyle}>
@@ -535,18 +548,8 @@ const DoctorPanel = () => {
           <button
             style={activeTab === 'dashboard' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('dashboard')}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'dashboard') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'dashboard') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}>
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', false)}>
 
             <Activity size={isMobile ? 16 : 20} />
             {!isMobile && <span>Панель</span>}
@@ -555,18 +558,8 @@ const DoctorPanel = () => {
           <button
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('patients')}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'patients') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'patients') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}>
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'patients', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'patients', false)}>
 
             <User size={isMobile ? 16 : 20} />
             {!isMobile && <span>Пациенты</span>}
@@ -575,18 +568,8 @@ const DoctorPanel = () => {
           <button
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('appointments')}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'appointments') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'appointments') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}>
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'appointments', false)}>
 
             <Calendar size={isMobile ? 16 : 20} />
             {!isMobile && <span>Записи</span>}
@@ -596,18 +579,8 @@ const DoctorPanel = () => {
           <button
             style={activeTab === 'queue' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('queue')}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'queue') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'queue') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}>
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'queue', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'queue', false)}>
 
             <Users size={isMobile ? 16 : 20} />
             {!isMobile && <span>Очередь</span>}
@@ -621,18 +594,8 @@ const DoctorPanel = () => {
           <button
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('ai')}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'ai') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'ai') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}>
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'ai', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'ai', false)}>
 
             <Brain size={isMobile ? 16 : 20} />
             {!isMobile && <span>AI Помощник</span>}
@@ -641,18 +604,8 @@ const DoctorPanel = () => {
           <button
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('reports')}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'reports') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'reports') {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}>
+            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'reports', true)}
+            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'reports', false)}>
 
             <FileText size={isMobile ? 16 : 20} />
             {!isMobile && <span>Отчеты</span>}
@@ -685,7 +638,7 @@ const DoctorPanel = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'white'
+                      color: 'var(--mac-text-on-accent)'
                     }}>
                         <User size={24} />
                       </div>
@@ -721,7 +674,7 @@ const DoctorPanel = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'white'
+                      color: 'var(--mac-text-on-accent)'
                     }}>
                         <Calendar size={24} />
                       </div>
@@ -757,7 +710,7 @@ const DoctorPanel = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'white'
+                      color: 'var(--mac-text-on-accent)'
                     }}>
                         <Clock size={24} />
                       </div>
@@ -793,7 +746,7 @@ const DoctorPanel = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'white'
+                      color: 'var(--mac-text-on-accent)'
                     }}>
                         <CheckCircle size={24} />
                       </div>
@@ -948,7 +901,7 @@ const DoctorPanel = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: 'white',
+                          color: 'var(--mac-text-on-accent)',
                           fontSize: getFontSize('sm'),
                           fontWeight: '700'
                         }}>
@@ -1443,29 +1396,30 @@ const DoctorPanel = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'color-mix(in srgb, var(--mac-bg-primary), black 42%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999
       }}>
           <div style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--mac-card-bg)',
+          border: '1px solid var(--mac-card-border)',
           borderRadius: '12px',
           padding: '24px',
           width: '100%',
           maxWidth: '500px',
           margin: '16px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          boxShadow: 'var(--mac-shadow-xl)'
         }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0 }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
                 Информация о пациенте
               </h3>
               <button
               onClick={patientModal.closeModal}
               style={{
-                color: '#9CA3AF',
+                color: 'var(--mac-text-tertiary)',
                 cursor: 'pointer',
                 border: 'none',
                 background: 'none',
@@ -1483,21 +1437,21 @@ const DoctorPanel = () => {
                 width: '48px',
                 height: '48px',
                 borderRadius: '50%',
-                backgroundColor: '#3B82F6',
+                backgroundColor: 'var(--mac-accent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'white',
+                color: 'var(--mac-text-on-accent)',
                 fontSize: '18px',
                 fontWeight: '600'
               }}>
                   {patientModal.selectedItem.name?.charAt(0) || 'П'}
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
                     {patientModal.selectedItem.name || 'Неизвестно'}
                   </h4>
-                  <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>
+                  <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', margin: 0 }}>
                     {patientModal.selectedItem.phone || 'Телефон не указан'}
                   </p>
                 </div>
@@ -1505,18 +1459,18 @@ const DoctorPanel = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
-                  <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Возраст
                   </p>
-                  <p style={{ fontSize: '16px', color: '#111827', margin: 0, fontWeight: '500' }}>
+                  <p style={{ fontSize: '16px', color: 'var(--mac-text-primary)', margin: 0, fontWeight: '500' }}>
                     {patientModal.selectedItem.age || 'Не указан'}
                   </p>
                 </div>
                 <div>
-                  <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Статус
                   </p>
-                  <p style={{ fontSize: '16px', color: '#111827', margin: 0, fontWeight: '500' }}>
+                  <p style={{ fontSize: '16px', color: 'var(--mac-text-primary)', margin: 0, fontWeight: '500' }}>
                     {patientModal.selectedItem.status === 'active' ? 'Активный' :
                   patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
                   patientModal.selectedItem.status || 'Неизвестно'}
@@ -1530,10 +1484,10 @@ const DoctorPanel = () => {
               onClick={patientModal.closeModal}
               style={{
                 padding: '8px 16px',
-                border: '1px solid #D1D5DB',
+                border: '1px solid var(--mac-border)',
                 borderRadius: '6px',
-                backgroundColor: 'white',
-                color: '#374151',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
                 cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: '500'
@@ -1546,8 +1500,8 @@ const DoctorPanel = () => {
                 padding: '8px 16px',
                 border: 'none',
                 borderRadius: '6px',
-                backgroundColor: '#3B82F6',
-                color: 'white',
+                backgroundColor: 'var(--mac-accent)',
+                color: 'var(--mac-text-on-accent)',
                 cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: '500'

@@ -1,0 +1,2108 @@
+{
+  "App.jsx": [
+    "components/TelegramManager.jsx",
+    "components/admin/UserManagement.jsx",
+    "components/auth/LoginFormStyled.jsx",
+    "components/buttons/ButtonShowcase.jsx",
+    "components/files/FileManager.jsx",
+    "components/integration/IntegrationDemo.jsx",
+    "components/layout/HeaderNew.jsx",
+    "components/medical/EMRInterface.jsx",
+    "components/notifications/EmailSMSManager.jsx",
+    "components/pwa/index.js",
+    "components/security/TwoFactorManager.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "hooks/usePWA.js",
+    "pages/AdminPanel.jsx",
+    "pages/AnalyticsPage.jsx",
+    "pages/Appointments.jsx",
+    "pages/Audit.jsx",
+    "pages/CSSTestPage.jsx",
+    "pages/CardiologistPanelUnified.jsx",
+    "pages/CashierPanel.jsx",
+    "pages/DentistPanelUnified.jsx",
+    "pages/DermatologistPanelUnified.jsx",
+    "pages/DisplayBoardUnified.jsx",
+    "pages/DoctorPanel.jsx",
+    "pages/EMRDemo.jsx",
+    "pages/EMRv2Demo.jsx",
+    "pages/Health.jsx",
+    "pages/LabPanel.jsx",
+    "pages/Landing.jsx",
+    "pages/Login.jsx",
+    "pages/MacOSDemoPage.jsx",
+    "pages/MediLabDemo.jsx",
+    "pages/PatientPanel.jsx",
+    "pages/PatientPickupView.jsx",
+    "pages/PaymentCancel.jsx",
+    "pages/PaymentSuccess.jsx",
+    "pages/PaymentTest.jsx",
+    "pages/QueueJoin.jsx",
+    "pages/RegistrarPanel.jsx",
+    "pages/Scheduler.jsx",
+    "pages/Search.jsx",
+    "pages/SecurityPage.jsx",
+    "pages/Settings.jsx",
+    "pages/SingleSheetEMRDemo.jsx",
+    "pages/UserProfile.jsx",
+    "pages/UserSelect.jsx",
+    "pages/VisitDetails.jsx",
+    "pages/auth/ChangePasswordRequired.jsx",
+    "providers/AppProviders.jsx",
+    "stores/auth.js",
+    "styles/dark-theme-visibility-fix.css",
+    "styles/global-fixes.css",
+    "styles/macos.css",
+    "styles/theme.css",
+    "theme/colorScheme.js",
+    "theme/macos-tokens.css",
+    "theme/macosTheme.jsx",
+    "utils/logger.js"
+  ],
+  "api/adminSettings.js": [
+    "api/client.js"
+  ],
+  "api/client.js": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "api/endpoints.js": [],
+  "api/health.js": [
+    "api/client.js"
+  ],
+  "api/index.js": [
+    "api/adminSettings.js",
+    "api/client.js",
+    "api/endpoints.js",
+    "api/health.js",
+    "api/queue.js",
+    "api/services.js",
+    "api/setting.js",
+    "api/visits.js",
+    "api/ws.js"
+  ],
+  "api/interceptors.js": [
+    "api/client.js",
+    "utils/errorHandler.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "api/mcpClient.js": [
+    "services/auth.js",
+    "utils/logger.js"
+  ],
+  "api/messages.js": [
+    "api/client.js"
+  ],
+  "api/queue.js": [
+    "api/client.js"
+  ],
+  "api/services.js": [
+    "api/client.js",
+    "api/endpoints.js"
+  ],
+  "api/setting.js": [
+    "api/client.js"
+  ],
+  "api/visits.js": [
+    "api/client.js"
+  ],
+  "api/ws.js": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "assets/iconsMap.js": [],
+  "components/AnimatedLoader.jsx": [
+    "design-system/index.js"
+  ],
+  "components/AnimatedToast.jsx": [
+    "design-system/index.js"
+  ],
+  "components/AppointmentFlow.jsx": [
+    "components/ui/native/index.js",
+    "constants/appointmentStatus.js",
+    "utils/logger.js"
+  ],
+  "components/Icon.jsx": [
+    "assets/iconsMap.js",
+    "utils/logger.js"
+  ],
+  "components/PrescriptionSystem.jsx": [
+    "components/ui/native/index.js",
+    "constants/appointmentStatus.js",
+    "utils/logger.js"
+  ],
+  "components/QueueIntegration.jsx": [
+    "components/queue/ModernQueueManager.jsx"
+  ],
+  "components/RescheduleDialog.jsx": [
+    "api/visits.js"
+  ],
+  "components/RoleGate.jsx": [
+    "stores/auth.js"
+  ],
+  "components/ServiceChecklist.jsx": [],
+  "components/TelegramManager.jsx": [
+    "components/ui/macos/List.jsx",
+    "components/ui/macos/Table.jsx",
+    "components/ui/macos/index.js",
+    "utils/tokenManager.js"
+  ],
+  "components/TwoFactorVerify.jsx": [
+    "api/client.js"
+  ],
+  "components/VisitTimeline.jsx": [
+    "components/ui/native/index.js",
+    "constants/appointmentStatus.js"
+  ],
+  "components/activation/AppActivation.jsx": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/admin/AISettings.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ActivationSystem.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/admin/AllFreeApproval.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/admin/AnalyticsDashboard.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/admin/AppointmentModal.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/BackupManagement.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/BenefitSettings.jsx": [
+    "api/adminSettings.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/BillingManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/BranchManagement.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ClinicManagement.jsx": [
+    "api/client.js",
+    "components/admin/BackupManagement.jsx",
+    "components/admin/BranchManagement.jsx",
+    "components/admin/ClinicSettings.jsx",
+    "components/admin/EquipmentManagement.jsx",
+    "components/admin/LicenseManagement.jsx",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ClinicSettings.jsx": [
+    "api/adminSettings.js",
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/CloudPrintingManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ColorSchemeSelector.jsx": [
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "theme/colorScheme.js",
+    "theme/macosTheme.jsx"
+  ],
+  "components/admin/DiscountBenefitsManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/DisplayBoardSettings.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/admin/DoctorModal.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/DynamicPricingManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/EmptyState.jsx": [
+    "components/ui/native/index.js"
+  ],
+  "components/admin/EquipmentManagement.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ErrorBoundary.jsx": [
+    "components/ui/native/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/FCMManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/FinanceModal.jsx": [
+    "components/ui/native/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/GraphQLExplorer.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/admin/GroupPermissionsManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/HelpTooltip.jsx": [
+    "components/ui/native/index.js"
+  ],
+  "components/admin/LicenseManagement.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/MedicalEquipmentManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/MobileOptimization.jsx": [
+    "components/ui/native/index.js"
+  ],
+  "components/admin/PatientModal.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/PaymentProviderSettings.jsx": [
+    "api/adminSettings.js",
+    "components/ui/macos/index.js",
+    "hooks/useAsyncAction.js"
+  ],
+  "components/admin/PhoneVerificationManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/QueueLimitsManager.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/admin/QueueProfilesManager.jsx": [
+    "services/api.js",
+    "utils/logger.js"
+  ],
+  "components/admin/QueueSettings.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/RegistrarNotificationManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ReportGenerator.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/admin/ReportsManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "components/ui/native/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/SecuritySettings.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/ServiceCatalog.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/serviceCodeUtils.js"
+  ],
+  "components/admin/SystemManagement.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/TelegramBotManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/TelegramSettings.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/admin/UnifiedAITools.jsx": [
+    "components/ai/DrugInteractionChecker.jsx",
+    "components/ai/MedicalImageAnalyzer.jsx",
+    "components/ai/QualityControl.jsx",
+    "components/ai/RiskAssessment.jsx",
+    "components/ai/SmartScheduling.jsx",
+    "components/ai/TreatmentRecommendations.jsx",
+    "components/ai/VoiceToText.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/admin/UnifiedFinance.jsx": [
+    "components/admin/BillingManager.jsx",
+    "components/admin/DiscountBenefitsManager.jsx",
+    "components/admin/DynamicPricingManager.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/admin/UnifiedNotifications.jsx": [
+    "components/admin/FCMManager.jsx",
+    "components/admin/RegistrarNotificationManager.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/admin/UnifiedReports.jsx": [
+    "components/admin/ReportGenerator.jsx",
+    "components/admin/ReportsManager.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/admin/UnifiedSettings.jsx": [
+    "components/admin/AISettings.jsx",
+    "components/admin/BenefitSettings.jsx",
+    "components/admin/ClinicSettings.jsx",
+    "components/admin/ColorSchemeSelector.jsx",
+    "components/admin/DisplayBoardSettings.jsx",
+    "components/admin/PaymentProviderSettings.jsx",
+    "components/admin/QueueLimitsManager.jsx",
+    "components/admin/QueueSettings.jsx",
+    "components/admin/SecuritySettings.jsx",
+    "components/admin/WizardSettings.jsx",
+    "components/ui/macos/AccentPicker.jsx",
+    "utils/logger.js"
+  ],
+  "components/admin/UnifiedTelegramManagement.jsx": [
+    "components/admin/TelegramBotManager.jsx",
+    "components/admin/TelegramSettings.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/admin/UnifiedUserManagement.jsx": [
+    "components/admin/GroupPermissionsManager.jsx",
+    "components/admin/UserDataTransferManager.jsx",
+    "components/admin/UserExportManager.jsx",
+    "components/admin/UserManagement.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/admin/UserDataTransferManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/UserExportManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/UserManagement.jsx": [
+    "api/client.js",
+    "components/admin/UserModal.jsx",
+    "components/ui/macos/index.js",
+    "hooks/useRoles.js",
+    "utils/logger.js"
+  ],
+  "components/admin/UserModal.jsx": [
+    "components/ui/macos/MacOSButton.jsx",
+    "components/ui/macos/MacOSCheckbox.jsx",
+    "components/ui/macos/MacOSInput.jsx",
+    "components/ui/macos/MacOSModal.jsx",
+    "components/ui/macos/MacOSSelect.jsx",
+    "hooks/useRoles.js",
+    "utils/logger.js"
+  ],
+  "components/admin/WebhookManager.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/admin/WizardSettings.jsx": [
+    "api/adminSettings.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/ai/AIAssistant.jsx": [
+    "api/client.js",
+    "api/mcpClient.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/sanitizer.js"
+  ],
+  "components/ai/AIButton.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/ai/AIChatWidget.css": [],
+  "components/ai/AIChatWidget.jsx": [
+    "components/ai/AIChatWidget.css",
+    "hooks/useAIChat.js"
+  ],
+  "components/ai/AIClinicalText.jsx": [
+    "components/ui/macos/List.jsx",
+    "components/ui/macos/index.js"
+  ],
+  "components/ai/AILoader.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/ai/AISuggestions.jsx": [
+    "components/ai/AIClinicalText.jsx",
+    "components/ui/macos/index.js"
+  ],
+  "components/ai/AnalyticsInsights.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/DrugInteractionChecker.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/MedicalImageAnalyzer.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/QualityControl.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/RiskAssessment.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/SmartScheduling.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/TreatmentRecommendations.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/VoiceToText.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/ai/index.js": [
+    "components/ai/AIAssistant.jsx",
+    "components/ai/AIButton.jsx",
+    "components/ai/AILoader.jsx",
+    "components/ai/AISuggestions.jsx"
+  ],
+  "components/analytics/AIAnalytics.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/analytics/AdvancedCharts.jsx": [
+    "components/ui/native/index.js"
+  ],
+  "components/analytics/KPIMetrics.jsx": [
+    "components/ui/native/index.js"
+  ],
+  "components/analytics/PredictiveAnalytics.jsx": [
+    "components/ui/native/index.js"
+  ],
+  "components/analytics/WaitTimeAnalytics.jsx": [
+    "components/ui/macos/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/auth/ForgotPassword.jsx": [
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/auth/LoginFormStyled.jsx": [
+    "api/client.js",
+    "components/TwoFactorVerify.jsx",
+    "components/auth/ForgotPassword.jsx",
+    "components/ui/macos/index.js",
+    "constants/routes.js",
+    "contexts/ThemeContext.jsx",
+    "stores/auth.js",
+    "theme/tokens.js",
+    "utils/logger.js"
+  ],
+  "components/auth/PhoneVerification.jsx": [
+    "components/ui/native/index.js",
+    "utils/api.js",
+    "utils/logger.js"
+  ],
+  "components/buttons/ButtonGroup.css": [],
+  "components/buttons/ButtonGroup.jsx": [
+    "components/buttons/ButtonGroup.css",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/buttons/ButtonShowcase.jsx": [
+    "components/buttons/index.js"
+  ],
+  "components/buttons/FloatingActionButton.css": [],
+  "components/buttons/FloatingActionButton.jsx": [
+    "components/buttons/FloatingActionButton.css",
+    "components/buttons/ModernButton.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/buttons/IconButton.css": [],
+  "components/buttons/IconButton.jsx": [
+    "components/buttons/IconButton.css",
+    "components/buttons/ModernButton.jsx"
+  ],
+  "components/buttons/MedicalButton.css": [],
+  "components/buttons/MedicalButton.jsx": [
+    "components/buttons/MedicalButton.css",
+    "components/buttons/ModernButton.jsx"
+  ],
+  "components/buttons/ModernButton.css": [],
+  "components/buttons/ModernButton.jsx": [
+    "components/buttons/ModernButton.css",
+    "contexts/ThemeContext.jsx",
+    "theme/tokens.js"
+  ],
+  "components/buttons/index.js": [
+    "components/buttons/ButtonGroup.jsx",
+    "components/buttons/FloatingActionButton.jsx",
+    "components/buttons/IconButton.jsx",
+    "components/buttons/MedicalButton.jsx",
+    "components/buttons/ModernButton.jsx"
+  ],
+  "components/cardiology/ECGParser.jsx": [
+    "utils/logger.js"
+  ],
+  "components/cardiology/ECGViewer.jsx": [
+    "api/client.js",
+    "components/cardiology/ECGParser.jsx",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/cardiology/EchoForm.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/cashier/RefundRequestsTable.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/chat/Chat.css": [],
+  "components/chat/ChatButton.jsx": [
+    "components/chat/ChatWindow.jsx",
+    "hooks/useChat.js"
+  ],
+  "components/chat/ChatWindow.jsx": [
+    "components/chat/Chat.css",
+    "components/chat/EmojiPicker.jsx",
+    "components/chat/FileUploader.jsx",
+    "components/chat/LinkPreview.jsx",
+    "components/chat/MessageContextMenu.jsx",
+    "components/chat/VoiceMessage.jsx",
+    "components/chat/VoiceRecorder.jsx",
+    "components/common/Avatar.jsx",
+    "components/common/Toast.jsx",
+    "hooks/useChat.js",
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "components/chat/EmojiPicker.jsx": [],
+  "components/chat/FileUploader.css": [],
+  "components/chat/FileUploader.jsx": [
+    "components/chat/FileUploader.css"
+  ],
+  "components/chat/LinkPreview.css": [],
+  "components/chat/LinkPreview.jsx": [
+    "components/chat/LinkPreview.css",
+    "utils/logger.js"
+  ],
+  "components/chat/MessageContextMenu.css": [],
+  "components/chat/MessageContextMenu.jsx": [
+    "components/chat/MessageContextMenu.css"
+  ],
+  "components/chat/NotificationPrompt.jsx": [
+    "services/pushNotifications.js",
+    "utils/logger.js"
+  ],
+  "components/chat/VoiceMessage.jsx": [
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "components/chat/VoiceRecorder.jsx": [
+    "utils/logger.js"
+  ],
+  "components/common/Avatar.css": [],
+  "components/common/Avatar.jsx": [
+    "components/common/Avatar.css"
+  ],
+  "components/common/EditPatientModal.jsx": [
+    "utils/logger.js"
+  ],
+  "components/common/ErrorBoundary.jsx": [
+    "components/ui/native/index.js",
+    "utils/logger.js"
+  ],
+  "components/common/Form.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/common/Modal.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/common/RoleGuard.jsx": [
+    "constants/routes.js",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/common/ScheduleNextModal.jsx": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/common/Toast.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/dental/DentalPriceManager.jsx": [
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/dental/DiagnosisForm.jsx": [
+    "utils/logger.js"
+  ],
+  "components/dental/ExaminationForm.jsx": [
+    "utils/logger.js"
+  ],
+  "components/dental/PatientCard.jsx": [
+    "utils/logger.js"
+  ],
+  "components/dental/PhotoArchive.jsx": [
+    "utils/logger.js"
+  ],
+  "components/dental/ProtocolTemplates.jsx": [],
+  "components/dental/ReportsAndAnalytics.jsx": [],
+  "components/dental/TeethChart.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/dental/ToothModal.jsx": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "components/dental/TreatmentPlanner.jsx": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "components/dental/VisitProtocol.jsx": [
+    "utils/logger.js"
+  ],
+  "components/dermatology/PhotoComparison.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/dermatology/PhotoUploader.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/dermatology/PriceOverrideManager.jsx": [
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/dermatology/ProcedureTemplates.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/dermatology/SkinAnalysis.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/dialogs/CancelDialog.jsx": [
+    "components/dialogs/ModernDialog.jsx",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/dialogs/ModernDialog.css": [],
+  "components/dialogs/ModernDialog.jsx": [
+    "components/dialogs/ModernDialog.css",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/dialogs/PaymentDialog.jsx": [
+    "components/dialogs/ModernDialog.jsx",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/dialogs/PrintDialog.jsx": [
+    "components/dialogs/ModernDialog.jsx",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/doctor/DoctorServiceSelector.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/emr-v2/DoctorTemplatesPanel.css": [],
+  "components/emr-v2/DoctorTemplatesPanel.jsx": [
+    "components/emr-v2/DoctorTemplatesPanel.css",
+    "hooks/useDoctorSectionTemplates.js"
+  ],
+  "components/emr-v2/EMRConflictDialog.css": [],
+  "components/emr-v2/EMRConflictDialog.jsx": [
+    "components/emr-v2/EMRConflictDialog.css"
+  ],
+  "components/emr-v2/EMRContainer.css": [],
+  "components/emr-v2/EMRContainer.jsx": [
+    "components/emr-v2/EMRContainer.css",
+    "hooks/useEMR.js",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/EMRContainerV2.css": [],
+  "components/emr-v2/EMRContainerV2.jsx": [
+    "api/mcpClient.js",
+    "components/emr-v2/EMRConflictDialog.jsx",
+    "components/emr-v2/EMRContainerV2.css",
+    "components/emr-v2/EMRDiffViewer.jsx",
+    "components/emr-v2/EMRHelpDialog.jsx",
+    "components/emr-v2/EMRHistoryPanel.jsx",
+    "components/emr-v2/EMRStatusIndicator.jsx",
+    "components/emr-v2/sections/index.js",
+    "components/emr-v2/sections/specialty/index.js",
+    "contexts/AppDataContext.jsx",
+    "core/cache/index.js",
+    "core/debouncePolicy.js",
+    "hooks/useDebouncedCallback.js",
+    "hooks/useEMR.js",
+    "hooks/useEMRAutosave.js",
+    "hooks/useEMRKeyboard.js",
+    "hooks/useNavigationGuard.js",
+    "hooks/useVisitLifecycle.js"
+  ],
+  "components/emr-v2/EMRDiffViewer.css": [],
+  "components/emr-v2/EMRDiffViewer.jsx": [
+    "api/client.js",
+    "components/emr-v2/EMRDiffViewer.css",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/EMRHelpDialog.jsx": [],
+  "components/emr-v2/EMRHistoryPanel.css": [],
+  "components/emr-v2/EMRHistoryPanel.jsx": [
+    "api/client.js",
+    "components/emr-v2/EMRHistoryPanel.css",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/EMRStatusIndicator.css": [],
+  "components/emr-v2/EMRStatusIndicator.jsx": [
+    "components/emr-v2/EMRStatusIndicator.css"
+  ],
+  "components/emr-v2/ai/AISuggestionCard.css": [],
+  "components/emr-v2/ai/AISuggestionCard.jsx": [
+    "components/emr-v2/ai/AISuggestionCard.css"
+  ],
+  "components/emr-v2/ai/AISuggestionPanel.css": [],
+  "components/emr-v2/ai/AISuggestionPanel.jsx": [
+    "components/emr-v2/ai/AISuggestionCard.jsx",
+    "components/emr-v2/ai/AISuggestionPanel.css"
+  ],
+  "components/emr-v2/ai/AISuggestionPopover.css": [],
+  "components/emr-v2/ai/AISuggestionPopover.jsx": [
+    "components/emr-v2/ai/AISuggestionPopover.css"
+  ],
+  "components/emr-v2/ai/CompletenessChecker.css": [],
+  "components/emr-v2/ai/CompletenessChecker.jsx": [
+    "components/emr-v2/ai/CompletenessChecker.css"
+  ],
+  "components/emr-v2/ai/PhraseSuggestions.css": [],
+  "components/emr-v2/ai/PhraseSuggestions.jsx": [
+    "components/emr-v2/ai/PhraseSuggestions.css"
+  ],
+  "components/emr-v2/ai/SmartAssistButton.css": [],
+  "components/emr-v2/ai/SmartAssistButton.jsx": [
+    "components/emr-v2/ai/SmartAssistButton.css"
+  ],
+  "components/emr-v2/ai/index.js": [
+    "components/emr-v2/ai/AISuggestionCard.jsx",
+    "components/emr-v2/ai/AISuggestionPanel.jsx",
+    "components/emr-v2/ai/AISuggestionPopover.jsx",
+    "components/emr-v2/ai/CompletenessChecker.jsx",
+    "components/emr-v2/ai/PhraseSuggestions.jsx",
+    "components/emr-v2/ai/SmartAssistButton.jsx",
+    "components/emr-v2/ai/useEMRAI.js"
+  ],
+  "components/emr-v2/ai/useEMRAI.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/index.js": [
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/EMRConflictDialog.jsx",
+    "components/emr-v2/EMRContainer.jsx",
+    "components/emr-v2/EMRContainerV2.jsx",
+    "components/emr-v2/EMRDiffViewer.jsx",
+    "components/emr-v2/EMRHistoryPanel.jsx",
+    "components/emr-v2/EMRStatusIndicator.jsx",
+    "components/emr-v2/ai/index.js",
+    "components/emr-v2/sections/index.js",
+    "components/emr-v2/templates/index.js",
+    "hooks/useDoctorHistory.js",
+    "hooks/useEMR.js",
+    "hooks/useEMRAutosave.js",
+    "hooks/useEMRKeyboard.js",
+    "hooks/useEMRTelemetry.js",
+    "hooks/useEMRVersion.js",
+    "hooks/useNavigationGuard.js",
+    "reducers/emrReducer.js"
+  ],
+  "components/emr-v2/sections/AnamnesisMorbiSection.jsx": [
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.jsx",
+    "hooks/useDoctorPhrases.js",
+    "hooks/useDoctorSectionTemplates.js"
+  ],
+  "components/emr-v2/sections/AnamnesisVitaeSection.jsx": [
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "components/emr/VitalsWidget.jsx",
+    "hooks/useDoctorSectionTemplates.js"
+  ],
+  "components/emr-v2/sections/ComplaintsSection.jsx": [
+    "api/client.js",
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr/ComplaintsField.jsx",
+    "hooks/useDoctorSectionTemplates.js",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/sections/DiagnosisSection.css": [],
+  "components/emr-v2/sections/DiagnosisSection.jsx": [
+    "components/emr-v2/sections/DiagnosisSection.css",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "hooks/useDoctorPhrases.js"
+  ],
+  "components/emr-v2/sections/EMRSection.css": [],
+  "components/emr-v2/sections/EMRSection.jsx": [
+    "components/emr-v2/sections/EMRSection.css"
+  ],
+  "components/emr-v2/sections/EMRSmartFieldV2.css": [],
+  "components/emr-v2/sections/EMRSmartFieldV2.jsx": [
+    "components/emr-v2/ai/AISuggestionPopover.jsx",
+    "components/emr-v2/ai/SmartAssistButton.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.css"
+  ],
+  "components/emr-v2/sections/EMRTextField.css": [],
+  "components/emr-v2/sections/EMRTextField.jsx": [
+    "components/emr-v2/sections/EMRTextField.css"
+  ],
+  "components/emr-v2/sections/ExaminationSection.jsx": [
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.jsx",
+    "components/emr/ExaminationMatrix.jsx",
+    "hooks/useDoctorPhrases.js",
+    "hooks/useDoctorSectionTemplates.js",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/sections/NotesSection.jsx": [
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "hooks/useDoctorSectionTemplates.js"
+  ],
+  "components/emr-v2/sections/RecommendationsSection.jsx": [
+    "components/emr-v2/DoctorTemplatesPanel.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "hooks/useDoctorSectionTemplates.js"
+  ],
+  "components/emr-v2/sections/TreatmentSection.jsx": [
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.jsx",
+    "components/emr-v2/templates/index.js",
+    "components/emr/PrescriptionEditor.jsx",
+    "hooks/useDoctorPhrases.js",
+    "hooks/useDoctorTreatmentTemplates.js",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/sections/index.js": [
+    "components/emr-v2/sections/AnamnesisMorbiSection.jsx",
+    "components/emr-v2/sections/AnamnesisVitaeSection.jsx",
+    "components/emr-v2/sections/ComplaintsSection.jsx",
+    "components/emr-v2/sections/DiagnosisSection.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "components/emr-v2/sections/ExaminationSection.jsx",
+    "components/emr-v2/sections/NotesSection.jsx",
+    "components/emr-v2/sections/RecommendationsSection.jsx",
+    "components/emr-v2/sections/TreatmentSection.jsx"
+  ],
+  "components/emr-v2/sections/specialty/CardiologySection.css": [],
+  "components/emr-v2/sections/specialty/CardiologySection.jsx": [
+    "components/cardiology/ECGViewer.jsx",
+    "components/cardiology/EchoForm.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "components/emr-v2/sections/specialty/CardiologySection.css",
+    "contexts/AppDataContext.jsx"
+  ],
+  "components/emr-v2/sections/specialty/DentistrySection.css": [],
+  "components/emr-v2/sections/specialty/DentistrySection.jsx": [
+    "components/dental/TeethChart.jsx",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRTextField.jsx",
+    "components/emr-v2/sections/specialty/DentistrySection.css"
+  ],
+  "components/emr-v2/sections/specialty/DermatologySection.css": [],
+  "components/emr-v2/sections/specialty/DermatologySection.jsx": [
+    "components/emr-v2/ai/useEMRAI.js",
+    "components/emr-v2/sections/EMRSection.jsx",
+    "components/emr-v2/sections/EMRSmartFieldV2.jsx",
+    "components/emr-v2/sections/specialty/DermatologySection.css",
+    "constants/ai.js",
+    "utils/logger.js"
+  ],
+  "components/emr-v2/sections/specialty/index.js": [
+    "components/emr-v2/sections/specialty/CardiologySection.jsx",
+    "components/emr-v2/sections/specialty/DentistrySection.jsx",
+    "components/emr-v2/sections/specialty/DermatologySection.jsx"
+  ],
+  "components/emr-v2/templates/TreatmentTemplatesPanel.css": [],
+  "components/emr-v2/templates/TreatmentTemplatesPanel.jsx": [
+    "components/emr-v2/templates/TreatmentTemplatesPanel.css",
+    "data/treatmentTemplates.json"
+  ],
+  "components/emr-v2/templates/index.js": [
+    "components/emr-v2/templates/TreatmentTemplatesPanel.jsx"
+  ],
+  "components/emr/ComplaintsField.css": [],
+  "components/emr/ComplaintsField.jsx": [
+    "components/emr/ComplaintsField.css",
+    "utils/logger.js"
+  ],
+  "components/emr/EMRSmartField.css": [],
+  "components/emr/EMRSmartField.jsx": [
+    "components/emr/EMRSmartField.css",
+    "hooks/useDoctorPhrases.js",
+    "utils/logger.js"
+  ],
+  "components/emr/EMRTextField.css": [],
+  "components/emr/EMRTextField.jsx": [
+    "components/emr/EMRTextField.css",
+    "utils/logger.js"
+  ],
+  "components/emr/ExaminationMatrix.css": [],
+  "components/emr/ExaminationMatrix.jsx": [
+    "components/emr/ExaminationMatrix.css"
+  ],
+  "components/emr/ICD10Autocomplete.css": [],
+  "components/emr/ICD10Autocomplete.jsx": [
+    "components/emr/ICD10Autocomplete.css"
+  ],
+  "components/emr/PrescriptionEditor.css": [],
+  "components/emr/PrescriptionEditor.jsx": [
+    "components/emr/PrescriptionEditor.css"
+  ],
+  "components/emr/SingleSheetEMR.css": [],
+  "components/emr/SingleSheetEMR.jsx": [
+    "components/emr/ComplaintsField.jsx",
+    "components/emr/EMRTextField.jsx",
+    "components/emr/ExaminationMatrix.jsx",
+    "components/emr/ICD10Autocomplete.jsx",
+    "components/emr/PrescriptionEditor.jsx",
+    "components/emr/SingleSheetEMR.css",
+    "components/emr/TreatmentTemplates.jsx",
+    "hooks/useEMRAI.js",
+    "hooks/useUserPreferences.js",
+    "utils/logger.js"
+  ],
+  "components/emr/TreatmentTemplates.css": [],
+  "components/emr/TreatmentTemplates.jsx": [
+    "components/emr/TreatmentTemplates.css"
+  ],
+  "components/emr/VitalsWidget.css": [],
+  "components/emr/VitalsWidget.jsx": [
+    "components/emr/VitalsWidget.css"
+  ],
+  "components/emr/index.js": [
+    "components/emr/ComplaintsField.jsx",
+    "components/emr/EMRSmartField.jsx",
+    "components/emr/EMRTextField.jsx",
+    "components/emr/ICD10Autocomplete.jsx",
+    "components/emr/SingleSheetEMR.jsx",
+    "components/emr/TreatmentTemplates.jsx"
+  ],
+  "components/examples/MacOSDemo.jsx": [
+    "components/ui/macos/AccentPicker.jsx",
+    "components/ui/macos/index.js"
+  ],
+  "components/files/FileManager.jsx": [
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/integration/IntegrationDemo.jsx": [
+    "components/ui/native/index.js",
+    "contexts/AppDataContext.jsx",
+    "hooks/useEMRAI.js",
+    "hooks/useQueueManager.js"
+  ],
+  "components/laboratory/LabReportGenerator.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/laboratory/LabResultsManager.jsx": [
+    "api/client.js",
+    "components/ai/index.js",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "components/layout/HeaderNew.jsx": [
+    "components/chat/ChatButton.jsx",
+    "components/pwa/CompactConnectionStatus.jsx",
+    "components/search/GlobalSearchBar.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "stores/auth.js",
+    "theme/colorScheme.js",
+    "utils/logger.js"
+  ],
+  "components/layout/Nav.jsx": [
+    "components/RoleGate.jsx",
+    "contexts/ThemeContext.jsx",
+    "stores/auth.js"
+  ],
+  "components/layout/UnifiedLayout.jsx": [
+    "components/layout/UnifiedSidebar.jsx",
+    "contexts/ThemeContext.jsx",
+    "styles/unified-sidebar.css"
+  ],
+  "components/layout/UnifiedSidebar.jsx": [
+    "components/Icon.jsx",
+    "contexts/ThemeContext.jsx",
+    "stores/auth.js",
+    "styles/cursor-effects.css",
+    "styles/sidebar-buttons.css",
+    "utils/logger.js"
+  ],
+  "components/medical/EMRInterface.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/medical/EMRSystem.jsx": [
+    "components/ai/index.js",
+    "components/dental/TeethChart.jsx",
+    "components/ui/macos/index.js",
+    "constants/ai.js",
+    "constants/appointmentStatus.js",
+    "hooks/useBlobURL.js",
+    "hooks/useEMRAI.js",
+    "utils/debounce.js",
+    "utils/fileValidator.js",
+    "utils/logger.js"
+  ],
+  "components/medical/MedicalCard.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/medical/MedicalTable.jsx": [
+    "components/Icon.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/medical/MetricCard.jsx": [
+    "components/Icon.jsx",
+    "components/medical/MedicalCard.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/medical/PatientCard.jsx": [
+    "components/Icon.jsx",
+    "components/medical/MedicalCard.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/medical/index.js": [
+    "components/medical/EMRInterface.jsx",
+    "components/medical/EMRSystem.jsx",
+    "components/medical/MedicalCard.jsx",
+    "components/medical/MedicalTable.jsx",
+    "components/medical/MetricCard.jsx",
+    "components/medical/PatientCard.jsx"
+  ],
+  "components/navigation/ModernTabs.css": [],
+  "components/navigation/ModernTabs.jsx": [
+    "api/client.js",
+    "components/navigation/ModernTabs.css",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/notifications/EmailSMSManager.jsx": [
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/patient/FamilyRelationsCard.jsx": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "components/payment/CashPaymentModal.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/payment/PaymentClick.css": [],
+  "components/payment/PaymentClick.jsx": [
+    "components/dialogs/ModernDialog.jsx",
+    "components/payment/PaymentClick.css",
+    "components/tickets/MultipleTicketsPrinter.jsx",
+    "hooks/useAsyncAction.js",
+    "utils/logger.js"
+  ],
+  "components/payment/PaymentManager.css": [],
+  "components/payment/PaymentManager.jsx": [
+    "components/payment/PaymentClick.jsx",
+    "components/payment/PaymentManager.css",
+    "components/payment/PaymentPayMe.jsx",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/payment/PaymentPayMe.css": [],
+  "components/payment/PaymentPayMe.jsx": [
+    "components/dialogs/ModernDialog.jsx",
+    "components/payment/PaymentPayMe.css",
+    "components/tickets/MultipleTicketsPrinter.jsx",
+    "hooks/useAsyncAction.js",
+    "utils/logger.js"
+  ],
+  "components/payment/PaymentWidget.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "components/pwa/CompactConnectionStatus.jsx": [
+    "hooks/usePWA.js"
+  ],
+  "components/pwa/ConnectionStatus.jsx": [
+    "hooks/usePWA.js"
+  ],
+  "components/pwa/PWAInstallPrompt.jsx": [
+    "hooks/usePWA.js",
+    "utils/logger.js"
+  ],
+  "components/pwa/index.js": [
+    "components/pwa/ConnectionStatus.jsx",
+    "components/pwa/PWAInstallPrompt.jsx"
+  ],
+  "components/queue/ModernQueueManager.css": [],
+  "components/queue/ModernQueueManager.jsx": [
+    "components/dialogs/ModernDialog.jsx",
+    "components/queue/ModernQueueManager.css",
+    "components/queue/QueueTable.jsx",
+    "components/ui/macos/index.js",
+    "hooks/useQueueManager.js",
+    "utils/dateUtils.js",
+    "utils/logger.js"
+  ],
+  "components/queue/QueueManagementCard.jsx": [
+    "services/api.js",
+    "utils/logger.js"
+  ],
+  "components/queue/QueueTable.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "components/registrar/ForceMajeureModal.jsx": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/search/GlobalSearchBar.jsx": [
+    "api/index.js",
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "components/security/SMSEmail2FA.jsx": [
+    "components/ui/native/index.js",
+    "utils/tokenManager.js"
+  ],
+  "components/security/TwoFactorManager.jsx": [
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "components/security/TwoFactorSetupWizard.jsx": [
+    "components/ui/native/index.js",
+    "utils/tokenManager.js"
+  ],
+  "components/settings/NotificationPreferences.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "components/settings/NotificationSystemStatus.jsx": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "components/statistics/ModernStatistics.jsx": [
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/tables/AppointmentContextMenu.jsx": [],
+  "components/tables/EnhancedAppointmentsTable.css": [],
+  "components/tables/EnhancedAppointmentsTable.jsx": [
+    "components/queue/QueueManagementCard.jsx",
+    "components/tables/EnhancedAppointmentsTable.css",
+    "components/ui/macos/index.js",
+    "utils/logger.js",
+    "utils/serviceCodeResolver.js"
+  ],
+  "components/tickets/MultipleTicketsPrinter.css": [],
+  "components/tickets/MultipleTicketsPrinter.jsx": [
+    "components/tickets/MultipleTicketsPrinter.css"
+  ],
+  "components/ui/PhoneInput.jsx": [],
+  "components/ui/animations.css": [],
+  "components/ui/index.js": [
+    "components/AnimatedLoader.jsx",
+    "components/AnimatedToast.jsx",
+    "components/ui/PhoneInput.jsx",
+    "components/ui/native/index.js"
+  ],
+  "components/ui/macos/AccentPicker.jsx": [
+    "theme/macosTheme.jsx"
+  ],
+  "components/ui/macos/Alert.jsx": [],
+  "components/ui/macos/Avatar.jsx": [],
+  "components/ui/macos/Badge.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Box.jsx": [],
+  "components/ui/macos/Button.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Card.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Checkbox.jsx": [],
+  "components/ui/macos/Dialog.jsx": [],
+  "components/ui/macos/Grid.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Icon.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Input.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Label.jsx": [],
+  "components/ui/macos/List.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/MacOSAlert.jsx": [],
+  "components/ui/macos/MacOSBadge.jsx": [],
+  "components/ui/macos/MacOSBreadcrumb.jsx": [],
+  "components/ui/macos/MacOSButton.jsx": [],
+  "components/ui/macos/MacOSCheckbox.jsx": [],
+  "components/ui/macos/MacOSEmptyState.jsx": [],
+  "components/ui/macos/MacOSInput.jsx": [],
+  "components/ui/macos/MacOSList.jsx": [],
+  "components/ui/macos/MacOSLoadingSkeleton.jsx": [],
+  "components/ui/macos/MacOSMetricCard.jsx": [],
+  "components/ui/macos/MacOSModal.jsx": [],
+  "components/ui/macos/MacOSPagination.jsx": [],
+  "components/ui/macos/MacOSRadio.jsx": [],
+  "components/ui/macos/MacOSSelect.jsx": [],
+  "components/ui/macos/MacOSStatCard.jsx": [],
+  "components/ui/macos/MacOSTab.jsx": [],
+  "components/ui/macos/MacOSTable.jsx": [],
+  "components/ui/macos/MacOSTextarea.jsx": [],
+  "components/ui/macos/Modal.jsx": [
+    "components/ui/macos/Button.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Option.jsx": [],
+  "components/ui/macos/Paper.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Progress.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Radio.jsx": [],
+  "components/ui/macos/SegmentedControl.jsx": [],
+  "components/ui/macos/Select.jsx": [],
+  "components/ui/macos/Sidebar.jsx": [
+    "components/ui/macos/Button.jsx",
+    "components/ui/macos/Icon.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Skeleton.jsx": [],
+  "components/ui/macos/Switch.jsx": [],
+  "components/ui/macos/Table.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Textarea.jsx": [],
+  "components/ui/macos/Toast.jsx": [],
+  "components/ui/macos/Tooltip.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/macos/Typography.jsx": [],
+  "components/ui/macos/index.js": [
+    "components/ui/macos/Alert.jsx",
+    "components/ui/macos/Avatar.jsx",
+    "components/ui/macos/Badge.jsx",
+    "components/ui/macos/Box.jsx",
+    "components/ui/macos/Button.jsx",
+    "components/ui/macos/Card.jsx",
+    "components/ui/macos/Checkbox.jsx",
+    "components/ui/macos/Dialog.jsx",
+    "components/ui/macos/Grid.jsx",
+    "components/ui/macos/Icon.jsx",
+    "components/ui/macos/Input.jsx",
+    "components/ui/macos/Label.jsx",
+    "components/ui/macos/List.jsx",
+    "components/ui/macos/MacOSAlert.jsx",
+    "components/ui/macos/MacOSBadge.jsx",
+    "components/ui/macos/MacOSBreadcrumb.jsx",
+    "components/ui/macos/MacOSButton.jsx",
+    "components/ui/macos/MacOSCheckbox.jsx",
+    "components/ui/macos/MacOSEmptyState.jsx",
+    "components/ui/macos/MacOSInput.jsx",
+    "components/ui/macos/MacOSList.jsx",
+    "components/ui/macos/MacOSLoadingSkeleton.jsx",
+    "components/ui/macos/MacOSMetricCard.jsx",
+    "components/ui/macos/MacOSModal.jsx",
+    "components/ui/macos/MacOSPagination.jsx",
+    "components/ui/macos/MacOSRadio.jsx",
+    "components/ui/macos/MacOSSelect.jsx",
+    "components/ui/macos/MacOSStatCard.jsx",
+    "components/ui/macos/MacOSTab.jsx",
+    "components/ui/macos/MacOSTable.jsx",
+    "components/ui/macos/MacOSTextarea.jsx",
+    "components/ui/macos/Modal.jsx",
+    "components/ui/macos/Option.jsx",
+    "components/ui/macos/Paper.jsx",
+    "components/ui/macos/Progress.jsx",
+    "components/ui/macos/Radio.jsx",
+    "components/ui/macos/SegmentedControl.jsx",
+    "components/ui/macos/Select.jsx",
+    "components/ui/macos/Sidebar.jsx",
+    "components/ui/macos/Skeleton.jsx",
+    "components/ui/macos/Switch.jsx",
+    "components/ui/macos/Table.jsx",
+    "components/ui/macos/Textarea.jsx",
+    "components/ui/macos/Toast.jsx",
+    "components/ui/macos/Tooltip.jsx",
+    "components/ui/macos/Typography.jsx"
+  ],
+  "components/ui/native/AnimatedTransition.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Badge.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/native/Button.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/native/Card.jsx": [
+    "contexts/ThemeContext.jsx"
+  ],
+  "components/ui/native/Dropdown.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Input.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Label.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Modal.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Select.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Skeleton.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Spinner.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Textarea.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/Tooltip.jsx": [
+    "utils/cn.js"
+  ],
+  "components/ui/native/hooks.js": [],
+  "components/ui/native/index.js": [
+    "components/ui/native/AnimatedTransition.jsx",
+    "components/ui/native/Badge.jsx",
+    "components/ui/native/Button.jsx",
+    "components/ui/native/Card.jsx",
+    "components/ui/native/Dropdown.jsx",
+    "components/ui/native/Input.jsx",
+    "components/ui/native/Label.jsx",
+    "components/ui/native/Modal.jsx",
+    "components/ui/native/Select.jsx",
+    "components/ui/native/Skeleton.jsx",
+    "components/ui/native/Spinner.jsx",
+    "components/ui/native/Textarea.jsx",
+    "components/ui/native/Tooltip.jsx",
+    "components/ui/native/hooks.js"
+  ],
+  "components/wizard/AppointmentWizardV2.css": [],
+  "components/wizard/AppointmentWizardV2.jsx": [
+    "api/client.js",
+    "api/queue.js",
+    "components/common/RoleGuard.jsx",
+    "components/dialogs/ModernDialog.jsx",
+    "components/ui/macos/index.js",
+    "components/wizard/AppointmentWizardV2.css",
+    "utils/dateUtils.js",
+    "utils/logger.js",
+    "utils/serviceCodeResolver.js",
+    "utils/serviceCodeUtils.js",
+    "utils/tokenManager.js"
+  ],
+  "constants/a11yTokens.js": [],
+  "constants/ai.js": [],
+  "constants/appointmentStatus.js": [],
+  "constants/routes.js": [],
+  "contexts/AppDataContext.jsx": [],
+  "contexts/ChatContext.jsx": [
+    "api/messages.js",
+    "services/pushNotifications.js",
+    "stores/auth.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "contexts/NotificationWebSocketContext.jsx": [
+    "components/common/Toast.jsx",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "contexts/ThemeContext.jsx": [
+    "api/client.js",
+    "theme/colorScheme.js",
+    "theme/colorUtils.js",
+    "theme/tokens.js",
+    "utils/logger.js"
+  ],
+  "core/cache/cacheConfig.js": [],
+  "core/cache/cacheService.js": [
+    "core/cache/cacheConfig.js"
+  ],
+  "core/cache/index.js": [
+    "core/cache/cacheConfig.js",
+    "core/cache/cacheService.js"
+  ],
+  "core/debouncePolicy.js": [],
+  "data/treatmentTemplates.json": [],
+  "design-system/components/EnhancedComponents.jsx": [
+    "utils/cn.js"
+  ],
+  "design-system/index.js": [
+    "design-system/components/EnhancedComponents.jsx",
+    "design-system/theme/EnhancedThemeProvider.jsx",
+    "design-system/tokens/design-tokens.js",
+    "hooks/useAI.jsx",
+    "hooks/useAnimation.jsx",
+    "hooks/useEnhancedMediaQuery.js",
+    "hooks/useForm.jsx",
+    "hooks/useMediaQuery.js",
+    "hooks/useModal.jsx",
+    "hooks/useNavigation.jsx",
+    "hooks/useNotifications.jsx",
+    "hooks/useTable.jsx",
+    "hooks/useUtils.js",
+    "utils/cn.js"
+  ],
+  "design-system/theme/EnhancedThemeProvider.jsx": [
+    "design-system/tokens/design-tokens.js"
+  ],
+  "design-system/tokens/design-tokens.js": [],
+  "hooks/useAI.jsx": [
+    "hooks/useEnhancedMediaQuery.js",
+    "utils/aiValidator.js",
+    "utils/logger.js",
+    "utils/mcp.js"
+  ],
+  "hooks/useAIChat.js": [
+    "api/client.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "hooks/useAdminData.js": [
+    "api/client.js"
+  ],
+  "hooks/useAnimation.jsx": [],
+  "hooks/useAppointments.js": [],
+  "hooks/useAsyncAction.js": [
+    "utils/logger.js"
+  ],
+  "hooks/useBlobURL.js": [],
+  "hooks/useChat.js": [
+    "contexts/ChatContext.jsx"
+  ],
+  "hooks/useDebouncedCallback.js": [
+    "core/debouncePolicy.js"
+  ],
+  "hooks/useDoctorHistory.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useDoctorPhrases.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useDoctorQueue.js": [
+    "services/api.js",
+    "utils/logger.js"
+  ],
+  "hooks/useDoctorSectionTemplates.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useDoctorTreatmentTemplates.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useDoctors.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useEMR.js": [
+    "api/client.js",
+    "reducers/emrReducer.js",
+    "utils/logger.js"
+  ],
+  "hooks/useEMRAI.js": [
+    "api/client.js",
+    "api/mcpClient.js",
+    "utils/aiValidator.js",
+    "utils/logger.js"
+  ],
+  "hooks/useEMRAutosave.js": [],
+  "hooks/useEMRKeyboard.js": [],
+  "hooks/useEMRTelemetry.js": [
+    "utils/logger.js"
+  ],
+  "hooks/useEMRVersion.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useEnhancedMediaQuery.js": [],
+  "hooks/useFinance.js": [],
+  "hooks/useForm.jsx": [
+    "hooks/useAnimation.jsx",
+    "hooks/useEnhancedMediaQuery.js",
+    "utils/logger.js"
+  ],
+  "hooks/useHotkeys.js": [
+    "utils/logger.js"
+  ],
+  "hooks/useMediaQuery.js": [],
+  "hooks/useModal.jsx": [
+    "hooks/useEnhancedMediaQuery.js"
+  ],
+  "hooks/useNavigation.jsx": [
+    "hooks/useAnimation.jsx",
+    "hooks/useEnhancedMediaQuery.js"
+  ],
+  "hooks/useNavigationGuard.js": [],
+  "hooks/useNotifications.jsx": [
+    "hooks/useAnimation.jsx",
+    "hooks/useEnhancedMediaQuery.js"
+  ],
+  "hooks/usePWA.js": [
+    "utils/logger.js"
+  ],
+  "hooks/usePatients.js": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "hooks/usePayments.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useQueueManager.js": [
+    "api/queue.js",
+    "utils/logger.js"
+  ],
+  "hooks/useReports.js": [],
+  "hooks/useRoles.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useSecurity.js": [],
+  "hooks/useSettings.js": [
+    "utils/logger.js"
+  ],
+  "hooks/useTable.jsx": [
+    "hooks/useEnhancedMediaQuery.js"
+  ],
+  "hooks/useTranslation.jsx": [],
+  "hooks/useUserPreferences.js": [
+    "api/client.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "hooks/useUsers.js": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "hooks/useUtils.js": [
+    "utils/logger.js"
+  ],
+  "hooks/useVisitLifecycle.js": [
+    "core/cache/cacheService.js"
+  ],
+  "main.jsx": [
+    "App.jsx",
+    "api/interceptors.js"
+  ],
+  "pages/AdminPanel.jsx": [
+    "components/admin/ActivationSystem.jsx",
+    "components/admin/AllFreeApproval.jsx",
+    "components/admin/AnalyticsDashboard.jsx",
+    "components/admin/AppointmentModal.jsx",
+    "components/admin/ClinicManagement.jsx",
+    "components/admin/CloudPrintingManager.jsx",
+    "components/admin/DoctorModal.jsx",
+    "components/admin/EmptyState.jsx",
+    "components/admin/ErrorBoundary.jsx",
+    "components/admin/FinanceModal.jsx",
+    "components/admin/GraphQLExplorer.jsx",
+    "components/admin/HelpTooltip.jsx",
+    "components/admin/MedicalEquipmentManager.jsx",
+    "components/admin/MobileOptimization.jsx",
+    "components/admin/PatientModal.jsx",
+    "components/admin/PhoneVerificationManager.jsx",
+    "components/admin/QueueProfilesManager.jsx",
+    "components/admin/ServiceCatalog.jsx",
+    "components/admin/SystemManagement.jsx",
+    "components/admin/UnifiedAITools.jsx",
+    "components/admin/UnifiedFinance.jsx",
+    "components/admin/UnifiedNotifications.jsx",
+    "components/admin/UnifiedReports.jsx",
+    "components/admin/UnifiedSettings.jsx",
+    "components/admin/UnifiedTelegramManagement.jsx",
+    "components/admin/UnifiedUserManagement.jsx",
+    "components/admin/WebhookManager.jsx",
+    "components/ai/AnalyticsInsights.jsx",
+    "components/analytics/AIAnalytics.jsx",
+    "components/analytics/WaitTimeAnalytics.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "hooks/useAdminData.js",
+    "hooks/useAppointments.js",
+    "hooks/useAsyncAction.js",
+    "hooks/useDoctors.js",
+    "hooks/useFinance.js",
+    "hooks/useHotkeys.js",
+    "hooks/useModal.jsx",
+    "hooks/usePatients.js",
+    "hooks/useReports.js",
+    "hooks/useSecurity.js",
+    "hooks/useSettings.js",
+    "hooks/useUsers.js",
+    "styles/admin-styles.css",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/AnalyticsPage.jsx": [
+    "api/client.js",
+    "components/admin/AnalyticsDashboard.jsx",
+    "components/analytics/AdvancedCharts.jsx",
+    "components/analytics/KPIMetrics.jsx",
+    "components/analytics/PredictiveAnalytics.jsx",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "pages/Appointments.jsx": [
+    "api/client.js",
+    "components/AppointmentFlow.jsx",
+    "components/RoleGate.jsx",
+    "components/layout/Nav.jsx",
+    "components/tables/EnhancedAppointmentsTable.jsx",
+    "utils/logger.js"
+  ],
+  "pages/Audit.jsx": [
+    "api/client.js",
+    "components/RoleGate.jsx"
+  ],
+  "pages/CSSTestPage.jsx": [
+    "components/navigation/ModernTabs.jsx",
+    "components/ui/macos/index.js",
+    "utils/logger.js"
+  ],
+  "pages/CardiologistPanelUnified.jsx": [
+    "components/ai/AIAssistant.jsx",
+    "components/ai/AIChatWidget.jsx",
+    "components/cardiology/ECGViewer.jsx",
+    "components/cardiology/EchoForm.jsx",
+    "components/common/EditPatientModal.jsx",
+    "components/common/ScheduleNextModal.jsx",
+    "components/doctor/DoctorServiceSelector.jsx",
+    "components/emr-v2/EMRContainerV2.jsx",
+    "components/tables/EnhancedAppointmentsTable.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "services/queue.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/CashierPanel.jsx": [
+    "components/cashier/RefundRequestsTable.jsx",
+    "components/payment/CashPaymentModal.jsx",
+    "components/payment/PaymentWidget.jsx",
+    "components/ui/macos/Input.jsx",
+    "components/ui/macos/MacOSTab.jsx",
+    "components/ui/macos/SegmentedControl.jsx",
+    "components/ui/macos/Tooltip.jsx",
+    "components/ui/macos/index.js",
+    "hooks/useEnhancedMediaQuery.js",
+    "hooks/useModal.jsx",
+    "hooks/usePayments.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/DentistPanelUnified.jsx": [
+    "components/QueueIntegration.jsx",
+    "components/ai/AIAssistant.jsx",
+    "components/ai/AIChatWidget.jsx",
+    "components/common/ScheduleNextModal.jsx",
+    "components/dental/DentalPriceManager.jsx",
+    "components/dental/DiagnosisForm.jsx",
+    "components/dental/ExaminationForm.jsx",
+    "components/dental/PatientCard.jsx",
+    "components/dental/PhotoArchive.jsx",
+    "components/dental/ProtocolTemplates.jsx",
+    "components/dental/ReportsAndAnalytics.jsx",
+    "components/dental/TeethChart.jsx",
+    "components/dental/ToothModal.jsx",
+    "components/dental/TreatmentPlanner.jsx",
+    "components/dental/VisitProtocol.jsx",
+    "components/emr-v2/EMRContainerV2.jsx",
+    "components/tables/EnhancedAppointmentsTable.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "stores/auth.js",
+    "styles/animations.css",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/DermatologistPanelUnified.jsx": [
+    "components/PrescriptionSystem.jsx",
+    "components/ServiceChecklist.jsx",
+    "components/VisitTimeline.jsx",
+    "components/ai/AIAssistant.jsx",
+    "components/ai/AIChatWidget.jsx",
+    "components/common/EditPatientModal.jsx",
+    "components/common/ScheduleNextModal.jsx",
+    "components/dermatology/PhotoComparison.jsx",
+    "components/dermatology/PhotoUploader.jsx",
+    "components/dermatology/PriceOverrideManager.jsx",
+    "components/dermatology/ProcedureTemplates.jsx",
+    "components/dermatology/SkinAnalysis.jsx",
+    "components/doctor/DoctorServiceSelector.jsx",
+    "components/emr-v2/EMRContainerV2.jsx",
+    "components/tables/EnhancedAppointmentsTable.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "services/queue.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/DisplayBoardUnified.jsx": [
+    "api/client.js",
+    "api/ws.js",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "pages/DoctorPanel.jsx": [
+    "components/ai/AIAssistant.jsx",
+    "components/ai/AIChatWidget.jsx",
+    "components/common/ScheduleNextModal.jsx",
+    "components/ui/macos/index.js",
+    "components/ui/native/AnimatedTransition.jsx",
+    "contexts/AppDataContext.jsx",
+    "contexts/ThemeContext.jsx",
+    "hooks/useDoctorQueue.js",
+    "hooks/useEnhancedMediaQuery.js",
+    "hooks/useModal.jsx",
+    "styles/animations.css",
+    "styles/dark-theme-visibility-fix.css",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/EMRDemo.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "pages/EMRv2Demo.jsx": [
+    "components/emr-v2/index.js",
+    "components/emr/ICD10Autocomplete.jsx"
+  ],
+  "pages/Health.jsx": [
+    "api/client.js",
+    "api/index.js",
+    "components/RoleGate.jsx"
+  ],
+  "pages/LabPanel.jsx": [
+    "components/ai/AIAssistant.jsx",
+    "components/ai/AIChatWidget.jsx",
+    "components/common/EditPatientModal.jsx",
+    "components/laboratory/LabReportGenerator.jsx",
+    "components/laboratory/LabResultsManager.jsx",
+    "components/tables/EnhancedAppointmentsTable.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "hooks/useModal.jsx",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/Landing.jsx": [
+    "components/activation/AppActivation.jsx",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "hooks/useTranslation.jsx",
+    "utils/logger.js"
+  ],
+  "pages/Login.jsx": [
+    "api/client.js",
+    "components/auth/ForgotPassword.jsx",
+    "components/security/SMSEmail2FA.jsx",
+    "constants/a11yTokens.js",
+    "constants/routes.js",
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "pages/MacOSDemoPage.jsx": [
+    "components/examples/MacOSDemo.jsx"
+  ],
+  "pages/MediLabDemo.jsx": [
+    "components/Icon.jsx",
+    "components/layout/UnifiedLayout.jsx",
+    "components/medical/MedicalCard.jsx",
+    "components/medical/index.js",
+    "contexts/ThemeContext.jsx",
+    "styles/animations.css",
+    "styles/cursor-effects.css",
+    "styles/full-width.css",
+    "styles/responsive.css",
+    "utils/logger.js"
+  ],
+  "pages/PatientPanel.jsx": [
+    "components/ui/macos/index.js",
+    "hooks/useEnhancedMediaQuery.js"
+  ],
+  "pages/PatientPickupView.jsx": [
+    "api/index.js",
+    "components/patient/FamilyRelationsCard.jsx",
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "pages/PaymentCancel.jsx": [
+    "components/ui/macos/index.js"
+  ],
+  "pages/PaymentSuccess.jsx": [
+    "api/client.js",
+    "utils/logger.js"
+  ],
+  "pages/PaymentTest.jsx": [
+    "api/client.js",
+    "components/payment/PaymentWidget.jsx",
+    "utils/logger.js"
+  ],
+  "pages/QueueJoin.jsx": [
+    "api/queue.js",
+    "constants/a11yTokens.js"
+  ],
+  "pages/RegistrarPanel.jsx": [
+    "api/client.js",
+    "components/dialogs/CancelDialog.jsx",
+    "components/dialogs/PaymentDialog.jsx",
+    "components/dialogs/PrintDialog.jsx",
+    "components/navigation/ModernTabs.jsx",
+    "components/payment/PaymentManager.jsx",
+    "components/queue/ModernQueueManager.jsx",
+    "components/registrar/ForceMajeureModal.jsx",
+    "components/statistics/ModernStatistics.jsx",
+    "components/tables/AppointmentContextMenu.jsx",
+    "components/tables/EnhancedAppointmentsTable.jsx",
+    "components/ui/animations.css",
+    "components/ui/index.js",
+    "components/ui/macos/index.js",
+    "components/wizard/AppointmentWizardV2.jsx",
+    "contexts/ThemeContext.jsx",
+    "hooks/useEnhancedMediaQuery.js",
+    "styles/animations.css",
+    "styles/dark-theme-visibility-fix.css",
+    "styles/responsive.css",
+    "utils/dateUtils.js",
+    "utils/logger.js",
+    "utils/serviceCodeResolver.js",
+    "utils/tokenManager.js"
+  ],
+  "pages/Scheduler.jsx": [
+    "api/client.js",
+    "components/RoleGate.jsx"
+  ],
+  "pages/Search.jsx": [
+    "api/index.js"
+  ],
+  "pages/SecurityPage.jsx": [
+    "components/security/SMSEmail2FA.jsx",
+    "components/security/TwoFactorManager.jsx",
+    "components/security/TwoFactorSetupWizard.jsx",
+    "contexts/ThemeContext.jsx"
+  ],
+  "pages/Settings.jsx": [
+    "api/client.js",
+    "components/RoleGate.jsx",
+    "components/admin/ColorSchemeSelector.jsx",
+    "components/auth/PhoneVerification.jsx",
+    "components/security/TwoFactorManager.jsx",
+    "components/settings/NotificationSystemStatus.jsx",
+    "components/ui/macos/AccentPicker.jsx",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "pages/SingleSheetEMRDemo.jsx": [
+    "components/emr/index.js",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "pages/UserProfile.jsx": [
+    "api/client.js",
+    "components/security/TwoFactorManager.jsx",
+    "components/settings/NotificationPreferences.jsx",
+    "components/ui/macos/index.js",
+    "stores/auth.js",
+    "utils/logger.js"
+  ],
+  "pages/UserSelect.jsx": [
+    "utils/tokenManager.js"
+  ],
+  "pages/VisitDetails.jsx": [
+    "api/index.js",
+    "components/RescheduleDialog.jsx",
+    "utils/logger.js"
+  ],
+  "pages/auth/ChangePasswordRequired.jsx": [
+    "api/client.js",
+    "components/ui/macos/index.js",
+    "contexts/ThemeContext.jsx",
+    "utils/logger.js"
+  ],
+  "providers/AppProviders.jsx": [
+    "components/chat/NotificationPrompt.jsx",
+    "components/common/ErrorBoundary.jsx",
+    "components/common/Form.jsx",
+    "components/common/Modal.jsx",
+    "components/common/Toast.jsx",
+    "contexts/AppDataContext.jsx",
+    "contexts/ChatContext.jsx",
+    "contexts/NotificationWebSocketContext.jsx",
+    "hooks/useTranslation.jsx"
+  ],
+  "reducers/emrReducer.js": [],
+  "services/api.js": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "services/auth.js": [
+    "api/client.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "services/pushNotifications.js": [
+    "utils/logger.js"
+  ],
+  "services/queue.js": [
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "stores/auth.js": [
+    "api/client.js",
+    "utils/logger.js",
+    "utils/tokenManager.js"
+  ],
+  "styles/admin-styles.css": [],
+  "styles/animations.css": [],
+  "styles/cursor-effects.css": [],
+  "styles/dark-theme-visibility-fix.css": [],
+  "styles/emr-tokens.css": [],
+  "styles/full-width.css": [],
+  "styles/global-fixes.css": [],
+  "styles/macos.css": [],
+  "styles/responsive.css": [],
+  "styles/sidebar-buttons.css": [],
+  "styles/theme.css": [
+    "styles/emr-tokens.css"
+  ],
+  "styles/unified-sidebar.css": [],
+  "theme/colorScheme.js": [
+    "utils/logger.js"
+  ],
+  "theme/colorUtils.js": [],
+  "theme/macos-tokens.css": [],
+  "theme/macosTheme.jsx": [
+    "theme/colorUtils.js"
+  ],
+  "theme/tokens.js": [],
+  "utils/aiValidator.js": [
+    "utils/logger.js",
+    "utils/sanitizer.js"
+  ],
+  "utils/api.js": [
+    "utils/tokenManager.js"
+  ],
+  "utils/cn.js": [],
+  "utils/dateUtils.js": [],
+  "utils/debounce.js": [],
+  "utils/errorHandler.js": [
+    "utils/logger.js"
+  ],
+  "utils/fileValidator.js": [
+    "utils/logger.js"
+  ],
+  "utils/logger.js": [],
+  "utils/mcp.js": [],
+  "utils/sanitizer.js": [
+    "utils/logger.js"
+  ],
+  "utils/serviceCodeResolver.js": [
+    "api/services.js"
+  ],
+  "utils/serviceCodeUtils.js": [],
+  "utils/tokenManager.js": [
+    "utils/logger.js"
+  ]
+}

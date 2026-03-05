@@ -21,8 +21,8 @@ import {
 } from '../api/queue';
 
 const FALLBACK_SPECIALISTS = [
-  { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-  { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: '#FF9500' },
+  { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: 'var(--mac-error)' },
+  { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: 'var(--mac-warning)' },
   { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: A11Y_COLORS.primary },
   { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: A11Y_COLORS.success }
 ];
@@ -496,37 +496,51 @@ const QueueJoin = () => {
     }
   };
 
+  const pageBaseStyle = {
+    background: 'var(--mac-gradient-window)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
+  };
+
+  const glassCardStyle = {
+    background: 'var(--mac-card-bg)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    borderRadius: '20px',
+    boxShadow: 'var(--mac-main-shell-shadow)',
+    border: '1px solid var(--mac-card-border)',
+    padding: '32px 24px'
+  };
+
+  const titleStyle = {
+    fontSize: '22px',
+    fontWeight: '600',
+    color: 'var(--mac-text-primary)',
+    marginBottom: '8px',
+    letterSpacing: '-0.02em'
+  };
+
+  const bodyTextStyle = {
+    fontSize: '15px',
+    color: 'var(--mac-text-secondary)',
+    lineHeight: '1.5'
+  };
+
+  const mutedCaptionStyle = {
+    fontSize: '13px',
+    color: 'var(--mac-text-tertiary)',
+    fontWeight: '500'
+  };
+
   // Компонент загрузки - macOS стиль
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{
-        background: 'var(--mac-gradient-window)',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-      }}>
-        <div className="max-w-md w-full text-center" style={{
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
-          border: '1px solid rgba(255, 255, 255, 0.6)',
-          padding: '32px 24px'
-        }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
+        <div className="max-w-md w-full text-center" style={glassCardStyle}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" style={{
             borderColor: A11Y_COLORS.primary
           }}></div>
-          <h2 style={{
-            fontSize: '22px',
-            fontWeight: '600',
-            color: '#1C1C1E',
-            marginBottom: '8px',
-            letterSpacing: '-0.02em'
-          }}>Юкланмоқда...</h2>
-          <p style={{
-            fontSize: '15px',
-            color: '#636366',
-            lineHeight: '1.5'
-          }}>Навбат ҳақида маълумот олиш</p>
+          <h2 style={titleStyle}>Юкланмоқда...</h2>
+          <p style={bodyTextStyle}>Навбат ҳақида маълумот олиш</p>
         </div>
       </div>
     );
@@ -535,37 +549,21 @@ const QueueJoin = () => {
   // Компонент ошибки - macOS стиль
   if (step === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-      }}>
-        <div className="max-w-md w-full text-center" style={{
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
-          border: '1px solid rgba(255, 255, 255, 0.6)',
-          padding: '32px 24px'
-        }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
+        <div className="max-w-md w-full text-center" style={glassCardStyle}>
           <AlertCircle style={{
             width: '64px',
             height: '64px',
-            color: '#FF3B30',
+            color: 'var(--mac-error)',
             margin: '0 auto 16px'
           }} />
           <h2 style={{
-            fontSize: '22px',
-            fontWeight: '600',
-            color: '#1C1C1E',
+            ...titleStyle,
             marginBottom: '12px',
-            letterSpacing: '-0.02em'
           }}>Хатолик</h2>
           <p style={{
-            fontSize: '15px',
-            color: '#636366',
+            ...bodyTextStyle,
             marginBottom: '24px',
-            lineHeight: '1.5'
           }} role="alert" aria-live="assertive">{error}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <button
@@ -576,7 +574,7 @@ const QueueJoin = () => {
               style={{
                 width: '100%',
                 background: A11Y_COLORS.primary,
-                color: 'white',
+                color: 'var(--mac-text-on-accent)',
                 padding: '16px 24px',
                 borderRadius: '12px',
                 border: 'none',
@@ -584,7 +582,7 @@ const QueueJoin = () => {
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(0, 81, 213, 0.3)'
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
               }}
               onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
               onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
@@ -596,7 +594,7 @@ const QueueJoin = () => {
               style={{
                 width: '100%',
                 background: A11Y_COLORS.danger,
-                color: 'white',
+                color: 'var(--mac-text-on-accent)',
                 padding: '16px 24px',
                 borderRadius: '12px',
                 border: 'none',
@@ -604,9 +602,9 @@ const QueueJoin = () => {
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(180, 35, 24, 0.3)'
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-error), transparent 70%)'
               }}
-              onMouseEnter={(e) => e.target.style.background = '#8C1B13'}
+              onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-error), black 20%)'}
               onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.danger}
             >
               Асосий саҳифа
@@ -620,65 +618,48 @@ const QueueJoin = () => {
   // Компонент ожидания открытия очереди - macOS стиль
   if (step === 'waiting') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-      }}>
-        <div className="max-w-md w-full text-center" style={{
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
-          border: '1px solid rgba(255, 255, 255, 0.6)',
-          padding: '32px 24px'
-        }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
+        <div className="max-w-md w-full text-center" style={glassCardStyle}>
           <Clock style={{
             width: '64px',
             height: '64px',
-            color: '#FF9500',
+            color: 'var(--mac-warning)',
             margin: '0 auto 20px',
             animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           }} />
           <h2 style={{
             fontSize: '24px',
             fontWeight: '600',
-            color: '#1C1C1E',
+            color: 'var(--mac-text-primary)',
             marginBottom: '12px',
             letterSpacing: '-0.02em'
           }}>Навбат тез орада очилади</h2>
           <p style={{
-            fontSize: '15px',
-            color: '#636366',
+            ...bodyTextStyle,
             marginBottom: '24px',
-            lineHeight: '1.5'
           }}>
             Навбатга ёзилиш {queueInfo?.start_time}да очилади
           </p>
 
           {/* Обратный отсчет - macOS стиль */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(255, 149, 0, 0.1) 0%, rgba(255, 149, 0, 0.05) 100%)',
+            background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-warning), transparent 88%) 0%, color-mix(in srgb, var(--mac-warning), transparent 93%) 100%)',
             borderRadius: '16px',
             padding: '24px',
             marginBottom: '24px',
-            border: '1px solid rgba(255, 149, 0, 0.15)'
+            border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 76%)'
           }}>
             <div style={{
               fontSize: '44px',
               fontWeight: '600',
-              color: '#FF9500',
+              color: 'var(--mac-warning)',
               marginBottom: '8px',
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
               letterSpacing: '0.02em'
             }}>
               {formatCountdown(countdown)}
             </div>
-            <p style={{
-              fontSize: '13px',
-              color: '#8E8E93',
-              fontWeight: '500'
-            }}>ёзилиш очилишига қадар</p>
+            <p style={mutedCaptionStyle}>ёзилиш очилишига қадар</p>
           </div>
 
           {/* Информация о враче и кабинете - macOS стиль */}
@@ -688,14 +669,14 @@ const QueueJoin = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '12px 16px',
-              background: 'rgba(242, 242, 247, 0.6)',
+              background: 'var(--mac-bg-secondary)',
               borderRadius: '12px'
             }}>
               <div className="flex items-center">
-                <User style={{ width: '18px', height: '18px', color: '#8E8E93', marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', color: '#636366' }}>Мутахассис</span>
+                <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Мутахассис</span>
               </div>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1C1C1E' }}>{queueInfo?.specialist_name}</span>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{queueInfo?.specialist_name}</span>
             </div>
 
             <div style={{
@@ -703,14 +684,14 @@ const QueueJoin = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '12px 16px',
-              background: 'rgba(242, 242, 247, 0.6)',
+              background: 'var(--mac-bg-secondary)',
               borderRadius: '12px'
             }}>
               <div className="flex items-center">
-                <MapPin style={{ width: '18px', height: '18px', color: '#8E8E93', marginRight: '8px' }} />
-                <span style={{ fontSize: '14px', color: '#636366' }}>Бўлим</span>
+                <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Бўлим</span>
               </div>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1C1C1E' }}>{queueInfo?.department_name}</span>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{queueInfo?.department_name}</span>
             </div>
 
             <div style={{
@@ -718,9 +699,9 @@ const QueueJoin = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '12px 16px',
-              background: 'linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(0, 122, 255, 0.05) 100%)',
+              background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%)',
               borderRadius: '12px',
-              border: '1px solid rgba(0, 122, 255, 0.15)'
+              border: '1px solid color-mix(in srgb, var(--mac-accent), transparent 76%)'
             }}>
               <div className="flex items-center">
                 <Calendar style={{ width: '18px', height: '18px', color: A11Y_COLORS.primary, marginRight: '8px' }} />
@@ -738,7 +719,7 @@ const QueueJoin = () => {
 
           <div style={{
             fontSize: '13px',
-            color: '#8E8E93',
+            color: 'var(--mac-text-tertiary)',
             marginBottom: '24px',
             textAlign: 'center',
             lineHeight: '1.5'
@@ -752,7 +733,7 @@ const QueueJoin = () => {
               onClick={() => navigate('/')}
               style={{
                 flex: 1,
-                background: 'rgba(142, 142, 147, 0.12)',
+                background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
                 color: A11Y_COLORS.primary,
                 padding: '14px 20px',
                 borderRadius: '12px',
@@ -762,8 +743,8 @@ const QueueJoin = () => {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(142, 142, 147, 0.18)'}
-              onMouseLeave={(e) => e.target.style.background = 'rgba(142, 142, 147, 0.12)'}
+              onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
+              onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
             >
               Асосий саҳифа
             </button>
@@ -772,7 +753,7 @@ const QueueJoin = () => {
               style={{
                 flex: 1,
                 background: A11Y_COLORS.primary,
-                color: 'white',
+                color: 'var(--mac-text-on-accent)',
                 padding: '14px 20px',
                 borderRadius: '12px',
                 border: 'none',
@@ -780,7 +761,7 @@ const QueueJoin = () => {
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(0, 81, 213, 0.3)'
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
               }}
               onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
               onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
@@ -811,19 +792,8 @@ const QueueJoin = () => {
     const departmentName = getDepartmentName(result.entries?.[0]?.department || result.entries?.[0]?.specialty);
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{
-        background: 'var(--mac-gradient-window)',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-      }}>
-        <div className="max-w-md w-full text-center" style={{
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
-          border: '1px solid rgba(255, 255, 255, 0.6)',
-          padding: '32px 24px'
-        }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
+        <div className="max-w-md w-full text-center" style={glassCardStyle}>
           <CheckCircle style={{
             width: '64px',
             height: '64px',
@@ -833,7 +803,7 @@ const QueueJoin = () => {
           <h2 style={{
             fontSize: '24px',
             fontWeight: '600',
-            color: '#1C1C1E',
+            color: 'var(--mac-text-primary)',
             marginBottom: '24px',
             letterSpacing: '-0.02em'
           }}>
@@ -844,16 +814,16 @@ const QueueJoin = () => {
             // Множественная регистрация
             <>
               <div style={{
-                background: 'linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
                 borderRadius: '16px',
                 padding: '24px',
                 marginBottom: '24px',
-                border: '1px solid rgba(52, 199, 89, 0.15)'
+                border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
               }}>
                 <p style={{
                   fontSize: '15px',
                   fontWeight: '600',
-                  color: '#1C1C1E',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '16px',
                   textAlign: 'center'
                 }}>
@@ -868,25 +838,25 @@ const QueueJoin = () => {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '16px',
-                        background: 'rgba(255, 255, 255, 0.8)',
+                        background: 'color-mix(in srgb, var(--mac-card-bg), transparent 16%)',
                         borderRadius: '12px',
-                        border: '1px solid rgba(52, 199, 89, 0.2)'
+                        border: '1px solid color-mix(in srgb, var(--mac-success), transparent 72%)'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span style={{ fontSize: '24px' }}>{entry.icon || '👨‍⚕️'}</span>
                         <div>
-                          <div style={{ fontSize: '15px', fontWeight: '600', color: '#1C1C1E' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>
                             {entry.specialist_name || entry.department || `Мутахассис ${idx + 1}`}
                           </div>
-                          <div style={{ fontSize: '12px', color: '#8E8E93', marginTop: '4px' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
                             Вақт: {entry.queue_time ? new Date(entry.queue_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '28px', fontWeight: '600', color: A11Y_COLORS.success }}>№{entry.queue_number || entry.number || '—'}</div>
-                        <div style={{ fontSize: '11px', color: '#8E8E93' }}>навбатда</div>
+                        <div style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)' }}>навбатда</div>
                       </div>
                     </div>
                   ))}
@@ -895,7 +865,7 @@ const QueueJoin = () => {
 
               <div style={{
                 fontSize: '13px',
-                color: '#8E8E93',
+                color: 'var(--mac-text-tertiary)',
                 marginBottom: '24px',
                 lineHeight: '1.5'
               }}>
@@ -910,11 +880,11 @@ const QueueJoin = () => {
             // Одиночная регистрация
             <>
               <div style={{
-                background: 'linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
                 borderRadius: '16px',
                 padding: '32px 24px',
                 marginBottom: '24px',
-                border: '1px solid rgba(52, 199, 89, 0.15)'
+                border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)'
               }}>
                 <div style={{
                   fontSize: '48px',
@@ -925,7 +895,7 @@ const QueueJoin = () => {
                 }}>
                   №{result.queue_number}
                 </div>
-                <p style={{ fontSize: '15px', color: '#636366', fontWeight: '500' }}>Навбатдаги рақамингиз</p>
+                <p style={{ fontSize: '15px', color: 'var(--mac-text-secondary)', fontWeight: '500' }}>Навбатдаги рақамингиз</p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
@@ -934,14 +904,14 @@ const QueueJoin = () => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '12px 16px',
-                  background: 'rgba(242, 242, 247, 0.6)',
+                  background: 'var(--mac-bg-secondary)',
                   borderRadius: '12px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Users style={{ width: '18px', height: '18px', color: '#8E8E93', marginRight: '8px' }} />
-                    <span style={{ fontSize: '14px', color: '#636366' }}>Олдингизда</span>
+                    <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                    <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Олдингизда</span>
                   </div>
-                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#1C1C1E' }}>{result.queue_number - 1} к.</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{result.queue_number - 1} к.</span>
                 </div>
 
                 {result.estimated_wait_time && (
@@ -950,14 +920,14 @@ const QueueJoin = () => {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '12px 16px',
-                    background: 'rgba(242, 242, 247, 0.6)',
+                    background: 'var(--mac-bg-secondary)',
                     borderRadius: '12px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <Timer style={{ width: '18px', height: '18px', color: '#8E8E93', marginRight: '8px' }} />
-                      <span style={{ fontSize: '14px', color: '#636366' }}>Кутиш</span>
+                      <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                      <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Кутиш</span>
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1C1C1E' }}>{formatWaitTime(result.estimated_wait_time)}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{formatWaitTime(result.estimated_wait_time)}</span>
                   </div>
                 )}
 
@@ -967,21 +937,21 @@ const QueueJoin = () => {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '12px 16px',
-                    background: 'rgba(242, 242, 247, 0.6)',
+                    background: 'var(--mac-bg-secondary)',
                     borderRadius: '12px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <User style={{ width: '18px', height: '18px', color: '#8E8E93', marginRight: '8px' }} />
-                      <span style={{ fontSize: '14px', color: '#636366' }}>Мутахассис</span>
+                      <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: '8px' }} />
+                      <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>Мутахассис</span>
                     </div>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1C1C1E' }}>{result.specialist_name}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>{result.specialist_name}</span>
                   </div>
                 )}
               </div>
 
               <div style={{
                 fontSize: '13px',
-                color: '#8E8E93',
+                color: 'var(--mac-text-tertiary)',
                 marginBottom: '24px',
                 lineHeight: '1.5'
               }}>
@@ -999,7 +969,7 @@ const QueueJoin = () => {
             style={{
               width: '100%',
               background: A11Y_COLORS.success,
-              color: 'white',
+              color: 'var(--mac-text-on-accent)',
               padding: '16px 24px',
               borderRadius: '12px',
               border: 'none',
@@ -1007,7 +977,7 @@ const QueueJoin = () => {
               fontWeight: '600',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px rgba(46, 125, 50, 0.3)'
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-success), transparent 70%)'
             }}
             onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.successHover}
             onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.success}
@@ -1021,10 +991,7 @@ const QueueJoin = () => {
 
   // Основной интерфейс (info + form) - macOS стиль
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{
-      background: 'var(--mac-gradient-window)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
-    }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
       <div
         aria-live="polite"
         style={{
@@ -1042,18 +1009,11 @@ const QueueJoin = () => {
         {step === 'form' && 'Заполните обязательные поля: ФИО и телефон.'}
         {step === 'info' && 'Проверьте информацию по очереди и перейдите к форме.'}
       </div>
-      <div className="max-w-md w-full overflow-hidden" style={{
-        background: 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: '20px',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)',
-        border: '1px solid rgba(255, 255, 255, 0.6)'
-      }}>
+      <div className="max-w-md w-full overflow-hidden" style={glassCardStyle}>
 
         {/* Заголовок с информацией об очереди - macOS стиль с правильным spacing */}
         <div className="text-white" style={{
-          background: 'linear-gradient(135deg, #007AFF 0%, #5856D6 100%)',
+          background: 'linear-gradient(135deg, var(--mac-accent) 0%, var(--mac-accent-purple) 100%)',
           borderRadius: '20px 20px 0 0',
           padding: '24px'
         }}>
@@ -1080,7 +1040,7 @@ const QueueJoin = () => {
               <div className="flex items-center" style={{
                 marginTop: '8px',
                 paddingTop: '12px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+                borderTop: '1px solid color-mix(in srgb, var(--mac-text-on-accent), transparent 80%)',
                 opacity: 0.95
               }}>
                 <Calendar style={{ width: '16px', height: '16px', marginRight: '8px', flexShrink: 0 }} />
@@ -1109,14 +1069,14 @@ const QueueJoin = () => {
               <h3 style={{
                 fontSize: '20px',
                 fontWeight: '600',
-                color: '#1C1C1E',
+                color: 'var(--mac-text-primary)',
                 marginBottom: '8px',
                 letterSpacing: '-0.02em'
               }}>
                 Мутахассисларни танланг
               </h3>
               <p style={{
-                color: '#636366',
+                color: 'var(--mac-text-secondary)',
                 fontSize: '15px',
                 lineHeight: '1.5',
                 margin: 0
@@ -1145,11 +1105,11 @@ const QueueJoin = () => {
                 <div style={{
                   padding: '18px 16px',
                   textAlign: 'center',
-                  color: '#636366',
+                  color: 'var(--mac-text-secondary)',
                   fontSize: '14px',
                   borderRadius: '12px',
-                  border: '1px dashed rgba(60, 60, 67, 0.28)',
-                  background: 'rgba(242, 242, 247, 0.65)',
+                  border: '1px dashed color-mix(in srgb, var(--mac-text-secondary), transparent 72%)',
+                  background: 'color-mix(in srgb, var(--mac-bg-secondary), transparent 10%)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px'
@@ -1161,7 +1121,7 @@ const QueueJoin = () => {
                     style={{
                       alignSelf: 'center',
                       background: A11Y_COLORS.primary,
-                      color: '#fff',
+                      color: 'var(--mac-text-on-accent)',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '8px 14px',
@@ -1190,8 +1150,10 @@ const QueueJoin = () => {
                         alignItems: 'center',
                         padding: '16px',
                         borderRadius: '12px',
-                        border: `2px solid ${isSelected ? specialist.color : '#E5E5EA'}`,
-                        background: isSelected ? `${specialist.color}15` : '#FFFFFF',
+                        border: `2px solid ${isSelected ? specialist.color : 'var(--mac-border)'}`,
+                        background: isSelected ?
+                          `color-mix(in srgb, ${specialist.color}, transparent 85%)` :
+                          'var(--mac-card-bg)',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         userSelect: 'none'
@@ -1222,7 +1184,7 @@ const QueueJoin = () => {
                       <span style={{
                         fontSize: '17px',
                         fontWeight: '600',
-                        color: isSelected ? specialist.color : '#1C1C1E'
+                        color: isSelected ? specialist.color : 'var(--mac-text-primary)'
                       }}>
                         {specialist.specialty_display || specialist.name}
                       </span>
@@ -1246,8 +1208,8 @@ const QueueJoin = () => {
               disabled={selectedSpecialists.length === 0}
               style={{
                 width: '100%',
-                background: selectedSpecialists.length > 0 ? A11Y_COLORS.primary : '#E5E5EA',
-                color: selectedSpecialists.length > 0 ? 'white' : '#8E8E93',
+                background: selectedSpecialists.length > 0 ? A11Y_COLORS.primary : 'var(--mac-border)',
+                color: selectedSpecialists.length > 0 ? 'var(--mac-text-on-accent)' : 'var(--mac-text-tertiary)',
                 padding: '16px 24px',
                 borderRadius: '12px',
                 border: 'none',
@@ -1255,7 +1217,7 @@ const QueueJoin = () => {
                 fontWeight: '600',
                 cursor: selectedSpecialists.length > 0 ? 'pointer' : 'not-allowed',
                 transition: 'all 0.2s ease',
-                boxShadow: selectedSpecialists.length > 0 ? '0 4px 12px rgba(0, 81, 213, 0.3)' : 'none'
+                boxShadow: selectedSpecialists.length > 0 ? '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)' : 'none'
               }}
               onMouseEnter={(e) => {
                 if (selectedSpecialists.length > 0) {
@@ -1276,9 +1238,9 @@ const QueueJoin = () => {
                 marginTop: '16px',
                 padding: '12px 16px',
                 borderRadius: '8px',
-                background: '#FFF3F3',
-                border: '1px solid #FFE5E5',
-                color: '#FF3B30',
+                background: 'var(--mac-error-bg)',
+                border: '1px solid var(--mac-error-border)',
+                color: 'var(--mac-error)',
                 fontSize: '14px',
                 textAlign: 'center'
               }} role="alert" aria-live="assertive">
@@ -1298,10 +1260,10 @@ const QueueJoin = () => {
               marginBottom: '24px'
             }}>
               <div style={{
-                background: 'linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(0, 122, 255, 0.05) 100%)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-accent), transparent 88%) 0%, color-mix(in srgb, var(--mac-accent), transparent 93%) 100%)',
                 borderRadius: '16px',
                 padding: '24px 20px',
-                border: '1px solid rgba(0, 122, 255, 0.15)',
+                border: '1px solid color-mix(in srgb, var(--mac-accent), transparent 76%)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1324,16 +1286,16 @@ const QueueJoin = () => {
                 }}>{queueInfo?.queue_length || 0}</div>
                 <div style={{
                   fontSize: '13px',
-                  color: '#8E8E93',
+                  color: 'var(--mac-text-tertiary)',
                   fontWeight: '500'
                 }}>навбатда</div>
               </div>
 
               <div style={{
-                background: 'linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-success), transparent 88%) 0%, color-mix(in srgb, var(--mac-success), transparent 93%) 100%)',
                 borderRadius: '16px',
                 padding: '24px 20px',
-                border: '1px solid rgba(52, 199, 89, 0.15)',
+                border: '1px solid color-mix(in srgb, var(--mac-success), transparent 76%)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1356,7 +1318,7 @@ const QueueJoin = () => {
                 }}>~{(queueInfo?.queue_length || 0) * 15}</div>
                 <div style={{
                   fontSize: '13px',
-                  color: '#8E8E93',
+                  color: 'var(--mac-text-tertiary)',
                   fontWeight: '500'
                 }}>мин кутиш</div>
               </div>
@@ -1371,7 +1333,7 @@ const QueueJoin = () => {
               gap: '20px'
             }}>
               <p style={{
-                color: '#636366',
+                color: 'var(--mac-text-secondary)',
                 fontSize: '15px',
                 lineHeight: '1.5',
                 margin: 0,
@@ -1384,7 +1346,7 @@ const QueueJoin = () => {
                 style={{
                   width: '100%',
                   background: A11Y_COLORS.primary,
-                  color: 'white',
+                  color: 'var(--mac-text-on-accent)',
                   padding: '16px 24px',
                   borderRadius: '12px',
                   border: 'none',
@@ -1392,7 +1354,7 @@ const QueueJoin = () => {
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0, 81, 213, 0.3)'
+                  boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
                 }}
                 onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
                 onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
@@ -1414,14 +1376,14 @@ const QueueJoin = () => {
                   display: 'block',
                   fontSize: '13px',
                   fontWeight: '500',
-                  color: '#3C3C43',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px'
                 }}
                 >
                   ФИО *
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: '#8E8E93' }} />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
                   <input
                     id="queue-patient-name"
                     name="patient_name"
@@ -1434,20 +1396,21 @@ const QueueJoin = () => {
                       paddingRight: '16px',
                       paddingTop: '12px',
                       paddingBottom: '12px',
-                      border: '1px solid rgba(60, 60, 67, 0.18)',
+                      border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
                       borderRadius: '10px',
                       fontSize: '17px',
                       fontFamily: 'inherit',
-                      background: 'rgba(242, 242, 247, 0.6)',
+                      background: 'var(--mac-bg-secondary)',
                       transition: 'all 0.2s ease',
-                      outline: 'none'
+                      outline: 'none',
+                      color: 'var(--mac-text-primary)'
                     }}
                     onFocus={(e) => {
-                      e.target.style.border = '1px solid #007AFF';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
+                      e.target.style.border = '1px solid var(--mac-accent)';
+                      e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
                     }}
                     onBlur={(e) => {
-                      e.target.style.border = '1px solid rgba(60, 60, 67, 0.18)';
+                      e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                       e.target.style.boxShadow = 'none';
                     }}
                     placeholder="Фамилия исмингизни киритинг"
@@ -1469,14 +1432,14 @@ const QueueJoin = () => {
                   display: 'block',
                   fontSize: '13px',
                   fontWeight: '500',
-                  color: '#3C3C43',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px'
                 }}
                 >
                   Телефон рақами *
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: '#8E8E93' }} />
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
                   <input
                     id="queue-phone"
                     name="phone"
@@ -1514,20 +1477,21 @@ const QueueJoin = () => {
                       paddingRight: '16px',
                       paddingTop: '12px',
                       paddingBottom: '12px',
-                      border: '1px solid rgba(60, 60, 67, 0.18)',
+                      border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
                       borderRadius: '10px',
                       fontSize: '17px',
                       fontFamily: 'inherit',
-                      background: 'rgba(242, 242, 247, 0.6)',
+                      background: 'var(--mac-bg-secondary)',
                       transition: 'all 0.2s ease',
-                      outline: 'none'
+                      outline: 'none',
+                      color: 'var(--mac-text-primary)'
                     }}
                     onFocus={(e) => {
-                      e.target.style.border = '1px solid #007AFF';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
+                      e.target.style.border = '1px solid var(--mac-accent)';
+                      e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
                     }}
                     onBlur={(e) => {
-                      e.target.style.border = '1px solid rgba(60, 60, 67, 0.18)';
+                      e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                       e.target.style.boxShadow = 'none';
                     }}
                     placeholder="+998 (90) 123-45-67"
@@ -1539,7 +1503,7 @@ const QueueJoin = () => {
                     required
                   />
                 </div>
-                <div id="queue-phone-hint" style={{ fontSize: '11px', color: '#8E8E93', marginTop: '4px' }}>
+                <div id="queue-phone-hint" style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
                   Формат: +998 (XX) XXX-XX-XX
                 </div>
               </div>
@@ -1552,13 +1516,13 @@ const QueueJoin = () => {
                   display: 'block',
                   fontSize: '13px',
                   fontWeight: '500',
-                  color: '#3C3C43',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px'
                 }}
                 >
                   Telegram ID (ихтиёрий)
                 </label>
-                <div style={{ fontSize: '11px', color: '#8E8E93', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)', marginBottom: '8px' }}>
                   Telegramда хабардор қилиш учун
                 </div>
                 <input
@@ -1570,20 +1534,21 @@ const QueueJoin = () => {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid rgba(60, 60, 67, 0.18)',
+                    border: '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)',
                     borderRadius: '10px',
                     fontSize: '17px',
                     fontFamily: 'inherit',
-                    background: 'rgba(242, 242, 247, 0.6)',
+                    background: 'var(--mac-bg-secondary)',
                     transition: 'all 0.2s ease',
-                    outline: 'none'
+                    outline: 'none',
+                    color: 'var(--mac-text-primary)'
                   }}
                   onFocus={(e) => {
-                    e.target.style.border = '1px solid #007AFF';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
+                    e.target.style.border = '1px solid var(--mac-accent)';
+                    e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.border = '1px solid rgba(60, 60, 67, 0.18)';
+                    e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                     e.target.style.boxShadow = 'none';
                   }}
                   placeholder="Мажбурий эмас"
@@ -1592,14 +1557,14 @@ const QueueJoin = () => {
 
               {error && (
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%)',
-                  border: '1px solid rgba(255, 59, 48, 0.2)',
+                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-error), transparent 88%) 0%, color-mix(in srgb, var(--mac-error), transparent 93%) 100%)',
+                  border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
                   borderRadius: '12px',
                   padding: '12px'
                 }} id="queue-join-error" role="alert" aria-live="assertive">
                   <div className="flex items-center">
-                    <AlertCircle className="h-5 w-5 mr-2" style={{ color: '#FF3B30' }} />
-                    <span style={{ color: '#FF3B30', fontSize: '14px' }}>{error}</span>
+                    <AlertCircle className="h-5 w-5 mr-2" style={{ color: 'var(--mac-error)' }} />
+                    <span style={{ color: 'var(--mac-error)', fontSize: '14px' }}>{error}</span>
                   </div>
                 </div>
               )}
@@ -1611,7 +1576,7 @@ const QueueJoin = () => {
                   onClick={() => setStep('info')}
                   style={{
                     flex: 1,
-                    background: 'rgba(142, 142, 147, 0.12)',
+                    background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
                     color: A11Y_COLORS.primary,
                     padding: '14px 20px',
                     borderRadius: '12px',
@@ -1621,8 +1586,8 @@ const QueueJoin = () => {
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
-                  onMouseEnter={(e) => e.target.style.background = 'rgba(142, 142, 147, 0.18)'}
-                  onMouseLeave={(e) => e.target.style.background = 'rgba(142, 142, 147, 0.12)'}
+                  onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
+                  onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
                 >
                   Ортга
                 </button>
@@ -1631,8 +1596,8 @@ const QueueJoin = () => {
                   disabled={loading}
                   style={{
                     flex: 1,
-                    background: loading ? '#8E8E93' : A11Y_COLORS.primary,
-                    color: 'white',
+                    background: loading ? 'var(--mac-text-tertiary)' : A11Y_COLORS.primary,
+                    color: 'var(--mac-text-on-accent)',
                     padding: '14px 20px',
                     borderRadius: '12px',
                     border: 'none',
@@ -1640,7 +1605,7 @@ const QueueJoin = () => {
                     fontWeight: '600',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: loading ? 'none' : '0 4px 12px rgba(0, 81, 213, 0.3)'
+                    boxShadow: loading ? 'none' : '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
                   }}
                   onMouseEnter={(e) => !loading && (e.target.style.background = A11Y_COLORS.primaryHover)}
                   onMouseLeave={(e) => !loading && (e.target.style.background = A11Y_COLORS.primary)}

@@ -82,7 +82,7 @@ const EMRDemo = () => {
         </Link>
       </Card>
 
-      <div style={{ marginTop: 48, padding: 24, backgroundColor: 'var(--mac-background-secondary)', borderRadius: 12, border: '1px solid var(--mac-border)' }}>
+      <div style={{ marginTop: 48, padding: 24, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 12, border: '1px solid var(--mac-border)' }}>
         <Typography variant="h4" style={{ marginBottom: 16 }}>
           📋 Инструкции по использованию
         </Typography>

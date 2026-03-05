@@ -11,6 +11,8 @@ import DisplayBoardSettings from './DisplayBoardSettings';
 import SecuritySettings from './SecuritySettings';
 import WizardSettings from './WizardSettings';
 import ClinicSettings from './ClinicSettings';
+import ColorSchemeSelector from './ColorSchemeSelector.jsx';
+import AccentPicker from '../ui/macos/AccentPicker.jsx';
 
 const UnifiedSettings = () => {
   const [searchParams] = useSearchParams();
@@ -66,7 +68,44 @@ const UnifiedSettings = () => {
 
       case 'settings':
       default:
-        return <ClinicSettings />;
+        return (
+          <div style={{ display: 'grid', gap: '20px' }}>
+            <ColorSchemeSelector />
+            <div style={{
+              padding: '20px',
+              borderRadius: 'var(--mac-radius-lg)',
+              background: 'var(--mac-bg-primary)',
+              border: '1px solid var(--mac-border)',
+              boxShadow: 'var(--mac-shadow-sm)',
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 12, color: 'var(--mac-text-primary)' }}>
+                Accent color
+              </div>
+              <div style={{ display: 'grid', gap: '10px' }}>
+                <AccentPicker />
+                <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                  Accent color влияет на кнопки, focus states и primary states в админ-панели. Он хранится локально в текущем браузере.
+                </div>
+              </div>
+            </div>
+            <div style={{
+              padding: '20px',
+              borderRadius: 'var(--mac-radius-lg)',
+              background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
+              border: '1px solid var(--mac-border)',
+              boxShadow: 'var(--mac-shadow-sm)',
+              display: 'grid',
+              gap: '10px',
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                Логика применения
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)', lineHeight: 1.55 }}>
+                Цветовая схема задаёт пространство интерфейса: фон, поверхности, header и sidebar. Accent управляет цветом действий и выделений. Theme preference синхронизируется через профиль пользователя, accent остаётся локальной настройкой рабочего места.
+              </div>
+            </div>
+            <ClinicSettings />
+          </div>);
     }
   };
 

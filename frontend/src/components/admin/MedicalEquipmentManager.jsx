@@ -726,7 +726,7 @@ const MedicalEquipmentManager = () => {
                   padding: '8px',
                   border: '1px solid var(--mac-border)',
                   borderRadius: 'var(--mac-border-radius)',
-                  backgroundColor: 'var(--mac-background-secondary)'
+                  backgroundColor: 'var(--mac-bg-secondary)'
                 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <DeviceIcon size={16} style={{ color: 'var(--mac-blue)' }} />

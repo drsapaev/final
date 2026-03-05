@@ -41,12 +41,12 @@
 }
 
 .doctor-templates-btn--active:hover:not(:disabled) {
-    background: rgba(34, 197, 94, 0.25);
+    background: color-mix(in srgb, var(--my-experience-border, #22c55e), transparent 75%);
 }
 
 .doctor-templates-btn-count {
     background: var(--accent-success, #22c55e);
-    color: white;
+    color: var(--mac-text-on-accent, #ffffff);
     font-size: 10px;
     padding: 1px 5px;
     border-radius: var(--radius-full, 9999px);
@@ -69,7 +69,7 @@
 .doctor-templates-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: color-mix(in srgb, var(--mac-bg-primary, #0f172a), black 44%);
     backdrop-filter: blur(4px);
 }
 
@@ -245,7 +245,7 @@
 }
 
 .doctor-templates-item-content:hover {
-    background: rgba(255, 255, 255, 0.02);
+    background: color-mix(in srgb, var(--surface-input, #252540), transparent 40%);
 }
 
 .doctor-templates-item-text {
@@ -299,7 +299,7 @@
 .doctor-templates-edit-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: color-mix(in srgb, var(--mac-bg-primary, #0f172a), black 58%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -377,7 +377,7 @@
 .doctor-templates-edit-btn--primary {
     background: var(--accent-primary, #6366f1);
     border: none;
-    color: white;
+    color: var(--mac-text-on-accent, #ffffff);
 }
 
 .doctor-templates-edit-btn--primary:hover {
@@ -387,7 +387,7 @@
 .doctor-templates-edit-btn--success {
     background: var(--accent-success, #22c55e);
     border: none;
-    color: white;
+    color: var(--mac-text-on-accent, #ffffff);
 }
 
 .doctor-templates-edit-btn--success:hover {

@@ -276,8 +276,8 @@ textarea {
   }
 }
 
-/* Темная тема специфичные стили - УЛУЧШЕННЫЕ */
-[data-theme="dark"] {
+/* Темная тема специфичные стили - УЛУЧШЕННЫЕ (только классическая dark схема) */
+[data-theme="dark"][data-color-scheme="dark"] {
   --text-on-gradient: #f8fafc;
   --text-shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.9);
   --text-shadow-medium: 0 1px 2px rgba(0, 0, 0, 0.7);
@@ -288,36 +288,36 @@ textarea {
   --border-dark: #475569;
 }
 
-[data-theme="dark"] .clinic-card {
+[data-theme="dark"][data-color-scheme="dark"] .clinic-card {
   background: var(--bg-card-dark) !important;
   border: 1px solid var(--border-dark) !important;
 }
 
 /* Темная тема: контраст для outline-кнопок */
-[data-theme="dark"] .clinic-button-outline {
+[data-theme="dark"][data-color-scheme="dark"] .clinic-button-outline {
   background: var(--bg-panel-dark);
   color: var(--text-primary);
   border: 1px solid var(--border-dark);
 }
 
-[data-theme="dark"] .clinic-page {
+[data-theme="dark"][data-color-scheme="dark"] .clinic-page {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
 /* КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прозрачные элементы в темной теме */
-[data-theme="dark"] [style*="rgba(15, 23, 42, 0.8)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(15, 23, 42, 0.8)"] {
   background: var(--bg-card-dark) !important;
 }
 
-[data-theme="dark"] [style*="rgba(255, 255, 255, 0.8)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.8)"] {
   background: var(--bg-card-dark) !important;
 }
 
-[data-theme="dark"] [style*="rgba(255, 255, 255, 0.1)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.1)"] {
   border-color: var(--border-dark) !important;
 }
 
-[data-theme="dark"] [style*="rgba(255, 255, 255, 0.2)"] {
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.2)"] {
   border-color: var(--border-dark) !important;
 }
 

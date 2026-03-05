@@ -5,21 +5,68 @@
 
 :root {
   /* macOS System Color Palette - Light Mode */
-  --mac-bg-primary: #ffffff;
-  --mac-bg-secondary: #f5f5f7;
-  --mac-bg-tertiary: #f0f0f0;
-  --mac-bg-quaternary: #e8e8e8;
+  --mac-bg-primary: #eef3fa;
+  --mac-bg-secondary: #e3ebf5;
+  --mac-bg-tertiary: #d7e1ee;
+  --mac-bg-quaternary: #ccd8e7;
+  /* Backward-compatible aliases for legacy components */
+  --mac-background: var(--mac-bg-primary);
+  --mac-background-secondary: var(--mac-bg-secondary);
+  --mac-background-tertiary: var(--mac-bg-tertiary);
+  --bg-primary: var(--mac-bg-primary);
+  --bg-secondary: var(--mac-bg-secondary);
+  --bg-tertiary: var(--mac-bg-tertiary);
+  --border-color: var(--mac-border);
+  --text-primary: var(--mac-text-primary);
+  --text-secondary: var(--mac-text-secondary);
+  --accent-color: var(--mac-accent);
+  --success-color: var(--mac-success);
+  --warning-color: var(--mac-warning);
+  --danger-color: var(--mac-error);
+  --info-color: var(--mac-accent);
+  --mac-blue: var(--mac-accent);
+  --mac-border-radius: var(--mac-radius-md);
 
   --mac-text-primary: #000000;
-  --mac-text-secondary: #6e6e73;
-  --mac-text-tertiary: #8e8e93;
+  --mac-text-secondary: #455568;
+  --mac-text-tertiary: #5d6f84;
 
-  --mac-border: #d1d1d6;
-  --mac-border-secondary: #e5e5ea;
+  --mac-border: #b8c8da;
+  --mac-border-secondary: #cad8e7;
 
   --mac-accent-blue: #007aff;
   --mac-accent-blue-hover: #0051d5;
   --mac-accent-blue-active: #004bb5;
+  --mac-accent-blue-500: var(--mac-accent-blue);
+  --mac-accent-blue-600: var(--mac-accent-blue-hover);
+  --mac-accent-blue-700: var(--mac-accent-blue-active);
+  --mac-accent: var(--mac-accent-blue);
+  --mac-accent-bg: color-mix(in srgb, var(--mac-accent-blue), transparent 86%);
+  --mac-accent-blue-bg: color-mix(in srgb, var(--mac-accent-blue), transparent 84%);
+  --mac-accent-border: color-mix(in srgb, var(--mac-accent-blue), transparent 72%);
+  --mac-accent-blue-light: color-mix(in srgb, var(--mac-accent-blue), white 78%);
+  --mac-text-on-accent: #ffffff;
+  --mac-accent-purple: #5856d6;
+  --mac-accent-purple-bg: color-mix(in srgb, var(--mac-accent-purple), transparent 84%);
+  --mac-accent-purple-light: color-mix(in srgb, var(--mac-accent-purple), white 78%);
+  --mac-accent-green: #34c759;
+  --mac-accent-green-bg: color-mix(in srgb, var(--mac-accent-green), transparent 84%);
+  --mac-accent-red: #ff3b30;
+  --mac-accent-red-bg: color-mix(in srgb, var(--mac-accent-red), transparent 84%);
+  --mac-accent-orange: #ff9500;
+  --mac-accent-orange-bg: color-mix(in srgb, var(--mac-accent-orange), transparent 84%);
+  --mac-header-bg: rgba(238, 245, 253, 0.92);
+  --mac-card-bg: rgba(238, 246, 255, 0.88);
+  --mac-card-hover-bg: #e4eefb;
+  --mac-card-border: rgba(27, 46, 73, 0.14);
+  --mac-nav-item-bg: rgba(244, 249, 255, 0.82);
+  --mac-nav-item-hover: #e0ebf8;
+  --mac-nav-item-active: var(--mac-accent-blue);
+  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active-text: var(--mac-text-on-accent);
+  --mac-main-shell-bg: linear-gradient(180deg, rgba(241, 247, 255, 0.9) 0%, rgba(224, 236, 249, 0.98) 100%);
+  --mac-main-shell-border: rgba(27, 46, 73, 0.12);
+  --mac-main-shell-shadow: 0 18px 38px rgba(126, 148, 177, 0.22);
 
   --mac-success: #30d158;
   --mac-success-hover: #28cd41;
@@ -27,19 +74,29 @@
   --mac-warning-hover: #ff8c00;
   --mac-danger: #ff453a;
   --mac-danger-hover: #ff3b30;
+  --mac-error: var(--mac-danger);
+  --mac-success-bg: color-mix(in srgb, var(--mac-success), transparent 86%);
+  --mac-success-bg-light: color-mix(in srgb, var(--mac-success), white 80%);
+  --mac-success-border: color-mix(in srgb, var(--mac-success), transparent 72%);
+  --mac-warning-bg: color-mix(in srgb, var(--mac-warning), transparent 84%);
+  --mac-warning-bg-light: color-mix(in srgb, var(--mac-warning), white 78%);
+  --mac-warning-border: color-mix(in srgb, var(--mac-warning), transparent 70%);
+  --mac-error-bg: color-mix(in srgb, var(--mac-error), transparent 86%);
+  --mac-error-bg-light: color-mix(in srgb, var(--mac-error), white 80%);
+  --mac-error-border: color-mix(in srgb, var(--mac-error), transparent 72%);
 
   --mac-separator: #e5e5ea;
 
   /* macOS Background Patterns */
-  --mac-bg-window: #f5f5f7;
-  --mac-bg-content: #ffffff;
-  --mac-bg-sidebar: #f0f0f0;
-  --mac-bg-toolbar: #ffffff;
+  --mac-bg-window: #e6edf6;
+  --mac-bg-content: #f4f7fb;
+  --mac-bg-sidebar: #e7eef7;
+  --mac-bg-toolbar: rgba(246, 250, 255, 0.94);
   
   /* macOS Gradients */
-  --mac-gradient-window: linear-gradient(180deg, #f5f5f7 0%, #f0f0f0 100%);
-  --mac-gradient-sidebar: linear-gradient(180deg, #f0f0f0 0%, #e8e8e8 100%);
-  --mac-gradient-button: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
+  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(95, 149, 255, 0.08), transparent 50%), linear-gradient(180deg, #f1f6fc 0%, #dfe8f3 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
+  --mac-gradient-button: linear-gradient(180deg, #ffffff 0%, #edf3fa 100%);
 
   /* macOS Spacing Scale (8px base) */
   --mac-spacing-1: 4px;
@@ -144,30 +201,42 @@
 
 /* Light Theme (macOS Light Mode) - Explicit */
 .light-theme {
-  --mac-bg-primary: #ffffff;
-  --mac-bg-secondary: #f5f5f7;
-  --mac-bg-tertiary: #f0f0f0;
-  --mac-bg-quaternary: #e8e8e8;
+  --mac-bg-primary: #eef3fa;
+  --mac-bg-secondary: #e3ebf5;
+  --mac-bg-tertiary: #d7e1ee;
+  --mac-bg-quaternary: #ccd8e7;
 
   --mac-text-primary: #000000;
-  --mac-text-secondary: #6e6e73;
-  --mac-text-tertiary: #8e8e93;
+  --mac-text-secondary: #455568;
+  --mac-text-tertiary: #5d6f84;
 
-  --mac-border: #d1d1d6;
-  --mac-border-secondary: #e5e5ea;
+  --mac-border: #b8c8da;
+  --mac-border-secondary: #cad8e7;
 
   --mac-separator: #e5e5ea;
+  --mac-header-bg: rgba(238, 245, 253, 0.92);
+  --mac-card-bg: rgba(238, 246, 255, 0.88);
+  --mac-card-hover-bg: #e4eefb;
+  --mac-card-border: rgba(27, 46, 73, 0.14);
+  --mac-nav-item-bg: rgba(244, 249, 255, 0.82);
+  --mac-nav-item-hover: #e0ebf8;
+  --mac-nav-item-active: var(--mac-accent-blue);
+  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active-text: var(--mac-text-on-accent);
+  --mac-main-shell-bg: linear-gradient(180deg, rgba(241, 247, 255, 0.9) 0%, rgba(224, 236, 249, 0.98) 100%);
+  --mac-main-shell-border: rgba(27, 46, 73, 0.12);
+  --mac-main-shell-shadow: 0 18px 38px rgba(126, 148, 177, 0.22);
 
   /* macOS Background Patterns - Light Mode */
-  --mac-bg-window: #f5f5f7;
-  --mac-bg-content: #ffffff;
-  --mac-bg-sidebar: #f0f0f0;
-  --mac-bg-toolbar: #ffffff;
+  --mac-bg-window: #e6edf6;
+  --mac-bg-content: #f4f7fb;
+  --mac-bg-sidebar: #e7eef7;
+  --mac-bg-toolbar: rgba(246, 250, 255, 0.94);
   
   /* macOS Gradients - Light Mode */
-  --mac-gradient-window: linear-gradient(180deg, #f5f5f7 0%, #f0f0f0 100%);
-  --mac-gradient-sidebar: linear-gradient(180deg, #f0f0f0 0%, #e8e8e8 100%);
-  --mac-gradient-button: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
+  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(95, 149, 255, 0.08), transparent 50%), linear-gradient(180deg, #f1f6fc 0%, #dfe8f3 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
+  --mac-gradient-button: linear-gradient(180deg, #ffffff 0%, #edf3fa 100%);
 
   /* macOS Shadows in Light Mode */
   --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
@@ -191,6 +260,18 @@
   --mac-border-secondary: #48484a;
 
   --mac-separator: #38383a;
+  --mac-header-bg: rgba(21, 23, 28, 0.78);
+  --mac-card-bg: rgba(33, 36, 42, 0.86);
+  --mac-card-hover-bg: rgba(41, 45, 52, 0.94);
+  --mac-card-border: rgba(255, 255, 255, 0.08);
+  --mac-nav-item-bg: rgba(255, 255, 255, 0.03);
+  --mac-nav-item-hover: rgba(255, 255, 255, 0.08);
+  --mac-nav-item-active: var(--mac-accent-blue);
+  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active-text: var(--mac-text-on-accent);
+  --mac-main-shell-bg: linear-gradient(180deg, rgba(28, 28, 30, 0.88) 0%, rgba(24, 24, 27, 0.92) 100%);
+  --mac-main-shell-border: rgba(255, 255, 255, 0.06);
+  --mac-main-shell-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
 
   /* macOS Background Patterns - Dark Mode */
   --mac-bg-window: #1c1c1e;
@@ -305,8 +386,8 @@
 
 /* macOS Card Styles */
 .mac-card {
-  background: var(--mac-bg-primary);
-  border: 1px solid var(--mac-border);
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
   border-radius: var(--mac-radius-lg);
   box-shadow: var(--mac-shadow-sm);
   padding: var(--mac-spacing-6);
@@ -543,4 +624,3 @@
     --mac-text-tertiary: #000000;
   }
 }
-

@@ -34,6 +34,10 @@ class Theme(str, Enum):
     LIGHT = "light"
     DARK = "dark"
     AUTO = "auto"
+    SYSTEM = "system"
+    VIBRANT = "vibrant"
+    GLASS = "glass"
+    GRADIENT = "gradient"
 
 
 class TimeFormat(str, Enum):
@@ -116,7 +120,7 @@ class UserPreferencesBase(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    theme: Theme | None = Theme.LIGHT
+    theme: Theme | None = Theme.AUTO
     language: str | None = Field(None, max_length=10)
     timezone: str | None = Field(None, max_length=50)
     date_format: str | None = Field(None, max_length=20)

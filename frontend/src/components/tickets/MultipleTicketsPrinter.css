@@ -1,5 +1,7 @@
 .multiple-tickets-printer {
-  background: white;
+  background: var(--mac-card-bg);
+  color: var(--mac-text-primary);
+  border: 1px solid var(--mac-card-border);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   max-width: 800px;
@@ -15,15 +17,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f8fafc;
+  border-bottom: 1px solid var(--mac-separator);
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
 }
 
 .printer-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--mac-text-primary);
 }
 
 .close-btn {
@@ -32,13 +34,13 @@
   padding: 8px;
   border-radius: 6px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   transition: all 0.2s;
 }
 
 .close-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--mac-nav-item-hover);
+  color: var(--mac-text-primary);
 }
 
 .tickets-grid {
@@ -51,23 +53,23 @@
 }
 
 .ticket-card {
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--mac-border);
   border-radius: 8px;
   padding: 16px;
-  background: white;
+  background: var(--mac-bg-primary);
   transition: all 0.3s ease;
   position: relative;
 }
 
 .ticket-card.printing {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--mac-accent);
+  background: var(--mac-accent-bg);
   transform: scale(1.02);
 }
 
 .ticket-card.printed {
-  border-color: #10b981;
-  background: #f0fdf4;
+  border-color: var(--mac-success);
+  background: var(--mac-success-bg);
 }
 
 .ticket-header {
@@ -79,13 +81,13 @@
 
 .queue-name {
   font-weight: 600;
-  color: #1f2937;
+  color: var(--mac-text-primary);
   font-size: 14px;
 }
 
 .queue-number {
-  background: #3b82f6;
-  color: white;
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent);
   padding: 4px 8px;
   border-radius: 4px;
   font-weight: 600;
@@ -93,7 +95,7 @@
 }
 
 .ticket-card.printed .queue-number {
-  background: #10b981;
+  background: var(--mac-success);
 }
 
 .ticket-details {
@@ -102,18 +104,18 @@
 
 .patient-name {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--mac-text-primary);
   margin-bottom: 4px;
 }
 
 .doctor-name {
-  color: #6b7280;
+  color: var(--mac-text-secondary);
   font-size: 13px;
   margin-bottom: 4px;
 }
 
 .visit-info {
-  color: #9ca3af;
+  color: var(--mac-text-tertiary);
   font-size: 12px;
 }
 
@@ -127,8 +129,8 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: #3b82f6;
-  color: white;
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -138,7 +140,7 @@
 }
 
 .print-single-btn:hover {
-  background: #2563eb;
+  background: color-mix(in srgb, var(--mac-accent), black 14%);
   transform: translateY(-1px);
 }
 
@@ -154,13 +156,13 @@
 }
 
 .printed-status {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--mac-success-bg);
+  color: var(--mac-success);
 }
 
 .printing-status {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--mac-accent-bg);
+  color: var(--mac-accent);
 }
 
 .spinning {
@@ -174,8 +176,8 @@
 
 .printer-footer {
   padding: 20px 24px;
-  border-top: 1px solid #e5e7eb;
-  background: #f8fafc;
+  border-top: 1px solid var(--mac-separator);
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
   display: flex;
   justify-content: center;
 }
@@ -190,8 +192,8 @@
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: #059669;
-  color: white;
+  background: var(--mac-success);
+  color: var(--mac-text-on-accent);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -201,12 +203,12 @@
 }
 
 .print-all-btn:hover:not(:disabled) {
-  background: #047857;
+  background: color-mix(in srgb, var(--mac-success), black 14%);
   transform: translateY(-1px);
 }
 
 .print-all-btn.countdown {
-  background: #6b7280;
+  background: color-mix(in srgb, var(--mac-bg-tertiary), black 10%);
   cursor: not-allowed;
 }
 
@@ -214,7 +216,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #166534;
+  color: var(--mac-success);
   font-weight: 600;
 }
 
@@ -232,3 +234,4 @@
   .printer-footer {
     padding: 16px;
   }
+}

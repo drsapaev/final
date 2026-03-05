@@ -19,6 +19,12 @@ class UserManagementApiService:
     ):
         self.repository = repository or UserManagementApiRepository(db)
 
+    @staticmethod
+    def normalize_theme(theme: str | None) -> str:
+        if theme == "system":
+            return "auto"
+        return theme or "auto"
+
     def update_current_user_preferences(
         self,
         *,
@@ -31,14 +37,14 @@ class UserManagementApiService:
             if not preferences:
                 preferences = self.repository.create_preferences(
                     user_id=current_user_id,
-                    theme=preferences_data.get("theme", "system"),
+                    theme=self.normalize_theme(preferences_data.get("theme")),
                     language=preferences_data.get("language", "ru"),
                     compact_mode=preferences_data.get("compact_mode", False),
                     sidebar_collapsed=preferences_data.get("sidebar_collapsed", False),
                 )
             else:
                 if "theme" in preferences_data:
-                    preferences.theme = preferences_data["theme"]
+                    preferences.theme = self.normalize_theme(preferences_data["theme"])
                 if "language" in preferences_data:
                     preferences.language = preferences_data["language"]
                 if "compact_mode" in preferences_data:

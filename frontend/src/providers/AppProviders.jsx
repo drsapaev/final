@@ -1,4 +1,3 @@
-// Главный провайдер для всех контекстов приложенияimport { ThemeProvider } from '../contexts/ThemeContext';
 import { TranslationProvider } from '../hooks/useTranslation';
 import { AppDataProvider } from '../contexts/AppDataContext';
 import { ChatProvider } from '../contexts/ChatContext';
@@ -10,31 +9,30 @@ import { NotificationPrompt } from '../components/chat/NotificationPrompt';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
 
 /**
- * Главный провайдер для всех контекстов
+ * Главный провайдер для всех контекстов.
+ * ThemeProvider находится уровнем выше, в App.jsx, чтобы не плодить независимые theme-state.
  */
 export function AppProviders({ children }) {
   return (
     <TranslationProvider>
-      <ThemeProvider>
-        <AppDataProvider>
-          <ChatProvider>
-            <ErrorBoundary>
-              <ToastProvider>
-                <NotificationWebSocketProvider>
-                  <ModalProvider>
-                    <FormProvider>
-                      {children}
-                      <NotificationPrompt />
-                    </FormProvider>
-                  </ModalProvider>
-                </NotificationWebSocketProvider>
-              </ToastProvider>
-            </ErrorBoundary>
-          </ChatProvider>
-        </AppDataProvider>
-      </ThemeProvider>
-    </TranslationProvider>
-  );
+      <AppDataProvider>
+        <ChatProvider>
+          <ErrorBoundary>
+            <ToastProvider>
+              <NotificationWebSocketProvider>
+                <ModalProvider>
+                  <FormProvider>
+                    {children}
+                    <NotificationPrompt />
+                  </FormProvider>
+                </ModalProvider>
+              </NotificationWebSocketProvider>
+            </ToastProvider>
+          </ErrorBoundary>
+        </ChatProvider>
+      </AppDataProvider>
+    </TranslationProvider>);
+
 }
 
 export default AppProviders;

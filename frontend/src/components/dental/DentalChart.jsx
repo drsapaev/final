@@ -224,7 +224,7 @@ const DentalChart = ({
           height: '40px',
           borderRadius: '50%',
           backgroundColor: status.color,
-          border: isSelected ? '3px solid #000' : '2px solid #fff',
+          border: isSelected ? '3px solid var(--mac-text-primary)' : '2px solid color-mix(in srgb, var(--mac-bg-primary), white 40%)',
           cursor: readOnly ? 'default' : 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -260,9 +260,9 @@ const DentalChart = ({
           width: '100%',
           height: '120px',
           marginBottom: '20px',
-          border: '2px solid #e5e7eb',
+          border: '2px solid var(--mac-border)',
           borderRadius: '8px',
-          backgroundColor: '#f9fafb'
+          backgroundColor: 'var(--mac-bg-secondary)'
         }}>
         
         {jawTeeth.map((tooth) => renderTooth(tooth.id, tooth))}
@@ -278,8 +278,8 @@ const DentalChart = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '10px',
-        backgroundColor: '#f3f4f6',
-        borderBottom: '1px solid #d1d5db',
+        backgroundColor: 'var(--mac-bg-secondary)',
+        borderBottom: '1px solid var(--mac-border)',
         marginBottom: '20px'
       }}>
         <div className="toolbar-left" style={{ display: 'flex', gap: '10px' }}>
@@ -345,9 +345,9 @@ const DentalChart = ({
           width: '100%',
           height: '300px',
           overflow: 'hidden',
-          border: '1px solid #d1d5db',
+          border: '1px solid var(--mac-border)',
           borderRadius: '8px',
-          backgroundColor: '#fff',
+          backgroundColor: 'var(--mac-bg-primary)',
           transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
           transformOrigin: 'top left'
         }}
@@ -358,13 +358,13 @@ const DentalChart = ({
         
         {/* Верхняя челюсть */}
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#374151' }}>Верхняя челюсть</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--mac-text-primary)' }}>Верхняя челюсть</h3>
         </div>
         {renderJaw(true)}
         
         {/* Нижняя челюсть */}
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#374151' }}>Нижняя челюсть</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--mac-text-primary)' }}>Нижняя челюсть</h3>
         </div>
         {renderJaw(false)}
       </div>
@@ -373,9 +373,9 @@ const DentalChart = ({
       <div className="tooth-legend" style={{
         marginTop: '20px',
         padding: '15px',
-        backgroundColor: '#f9fafb',
+        backgroundColor: 'var(--mac-bg-secondary)',
         borderRadius: '8px',
-        border: '1px solid #e5e7eb'
+        border: '1px solid var(--mac-border)'
       }}>
         <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '600' }}>
           Состояния зубов:
@@ -388,7 +388,7 @@ const DentalChart = ({
               height: '20px',
               borderRadius: '50%',
               backgroundColor: status.color,
-              border: '1px solid #d1d5db'
+              border: '1px solid var(--mac-border)'
             }} />
               <span style={{ fontSize: '12px' }}>{status.label}</span>
             </div>
@@ -448,8 +448,10 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
       zIndex: 1000
     }}>
       <div className="modal-content" style={{
-        backgroundColor: '#fff',
+        backgroundColor: 'var(--mac-card-bg)',
+        border: '1px solid var(--mac-card-border)',
         borderRadius: '8px',
+        color: 'var(--mac-text-primary)',
         padding: '20px',
         width: '400px',
         maxHeight: '80vh',
@@ -468,8 +470,10 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               style={{
                 width: '100%',
                 padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px'
+                border: '1px solid var(--mac-border)',
+                borderRadius: '4px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }}>
               
               <option value="healthy">Здоровый</option>
@@ -497,8 +501,10 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               style={{
                 width: '100%',
                 padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px'
+                border: '1px solid var(--mac-border)',
+                borderRadius: '4px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -515,8 +521,10 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               style={{
                 width: '100%',
                 padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px'
+                border: '1px solid var(--mac-border)',
+                borderRadius: '4px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -533,8 +541,10 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               style={{
                 width: '100%',
                 padding: '8px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--mac-border)',
                 borderRadius: '4px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
                 resize: 'vertical'
               }} />
             
@@ -546,9 +556,10 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               onClick={onClose}
               style={{
                 padding: '8px 16px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--mac-border)',
                 borderRadius: '4px',
-                backgroundColor: '#fff',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
                 cursor: 'pointer'
               }}>
               
@@ -560,7 +571,7 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
                 padding: '8px 16px',
                 border: 'none',
                 borderRadius: '4px',
-                backgroundColor: '#3b82f6',
+                backgroundColor: 'var(--mac-accent)',
                 color: '#fff',
                 cursor: 'pointer'
               }}>
@@ -622,8 +633,10 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
       zIndex: 1000
     }}>
       <div className="modal-content" style={{
-        backgroundColor: '#fff',
+        backgroundColor: 'var(--mac-card-bg)',
+        border: '1px solid var(--mac-card-border)',
         borderRadius: '8px',
+        color: 'var(--mac-text-primary)',
         padding: '20px',
         width: '600px',
         maxHeight: '80vh',
@@ -632,13 +645,13 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
         <h3 style={{ margin: '0 0 20px 0' }}>План лечения</h3>
         
         {/* Добавление нового элемента */}
-        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'var(--mac-bg-secondary)', borderRadius: '8px' }}>
           <h4 style={{ margin: '0 0 15px 0' }}>Добавить лечение</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <select
               value={newItem.toothId}
               onChange={(e) => setNewItem({ ...newItem, toothId: e.target.value })}
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}>
+              style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }}>
               
               <option value="">Выберите зуб</option>
               {Object.keys(teeth).map((toothId) =>
@@ -650,14 +663,14 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               value={newItem.treatment}
               onChange={(e) => setNewItem({ ...newItem, treatment: e.target.value })}
               placeholder="Описание лечения"
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
+              style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }} />
             
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <select
               value={newItem.priority}
               onChange={(e) => setNewItem({ ...newItem, priority: e.target.value })}
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}>
+              style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }}>
               
               <option value="low">Низкий</option>
               <option value="medium">Средний</option>
@@ -668,14 +681,14 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               value={newItem.estimatedCost}
               onChange={(e) => setNewItem({ ...newItem, estimatedCost: e.target.value })}
               placeholder="Стоимость"
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
+              style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }} />
             
             <input
               type="number"
               value={newItem.estimatedTime}
               onChange={(e) => setNewItem({ ...newItem, estimatedTime: e.target.value })}
               placeholder="Время (мин)"
-              style={{ padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }} />
+              style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }} />
             
           </div>
           <button
@@ -684,7 +697,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               padding: '8px 16px',
               border: 'none',
               borderRadius: '4px',
-              backgroundColor: '#10b981',
+              backgroundColor: 'var(--mac-success)',
               color: '#fff',
               cursor: 'pointer'
             }}>
@@ -697,26 +710,26 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
         <div style={{ marginBottom: '20px' }}>
           <h4 style={{ margin: '0 0 15px 0' }}>Текущий план</h4>
           {treatmentPlan.length === 0 ?
-          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>План лечения пуст</p> :
+          <p style={{ color: 'var(--mac-text-secondary)', fontStyle: 'italic' }}>План лечения пуст</p> :
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {treatmentPlan.map((item) =>
             <div key={item.id} style={{
               padding: '15px',
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--mac-border)',
               borderRadius: '8px',
-              backgroundColor: '#fff'
+              backgroundColor: 'var(--mac-bg-primary)'
             }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '600', marginBottom: '5px' }}>
                         Зуб {item.toothId}: {item.treatment}
                       </div>
-                      <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '5px' }}>
+                      <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '5px' }}>
                         Приоритет: {item.priority} | Стоимость: {item.estimatedCost} | Время: {item.estimatedTime} мин
                       </div>
                       {item.notes &&
-                  <div style={{ fontSize: '14px', color: '#374151' }}>
+                  <div style={{ fontSize: '14px', color: 'var(--mac-text-primary)' }}>
                           {item.notes}
                         </div>
                   }
@@ -727,7 +740,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
                     padding: '4px 8px',
                     border: 'none',
                     borderRadius: '4px',
-                    backgroundColor: '#ef4444',
+                    backgroundColor: 'var(--mac-error)',
                     color: '#fff',
                     cursor: 'pointer',
                     fontSize: '12px'
@@ -747,9 +760,10 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
             onClick={onClose}
             style={{
               padding: '8px 16px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--mac-border)',
               borderRadius: '4px',
-              backgroundColor: '#fff',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
               cursor: 'pointer'
             }}>
             

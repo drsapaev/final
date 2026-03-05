@@ -1,0 +1,37 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - button "Clinic Management" [ref=e7] [cursor=pointer]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - text: Clinic Management
+    - generic [ref=e12]:
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - button "Кассир" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]:
+          - img [ref=e19]
+          - text: Кассир
+    - generic [ref=e23]:
+      - button "RU" [ref=e25] [cursor=pointer]:
+        - generic [ref=e26]:
+          - img [ref=e27]
+          - text: RU
+      - generic "Онлайн" [ref=e31]:
+        - img [ref=e32]
+        - text: Онлайн
+      - button "Сообщения (офлайн)" [ref=e35] [cursor=pointer]:
+        - img [ref=e36]
+      - button "Выбрать тему" [ref=e40] [cursor=pointer]:
+        - img [ref=e43]
+      - button "Registrar User" [ref=e46] [cursor=pointer]:
+        - generic [ref=e47]:
+          - img [ref=e48]
+          - text: Registrar User
+      - button "Выйти" [ref=e51] [cursor=pointer]:
+        - generic [ref=e52]:
+          - img [ref=e53]
+          - text: Выйти
+  - main [ref=e57]:
+    - generic [ref=e58]: Загрузка профиля...

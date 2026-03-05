@@ -7,7 +7,6 @@ import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucid
 import UnifiedLayout from '../components/layout/UnifiedLayout';
 import { PatientCard, MetricCard, MedicalTable } from '../components/medical';
 import MedicalCard from '../components/medical/MedicalCard';
-import { useTheme } from '../contexts/ThemeContext';
 import logger from '../utils/logger';
 import '../styles/full-width.css';
 import '../styles/cursor-effects.css';
@@ -26,7 +25,6 @@ const resolveTabFromPath = (path) => {
  * Показывает все новые компоненты в действии
  */
 const MediLabDemo = () => {
-  const { isDark } = useTheme();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -193,16 +191,116 @@ const MediLabDemo = () => {
     }
   ];
 
+  const titleStyle = { color: 'var(--mac-text-primary)' };
+  const subtitleStyle = { color: 'var(--mac-text-secondary)' };
+  const mutedTextStyle = { color: 'var(--mac-text-secondary)' };
+  const panelBorderStyle = { borderColor: 'var(--mac-border)' };
+  const panelInputStyle = {
+    backgroundColor: 'var(--mac-card-bg)',
+    borderColor: 'var(--mac-border)',
+    color: 'var(--mac-text-primary)'
+  };
+  const panelMutedSurfaceStyle = { backgroundColor: 'var(--mac-bg-secondary)' };
+  const dividerStyle = { backgroundColor: 'var(--mac-separator)' };
+  const timelineTickStyle = { backgroundColor: 'var(--mac-border)' };
+  const roleBadgeStyle = { backgroundColor: 'var(--mac-accent-bg)' };
+  const roleIconStyle = { color: 'var(--mac-accent)' };
+  const tokenizedPrimaryButtonStyle = {
+    background: 'linear-gradient(135deg, var(--mac-accent) 0%, color-mix(in srgb, var(--mac-accent), black 18%) 100%)',
+    color: 'var(--mac-text-on-accent)',
+    border: '1px solid color-mix(in srgb, var(--mac-accent), black 24%)',
+    boxShadow: '0 4px 10px color-mix(in srgb, var(--mac-accent), transparent 68%)'
+  };
+  const tokenizedSuccessButtonStyle = {
+    background: 'linear-gradient(135deg, var(--mac-success) 0%, color-mix(in srgb, var(--mac-success), black 18%) 100%)',
+    color: 'var(--mac-text-on-accent)',
+    border: '1px solid color-mix(in srgb, var(--mac-success), black 24%)',
+    boxShadow: '0 4px 10px color-mix(in srgb, var(--mac-success), transparent 68%)'
+  };
+  const tokenizedWarningButtonStyle = {
+    background: 'linear-gradient(135deg, var(--mac-warning) 0%, color-mix(in srgb, var(--mac-warning), black 18%) 100%)',
+    color: 'var(--mac-text-on-accent)',
+    border: '1px solid color-mix(in srgb, var(--mac-warning), black 24%)',
+    boxShadow: '0 4px 10px color-mix(in srgb, var(--mac-warning), transparent 68%)'
+  };
+
+  const activityItems = [
+    {
+      action: 'New patient registered',
+      time: '2 min ago',
+      iconName: 'User',
+      color: 'var(--mac-accent)',
+    },
+    {
+      action: 'Appointment completed',
+      time: '15 min ago',
+      iconName: 'Calendar',
+      color: 'var(--mac-success)',
+    },
+    {
+      action: 'Payment received',
+      time: '1 hour ago',
+      iconName: 'DollarSign',
+      color: 'var(--mac-error)',
+    },
+    {
+      action: 'System backup completed',
+      time: '2 hours ago',
+      iconName: 'Activity',
+      color: 'var(--mac-warning)',
+    },
+  ];
+
+  const quickActions = [
+    {
+      label: 'New Patient',
+      iconName: 'User',
+      color: 'var(--mac-accent)',
+    },
+    {
+      label: 'Schedule',
+      iconName: 'Calendar',
+      color: 'var(--mac-success)',
+    },
+    {
+      label: 'Reports',
+      iconName: 'BarChart3',
+      color: 'var(--mac-error)',
+    },
+    {
+      label: 'Staff',
+      iconName: 'Stethoscope',
+      color: 'var(--mac-warning)',
+    },
+  ];
+
+  const shiftColors = {
+    pink: 'var(--mac-error-bg)',
+    yellow: 'var(--mac-warning-bg)',
+    purple: 'var(--mac-accent-purple-bg)',
+    blue: 'var(--mac-accent-blue-bg)',
+    default: 'var(--mac-bg-secondary)',
+  };
+
+  const getActionShadow = (color, opacity = '55%') =>
+    `0 2px 8px color-mix(in srgb, ${color}, transparent ${opacity})`;
+
+  const getActionHoverShadow = (color, opacity = '38%') =>
+    `0 4px 12px color-mix(in srgb, ${color}, transparent ${opacity})`;
+
+  const getActionHoverColor = (color) =>
+    `color-mix(in srgb, ${color}, black 12%)`;
+
   // Рендер дашборда
   const renderDashboard = () => (
     <div className="h-full flex flex-col w-full">
       {/* Заголовок - компактный */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+          <h1 className="text-2xl font-bold" style={titleStyle}>
             MediLab Dashboard
           </h1>
-          <p className="text-sm text-gray-600" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+          <p className="text-sm text-gray-600" style={subtitleStyle}>
             Medical clinic management system
           </p>
         </div>
@@ -227,66 +325,35 @@ const MediLabDemo = () => {
         {/* Разделитель */}
         <div 
           className="col-span-full h-px my-4" 
-          style={{ 
-            backgroundColor: isDark ? '#374151' : '#e5e7eb' 
-          }}
+          style={dividerStyle}
         ></div>
         
          {/* Recent Activity */}
          <MedicalCard className="h-48 animate-fade-in-left animate-delay-200 card-responsive">
-           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+           <h3 className="text-responsive-lg font-semibold mb-4" style={titleStyle}>
              Recent Activity
            </h3>
            <div className="space-y-3">
-             {[
-               { 
-                 action: 'New patient registered', 
-                 time: '2 min ago', 
-                 iconName: 'User',
-                 bgColor: '#0088cc',
-                 iconColor: '#ffffff'
-               },
-               { 
-                 action: 'Appointment completed', 
-                 time: '15 min ago', 
-                 iconName: 'Calendar',
-                 bgColor: '#00a884',
-                 iconColor: '#ffffff'
-               },
-               { 
-                 action: 'Payment received', 
-                 time: '1 hour ago', 
-                 iconName: 'DollarSign',
-                 bgColor: '#ff6b6b',
-                 iconColor: '#ffffff'
-               },
-               { 
-                 action: 'System backup completed', 
-                 time: '2 hours ago', 
-                 iconName: 'Activity',
-                 bgColor: '#ffa726',
-                 iconColor: '#ffffff'
-               }
-             ].map((item, index) => (
+             {activityItems.map((item, index) => (
                <div key={index} className={`flex items-center gap-3 animate-fade-in-left animate-delay-${(index + 1) * 100}`}>
                  <div 
                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                    style={{
-                     backgroundColor: item.bgColor,
-                     boxShadow: `0 2px 8px ${item.bgColor}40`
+                     backgroundColor: item.color,
+                     boxShadow: getActionShadow(item.color)
                    }}
                  >
                    <Icon
                      name={item.iconName}
                      size={24}
-                     color={item.iconColor}
+                     color="var(--mac-text-on-accent)"
                    />
                  </div>
                  <div className="flex-1 min-w-0">
-                   <p className="text-base font-medium truncate" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+                   <p className="text-base font-medium truncate" style={titleStyle}>
                      {item.action}
                    </p>
-                   <p className="text-sm text-gray-500" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                   <p className="text-sm text-gray-500" style={mutedTextStyle}>
                      {item.time}
                    </p>
                  </div>
@@ -297,50 +364,26 @@ const MediLabDemo = () => {
 
          {/* Quick Actions */}
          <MedicalCard className="h-48 animate-fade-in-right animate-delay-300 card-responsive">
-           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+           <h3 className="text-responsive-lg font-semibold mb-4" style={titleStyle}>
              Quick Actions
            </h3>
            <div className="grid grid-cols-2 gap-3">
-             {[
-               { 
-                 label: 'New Patient', 
-                 iconName: 'User',
-                 bgColor: '#0088cc',
-                 hoverColor: '#006699'
-               },
-               { 
-                 label: 'Schedule', 
-                 iconName: 'Calendar',
-                 bgColor: '#00a884',
-                 hoverColor: '#008a6b'
-               },
-               { 
-                 label: 'Reports', 
-                 iconName: 'BarChart3',
-                 bgColor: '#ff6b6b',
-                 hoverColor: '#ff5252'
-               },
-               { 
-                 label: 'Staff', 
-                 iconName: 'Stethoscope',
-                 bgColor: '#ffa726',
-                 hoverColor: '#ff9800'
-               }
-             ].map((action, index) => (
+             {quickActions.map((action, index) => (
                <button
                  key={index}
                  className={`p-4 rounded-xl text-white transition-all duration-200 text-center h-16 flex flex-col items-center justify-center hover:scale-105 animate-fade-in-scale animate-delay-${(index + 1) * 100} button-responsive`}
                  style={{
-                   backgroundColor: action.bgColor,
-                   boxShadow: `0 2px 8px ${action.bgColor}40`
+                   backgroundColor: action.color,
+                   boxShadow: getActionShadow(action.color),
+                   color: 'var(--mac-text-on-accent)'
                  }}
                  onMouseEnter={(e) => {
-                   e.target.style.backgroundColor = action.hoverColor;
-                   e.target.style.boxShadow = `0 4px 12px ${action.bgColor}60`;
+                   e.currentTarget.style.backgroundColor = getActionHoverColor(action.color);
+                   e.currentTarget.style.boxShadow = getActionHoverShadow(action.color);
                  }}
                  onMouseLeave={(e) => {
-                   e.target.style.backgroundColor = action.bgColor;
-                   e.target.style.boxShadow = `0 2px 8px ${action.bgColor}40`;
+                   e.currentTarget.style.backgroundColor = action.color;
+                   e.currentTarget.style.boxShadow = getActionShadow(action.color);
                  }}
                  aria-label={`${action.label} action`}
                >
@@ -357,24 +400,24 @@ const MediLabDemo = () => {
 
          {/* Today's Summary */}
          <MedicalCard className="h-48 animate-fade-in-scale animate-delay-400 card-responsive">
-           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+           <h3 className="text-responsive-lg font-semibold mb-4" style={titleStyle}>
              Today&apos;s Summary
            </h3>
            <div className="space-y-3">
              <div className="flex justify-between items-center animate-fade-in-left animate-delay-100">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Appointments</span>
-               <span className="text-base font-semibold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>24</span>
+               <span className="text-base" style={mutedTextStyle}>Appointments</span>
+               <span className="text-base font-semibold" style={titleStyle}>24</span>
              </div>
              <div className="flex justify-between items-center animate-fade-in-left animate-delay-200">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Completed</span>
+               <span className="text-base" style={mutedTextStyle}>Completed</span>
                <span className="text-base font-semibold text-green-600">18</span>
              </div>
              <div className="flex justify-between items-center animate-fade-in-left animate-delay-300">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Pending</span>
+               <span className="text-base" style={mutedTextStyle}>Pending</span>
                <span className="text-base font-semibold text-yellow-600">6</span>
              </div>
              <div className="flex justify-between items-center animate-fade-in-left animate-delay-400">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Revenue</span>
+               <span className="text-base" style={mutedTextStyle}>Revenue</span>
                <span className="text-base font-semibold text-green-600">$12,450</span>
              </div>
            </div>
@@ -382,24 +425,24 @@ const MediLabDemo = () => {
 
          {/* Additional Stats */}
          <MedicalCard className="h-48 animate-fade-in-left animate-delay-500 card-responsive">
-           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+           <h3 className="text-responsive-lg font-semibold mb-4" style={titleStyle}>
              Performance
            </h3>
            <div className="space-y-3">
              <div className="flex justify-between items-center animate-fade-in-right animate-delay-100">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Efficiency</span>
+               <span className="text-base" style={mutedTextStyle}>Efficiency</span>
                <span className="text-base font-semibold text-green-600">94%</span>
              </div>
              <div className="flex justify-between items-center animate-fade-in-right animate-delay-200">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Satisfaction</span>
+               <span className="text-base" style={mutedTextStyle}>Satisfaction</span>
                <span className="text-base font-semibold text-blue-600">4.8/5</span>
              </div>
              <div className="flex justify-between items-center animate-fade-in-right animate-delay-300">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Wait Time</span>
+               <span className="text-base" style={mutedTextStyle}>Wait Time</span>
                <span className="text-base font-semibold text-orange-600">12 min</span>
              </div>
              <div className="flex justify-between items-center animate-fade-in-right animate-delay-400">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Capacity</span>
+               <span className="text-base" style={mutedTextStyle}>Capacity</span>
                <span className="text-base font-semibold text-purple-600">78%</span>
              </div>
            </div>
@@ -407,20 +450,20 @@ const MediLabDemo = () => {
 
          {/* System Status */}
          <MedicalCard className="h-48">
-           <h3 className="text-base font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+           <h3 className="text-base font-semibold mb-4" style={titleStyle}>
              System Status
            </h3>
            <div className="space-y-3">
              <div className="flex justify-between items-center">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Server</span>
+               <span className="text-base" style={mutedTextStyle}>Server</span>
                <span className="text-base font-semibold text-green-600">Online</span>
              </div>
              <div className="flex justify-between items-center">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Database</span>
+               <span className="text-base" style={mutedTextStyle}>Database</span>
                <span className="text-base font-semibold text-green-600">Healthy</span>
              </div>
              <div className="flex justify-between items-center">
-               <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Backup</span>
+               <span className="text-base" style={mutedTextStyle}>Backup</span>
                <span className="text-base font-semibold text-blue-600">2h ago</span>
              </div>
            </div>
@@ -435,18 +478,16 @@ const MediLabDemo = () => {
       {/* Заголовок - компактный */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+          <h1 className="text-2xl font-bold" style={titleStyle}>
             Patients Directory
           </h1>
-          <p className="text-sm text-gray-600" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+          <p className="text-sm text-gray-600" style={subtitleStyle}>
             Manage patient records and information
           </p>
         </div>
         <button 
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-          style={{
-            boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
-          }}
+          className="px-4 py-2 text-white rounded-lg transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+          style={tokenizedPrimaryButtonStyle}
           aria-label="Add new patient"
         >
           <Plus className="h-4 w-4" />
@@ -465,14 +506,14 @@ const MediLabDemo = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              style={{
-                backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                borderColor: isDark ? '#334155' : '#d1d5db',
-                color: isDark ? '#f8fafc' : '#374151'
-              }}
+              style={panelInputStyle}
             />
           </div>
-          <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm interactive-element hover-lift ripple-effect magnetic-hover focus-ring" aria-label="Filter patients">
+          <button
+            className="px-3 py-2 border border-gray-300 rounded-lg transition-colors text-sm interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+            style={panelBorderStyle}
+            aria-label="Filter patients"
+          >
             <Filter className="h-4 w-4 mr-1" />
             Filter
           </button>
@@ -501,19 +542,20 @@ const MediLabDemo = () => {
       {/* Заголовок - компактный */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+          <h1 className="text-2xl font-bold" style={titleStyle}>
             Appointments
           </h1>
-          <p className="text-sm text-gray-600" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+          <p className="text-sm text-gray-600" style={subtitleStyle}>
             Manage patient appointments and schedule
           </p>
         </div>
         <div className="flex gap-2">
           <button 
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
-            style={{ 
-              borderColor: isDark ? '#374151' : '#d1d5db',
-              color: isDark ? '#f9fafb' : '#374151'
+            className="px-4 py-2 border border-gray-300 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+            style={{
+              borderColor: 'var(--mac-border)',
+              color: 'var(--mac-text-primary)',
+              backgroundColor: 'var(--mac-card-bg)'
             }}
             aria-label="Switch to calendar view"
           >
@@ -521,10 +563,8 @@ const MediLabDemo = () => {
             Calendar View
           </button>
           <button 
-            className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-            style={{
-              boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)'
-            }}
+            className="px-4 py-2 text-white rounded-lg transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+            style={tokenizedSuccessButtonStyle}
             aria-label="Create new appointment"
           >
             <Plus className="h-4 w-4" />
@@ -576,18 +616,16 @@ const MediLabDemo = () => {
       {/* Заголовок - компактный */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+          <h1 className="text-2xl font-bold" style={titleStyle}>
             Staff Schedule
           </h1>
-          <p className="text-sm text-gray-600" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+          <p className="text-sm text-gray-600" style={subtitleStyle}>
             Manage staff shifts and schedules
           </p>
         </div>
         <button 
-          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-          style={{
-            boxShadow: '0 4px 6px -1px rgba(147, 51, 234, 0.3)'
-          }}
+          className="px-4 py-2 text-white rounded-lg transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+          style={tokenizedWarningButtonStyle}
           aria-label="Add new staff shift"
         >
           <Plus className="h-4 w-4" />
@@ -599,22 +637,22 @@ const MediLabDemo = () => {
       <div className="flex-1 min-h-0 w-full">
         <MedicalCard className="h-full">
           <div className="mb-3">
-            <h3 className="text-base font-semibold mb-1" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+            <h3 className="text-base font-semibold mb-1" style={titleStyle}>
               June, Friday 5th 2023
             </h3>
-            <p className="text-xs font-medium" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+            <p className="text-xs font-medium" style={subtitleStyle}>
               Emergency shift
             </p>
           </div>
 
           {/* Временная шкала - на всю ширину */}
           <div className="mb-3">
-            <div className="flex items-center gap-8 text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+            <div className="flex items-center gap-8 text-xs" style={mutedTextStyle}>
               {['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((time) => (
                 <div key={time} className="text-center">
                   <div 
                     className="w-12 h-0.5 mb-1"
-                    style={{ backgroundColor: isDark ? '#4b5563' : '#d1d5db' }}
+                    style={timelineTickStyle}
                   ></div>
                   <span className="text-xs">{time}</span>
                 </div>
@@ -630,20 +668,18 @@ const MediLabDemo = () => {
                   <div className="flex items-center gap-2">
                     <div 
                       className="w-8 h-8 rounded-full flex items-center justify-center"
-                      style={{
-                        backgroundColor: isDark ? '#1e3a8a' : '#dbeafe'
-                      }}
+                      style={roleBadgeStyle}
                     >
                       <Stethoscope 
                         className="h-4 w-4" 
-                        style={{ color: isDark ? '#60a5fa' : '#2563eb' }}
+                        style={roleIconStyle}
                       />
                     </div>
                     <div>
-                      <p className="text-sm font-medium" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+                      <p className="text-sm font-medium" style={titleStyle}>
                         {staff.name}
                       </p>
-                      <p className="text-xs text-gray-500" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                      <p className="text-xs text-gray-500" style={mutedTextStyle}>
                         {staff.role}
                       </p>
                     </div>
@@ -653,9 +689,7 @@ const MediLabDemo = () => {
                 <div className="flex-1 relative">
                   <div 
                     className="h-8 rounded relative"
-                    style={{
-                      backgroundColor: isDark ? '#374151' : '#f3f4f6'
-                    }}
+                    style={panelMutedSurfaceStyle}
                   >
                     {staff.shifts.map((shift, shiftIndex) => (
                       <div
@@ -664,11 +698,8 @@ const MediLabDemo = () => {
                         style={{
                           left: `${((parseInt(shift.start.split(':')[0]) - 10) / 7) * 100}%`,
                           width: `${((parseInt(shift.end.split(':')[0]) - parseInt(shift.start.split(':')[0])) / 7) * 100}%`,
-                          backgroundColor: shift.color === 'pink' ? (isDark ? '#7c2d12' : '#fce7f3') :
-                                         shift.color === 'yellow' ? (isDark ? '#78350f' : '#fef3c7') :
-                                         shift.color === 'purple' ? (isDark ? '#581c87' : '#e9d5ff') :
-                                         shift.color === 'blue' ? (isDark ? '#1e3a8a' : '#dbeafe') : 
-                                         (isDark ? '#374151' : '#f3f4f6')
+                          backgroundColor: shiftColors[shift.color] || shiftColors.default,
+                          color: 'var(--mac-text-primary)'
                         }}
                       >
                         <span className="text-xs font-medium">
@@ -682,10 +713,10 @@ const MediLabDemo = () => {
                               backgroundColor: 'transparent'
                             }}
                             onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = isDark ? '#4b5563' : '#ffffff';
+                              e.currentTarget.style.backgroundColor = 'var(--mac-card-hover-bg)';
                             }}
                             onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.backgroundColor = 'transparent';
                             }}
                           >
                             <Edit className="h-4 w-4" />
@@ -697,10 +728,10 @@ const MediLabDemo = () => {
                               backgroundColor: 'transparent'
                             }}
                             onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = isDark ? '#4b5563' : '#ffffff';
+                              e.currentTarget.style.backgroundColor = 'var(--mac-card-hover-bg)';
                             }}
                             onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.backgroundColor = 'transparent';
                             }}
                           >
                             <Trash2 className="h-4 w-4" />

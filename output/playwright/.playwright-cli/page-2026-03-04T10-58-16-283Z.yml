@@ -1,0 +1,162 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: R
+        - generic [ref=e8]:
+          - heading "Registrar User" [level=1] [ref=e9]
+          - generic [ref=e10]:
+            - generic [ref=e11]:
+              - img [ref=e12]
+              - text: Email не подтвержден
+            - generic [ref=e15]:
+              - img [ref=e16]
+              - text: Телефон не подтвержден
+            - generic [ref=e19]:
+              - img [ref=e20]
+              - text: 2FA включена
+            - generic [ref=e23]:
+              - img [ref=e24]
+              - text: Аккаунт активен
+          - generic [ref=e27]: Receptionist · registrar@example.com
+        - generic [ref=e28]:
+          - button "Обновить" [ref=e29] [cursor=pointer]:
+            - generic [ref=e30]:
+              - img [ref=e31]
+              - text: Обновить
+          - button "Сохранить профиль" [disabled] [ref=e36]:
+            - generic [ref=e37]:
+              - img [ref=e38]
+              - text: Сохранить профиль
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - img [ref=e45]
+          - generic [ref=e48]: Логин
+          - generic [ref=e49]: registrar@example.com
+        - generic [ref=e50]:
+          - img [ref=e52]
+          - generic [ref=e54]: Создан
+          - generic [ref=e55]: 27.09.2025, 10:02:09
+        - generic [ref=e56]:
+          - img [ref=e58]
+          - generic [ref=e61]: Последний вход
+          - generic [ref=e62]: Не указано
+        - generic [ref=e63]:
+          - img [ref=e65]
+          - generic [ref=e68]: Безопасность
+          - generic [ref=e69]: 2FA активна
+    - generic [ref=e70]:
+      - button "Личные данные" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - text: Личные данные
+      - button "Уведомления" [ref=e76] [cursor=pointer]:
+        - img [ref=e77]
+        - text: Уведомления
+      - button "Безопасность" [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+        - text: Безопасность
+    - generic [ref=e84]:
+      - generic [ref=e86]:
+        - generic [ref=e87]:
+          - generic [ref=e88]: Основной профиль
+          - generic [ref=e89]: Сначала заполните имя, email и телефон. Остальные поля улучшают карточку пользователя, но не обязательны для базовой работы в системе.
+        - generic [ref=e90]: Форма синхронизирована с сервером. Можно безопасно переключаться между вкладками.
+      - generic [ref=e91]:
+        - generic [ref=e93]:
+          - heading "Основные данные" [level=3] [ref=e94]
+          - generic [ref=e95]: Эти поля чаще всего видят коллеги и другие модули системы.
+        - generic [ref=e97]:
+          - generic [ref=e98]:
+            - generic [ref=e99]: Полное имя
+            - generic [ref=e100]:
+              - img
+              - textbox "Как отображать имя в системе" [ref=e101]: Registrar User
+          - generic [ref=e102]:
+            - generic [ref=e103]: Email
+            - generic [ref=e104]:
+              - img
+              - textbox "user@example.com" [ref=e105]: registrar@example.com
+          - generic [ref=e106]:
+            - generic [ref=e107]: Телефон
+            - generic [ref=e108]:
+              - img
+              - textbox "+998901234567" [ref=e109]
+          - generic [ref=e110]:
+            - generic [ref=e111]: Дата рождения
+            - generic [ref=e112]:
+              - img
+              - textbox [ref=e113]
+      - generic [ref=e114]:
+        - generic [ref=e116]:
+          - heading "Детали профиля" [level=3] [ref=e117]
+          - generic [ref=e118]: Дополнительные сведения для персонализации, локализации и внутреннего профиля.
+        - generic [ref=e119]:
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - generic [ref=e122]: Имя
+              - textbox "Имя" [ref=e124]
+            - generic [ref=e125]:
+              - generic [ref=e126]: Фамилия
+              - textbox "Фамилия" [ref=e128]
+            - generic [ref=e129]:
+              - generic [ref=e130]: Отчество
+              - textbox "Отчество" [ref=e132]
+            - generic [ref=e133]:
+              - generic [ref=e134]: Пол
+              - combobox [ref=e135] [cursor=pointer]:
+                - option "Не указан" [selected]
+                - option "Мужской"
+                - option "Женский"
+                - option "Другой"
+            - generic [ref=e136]:
+              - generic [ref=e137]: Язык интерфейса
+              - combobox [ref=e138] [cursor=pointer]:
+                - option "Русский" [selected]
+                - 'option "O`zbekcha"'
+                - option "English"
+            - generic [ref=e139]:
+              - generic [ref=e140]: Часовой пояс
+              - combobox [ref=e141] [cursor=pointer]:
+                - option "Asia/Tashkent"
+                - option "Europe/Moscow" [selected]
+                - option "UTC"
+            - generic [ref=e142]:
+              - generic [ref=e143]: Национальность
+              - generic [ref=e144]:
+                - img
+                - textbox "Например, Uzbek" [ref=e145]
+            - generic [ref=e146]:
+              - generic [ref=e147]: Сайт
+              - generic [ref=e148]:
+                - img
+                - textbox "https://example.com" [ref=e149]
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - generic [ref=e152]: URL аватара
+              - generic [ref=e153]:
+                - img
+                - textbox "https://..." [ref=e154]
+            - generic [ref=e155]:
+              - generic [ref=e156]: О себе
+              - textbox "Краткая информация о пользователе" [ref=e157]
+      - generic [ref=e159]:
+        - generic [ref=e160]:
+          - generic [ref=e161]: Завершение редактирования
+          - generic [ref=e162]: Верните исходные значения или сохраните изменения без прокрутки к верхней панели.
+        - generic [ref=e163]:
+          - button "Вернуть исходные данные" [disabled] [ref=e164]:
+            - generic [ref=e165]: Вернуть исходные данные
+          - button "Сохранить изменения" [disabled] [ref=e166]:
+            - generic [ref=e167]:
+              - img [ref=e168]
+              - text: Сохранить изменения
+  - generic [ref=e172]:
+    - generic [ref=e173]:
+      - img [ref=e174]
+      - generic [ref=e177]:
+        - strong [ref=e178]: Включить уведомления?
+        - generic [ref=e179]: Получайте уведомления о новых сообщениях
+    - generic [ref=e180]:
+      - button "Включить" [ref=e181] [cursor=pointer]
+      - button "Закрыть" [ref=e182] [cursor=pointer]:
+        - img [ref=e183]

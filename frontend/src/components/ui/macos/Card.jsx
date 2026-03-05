@@ -22,8 +22,8 @@ const Card = React.forwardRef(({
   // macOS card styles based on variant
   const getCardStyles = () => {
     const baseStyles = {
-      backgroundColor: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border)',
+      backgroundColor: 'var(--mac-card-bg, var(--mac-bg-primary))',
+      border: '1px solid var(--mac-card-border, var(--mac-border))',
       borderRadius: 'var(--mac-radius-lg)', // Стандартный радиус macOS для карточек
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
       position: 'relative',
@@ -55,11 +55,11 @@ const Card = React.forwardRef(({
       },
       outlined: {
         backgroundColor: 'transparent',
-        border: '2px solid var(--mac-border)'
+        border: '2px solid var(--mac-card-border, var(--mac-border))'
       },
       filled: {
-        backgroundColor: 'var(--mac-bg-tertiary)',
-        border: '1px solid var(--mac-border-secondary)'
+        backgroundColor: 'var(--mac-card-hover-bg, var(--mac-bg-tertiary))',
+        border: '1px solid var(--mac-card-border, var(--mac-border-secondary))'
       }
     };
 
@@ -111,7 +111,7 @@ const Card = React.forwardRef(({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 122, 255, 0.02)',
+          background: 'var(--mac-accent-bg)',
           opacity: 0,
           transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
           pointerEvents: 'none',
@@ -124,21 +124,6 @@ const Card = React.forwardRef(({
         .mac-card:hover .mac-card-overlay {
           opacity: 1 !important;
         }
-
-        /* Dark mode adjustments */
-        @media (prefers-color-scheme: dark) {
-          .mac-card {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-            color: #f5f5f7 !important;
-          }
-
-          .mac-card--interactive:hover {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            border-color: rgba(255, 255, 255, 0.15) !important;
-          }
-        }
-
         /* High contrast mode */
         @media (prefers-contrast: high) {
           .mac-card {
@@ -215,7 +200,7 @@ export const CardHeader = React.forwardRef(({
       style={{
         marginBottom: '16px',
         paddingBottom: '12px',
-        borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+        borderBottom: '1px solid var(--mac-separator)',
         ...style
       }}
       {...props}>
@@ -333,7 +318,7 @@ export const CardFooter = React.forwardRef(({
       style={{
         marginTop: '16px',
         paddingTop: '12px',
-        borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+        borderTop: '1px solid var(--mac-separator)',
         display: 'flex',
         justifyContent: 'flex-end',
         gap: '8px',

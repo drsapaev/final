@@ -42,6 +42,10 @@ function notify() {
       logger.error('auth subscriber error:', e);
     }
   }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('authStateChanged', { detail: state }));
+  }
 }
 
 /**

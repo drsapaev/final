@@ -43,6 +43,7 @@ const LabReportGenerator = ({
   visitId
 }) => {
   const [generating, setGenerating] = useState(false);
+  const [emailFeedback, setEmailFeedback] = useState(null);
 
   // Группировка результатов по категориям
   const groupResultsByCategory = () => {
@@ -59,6 +60,7 @@ const LabReportGenerator = ({
   // Генерация PDF
   const generatePDF = async () => {
     setGenerating(true);
+    setEmailFeedback(null);
 
     try {
       const doc = new jsPDF();
@@ -159,6 +161,7 @@ const LabReportGenerator = ({
 
     } catch (error) {
       logger.error('Ошибка генерации PDF:', error);
+      setEmailFeedback({ type: 'error', message: 'Не удалось сформировать PDF-отчет.' });
     } finally {
       setGenerating(false);
     }
@@ -171,13 +174,15 @@ const LabReportGenerator = ({
 
   // Отправка по email
   const sendByEmail = async () => {
+    setEmailFeedback(null);
     try {
       await api.post(`/visits/${visitId}/lab-results/email`, {
         patient_email: patient.email
       });
-      alert('Отчет отправлен на email пациента');
+      setEmailFeedback({ type: 'success', message: 'Отчет отправлен на email пациента.' });
     } catch (error) {
       logger.error('Ошибка отправки email:', error);
+      setEmailFeedback({ type: 'error', message: 'Не удалось отправить отчет на email пациента.' });
     }
   };
 
@@ -255,29 +260,35 @@ const LabReportGenerator = ({
             </Box>
           </Box>
 
+          {emailFeedback &&
+            <Alert severity={emailFeedback.type} style={{ marginBottom: 16 }}>
+              {emailFeedback.message}
+            </Alert>
+          }
+
           {/* Статистика */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div className="theme-soft-surface" style={{ padding: 16, textAlign: 'center' }}>
               <Typography variant="h4">{stats.total}</Typography>
               <Typography variant="caption" color="textSecondary">
                 Всего анализов
               </Typography>
             </div>
-            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8, backgroundColor: 'rgba(52,199,89,0.1)' }}>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-success-border)', borderRadius: 8, backgroundColor: 'var(--mac-success-bg)' }}>
               <Typography variant="h4">{stats.normal}</Typography>
-              <Typography variant="caption">
+              <Typography variant="caption" style={{ color: 'var(--mac-success)' }}>
                 В норме
               </Typography>
             </div>
-            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8, backgroundColor: 'rgba(255,59,48,0.1)' }}>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-error-border)', borderRadius: 8, backgroundColor: 'var(--mac-error-bg)' }}>
               <Typography variant="h4">{stats.abnormal}</Typography>
-              <Typography variant="caption">
+              <Typography variant="caption" style={{ color: 'var(--mac-error)' }}>
                 Отклонения
               </Typography>
             </div>
-            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8, backgroundColor: 'rgba(255,149,0,0.1)' }}>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-warning-border)', borderRadius: 8, backgroundColor: 'var(--mac-warning-bg)' }}>
               <Typography variant="h4">{stats.pending}</Typography>
-              <Typography variant="caption">
+              <Typography variant="caption" style={{ color: 'var(--mac-warning)' }}>
                 Ожидается
               </Typography>
             </div>
@@ -317,16 +328,16 @@ const LabReportGenerator = ({
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>
+                      <th style={{ border: '1px solid var(--mac-border)', padding: '8px', textAlign: 'left' }}>
                         Исследование
                       </th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>
+                      <th style={{ border: '1px solid var(--mac-border)', padding: '8px', textAlign: 'left' }}>
                         Результат
                       </th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>
+                      <th style={{ border: '1px solid var(--mac-border)', padding: '8px', textAlign: 'left' }}>
                         Норма
                       </th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>
+                      <th style={{ border: '1px solid var(--mac-border)', padding: '8px', textAlign: 'left' }}>
                         Статус
                       </th>
                     </tr>
@@ -334,19 +345,19 @@ const LabReportGenerator = ({
                   <tbody>
                     {categoryResults.map((result, index) =>
                   <tr key={index}>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                        <td style={{ border: '1px solid var(--mac-border)', padding: '8px' }}>
                           {result.test_name}
                         </td>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                        <td style={{ border: '1px solid var(--mac-border)', padding: '8px' }}>
                           {result.value} {result.unit}
                         </td>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                        <td style={{ border: '1px solid var(--mac-border)', padding: '8px' }}>
                           {result.reference_min}-{result.reference_max} {result.unit}
                         </td>
                         <td style={{
-                      border: '1px solid #ddd',
+                      border: '1px solid var(--mac-border)',
                       padding: '8px',
-                      color: result.status === 'abnormal' ? 'red' : 'inherit'
+                      color: result.status === 'abnormal' ? 'var(--mac-error)' : 'inherit'
                     }}>
                           {getStatusText(result.status)}
                         </td>

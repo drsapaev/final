@@ -3,6 +3,21 @@
   --payme-primary: #00b4d8;
   --payme-secondary: #0077b6;
   --payme-accent: #90e0ef;
+  --surface-color: var(--mac-bg-secondary);
+  --border-color: var(--mac-border);
+  --text-primary: var(--mac-text-primary);
+  --text-secondary: var(--mac-text-secondary);
+  --info-bg: var(--mac-accent-bg);
+  --info-border: var(--mac-accent-border);
+  --info-text: var(--mac-text-primary);
+  --success-text: var(--mac-success);
+  --error-bg: var(--mac-error-bg);
+  --error-border: var(--mac-error-border);
+  --error-text: var(--mac-error);
+  --warning-color: var(--mac-warning);
+  --info-color: var(--mac-accent);
+  --success-color: var(--mac-success);
+  --error-color: var(--mac-error);
 }
 
 .payment-payme-container {
@@ -202,7 +217,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background: white;
+  background: var(--mac-bg-primary);
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 0.375rem;
 }
@@ -305,3 +320,4 @@
   .print-tickets {
     margin-bottom: 1rem;
   }
+}

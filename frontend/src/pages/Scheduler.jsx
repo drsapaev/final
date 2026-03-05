@@ -14,8 +14,7 @@ function todayStr() {
  * Расписание: просмотр слотов (чтение).
  * Совместимо с GET /schedule?date=YYYY-MM-DD&limit=...
  */
-export default function Scheduler() {void
-  useState('Scheduler');
+export default function Scheduler() {
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -55,44 +54,44 @@ export default function Scheduler() {void
   return (
     <div>
       <RoleGate roles={['Admin', 'Registrar', 'Doctor']}>
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+        <div className="legacy-page-shell">
           <h2 style={{ margin: 0 }}>Расписание</h2>
 
-          <div style={panel}>
+          <div className="legacy-toolbar">
             <label>
               Дата:&nbsp;
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
+              <input className="legacy-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
-            <input placeholder="Поиск по врачу/кабинету/статусу" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inp, minWidth: 260 }} />
-            <button onClick={load} disabled={busy} style={btn}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <input className="legacy-input" placeholder="Поиск по врачу/кабинету/статусу" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
+            <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
           </div>
 
-          {err && <div style={errBox}>{String(err)}</div>}
+          {err && <div className="legacy-error">{String(err)}</div>}
 
-          <div style={{ overflow: 'auto', border: '1px solid #eee', borderRadius: 12, background: '#fff' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="legacy-table-wrap">
+            <table className="legacy-table">
               <thead>
                 <tr>
-                  <th style={th}>Врач</th>
-                  <th style={th}>Кабинет</th>
-                  <th style={th}>Время</th>
-                  <th style={th}>Статус</th>
+                  <th>Врач</th>
+                  <th>Кабинет</th>
+                  <th>Время</th>
+                  <th>Статус</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((s, i) =>
                 <tr key={s.id || i}>
-                    <td style={td}>{s.doctor_name || s.doctor || '—'}</td>
-                    <td style={td}>{s.room || '—'}</td>
-                    <td style={td}>
+                    <td>{s.doctor_name || s.doctor || '—'}</td>
+                    <td>{s.room || '—'}</td>
+                    <td>
                       {s.time || s.slot || s.start_time ? s.time || s.slot || s.start_time : '—'}
                       {s.end_time ? ` — ${s.end_time}` : ''}
                     </td>
-                    <td style={td}>{s.status || (s.available ? 'available' : '—')}</td>
+                    <td>{s.status || (s.available ? 'available' : '—')}</td>
                   </tr>
                 )}
                 {filtered.length === 0 &&
-                <tr><td style={td} colSpan={4}>Нет записей</td></tr>
+                <tr><td colSpan={4}>Нет записей</td></tr>
                 }
               </tbody>
             </table>
@@ -102,10 +101,3 @@ export default function Scheduler() {void
     </div>);
 
 }
-
-const panel = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #eee', borderRadius: 12, padding: 12, background: '#fff' };
-const inp = { padding: '6px 10px', border: '1px solid #ddd', borderRadius: 8, background: '#fff' };
-const btn = { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' };
-const th = { textAlign: 'left', padding: 10, borderBottom: '1px solid #eee', fontWeight: 700, whiteSpace: 'nowrap' };
-const td = { padding: 10, borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' };
-const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8 };

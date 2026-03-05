@@ -200,20 +200,8 @@ export function __resetSelfProfileCacheForTests() {
 function ProfileTabButton({ active, icon: Icon, label, onClick }) {
   return (
     <button
+      className={`theme-tab-button ${active ? 'theme-tab-button--active' : ''}`}
       onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '12px 16px',
-        background: active ? 'var(--mac-bg-secondary)' : 'transparent',
-        border: 'none',
-        borderBottom: active ? '2px solid var(--mac-accent-blue)' : '2px solid transparent',
-        color: active ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
-        fontWeight: active ? 600 : 500,
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-      }}
       type="button"
     >
       <Icon size={16} />
@@ -232,11 +220,9 @@ ProfileTabButton.propTypes = {
 function ProfileMetaCard({ icon: Icon, label, value, accent }) {
   return (
     <div
+      className="theme-soft-surface"
       style={{
-        border: '1px solid var(--mac-border)',
-        borderRadius: 14,
         padding: 16,
-        background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
       }}
     >
       <div
@@ -337,6 +323,29 @@ export default function UserProfile() {
     return original !== current;
   }, [draft, profile]);
 
+  const toneChipStyles = {
+    success: {
+      background: 'var(--mac-success-bg)',
+      color: 'var(--mac-success)',
+      border: '1px solid var(--mac-success-border)',
+    },
+    warning: {
+      background: 'var(--mac-warning-bg)',
+      color: 'var(--mac-warning)',
+      border: '1px solid var(--mac-warning-border)',
+    },
+    error: {
+      background: 'var(--mac-error-bg)',
+      color: 'var(--mac-error)',
+      border: '1px solid var(--mac-error-border)',
+    },
+    info: {
+      background: 'var(--mac-accent-bg)',
+      color: 'var(--mac-accent)',
+      border: '1px solid var(--mac-accent-border)',
+    },
+  };
+
   useEffect(() => {
     void loadProfile();
   }, []);
@@ -426,13 +435,13 @@ export default function UserProfile() {
   }
 
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', padding: '24px 20px 40px' }}>
+    <div className="theme-page-shell">
       <Card shadow="large" style={{ marginBottom: 24, overflow: 'hidden' }}>
         <div
           style={{
             padding: 24,
             background:
-              'radial-gradient(circle at top left, rgba(0, 122, 255, 0.18), transparent 32%), linear-gradient(135deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
+              'radial-gradient(circle at top left, color-mix(in srgb, var(--mac-accent), transparent 82%), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--mac-card-bg), white 3%), color-mix(in srgb, var(--mac-bg-secondary), transparent 16%))',
             display: 'grid',
             gap: 24,
           }}
@@ -450,14 +459,14 @@ export default function UserProfile() {
                 width: 84,
                 height: 84,
                 borderRadius: 24,
-                background: 'linear-gradient(135deg, #0a84ff, #30b0c7)',
-                color: 'white',
+                background: 'linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 20%))',
+                color: 'var(--mac-text-on-accent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 30,
                 fontWeight: 700,
-                boxShadow: '0 18px 36px rgba(10, 132, 255, 0.24)',
+                boxShadow: '0 18px 36px color-mix(in srgb, var(--mac-accent), transparent 72%)',
               }}
             >
               {profile.full_name?.[0]?.toUpperCase() || profile.username?.[0]?.toUpperCase() || 'U'}
@@ -479,22 +488,7 @@ export default function UserProfile() {
                       padding: '6px 10px',
                       fontSize: 12,
                       fontWeight: 600,
-                      background:
-                        badge.tone === 'success'
-                          ? 'rgba(52, 199, 89, 0.12)'
-                          : badge.tone === 'warning'
-                            ? 'rgba(255, 159, 10, 0.12)'
-                            : badge.tone === 'error'
-                              ? 'rgba(255, 69, 58, 0.12)'
-                              : 'rgba(10, 132, 255, 0.12)',
-                      color:
-                        badge.tone === 'success'
-                          ? '#22863a'
-                          : badge.tone === 'warning'
-                            ? '#b26b00'
-                            : badge.tone === 'error'
-                              ? '#b42318'
-                              : '#0a84ff',
+                      ...(toneChipStyles[badge.tone] || toneChipStyles.info),
                     }}
                   >
                     <BadgeCheck size={14} />
@@ -539,25 +533,25 @@ export default function UserProfile() {
               icon={UserRound}
               label="Логин"
               value={profile.username}
-              accent="linear-gradient(135deg, #0a84ff, #3b82f6)"
+              accent="linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 20%))"
             />
             <ProfileMetaCard
               icon={CalendarDays}
               label="Создан"
               value={formatDateTime(profile.created_at)}
-              accent="linear-gradient(135deg, #34c759, #22c55e)"
+              accent="linear-gradient(135deg, var(--mac-success), color-mix(in srgb, var(--mac-success), white 18%))"
             />
             <ProfileMetaCard
               icon={Clock3}
               label="Последний вход"
               value={formatDateTime(profile.last_login)}
-              accent="linear-gradient(135deg, #ff9f0a, #f97316)"
+              accent="linear-gradient(135deg, var(--mac-warning), color-mix(in srgb, var(--mac-warning), white 18%))"
             />
             <ProfileMetaCard
               icon={ShieldCheck}
               label="Безопасность"
               value={profile.two_factor_enabled ? '2FA активна' : '2FA не настроена'}
-              accent="linear-gradient(135deg, #7c3aed, #0ea5e9)"
+              accent="linear-gradient(135deg, var(--mac-accent-purple), color-mix(in srgb, var(--mac-accent), white 12%))"
             />
           </div>
         </div>
@@ -574,15 +568,7 @@ export default function UserProfile() {
         </Alert>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          marginBottom: 20,
-          borderBottom: '1px solid var(--mac-border)',
-          overflowX: 'auto',
-        }}
-      >
+      <div className="theme-tab-strip">
         <ProfileTabButton
           active={activeTab === 'info'}
           icon={UserCircle2}
@@ -624,11 +610,9 @@ export default function UserProfile() {
                 </div>
               </div>
               <div
+                className="theme-soft-surface"
                 style={{
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 14,
                   padding: '14px 16px',
-                  background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
                   fontSize: 13,
                   color: 'var(--mac-text-secondary)',
                 }}

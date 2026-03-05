@@ -6,8 +6,7 @@ import { api } from '../api/client.js';
  * Аудит: список последних действий пользователей.
  * Совместимо с GET /audit?limit=...&offset=...
  */
-export default function Audit() {void
-  useState('Audit');
+export default function Audit() {
   const [rows, setRows] = useState([]);
   const [limit, setLimit] = useState(100);
   const [q, setQ] = useState('');
@@ -44,43 +43,43 @@ export default function Audit() {void
   return (
     <div>
       <RoleGate roles={['Admin']}>
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+        <div className="legacy-page-shell">
           <h2 style={{ margin: 0 }}>Аудит</h2>
 
-          <div style={panel}>
+          <div className="legacy-toolbar">
             <label>
               Порог:&nbsp;
-              <input type="number" min={10} max={1000} value={limit} onChange={(e) => setLimit(Number(e.target.value) || 100)} style={inp} />
+              <input className="legacy-input" type="number" min={10} max={1000} value={limit} onChange={(e) => setLimit(Number(e.target.value) || 100)} />
             </label>
-            <input placeholder="Поиск по пользователю/действию/сущности" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inp, minWidth: 260 }} />
-            <button onClick={load} disabled={busy} style={btn}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <input className="legacy-input" placeholder="Поиск по пользователю/действию/сущности" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
+            <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
           </div>
 
-          {err && <div style={errBox}>{String(err)}</div>}
+          {err && <div className="legacy-error">{String(err)}</div>}
 
-          <div style={{ overflow: 'auto', border: '1px solid #eee', borderRadius: 12, background: '#fff' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="legacy-table-wrap">
+            <table className="legacy-table">
               <thead>
                 <tr>
-                  <th style={th}>Время</th>
-                  <th style={th}>Пользователь</th>
-                  <th style={th}>Действие</th>
-                  <th style={th}>Сущность</th>
-                  <th style={th}>Детали</th>
+                  <th>Время</th>
+                  <th>Пользователь</th>
+                  <th>Действие</th>
+                  <th>Сущность</th>
+                  <th>Детали</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((a, i) =>
                 <tr key={a.id || i}>
-                    <td style={td}>{a.created_at || a.time || '—'}</td>
-                    <td style={td}>{a.user || a.username || '—'}</td>
-                    <td style={td}>{a.action || '—'}</td>
-                    <td style={td}>{a.entity || a.table || '—'}</td>
-                    <td style={td}><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : '—'}</code></td>
+                    <td>{a.created_at || a.time || '—'}</td>
+                    <td>{a.user || a.username || '—'}</td>
+                    <td>{a.action || '—'}</td>
+                    <td>{a.entity || a.table || '—'}</td>
+                    <td><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : '—'}</code></td>
                   </tr>
                 )}
                 {filtered.length === 0 &&
-                <tr><td style={td} colSpan={5}>Нет записей</td></tr>
+                <tr><td colSpan={5}>Нет записей</td></tr>
                 }
               </tbody>
             </table>
@@ -90,10 +89,3 @@ export default function Audit() {void
     </div>);
 
 }
-
-const panel = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #eee', borderRadius: 12, padding: 12, background: '#fff' };
-const inp = { padding: '6px 10px', border: '1px solid #ddd', borderRadius: 8, background: '#fff' };
-const btn = { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' };
-const th = { textAlign: 'left', padding: 10, borderBottom: '1px solid #eee', fontWeight: 700, whiteSpace: 'nowrap' };
-const td = { padding: 10, borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' };
-const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8 };

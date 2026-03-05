@@ -25,13 +25,20 @@ import {
 import { getState as getAuthState } from '../../stores/auth';
 import logger from '../../utils/logger';
 
+const accentGradients = {
+  info: 'linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 18%))',
+  success: 'linear-gradient(135deg, var(--mac-success), color-mix(in srgb, var(--mac-success), white 18%))',
+  warning: 'linear-gradient(135deg, var(--mac-warning), color-mix(in srgb, var(--mac-warning), white 18%))',
+  purple: 'linear-gradient(135deg, var(--mac-accent-purple), color-mix(in srgb, var(--mac-accent), white 12%))',
+};
+
 const notificationSections = [
   {
     key: 'email',
     title: 'Email уведомления',
     description: 'Письма для рабочих сценариев и подтверждений.',
     icon: Mail,
-    accent: 'linear-gradient(135deg, #0a84ff, #3b82f6)',
+    accent: accentGradients.info,
     fields: [
       {
         key: 'email_appointment_reminder',
@@ -70,7 +77,7 @@ const notificationSections = [
     title: 'SMS уведомления',
     description: 'Короткие и срочные сообщения на телефон.',
     icon: MessageSquareText,
-    accent: 'linear-gradient(135deg, #34c759, #10b981)',
+    accent: accentGradients.success,
     note: 'SMS-канал может тарифицироваться отдельно у оператора или провайдера.',
     fields: [
       {
@@ -90,7 +97,7 @@ const notificationSections = [
     title: 'Push уведомления',
     description: 'Оповещения для мобильного приложения и PWA.',
     icon: Smartphone,
-    accent: 'linear-gradient(135deg, #7c3aed, #0ea5e9)',
+    accent: accentGradients.purple,
     note: 'Работает только если устройство уже дало разрешение на push-уведомления.',
     fields: [
       {
@@ -135,6 +142,7 @@ const generalFields = [
     type: 'time',
   },
 ];
+
 
 const NOTIFICATION_SETTINGS_CACHE_MS = 30_000;
 const notificationSettingsCache = new Map();
@@ -221,7 +229,7 @@ function NotificationChannelCard({ accent, description, icon: Icon, title, note,
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
-              boxShadow: '0 14px 28px rgba(15, 23, 42, 0.14)',
+              boxShadow: 'var(--mac-shadow-md)',
               flexShrink: 0,
             }}
           >
@@ -259,15 +267,13 @@ NotificationChannelCard.propTypes = {
 function PreferenceRow({ checked, description, disabled, label, onChange }) {
   return (
     <div
+      className="theme-soft-surface"
       style={{
         display: 'grid',
         gridTemplateColumns: '1fr auto',
         gap: 16,
         alignItems: 'center',
         padding: '14px 16px',
-        border: '1px solid var(--mac-border)',
-        borderRadius: 14,
-        background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
       }}
     >
       <div style={{ minWidth: 0 }}>
@@ -498,13 +504,13 @@ export default function NotificationPreferences() {
                 width: 42,
                 height: 42,
                 borderRadius: 14,
-                background: 'linear-gradient(135deg, #ff9f0a, #f97316)',
+                background: accentGradients.warning,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
                 flexShrink: 0,
-                boxShadow: '0 14px 28px rgba(249, 115, 22, 0.18)',
+                boxShadow: '0 14px 28px color-mix(in srgb, var(--mac-warning), transparent 76%)',
               }}
             >
               <Clock3 size={18} />
@@ -521,15 +527,13 @@ export default function NotificationPreferences() {
           {generalFields.map((field) => (
             <div
               key={field.key}
+              className="theme-soft-surface"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr minmax(120px, 180px)',
                 gap: 16,
                 alignItems: 'center',
                 padding: '14px 16px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 14,
-                background: 'linear-gradient(180deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
               }}
             >
               <div>

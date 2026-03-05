@@ -27,26 +27,26 @@ export default function UserSelect() {
   }, []);
 
   return (
-    <div style={{ maxWidth: 800, margin: '20px auto', padding: 16 }}>
+    <div className="theme-page-shell" style={{ maxWidth: 860 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Выбор пользователя</h1>
-      <div style={{ opacity: .7, marginBottom: 12 }}>Доступно администратору. Нажмите, чтобы перейти к роли.</div>
-      {err && <div style={{ color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', padding: 8, borderRadius: 8 }}>{err}</div>}
+      <div className="legacy-muted" style={{ marginBottom: 12 }}>Доступно администратору. Нажмите, чтобы перейти к роли.</div>
+      {err && <div className="legacy-error">{err}</div>}
       {loading ? (
         <div>Загрузка…</div>
       ) : (
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div className="legacy-list">
           {items.map(u => (
-            <div key={u.id} style={{ border: '1px solid #eee', borderRadius: 10, padding: 12, background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div key={u.id} className="legacy-list-item">
               <div>
                 <div style={{ fontWeight: 700 }}>{u.full_name || u.username}</div>
-                <div style={{ fontSize: 12, opacity: .7 }}>{u.role || '—'} · {u.email || '—'}</div>
+                <div className="legacy-muted" style={{ fontSize: 12 }}>{u.role || '—'} · {u.email || '—'}</div>
               </div>
               <div>
-                <button onClick={() => navigate(routeForRole(u.role))} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' }}>Перейти</button>
+                <button className="legacy-button" onClick={() => navigate(routeForRole(u.role))}>Перейти</button>
               </div>
             </div>
           ))}
-          {items.length === 0 && <div style={{ opacity: .7 }}>Пользователи не найдены</div>}
+          {items.length === 0 && <div className="legacy-muted">Пользователи не найдены</div>}
         </div>
       )}
     </div>

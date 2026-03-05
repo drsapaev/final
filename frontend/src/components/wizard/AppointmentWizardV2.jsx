@@ -2069,7 +2069,11 @@ const AppointmentWizardV2 = ({
         if (isPermissionError) {
           toast.error(errorMessage, {
             duration: 5000,
-            style: { backgroundColor: '#fee', border: '1px solid #fcc' }
+            style: {
+              backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
+              border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
+              color: 'var(--mac-text-primary)'
+            }
           });
           // Закрываем мастер при ошибке прав доступа
           onClose();
@@ -2333,13 +2337,13 @@ const AppointmentWizardV2 = ({
           padding: '7px 16px',
           borderRadius: 'var(--mac-radius-full)',
           border: activeServiceCategory === cat.id ?
-          '1px solid var(--mac-primary)' :
+          '1px solid var(--mac-accent)' :
           '1px solid transparent',
           background: activeServiceCategory === cat.id ?
-          'linear-gradient(135deg, var(--mac-primary) 0%, #005bb5 100%)' :
+          'linear-gradient(135deg, var(--mac-accent) 0%, color-mix(in srgb, var(--mac-accent), black 18%) 100%)' :
           'var(--mac-bg-secondary)',
           color: activeServiceCategory === cat.id ?
-          'white' :
+          'var(--mac-text-on-accent)' :
           'var(--mac-text-primary)',
           cursor: 'pointer',
           fontSize: '13px',
@@ -2350,22 +2354,22 @@ const AppointmentWizardV2 = ({
           alignItems: 'center',
           gap: '6px',
           boxShadow: activeServiceCategory === cat.id ?
-          '0 4px 12px rgba(0, 122, 255, 0.3), 0 2px 4px rgba(0, 122, 255, 0.2)' :
-          '0 1px 2px rgba(0, 0, 0, 0.05)',
+          '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%), 0 2px 4px color-mix(in srgb, var(--mac-accent), transparent 78%)' :
+          '0 1px 2px color-mix(in srgb, var(--mac-text-primary), transparent 94%)',
           transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)'
         }}
         onMouseEnter={(e) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
             e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.boxShadow = '0 2px 6px color-mix(in srgb, var(--mac-text-primary), transparent 90%)';
           }
         }}
         onMouseLeave={(e) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+            e.currentTarget.style.boxShadow = '0 1px 2px color-mix(in srgb, var(--mac-text-primary), transparent 94%)';
           }
         }}>
 
@@ -2842,8 +2846,8 @@ const PatientStepV2 = ({
           <div style={{
             marginTop: '4px',
             padding: '8px',
-            background: '#fee2e2',
-            border: '1px solid #fecaca',
+            background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
+            border: '1px solid color-mix(in srgb, var(--mac-error), transparent 70%)',
             borderRadius: 'var(--mac-radius-sm)',
             display: 'flex',
             flexDirection: 'column',
@@ -2851,7 +2855,7 @@ const PatientStepV2 = ({
           }}>
               <span style={{
               fontSize: 'var(--mac-font-size-xs)',
-              color: '#991b1b',
+              color: 'var(--mac-error)',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
@@ -2863,8 +2867,8 @@ const PatientStepV2 = ({
               <button
               onClick={() => onSelectPatient(phoneError.patient)}
               style={{
-                background: '#991b1b',
-                color: 'white',
+                background: 'var(--mac-error)',
+                color: 'var(--mac-text-on-accent)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -3378,10 +3382,10 @@ const CartStepV2 = ({
         {(errors.cart || errors.doctors) &&
         <div style={{
           padding: '8px',
-          background: '#fee2e2',
-          border: '1px solid #fecaca',
+          background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
+          border: '1px solid color-mix(in srgb, var(--mac-error), transparent 70%)',
           borderRadius: 'var(--mac-radius-sm)',
-          color: '#991b1b',
+          color: 'var(--mac-error)',
           fontSize: 'var(--mac-font-size-xs)',
           display: 'flex',
           alignItems: 'center',

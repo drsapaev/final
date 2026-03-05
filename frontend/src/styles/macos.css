@@ -1,6 +1,6 @@
 :root {
   --accent: var(--accent-blue);
-  --bg: #f6f7f9;
+  --bg: #eef3f8;
   --text: #111315;
   --surface: rgba(255, 255, 255, 0.7);
   --glass-stroke: rgba(0, 0, 0, 0.12);
@@ -19,16 +19,17 @@
   --mac-text-primary: #111315;
   --mac-text-secondary: color-mix(in oklab, var(--mac-text-primary), white 40%);
   --mac-text-tertiary: color-mix(in oklab, var(--mac-text-primary), white 65%);
-  --mac-bg-primary: #fafafa;
-  --mac-bg-secondary: #f2f3f5;
-  --mac-bg-toolbar: #ffffff;
-  --mac-border: rgba(0, 0, 0, 0.1);
+  --mac-bg-primary: #fbfcfe;
+  --mac-bg-secondary: #f2f5f9;
+  --mac-bg-tertiary: #e7edf4;
+  --mac-bg-toolbar: rgba(255, 255, 255, 0.92);
+  --mac-border: rgba(15, 23, 42, 0.1);
   --mac-separator: rgba(0, 0, 0, 0.07);
   --mac-radius-sm: 8px;
   --mac-radius-md: 12px;
   --mac-radius-lg: 20px;
   --mac-blur-light: saturate(180%) blur(18px);
-  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(0, 122, 255, 0.08), transparent 55%), radial-gradient(120% 120% at 100% 0%, rgba(88, 86, 214, 0.08), transparent 55%);
+  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(70, 118, 255, 0.06), transparent 52%), linear-gradient(180deg, #f7f9fc 0%, #e8eef5 100%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,266 +53,748 @@
 
 /* 💡 Яркая тема - матовая версия */
 [data-color-scheme="vibrant"] {
-  /* Приглушённые матовые цвета с уменьшенной насыщенностью */
-  --mac-bg-primary: #6b8db3; /* Приглушённый синий */
-  --mac-bg-secondary: #7fa899; /* Приглушённый бирюзовый */
-  --mac-text-primary: #ffffff;
-  --mac-text-secondary: rgba(255,255,255,0.92);
-  --mac-accent-blue: #d4a063; /* Приглушённый оранжевый/персиковый */
-  /* Статусные цвета */
-  --mac-success: #5fb85f; /* Приглушённый зелёный */
-  --mac-warning: #e8b563; /* Приглушённый жёлтый */
-  --mac-error: #e87a7a; /* Приглушённый красный */
-  /* Матовый градиент с меньшей насыщенностью и нейтральным слоем */
-  --mac-gradient-window: 
-    linear-gradient(135deg, rgba(107, 141, 179, 0.75) 0%, rgba(127, 168, 153, 0.7) 40%, rgba(212, 160, 99, 0.65) 80%),
-    linear-gradient(135deg, rgba(120, 130, 145, 0.3) 0%, rgba(130, 140, 150, 0.25) 100%);
-  /* Усиление контраста для элементов интерфейса */
-  --mac-separator: rgba(255,255,255,0.22);
-  --mac-border: rgba(255,255,255,0.22);
-  --mac-border-secondary: rgba(255,255,255,0.18);
-  /* Матовый градиент для сайдбара */
-  --mac-gradient-sidebar: 
-    linear-gradient(135deg, rgba(100, 130, 165, 0.7) 0%, rgba(115, 155, 140, 0.65) 45%, rgba(200, 150, 90, 0.6) 100%),
-    linear-gradient(135deg, rgba(130, 140, 150, 0.25) 0%, rgba(140, 150, 160, 0.2) 100%);
-  --mac-bg-toolbar: rgba(30, 35, 45, 0.4); /* Немного затемнённый для матового эффекта */
-  /* Тени */
-  --mac-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --mac-bg-primary: #2d1f28;
+  --mac-bg-secondary: #432733;
+  --mac-bg-tertiary: #5a3442;
+  --mac-text-primary: #f8fbff;
+  --mac-text-secondary: rgba(248, 244, 239, 0.8);
+  --mac-success: #5bcf84;
+  --mac-warning: #ffca78;
+  --mac-error: #ff7a6b;
+  --mac-gradient-window:
+    radial-gradient(circle at 16% 14%, rgba(255, 181, 120, 0.28), transparent 24%),
+    radial-gradient(circle at 82% 18%, rgba(255, 118, 113, 0.16), transparent 20%),
+    linear-gradient(145deg, rgba(65, 34, 53, 0.97) 0%, rgba(143, 79, 85, 0.92) 54%, rgba(228, 156, 97, 0.9) 100%);
+  --mac-separator: rgba(255, 255, 255, 0.12);
+  --mac-border: rgba(255, 255, 255, 0.16);
+  --mac-border-secondary: rgba(255, 255, 255, 0.1);
+  --mac-gradient-sidebar: linear-gradient(180deg, rgba(55, 29, 42, 0.82) 0%, rgba(98, 50, 60, 0.72) 100%);
+  --mac-bg-toolbar: rgba(58, 31, 42, 0.64);
+  --mac-shadow-sm: 0 2px 10px rgba(28, 12, 19, 0.24);
+  --mac-shadow-md: 0 10px 24px rgba(28, 12, 19, 0.32);
 }
 
 /* 🪟 Стеклянная тема */
 [data-color-scheme="glass"] {
-  --mac-bg-primary: rgba(50, 55, 65, 0.75); /* Увеличена непрозрачность для лучшей видимости карточек */
-  --mac-bg-secondary: rgba(60, 65, 75, 0.65);
-  --mac-bg-toolbar: rgba(50, 55, 65, 0.85); /* Увеличенная непрозрачность для хедера */
-  --mac-bg-tertiary: rgba(70, 75, 85, 0.55);
-  --mac-text-primary: #f0f1f5;
-  --mac-text-secondary: rgba(240,240,245,0.9); /* Улучшена видимость вторичного текста */
-  --mac-accent-blue: rgba(0,122,255,0.8);
-  /* Статусные цвета */
-  --mac-success: #34c759;
-  --mac-warning: #ff9500;
-  --mac-error: #ff3b30;
-  --mac-border: rgba(255, 255, 255, 0.2); /* Более заметные границы */
-  --mac-border-secondary: rgba(255, 255, 255, 0.15);
-  --mac-separator: rgba(255, 255, 255, 0.2); /* Улучшенная видимость разделителей */
-  --mac-gradient-sidebar: rgba(50, 55, 65, 0.85); /* Фон сайдбара */
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.4); /* Улучшенная тень */
-  --mac-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --mac-blur-light: saturate(180%) blur(22px);
-  background: rgba(20, 20, 25, 0.3);
-  backdrop-filter: blur(22px) saturate(160%);
-}
-
-/* Улучшенная видимость карточек в glass теме */
-[data-color-scheme="glass"] .mac-card {
-  background-color: rgba(50, 55, 65, 0.85) !important; /* Более непрозрачный фон для карточек */
-  border: 1px solid rgba(255, 255, 255, 0.25) !important; /* Более заметная граница */
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-}
-
-/* Улучшенная видимость карточек в vibrant теме */
-[data-color-scheme="vibrant"] .mac-card {
-  background-color: rgba(15, 17, 22, 0.28) !important; /* тёмный слой поверх яркого фона */
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-}
-
-[data-color-scheme="vibrant"] .mac-card:hover {
-  background-color: rgba(15, 17, 22, 0.34) !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
-}
-
-[data-color-scheme="glass"] .mac-card:hover {
-  background-color: rgba(55, 60, 70, 0.9) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-[data-color-scheme="glass"] .mac-card-header {
-  border-bottom-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-[data-color-scheme="glass"] .mac-card-footer {
-  border-top-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-/* Улучшенная видимость сайдбара в glass теме */
-[data-color-scheme="glass"] aside {
-  background: rgba(50, 55, 65, 0.85) !important; /* Более непрозрачный фон для сайдбара */
-  border-right: 1px solid rgba(255, 255, 255, 0.25) !important; /* Более заметная граница */
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-}
-
-/* Улучшенная видимость сайдбара в vibrant теме */
-[data-color-scheme="vibrant"] aside {
-  background: var(--mac-gradient-sidebar) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.22) !important;
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08) inset !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-}
-
-[data-color-scheme="vibrant"] aside > div[style*="border"] {
-  border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-[data-color-scheme="vibrant"] aside nav {
-  background: transparent !important;
-}
-
-[data-color-scheme="glass"] aside > div[style*="border"] {
-  border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-[data-color-scheme="glass"] aside nav {
-  background: transparent !important;
-}
-
-/* Улучшенная видимость сайдбара в gradient теме */
-[data-color-scheme="gradient"] aside {
-  background: transparent !important;
-  border-right: 1px solid var(--mac-separator) !important;
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.25) !important;
-  backdrop-filter: blur(8px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(8px) saturate(140%) !important;
-}
-
-[data-color-scheme="gradient"] aside > div[style*="border"] {
-  border-color: var(--mac-separator) !important;
-}
-
-[data-color-scheme="gradient"] aside nav {
-  background: transparent !important;
-}
-
-[data-color-scheme="glass"] aside nav div[style*="backgroundColor"] {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-[data-color-scheme="vibrant"] aside nav div[style*="backgroundColor"] {
-  background-color: rgba(255, 255, 255, 0.14) !important;
-}
-
-/* Улучшенная видимость хедера в glass теме */
-[data-color-scheme="glass"] .app-header {
-  background-color: rgba(50, 55, 65, 0.85) !important; /* Более непрозрачный фон для хедера */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.25) !important; /* Более заметная граница */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-}
-
-/* Улучшенная видимость хедера в vibrant теме */
-[data-color-scheme="vibrant"] .app-header {
-  background-color: rgba(20, 22, 30, 0.28) !important; /* затемнение для контраста поверх яркого фона */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.22) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-}
-
-[data-color-scheme="glass"] .app-header .hdr-nav-item {
-  background-color: transparent !important;
-}
-
-[data-color-scheme="glass"] .app-header .hdr-nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-[data-color-scheme="glass"] .app-header .hdr-nav-item.active {
-  background-color: rgba(0, 122, 255, 0.2) !important;
-  border-color: rgba(0, 122, 255, 0.4) !important;
+  --mac-bg-primary: rgba(15, 23, 35, 0.72);
+  --mac-bg-secondary: rgba(25, 37, 52, 0.6);
+  --mac-bg-toolbar: rgba(15, 23, 35, 0.72);
+  --mac-bg-tertiary: rgba(52, 70, 90, 0.46);
+  --mac-text-primary: #f7fbff;
+  --mac-text-secondary: rgba(247, 251, 255, 0.76);
+  --mac-success: #58d38b;
+  --mac-warning: #ffc261;
+  --mac-error: #ff8b7e;
+  --mac-border: rgba(255, 255, 255, 0.18);
+  --mac-border-secondary: rgba(255, 255, 255, 0.11);
+  --mac-separator: rgba(255, 255, 255, 0.14);
+  --mac-gradient-window:
+    radial-gradient(circle at 18% 16%, rgba(125, 211, 252, 0.2), transparent 26%),
+    linear-gradient(160deg, rgba(9, 15, 24, 0.96) 0%, rgba(26, 44, 63, 0.84) 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, rgba(12, 18, 27, 0.74) 0%, rgba(23, 37, 54, 0.66) 100%);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --mac-shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.3);
+  --mac-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.38);
+  --mac-blur-light: saturate(185%) blur(24px);
+  background: rgba(8, 12, 18, 0.22);
+  backdrop-filter: blur(24px) saturate(170%);
 }
 
 /* 🎨 Градиентная тема */
 [data-color-scheme="gradient"] {
-  --mac-bg-primary: #667eea;
-  --mac-bg-secondary: #764ba2;
-  --mac-text-primary: #ffffff;
-  --mac-text-secondary: rgba(255,255,255,0.9);
-  --mac-accent-blue: #f093fb;
-  /* Статусные цвета */
-  --mac-success: #34c759;
-  --mac-warning: #ff9500;
-  --mac-error: #ff3b30;
-  --mac-border: rgba(255, 255, 255, 0.18);
-  --mac-separator: rgba(255, 255, 255, 0.16);
-  --mac-gradient-window: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-  /* Бесшовный фон для элементов */
-  --mac-gradient-sidebar: transparent;
-  --mac-bg-toolbar: transparent;
+  --mac-bg-primary: #112845;
+  --mac-bg-secondary: #183d66;
+  --mac-bg-tertiary: #23588b;
+  --mac-text-primary: #fbfdff;
+  --mac-text-secondary: rgba(251, 253, 255, 0.78);
+  --mac-success: #4ade80;
+  --mac-warning: #9fe4ff;
+  --mac-error: #ff7cb6;
+  --mac-border: rgba(255, 255, 255, 0.16);
+  --mac-border-secondary: rgba(255, 255, 255, 0.1);
+  --mac-separator: rgba(255, 255, 255, 0.14);
+  --mac-gradient-window:
+    radial-gradient(circle at 18% 16%, rgba(102, 233, 255, 0.26), transparent 26%),
+    radial-gradient(circle at 82% 16%, rgba(178, 132, 255, 0.22), transparent 24%),
+    linear-gradient(145deg, rgba(16, 40, 71, 0.96) 0%, rgba(21, 84, 147, 0.88) 52%, rgba(113, 84, 255, 0.88) 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, rgba(10, 26, 48, 0.32) 0%, rgba(20, 66, 118, 0.2) 100%);
+  --mac-bg-toolbar: rgba(11, 29, 54, 0.28);
   --bg: transparent;
-  /* Тени */
-  --mac-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --mac-shadow-sm: 0 2px 10px rgba(7, 17, 40, 0.2);
+  --mac-shadow-md: 0 10px 26px rgba(7, 17, 40, 0.28);
 }
 
-/* Бесшовный фон на всех панелях в градиентной теме */
-[data-color-scheme="gradient"] main,
-[data-color-scheme="gradient"] .app-content,
-[data-color-scheme="gradient"] .panel-container,
-[data-color-scheme="gradient"] .page-root,
-[data-color-scheme="gradient"] .content-root,
-[data-color-scheme="gradient"] .main,
-[data-color-scheme="gradient"] .content,
-[data-color-scheme="gradient"] .page,
-[data-color-scheme="gradient"] .page-content,
-[data-color-scheme="gradient"] .container,
-[data-color-scheme="gradient"] .wrapper {
+[data-color-scheme="vibrant"] .mac-card,
+[data-color-scheme="glass"] .mac-card,
+[data-color-scheme="gradient"] .mac-card {
+  background-color: var(--mac-card-bg) !important;
+  border: 1px solid var(--mac-card-border) !important;
+  box-shadow: var(--mac-shadow-md), 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 40%) inset !important;
+}
+
+[data-color-scheme="vibrant"] .mac-card {
+  backdrop-filter: blur(16px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(165%) !important;
+}
+
+[data-color-scheme="glass"] .mac-card {
+  backdrop-filter: blur(20px) saturate(185%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(185%) !important;
+}
+
+[data-color-scheme="gradient"] .mac-card {
+  background-color: rgba(17, 42, 74, 0.18) !important;
+  backdrop-filter: blur(12px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+}
+
+[data-color-scheme="vibrant"] .mac-card:hover,
+[data-color-scheme="glass"] .mac-card:hover,
+[data-color-scheme="gradient"] .mac-card:hover {
+  background-color: var(--mac-card-hover-bg) !important;
+  border-color: color-mix(in srgb, var(--mac-card-border), white 18%) !important;
+}
+
+[data-color-scheme="glass"] .mac-card-header,
+[data-color-scheme="gradient"] .mac-card-header {
+  border-bottom-color: color-mix(in srgb, var(--mac-border), white 10%) !important;
+}
+
+[data-color-scheme="glass"] .mac-card-footer,
+[data-color-scheme="gradient"] .mac-card-footer {
+  border-top-color: color-mix(in srgb, var(--mac-border), white 10%) !important;
+}
+
+[data-color-scheme="vibrant"] aside,
+[data-color-scheme="glass"] aside,
+[data-color-scheme="gradient"] aside {
+  background: var(--mac-gradient-sidebar) !important;
+  border-right: 1px solid color-mix(in srgb, var(--mac-border), white 10%) !important;
+  box-shadow: 4px 0 18px rgba(0, 0, 0, 0.26), 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 35%) inset !important;
+}
+
+[data-color-scheme="vibrant"] aside {
+  backdrop-filter: blur(16px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(165%) !important;
+}
+
+[data-color-scheme="glass"] aside {
+  backdrop-filter: blur(20px) saturate(185%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(185%) !important;
+}
+
+[data-color-scheme="gradient"] aside {
+  backdrop-filter: blur(10px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
+}
+
+[data-color-scheme="vibrant"] aside > div[style*="border"],
+[data-color-scheme="glass"] aside > div[style*="border"],
+[data-color-scheme="gradient"] aside > div[style*="border"] {
+  border-color: color-mix(in srgb, var(--mac-border), white 8%) !important;
+}
+
+[data-color-scheme="vibrant"] aside nav,
+[data-color-scheme="glass"] aside nav,
+[data-color-scheme="gradient"] aside nav {
   background: transparent !important;
 }
 
-/* Убираем локальный фон у первого контейнера внутри main (универсальный враппер страниц) */
-[data-color-scheme="gradient"] main > div {
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
+[data-color-scheme="glass"] aside nav div[style*="backgroundColor"],
+[data-color-scheme="gradient"] aside nav div[style*="backgroundColor"],
+[data-color-scheme="vibrant"] aside nav div[style*="backgroundColor"] {
+  background-color: color-mix(in srgb, var(--mac-bg-secondary), white 8%) !important;
 }
 
-/* Убираем локальный фон у первого контейнера внутри main для яркой темы */
-[data-color-scheme="vibrant"] main > div {
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
+[data-color-scheme="vibrant"] .app-header,
+[data-color-scheme="glass"] .app-header,
+[data-color-scheme="gradient"] .app-header {
+  background-color: var(--mac-header-bg) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--mac-border), white 10%) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22), 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 36%) inset !important;
 }
 
-/* Убираем локальный фон у первого контейнера внутри main для светлой/тёмной тем */
-[data-theme="light"] main > div,
-.light-theme main > div {
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  border: none !important;
-  border-radius: 0 !important;
-  outline: none !important;
-  filter: none !important;
-  backdrop-filter: none !important;
+[data-color-scheme="vibrant"] .app-header {
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
 }
 
-[data-theme="dark"] main > div,
-.dark-theme main > div {
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  border: none !important;
-  border-radius: 0 !important;
-  outline: none !important;
-  filter: none !important;
-  backdrop-filter: none !important;
+[data-color-scheme="glass"] .app-header {
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
 }
+
+[data-color-scheme="gradient"] .app-header {
+  backdrop-filter: blur(10px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(145%) !important;
+}
+
+[data-color-scheme="glass"] .app-header .hdr-nav-item,
+[data-color-scheme="gradient"] .app-header .hdr-nav-item {
+  background-color: transparent !important;
+}
+
+[data-color-scheme="glass"] .app-header .hdr-nav-item:hover,
+[data-color-scheme="gradient"] .app-header .hdr-nav-item:hover {
+  background-color: color-mix(in srgb, var(--mac-bg-secondary), white 8%) !important;
+}
+
+[data-color-scheme="glass"] .app-header .hdr-nav-item.active,
+[data-color-scheme="gradient"] .app-header .hdr-nav-item.active {
+  background-color: var(--mac-accent-bg) !important;
+  border-color: var(--mac-accent-border) !important;
+}
+
+[data-color-scheme="vibrant"] .app-shell,
+[data-color-scheme="glass"] .app-shell,
+[data-color-scheme="gradient"] .app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-color-scheme="vibrant"] .app-shell::before,
+[data-color-scheme="glass"] .app-shell::before,
+[data-color-scheme="gradient"] .app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+}
+
+[data-color-scheme="vibrant"] .app-shell::after,
+[data-color-scheme="glass"] .app-shell::after,
+[data-color-scheme="gradient"] .app-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+[data-color-scheme="vibrant"] .app-shell::before {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(255, 190, 126, 0.22), transparent 24%),
+    radial-gradient(circle at 86% 18%, rgba(255, 128, 114, 0.16), transparent 22%),
+    radial-gradient(circle at 50% 88%, rgba(255, 233, 202, 0.07), transparent 28%);
+}
+
+[data-color-scheme="vibrant"] .app-shell::after {
+  background:
+    linear-gradient(165deg, rgba(255, 241, 229, 0.05) 0%, transparent 32%),
+    linear-gradient(345deg, rgba(255, 162, 117, 0.06) 0%, transparent 42%);
+}
+
+[data-color-scheme="glass"] .app-shell::before {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(144, 224, 239, 0.18), transparent 26%),
+    radial-gradient(circle at 84% 20%, rgba(125, 160, 255, 0.14), transparent 24%),
+    radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.06), transparent 32%);
+}
+
+[data-color-scheme="glass"] .app-shell::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%),
+    linear-gradient(145deg, rgba(98, 149, 255, 0.04) 0%, transparent 34%);
+}
+
+[data-color-scheme="gradient"] .app-shell::before {
+  background:
+    radial-gradient(circle at 16% 18%, rgba(102, 233, 255, 0.22), transparent 26%),
+    radial-gradient(circle at 82% 16%, rgba(178, 132, 255, 0.2), transparent 24%),
+    radial-gradient(circle at 52% 86%, rgba(214, 233, 255, 0.08), transparent 30%);
+}
+
+[data-color-scheme="gradient"] .app-shell::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 22%),
+    linear-gradient(135deg, rgba(140, 225, 255, 0.05) 0%, transparent 30%);
+}
+
+[data-color-scheme="vibrant"] .app-main,
+[data-color-scheme="glass"] .app-main,
+[data-color-scheme="gradient"] .app-main {
+  background: var(--mac-main-shell-bg);
+  border: 1px solid var(--mac-main-shell-border);
+  border-radius: 24px;
+  box-shadow: var(--mac-main-shell-shadow);
+}
+
+[data-color-scheme="vibrant"] .app-main::before,
+[data-color-scheme="glass"] .app-main::before,
+[data-color-scheme="gradient"] .app-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+}
+
+[data-color-scheme="vibrant"] .app-main::before {
+  background:
+    linear-gradient(180deg, rgba(255, 210, 164, 0.08) 0%, transparent 16%),
+    radial-gradient(circle at 0% 0%, rgba(255, 169, 112, 0.12), transparent 22%);
+}
+
+[data-color-scheme="glass"] .app-main::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 18%),
+    radial-gradient(circle at 12% 0%, rgba(144, 224, 239, 0.1), transparent 20%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+[data-color-scheme="gradient"] .app-main::before {
+  background:
+    linear-gradient(180deg, rgba(222, 237, 255, 0.1) 0%, transparent 14%),
+    radial-gradient(circle at 0% 0%, rgba(102, 233, 255, 0.12), transparent 24%);
+}
+
+[data-theme="light"] .app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="light"] .app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 10% 12%, rgba(83, 138, 255, 0.08), transparent 26%),
+    radial-gradient(circle at 88% 14%, rgba(144, 175, 222, 0.1), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 28%);
+}
+
+[data-theme="light"] .app-main {
+  background: var(--mac-main-shell-bg);
+  border: 1px solid var(--mac-main-shell-border);
+  border-radius: 24px;
+  box-shadow: var(--mac-main-shell-shadow);
+}
+
+[data-theme="light"] .app-header {
+  background-color: var(--mac-header-bg) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--mac-border), white 14%) !important;
+  box-shadow: 0 12px 28px rgba(148, 163, 184, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.55) inset !important;
+}
+
+[data-theme="light"] .mac-card {
+  background-color: var(--mac-card-bg) !important;
+  border: 1px solid var(--mac-card-border) !important;
+  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.12), 0 1px 0 rgba(255, 255, 255, 0.7) inset !important;
+}
+
+[data-theme="light"] .mac-card:hover {
+  background-color: var(--mac-card-hover-bg) !important;
+  border-color: color-mix(in srgb, var(--mac-card-border), white 12%) !important;
+}
+
+/* Важно: не обнуляем массово фон `main > div`, иначе схемы становятся визуально одинаковыми.
+   Нормализация legacy инлайновых фонов идёт ниже через точечные style*-селекторы. */
 
 html, body, #root {
+  min-height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
-  background: var(--mac-gradient-window), var(--bg);
   color: var(--mac-text-primary);
+}
+
+html {
+  background-color: var(--bg);
+  background-image: var(--mac-gradient-window);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+body {
+  margin: 0;
+  background-color: transparent;
+  background-image: none;
+  overflow-x: hidden;
+}
+
+#root,
+.app-shell,
+.app-shell-grid {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.app-shell,
+.app-shell-grid {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-shell-grid {
+  align-items: start;
+}
+
+.app-main {
+  background: var(--mac-main-shell-bg);
+  border: 1px solid var(--mac-main-shell-border);
+  border-radius: 24px;
+  box-shadow: var(--mac-main-shell-shadow);
+  background-clip: padding-box;
+}
+
+.app-main.app-main--frameless {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-main > * {
+  position: relative;
+  z-index: 1;
+}
+
+.theme-page-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+.theme-section-panel,
+.theme-soft-surface {
+  border: 1px solid var(--mac-card-border);
+  border-radius: 14px;
+}
+
+.theme-section-panel {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--mac-card-bg), white 4%),
+    color-mix(in srgb, var(--mac-bg-secondary), transparent 18%)
+  );
+}
+
+.theme-soft-surface {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--mac-card-bg), white 3%),
+    color-mix(in srgb, var(--mac-bg-secondary), transparent 20%)
+  );
+}
+
+.theme-empty-state {
+  border: 1px dashed var(--mac-card-border);
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--mac-card-bg), white 2%),
+    color-mix(in srgb, var(--mac-bg-secondary), transparent 24%)
+  );
+}
+
+.theme-tab-strip {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 6px;
+  border: 1px solid var(--mac-card-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--mac-card-bg), transparent 16%);
+  overflow-x: auto;
+}
+
+.theme-tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--mac-text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-tab-button.theme-tab-button--active {
+  background: var(--mac-card-bg);
+  border-color: var(--mac-card-border);
+  color: var(--mac-text-primary);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.theme-icon-button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--mac-text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.theme-icon-button:hover {
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 6%);
+  border-color: var(--mac-border);
+  color: var(--mac-text-primary);
+}
+
+.theme-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.theme-modal-surface {
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  color: var(--mac-text-primary);
+  box-shadow: var(--mac-shadow-md);
+}
+
+.theme-field-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+}
+
+.theme-field-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--mac-accent), white 22%);
+  outline-offset: 1px;
+}
+
+.theme-collapsible-summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--mac-bg-secondary);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--mac-text-primary);
+  border: 1px solid var(--mac-border);
+}
+
+.theme-collapsible-content {
+  padding: 16px;
+  border: 1px solid var(--mac-border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Legacy pages: normalize old JSX inline surfaces to token-based theme */
+.legacy-page-shell {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.legacy-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--mac-card-bg), white 2%),
+    color-mix(in srgb, var(--mac-bg-secondary), transparent 18%)
+  );
+}
+
+.legacy-input {
+  padding: 6px 10px;
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+}
+
+.legacy-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--mac-accent), white 24%);
+  outline-offset: 1px;
+}
+
+.legacy-button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--mac-border);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.legacy-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--mac-bg-secondary), white 4%);
+  border-color: color-mix(in srgb, var(--mac-border), white 12%);
+}
+
+.legacy-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.legacy-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  background: var(--mac-card-bg);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.legacy-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--mac-text-primary);
+}
+
+.legacy-table th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--mac-separator);
+  font-weight: 700;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
+}
+
+.legacy-table td {
+  padding: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--mac-separator), transparent 25%);
+  vertical-align: top;
+}
+
+.legacy-error {
+  color: var(--mac-error);
+  background: var(--mac-error-bg);
+  border: 1px solid var(--mac-error-border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.legacy-muted {
+  color: var(--mac-text-secondary);
+}
+
+.legacy-list {
+  display: grid;
+  gap: 10px;
+}
+
+.legacy-list-item {
+  border: 1px solid var(--mac-card-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--mac-card-bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.legacy-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--mac-separator);
+  background: color-mix(in srgb, var(--mac-header-bg), transparent 10%);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: var(--mac-blur-light);
+  -webkit-backdrop-filter: var(--mac-blur-light);
+}
+
+.legacy-nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--mac-border);
+  margin-right: 6px;
+  text-decoration: none;
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  transition: all 0.2s ease;
+}
+
+.legacy-nav-link:hover {
+  background: var(--mac-nav-item-hover);
+  border-color: color-mix(in srgb, var(--mac-border), white 10%);
+}
+
+.legacy-nav-link--active {
+  background: var(--mac-nav-item-active);
+  color: var(--mac-nav-item-active-text);
+  border-color: var(--mac-nav-item-active-border);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+/* Legacy hardcoded inline rescue layer: normalize old white/gray surfaces */
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #fff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#fff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #ffffff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#ffffff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: rgb(255, 255, 255)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #fff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#fff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #ffffff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#ffffff"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: rgb(255, 255, 255)"] {
+  background: var(--mac-card-bg) !important;
+  color: var(--mac-text-primary) !important;
+}
+
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #f9fafb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#f9fafb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: rgb(249, 250, 251)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #f3f4f6"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#f3f4f6"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #f5f5f5"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#f5f5f5"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #fafafa"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#fafafa"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #f9fafb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#f9fafb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: rgb(249, 250, 251)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #f3f4f6"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#f3f4f6"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #f5f5f5"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#f5f5f5"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color: #fafafa"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background-color:#fafafa"] {
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 10%) !important;
+  color: var(--mac-text-primary) !important;
+}
+
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #ddd"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #ddd"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #d1d5db"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #d1d5db"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #ccc"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #ccc"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #e5e7eb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #e5e7eb"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid #eee"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border:1px solid #eee"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid rgb(221, 221, 221)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid rgb(209, 213, 219)"],
+[data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td, button, input, select, textarea)[style*="border: 1px solid rgb(238, 238, 238)"] {
+  border-color: var(--mac-border) !important;
 }
 
 /* СХЕМА-ТАРГЕТИРОВАНИЕ ДЛЯ ТАБЛИЦ: жестко привязываем фон к активной теме */
@@ -376,36 +859,25 @@ html .enhanced-table > div:first-of-type > div {
 
 /* Регистратор: внешняя обёртка вокруг таблицы — подчиняется теме и сливается с вкладками */
 [data-color-scheme] #main-content > div {
-  background-color: var(--mac-bg-primary) !important;
+  background: var(--mac-main-shell-bg) !important;
   color: var(--mac-text-primary) !important;
-  border: none !important; /* убираем второй контур, оставляем только чёрный inset */
-  border-top: none !important;
+  border: 1px solid var(--mac-main-shell-border) !important;
+  border-top: 1px solid var(--mac-main-shell-border) !important;
   border-radius: 0 0 var(--mac-radius-md) var(--mac-radius-md) !important;
-  box-shadow: var(--mac-shadow-md, 0 4px 12px rgba(0,0,0,0.2)), 0 0 0 1px rgba(0,0,0,0.6) inset !important; /* тонкая чёрная линия вокруг */
+  box-shadow: var(--mac-main-shell-shadow) !important;
 }
-[data-theme="light"] #main-content > div, .light-theme #main-content > div {
-  background-color: var(--bg-primary, #ffffff) !important;
-  color: var(--text-primary, #0f172a) !important;
-  border: none !important; /* убираем второй контур, оставляем только чёрный inset */
-  border-top: none !important;
+[data-theme] #main-content > div {
+  background: var(--mac-main-shell-bg) !important;
+  color: var(--mac-text-primary) !important;
+  border: 1px solid var(--mac-main-shell-border) !important;
+  border-top: 1px solid var(--mac-main-shell-border) !important;
   border-radius: 0 0 var(--mac-radius-md) var(--mac-radius-md) !important;
-  box-shadow: var(--shadow-md, 0 4px 6px rgba(0,0,0,0.12)), 0 0 0 1px rgba(0,0,0,0.6) inset !important;
-}
-[data-theme="dark"] #main-content > div, .dark-theme #main-content > div {
-  background-color: var(--mac-bg-primary, #1c1c1e) !important;
-  color: var(--mac-text-primary, #ffffff) !important;
-  border: none !important; /* убираем второй контур, оставляем только чёрный inset */
-  border-top: none !important;
-  border-radius: 0 0 var(--mac-radius-md) var(--mac-radius-md) !important;
-  box-shadow: var(--mac-shadow-md, 0 4px 12px rgba(0,0,0,0.35)), 0 0 0 1px rgba(0,0,0,0.6) inset !important;
+  box-shadow: var(--mac-main-shell-shadow) !important;
 }
 
 /* Регистратор: внутренний верхний контейнер берёт цвета родителя */
 [data-color-scheme] #main-content > div > div > div:nth-child(1) > div,
-[data-theme="light"] #main-content > div > div > div:nth-child(1) > div,
-.light-theme #main-content > div > div > div:nth-child(1) > div,
-[data-theme="dark"] #main-content > div > div > div:nth-child(1) > div,
-.dark-theme #main-content > div > div > div:nth-child(1) > div {
+[data-theme] #main-content > div > div > div:nth-child(1) > div {
   background-color: inherit !important;
   color: inherit !important;
   border-color: inherit !important;
@@ -413,10 +885,7 @@ html .enhanced-table > div:first-of-type > div {
 
 /* Унификация для остальных панелей: внутренний верхний блок таблицы наследует цвета родителя */
 [data-color-scheme] main > div > div > div:nth-child(1) > div,
-[data-theme="light"] main > div > div > div:nth-child(1) > div,
-.light-theme main > div > div > div:nth-child(1) > div,
-[data-theme="dark"] main > div > div > div:nth-child(1) > div,
-.dark-theme main > div > div > div:nth-child(1) > div {
+[data-theme] main > div > div > div:nth-child(1) > div {
   background-color: inherit !important;
   color: inherit !important;
   border-color: inherit !important;

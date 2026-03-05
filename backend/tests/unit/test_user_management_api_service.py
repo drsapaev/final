@@ -24,6 +24,7 @@ class TestUserManagementApiService:
                 return None
 
             def create_preferences(self, **kwargs):
+                created_preferences.theme = kwargs["theme"]
                 return created_preferences
 
             def commit(self):
@@ -46,6 +47,7 @@ class TestUserManagementApiService:
         assert state["committed"] is True
         assert state["refreshed"] is True
         assert "emr_smart_field_mode" in created_preferences.emr_settings
+        assert created_preferences.theme == "auto"
 
     def test_apply_profile_update_sets_fields_and_commits(self):
         profile = SimpleNamespace(full_name="Old")
@@ -73,3 +75,70 @@ class TestUserManagementApiService:
 
         assert updated.full_name == "New"
         assert state["committed"] is True
+
+    def test_update_current_user_preferences_normalizes_legacy_system_theme(self):
+        created_preferences = SimpleNamespace(
+            emr_settings=None,
+            theme="system",
+            language="ru",
+            compact_mode=False,
+            sidebar_collapsed=False,
+        )
+
+        class Repository:
+            def get_preferences_by_user_id(self, user_id):
+                return None
+
+            def create_preferences(self, **kwargs):
+                created_preferences.theme = kwargs["theme"]
+                return created_preferences
+
+            def commit(self):
+                return None
+
+            def refresh(self, instance):
+                return None
+
+            def rollback(self):
+                raise AssertionError("rollback must not be called")
+
+        service = UserManagementApiService(db=None, repository=Repository())
+        service.update_current_user_preferences(
+            current_user_id=1,
+            preferences_data={"theme": "system"},
+        )
+
+        assert created_preferences.theme == "auto"
+
+    def test_update_current_user_preferences_preserves_custom_theme_values(self):
+        preferences = SimpleNamespace(
+            emr_settings=None,
+            theme="light",
+            language="ru",
+            compact_mode=False,
+            sidebar_collapsed=False,
+        )
+
+        class Repository:
+            def get_preferences_by_user_id(self, user_id):
+                return preferences
+
+            def create_preferences(self, **kwargs):
+                raise AssertionError("create_preferences must not be called")
+
+            def commit(self):
+                return None
+
+            def refresh(self, instance):
+                return None
+
+            def rollback(self):
+                raise AssertionError("rollback must not be called")
+
+        service = UserManagementApiService(db=None, repository=Repository())
+        service.update_current_user_preferences(
+            current_user_id=1,
+            preferences_data={"theme": "glass"},
+        )
+
+        assert preferences.theme == "glass"

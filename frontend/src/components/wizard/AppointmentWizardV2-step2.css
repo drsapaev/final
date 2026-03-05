@@ -5,6 +5,19 @@
   flex-direction: column;
   gap: 20px;
   height: 100%;
+  --wizard2-surface: var(--mac-card-bg);
+  --wizard2-surface-soft: var(--mac-bg-secondary);
+  --wizard2-surface-muted: var(--mac-bg-tertiary);
+  --wizard2-surface-hover: var(--mac-card-hover-bg);
+  --wizard2-border: var(--mac-border);
+  --wizard2-border-subtle: var(--mac-border-secondary);
+  --wizard2-text: var(--mac-text-primary);
+  --wizard2-text-muted: var(--mac-text-secondary);
+  --wizard2-accent: var(--mac-accent);
+  --wizard2-accent-strong: color-mix(in srgb, var(--mac-accent), black 18%);
+  --wizard2-success: var(--mac-success);
+  --wizard2-danger: var(--mac-error);
+  --wizard2-warning: var(--mac-warning);
 }
 
 /* Панель инструментов */
@@ -13,9 +26,9 @@
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  background: #f8fafc;
+  background: var(--wizard2-surface-soft);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--wizard2-border);
 }
 
 .search-box {
@@ -28,23 +41,25 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   pointer-events: none;
 }
 
 .search-input {
   width: 100%;
   padding: 10px 40px 10px 40px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--wizard2-border-subtle);
   border-radius: 6px;
   font-size: 14px;
   transition: all 0.2s;
+  background: var(--wizard2-surface);
+  color: var(--wizard2-text);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #0078d4;
-  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+  border-color: var(--wizard2-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wizard2-accent), transparent 86%);
 }
 
 .clear-search {
@@ -54,7 +69,7 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -64,7 +79,7 @@
 }
 
 .clear-search:hover {
-  color: #374151;
+  color: var(--wizard2-text);
 }
 
 /* Переключатель вида */
@@ -72,8 +87,8 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: var(--wizard2-surface);
+  border: 1px solid var(--wizard2-border-subtle);
   border-radius: 6px;
 }
 
@@ -82,7 +97,7 @@
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -91,13 +106,13 @@
 }
 
 .view-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--wizard2-surface-hover);
+  color: var(--wizard2-text);
 }
 
 .view-btn.active {
-  background: #0078d4;
-  color: white;
+  background: var(--wizard2-accent);
+  color: var(--mac-text-on-accent);
 }
 
 /* Вкладки категорий */
@@ -114,12 +129,12 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: white;
-  border: 2px solid #e5e7eb;
+  background: var(--wizard2-surface);
+  border: 2px solid var(--wizard2-border);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--wizard2-text);
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -127,13 +142,13 @@
 }
 
 .category-tab:hover {
-  background: #f8fafc;
+  background: var(--wizard2-surface-soft);
   transform: translateY(-1px);
 }
 
 .category-tab.active {
-  color: #0078d4;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: var(--wizard2-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--wizard2-text), transparent 88%);
 }
 
 .cat-icon {
@@ -146,7 +161,7 @@
 
 .cat-count {
   padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.05);
+  background: color-mix(in srgb, var(--wizard2-text), transparent 94%);
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
@@ -163,8 +178,8 @@
 
 /* Секция услуг */
 .services-section {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--wizard2-surface);
+  border: 1px solid var(--wizard2-border);
   border-radius: 8px;
   padding: 20px;
   overflow-y: auto;
@@ -187,8 +202,8 @@
 
 /* Карточка услуги */
 .service-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--wizard2-surface);
+  border: 1px solid var(--wizard2-border);
   border-radius: 8px;
   padding: 16px;
   transition: all 0.2s;
@@ -196,13 +211,13 @@
 }
 
 .service-card:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-color: var(--wizard2-border-subtle);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--wizard2-text), transparent 94%);
 }
 
 .service-card.in-cart {
-  background: #f0fdf4;
-  border-color: #10b981;
+  background: color-mix(in srgb, var(--wizard2-success), transparent 88%);
+  border-color: var(--wizard2-success);
 }
 
 .service-card-header {
@@ -230,15 +245,15 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  background: #7c3aed;
-  color: white;
+  background: var(--mac-accent-purple);
+  color: var(--mac-text-on-accent);
   border-radius: 4px;
 }
 
 .service-card-name {
   font-size: 15px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--wizard2-text);
   margin: 0 0 12px;
   line-height: 1.3;
 }
@@ -258,12 +273,12 @@
 .price-value {
   font-size: 18px;
   font-weight: 700;
-  color: #059669;
+  color: var(--wizard2-success);
 }
 
 .price-currency {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
 }
 
 /* Кнопки управления количеством */
@@ -272,8 +287,8 @@
   align-items: center;
   gap: 8px;
   padding: 4px;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: var(--wizard2-surface);
+  border: 1px solid var(--wizard2-border-subtle);
   border-radius: 6px;
 }
 
@@ -286,21 +301,21 @@
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .qty-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--wizard2-surface-hover);
+  color: var(--wizard2-text);
 }
 
 .qty-value {
   min-width: 24px;
   text-align: center;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--wizard2-text);
 }
 
 .add-to-cart-btn {
@@ -308,8 +323,8 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: #0078d4;
-  color: white;
+  background: var(--wizard2-accent);
+  color: var(--mac-text-on-accent);
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -319,15 +334,15 @@
 }
 
 .add-to-cart-btn:hover {
-  background: #106ebe;
+  background: var(--wizard2-accent-strong);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--wizard2-accent), transparent 72%);
 }
 
 /* Боковая панель корзины */
 .cart-sidebar {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--wizard2-surface);
+  border: 1px solid var(--wizard2-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -336,8 +351,8 @@
 
 .cart-header {
   padding: 16px 20px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--wizard2-surface-soft);
+  border-bottom: 1px solid var(--wizard2-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -349,13 +364,13 @@
   gap: 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--wizard2-text);
   margin: 0;
 }
 
 .cart-count {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   font-weight: 500;
 }
 
@@ -371,20 +386,20 @@
 }
 
 .empty-cart .empty-icon {
-  color: #d1d5db;
+  color: var(--wizard2-border-subtle);
   margin-bottom: 16px;
 }
 
 .empty-cart h4 {
   font-size: 16px;
   font-weight: 600;
-  color: #374151;
+  color: var(--wizard2-text);
   margin: 0 0 8px;
 }
 
 .empty-cart p {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   margin: 0;
 }
 
@@ -399,8 +414,8 @@
 }
 
 .cart-item-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--wizard2-surface-muted);
+  border: 1px solid var(--wizard2-border);
   border-radius: 8px;
   padding: 12px;
 }
@@ -427,8 +442,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fee2e2;
-  color: #dc2626;
+  background: color-mix(in srgb, var(--wizard2-danger), transparent 82%);
+  color: var(--wizard2-danger);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -436,13 +451,13 @@
 }
 
 .remove-btn:hover {
-  background: #fecaca;
+  background: color-mix(in srgb, var(--wizard2-danger), transparent 74%);
 }
 
 .cart-item-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--wizard2-text);
   margin: 0 0 12px;
   line-height: 1.3;
 }
@@ -465,7 +480,7 @@
 .qty-label,
 .doctor-label {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -476,23 +491,24 @@
   align-items: center;
   gap: 4px;
   padding: 2px;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: var(--wizard2-surface);
+  border: 1px solid var(--wizard2-border-subtle);
   border-radius: 4px;
 }
 
 .doctor-select {
   flex: 1;
   padding: 6px 8px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--wizard2-border-subtle);
   border-radius: 4px;
   font-size: 13px;
-  background: white;
+  background: var(--wizard2-surface);
+  color: var(--wizard2-text);
 }
 
 .doctor-select.required {
-  border-color: #f59e0b;
-  background: #fffbeb;
+  border-color: var(--wizard2-warning);
+  background: color-mix(in srgb, var(--wizard2-warning), transparent 90%);
 }
 
 .cart-item-price {
@@ -500,25 +516,25 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--wizard2-border);
 }
 
 .price-label {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
 }
 
 .cart-item-price .price-value {
   font-size: 15px;
   font-weight: 700;
-  color: #059669;
+  color: var(--wizard2-success);
 }
 
 /* Итоговая сумма */
 .cart-summary {
   padding: 16px 20px;
-  background: #f8fafc;
-  border-top: 1px solid #e5e7eb;
+  background: var(--wizard2-surface-soft);
+  border-top: 1px solid var(--wizard2-border);
 }
 
 .summary-row {
@@ -536,7 +552,7 @@
 .total-price {
   font-size: 20px;
   font-weight: 700;
-  color: #059669;
+  color: var(--wizard2-success);
 }
 
 .summary-info {
@@ -544,9 +560,9 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
   padding: 8px;
-  background: white;
+  background: var(--wizard2-surface);
   border-radius: 4px;
 }
 
@@ -561,20 +577,20 @@
 }
 
 .no-services-icon {
-  color: #d1d5db;
+  color: var(--wizard2-border-subtle);
   margin-bottom: 16px;
 }
 
 .no-services p {
   font-size: 16px;
   font-weight: 600;
-  color: #374151;
+  color: var(--wizard2-text);
   margin: 0 0 8px;
 }
 
 .no-services-hint {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--wizard2-text-muted);
 }
 
 /* Ошибки валидации */
@@ -590,10 +606,10 @@
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
+  background: color-mix(in srgb, var(--wizard2-danger), transparent 82%);
+  border: 1px solid color-mix(in srgb, var(--wizard2-danger), transparent 70%);
   border-radius: 6px;
-  color: #991b1b;
+  color: var(--wizard2-danger);
   font-size: 14px;
 }
 
@@ -635,7 +651,4 @@
   }
 }
 
-/* Темная тема */
-[data-theme="dark"] .cart-step-v2 {
-  /* Добавьте стили для темной темы по необходимости */
-}
+/* Тема управляется токенами --mac-* */

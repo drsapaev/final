@@ -64,16 +64,16 @@ export default function Appointments() {
     <div>
       <Nav active={page} onNavigate={setPage} />
       <RoleGate roles={['Admin', 'Registrar', 'Doctor']}>
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+        <div className="legacy-page-shell">
           <h2 style={{ margin: 0 }}>Записи</h2>
 
-          <div style={panel}>
+          <div className="legacy-toolbar">
             <label>
               Дата:&nbsp;
-              <input type="date" value={date} onChange={(e)=>setDate(e.target.value)} style={inp}/>
+              <input className="legacy-input" type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
             </label>
-            <input placeholder="Поиск по пациенту/врачу/статусу/ID" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...inp, minWidth: 260 }}/>
-            <button onClick={load} disabled={busy} style={btn}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <input className="legacy-input" placeholder="Поиск по пациенту/врачу/статусу/ID" value={q} onChange={(e)=>setQ(e.target.value)} style={{ minWidth: 260 }} />
+            <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
             <label>
               <input 
                 type="checkbox" 
@@ -84,7 +84,7 @@ export default function Appointments() {
             </label>
           </div>
 
-          {err && <div style={errBox}>{String(err)}</div>}
+          {err && <div className="legacy-error">{String(err)}</div>}
 
           {useAdvancedTable ? (
             <EnhancedAppointmentsTable
@@ -95,28 +95,28 @@ export default function Appointments() {
               setShowWizard={(show) => logger.log('Show wizard:', show)}
             />
           ) : (
-            <div style={{ overflow: 'auto', border: '1px solid #eee', borderRadius: 12, background: '#fff' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="legacy-table-wrap">
+              <table className="legacy-table">
               <thead>
                 <tr>
-                  <th style={th}>ID</th>
-                  <th style={th}>Пациент</th>
-                  <th style={th}>Врач</th>
-                  <th style={th}>Время</th>
-                  <th style={th}>Статус</th>
+                  <th>ID</th>
+                  <th>Пациент</th>
+                  <th>Врач</th>
+                  <th>Время</th>
+                  <th>Статус</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((a, i) => (
                   <tr key={a.id || i}>
-                    <td style={td}>{a.id}</td>
-                    <td style={td}>{a.patient_name || a.patient?.full_name || '—'}</td>
-                    <td style={td}>{a.doctor_name || a.doctor || '—'}</td>
-                    <td style={td}>
+                    <td>{a.id}</td>
+                    <td>{a.patient_name || a.patient?.full_name || '—'}</td>
+                    <td>{a.doctor_name || a.doctor || '—'}</td>
+                    <td>
                       {(a.time || a.slot || a.start_time) ? (a.time || a.slot || a.start_time) : '—'}
                       {(a.end_time ? ` — ${a.end_time}` : '')}
                     </td>
-                    <td style={td}>
+                    <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {a.status || '—'}
                         {a.status && (
@@ -131,7 +131,7 @@ export default function Appointments() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td style={td} colSpan={5}>Нет записей</td></tr>
+                  <tr><td colSpan={5}>Нет записей</td></tr>
                 )}
               </tbody>
               </table>
@@ -142,11 +142,4 @@ export default function Appointments() {
     </div>
   );
 }
-
-const panel = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #eee', borderRadius: 12, padding: 12, background: '#fff' };
-const inp = { padding: '6px 10px', border: '1px solid #ddd', borderRadius: 8, background: '#fff' };
-const btn = { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' };
-const th = { textAlign: 'left', padding: 10, borderBottom: '1px solid #eee', fontWeight: 700, whiteSpace: 'nowrap' };
-const td = { padding: 10, borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' };
-const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8 };
 

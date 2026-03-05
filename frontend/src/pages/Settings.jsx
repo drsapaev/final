@@ -4,6 +4,8 @@ import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
+import ColorSchemeSelector from '../components/admin/ColorSchemeSelector.jsx';
+import AccentPicker from '../components/ui/macos/AccentPicker.jsx';
 
 import PhoneVerification from '../components/auth/PhoneVerification';
 
@@ -209,8 +211,36 @@ export default function Settings() {void
             <TabButton active={tab === 'display_board'} onClick={() => setTab('display_board')}>Табло очереди</TabButton>
             <TabButton active={tab === 'payment_providers'} onClick={() => setTab('payment_providers')}>Провайдеры оплаты</TabButton>
             <TabButton active={tab === 'notifications'} onClick={() => setTab('notifications')}>Уведомления (System)</TabButton>
+            <TabButton active={tab === 'appearance'} onClick={() => setTab('appearance')}>Тема и стиль</TabButton>
             <TabButton active={tab === 'security'} onClick={() => setTab('security')}>Безопасность</TabButton>
           </div>
+
+          {tab === 'appearance' &&
+          <div style={{ display: 'grid', gap: 12 }}>
+              <ColorSchemeSelector />
+
+              <div style={card}>
+                <div style={{ fontWeight: 700, marginBottom: 12 }}>Accent color</div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <AccentPicker />
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                    Акцентный цвет перекрашивает кнопки, focus states, badges и первичные действия. Он сохраняется локально в браузере, отдельно от theme preference.
+                  </div>
+                </div>
+              </div>
+
+              <div style={card}>
+                <div style={{ fontWeight: 700, marginBottom: 12 }}>Как использовать вместе</div>
+                <div style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--text-primary)' }}>
+                  <div>1. Сначала выберите theme для фона, sidebar и карточек.</div>
+                  <div>2. Потом подберите accent для primary actions и focus состояний.</div>
+                  <div style={{ opacity: 0.75 }}>
+                    Theme сохраняется в вашем профиле. Accent хранится только в текущем браузере.
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
 
           {tab === 'notifications' &&
           <div style={{ display: 'grid', gap: 12 }}>

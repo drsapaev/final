@@ -133,7 +133,7 @@ class UserPreferences(Base):
     )
 
     # Общие настройки
-    theme: Mapped[str] = mapped_column(String(20), default="light")  # light, dark, auto
+    theme: Mapped[str] = mapped_column(String(20), default="auto")  # light, dark, auto, vibrant, glass, gradient
     language: Mapped[str] = mapped_column(String(10), default="ru")
     timezone: Mapped[str] = mapped_column(String(50), default="Europe/Moscow")
     date_format: Mapped[str] = mapped_column(String(20), default="DD.MM.YYYY")

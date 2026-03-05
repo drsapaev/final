@@ -43,6 +43,14 @@ def app_with_security():
     async def test_authentication_profile():
         return {"id": 1, "username": "tester"}
 
+    @app.get("/api/v1/users/me/preferences")
+    async def test_get_current_user_preferences():
+        return {"theme": "light"}
+
+    @app.put("/api/v1/users/me/preferences")
+    async def test_update_current_user_preferences():
+        return {"theme": "dark"}
+
     @app.get("/api/v1/health")
     async def test_health():
         return {"status": "ok"}
@@ -169,6 +177,28 @@ class TestRateLimiting:
         client = TestClient(app_with_security)
 
         response = client.get("/api/v1/authentication/profile")
+        assert response.status_code == 200
+        assert response.headers["X-RateLimit-Limit"] == "600"
+        assert response.headers["X-RateLimit-Window"] == "3600"
+
+    def test_user_preferences_get_uses_session_rate_limit(self, app_with_security):
+        """Тест: GET /users/me/preferences получает session bucket."""
+        client = TestClient(app_with_security)
+
+        response = client.get("/api/v1/users/me/preferences")
+        assert response.status_code == 200
+        assert response.headers["X-RateLimit-Limit"] == "600"
+        assert response.headers["X-RateLimit-Window"] == "3600"
+
+    def test_user_preferences_put_uses_session_rate_limit(self, app_with_security):
+        """Тест: PUT /users/me/preferences не должен попадать под общий api лимит."""
+        client = TestClient(app_with_security)
+
+        for _ in range(101):
+            response = client.put("/api/v1/users/me/preferences")
+            assert response.status_code == 200
+
+        response = client.put("/api/v1/users/me/preferences")
         assert response.status_code == 200
         assert response.headers["X-RateLimit-Limit"] == "600"
         assert response.headers["X-RateLimit-Window"] == "3600"
@@ -333,4 +363,9 @@ class TestSecurityMiddlewareIntegration:
         """Тест: classifier распознает authentication/profile как session endpoint."""
         middleware = SecurityMiddleware(None)
         assert middleware._get_endpoint_type("/api/v1/authentication/profile") == "session"
+
+    def test_user_preferences_path_is_classified_as_session(self):
+        """Тест: classifier распознает users/me/preferences как session endpoint."""
+        middleware = SecurityMiddleware(None)
+        assert middleware._get_endpoint_type("/api/v1/users/me/preferences") == "session"
 
