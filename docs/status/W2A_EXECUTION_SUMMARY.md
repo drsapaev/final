@@ -21,6 +21,20 @@ Current pass: first architectural slices only (non-protected).
 
 - No additional non-protected slice is confirmed in the current discovery pass.
 
+## Human Review Pass
+
+- Human review pass completed for `W2A-SR-011`, `W2A-SR-040`, and adjacent queue/payment/registrar slices.
+- New analysis artifacts:
+  - `docs/architecture/W2A_DOMAIN_FLOW_ANALYSIS.md`
+  - `docs/status/W2A_HUMAN_REVIEW_CLASSIFICATION.md`
+  - `docs/architecture/W2A_REFACTOR_OPTIONS.md`
+  - `docs/architecture/WAVE2_TRACK_MAP.md`
+  - `docs/status/W2A_MICRO_SLICES.md`
+- Result:
+  - no broad safe Wave 2A slice remains
+  - only narrow read-only micro-slices are still plausible
+  - larger work should move to `Wave 2C` (queue) or `Wave 2D` (payment)
+
 ## Pending Human Review Slices
 
 - `W2A-SR-011` and above (mixed/protected modules), including:
@@ -55,4 +69,5 @@ Current pass: first architectural slices only (non-protected).
 
 ## Next Recommended Slice
 
-- No further safe non-protected slice is confirmed. Next Wave 2A step should be explicit human review for `W2A-SR-011` (`services.py` queue-adjacent handlers) or `W2A-SR-040` (`visits.py` queue-coupled writes).
+- If one more tiny slice is desired, use `W2A-MS-011A` / `W2A-MS-011B` from `docs/status/W2A_MICRO_SLICES.md`.
+- Otherwise, stop Wave 2A and open specialized planning for `Wave 2C` (queue lifecycle) or `Wave 2D` (payment flow hardening).

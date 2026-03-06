@@ -30,3 +30,9 @@ Execution rule: low-risk non-protected first.
 - Executed: `W2A-SR-001`, `W2A-SR-002`, `W2A-SR-003`, `W2A-SR-010`, `W2A-SR-012`, `W2A-SR-013`
 - Deferred protected: `W2A-SR-011`, `W2A-SR-020+`
 - Next safe candidate: none confirmed; next Wave 2A step requires human review on `W2A-SR-011` or `W2A-SR-040`
+
+## Human Review Notes
+
+- `W2A-SR-011`: queue-adjacent read-model / metadata slice. Possible micro-slices exist, but queue taxonomy impact should be acknowledged before execution.
+- `W2A-SR-040`: queue-coupled transaction slice. Do not continue automatically.
+- `W2A-SR-090` and `W2A-SR-100` contain read-only reporting micro-slices, but they align better with `Wave 2B` / `Wave 2D` than with core Wave 2A cleanup.

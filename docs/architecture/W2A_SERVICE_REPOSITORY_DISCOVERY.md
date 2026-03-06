@@ -58,3 +58,13 @@ Result baseline:
 - Queue-heavy modules: `registrar_*`, `qr_queue`, `doctor_integration`, queue-related parts of `services.py`, `visits.py`, `admin_departments.py`
 - Payment-heavy modules: `cashier.py`, `appointments.py` payment endpoints, `admin_stats.py`, payment paths in `registrar_wizard.py`
 - Any slice requiring changes in protected modules is deferred to `pending human review`.
+
+## Human Review Pass Outcome
+
+- `W2A-SR-011` is no longer a generic cleanup slice; it is queue-adjacent metadata with a small read-only micro-slice candidate.
+- `W2A-SR-040` is queue-coupled and transaction-critical; it should not be auto-refactored.
+- No broad non-protected slice remains after `W2A-SR-013`.
+- Remaining work naturally separates into:
+  - `Wave 2C` queue lifecycle
+  - `Wave 2D` payment flow hardening
+  - a few read-only micro-slices that can still be handled under `Wave 2A` or `Wave 2B`
