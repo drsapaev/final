@@ -1,4 +1,5 @@
 import React from 'react';
+import { XCircle } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -11,10 +12,10 @@ const MacOSInput = React.forwardRef(({
   disabled,
   clearable, // Extract to prevent passing to input
   onClear,   // Extract to prevent passing to input
+  value,
+  onChange,
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -55,10 +56,20 @@ const MacOSInput = React.forwardRef(({
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
+  const hasClearButton = clearable && value && !disabled;
+  const hasRightIcon = Icon && iconPosition === 'right';
+
+  let paddingRight = currentSize.padding.split(' ')[1];
+  if (hasRightIcon && hasClearButton) {
+    paddingRight = '68px'; // Accommodate both
+  } else if (hasRightIcon || hasClearButton) {
+    paddingRight = '40px'; // Accommodate one
+  }
+
   const inputStyle = {
     width: '100%',
     paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingRight: paddingRight,
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -99,6 +110,33 @@ const MacOSInput = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
+  const handleClear = (e) => {
+    e.stopPropagation();
+    if (onClear) {
+      onClear();
+    } else if (onChange) {
+      onChange({ target: { value: '', name: props.name } });
+    }
+  };
+
+  const clearButtonStyle = {
+    position: 'absolute',
+    top: '50%',
+    right: hasRightIcon ? '40px' : '12px',
+    transform: 'translateY(-50%)',
+    color: 'var(--mac-text-tertiary)',
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    margin: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.6,
+    transition: 'opacity var(--mac-duration-fast) var(--mac-ease)',
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       {Icon && (
@@ -111,8 +149,22 @@ const MacOSInput = React.forwardRef(({
         disabled={disabled}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        value={value}
+        onChange={onChange}
         {...props}
       />
+      {hasClearButton && (
+        <button
+          type="button"
+          onClick={handleClear}
+          style={clearButtonStyle}
+          aria-label="Очистить поле"
+          onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+        >
+          <XCircle size={16} />
+        </button>
+      )}
     </div>
   );
 });
