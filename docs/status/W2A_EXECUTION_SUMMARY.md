@@ -11,6 +11,7 @@ Current pass: first architectural slices only (non-protected).
 - `W2A-SR-003` (`done`): architecture guard added to prevent router-level DB regression in completed module.
 - `W2A-SR-010` (`done`): services catalog handlers moved to service/repository flow while queue-adjacent handlers remained untouched.
 - `W2A-SR-012` (`done`): read-only visits handlers (`list_visits`, `get_visit`) moved to service/repository flow while write handlers remained untouched.
+- `W2A-SR-013` (`done`): safe visit write handlers (`create_visit`, `add_service`) moved to service/repository flow while queue-coupled handlers remained untouched.
 
 ## Partial Slices
 
@@ -18,7 +19,7 @@ Current pass: first architectural slices only (non-protected).
 
 ## Remaining Non-Protected Slice Candidates
 
-- `W2A-SR-013` (`pending`): `visits.py` non-queue write handlers (`create_visit`, `add_service`) if audit/transaction semantics can remain local to the module.
+- No additional non-protected slice is confirmed in the current discovery pass.
 
 ## Pending Human Review Slices
 
@@ -28,9 +29,9 @@ Current pass: first architectural slices only (non-protected).
 
 ## Tests Run
 
-- `cd backend && pytest -q` -> `655 passed, 3 skipped`
+- `cd backend && pytest -q` -> `658 passed, 3 skipped`
 - `cd backend && pytest tests/test_openapi_contract.py -q` -> `10 passed`
-- `cd backend && pytest tests/unit -q` -> `381 passed`
+- `cd backend && pytest tests/unit -q` -> `383 passed`
 
 ## Regressions Found
 
@@ -49,7 +50,9 @@ Current pass: first architectural slices only (non-protected).
 - `docs/status/wave2a/W2A-SR-010_STATUS.md`
 - `docs/status/wave2a/W2A-SR-012_PLAN.md`
 - `docs/status/wave2a/W2A-SR-012_STATUS.md`
+- `docs/status/wave2a/W2A-SR-013_PLAN.md`
+- `docs/status/wave2a/W2A-SR-013_STATUS.md`
 
 ## Next Recommended Slice
 
-- `W2A-SR-013`: continue the same module with non-queue write handlers (`create_visit`, `add_service`) if the slice stays local and keeps audit semantics unchanged.
+- No further safe non-protected slice is confirmed. Next Wave 2A step should be explicit human review for `W2A-SR-011` (`services.py` queue-adjacent handlers) or `W2A-SR-040` (`visits.py` queue-coupled writes).

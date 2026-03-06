@@ -1,7 +1,6 @@
 # app/api/v1/endpoints/visits.py
 from __future__ import annotations
 
-import os
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
@@ -11,9 +10,7 @@ from sqlalchemy import MetaData, select, Table
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.services.service_mapping import normalize_service_code
 from app.services.visits_api_service import VisitsApiService
-from app.core.audit import log_critical_change, extract_model_changes
 
 router = APIRouter()
 
@@ -99,108 +96,12 @@ def create_visit(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
-    """
-    Создать визит.
-
-    Использует feature flag USE_CRUD_VISITS для переключения между старой (Table API)
-    и новой (CRUD) реализацией. По умолчанию используется старая реализация для безопасности.
-    """
-    # Feature flag для безопасной миграции на CRUD
-    use_crud = os.getenv("USE_CRUD_VISITS", "false").lower() == "true"
-
-    if use_crud:
-        # Новая реализация через CRUD (Single Source of Truth)
-        from app.crud.visit import create_visit as crud_create_visit
-
-        visit = crud_create_visit(
-            db=db,
-            patient_id=payload.patient_id,
-            doctor_id=payload.doctor_id,
-            visit_date=payload.planned_date,  # planned_date -> visit_date
-            notes=payload.notes,
-            source=payload.source or "desk",
-            status="open",
-            auto_status=False,  # Статус уже установлен
-            notify=False,
-            log=True,
-        )
-        
-        # ✅ AUDIT LOG: Логируем создание визита (CRUD путь)
-        _, new_data = extract_model_changes(None, visit)
-        log_critical_change(
-            db=db,
-            user_id=getattr(current_user, 'id', None) or 0,
-            action="CREATE",
-            table_name="visits",
-            row_id=visit.id,
-            old_data=None,
-            new_data=new_data,
-            request=request,
-            description=f"Создан визит ID={visit.id}",
-        )
-        db.commit()
-
-        return VisitOut(
-            id=visit.id,
-            patient_id=visit.patient_id,
-            doctor_id=visit.doctor_id,
-            status=visit.status,
-            created_at=visit.created_at,
-            started_at=None,
-            finished_at=None,
-            notes=visit.notes,
-            planned_date=visit.visit_date,
-            source=getattr(visit, "source", None) or payload.source or "desk",
-        )
-    else:
-        # Старая реализация через Table API (для обратной совместимости)
-        t = _visits(db)
-        ins_values = {
-            "patient_id": payload.patient_id,
-            "doctor_id": payload.doctor_id,
-            "status": "open",
-            "notes": payload.notes,
-            "created_at": datetime.utcnow(),  # ✅ FIX: Add created_at for Table API
-            "discount_mode": "none",  # ✅ FIX: Add discount_mode default (from Visit model)
-            "approval_status": "none",  # ✅ FIX: Add approval_status default (from Visit model)
-        }
-        # если передали planned_date — добавим в insert (если колонка есть)
-        if hasattr(t.c, "planned_date") and payload.planned_date is not None:
-            ins_values["planned_date"] = payload.planned_date
-        if hasattr(t.c, "source"):
-            ins_values["source"] = payload.source or "desk"
-
-        ins = t.insert().values(**ins_values).returning(t)
-        row = db.execute(ins).mappings().first()
-        assert row is not None
-        
-        # ✅ AUDIT LOG: Log visit creation for Table API path (BEFORE commit for atomicity)
-        visit_id = row["id"]
-        # Convert row to dict and serialize datetime objects to strings for JSON
-        new_data = {}
-        for key, value in dict(row).items():
-            if isinstance(value, datetime):
-                new_data[key] = value.isoformat()
-            elif isinstance(value, date):
-                new_data[key] = value.isoformat()
-            else:
-                new_data[key] = value
-        log_critical_change(
-            db=db,
-            user_id=getattr(current_user, 'id', None) or 0,  # ✅ FIX: Consistent with CRUD path
-            action="CREATE",
-            table_name="visits",
-            row_id=visit_id,
-            old_data=None,
-            new_data=new_data,
-            request=request,
-            description=f"Создан визит ID={visit_id}",
-        )
-        # ✅ FIX: Single commit after both visit creation and audit log for atomicity
-        # If audit log fails, the entire transaction (including visit) will be rolled back
-        db.commit()
-        
-        return VisitOut(**row)  # type: ignore[arg-type]
+    result = VisitsApiService(db).create_visit(
+        request=request,
+        payload=payload,
+        current_user=current_user,
+    )
+    return VisitOut(**result)
 
 
 @router.get(
@@ -220,29 +121,7 @@ def get_visit(visit_id: int, db: Session = Depends(get_db)):
     summary="Добавить услугу к визиту",
 )
 def add_service(visit_id: int, item: VisitServiceIn, db: Session = Depends(get_db)):
-    t = _visits(db)
-    s = _vservices(db)
-    exists = db.execute(select(t.c.id).where(t.c.id == visit_id)).first()
-    if not exists:
-        raise HTTPException(404, "Visit not found")
-
-    # Normalize service code before using it
-    normalized_code = normalize_service_code(item.code) if item.code else None
-
-    ins = (
-        s.insert()
-        .values(
-            visit_id=visit_id,
-            code=normalized_code,
-            name=item.name,
-            price=item.price,
-            qty=item.qty,
-        )
-        .returning(s)
-    )
-    row = db.execute(ins).mappings().first()
-    db.commit()
-    return {"ok": True, "service": dict(row)}
+    return VisitsApiService(db).add_service(visit_id=visit_id, item=item)
 
 
 @router.post(

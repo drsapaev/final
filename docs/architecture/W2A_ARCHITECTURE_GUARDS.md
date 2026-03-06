@@ -80,6 +80,27 @@ Why this guard:
 - avoids false positives on remaining write handlers in the same mixed module
 - keeps the guard deterministic while Wave 2A is still proceeding slice-by-slice
 
+### Guard ID: `W2A-G-004` (Visits Safe Write Router Boundary)
+
+- Type: lightweight architecture test
+- File: `backend/tests/architecture/test_w2a_router_boundaries.py`
+- Intent:
+  - ensure non-queue visit write handlers delegate to `VisitsApiService`
+  - prevent direct router-level session writes from reappearing in the completed safe-write sub-slice
+
+Covered handlers:
+- `create_visit`
+- `add_service`
+
+Assertions:
+1. Each covered handler contains `VisitsApiService(db)`.
+2. Covered handler blocks do not contain direct DB session calls (`db.query`, `db.commit`, `db.refresh`, `db.delete`, `db.execute`, etc.).
+
+Why this guard:
+- protects only the completed safe-write visit handlers
+- avoids false positives on remaining queue-coupled handlers in the same module
+- keeps CI focused on slices that are actually complete
+
 ## Existing Complementary Guard
 
 - `backend/tests/unit/test_service_repository_boundary.py`
