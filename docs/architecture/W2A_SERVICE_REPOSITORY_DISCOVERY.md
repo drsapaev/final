@@ -17,7 +17,7 @@ Result baseline:
 
 ## Priority Groups
 
-- Safe non-protected (can execute first): `messages.py`
+- Safe non-protected (can execute first): `messages.py`, catalog-only handlers in `services.py`
 - Touches payments: `cashier.py`, `appointments.py`, `admin_stats.py`, `registrar_wizard.py`
 - Touches queue: `registrar_wizard.py`, `registrar_integration.py`, `qr_queue.py`, `admin_departments.py`, `doctor_integration.py`, `services.py`, `visits.py`
 - Touches auth: none in this scan set with direct DB calls at router level
@@ -29,7 +29,7 @@ Result baseline:
 | File path | Endpoint/function (examples) | Current anti-pattern | Target shape | Risk | Protected zone | Recommended slice order |
 |---|---|---|---|---|---|---|
 | `backend/app/api/v1/endpoints/messages.py` | `send_message`, `get_conversation`, `send_voice_message`, `upload_file_message` | Router validates recipient, loads ORM entities, writes audit/file/message rows, commits transaction | Router delegates to `MessagesApiService`, DB access via `MessagesApiRepository` | Low | No | 1 |
-| `backend/app/api/v1/endpoints/services.py` | `create_service_category`, `update_service`, `delete_service`, `get_queue_groups` | Router does ORM checks/CRUD and transaction control | Split: safe catalog routes to service/repo; queue-adjacent routes isolated | Medium | Partial (queue-adjacent) | 4 |
+| `backend/app/api/v1/endpoints/services.py` | catalog handlers: `list_service_categories`, `create_service`, `update_service`, `delete_service`, `list_doctors_temp`; queue-adjacent handlers: `get_queue_groups`, `resolve_service_endpoint`, `get_service_code_mappings` | Router mixed safe catalog CRUD with queue-adjacent lookup logic in one module | Keep catalog handlers on service/repo flow; leave queue-adjacent handlers isolated for separate review | Medium | Partial (queue-adjacent) | 4 |
 | `backend/app/api/v1/endpoints/admin_departments.py` | `create_department`, `update_queue_settings`, `initialize_department` | Router contains multi-step writes and queue/registration settings persistence | Router thin, orchestration in service, DB in repository | High | Yes (queue) | Pending human review |
 | `backend/app/api/v1/endpoints/doctor_integration.py` | `get_doctor_queue_today`, `complete_patient_visit`, `schedule_next_visit` | Router mixes queue flow orchestration + transaction logic | Move flow orchestration to service layer | High | Yes (queue) | Pending human review |
 | `backend/app/api/v1/endpoints/visits.py` | `set_status`, `reschedule_visit`, `reschedule_visit_tomorrow` | Router updates visits and queue state in same handler | Encapsulate write flow in service with clear transaction boundary | High | Yes (queue) | Pending human review |
@@ -45,11 +45,11 @@ Result baseline:
 1. `W2A-SR-001` messages core router-thinning (`/send`, `/conversations`, `/conversation/{id}`, `/unread`, `/{id}/read`, `/{id}`)
 2. `W2A-SR-002` messages media/reaction router-thinning (`/reactions`, `/users/available`, `/send-voice`, `/voice/{id}/stream`, `/upload`)
 3. `W2A-SR-003` architecture guard for router DB anti-patterns in completed module(s)
-4. `W2A-SR-010+` mixed/queue-adjacent modules only after explicit human review
+4. `W2A-SR-010` services catalog-only handlers
+5. `W2A-SR-011+` mixed/queue-adjacent modules only after explicit human review
 
 ## Zones Deferred From Wave 2A Initial Pass
 
 - Queue-heavy modules: `registrar_*`, `qr_queue`, `doctor_integration`, queue-related parts of `services.py`, `visits.py`, `admin_departments.py`
 - Payment-heavy modules: `cashier.py`, `appointments.py` payment endpoints, `admin_stats.py`, payment paths in `registrar_wizard.py`
 - Any slice requiring changes in protected modules is deferred to `pending human review`.
-

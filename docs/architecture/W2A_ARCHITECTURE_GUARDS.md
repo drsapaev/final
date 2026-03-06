@@ -30,6 +30,35 @@ Why this guard:
 - focused on completed slice boundary only
 - prevents regression to router-level ORM anti-pattern
 
+### Guard ID: `W2A-G-002` (Services Catalog Router Boundary)
+
+- Type: lightweight architecture test
+- File: `backend/tests/architecture/test_w2a_router_boundaries.py`
+- Intent:
+  - ensure non-protected catalog handlers in `services.py` delegate to `ServicesApiService`
+  - prevent direct router-level `db.*` calls from returning inside executed catalog handlers
+
+Covered handlers:
+- `list_service_categories`
+- `create_service_category`
+- `update_service_category`
+- `delete_service_category`
+- `list_services`
+- `get_service`
+- `create_service`
+- `update_service`
+- `delete_service`
+- `list_doctors_temp`
+
+Assertions:
+1. Each covered handler contains `ServicesApiService(db)`.
+2. Covered handler blocks do not contain direct DB session calls (`db.query`, `db.commit`, `db.refresh`, `db.delete`, `db.execute`, etc.).
+
+Why this guard:
+- protects only the completed catalog sub-slice
+- avoids false positives on queue-adjacent handlers intentionally left untouched
+- keeps CI signal stable and narrow
+
 ## Existing Complementary Guard
 
 - `backend/tests/unit/test_service_repository_boundary.py`
@@ -46,4 +75,3 @@ Why this guard:
 
 - If additional non-protected slices are completed, add similarly narrow module-specific guards.
 - Do not introduce global regex guard over all routers until protected-zone slices are human-reviewed.
-
