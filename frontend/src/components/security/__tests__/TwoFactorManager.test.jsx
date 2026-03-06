@@ -4,15 +4,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
-const { getAccessToken, loggerInfo, loggerError } = vi.hoisted(() => ({
-  getAccessToken: vi.fn(() => 'test-token'),
+const { apiGet, apiPost, apiDelete, loggerInfo, loggerError } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  apiDelete: vi.fn(),
   loggerInfo: vi.fn(),
   loggerError: vi.fn(),
 }));
 
-vi.mock('../../../utils/tokenManager', () => ({
-  default: {
-    getAccessToken,
+vi.mock('../../../api/client', () => ({
+  api: {
+    get: apiGet,
+    post: apiPost,
+    delete: apiDelete,
   },
 }));
 
@@ -25,11 +29,59 @@ vi.mock('../../../utils/logger', () => ({
 
 import TwoFactorManager from '../TwoFactorManager.jsx';
 
-function jsonResponse(data, ok = true, status = 200) {
-  return Promise.resolve({
-    ok,
-    status,
-    json: async () => data,
+const disabledStatus = {
+  enabled: false,
+  totp_enabled: false,
+  totp_verified: false,
+  backup_codes_generated: false,
+  backup_codes_count: 0,
+  recovery_enabled: false,
+  recovery_email: null,
+  recovery_phone: null,
+  trusted_devices_count: 0,
+  last_used: null,
+};
+
+const enabledStatus = {
+  enabled: true,
+  totp_enabled: true,
+  totp_verified: true,
+  backup_codes_generated: true,
+  backup_codes_count: 10,
+  recovery_enabled: false,
+  recovery_email: null,
+  recovery_phone: null,
+  trusted_devices_count: 1,
+  last_used: '2026-03-03T10:00:00Z',
+};
+
+function mockApiGetState({ statusSequence = [disabledStatus], devices = [], logs = [], methods = [] } = {}) {
+  let statusCalls = 0;
+
+  apiGet.mockImplementation((url) => {
+    if (url === '/2fa/status') {
+      const index = Math.min(statusCalls, statusSequence.length - 1);
+      statusCalls += 1;
+      return Promise.resolve({ data: statusSequence[index] });
+    }
+
+    if (url === '/2fa/devices') {
+      return Promise.resolve({ data: { devices } });
+    }
+
+    if (url === '/2fa/security-logs') {
+      return Promise.resolve({ data: { logs } });
+    }
+
+    if (url === '/2fa/recovery-methods') {
+      return Promise.resolve({ data: { methods } });
+    }
+
+    if (url === '/2fa/backup-codes') {
+      return Promise.resolve({ data: { backup_codes: [] } });
+    }
+
+    return Promise.reject(new Error(`Unhandled api.get call in test: ${url}`));
   });
 }
 
@@ -46,38 +98,9 @@ function renderManager() {
 describe('TwoFactorManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn((input, init) => {
-      const url = String(input);
-
-      if (url.endsWith('/api/v1/2fa/status')) {
-        return jsonResponse({
-          enabled: false,
-          totp_enabled: false,
-          totp_verified: false,
-          backup_codes_generated: false,
-          backup_codes_count: 0,
-          recovery_enabled: false,
-          recovery_email: null,
-          recovery_phone: null,
-          trusted_devices_count: 0,
-          last_used: null,
-        });
-      }
-
-      if (url.endsWith('/api/v1/2fa/devices')) {
-        return jsonResponse({ devices: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/security-logs')) {
-        return jsonResponse({ logs: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/recovery-methods')) {
-        return jsonResponse({ methods: [] });
-      }
-
-      throw new Error(`Unhandled fetch: ${url} ${(init?.method || 'GET')}`);
-    });
+    mockApiGetState();
+    apiPost.mockResolvedValue({ data: {} });
+    apiDelete.mockResolvedValue({ data: { success: true } });
   });
 
   it('does not expose backup-code regeneration before 2FA is enabled', async () => {
@@ -85,85 +108,41 @@ describe('TwoFactorManager', () => {
 
     expect(await screen.findByText(/Резервные коды пока недоступны/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /создать новый комплект/i })).not.toBeInTheDocument();
-    expect(
-      global.fetch.mock.calls.some(([url]) => String(url).includes('/api/v1/2fa/backup-codes/regenerate'))
-    ).toBe(false);
+    expect(apiPost.mock.calls.some(([url]) => url === '/2fa/backup-codes/regenerate')).toBe(false);
   });
 
   it('verifies setup before allowing backup code regeneration', async () => {
-    let statusCalls = 0;
+    mockApiGetState({ statusSequence: [disabledStatus, enabledStatus] });
 
-    global.fetch = vi.fn((input, init) => {
-      const url = String(input);
-      const method = init?.method || 'GET';
-
-      if (url.endsWith('/api/v1/2fa/status')) {
-        statusCalls += 1;
-        return jsonResponse(
-          statusCalls === 1
-            ? {
-              enabled: false,
-              totp_enabled: false,
-              totp_verified: false,
-              backup_codes_generated: false,
-              backup_codes_count: 0,
-              recovery_enabled: false,
-              recovery_email: null,
-              recovery_phone: null,
-              trusted_devices_count: 0,
-              last_used: null,
-            }
-            : {
-              enabled: true,
-              totp_enabled: true,
-              totp_verified: true,
-              backup_codes_generated: true,
-              backup_codes_count: 10,
-              recovery_enabled: false,
-              recovery_email: null,
-              recovery_phone: null,
-              trusted_devices_count: 0,
-              last_used: null,
-            }
-        );
-      }
-
-      if (url.endsWith('/api/v1/2fa/devices')) {
-        return jsonResponse({ devices: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/security-logs')) {
-        return jsonResponse({ logs: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/recovery-methods')) {
-        return jsonResponse({ methods: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/setup') && method === 'POST') {
-        return jsonResponse({
-          qr_code_url: 'data:image/png;base64,abc',
-          secret_key: 'SECRETKEY123',
-          backup_codes: ['AAAA1111', 'BBBB2222'],
-          recovery_token: null,
-          expires_at: null,
+    apiPost.mockImplementation((url, _data, config) => {
+      if (url === '/2fa/setup') {
+        return Promise.resolve({
+          data: {
+            qr_code_url: 'data:image/png;base64,abc',
+            secret_key: 'SECRETKEY123',
+            backup_codes: ['AAAA1111', 'BBBB2222'],
+            recovery_token: null,
+            expires_at: null,
+          },
         });
       }
 
-      if (url.includes('/api/v1/2fa/verify-setup?totp_code=123456') && method === 'POST') {
-        return jsonResponse({
-          success: true,
-          message: 'TOTP setup verified successfully',
+      if (url === '/2fa/verify-setup') {
+        if (config?.params?.totp_code !== '123456') {
+          return Promise.resolve({ data: { success: false, message: 'invalid code' } });
+        }
+        return Promise.resolve({
+          data: { success: true, message: 'TOTP setup verified successfully' },
         });
       }
 
-      if (url.endsWith('/api/v1/2fa/backup-codes/regenerate') && method === 'POST') {
-        return jsonResponse({
-          backup_codes: ['CCCC3333', 'DDDD4444'],
+      if (url === '/2fa/backup-codes/regenerate') {
+        return Promise.resolve({
+          data: { backup_codes: ['CCCC3333', 'DDDD4444'] },
         });
       }
 
-      throw new Error(`Unhandled fetch: ${url} ${method}`);
+      return Promise.reject(new Error(`Unhandled api.post call in test: ${url}`));
     });
 
     renderManager();
@@ -177,9 +156,10 @@ describe('TwoFactorManager', () => {
     fireEvent.click(screen.getByRole('button', { name: /Подтвердить и включить 2FA/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/2fa/verify-setup?totp_code=123456'),
-        expect.objectContaining({ method: 'POST' })
+      expect(apiPost).toHaveBeenCalledWith(
+        '/2fa/verify-setup',
+        null,
+        expect.objectContaining({ params: { totp_code: '123456' } })
       );
     });
 
@@ -189,62 +169,26 @@ describe('TwoFactorManager', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Подтвердить обновление кодов/i }));
 
     expect(await screen.findByText('CCCC3333')).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/2fa/backup-codes/regenerate',
-      expect.objectContaining({ method: 'POST' })
-    );
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith('/2fa/backup-codes/regenerate');
+    });
   });
 
   it('revokes trusted devices through the supported delete endpoint', async () => {
-    global.fetch = vi.fn((input, init) => {
-      const url = String(input);
-      const method = init?.method || 'GET';
-
-      if (url.endsWith('/api/v1/2fa/status')) {
-        return jsonResponse({
-          enabled: true,
-          totp_enabled: true,
-          totp_verified: true,
-          backup_codes_generated: true,
-          backup_codes_count: 10,
-          recovery_enabled: false,
-          recovery_email: null,
-          recovery_phone: null,
-          trusted_devices_count: 1,
+    mockApiGetState({
+      statusSequence: [enabledStatus],
+      devices: [
+        {
+          id: 7,
+          device_name: 'Clinic Desktop',
+          device_type: 'desktop',
+          trusted: true,
+          active: true,
+          ip_address: '127.0.0.1',
+          user_agent: 'Chrome',
           last_used: '2026-03-03T10:00:00Z',
-        });
-      }
-
-      if (url.endsWith('/api/v1/2fa/devices') && method === 'GET') {
-        return jsonResponse({
-          devices: [
-            {
-              id: 7,
-              device_name: 'Clinic Desktop',
-              device_type: 'desktop',
-              trusted: true,
-              active: true,
-              ip_address: '127.0.0.1',
-              user_agent: 'Chrome',
-              last_used: '2026-03-03T10:00:00Z',
-            },
-          ],
-        });
-      }
-
-      if (url.endsWith('/api/v1/2fa/security-logs')) {
-        return jsonResponse({ logs: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/recovery-methods')) {
-        return jsonResponse({ methods: [] });
-      }
-
-      if (url.endsWith('/api/v1/2fa/devices/7') && method === 'DELETE') {
-        return jsonResponse({ success: true, message: 'Device untrusted successfully' });
-      }
-
-      throw new Error(`Unhandled fetch: ${url} ${method}`);
+        },
+      ],
     });
 
     renderManager();
@@ -254,10 +198,7 @@ describe('TwoFactorManager', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Подтвердить отзыв/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/2fa/devices/7',
-        expect.objectContaining({ method: 'DELETE' })
-      );
+      expect(apiDelete).toHaveBeenCalledWith('/2fa/devices/7');
     });
   });
 });
