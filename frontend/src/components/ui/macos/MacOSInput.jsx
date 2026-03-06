@@ -1,4 +1,5 @@
 import React from 'react';
+import { XCircle } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -13,8 +14,6 @@ const MacOSInput = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -58,7 +57,7 @@ const MacOSInput = React.forwardRef(({
   const inputStyle = {
     width: '100%',
     paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingRight: clearable ? '32px' : (Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1]),
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -99,6 +98,13 @@ const MacOSInput = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
+  const handleClear = (e) => {
+    e.preventDefault();
+    if (onClear) {
+      onClear();
+    }
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       {Icon && (
@@ -113,6 +119,33 @@ const MacOSInput = React.forwardRef(({
         onBlur={handleBlur}
         {...props}
       />
+      {clearable && props.value && !disabled && (
+        <button
+          type="button"
+          onClick={handleClear}
+          aria-label="Clear input"
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            padding: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--mac-text-tertiary)',
+            opacity: 0.6,
+            transition: 'opacity var(--mac-duration-normal) var(--mac-ease)',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+        >
+          <XCircle size={14} />
+        </button>
+      )}
     </div>
   );
 });
