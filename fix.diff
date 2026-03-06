@@ -1,0 +1,16 @@
+--- frontend/src/components/security/__tests__/TwoFactorManager.test.jsx
++++ frontend/src/components/security/__tests__/TwoFactorManager.test.jsx
+@@ -10,11 +10,13 @@
+   loggerError: vi.fn(),
+ }));
+
+ vi.mock('../../../utils/tokenManager', () => ({
+   default: {
+     getAccessToken,
+   },
++  tokenManager: {
++    getAccessToken,
++  },
+ }));
+
+ vi.mock('../../../utils/logger', () => ({

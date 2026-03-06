@@ -10,11 +10,16 @@ const { getAccessToken, loggerInfo, loggerError } = vi.hoisted(() => ({
   loggerError: vi.fn(),
 }));
 
-vi.mock('../../../utils/tokenManager', () => ({
-  default: {
-    getAccessToken,
-  },
-}));
+vi.mock('../../../utils/tokenManager', () => {
+  return {
+    default: {
+      getAccessToken,
+    },
+    tokenManager: {
+      getAccessToken,
+    },
+  };
+});
 
 vi.mock('../../../utils/logger', () => ({
   default: {

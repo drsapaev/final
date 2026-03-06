@@ -1,0 +1,23 @@
+--- frontend/src/components/AnimatedLoader.jsx
++++ frontend/src/components/AnimatedLoader.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import '../styles/animations.css';
++import PropTypes from 'prop-types';
+
+ const AnimatedLoader = ({
+   size = 'md',
+@@ -53,6 +54,14 @@
+   );
+ };
+
++AnimatedLoader.propTypes = {
++  size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl']),
++  color: PropTypes.string,
++  className: PropTypes.string,
++  style: PropTypes.object,
++  rows: PropTypes.number,
++  columns: PropTypes.number,
++};
++
+ export default AnimatedLoader;

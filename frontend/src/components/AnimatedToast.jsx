@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getColor } from '../design-system';
+import PropTypes from 'prop-types';
 
 const AnimatedToast = ({
   message,
@@ -133,6 +134,23 @@ const AnimatedToast = ({
       </button>
     </div>);
 
+};
+
+AnimatedToast.propTypes = {
+  message: PropTypes.node.isRequired,
+  type: PropTypes.oneOf(['success', 'error', 'warning', 'info']),
+  duration: PropTypes.number,
+  onClose: PropTypes.func,
+  position: PropTypes.oneOf([
+    'top-left',
+    'top-right',
+    'top-center',
+    'bottom-left',
+    'bottom-right',
+    'bottom-center'
+  ]),
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 export default AnimatedToast;

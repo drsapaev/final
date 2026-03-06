@@ -1,4 +1,5 @@
 import { getColor } from '../design-system';
+import PropTypes from 'prop-types';
 
 const AnimatedLoader = ({
   size = 'md',
@@ -45,6 +46,13 @@ const AnimatedLoader = ({
       aria-label="Загрузка" />);
 
 
+};
+
+AnimatedLoader.propTypes = {
+  size: PropTypes.string,
+  color: PropTypes.string,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 // Компонент для скелетона таблицы
@@ -111,6 +119,13 @@ const AnimatedTableSkeleton = ({
       )}
     </div>);
 
+};
+
+AnimatedTableSkeleton.propTypes = {
+  rows: PropTypes.number,
+  columns: PropTypes.number,
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 // Компонент для скелетона карточки
@@ -187,6 +202,11 @@ const AnimatedCardSkeleton = ({
       </div>
     </div>);
 
+};
+
+AnimatedCardSkeleton.propTypes = {
+  className: PropTypes.string,
+  style: PropTypes.object
 };
 
 // Прикрепляем подкомпоненты к AnimatedLoader
