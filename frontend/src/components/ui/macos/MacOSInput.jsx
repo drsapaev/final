@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -11,10 +12,9 @@ const MacOSInput = React.forwardRef(({
   disabled,
   clearable, // Extract to prevent passing to input
   onClear,   // Extract to prevent passing to input
+  value,
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -55,10 +55,34 @@ const MacOSInput = React.forwardRef(({
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
+  const hasClearButton = clearable && !disabled && value && String(value).length > 0;
+
+  // Calculate padding based on icons present
+  let paddingLeft = currentSize.padding.split(' ')[1];
+  let paddingRight = currentSize.padding.split(' ')[1];
+
+  if (Icon && iconPosition === 'left') {
+    paddingLeft = '40px';
+  }
+
+  if (Icon && iconPosition === 'right') {
+    paddingRight = '40px';
+  }
+
+  // Add extra padding for clear button if present (it appears on the right)
+  if (hasClearButton) {
+    // If there's already an icon on the right, push padding further
+    if (Icon && iconPosition === 'right') {
+      paddingRight = '68px'; // 40px (icon) + 28px (clear button)
+    } else {
+      paddingRight = '36px'; // Standard padding for clear button
+    }
+  }
+
   const inputStyle = {
     width: '100%',
-    paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingLeft,
+    paddingRight,
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -111,8 +135,43 @@ const MacOSInput = React.forwardRef(({
         disabled={disabled}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        value={value}
         {...props}
       />
+      {hasClearButton && (
+        <button
+          type="button"
+          onClick={onClear}
+          onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
+          style={{
+            position: 'absolute',
+            right: Icon && iconPosition === 'right' ? '40px' : '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--mac-text-tertiary)',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            transition: 'color 0.2s ease, background-color 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--mac-text-secondary)';
+            e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--mac-text-tertiary)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          aria-label="Clear input"
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   );
 });
