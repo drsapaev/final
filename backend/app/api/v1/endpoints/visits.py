@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.services.service_mapping import normalize_service_code
+from app.services.visits_api_service import VisitsApiService
 from app.core.audit import log_critical_change, extract_model_changes
 
 router = APIRouter()
@@ -74,23 +75,14 @@ def list_visits(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    t = _visits(db)
-    stmt = select(t)
-    if patient_id is not None:
-        stmt = stmt.where(t.c.patient_id == patient_id)
-    if doctor_id is not None:
-        stmt = stmt.where(t.c.doctor_id == doctor_id)
-    if status_q:
-        stmt = stmt.where(t.c.status == status_q)
-    if planned is not None:
-        # фильтр по planned_date (если столбец есть)
-        if "planned_date" in t.c:
-            stmt = stmt.where(t.c.planned_date == planned)
-        else:
-            # если столбца нет — просто возвращаем пустой список или raise (выбрал мягкое поведение)
-            return []
-    stmt = stmt.order_by(t.c.id.desc()).limit(limit).offset(offset)
-    rows = db.execute(stmt).mappings().all()
+    rows = VisitsApiService(db).list_visits(
+        patient_id=patient_id,
+        doctor_id=doctor_id,
+        status_q=status_q,
+        planned=planned,
+        limit=limit,
+        offset=offset,
+    )
     return [VisitOut(**row) for row in rows]  # type: ignore[arg-type]
 
 
@@ -215,19 +207,10 @@ def create_visit(
     "/visits/{visit_id}", response_model=VisitWithServices, summary="Карточка визита"
 )
 def get_visit(visit_id: int, db: Session = Depends(get_db)):
-    t = _visits(db)
-    s = _vservices(db)
-    vrow = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
-    if not vrow:
-        raise HTTPException(404, "Visit not found")
-    items = (
-        db.execute(select(s).where(s.c.visit_id == visit_id).order_by(s.c.id.asc()))
-        .mappings()
-        .all()
-    )
+    payload = VisitsApiService(db).get_visit(visit_id=visit_id)
     return VisitWithServices(
-        visit=VisitOut(**vrow),  # type: ignore[arg-type]
-        services=[VisitServiceIn(**it) for it in items],  # type: ignore[list-item]
+        visit=VisitOut(**payload["visit"]),
+        services=[VisitServiceIn(**item) for item in payload["services"]],
     )
 
 
