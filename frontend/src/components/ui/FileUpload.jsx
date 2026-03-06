@@ -53,7 +53,9 @@ const FileUpload = ({
     setConverting(true);
 
     if (rejectedFiles && rejectedFiles.length > 0) {
-      if (rejectedFiles[0].size > maxSize) {
+      // Handle FileRejection object structure from react-dropzone
+      const rejectedFile = rejectedFiles[0].file || rejectedFiles[0];
+      if (rejectedFile.size > maxSize) {
         setError(`File size too large (max ${maxSize / 1024 / 1024}MB)`);
       } else {
         setError('File type not supported or invalid');
@@ -123,7 +125,7 @@ const FileUpload = ({
     }
   }, [maxSize, onFilesSelected, clearOnSelect]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
     onDrop: handleDrop,
     maxSize,
     accept,
@@ -153,20 +155,28 @@ const FileUpload = ({
 
   const containerStyle = {
     padding: '24px',
-    border: `2px dashed ${isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-border, #E5E5E5)'}`,
+    border: `2px dashed ${
+      isDragActive || isFocused
+        ? 'var(--mac-accent-blue, #007AFF)'
+        : 'var(--mac-border, #E5E5E5)'
+    }`,
     borderRadius: '8px',
     backgroundColor: isDragActive ? 'var(--mac-bg-secondary, #F5F5F7)' : 'var(--mac-bg-primary, #FFFFFF)',
     cursor: disabled ? 'default' : 'pointer',
     textAlign: 'center',
     transition: 'all 0.2s ease',
     opacity: disabled ? 0.6 : 1,
+    outline: 'none',
     ...style
   };
 
   return (
     <div className={className}>
             <div {...getRootProps()} style={containerStyle}>
-                <input {...getInputProps()} />
+                <input
+                  {...getInputProps()}
+                  aria-describedby={error ? 'file-upload-error' : undefined}
+                />
 
                 {converting ?
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
@@ -183,7 +193,7 @@ const FileUpload = ({
               color: isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-text-tertiary, #C7C7CC)',
               marginBottom: '12px'
             }} />
-          
+
                         <p style={{ margin: '0 0 4px', color: 'var(--mac-text-primary, #1D1D1F)', fontWeight: 500 }}>
                             {isDragActive ? 'Drop files here' : 'Click or drag files to upload'}
                         </p>
@@ -195,7 +205,10 @@ const FileUpload = ({
             </div>
 
             {error &&
-      <div style={{
+      <div
+        id="file-upload-error"
+        role="alert"
+        style={{
         marginTop: '12px',
         padding: '12px',
         backgroundColor: '#FFF2F2',
@@ -281,8 +294,9 @@ const FileUpload = ({
               cursor: 'pointer',
               padding: 0
             }}
-            title="Remove">
-            
+            title="Remove"
+            aria-label={`Remove ${preview.originalName}`}>
+
                                 <X size={12} />
                             </button>
 
