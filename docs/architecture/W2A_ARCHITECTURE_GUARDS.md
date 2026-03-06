@@ -59,6 +59,27 @@ Why this guard:
 - avoids false positives on queue-adjacent handlers intentionally left untouched
 - keeps CI signal stable and narrow
 
+### Guard ID: `W2A-G-003` (Visits Read-Only Router Boundary)
+
+- Type: lightweight architecture test
+- File: `backend/tests/architecture/test_w2a_router_boundaries.py`
+- Intent:
+  - ensure read-only visit handlers in `visits.py` delegate to `VisitsApiService`
+  - prevent direct router-level `db.*` calls from reappearing in the completed read-only sub-slice
+
+Covered handlers:
+- `list_visits`
+- `get_visit`
+
+Assertions:
+1. Each covered handler contains `VisitsApiService(db)`.
+2. Covered handler blocks do not contain direct DB session calls (`db.query`, `db.commit`, `db.refresh`, `db.delete`, `db.execute`, etc.).
+
+Why this guard:
+- protects only the completed read-only visits sub-slice
+- avoids false positives on remaining write handlers in the same mixed module
+- keeps the guard deterministic while Wave 2A is still proceeding slice-by-slice
+
 ## Existing Complementary Guard
 
 - `backend/tests/unit/test_service_repository_boundary.py`

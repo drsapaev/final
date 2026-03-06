@@ -75,3 +75,26 @@ def test_services_catalog_handlers_use_service_layer() -> None:
             block,
         )
         assert forbidden is None, handler_name
+
+
+def test_visits_read_only_handlers_use_service_layer() -> None:
+    endpoint_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "api"
+        / "v1"
+        / "endpoints"
+        / "visits.py"
+    )
+    safe_handlers = [
+        "list_visits",
+        "get_visit",
+    ]
+    for handler_name in safe_handlers:
+        block = _function_block(endpoint_path, handler_name)
+        assert "VisitsApiService(db)" in block
+        forbidden = re.search(
+            r"\bdb\.(query|add|commit|refresh|rollback|delete|execute|flush)\(",
+            block,
+        )
+        assert forbidden is None, handler_name

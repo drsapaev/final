@@ -11,18 +11,20 @@ Goal: find API handlers where router layer still owns ORM/session/query logic in
 3. Cross-check that parallel `*_api_service.py` and `*_api_repository.py` already exist for affected modules.
 
 Result baseline:
-- Files with confirmed router-layer DB anti-pattern: `11`
-- Route handlers with confirmed direct DB operations: `122`
+- Original first-pass baseline: `11` files / `122` route handlers
+- Current remaining router-layer DB anti-pattern: `10` files / `103` route handlers
+- Completed safe slices removed direct router DB access from `messages.py`, catalog-only handlers in `services.py`, and read-only handlers in `visits.py`
 - Existing service/repository scaffolding found for all affected modules: `yes` (but not consistently wired from routers).
 
 ## Priority Groups
 
-- Safe non-protected (can execute first): `messages.py`, catalog-only handlers in `services.py`
+- Safe non-protected (completed): `messages.py`, catalog-only handlers in `services.py`, read-only handlers in `visits.py`
+- Safe non-protected (remaining candidate): non-queue writes in `visits.py` (`create_visit`, `add_service`) after explicit transaction/audit scope check
 - Touches payments: `cashier.py`, `appointments.py`, `admin_stats.py`, `registrar_wizard.py`
-- Touches queue: `registrar_wizard.py`, `registrar_integration.py`, `qr_queue.py`, `admin_departments.py`, `doctor_integration.py`, `services.py`, `visits.py`
+- Touches queue: `registrar_wizard.py`, `registrar_integration.py`, `qr_queue.py`, `admin_departments.py`, `doctor_integration.py`, queue-adjacent handlers in `services.py`, queue-coupled write handlers in `visits.py`
 - Touches auth: none in this scan set with direct DB calls at router level
 - Touches EMR: none in this scan set with direct DB calls at router level
-- Unclear / needs human review: mixed modules where file includes both safe catalog endpoints and queue-adjacent endpoints (`services.py`)
+- Unclear / needs human review: mixed modules where file includes both safe and protected endpoints (`services.py`, `visits.py`)
 
 ## Detailed Findings
 
@@ -30,9 +32,10 @@ Result baseline:
 |---|---|---|---|---|---|---|
 | `backend/app/api/v1/endpoints/messages.py` | `send_message`, `get_conversation`, `send_voice_message`, `upload_file_message` | Router validates recipient, loads ORM entities, writes audit/file/message rows, commits transaction | Router delegates to `MessagesApiService`, DB access via `MessagesApiRepository` | Low | No | 1 |
 | `backend/app/api/v1/endpoints/services.py` | catalog handlers: `list_service_categories`, `create_service`, `update_service`, `delete_service`, `list_doctors_temp`; queue-adjacent handlers: `get_queue_groups`, `resolve_service_endpoint`, `get_service_code_mappings` | Router mixed safe catalog CRUD with queue-adjacent lookup logic in one module | Keep catalog handlers on service/repo flow; leave queue-adjacent handlers isolated for separate review | Medium | Partial (queue-adjacent) | 4 |
+| `backend/app/api/v1/endpoints/visits.py` | read-only handlers: `list_visits`, `get_visit` | Router built reflected tables, executed selects, and returned mapped rows directly | Router delegates to `VisitsApiService`, DB access via `VisitsApiRepository` | Low | No | 5 |
+| `backend/app/api/v1/endpoints/visits.py` | non-queue writes: `create_visit`, `add_service`; queue-coupled writes: `set_status`, `reschedule_visit`, `reschedule_visit_tomorrow` | Router still owns insert/update logic; some handlers also mutate queue state | Split non-queue writes from queue-coupled writes before further refactor | Medium to High | Partial (queue-coupled writes) | 6 / pending human review |
 | `backend/app/api/v1/endpoints/admin_departments.py` | `create_department`, `update_queue_settings`, `initialize_department` | Router contains multi-step writes and queue/registration settings persistence | Router thin, orchestration in service, DB in repository | High | Yes (queue) | Pending human review |
 | `backend/app/api/v1/endpoints/doctor_integration.py` | `get_doctor_queue_today`, `complete_patient_visit`, `schedule_next_visit` | Router mixes queue flow orchestration + transaction logic | Move flow orchestration to service layer | High | Yes (queue) | Pending human review |
-| `backend/app/api/v1/endpoints/visits.py` | `set_status`, `reschedule_visit`, `reschedule_visit_tomorrow` | Router updates visits and queue state in same handler | Encapsulate write flow in service with clear transaction boundary | High | Yes (queue) | Pending human review |
 | `backend/app/api/v1/endpoints/registrar_integration.py` | `create_registrar_appointment`, `start_queue_visit`, `get_today_queues` | Router includes heavy query composition + queue transaction branches | Service orchestrates, repository isolates query builders | High | Yes (queue) | Pending human review |
 | `backend/app/api/v1/endpoints/registrar_wizard.py` | `create_cart_appointments`, `mark_visit_as_paid`, `mark_queue_entry_as_paid` | Router owns queue + payment state transitions and commits | Service use-case orchestration with repository adapters | High | Yes (queue + payments) | Pending human review |
 | `backend/app/api/v1/endpoints/qr_queue.py` | `full_update_online_entry`, `update_online_entry`, `cancel_service_in_entry` | Router has very dense queue mutation transaction logic | Service transaction orchestration + repository helpers | High | Yes (queue) | Pending human review |
@@ -46,7 +49,9 @@ Result baseline:
 2. `W2A-SR-002` messages media/reaction router-thinning (`/reactions`, `/users/available`, `/send-voice`, `/voice/{id}/stream`, `/upload`)
 3. `W2A-SR-003` architecture guard for router DB anti-patterns in completed module(s)
 4. `W2A-SR-010` services catalog-only handlers
-5. `W2A-SR-011+` mixed/queue-adjacent modules only after explicit human review
+5. `W2A-SR-012` visits read-only handlers (`list_visits`, `get_visit`)
+6. `W2A-SR-013` visits non-queue writes (`create_visit`, `add_service`) if audit/transaction scope stays local
+7. `W2A-SR-011+` mixed/queue-adjacent modules only after explicit human review
 
 ## Zones Deferred From Wave 2A Initial Pass
 
