@@ -7,13 +7,13 @@ Workflow: `ci-cd-unified.yml` (`🏥 CI/CD Pipeline - Клиника (Unified)`)
 
 ## Run Evidence
 
-- Run ID: `22762302449`
-- URL: https://github.com/drsapaev/final/actions/runs/22762302449
-- Head SHA: `aabcae9040ffb0de226c34fea9d460ab39697eeb`
+- Run ID: `22762620308`
+- URL: https://github.com/drsapaev/final/actions/runs/22762620308
+- Head SHA: `c0686c36aaf7128a7979c541ae5254449f904074`
 - Status: `completed`
 - Conclusion: `success`
-- Started: `2026-03-06T11:52:50Z`
-- Completed: `2026-03-06T12:00:32Z`
+- Started: `2026-03-06T12:02:38Z`
+- Completed: `2026-03-06T12:10:35Z`
 
 ## Job Summary
 

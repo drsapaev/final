@@ -8,9 +8,9 @@ Verdict: **READY_FOR_WAVE2**
 
 Unified pipeline now has a fresh green run after Wave 1.96 fix:
 - Workflow: `ci-cd-unified.yml`
-- Run ID: `22762302449`
-- URL: https://github.com/drsapaev/final/actions/runs/22762302449
-- Head SHA: `aabcae9040ffb0de226c34fea9d460ab39697eeb`
+- Run ID: `22762620308`
+- URL: https://github.com/drsapaev/final/actions/runs/22762620308
+- Head SHA: `c0686c36aaf7128a7979c541ae5254449f904074`
 - Conclusion: `success`
 
 Conclusion: CI readiness is **confirmed** for the post-fix SHA.
