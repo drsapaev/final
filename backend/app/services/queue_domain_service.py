@@ -64,6 +64,46 @@ class QueueDomainService:
         )
         return QueueSnapshot(queue=queue, entries=entries)
 
+    def _resolve_specialist_name(self, specialist_id: int) -> str:
+        specialist = self.read_repository.get_doctor(specialist_id)
+        if specialist and specialist.user:
+            return specialist.user.full_name
+        return f"Специалист #{specialist_id}"
+
+    def _build_cabinet_payload(self, queue: object) -> dict[str, Any]:
+        return {
+            "id": queue.id,
+            "day": queue.day.isoformat(),
+            "specialist_id": queue.specialist_id,
+            "specialist_name": self._resolve_specialist_name(queue.specialist_id),
+            "queue_tag": queue.queue_tag,
+            "cabinet_number": queue.cabinet_number,
+            "cabinet_floor": queue.cabinet_floor,
+            "cabinet_building": queue.cabinet_building,
+            "entries_count": self.read_repository.count_entries(queue_id=queue.id),
+            "active": queue.active,
+        }
+
+    def list_queue_cabinet_info(
+        self,
+        *,
+        day: date | None,
+        specialist_id: int | None,
+        cabinet_number: str | None,
+    ) -> list[dict[str, Any]]:
+        queues = self.read_repository.list_daily_queues(
+            day_obj=day,
+            specialist_id=specialist_id,
+            cabinet_number=cabinet_number,
+        )
+        return [self._build_cabinet_payload(queue) for queue in queues]
+
+    def get_queue_cabinet_info(self, *, queue_id: int) -> dict[str, Any]:
+        queue = self.read_repository.get_queue(queue_id)
+        if not queue:
+            raise QueueDomainReadError(404, "Очередь не найдена")
+        return self._build_cabinet_payload(queue)
+
     def enqueue(self, **_: Any) -> QueueSnapshot:
         raise NotImplementedError("QueueDomainService.enqueue is a Phase 2 method")
 

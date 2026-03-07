@@ -47,3 +47,18 @@ def test_queue_reorder_status_reads_use_domain_service() -> None:
         block = _function_block(service_path, function_name)
         assert "self.domain_service" in block
         assert "list_active_entries" not in block
+
+
+def test_queue_cabinet_read_handlers_use_domain_service() -> None:
+    endpoint_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "api"
+        / "v1"
+        / "endpoints"
+        / "queue_cabinet_management.py"
+    )
+    for function_name in ("get_queues_cabinet_info", "get_queue_cabinet_info"):
+        block = _function_block(endpoint_path, function_name)
+        assert "QueueDomainService(db)" in block
+        assert "QueueCabinetManagementApiService(db)" not in block

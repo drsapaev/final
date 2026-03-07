@@ -25,13 +25,16 @@ Completed in Phase 1:
 
 - `W2C-MS-001`
 - `W2C-MS-006`
+- `W2C-MS-003` (narrowed to cabinet info read handlers only)
 
 Still pending safe candidates:
 
-- `W2C-MS-003`
 - `W2C-MS-002`
 - `W2C-MS-005`
 - optional `W2C-MS-004`
+
+Cabinet write and sync/statistics paths remain on the legacy service path and were not
+included in the executed `W2C-MS-003` slice.
 
 ## Not Safe for the First Queue Refactor Pass
 
@@ -50,10 +53,9 @@ These should not be auto-refactored before the domain service and state machine 
 
 ## Recommended Order
 
-1. `W2C-MS-003`
-2. `W2C-MS-002`
-3. `W2C-MS-005`
-4. optional `W2C-MS-004`
+1. `W2C-MS-002`
+2. `W2C-MS-005`
+3. optional `W2C-MS-004`
 
 `W2C-MS-004` stays optional because queue taxonomy is queue-domain policy, not just catalog metadata.
 

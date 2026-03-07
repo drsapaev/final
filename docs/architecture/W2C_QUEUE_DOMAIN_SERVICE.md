@@ -255,6 +255,8 @@ Currently implemented:
 
 - `get_queue_snapshot(queue_id=...)`
 - `get_queue_snapshot_by_specialist_day(specialist_id=..., day=...)`
+- `list_queue_cabinet_info(day=..., specialist_id=..., cabinet_number=...)`
+- `get_queue_cabinet_info(queue_id=...)`
 
 Skeleton-only methods that intentionally still raise `NotImplementedError`:
 
