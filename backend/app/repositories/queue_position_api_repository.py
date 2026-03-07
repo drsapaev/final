@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.services.queue_status import POSITION_VISIBLE_RAW_STATUSES
 
 
 class QueuePositionApiRepository:
@@ -72,7 +73,7 @@ class QueuePositionApiRepository:
             self.db.query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.queue_id == queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called", "in_service", "diagnostics"]),
+                OnlineQueueEntry.status.in_(POSITION_VISIBLE_RAW_STATUSES),
             )
             .order_by(
                 OnlineQueueEntry.priority.desc(),
@@ -80,4 +81,3 @@ class QueuePositionApiRepository:
             )
             .all()
         )
-

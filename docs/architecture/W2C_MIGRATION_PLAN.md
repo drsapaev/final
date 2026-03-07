@@ -58,6 +58,18 @@ Go gate:
 - service methods exist
 - targeted unit tests prove status normalization and numbering behavior
 
+Status:
+
+- partially completed on 2026-03-07
+- done:
+  - `QueueDomainService` skeleton added
+  - status normalization helper added
+  - first read-only slices completed
+- still deferred:
+  - numbering extraction
+  - duplicate-policy extraction
+  - any mutation-family migration
+
 ## Phase 2: Move Read-Only Queue Endpoints
 
 Purpose:
@@ -80,6 +92,11 @@ Go gate:
 
 - read-only endpoints use service/repository boundaries
 - queue tests and full backend tests stay green
+
+Status:
+
+- started in Phase 1 with `W2C-MS-001` and `W2C-MS-006`
+- remaining safe read-only slices are `W2C-MS-003`, `W2C-MS-002`, and possibly `W2C-MS-005`
 
 ## Phase 3: Move State Transitions
 
