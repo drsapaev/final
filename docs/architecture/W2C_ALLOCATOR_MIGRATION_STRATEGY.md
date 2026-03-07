@@ -31,7 +31,7 @@ Migration must follow this order:
 | `qr_queue.py` direct SQL allocator | High-risk inline allocator in add-service/update flows | Do not migrate early. First add characterization tests, then replace direct allocation with domain-service orchestration only after duplicate/fairness contract is stable | High |
 | Registrar batch path | Modern registrar write path using `create_queue_entry(auto_number=True)` | Repoint registrar application service to `QueueDomainService` once duplicate-policy contract is implemented; preserve current batch semantics during first cut | Medium |
 | Registrar legacy count-based path | Older desk path with `start_number + current_count` | Treat as legacy compatibility slice. Replace only after characterization tests prove operator-visible behavior can be preserved or intentionally superseded | High |
-| Confirmation flows | Split "get number, then create row" flows | Collapse into domain-service call after the single-owner API exists; remove split allocation from public application services | Medium |
+| Confirmation flows | Split "get number, then create row" flows | Mounted confirmation family is now migrated to the compatibility boundary for row creation; keep standalone number lookup legacy for now and defer unmounted/duplicate cleanup | Medium |
 | Force majeure transfer allocator | Exceptional tomorrow-transfer allocator | Keep separate initially, but force it to call the same internal reservation primitive once transfer semantics are modeled | High |
 | Legacy `OnlineDay` path | Separate queue-counter world | Freeze behind legacy adapter. Do not mix into the first allocator migration. Migrate or retire only in a dedicated legacy track | Very High |
 
@@ -70,7 +70,6 @@ Preferred early caller families:
 
 - SSOT queue-service-backed online join
 - registrar batch path only after explicit duplicate-policy review
-- confirmation path only after split allocation is collapsed safely
 
 Later only:
 
@@ -134,3 +133,17 @@ Recommended order after Phase 2.2:
 5. force-majeure characterization expansion
 6. `qr_queue.py` direct SQL preparation
 7. `OnlineDay` legacy decision track
+
+## Confirmation Migration Update
+
+Completed in the current slice:
+
+- mounted public confirmation allocation now goes through
+  `QueueDomainService.allocate_ticket()`
+- mounted registrar confirmation bridge follows the same path indirectly
+
+Still deferred inside the broader confirmation/registrar surface:
+
+- standalone number lookup remains legacy
+- unmounted duplicate confirmation modules
+- broader registrar wizard/batch allocator families

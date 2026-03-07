@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from app.services.context_facades.queue_facade import QueueContextFacade
 from app.services.queue_domain_service import QueueDomainService
 
 
@@ -91,3 +92,26 @@ def test_allocate_ticket_raises_for_unsupported_mode() -> None:
         service.allocate_ticket(allocation_mode="unsupported")
 
     assert "Unsupported allocation_mode" in str(exc_info.value)
+
+
+@pytest.mark.unit
+def test_queue_context_facade_allocate_ticket_delegates_to_contract() -> None:
+    contract = Mock()
+    expected_entry = SimpleNamespace(id=12, number=5, queue_id=22)
+    contract.allocate_ticket.return_value = expected_entry
+
+    facade = QueueContextFacade(contract)
+
+    result = facade.allocate_ticket(
+        allocation_mode="create_entry",
+        correlation_id="req-1",
+        daily_queue=SimpleNamespace(id=22),
+        patient_id=9,
+        source="confirmation",
+    )
+
+    assert result is expected_entry
+    contract.allocate_ticket.assert_called_once()
+    assert contract.allocate_ticket.call_args.kwargs["allocation_mode"] == "create_entry"
+    assert contract.allocate_ticket.call_args.kwargs["request_id"] == "req-1"
+    assert contract.allocate_ticket.call_args.kwargs["patient_id"] == 9

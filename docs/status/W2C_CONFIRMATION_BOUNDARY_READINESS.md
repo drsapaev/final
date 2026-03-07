@@ -37,3 +37,11 @@ These remaining items do not block a later narrow boundary migration anymore.
 `QueueDomainService.allocate_ticket()` can now be introduced as a later
 compatibility boundary for the mounted confirmation family without preserving
 the old duplicate-creating drift.
+
+## Later Progress
+
+This readiness result has now been consumed by the boundary migration slice.
+See:
+
+- `docs/architecture/W2C_CONFIRMATION_BOUNDARY_MIGRATION.md`
+- `docs/status/W2C_CONFIRMATION_BOUNDARY_MIGRATION_STATUS.md`

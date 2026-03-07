@@ -302,6 +302,9 @@ Current production callers through `allocate_ticket()`:
 - `backend/app/api/v1/endpoints/online_queue_new.py::join_queue()`
 - `backend/app/services/qr_queue_service.py::complete_join_session()`
 - `backend/app/services/qr_queue_service.py::complete_join_session_multiple()`
+- `backend/app/services/visit_confirmation_service.py` through
+  `QueueContextFacade(QueueDomainServiceContractAdapter)` when a new queue row
+  is needed during mounted confirmation
 
 ## Phase 2.2 Boundary Limits
 
@@ -311,10 +314,11 @@ yet a safe public migration target for all allocator families.
 Still outside the safe boundary:
 
 - registrar wizard split allocation
-- confirmation split-flow until replay behavior is characterized
 - `qr_queue.py` direct SQL allocator branches
 - force-majeure transfer allocator
 - all `OnlineDay` legacy allocators
+- registrar batch allocator family
+- unmounted duplicate confirmation modules
 
 Reason:
 
@@ -322,6 +326,16 @@ Reason:
 - some families still own duplicate-policy shortcuts
 - some families are not yet narrowed enough to preserve behavior through a thin
   boundary migration
+
+### Confirmation family note
+
+Mounted confirmation is no longer blocked here:
+
+- Phase 2.4 corrected same-queue duplicate drift
+- the current slice moved mounted confirmation queue-row creation through the
+  compatibility boundary
+- remaining confirmation work is limited to cleanup/dead-path clarification, not
+  allocator ownership
 
 Notes for the narrowed `W2C-MS-004` slice:
 

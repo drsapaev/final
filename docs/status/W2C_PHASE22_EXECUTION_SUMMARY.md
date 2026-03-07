@@ -45,3 +45,15 @@ Reason:
 ## Recommended Next Step
 
 See `docs/status/W2C_NEXT_EXECUTION_UNIT.md`.
+
+## Later Progress Note
+
+The Phase 2.2 recommendation was executed in later slices:
+
+- confirmation characterization completed
+- confirmation contract clarified
+- mounted confirmation family corrected and migrated to the compatibility boundary
+
+The next allocator-family recommendation now lives in:
+
+- `docs/status/W2C_NEXT_EXECUTION_UNIT_AFTER_CONFIRMATION.md`

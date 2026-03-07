@@ -9,8 +9,7 @@ Mode: behavior-preserving execution
 | `backend/app/services/morning_assignment.py` | `_assign_single_queue()` | `morning_assignment` source semantics and visit-opening flow should be migrated only with dedicated characterization around scheduled queue population | Lifecycle/source semantics | Later safe pass or pre-2C high-risk review |
 | `backend/app/api/v1/endpoints/registrar_integration.py` | `create_queue_entries_batch()` | Registrar batch orchestration mixes allocator call with duplicate decisions and operator-visible batch behavior | Registrar orchestration / duplicate-policy sensitivity | Review before high-risk allocator migration |
 | `backend/app/services/queue_batch_service.py` | `create_entries()` | Batch writer path with broader side effects than thin join callers | Batch write semantics | Review before high-risk allocator migration |
-| `backend/app/services/visit_confirmation_service.py` | confirmation queue creation | Still splits number allocation and row creation | Split allocation flow | Queue domain refactor phase |
-| `backend/app/api/v1/endpoints/registrar_wizard.py` | queue creation branches | Mixed path; some branches still separate numbering from persistence or create rows directly | Mixed logic | High-risk allocator migration |
+| `backend/app/api/v1/endpoints/registrar_wizard.py` | non-confirmation queue creation branches | Mounted confirmation bridge is migrated separately, but broader wizard queue creation still mixes numbering, persistence, and orchestration | Mixed logic | High-risk allocator migration |
 | `backend/app/services/registrar_wizard_api_service.py` | queue creation branches | Same mixed allocator behavior as router counterpart | Mixed logic | High-risk allocator migration |
 | `backend/app/crud/online_queue.py` | online join helpers | Direct model creation after standalone number lookup | Direct model creation | High-risk allocator migration |
 | `backend/app/api/v1/endpoints/qr_queue.py` | `full_update_online_entry()` branches | Direct SQL allocator branches | Direct SQL / numbering semantics | Review before high-risk allocator migration |
@@ -30,3 +29,6 @@ readiness and ordering now live in:
 - `docs/architecture/W2C_HIGH_RISK_ALLOCATOR_FAMILIES.md`
 - `docs/status/W2C_HIGH_RISK_MIGRATION_READINESS.md`
 - `docs/architecture/W2C_HIGH_RISK_MIGRATION_ORDER.md`
+
+Mounted confirmation family is no longer deferred. It now uses the compatibility
+boundary for queue-row creation.

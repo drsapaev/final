@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -148,3 +149,69 @@ def test_assign_queue_numbers_on_confirmation_raises_explicit_error_on_ambiguity
         .count()
         == 0
     )
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+@pytest.mark.confirmation
+def test_assign_queue_numbers_on_confirmation_uses_domain_boundary_for_new_entry(
+    db_session,
+    test_visit,
+    test_daily_queue,
+    test_service,
+    monkeypatch,
+):
+    _attach_visit_service(db_session, test_visit, test_service)
+
+    boundary_calls: list[dict[str, object]] = []
+
+    def _fake_allocate_ticket(*, allocation_mode="create_entry", **kwargs):  # type: ignore[no-untyped-def]
+        boundary_calls.append(
+            {
+                "allocation_mode": allocation_mode,
+                "kwargs": kwargs,
+            }
+        )
+        return SimpleNamespace(
+            id=999,
+            queue_id=test_daily_queue.id,
+            number=4,
+            status="waiting",
+            source="confirmation",
+            queue_time=datetime.utcnow(),
+        )
+
+    def _unexpected_direct_create(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("confirmation slice should use queue facade boundary")
+
+    monkeypatch.setattr(queue_service, "get_next_queue_number", lambda *args, **kwargs: 4)
+    monkeypatch.setattr(queue_service, "create_queue_entry", _unexpected_direct_create)
+
+    service = VisitConfirmationService(db_session)
+    monkeypatch.setattr(service.queue_facade, "allocate_ticket", _fake_allocate_ticket)
+
+    queue_numbers, print_tickets = service.assign_queue_numbers_on_confirmation(
+        test_visit,
+        confirmation_telegram_id="123456789",
+    )
+
+    assert boundary_calls == [
+        {
+            "allocation_mode": "create_entry",
+            "kwargs": {
+                "daily_queue": test_daily_queue,
+                "patient_id": test_visit.patient_id,
+                "visit_id": test_visit.id,
+                "number": 4,
+                "source": "confirmation",
+            },
+        }
+    ]
+    assert queue_numbers == [
+        {
+            "queue_tag": "cardiology_common",
+            "number": 4,
+            "queue_id": test_daily_queue.id,
+        }
+    ]
+    assert print_tickets[0]["queue_number"] == 4
