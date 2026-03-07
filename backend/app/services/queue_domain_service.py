@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings
 from app.repositories.queue_read_repository import QueueReadRepository
+from app.services.queue_service import get_queue_service
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
 
 
@@ -33,10 +34,12 @@ class QueueDomainService:
         db: Session,
         read_repository: QueueReadRepository | None = None,
         get_settings: Callable[[Session], dict] | None = None,
+        allocator_service: Any | None = None,
     ):
         self.db = db
         self.read_repository = read_repository or QueueReadRepository(db)
         self._get_settings = get_settings or get_queue_settings
+        self.allocator_service = allocator_service or get_queue_service()
 
     def get_queue_snapshot(self, *, queue_id: int) -> QueueSnapshot:
         queue = self.read_repository.get_queue(queue_id)
@@ -243,6 +246,26 @@ class QueueDomainService:
             "category_mapping": category_mapping,
             "specialty_aliases": SPECIALTY_ALIASES,
         }
+
+    def allocate_ticket(
+        self,
+        *,
+        allocation_mode: Literal["create_entry", "join_with_token"] = "create_entry",
+        **kwargs: Any,
+    ) -> Any:
+        """Compatibility boundary for current allocator behavior.
+
+        Phase 2 keeps runtime semantics unchanged. This method is only a public
+        queue-domain facade over the existing allocators:
+        - `create_entry` -> `queue_service.create_queue_entry()`
+        - `join_with_token` -> `queue_service.join_queue_with_token()`
+        """
+
+        if allocation_mode == "create_entry":
+            return self.allocator_service.create_queue_entry(self.db, **kwargs)
+        if allocation_mode == "join_with_token":
+            return self.allocator_service.join_queue_with_token(self.db, **kwargs)
+        raise ValueError(f"Unsupported allocation_mode: {allocation_mode}")
 
     def enqueue(self, **_: Any) -> QueueSnapshot:
         raise NotImplementedError("QueueDomainService.enqueue is a Phase 2 method")

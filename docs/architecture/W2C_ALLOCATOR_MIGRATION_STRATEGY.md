@@ -1,7 +1,7 @@
 # Wave 2C Allocator Migration Strategy
 
 Date: 2026-03-07
-Mode: analysis-first, docs-only
+Mode: behavior-preserving execution
 
 ## Purpose
 
@@ -37,18 +37,19 @@ Migration must follow this order:
 
 ## Recommended Migration Phases
 
-### Phase A: Contract + characterization
+### Phase 1: Contract + characterization
 
-- done in Phase 1.5 and 1.6 docs
-- add characterization tests before code movement
+- completed in Phase 1.5 and 1.6 docs
+- characterization tests added before behavior changes
 
-### Phase B: Introduce domain owner without changing callers
+### Phase 2: Introduce compatibility boundary
 
-- `QueueDomainService.allocate_ticket()` exists as compatibility boundary
-- current `queue_service` becomes an internal collaborator
-- no router path changes yet
+- `QueueDomainService.allocate_ticket()` exists as the public boundary
+- current `queue_service` remains the internal implementation
+- no production caller migration yet
+- direct SQL and legacy allocators remain untouched
 
-### Phase C: Migrate low-complexity writers
+### Phase 3: Gradually migrate callers
 
 Preferred early caller families:
 
@@ -56,21 +57,21 @@ Preferred early caller families:
 - registrar batch path
 - confirmation path that already relies on SSOT queue models
 
-### Phase D: Migrate complex mutation families
-
 Later only:
 
 - QR full-update / add-service path
 - force-majeure transfer path
 - doctor/registrar queue lifecycle flows if allocator coupling appears
 
-### Phase E: Legacy isolation or retirement
+### Phase 4: Remove legacy allocators
 
+- direct SQL allocator branches in `qr_queue.py`
+- legacy registrar count-based allocator
 - `OnlineDay`
 - `appointments.py` legacy counters
 - stale `crud/queue.py`
 
-This phase should not be mixed into the first allocator migration.
+This phase should not be mixed into the first compatibility-boundary rollout.
 
 ## Migration Guardrails
 
