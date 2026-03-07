@@ -15,6 +15,7 @@ Mode: analysis-first, execution-enabled
 - `W2C-MS-001` (`done`): centralized queue read-status vocabulary for queue-position reads
 - `W2C-MS-006` (`done`): moved queue snapshot/status reads to `QueueDomainService -> QueueReadRepository`
 - `W2C-MS-003` (`done`, narrowed): moved cabinet info read handlers to `QueueDomainService -> QueueReadRepository`
+- `W2C-MS-002` (`done`, narrowed): moved `GET /queue-status` to `QueueDomainService -> QueueReadRepository` while preserving current `doctor.user_id` lookup behavior
 
 ## Foundational Additions
 
@@ -39,7 +40,7 @@ Mode: analysis-first, execution-enabled
 ## Test Results
 
 - targeted Phase 1 tests: passed
-- full backend suite: `669 passed, 3 skipped`
+- full backend suite: `671 passed, 3 skipped`
 - OpenAPI contract suite: `10 passed`
 
 ## Regressions Found
@@ -48,7 +49,7 @@ None detected.
 
 ## Remaining Safe Candidates
 
-- `W2C-MS-002` queue limits read model
+- optional `W2C-MS-004` queue metadata read helpers
 - `W2C-MS-005` number-allocation boundary extraction, only after another compliance pass
 
 ## Not Allowed For Phase 1 Follow-Up
@@ -62,5 +63,6 @@ None detected.
 
 ## Recommended Next Step
 
-Continue Wave 2C only with another read-only slice (`W2C-MS-002`).
+If Phase 1 continues, prefer optional `W2C-MS-004`.
+Do not start `W2C-MS-005` until numbering semantics get a separate compliance review.
 Do not enter queue mutation refactor until a separate Phase 2 approval pass.

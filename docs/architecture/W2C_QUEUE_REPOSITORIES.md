@@ -158,6 +158,7 @@ Wave 2C Phase 1 introduced `QueueReadRepository` in
 Current implemented read boundary:
 
 - `get_queue(queue_id)`
+- `list_active_doctors(specialty)`
 - `get_queue_by_specialist_day(specialist_id, day)`
 - `list_daily_queues(day_obj, specialist_id, cabinet_number)`
 - `get_doctor(doctor_id)`
