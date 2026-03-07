@@ -64,6 +64,76 @@ class QueueDomainService:
         )
         return QueueSnapshot(queue=queue, entries=entries)
 
+    def _resolve_specialist_name(self, specialist_id: int) -> str:
+        specialist = self.read_repository.get_doctor(specialist_id)
+        if specialist and specialist.user:
+            user = specialist.user
+            return user.full_name or user.username or f"Специалист #{specialist_id}"
+        return f"Специалист #{specialist_id}"
+
+    def _build_cabinet_payload(self, queue: object) -> dict[str, Any]:
+        doctor = self.read_repository.get_doctor(queue.specialist_id)
+        doctor_cabinet = getattr(doctor, "cabinet", None) if doctor else None
+        linked_doctor_found = doctor is not None
+        doctor_has_cabinet = bool(doctor_cabinet)
+        queue_cabinet = queue.cabinet_number
+        effective_cabinet = queue_cabinet or doctor_cabinet
+        integrity_warnings: list[str] = []
+
+        if not linked_doctor_found:
+            sync_status = "missing_doctor"
+            integrity_warnings.append("linked_doctor_missing")
+        elif not doctor_has_cabinet:
+            sync_status = "doctor_cabinet_missing"
+            integrity_warnings.append("doctor_cabinet_missing")
+        elif queue_cabinet != doctor_cabinet:
+            sync_status = "stale"
+            integrity_warnings.append("queue_cabinet_stale")
+        else:
+            sync_status = "synced"
+
+        if not effective_cabinet:
+            integrity_warnings.append("effective_cabinet_missing")
+
+        return {
+            "id": queue.id,
+            "day": queue.day.isoformat(),
+            "specialist_id": queue.specialist_id,
+            "specialist_name": self._resolve_specialist_name(queue.specialist_id),
+            "queue_tag": queue.queue_tag,
+            "cabinet_number": queue_cabinet,
+            "doctor_cabinet": doctor_cabinet,
+            "effective_cabinet": effective_cabinet,
+            "cabinet_floor": queue.cabinet_floor,
+            "cabinet_building": queue.cabinet_building,
+            "entries_count": self.read_repository.count_entries(queue_id=queue.id),
+            "active": queue.active,
+            "linked_doctor_found": linked_doctor_found,
+            "doctor_has_cabinet": doctor_has_cabinet,
+            "sync_status": sync_status,
+            "integrity_warnings": integrity_warnings,
+        }
+
+    def list_queue_cabinet_info(
+        self,
+        *,
+        day: date | None,
+        specialist_id: int | None,
+        cabinet_number: str | None,
+    ) -> list[dict[str, Any]]:
+        queues = self.read_repository.list_daily_queues(
+            day_obj=day,
+            specialist_id=specialist_id,
+            cabinet_number=cabinet_number,
+        )
+        return [self._build_cabinet_payload(queue) for queue in queues]
+
+    def get_queue_cabinet_info(self, *, queue_id: int) -> dict[str, Any]:
+        queue = self.read_repository.get_queue(queue_id)
+        if not queue:
+            raise QueueDomainReadError(404, "Очередь не найдена")
+        return self._build_cabinet_payload(queue)
+
     def enqueue(self, **_: Any) -> QueueSnapshot:
         raise NotImplementedError("QueueDomainService.enqueue is a Phase 2 method")
 
