@@ -8,6 +8,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.repositories.queue_reorder_api_repository import QueueReorderApiRepository
+from app.services.queue_domain_service import QueueDomainReadError, QueueDomainService
 
 
 @dataclass
@@ -23,8 +24,10 @@ class QueueReorderApiService:
         self,
         db: Session,
         repository: QueueReorderApiRepository | None = None,
+        domain_service: QueueDomainService | None = None,
     ):
         self.repository = repository or QueueReorderApiRepository(db)
+        self.domain_service = domain_service or QueueDomainService(db)
 
     @staticmethod
     def _queue_info(queue, entries: list) -> dict:
@@ -171,23 +174,21 @@ class QueueReorderApiService:
         )
 
     def get_queue_status_by_specialist(self, *, specialist_id: int, day: date) -> dict:
-        queue = self.repository.get_queue_by_specialist_day(
-            specialist_id=specialist_id,
-            day=day,
-        )
-        if not queue:
-            raise QueueReorderApiDomainError(404, "Очередь не найдена")
-
-        entries = self.repository.list_active_entries(queue_id=queue.id)
-        return self._queue_info(queue, entries)
+        try:
+            snapshot = self.domain_service.get_queue_snapshot_by_specialist_day(
+                specialist_id=specialist_id,
+                day=day,
+            )
+        except QueueDomainReadError as exc:
+            raise QueueReorderApiDomainError(exc.status_code, exc.detail) from exc
+        return self._queue_info(snapshot.queue, snapshot.entries)
 
     def get_queue_status(self, *, queue_id: int) -> dict:
-        queue = self.repository.get_queue(queue_id)
-        if not queue:
-            raise QueueReorderApiDomainError(404, "Очередь не найдена")
-
-        entries = self.repository.list_active_entries(queue_id=queue_id)
-        return self._queue_info(queue, entries)
+        try:
+            snapshot = self.domain_service.get_queue_snapshot(queue_id=queue_id)
+        except QueueDomainReadError as exc:
+            raise QueueReorderApiDomainError(exc.status_code, exc.detail) from exc
+        return self._queue_info(snapshot.queue, snapshot.entries)
 
     def rollback(self) -> None:
         self.repository.rollback()

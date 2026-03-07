@@ -149,3 +149,17 @@ Most realistic first boundaries:
 5. `VisitRepository.get_visit` and `set_visit_date`
 
 These cover the queue invariants with the least architectural risk.
+
+## Phase 1 Implementation Status
+
+Wave 2C Phase 1 introduced `QueueReadRepository` in
+`backend/app/repositories/queue_read_repository.py`.
+
+Current implemented read boundary:
+
+- `get_queue(queue_id)`
+- `get_queue_by_specialist_day(specialist_id, day)`
+- `list_snapshot_entries(queue_id, statuses)`
+
+This repository is intentionally read-only and is currently used by
+`QueueDomainService` for safe status/snapshot endpoints.
