@@ -21,3 +21,12 @@ Mode: behavior-preserving execution
 | `backend/app/services/online_queue_api_service.py` | legacy online queue endpoints | Delegates to `OnlineDay` counter semantics | Legacy/OnlineDay | Legacy migration track |
 | `backend/app/crud/queue.py` | `next_ticket_and_insert_entry()` | Stale legacy ticket path | Legacy/stale allocator | Legacy cleanup track |
 | `backend/app/services/online_queue_new_api_service.py` | `join_queue()` and related router-like handlers | Duplicate unmounted module; unsafe to refactor blindly while mounted runtime path lives elsewhere | Shadow/dead-path ambiguity | Human review / cleanup track |
+
+## Superseded by Phase 2.2 Review
+
+This caller list is still valid as a raw deferred inventory, but family-level
+readiness and ordering now live in:
+
+- `docs/architecture/W2C_HIGH_RISK_ALLOCATOR_FAMILIES.md`
+- `docs/status/W2C_HIGH_RISK_MIGRATION_READINESS.md`
+- `docs/architecture/W2C_HIGH_RISK_MIGRATION_ORDER.md`

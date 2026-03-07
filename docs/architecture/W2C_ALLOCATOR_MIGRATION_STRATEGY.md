@@ -110,3 +110,27 @@ The correct first execution target is:
 The incorrect first execution target would be:
 
 - replacing scattered allocators directly in routers without the owner contract
+
+## Phase 2.2 Review Adjustment
+
+Phase 2.2 narrowed the next migration order further.
+
+Current result:
+
+- confirmation split-flow is the closest family to further work, but only after
+  a targeted characterization pass
+- registrar work must be split into smaller subfamilies before migration
+- `qr_queue.py` direct SQL branches remain blocked by transaction-model
+  complexity
+- force-majeure transfer remains blocked by its own transfer transaction model
+- `OnlineDay` remains a separate legacy track
+
+Recommended order after Phase 2.2:
+
+1. confirmation split-flow characterization
+2. registrar batch-only preparation
+3. registrar wizard family split
+4. duplicate or unmounted service ownership cleanup
+5. force-majeure characterization expansion
+6. `qr_queue.py` direct SQL preparation
+7. `OnlineDay` legacy decision track
