@@ -83,6 +83,7 @@ Compliance outcome:
   - status vocabulary now has a documented alias layer for internal comparisons
   - queue snapshot/status reads now use an explicit read-only domain boundary
   - cabinet read handlers now use runtime `DailyQueue.specialist_id -> doctors.id` semantics through the queue read boundary
+  - queue-limits status read now uses the same runtime-compatible `doctor.user_id` lookup it used before the refactor
 - still in conflict and deferred:
   - status drift beyond the normative four-state vocabulary
   - `doctors.id` vs `users.id` wording drift

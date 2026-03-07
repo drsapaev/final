@@ -1,0 +1,65 @@
+{
+  "contract_version": "1.0",
+  "task_id": "W2C-MS-002",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/queue_limits.py",
+      "backend/app/repositories/queue_read_repository.py",
+      "backend/app/services/queue_domain_service.py",
+      "backend/tests/architecture/test_w2c_queue_boundaries.py",
+      "backend/tests/unit/test_queue_domain_service.py",
+      "backend/tests/unit/test_queue_limits_api_service.py",
+      "docs/status/wave2c/W2C-MS-002_PLAN.md",
+      "docs/status/wave2c/W2C-MS-002_STATUS.md"
+    ],
+    "exclude": [
+      "backend/app/services/queue_service.py",
+      "backend/app/api/v1/endpoints/qr_queue.py",
+      "backend/app/api/v1/endpoints/doctor_integration.py",
+      "backend/app/api/v1/endpoints/registrar_integration.py",
+      "backend/app/api/v1/endpoints/visits.py",
+      "backend/app/repositories/queue_limits_repository.py",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Move the queue-status-with-limits read endpoint to QueueDomainService and QueueReadRepository.",
+    "Preserve current runtime lookup semantics, including Doctor.user_id based queue lookup.",
+    "Keep queue limits writes and settings updates unchanged."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 9,
+    "max_diff_lines": 280,
+    "must_run_tests": true,
+    "mandatory_human_review": false
+  },
+  "must_run": [
+    "cd backend && pytest tests/unit/test_queue_domain_service.py tests/unit/test_queue_limits_api_service.py tests/architecture/test_w2c_queue_boundaries.py -q",
+    "cd backend && pytest tests/unit/test_service_repository_boundary.py -q",
+    "cd backend && pytest -q",
+    "cd backend && pytest tests/test_openapi_contract.py -q"
+  ],
+  "must_not_touch": [
+    "queue limits write handlers",
+    "queue numbering logic",
+    "duplicate policy semantics",
+    "visit lifecycle logic",
+    "QR blocking logic",
+    "DailyQueue.specialist_id runtime behavior"
+  ],
+  "required_artifacts": [
+    "docs/status/wave2c/W2C-MS-002_PLAN.md",
+    "docs/status/wave2c/W2C-MS-002_STATUS.md"
+  ],
+  "stop_conditions": [
+    "Need to change queue lookup semantics from Doctor.user_id to Doctor.id.",
+    "Need to change queue limits write behavior.",
+    "Need to touch numbering, duplicate, visit, or QR-window logic."
+  ]
+}

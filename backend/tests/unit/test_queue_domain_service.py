@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -106,3 +107,53 @@ class TestQueueDomainService:
             service.get_queue_cabinet_info(queue_id=5)
 
         assert exc_info.value.status_code == 404
+
+    def test_get_queue_limits_status_preserves_runtime_user_id_lookup(self) -> None:
+        doctor = SimpleNamespace(
+            id=3,
+            user_id=33,
+            specialty="cardio",
+            cabinet="101",
+            user=SimpleNamespace(full_name="Doctor Test"),
+        )
+        queue = SimpleNamespace(id=9, opened_at=None)
+
+        class Repository:
+            def list_active_doctors(self, *, specialty):
+                assert specialty == "cardio"
+                return [doctor]
+
+            def get_queue_by_specialist_day(self, *, specialist_id, day):
+                assert specialist_id == 33
+                assert day.isoformat() == "2026-03-07"
+                return queue
+
+            def count_entries(self, *, queue_id):
+                assert queue_id == 9
+                return 4
+
+        service = QueueDomainService(
+            db="db",
+            read_repository=Repository(),
+            get_settings=lambda db: {"max_per_day": {"cardio": 5}},
+        )
+
+        result = service.get_queue_limits_status(
+            day=date(2026, 3, 7),
+            specialty="cardio",
+        )
+
+        assert result == [
+            {
+                "doctor_id": 3,
+                "doctor_name": "Doctor Test",
+                "specialty": "cardio",
+                "cabinet": "101",
+                "day": date(2026, 3, 7),
+                "current_entries": 4,
+                "max_entries": 5,
+                "limit_reached": False,
+                "queue_opened": False,
+                "online_available": True,
+            }
+        ]
