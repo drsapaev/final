@@ -3,6 +3,7 @@ API endpoints для управления информацией о кабине
 """
 
 import logging
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
+from app.services.queue_domain_service import QueueDomainReadError, QueueDomainService
 from app.services.queue_cabinet_management_api_service import (
     QueueCabinetManagementApiService,
     QueueCabinetManagementDomainError,
@@ -19,6 +21,18 @@ from app.services.queue_cabinet_management_api_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _parse_day_query(day: str | None) -> date | None:
+    if day is None:
+        return None
+    try:
+        return datetime.strptime(day, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Неверный формат даты. Используйте YYYY-MM-DD",
+        ) from exc
 
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
@@ -67,13 +81,13 @@ def get_queues_cabinet_info(
     Получить информацию о кабинетах для очередей
     """
     try:
-        payload = QueueCabinetManagementApiService(db).get_queues_cabinet_info(
-            day=day,
+        payload = QueueDomainService(db).list_queue_cabinet_info(
+            day=_parse_day_query(day),
             specialist_id=specialist_id,
             cabinet_number=cabinet_number,
         )
         return [QueueCabinetResponse(**item) for item in payload]
-    except QueueCabinetManagementDomainError as exc:
+    except QueueDomainReadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         logger.error(f"Ошибка получения информации о кабинетах: {e}")
@@ -93,9 +107,9 @@ def get_queue_cabinet_info(
     Получить информацию о кабинете для конкретной очереди
     """
     try:
-        payload = QueueCabinetManagementApiService(db).get_queue_cabinet_info(queue_id=queue_id)
+        payload = QueueDomainService(db).get_queue_cabinet_info(queue_id=queue_id)
         return QueueCabinetResponse(**payload)
-    except QueueCabinetManagementDomainError as exc:
+    except QueueDomainReadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         logger.error(
