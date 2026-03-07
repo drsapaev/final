@@ -162,8 +162,10 @@ Current implemented read boundary:
 - `get_queue_by_specialist_day(specialist_id, day)`
 - `list_daily_queues(day_obj, specialist_id, cabinet_number)`
 - `get_doctor(doctor_id)`
+- `list_active_services()`
 - `count_entries(queue_id)`
 - `list_snapshot_entries(queue_id, statuses)`
 
 This repository is intentionally read-only and is currently used by
-`QueueDomainService` for safe status/snapshot and cabinet-info endpoints.
+`QueueDomainService` for safe status/snapshot, cabinet-info, limits-status, and
+queue-metadata read endpoints.

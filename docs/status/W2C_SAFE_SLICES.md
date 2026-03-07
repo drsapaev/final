@@ -27,17 +27,20 @@ Completed in Phase 1:
 - `W2C-MS-006`
 - `W2C-MS-003` (narrowed to cabinet info read handlers only)
 - `W2C-MS-002` (narrowed to `GET /queue-status` only)
+- `W2C-MS-004` (narrowed to `GET /services/queue-groups` and `GET /services/code-mappings`)
 
 Still pending safe candidates:
 
 - `W2C-MS-005`
-- optional `W2C-MS-004`
 
 Cabinet write and sync/statistics paths remain on the legacy service path and were not
 included in the executed `W2C-MS-003` slice.
 
 Queue limits writes and `GET /queue-limits` remain on the legacy service path and were not
 included in the executed `W2C-MS-002` slice.
+
+`GET /services/resolve` remains on the legacy path and was not included in the executed
+`W2C-MS-004` slice.
 
 ## Not Safe for the First Queue Refactor Pass
 
@@ -56,10 +59,9 @@ These should not be auto-refactored before the domain service and state machine 
 
 ## Recommended Order
 
-1. optional `W2C-MS-004`
-2. `W2C-MS-005` only after an explicit numbering/compliance pass
+1. `W2C-MS-005` only after an explicit numbering/compliance pass
 
-`W2C-MS-004` stays optional because queue taxonomy is queue-domain policy, not just catalog metadata.
+`W2C-MS-005` stays gated because queue numbering is domain policy, not a simple read boundary.
 
 ## Exit Rule
 

@@ -42,6 +42,7 @@ The first migrated read-only slices are:
 - `W2C-MS-006` queue snapshot/status reads via `QueueDomainService`
 - `W2C-MS-003` cabinet info read handlers via `QueueDomainService`
 - `W2C-MS-002` narrowed queue-status-with-limits read handler via `QueueDomainService`
+- `W2C-MS-004` narrowed queue metadata read handlers in `services.py` via `QueueDomainService`
 
 Runtime mutation ownership is still fragmented exactly as documented below.
 

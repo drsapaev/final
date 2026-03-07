@@ -258,6 +258,8 @@ Currently implemented:
 - `list_queue_cabinet_info(day=..., specialist_id=..., cabinet_number=...)`
 - `get_queue_cabinet_info(queue_id=...)`
 - `get_queue_limits_status(day=..., specialty=...)`
+- `get_queue_groups_payload()`
+- `get_service_code_mappings_payload()`
 
 Skeleton-only methods that intentionally still raise `NotImplementedError`:
 
@@ -273,3 +275,9 @@ This is intentional for Phase 1:
 - read-only queue slices can adopt the service now
 - mutation flows stay in legacy paths until the state machine and transaction rules
   are migrated explicitly
+
+Notes for the narrowed `W2C-MS-004` slice:
+
+- only queue metadata reads moved under `QueueDomainService`
+- static taxonomy definitions still live in `app/services/service_mapping.py`
+- no queue numbering, duplicate, lifecycle, or QR-window behavior changed

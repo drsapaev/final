@@ -157,3 +157,41 @@ class TestQueueDomainService:
                 "online_available": True,
             }
         ]
+
+    def test_get_queue_groups_payload_preserves_static_groups_and_db_enrichment(self) -> None:
+        service_row = SimpleNamespace(service_code="K77")
+
+        class Repository:
+            def list_active_services(self):
+                return [service_row]
+
+        service = QueueDomainService(db=None, read_repository=Repository())
+
+        payload = service.get_queue_groups_payload()
+
+        assert payload["groups"]["cardiology"]["tab_key"] == "cardio"
+        assert payload["code_to_group"]["K01"] == "cardiology"
+        assert payload["code_to_group"]["K77"] == "cardiology"
+        assert payload["tab_to_group"]["cardio"] == "cardiology"
+
+    def test_get_service_code_mappings_payload_preserves_static_aliases_and_db_enrichment(
+        self,
+    ) -> None:
+        service_row = SimpleNamespace(
+            service_code="L77",
+            name="Расширенный лабораторный профиль",
+            queue_tag="laboratory",
+        )
+
+        class Repository:
+            def list_active_services(self):
+                return [service_row]
+
+        service = QueueDomainService(db=None, read_repository=Repository())
+
+        payload = service.get_service_code_mappings_payload()
+
+        assert payload["specialty_to_code"]["laboratory"] == "L77"
+        assert payload["code_to_name"]["L77"] == "Расширенный лабораторный профиль"
+        assert payload["category_mapping"]["laboratory"] == "L"
+        assert payload["specialty_aliases"]["derma"] == "dermatology"

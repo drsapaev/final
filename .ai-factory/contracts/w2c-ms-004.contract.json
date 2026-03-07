@@ -1,0 +1,64 @@
+{
+  "contract_version": "1.0",
+  "task_id": "W2C-MS-004",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/services.py",
+      "backend/app/repositories/queue_read_repository.py",
+      "backend/app/services/queue_domain_service.py",
+      "backend/tests/architecture/test_w2c_queue_boundaries.py",
+      "backend/tests/unit/test_queue_domain_service.py",
+      "backend/tests/unit/test_services_router_service_wiring.py",
+      "docs/status/wave2c/W2C-MS-004_PLAN.md",
+      "docs/status/wave2c/W2C-MS-004_STATUS.md"
+    ],
+    "exclude": [
+      "backend/app/api/v1/endpoints/qr_queue.py",
+      "backend/app/api/v1/endpoints/doctor_integration.py",
+      "backend/app/api/v1/endpoints/registrar_integration.py",
+      "backend/app/api/v1/endpoints/visits.py",
+      "backend/app/services/service_mapping.py",
+      "backend/app/services/queue_service.py",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Move queue metadata read handlers to QueueDomainService and QueueReadRepository.",
+    "Preserve static SSOT mappings and DB enrichment behavior.",
+    "Leave resolve_service and catalog CRUD outside this narrowed slice."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 9,
+    "max_diff_lines": 300,
+    "must_run_tests": true,
+    "mandatory_human_review": false
+  },
+  "must_run": [
+    "cd backend && pytest tests/unit/test_queue_domain_service.py tests/unit/test_services_router_service_wiring.py tests/architecture/test_w2c_queue_boundaries.py tests/unit/test_service_repository_boundary.py -q",
+    "cd backend && pytest -q",
+    "cd backend && pytest tests/test_openapi_contract.py -q"
+  ],
+  "must_not_touch": [
+    "resolve_service runtime behavior",
+    "queue taxonomy data structures",
+    "queue numbering logic",
+    "duplicate policy semantics",
+    "visit lifecycle logic",
+    "QR blocking logic"
+  ],
+  "required_artifacts": [
+    "docs/status/wave2c/W2C-MS-004_PLAN.md",
+    "docs/status/wave2c/W2C-MS-004_STATUS.md"
+  ],
+  "stop_conditions": [
+    "Need to change resolve_service semantics.",
+    "Need to modify static queue taxonomy mappings.",
+    "Need to touch numbering, duplicate, visit, or QR-window logic."
+  ]
+}

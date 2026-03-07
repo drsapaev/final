@@ -76,3 +76,19 @@ def test_queue_limits_status_handler_uses_domain_service() -> None:
     block = _function_block(endpoint_path, "get_queue_status_with_limits")
     assert "QueueDomainService(db)" in block
     assert "QueueLimitsApiService(db).get_queue_status_with_limits" not in block
+
+
+def test_service_queue_metadata_handlers_use_queue_domain_service() -> None:
+    endpoint_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "api"
+        / "v1"
+        / "endpoints"
+        / "services.py"
+    )
+    for function_name in ("get_queue_groups", "get_service_code_mappings"):
+        block = _function_block(endpoint_path, function_name)
+        assert "QueueDomainService(db)" in block
+        assert "ServicesApiService(db)" not in block
+        assert "db.query(" not in block
