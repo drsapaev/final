@@ -1,47 +1,36 @@
 # Wave 2C Confirmation Next Execution Unit V2
 
 Date: 2026-03-07
-Mode: analysis-first, docs-only
+Mode: post-correction planning
 
 ## Recommended Next Step
 
-`confirmation reuse-existing-entry change`
+`confirmation boundary migration slice`
 
 ## Why This Is The Right Next Unit
 
-The contract clarification is now sufficient to reject the current
-duplicate-creating behavior as the target design.
+The reuse-existing-entry correction is complete for the mounted confirmation
+family.
 
-The next execution unit should therefore be a narrow behavior-change slice that:
+The next narrow step can focus on plumbing, not contract repair:
 
-- checks for an existing active queue row for the same canonical queue claim
-- reuses that row instead of allocating a second one
-- fails explicitly when ownership is ambiguous
-- leaves allocator-family migration for later
+- keep the corrected reuse/ambiguity semantics
+- route the creation branch through `QueueDomainService.allocate_ticket()`
+- preserve legacy numbering behavior inside the boundary
+- avoid touching `qr_queue`, `OnlineDay`, or unrelated allocator families
 
-## Why Not Boundary Migration Yet
+## Why This Is Safe Now
 
-Direct migration to `QueueDomainService.allocate_ticket()` would move plumbing
-without first resolving the actual domain drift.
-
-That would preserve the wrong behavior behind a cleaner boundary.
-
-## Why Not Defer Entirely
-
-The conflict is now clarified enough to define a narrow follow-up slice.
-
-The blocker is no longer "insufficient understanding". The blocker is "runtime
-behavior needs a deliberate domain correction before migration".
+The main blocker was the duplicate-creating confirmation drift.
+That blocker has now been removed and regression-tested.
 
 ## Suggested Scope For The Next Unit
 
-- public confirmation flow in `visit_confirmation_service.py`
-- registrar confirmation bridge only if its behavior is intentionally aligned in
-  the same slice, otherwise defer it explicitly
-- characterization updates proving:
-  - existing active row is reused
-  - second active row is no longer created
-  - ambiguous duplicate ownership returns an explicit conflict path
+- `backend/app/services/visit_confirmation_service.py`
+- the confirmation branch in `backend/app/api/v1/endpoints/registrar_wizard.py`
+- no allocator algorithm change
+- no broader registrar migration
+- no queue-policy redesign outside confirmation
 
 ## Status
 
