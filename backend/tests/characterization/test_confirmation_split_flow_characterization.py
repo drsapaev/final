@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
@@ -127,7 +128,7 @@ def test_confirmation_split_flow_replay_returns_error_and_keeps_single_queue_row
 @pytest.mark.integration
 @pytest.mark.queue
 @pytest.mark.confirmation
-def test_confirmation_split_flow_with_existing_active_entry_creates_second_active_row(
+def test_confirmation_split_flow_with_existing_active_entry_reuses_existing_row(
     client,
     db_session,
     test_visit,
@@ -136,6 +137,7 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
     test_patient,
 ):
     _attach_visit_service(db_session, test_visit, test_service)
+    original_queue_time = datetime.utcnow().replace(microsecond=0)
 
     existing_active_entry = OnlineQueueEntry(
         queue_id=test_daily_queue.id,
@@ -145,6 +147,7 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
         phone=test_patient.phone,
         source="online",
         status="waiting",
+        queue_time=original_queue_time,
     )
     db_session.add(existing_active_entry)
     db_session.commit()
@@ -158,6 +161,7 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
     )
 
     assert response.status_code == 200
+    payload = response.json()
 
     same_patient_entries = (
         db_session.query(OnlineQueueEntry)
@@ -170,9 +174,79 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
         .all()
     )
 
-    assert [entry.number for entry in same_patient_entries] == [1, 2]
-    assert [entry.source for entry in same_patient_entries] == ["online", "confirmation"]
-    assert same_patient_entries[1].visit_id == test_visit.id
+    db_session.refresh(existing_active_entry)
+
+    assert len(same_patient_entries) == 1
+    assert same_patient_entries[0].id == existing_active_entry.id
+    assert same_patient_entries[0].number == 1
+    assert same_patient_entries[0].source == "online"
+    assert same_patient_entries[0].visit_id == test_visit.id
+    assert same_patient_entries[0].queue_time == original_queue_time
+    assert payload["queue_numbers"] == [
+        {
+            "queue_tag": "cardiology_common",
+            "number": 1,
+            "queue_id": test_daily_queue.id,
+        }
+    ]
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+@pytest.mark.confirmation
+def test_confirmation_split_flow_returns_explicit_error_on_ambiguous_existing_entries(
+    client,
+    db_session,
+    test_visit,
+    test_daily_queue,
+    test_service,
+    test_patient,
+):
+    _attach_visit_service(db_session, test_visit, test_service)
+
+    first_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=1,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="online",
+        status="waiting",
+    )
+    second_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=2,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="desk",
+        status="called",
+    )
+    db_session.add(first_entry)
+    db_session.add(second_entry)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/telegram/visits/confirm",
+        json={
+            "token": test_visit.confirmation_token,
+            "telegram_user_id": "123456789",
+        },
+    )
+
+    assert response.status_code == 409
+    assert "однозначно" in response.json()["detail"]
+
+    entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == test_daily_queue.id)
+        .order_by(OnlineQueueEntry.number.asc())
+        .all()
+    )
+    assert [entry.number for entry in entries] == [1, 2]
+    assert _queue_entries_for_visit(db_session, test_visit.id) == []
+    db_session.refresh(test_visit)
+    assert test_visit.status == "pending_confirmation"
 
 
 @pytest.mark.integration
@@ -210,3 +284,64 @@ def test_confirmation_split_flow_registrar_bridge_creates_confirmation_source_en
 
     assert payload["status"] == "open"
     assert payload["queue_numbers"]["cardiology_common"]["number"] == entries[0].number
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+@pytest.mark.confirmation
+def test_confirmation_split_flow_registrar_bridge_reuses_existing_active_entry(
+    client,
+    db_session,
+    test_visit,
+    test_daily_queue,
+    test_service,
+    test_patient,
+    registrar_auth_headers,
+):
+    _attach_visit_service(db_session, test_visit, test_service)
+    original_queue_time = datetime.utcnow().replace(microsecond=0)
+
+    existing_active_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=3,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="online",
+        status="waiting",
+        queue_time=original_queue_time,
+    )
+    db_session.add(existing_active_entry)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/v1/registrar/visits/{test_visit.id}/confirm",
+        headers=registrar_auth_headers,
+        json={
+            "confirmation_method": "manual",
+            "confirmed_by": "registrar_test",
+            "notes": "reuse-existing-entry",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    same_patient_entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.queue_id == test_daily_queue.id,
+            OnlineQueueEntry.patient_id == test_patient.id,
+            OnlineQueueEntry.status == "waiting",
+        )
+        .order_by(OnlineQueueEntry.number.asc())
+        .all()
+    )
+
+    db_session.refresh(existing_active_entry)
+    assert len(same_patient_entries) == 1
+    assert same_patient_entries[0].id == existing_active_entry.id
+    assert same_patient_entries[0].number == 3
+    assert same_patient_entries[0].visit_id == test_visit.id
+    assert same_patient_entries[0].queue_time == original_queue_time
+    assert payload["queue_numbers"]["cardiology_common"]["number"] == 3

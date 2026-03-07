@@ -7,11 +7,20 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.queue_service import queue_service
+from app.utils.validators import normalize_phone_uz
 
 logger = logging.getLogger(__name__)
+
+CANONICAL_ACTIVE_CONFIRMATION_STATUSES = (
+    "waiting",
+    "called",
+    "in_service",
+    "diagnostics",
+)
 
 
 @dataclass
@@ -96,6 +105,7 @@ class VisitConfirmationService:
                 visit=visit,
                 confirmed_by=f"telegram_{telegram_user_id or 'unknown'}",
                 channel="telegram",
+                confirmation_telegram_id=telegram_user_id,
             )
 
             self.security_service.record_confirmation_attempt(
@@ -195,6 +205,7 @@ class VisitConfirmationService:
                 visit=visit,
                 confirmed_by=f"pwa_{source_ip or 'unknown'}",
                 channel="pwa",
+                confirmation_phone=patient_phone,
             )
             self.security_service.record_confirmation_attempt(
                 visit_id=visit.id, success=True, channel="pwa"
@@ -289,6 +300,8 @@ class VisitConfirmationService:
         visit,
         confirmed_by: str,
         channel: str,
+        confirmation_phone: str | None = None,
+        confirmation_telegram_id: str | None = None,
     ) -> dict[str, Any]:
         visit.confirmed_at = datetime.utcnow()
         visit.confirmed_by = confirmed_by
@@ -297,7 +310,11 @@ class VisitConfirmationService:
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
         if visit.visit_date == date.today():
-            queue_numbers, print_tickets = self._assign_queue_numbers_on_confirmation(visit)
+            queue_numbers, print_tickets = self.assign_queue_numbers_on_confirmation(
+                visit,
+                confirmation_phone=confirmation_phone,
+                confirmation_telegram_id=confirmation_telegram_id,
+            )
             visit.status = "open"
 
         self.repository.commit()
@@ -323,8 +340,164 @@ class VisitConfirmationService:
             "print_tickets": print_tickets,
         }
 
+    def assign_queue_numbers_on_confirmation(
+        self,
+        visit,
+        *,
+        confirmation_phone: str | None = None,
+        confirmation_telegram_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        return self._assign_queue_numbers_on_confirmation(
+            visit,
+            confirmation_phone=confirmation_phone,
+            confirmation_telegram_id=confirmation_telegram_id,
+        )
+
+    @staticmethod
+    def _normalize_confirmation_phone(phone: str | None) -> str | None:
+        if not phone:
+            return None
+        normalized_phone = normalize_phone_uz(phone)
+        return normalized_phone or None
+
+    @staticmethod
+    def _normalize_confirmation_telegram_id(
+        telegram_id: str | int | None,
+    ) -> int | None:
+        if telegram_id in (None, ""):
+            return None
+        try:
+            return int(str(telegram_id).strip())
+        except (TypeError, ValueError):
+            return None
+
+    def _resolve_existing_active_entry(
+        self,
+        *,
+        daily_queue: DailyQueue,
+        visit,
+        patient,
+        confirmation_phone: str | None,
+        confirmation_telegram_id: str | None,
+    ) -> OnlineQueueEntry | None:
+        active_entries = self.repository.get_active_queue_entries(
+            queue_id=daily_queue.id,
+            active_statuses=CANONICAL_ACTIVE_CONFIRMATION_STATUSES,
+        )
+        if not active_entries:
+            return None
+
+        candidate_entries: dict[int, OnlineQueueEntry] = {}
+
+        if visit.patient_id:
+            for entry in active_entries:
+                if entry.patient_id == visit.patient_id:
+                    candidate_entries[entry.id] = entry
+
+        normalized_phone = self._normalize_confirmation_phone(
+            confirmation_phone or (patient.phone if patient else None)
+        )
+        if normalized_phone:
+            for entry in active_entries:
+                entry_phone = self._normalize_confirmation_phone(entry.phone)
+                if entry_phone and entry_phone == normalized_phone:
+                    candidate_entries[entry.id] = entry
+
+        normalized_telegram_id = self._normalize_confirmation_telegram_id(
+            confirmation_telegram_id
+        )
+        if normalized_telegram_id is not None:
+            for entry in active_entries:
+                if entry.telegram_id == normalized_telegram_id:
+                    candidate_entries[entry.id] = entry
+
+        if not candidate_entries:
+            return None
+
+        if len(candidate_entries) > 1:
+            raise VisitConfirmationDomainError(
+                status_code=409,
+                detail=(
+                    "Невозможно однозначно определить существующую запись очереди "
+                    "для подтверждения"
+                ),
+            )
+
+        existing_entry = next(iter(candidate_entries.values()))
+
+        if existing_entry.patient_id not in (None, visit.patient_id):
+            raise VisitConfirmationDomainError(
+                status_code=409,
+                detail=(
+                    "Невозможно однозначно определить существующую запись очереди "
+                    "для подтверждения"
+                ),
+            )
+
+        if existing_entry.visit_id not in (None, visit.id):
+            raise VisitConfirmationDomainError(
+                status_code=409,
+                detail=(
+                    "Невозможно однозначно определить существующую запись очереди "
+                    "для подтверждения"
+                ),
+            )
+
+        return existing_entry
+
+    def _reuse_existing_active_entry(
+        self,
+        *,
+        existing_entry: OnlineQueueEntry,
+        visit,
+    ) -> None:
+        if existing_entry.patient_id is None:
+            existing_entry.patient_id = visit.patient_id
+        if existing_entry.visit_id is None:
+            existing_entry.visit_id = visit.id
+
+    def _build_confirmation_print_ticket(
+        self,
+        *,
+        visit,
+        queue_tag: str,
+        queue_id: int,
+        queue_number: int,
+    ) -> dict[str, Any]:
+        queue_names = {
+            "ecg": "ЭКГ",
+            "cardiology_common": "Кардиолог",
+            "dermatology": "Дерматолог",
+            "stomatology": "Стоматолог",
+            "cosmetology": "Косметолог",
+            "lab": "Лаборатория",
+            "general": "Общая очередь",
+        }
+        doctor = self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+        patient = self.repository.get_patient(visit.patient_id)
+
+        return {
+            "visit_id": visit.id,
+            "queue_tag": queue_tag,
+            "queue_name": queue_names.get(queue_tag, queue_tag),
+            "queue_number": queue_number,
+            "queue_id": queue_id,
+            "patient_id": visit.patient_id,
+            "patient_name": patient.short_name() if patient else "Неизвестный пациент",
+            "doctor_name": (
+                doctor.user.full_name if doctor and doctor.user else "Без врача"
+            ),
+            "department": visit.department,
+            "visit_date": visit.visit_date.isoformat(),
+            "visit_time": visit.visit_time,
+        }
+
     def _assign_queue_numbers_on_confirmation(
-        self, visit
+        self,
+        visit,
+        *,
+        confirmation_phone: str | None = None,
+        confirmation_telegram_id: str | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         visit_services = self.repository.get_visit_services(visit.id)
 
@@ -352,6 +525,7 @@ class VisitConfirmationService:
         today = date.today()
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
+        patient = self.repository.get_patient(visit.patient_id)
 
         for queue_tag in unique_queue_tags:
             specialist_user_id: int | None = None
@@ -397,59 +571,53 @@ class VisitConfirmationService:
                 queue_tag=queue_tag,
             )
 
-            next_number = queue_service.get_next_queue_number(
-                self.repository.db,
+            existing_entry = self._resolve_existing_active_entry(
                 daily_queue=daily_queue,
-                queue_tag=queue_tag,
+                visit=visit,
+                patient=patient,
+                confirmation_phone=confirmation_phone,
+                confirmation_telegram_id=confirmation_telegram_id,
             )
+            if existing_entry:
+                self._reuse_existing_active_entry(
+                    existing_entry=existing_entry,
+                    visit=visit,
+                )
+                queue_number = existing_entry.number
+                queue_id = existing_entry.queue_id
+            else:
+                next_number = queue_service.get_next_queue_number(
+                    self.repository.db,
+                    daily_queue=daily_queue,
+                    queue_tag=queue_tag,
+                )
 
-            queue_service.create_queue_entry(
-                self.repository.db,
-                daily_queue=daily_queue,
-                patient_id=visit.patient_id,
-                visit_id=visit.id,
-                number=next_number,
-                source="confirmation",
-            )
+                queue_service.create_queue_entry(
+                    self.repository.db,
+                    daily_queue=daily_queue,
+                    patient_id=visit.patient_id,
+                    visit_id=visit.id,
+                    number=next_number,
+                    source="confirmation",
+                )
+                queue_number = next_number
+                queue_id = daily_queue.id
 
             queue_numbers.append(
                 {
-                "queue_tag": queue_tag,
-                "number": next_number,
-                "queue_id": daily_queue.id,
+                    "queue_tag": queue_tag,
+                    "number": queue_number,
+                    "queue_id": queue_id,
                 }
             )
 
-            queue_names = {
-                "ecg": "ЭКГ",
-                "cardiology_common": "Кардиолог",
-                "dermatology": "Дерматолог",
-                "stomatology": "Стоматолог",
-                "cosmetology": "Косметолог",
-                "lab": "Лаборатория",
-                "general": "Общая очередь",
-            }
-            doctor = self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
-            patient = self.repository.get_patient(visit.patient_id)
-
             print_tickets.append(
-                {
-                    "visit_id": visit.id,
-                    "queue_tag": queue_tag,
-                    "queue_name": queue_names.get(queue_tag, queue_tag),
-                    "queue_number": next_number,
-                    "queue_id": daily_queue.id,
-                    "patient_id": visit.patient_id,
-                    "patient_name": (
-                        patient.short_name() if patient else "Неизвестный пациент"
-                    ),
-                    "doctor_name": (
-                        doctor.user.full_name if doctor and doctor.user else "Без врача"
-                    ),
-                    "department": visit.department,
-                    "visit_date": visit.visit_date.isoformat(),
-                    "visit_time": visit.visit_time,
-                }
+                self._build_confirmation_print_ticket(
+                    visit=visit,
+                    queue_tag=queue_tag,
+                    queue_id=queue_id,
+                    queue_number=queue_number,
+                )
             )
 
         return queue_numbers, print_tickets
