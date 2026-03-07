@@ -28,6 +28,7 @@ from app.models.online_queue import (
 )
 from app.models.patient import Patient
 from app.models.user import User
+from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_service import (
     QueueConflictError,
     QueueNotFoundError,
@@ -44,8 +45,13 @@ logger = logging.getLogger(__name__)
 class QRQueueService:
     """Сервис для управления QR очередями"""
 
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        queue_domain_service: QueueDomainService | None = None,
+    ):
         self.db = db
+        self.queue_domain_service = queue_domain_service or QueueDomainService(db)
 
     def _find_or_create_patient(
         self,
@@ -748,8 +754,8 @@ class QRQueueService:
             )
 
         try:
-            join_result = queue_service.join_queue_with_token(
-                self.db,
+            join_result = self.queue_domain_service.allocate_ticket(
+                allocation_mode="join_with_token",
                 token_str=qr_token.token,
                 patient_name=patient_name,
                 phone=phone,
@@ -864,8 +870,8 @@ class QRQueueService:
 
         for specialist_id in specialist_ids:
             try:
-                join_result = queue_service.join_queue_with_token(
-                    self.db,
+                join_result = self.queue_domain_service.allocate_ticket(
+                    allocation_mode="join_with_token",
                     token_str=qr_token.token,
                     patient_name=patient_name,
                     phone=phone,

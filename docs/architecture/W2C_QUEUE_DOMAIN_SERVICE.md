@@ -293,9 +293,15 @@ Current behavior:
 
 Current limitation:
 
-- production callers are not yet repointed to this boundary
+- only a narrow set of production callers is repointed to this boundary
 - direct SQL allocators and legacy `OnlineDay` flows remain outside it
-- migration risk is reduced by characterization tests, not by runtime unification yet
+- migration risk is still controlled by characterization tests because the internal allocator has not changed
+
+Current production callers through `allocate_ticket()`:
+
+- `backend/app/api/v1/endpoints/online_queue_new.py::join_queue()`
+- `backend/app/services/qr_queue_service.py::complete_join_session()`
+- `backend/app/services/qr_queue_service.py::complete_join_session_multiple()`
 
 Notes for the narrowed `W2C-MS-004` slice:
 
