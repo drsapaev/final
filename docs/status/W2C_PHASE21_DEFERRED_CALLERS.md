@@ -7,7 +7,7 @@ Mode: behavior-preserving execution
 |---|---|---|---|---|
 | `backend/app/api/v1/endpoints/queue.py` | `join_queue()` | Legacy-prefixed route with low current signal; not part of primary QR/public join flow for this pass | Legacy/deprecated path | Review before later safe migration pass |
 | `backend/app/services/morning_assignment.py` | `_assign_single_queue()` | `morning_assignment` source semantics and visit-opening flow should be migrated only with dedicated characterization around scheduled queue population | Lifecycle/source semantics | Later safe pass or pre-2C high-risk review |
-| `backend/app/api/v1/endpoints/registrar_integration.py` | `create_queue_entries_batch()` | Registrar batch orchestration mixes allocator call with duplicate decisions and operator-visible batch behavior | Registrar orchestration / duplicate-policy sensitivity | Review before high-risk allocator migration |
+| `backend/app/api/v1/endpoints/registrar_integration.py` | broader registrar queue creation branches outside mounted batch-only create path | Mounted batch-only create path is migrated, but broader registrar orchestration still mixes allocator behavior with wizard/runtime concerns | Registrar orchestration / mixed logic | Broader registrar family track |
 | `backend/app/services/queue_batch_service.py` | `create_entries()` | Batch writer path with broader side effects than thin join callers | Batch write semantics | Review before high-risk allocator migration |
 | `backend/app/api/v1/endpoints/registrar_wizard.py` | non-confirmation queue creation branches | Mounted confirmation bridge is migrated separately, but broader wizard queue creation still mixes numbering, persistence, and orchestration | Mixed logic | High-risk allocator migration |
 | `backend/app/services/registrar_wizard_api_service.py` | queue creation branches | Same mixed allocator behavior as router counterpart | Mixed logic | High-risk allocator migration |
@@ -32,3 +32,7 @@ readiness and ordering now live in:
 
 Mounted confirmation family is no longer deferred. It now uses the compatibility
 boundary for queue-row creation.
+
+Mounted registrar batch-only create path is also no longer deferred. It now
+uses the compatibility boundary while keeping local reuse/ambiguity logic in
+place.

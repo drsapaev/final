@@ -65,12 +65,15 @@ After the confirmation migration slice, the boundary is used in:
   confirmation allocation when a new queue row is needed
 - mounted registrar confirmation bridge indirectly through
   `VisitConfirmationService.assign_queue_numbers_on_confirmation()`
+- `backend/app/api/v1/endpoints/registrar_integration.py::create_queue_entries_batch()`
+  for the mounted batch-only create branch when no active specialist-day claim
+  exists
 
 This is a limited production rollout.
 
 It is intentionally **not** yet wired into:
 
-- registrar batch writers
+- broader registrar batch/runtime service ownership beyond the mounted create branch
 - force-majeure allocator paths
 - direct SQL allocator branches
 - legacy `OnlineDay` callers
@@ -118,3 +121,18 @@ row creation while keeping the number lookup helper unchanged:
 
 This preserves the corrected confirmation behavior while removing the direct
 confirmation-family dependency on legacy queue-row creation.
+
+## Registrar Batch Migration Update
+
+Mounted registrar batch-only flow now uses the compatibility boundary for the
+create branch only:
+
+1. mounted batch duplicate gate / reuse logic
+2. `QueueDomainService.allocate_ticket(...)`
+3. legacy `queue_service.create_queue_entry(...)`
+
+This keeps:
+
+- active-row reuse in the mounted path
+- explicit `409` ambiguity handling in the mounted path
+- numbering and fairness inside the legacy allocator

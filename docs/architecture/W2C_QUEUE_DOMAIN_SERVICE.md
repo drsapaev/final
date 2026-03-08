@@ -305,6 +305,9 @@ Current production callers through `allocate_ticket()`:
 - `backend/app/services/visit_confirmation_service.py` through
   `QueueContextFacade(QueueDomainServiceContractAdapter)` when a new queue row
   is needed during mounted confirmation
+- `backend/app/api/v1/endpoints/registrar_integration.py::create_queue_entries_batch()`
+  for mounted batch-only create flow when duplicate gate does not reuse an
+  existing specialist-day claim
 
 ## Phase 2.2 Boundary Limits
 
@@ -317,7 +320,8 @@ Still outside the safe boundary:
 - `qr_queue.py` direct SQL allocator branches
 - force-majeure transfer allocator
 - all `OnlineDay` legacy allocators
-- registrar batch allocator family
+- broader registrar batch service/runtime ownership beyond the mounted create
+  branch
 - unmounted duplicate confirmation modules
 
 Reason:
@@ -336,6 +340,14 @@ Mounted confirmation is no longer blocked here:
   compatibility boundary
 - remaining confirmation work is limited to cleanup/dead-path clarification, not
   allocator ownership
+
+### Registrar batch-only note
+
+Mounted registrar batch-only family is now partially migrated:
+
+- reuse and ambiguity logic still live in the mounted router path
+- create branch now routes through `QueueDomainService.allocate_ticket()`
+- broader registrar wizard/batch service migration is still deferred
 
 Notes for the narrowed `W2C-MS-004` slice:
 

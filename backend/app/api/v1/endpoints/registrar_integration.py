@@ -19,6 +19,7 @@ from app.crud import clinic as crud_clinic, online_queue as crud_queue
 from app.models.department import Department, DepartmentService
 from app.models.service import Service
 from app.models.user import User
+from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_service import queue_service
 from app.services.service_mapping import get_service_code
 
@@ -29,6 +30,10 @@ from app.services.service_mapping import get_service_code
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _queue_domain_service(db: Session) -> QueueDomainService:
+    return QueueDomainService(db)
 
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
 
@@ -3154,6 +3159,7 @@ def create_queue_entries_batch(
         # Создаем записи в очереди для каждого специалиста
         created_entries = []
         reused_entries_count = 0
+        queue_domain_service = _queue_domain_service(db)
 
         for specialist_id, services_list in services_by_specialist.items():
             # Проверяем, есть ли очередь у специалиста на сегодня
@@ -3224,9 +3230,10 @@ def create_queue_entries_batch(
                 )
                 patient_phone = patient.phone or None
 
-                # Создаем запись через SSOT
-                queue_entry = queue_service.create_queue_entry(
-                    db,
+                # Caller migration only: create path now goes through the queue-domain
+                # compatibility boundary while preserving legacy allocator behavior.
+                queue_entry = queue_domain_service.allocate_ticket(
+                    allocation_mode="create_entry",
                     daily_queue=daily_queue,
                     patient_id=request.patient_id,
                     patient_name=patient_name,

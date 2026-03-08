@@ -3,6 +3,12 @@
 Date: 2026-03-07
 Status: `SAFE_NEXT_STEP_IDENTIFIED`
 
+> Superseded by later Wave 2C passes.
+> Registrar batch characterization, contract clarification, behavior correction,
+> and boundary migration are now completed. Use
+> [W2C_NEXT_EXECUTION_UNIT_AFTER_BATCH.md](C:/final/docs/status/W2C_NEXT_EXECUTION_UNIT_AFTER_BATCH.md)
+> for the current next-step decision.
+
 ## Recommended Next Step
 
 `registrar batch-only characterization`
