@@ -18,6 +18,15 @@ Mode: readiness recheck, docs-only
 
 Verdict: `REQUIRES_PARTIAL_DECOMPOSITION`
 
+## Post-Extraction Update
+
+The required partial decomposition slice has now been implemented via:
+
+- `RegistrarWizardQueueAssignmentService.assign_same_day_queue_numbers(...)`
+
+This means the previous readiness blocker has been reduced, but not yet
+re-adjudicated.
+
 ## Why Not READY_FOR_BOUNDARY_MIGRATION
 
 Queue-domain blockers are reduced, but the mounted wizard family still does not
@@ -42,9 +51,8 @@ family-local allocator seam for migration.
 
 ## What Still Needs Work
 
-- isolate wizard-family allocator handoff from shared `MorningAssignmentService`
-- keep mounted `/registrar/cart` behavior intact while narrowing the queue
-  integration seam
+- run a narrow readiness recheck on the extracted wizard seam
+- decide whether remaining billing coupling is still a migration blocker
 
 ## Readiness Summary
 
@@ -55,3 +63,8 @@ Wizard-family is also not blocked by numbering drift.
 It is blocked by the need for one more narrow decomposition step before a clean
 boundary migration can happen without implicitly migrating other
 `MorningAssignmentService` callers.
+
+That decomposition step is now complete.
+
+The next correct step is a formal wizard boundary-readiness recheck, not direct
+migration in the same slice.

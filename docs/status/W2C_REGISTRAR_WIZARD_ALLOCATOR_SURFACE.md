@@ -5,20 +5,21 @@ Mode: readiness recheck, docs-only
 
 ## Current Production-Relevant Allocator Surface
 
-Mounted wizard-family queue creation does not call `QueueDomainService`
-directly.
+Mounted wizard-family queue creation still does not call `QueueDomainService`
+directly, but it now owns a cleaner queue-assignment seam.
 
 Current call chain:
 
 1. `backend/app/api/v1/endpoints/registrar_wizard.py`
    `POST /registrar/cart`
-2. `MorningAssignmentService._assign_queues_for_visit(...)`
-3. `MorningAssignmentService._assign_single_queue(...)`
-4. `queue_service.create_queue_entry(..., auto_number=True, commit=False)`
+2. `RegistrarWizardQueueAssignmentService.assign_same_day_queue_numbers(...)`
+3. `MorningAssignmentService._assign_queues_for_visit(...)`
+4. `MorningAssignmentService._assign_single_queue(...)`
+5. `queue_service.create_queue_entry(..., auto_number=True, commit=False)`
 
 ## Shared Surface Warning
 
-`MorningAssignmentService` is not wizard-only.
+`MorningAssignmentService` is still not wizard-only.
 
 It is also used by:
 
@@ -26,9 +27,12 @@ It is also used by:
 - `morning_assignment_api_service.py`
 - duplicate / unmounted registrar wizard service code
 
-That means replacing the direct allocator call inside
-`MorningAssignmentService._assign_single_queue(...)` would affect more than the
-mounted wizard family.
+That means replacing the allocator call inside
+`MorningAssignmentService._assign_single_queue(...)` directly would still affect
+more than the mounted wizard family.
+
+However, the mounted wizard-family now reaches that shared logic through a
+wizard-specific service seam rather than inline endpoint code.
 
 ## Boundary Replacement Feasibility
 
@@ -39,22 +43,24 @@ Technically, the create branch could be switched to:
 without changing numbering semantics, because the boundary still delegates to
 the same legacy allocator.
 
-## Why This Is Not Yet A Clean Wizard-Only Migration
+## What The Extraction Changed
 
-Because the allocator call lives inside a shared service seam, not inside a
-wizard-only caller seam.
+The production-relevant wizard-family now has a local seam:
 
-So a direct replacement would be:
+- `RegistrarWizardQueueAssignmentService`
 
-- behavior-preserving
-- but not family-local
+That narrows the migration target substantially because the mounted endpoint no
+longer owns the allocator handoff inline.
 
 ## Surface Verdict
 
-Allocator surface is narrow enough to map clearly, but not isolated enough for
-a clean wizard-only migration slice.
+Allocator surface is now clean enough for a follow-up readiness recheck.
+
+The remaining question is no longer "where is the call site?" but "is the new
+seam sufficient for direct boundary migration without dragging billing coupling
+into scope?"
 
 ## Recommended Direction
 
-Before wizard-family boundary migration, extract or isolate the wizard-specific
-allocator handoff from the shared `MorningAssignmentService` surface.
+Run a narrow wizard boundary-readiness recheck on the extracted seam before any
+boundary migration.
