@@ -1,70 +1,56 @@
 # Wave 2C Registrar Batch Boundary Readiness
 
-Date: 2026-03-07
-Mode: characterization-first
-Decision: `READY_AFTER_CONTRACT_CLARIFICATION`
+Date: 2026-03-08
+Mode: post-correction readiness review
+Decision: `READY_FOR_BOUNDARY_MIGRATION`
 
-## Why It Is Not Ready Yet
+## What Is Now True
 
-### 1. Active-entry contract conflict
+- active-entry contract for batch duplicate gate is clarified
+- specialist-level claim model for this family is clarified
+- mounted runtime now reuses compatible active rows in:
+  - `waiting`
+  - `called`
+  - `in_service`
+  - `diagnostics`
+- ambiguity now returns explicit `409`
 
-Mounted runtime duplicate detection reuses only:
+## Why The Family Is Ready Now
 
-- `waiting`
-- `called`
+### 1. The main behavior drift is corrected
 
-Characterization now shows:
+The mounted batch path no longer creates a second `waiting` row when the
+patient already has a compatible active specialist-day claim.
 
-- existing `diagnostics` row does not block new allocation
+### 2. Numbering and fairness were preserved
 
-That conflicts with the canonical active-entry contract where `diagnostics` is
-active.
+This correction did not change:
 
-### 2. Grouping contract is still ambiguous
+- legacy numbering algorithm
+- `queue_time` handling
+- fairness ordering
 
-Mounted runtime groups by resolved `specialist_id`, not by `queue_tag` or
-canonical queue claim.
+### 3. The family remains narrowly scoped
 
-Characterization shows:
+Still out of scope:
 
-- two services for the same specialist but different `queue_tag` values still
-  produce one queue row
+- QR allocator families
+- `OnlineDay`
+- force-majeure
+- broader registrar wizard orchestration
 
-That behavior may be correct, but it needs an explicit contract decision before
-boundary migration freezes it.
+That means boundary migration can stay narrow and behavior-preserving.
 
-### 3. Mounted runtime owner is still the router
+## Remaining Deferred Concerns
 
-The mounted API path still owns:
+These are not blockers for the next narrow step:
 
-- patient/service validation
-- specialist normalization
-- duplicate pre-check
-- daily queue creation
-- response shaping
+- mounted runtime owner is still router-level
+- cleaner service seam is not yet runtime owner
 
-A cleaner `QueueBatchService` seam exists, but it is not runtime truth.
-
-## What Is Favorable
-
-- direct billing/payment side effects are not part of this subfamily
-- visit linkage is not part of this subfamily
-- row creation still goes through SSOT `queue_service.create_queue_entry(...)`
-- repeated batch submission is stable for `waiting/called` duplicates
-
-## What Contract Clarification Is Needed
-
-1. Should batch-only duplicate reuse treat `diagnostics` and `in_service` as
-   active blockers?
-2. Is same-specialist grouping intended to collapse different `queue_tag`
-   services into one row?
-3. Should registrar batch endpoint continue accepting `source="morning_assignment"`
-   as passthrough input?
+Those concerns are exactly what the next boundary-migration slice should reduce.
 
 ## Verdict
 
-`QueueDomainService.allocate_ticket()` should **not** be the next registrar
-batch change yet.
-
-The family is close enough for targeted follow-up work, but only after the
-batch-specific contract is clarified.
+Registrar batch-only family is now ready for a narrow caller-path migration
+through `QueueDomainService.allocate_ticket()`.
