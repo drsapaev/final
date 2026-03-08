@@ -20,6 +20,17 @@ from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
 
+WIZARD_DUPLICATE_ACTIVE_STATUSES = (
+    "waiting",
+    "called",
+    "in_service",
+    "diagnostics",
+)
+
+
+class MorningAssignmentClaimError(ValueError):
+    """Raised when a wizard-family queue claim cannot be resolved safely."""
+
 
 class MorningAssignmentService:
     """Сервис утренней сборки для присвоения номеров в очередях"""
@@ -420,8 +431,6 @@ class MorningAssignmentService:
             f"Используем doctor_id={doctor_id} для queue_tag={queue_tag}, visit_id={visit.id}"
         )
 
-        # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для получения/создания очереди
-        # Получаем информацию о враче для defaults
         defaults = {}
         if doctor:
             defaults = {
@@ -433,15 +442,10 @@ class MorningAssignmentService:
                 ),
             }
 
-        # Сначала пытаемся использовать уже созданную очередь на текущую дату.
-        daily_queue = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active == True,
-            )
-            .first()
+        daily_queue, existing_entry = self._resolve_existing_queue_claim_or_raise(
+            patient_id=visit.patient_id,
+            target_date=target_date,
+            queue_tag=queue_tag,
         )
 
         if not daily_queue:
@@ -453,18 +457,6 @@ class MorningAssignmentService:
                 queue_tag=queue_tag,
                 defaults=defaults,
             )
-
-        # Проверяем нет ли уже записи для этого пациента в этой очереди
-        existing_entry = (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                and_(
-                    OnlineQueueEntry.queue_id == daily_queue.id,
-                    OnlineQueueEntry.patient_id == visit.patient_id,
-                )
-            )
-            .first()
-        )
 
         if existing_entry:
             logger.info(f"Пациент {visit.patient_id} уже есть в очереди {queue_tag}")
@@ -562,6 +554,62 @@ class MorningAssignmentService:
             "number": queue_entry.number,
             "status": "assigned",
         }
+
+    def _resolve_existing_queue_claim_or_raise(
+        self,
+        *,
+        patient_id: int,
+        target_date: date,
+        queue_tag: str,
+    ) -> tuple[DailyQueue | None, OnlineQueueEntry | None]:
+        active_queues = (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            )
+            .order_by(DailyQueue.id.asc())
+            .all()
+        )
+
+        if not active_queues:
+            return None, None
+
+        active_entries = (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id.in_([queue.id for queue in active_queues]),
+                OnlineQueueEntry.patient_id == patient_id,
+                OnlineQueueEntry.status.in_(WIZARD_DUPLICATE_ACTIVE_STATUSES),
+            )
+            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
+            .all()
+        )
+
+        if len(active_entries) > 1:
+            raise MorningAssignmentClaimError(
+                "Неоднозначная активная запись очереди для queue_tag="
+                f"{queue_tag} и пациента {patient_id}"
+            )
+
+        if len(active_entries) == 1:
+            queue_by_id = {queue.id: queue for queue in active_queues}
+            matched_queue = queue_by_id.get(active_entries[0].queue_id)
+            if matched_queue is None:
+                raise MorningAssignmentClaimError(
+                    "Не удалось безопасно сопоставить активную запись очереди с "
+                    f"queue_tag={queue_tag} и пациентом {patient_id}"
+                )
+            return matched_queue, active_entries[0]
+
+        if len(active_queues) > 1:
+            raise MorningAssignmentClaimError(
+                "Неоднозначная очередь для queue_tag="
+                f"{queue_tag} и пациента {patient_id}"
+            )
+
+        return active_queues[0], None
 
     def get_morning_assignment_stats(
         self, target_date: date | None = None

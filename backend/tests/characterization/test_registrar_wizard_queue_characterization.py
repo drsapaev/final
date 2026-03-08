@@ -177,6 +177,7 @@ def test_registrar_wizard_characterization_same_day_cart_creates_desk_queue_entr
 
 @pytest.mark.integration
 @pytest.mark.queue
+@pytest.mark.parametrize("existing_status", ["waiting", "called", "in_service", "diagnostics"])
 def test_registrar_wizard_characterization_reuses_existing_same_queue_row(
     client,
     db_session,
@@ -184,6 +185,7 @@ def test_registrar_wizard_characterization_reuses_existing_same_queue_row(
     test_patient,
     test_doctor,
     test_service,
+    existing_status,
 ):
     daily_queue = _create_daily_queue(
         db_session,
@@ -201,7 +203,7 @@ def test_registrar_wizard_characterization_reuses_existing_same_queue_row(
         phone=test_patient.phone,
         visit_id=None,
         number=17,
-        status="waiting",
+        status=existing_status,
         source="online",
         queue_time=preserved_queue_time,
     )
@@ -240,6 +242,7 @@ def test_registrar_wizard_characterization_reuses_existing_same_queue_row(
     assert patient_entries[0].id == existing_entry.id
     assert patient_entries[0].number == existing_entry.number
     assert patient_entries[0].queue_time == preserved_queue_time.replace(tzinfo=None)
+    assert patient_entries[0].status == existing_status
     assert payload["queue_numbers"][str(visit_id)][0]["number"] == existing_entry.number
 
 
@@ -425,4 +428,92 @@ def test_registrar_wizard_characterization_future_day_cart_defers_queue_creation
 
     assert payload["queue_numbers"] == {}
     assert entry is None
+    assert visit.status == "confirmed"
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_wizard_characterization_ambiguous_same_queue_tag_claim_skips_allocation(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+    test_service,
+):
+    second_doctor = _create_specialist(
+        db_session,
+        username="wizard_ambiguous_doctor",
+        email="wizard_ambiguous_doctor@test.local",
+        full_name="Wizard Ambiguous Doctor",
+        specialty="Cardiology",
+    )
+    first_queue = _create_daily_queue(
+        db_session,
+        specialist_id=test_doctor.id,
+        queue_tag=test_service.queue_tag,
+    )
+    second_queue = _create_daily_queue(
+        db_session,
+        specialist_id=second_doctor.id,
+        queue_tag=test_service.queue_tag,
+    )
+    _create_queue_entry(
+        db_session,
+        queue_id=first_queue.id,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=None,
+        number=10,
+        status="waiting",
+        source="online",
+        queue_time=datetime.now(ZoneInfo("Asia/Tashkent")).replace(microsecond=0),
+    )
+    _create_queue_entry(
+        db_session,
+        queue_id=second_queue.id,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=None,
+        number=11,
+        status="diagnostics",
+        source="online",
+        queue_time=datetime.now(ZoneInfo("Asia/Tashkent")).replace(microsecond=0),
+    )
+
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=registrar_auth_headers,
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                {
+                    "doctor_id": test_doctor.id,
+                    "visit_date": date.today().isoformat(),
+                    "department": "cardiology",
+                    "services": [
+                        {
+                            "service_id": test_service.id,
+                            "quantity": 1,
+                        }
+                    ],
+                }
+            ],
+        ),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    visit_id = payload["visit_ids"][0]
+    visit = db_session.query(Visit).filter(Visit.id == visit_id).one()
+    patient_entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .all()
+    )
+
+    assert payload["queue_numbers"] == {}
+    assert len(patient_entries) == 2
     assert visit.status == "confirmed"
