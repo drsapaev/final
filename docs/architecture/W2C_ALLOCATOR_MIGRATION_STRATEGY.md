@@ -29,7 +29,7 @@ Migration must follow this order:
 |---|---|---|---|
 | `queue_service` path | Main SSOT-style allocator and entry-creation helper | Convert into internal implementation behind `QueueDomainService.allocate_ticket()` first; keep behavior-compatible adapter during transition | Medium |
 | `qr_queue.py` direct SQL allocator | High-risk inline allocator in add-service/update flows | Do not migrate early. First add characterization tests, then replace direct allocation with domain-service orchestration only after duplicate/fairness contract is stable | High |
-| Registrar batch path | Modern registrar write path using `create_queue_entry(auto_number=True)` | Repoint registrar application service to `QueueDomainService` once duplicate-policy contract is implemented; preserve current batch semantics during first cut | Medium |
+| Registrar batch path | Modern registrar write path using `create_queue_entry(auto_number=True)` | Mounted batch-only create branch is now migrated to `QueueDomainService.allocate_ticket()`; keep duplicate/reuse logic local and defer broader service/runtime seam migration | Medium |
 | Registrar legacy count-based path | Older desk path with `start_number + current_count` | Treat as legacy compatibility slice. Replace only after characterization tests prove operator-visible behavior can be preserved or intentionally superseded | High |
 | Confirmation flows | Split "get number, then create row" flows | Mounted confirmation family is now migrated to the compatibility boundary for row creation; keep standalone number lookup legacy for now and defer unmounted/duplicate cleanup | Medium |
 | Force majeure transfer allocator | Exceptional tomorrow-transfer allocator | Keep separate initially, but force it to call the same internal reservation primitive once transfer semantics are modeled | High |
@@ -69,7 +69,7 @@ Why these callers were safe:
 Preferred early caller families:
 
 - SSOT queue-service-backed online join
-- registrar batch path only after explicit duplicate-policy review
+- mounted registrar batch-only create path after explicit duplicate-policy review
 
 Later only:
 
@@ -147,3 +147,16 @@ Still deferred inside the broader confirmation/registrar surface:
 - standalone number lookup remains legacy
 - unmounted duplicate confirmation modules
 - broader registrar wizard/batch allocator families
+
+## Registrar Batch Migration Update
+
+Completed in the current slice:
+
+- mounted registrar batch-only create path now goes through
+  `QueueDomainService.allocate_ticket()`
+
+Still deferred:
+
+- broader registrar wizard branches
+- `queue_batch_service.py` as future runtime owner/seam
+- legacy count-based registrar paths
