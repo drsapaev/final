@@ -3017,6 +3017,49 @@ class BatchQueueEntriesResponse(BaseModel):
     message: str
 
 
+REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES = (
+    "waiting",
+    "called",
+    "in_service",
+    "diagnostics",
+)
+
+
+def _find_registrar_batch_existing_entry_or_raise(
+    db: Session,
+    *,
+    queue_id: int,
+    patient_id: int,
+):
+    """Returns a single active batch claim or raises a 409 ambiguity error."""
+    from app.models.online_queue import OnlineQueueEntry
+
+    active_entries = (
+        db.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.queue_id == queue_id,
+            OnlineQueueEntry.patient_id == patient_id,
+            OnlineQueueEntry.status.in_(REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES),
+        )
+        .order_by(OnlineQueueEntry.id.asc())
+        .all()
+    )
+
+    if not active_entries:
+        return None
+
+    if len(active_entries) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Неоднозначная активная запись очереди для пациента у "
+                "специалиста на сегодня"
+            ),
+        )
+
+    return active_entries[0]
+
+
 @router.post(
     "/registrar-integration/queue/entries/batch",
     response_model=BatchQueueEntriesResponse,
@@ -3046,7 +3089,7 @@ def create_queue_entries_batch(
     import logging
     from zoneinfo import ZoneInfo
 
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.online_queue import DailyQueue
     from app.models.patient import Patient
 
     logger = logging.getLogger(__name__)
@@ -3135,24 +3178,19 @@ def create_queue_entries_batch(
                 db.add(daily_queue)
                 db.flush()
 
-            # Проверяем дубликаты (для любых source)
+            # Проверяем дубликаты (для любых source) в рамках specialist-level claim
             if daily_queue:
-                existing_entry = (
-                    db.query(OnlineQueueEntry)
-                    .filter(
-                        OnlineQueueEntry.queue_id == daily_queue.id,
-                        OnlineQueueEntry.patient_id == request.patient_id,
-                        OnlineQueueEntry.status.in_(
-                            ["waiting", "called"]
-                        ),  # Активные записи
-                    )
-                    .first()
+                existing_entry = _find_registrar_batch_existing_entry_or_raise(
+                    db,
+                    queue_id=daily_queue.id,
+                    patient_id=request.patient_id,
                 )
 
                 if existing_entry:
                     logger.warning(
                         f"[create_queue_entries_batch] Пациент {request.patient_id} уже в очереди "
-                        f"к специалисту {specialist_id} (queue_id={daily_queue.id}, entry_id={existing_entry.id})"
+                        f"к специалисту {specialist_id} (queue_id={daily_queue.id}, entry_id={existing_entry.id}, "
+                        f"status={existing_entry.status})"
                     )
                     # Пропускаем создание дубликата, но добавляем существующую запись в ответ
                     created_entries.append(

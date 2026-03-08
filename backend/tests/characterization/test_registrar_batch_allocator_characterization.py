@@ -71,6 +71,35 @@ def _create_daily_queue(
     return queue
 
 
+def _create_existing_entry(
+    db_session,
+    *,
+    queue_id: int,
+    patient_id: int,
+    patient_name: str,
+    phone: str | None,
+    number: int,
+    status: str,
+    source: str = "online",
+    queue_time: datetime | None = None,
+) -> OnlineQueueEntry:
+    entry = OnlineQueueEntry(
+        queue_id=queue_id,
+        number=number,
+        patient_id=patient_id,
+        patient_name=patient_name,
+        phone=phone,
+        source=source,
+        status=status,
+        queue_time=queue_time
+        or datetime.now(ZoneInfo("Asia/Tashkent")).replace(microsecond=0),
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    return entry
+
+
 @pytest.mark.integration
 @pytest.mark.queue
 def test_registrar_batch_characterization_preserves_request_source_on_create(
@@ -258,7 +287,7 @@ def test_registrar_batch_characterization_mixed_specialist_batch_reuses_one_and_
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_registrar_batch_characterization_existing_diagnostics_entry_still_allocates_new_row(
+def test_registrar_batch_characterization_existing_diagnostics_entry_reuses_existing_row(
     client,
     db_session,
     registrar_auth_headers,
@@ -267,18 +296,16 @@ def test_registrar_batch_characterization_existing_diagnostics_entry_still_alloc
     test_service,
 ):
     existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
-    diagnostics_entry = OnlineQueueEntry(
+    diagnostics_entry = _create_existing_entry(
+        db_session,
         queue_id=existing_queue.id,
-        number=5,
         patient_id=test_patient.id,
         patient_name=test_patient.short_name(),
         phone=test_patient.phone,
-        source="online",
+        number=5,
         status="diagnostics",
-        queue_time=datetime.now(ZoneInfo("Asia/Tashkent")).replace(microsecond=0),
+        source="online",
     )
-    db_session.add(diagnostics_entry)
-    db_session.commit()
 
     response = client.post(
         "/api/v1/registrar-integration/queue/entries/batch",
@@ -299,6 +326,7 @@ def test_registrar_batch_characterization_existing_diagnostics_entry_still_alloc
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
+    assert len(payload["entries"]) == 1
 
     queue_entries = (
         db_session.query(OnlineQueueEntry)
@@ -310,8 +338,138 @@ def test_registrar_batch_characterization_existing_diagnostics_entry_still_alloc
         .all()
     )
 
-    assert len(queue_entries) == 2
-    assert [entry.status for entry in queue_entries] == ["diagnostics", "waiting"]
+    assert len(queue_entries) == 1
+    assert queue_entries[0].id == diagnostics_entry.id
+    assert queue_entries[0].status == "diagnostics"
     assert queue_entries[0].number == 5
-    assert queue_entries[1].number > queue_entries[0].number
-    assert payload["entries"][0]["number"] == queue_entries[1].number
+    assert payload["entries"][0]["number"] == diagnostics_entry.number
+    assert payload["entries"][0]["queue_time"].startswith(
+        queue_entries[0].queue_time.isoformat()
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_characterization_existing_in_service_entry_reuses_existing_row(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    cardio_user,
+    test_service,
+):
+    existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
+    in_service_entry = _create_existing_entry(
+        db_session,
+        queue_id=existing_queue.id,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        number=9,
+        status="in_service",
+        source="online",
+    )
+
+    response = client.post(
+        "/api/v1/registrar-integration/queue/entries/batch",
+        headers=registrar_auth_headers,
+        json={
+            "patient_id": test_patient.id,
+            "source": "desk",
+            "services": [
+                {
+                    "specialist_id": cardio_user.id,
+                    "service_id": test_service.id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert len(payload["entries"]) == 1
+
+    queue_entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.queue_id == existing_queue.id,
+            OnlineQueueEntry.patient_id == test_patient.id,
+        )
+        .order_by(OnlineQueueEntry.number.asc())
+        .all()
+    )
+
+    assert len(queue_entries) == 1
+    assert queue_entries[0].id == in_service_entry.id
+    assert queue_entries[0].status == "in_service"
+    assert payload["entries"][0]["number"] == in_service_entry.number
+    assert payload["entries"][0]["queue_time"].startswith(
+        queue_entries[0].queue_time.isoformat()
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_characterization_ambiguous_active_rows_return_409(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    cardio_user,
+    test_service,
+):
+    existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
+    _create_existing_entry(
+        db_session,
+        queue_id=existing_queue.id,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        number=4,
+        status="waiting",
+        source="online",
+    )
+    _create_existing_entry(
+        db_session,
+        queue_id=existing_queue.id,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        number=5,
+        status="diagnostics",
+        source="online",
+    )
+
+    response = client.post(
+        "/api/v1/registrar-integration/queue/entries/batch",
+        headers=registrar_auth_headers,
+        json={
+            "patient_id": test_patient.id,
+            "source": "desk",
+            "services": [
+                {
+                    "specialist_id": cardio_user.id,
+                    "service_id": test_service.id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 409
+    payload = response.json()
+    assert "Неоднозначная активная запись очереди" in payload["detail"]
+
+    queue_entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.queue_id == existing_queue.id,
+            OnlineQueueEntry.patient_id == test_patient.id,
+        )
+        .order_by(OnlineQueueEntry.number.asc())
+        .all()
+    )
+    assert len(queue_entries) == 2
+    assert [entry.status for entry in queue_entries] == ["waiting", "diagnostics"]
