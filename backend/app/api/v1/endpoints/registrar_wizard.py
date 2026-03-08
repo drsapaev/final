@@ -23,6 +23,9 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.feature_flags import is_feature_enabled
+from app.services.registrar_wizard_queue_assignment_service import (
+    RegistrarWizardQueueAssignmentService,
+)
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import normalize_service_code
@@ -678,44 +681,11 @@ def create_cart_appointments(
         queue_numbers = {}
         today = date.today()
 
-        for visit in created_visits:
-            if visit.visit_date == today and visit.status == "confirmed":
-                try:
-                    # Используем функцию из утренней сборки для присвоения номеров
-                    # [OK] ИСПРАВЛЕНО: Убеждаемся, что VisitService импортирован для использования в morning_assignment
-                    from app.models.visit import VisitService
-                    from app.services.morning_assignment import MorningAssignmentService
-
-                    service = MorningAssignmentService()
-                    service.db = db  # Используем существующую сессию
-                    # Для ручной регистрации через мастера источник должен быть 'desk'
-                    queue_assignments = service._assign_queues_for_visit(
-                        visit,
-                        today,
-                        source="desk",
-                    )
-                    if queue_assignments:
-                        visit.status = "open"  # Готов к приему
-                        queue_numbers[visit.id] = queue_assignments
-                        logger.info(
-                            "REGISTRATION: Визит %d - присвоено %d номеров в очередях (source=desk)",
-                            visit.id,
-                            len(queue_assignments),
-                        )
-                    else:
-                        logger.warning(
-                            "REGISTRATION: Визит %d - не удалось присвоить номера в очередях (source=desk)",
-                            visit.id,
-                        )
-                except Exception as e:
-                    logger.warning(
-                        "REGISTRATION: Ошибка присвоения очередей для визита %d (source=desk): %s",
-                        visit.id,
-                        str(e),
-                        exc_info=True,
-                    )
-                    # Не прерываем создание визита из-за ошибки очередей
-                    continue
+        queue_numbers = RegistrarWizardQueueAssignmentService(db).assign_same_day_queue_numbers(
+            created_visits,
+            target_day=today,
+            source="desk",
+        )
 
         db.commit()
         logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
