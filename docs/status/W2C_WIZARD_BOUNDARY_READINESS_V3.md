@@ -1,45 +1,53 @@
 # Wave 2C Wizard Boundary Readiness V3
 
-Date: 2026-03-08
-Mode: readiness recheck, docs-only
+Date: 2026-03-09
+Mode: post-extraction status
 
-## Inputs Reviewed
+## Previous Verdict
 
-- `docs/status/W2C_WIZARD_SEAM_VERIFICATION.md`
-- `docs/status/W2C_WIZARD_CONTRACT_COMPLIANCE_RECHECK.md`
-- `docs/architecture/W2C_WIZARD_BILLING_COUPLING_RECHECK.md`
-- `docs/status/W2C_WIZARD_BOUNDARY_FEASIBILITY.md`
-- `docs/status/W2C_REGISTRAR_WIZARD_BOUNDARY_READINESS_V2.md`
+Before the create-branch extraction slice, wizard-family was:
 
-## Decision
+`REQUIRES_ONE_MORE_NARROW_EXTRACTION`
 
-Verdict: `REQUIRES_ONE_MORE_NARROW_EXTRACTION`
+That blocker is now closed.
 
-## Why Not READY_FOR_BOUNDARY_MIGRATION
+## Current Status
 
-The mounted wizard family now has the right outer seam, but the exact
-create-entry handoff still lives inside shared `MorningAssignmentService`.
+Post-extraction status: `READY_FOR_BOUNDARY_READINESS_RECHECK`
 
-That means a direct migration now would still need to touch shared internal
-logic rather than only the wizard-specific seam.
+## What Changed
 
-## Why Not BLOCKED_BY_BILLING_COUPLING
+- outer wizard seam already existed
+- create-branch handoff is no longer hidden inside
+  `MorningAssignmentService._assign_single_queue(...)`
+- mounted wizard-family now has an explicit wizard-local create-branch
+  materialization point
 
-Billing coupling remains present, but the extraction reduced it from the
-primary blocker to a secondary concern.
+## What Stayed Stable
 
-The sharper blocker is now the remaining shared create-branch logic.
+- queue-tag-level claim model
+- canonical active statuses
+- same `queue_tag` reuse
+- different `queue_tag` fan-out
+- numbering semantics
+- queue_time / fairness
+- billing and invoice observed behavior
 
-## Why Not DEFER_WIZARD_FAMILY
+## Why This Is Not Yet A Migration Verdict
 
-Wizard-family is close to migration readiness.
+This slice extracted the blocker, but did not itself perform the readiness
+review needed before swapping to `QueueDomainService.allocate_ticket(...)`.
 
-The remaining gap is narrow and well-defined.
+The remaining question is now narrow and local:
 
-## Readiness Summary
+- is the extracted seam isolated enough for a direct boundary swap without
+  behavior drift?
 
-- outer seam: ready
+## Summary
+
+- outer seam: explicit
+- create-branch seam: explicit
 - contract compliance: preserved
 - numbering semantics: unchanged
-- billing coupling: medium
-- exact create-branch migration point: not isolated enough yet
+- billing coupling: reduced but still present in the mounted request flow
+- next step: readiness recheck
