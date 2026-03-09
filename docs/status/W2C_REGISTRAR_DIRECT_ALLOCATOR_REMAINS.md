@@ -4,6 +4,8 @@
 
 Registrar-related direct allocator usage still remains in one production-relevant mounted path.
 
+That path is now characterization-confirmed as `LIVE_BUT_BROKEN`, not merely suspected from static inspection.
+
 ## Production-Relevant Remaining Path
 
 ### 1. Mounted registrar batch edit/create flow
@@ -61,7 +63,7 @@ This pass verified the import directly in the backend runtime environment:
 ImportError: cannot import name 'QueueService' from 'app.services.queue_service'
 ```
 
-That means the remaining mounted registrar allocator path is not only outside the boundary, but also likely stale or broken when the create-action branch is exercised.
+That means the remaining mounted registrar allocator path is not only outside the boundary, but is now verified as broken when the create-action branch is exercised.
 
 ## Non-Production Direct Allocator Remains
 
