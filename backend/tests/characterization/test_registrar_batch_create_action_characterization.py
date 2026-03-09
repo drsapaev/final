@@ -5,25 +5,51 @@ from datetime import date
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.service import Service
 from app.services.batch_patient_service import (
     BatchPatientService,
     BatchUpdateRequest,
     EntryAction,
 )
+from app.services.service_mapping import normalize_service_code
+
+
+def _create_batch_service(
+    db_session,
+    *,
+    service_code: str,
+    doctor_id: int | None,
+    queue_tag: str = "cardiology",
+) -> Service:
+    service = Service(
+        code=service_code,
+        service_code=service_code,
+        name=f"Service {service_code}",
+        active=True,
+        queue_tag=queue_tag,
+        doctor_id=doctor_id,
+        requires_doctor=doctor_id is not None,
+    )
+    db_session.add(service)
+    db_session.commit()
+    db_session.refresh(service)
+    return service
 
 
 def _create_existing_entry(
     db_session,
     *,
     patient_id: int,
+    doctor_id: int,
     number: int,
+    queue_tag: str,
     status: str = "waiting",
     source: str = "desk",
 ) -> OnlineQueueEntry:
     queue = DailyQueue(
         day=date.today(),
-        specialist_id=101,
-        queue_tag="cardiology",
+        specialist_id=doctor_id,
+        queue_tag=queue_tag,
         active=True,
     )
     db_session.add(queue)
@@ -47,18 +73,20 @@ def _create_existing_entry(
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_registrar_batch_create_action_characterization_mounted_path_is_live_but_returns_400(
+def test_registrar_batch_create_action_characterization_mounted_path_creates_queue_row(
     client,
     db_session,
     registrar_auth_headers,
     test_patient,
+    test_doctor,
 ):
-    target_day = date.today().isoformat()
-    before_count = (
-        db_session.query(OnlineQueueEntry)
-        .filter(OnlineQueueEntry.patient_id == test_patient.id)
-        .count()
+    service = _create_batch_service(
+        db_session,
+        service_code="W2C-BATCH-CREATE",
+        doctor_id=test_doctor.id,
+        queue_tag="cardiology",
     )
+    target_day = date.today().isoformat()
 
     response = client.patch(
         f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{target_day}",
@@ -68,33 +96,56 @@ def test_registrar_batch_create_action_characterization_mounted_path_is_live_but
                 {
                     "action": "create",
                     "specialty": "cardiology",
-                    "service_code": "W2C-BATCH-CREATE",
+                    "service_code": service.service_code,
                 }
             ]
         },
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "One or more operations failed"
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["updated_entries"][0]["status"] == "created"
 
-    after_entries = (
+    created_entries = (
         db_session.query(OnlineQueueEntry)
         .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .order_by(OnlineQueueEntry.id.asc())
         .all()
     )
-    assert len(after_entries) == before_count
-    assert not any(entry.source == "batch_update" for entry in after_entries)
+    assert len(created_entries) == 1
+    assert created_entries[0].source == "batch_update"
+    assert created_entries[0].status == "waiting"
+    assert created_entries[0].number == 1
+    assert created_entries[0].service_codes == [normalize_service_code(service.service_code)]
+    assert created_entries[0].queue_time is not None
+
+    created_queue = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.id == created_entries[0].queue_id)
+        .first()
+    )
+    assert created_queue is not None
+    assert created_queue.specialist_id == test_doctor.id
+    assert created_queue.queue_tag == service.queue_tag
 
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_registrar_batch_create_action_characterization_reports_queue_service_import_error(
+def test_registrar_batch_create_action_characterization_service_path_returns_created_entry(
     db_session,
     test_patient,
+    test_doctor,
 ):
-    service = BatchPatientService(db_session)
+    service = _create_batch_service(
+        db_session,
+        service_code="W2C-BATCH-CREATE-SVC",
+        doctor_id=test_doctor.id,
+        queue_tag="cardiology",
+    )
+    batch_service = BatchPatientService(db_session)
 
-    result = service.batch_update(
+    result = batch_service.batch_update(
         patient_id=test_patient.id,
         target_date=date.today(),
         request=BatchUpdateRequest(
@@ -102,30 +153,47 @@ def test_registrar_batch_create_action_characterization_reports_queue_service_im
                 EntryAction(
                     action="create",
                     specialty="cardiology",
-                    service_code="W2C-BATCH-CREATE",
+                    service_code=service.service_code,
                 )
             ]
         ),
     )
 
-    assert result.success is False
+    assert result.success is True
     assert len(result.updated_entries) == 1
-    assert result.updated_entries[0].status == "error"
-    assert "cannot import name 'QueueService'" in (result.updated_entries[0].error or "")
+    assert result.updated_entries[0].status == "created"
+
+    created_entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.id == result.updated_entries[0].id)
+        .first()
+    )
+    assert created_entry is not None
+    assert created_entry.source == "batch_update"
+    assert created_entry.service_codes == [normalize_service_code(service.service_code)]
 
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_registrar_batch_create_action_characterization_duplicate_scenario_still_creates_no_new_row(
+def test_registrar_batch_create_action_characterization_duplicate_scenario_creates_next_number(
     client,
     db_session,
     registrar_auth_headers,
     test_patient,
+    test_doctor,
 ):
+    service = _create_batch_service(
+        db_session,
+        service_code="W2C-BATCH-DUP",
+        doctor_id=test_doctor.id,
+        queue_tag="cardiology",
+    )
     existing_entry = _create_existing_entry(
         db_session,
         patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
         number=8,
+        queue_tag="cardiology",
         status="diagnostics",
         source="online",
     )
@@ -139,22 +207,29 @@ def test_registrar_batch_create_action_characterization_duplicate_scenario_still
                 {
                     "action": "create",
                     "specialty": "cardiology",
-                    "service_code": "W2C-BATCH-DUP",
+                    "service_code": service.service_code,
                 }
             ]
         },
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "One or more operations failed"
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["updated_entries"][0]["status"] == "created"
 
     patient_entries = (
         db_session.query(OnlineQueueEntry)
         .filter(OnlineQueueEntry.patient_id == test_patient.id)
-        .order_by(OnlineQueueEntry.id.asc())
+        .order_by(OnlineQueueEntry.number.asc(), OnlineQueueEntry.id.asc())
         .all()
     )
-    assert [entry.id for entry in patient_entries] == [existing_entry.id]
-    assert patient_entries[0].number == existing_entry.number
-    assert patient_entries[0].status == existing_entry.status
-    assert patient_entries[0].source == existing_entry.source
+    assert [entry.id for entry in patient_entries] == [
+        existing_entry.id,
+        payload["updated_entries"][0]["id"],
+    ]
+    assert patient_entries[0].number == 8
+    assert patient_entries[0].status == "diagnostics"
+    assert patient_entries[1].number == 9
+    assert patient_entries[1].source == "batch_update"
+    assert patient_entries[1].service_codes == [normalize_service_code(service.service_code)]
