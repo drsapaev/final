@@ -6,7 +6,7 @@
 
 ## Recommended Execution Unit
 
-`Registrar batch-edit create-action characterization`
+`Narrow runtime fix for mounted registrar batch create-action`
 
 ## Target Scope
 
@@ -20,9 +20,9 @@ Only:
 ## Why This Is The Right Next Step
 
 - it is the only remaining production-relevant registrar allocator path outside the boundary architecture;
+- it has now been characterized as live-but-broken;
 - it is narrower than a broad registrar follow-up;
-- it should be characterized before any migration or correction;
-- it already shows concrete runtime drift (`QueueService` import mismatch), so moving to `qr_queue` now would leave one mounted registrar allocator path unresolved.
+- moving to `qr_queue` now would leave one mounted registrar allocator path unresolved.
 
 ## Not Recommended As The Next Step
 
@@ -37,7 +37,7 @@ Only:
 
 A safe next slice should:
 
-- be characterization-first;
-- verify whether `/registrar/batch` create-action is actually exercised and how it behaves;
-- add tests around `_create_entry()` and mounted create-action dispatch;
-- determine whether the path needs a narrow runtime correction before any later boundary migration or can be retired as dead UI surface.
+- repair or explicitly retire the mounted create-action branch;
+- keep scope limited to `registrar_batch.py` and `batch_patient_service.py`;
+- avoid any broader registrar, `qr_queue`, `OnlineDay`, or `force_majeure` work;
+- preserve non-create batch-edit semantics.
