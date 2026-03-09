@@ -6,21 +6,11 @@ Completed / effectively covered:
 
 - confirmation family;
 - mounted registrar batch-only create family;
-- mounted wizard same-day queue-assignment family.
-
-Still remaining:
-
-- mounted registrar batch-edit create-action path via
+- mounted wizard same-day queue-assignment family;
+- mounted registrar batch edit/create-action path via
   [`backend/app/api/v1/endpoints/registrar_batch.py`](C:/final/backend/app/api/v1/endpoints/registrar_batch.py)
   and
-  [`backend/app/services/batch_patient_service.py`](C:/final/backend/app/services/batch_patient_service.py)
-
-Current status of that remaining path:
-
-- mounted and reachable;
-- characterization-confirmed;
-- currently `LIVE_BUT_BROKEN`;
-- behaves as a separate registrar legacy micro-family, not as part of the already migrated batch-only family.
+  [`backend/app/services/batch_patient_service.py`](C:/final/backend/app/services/batch_patient_service.py).
 
 Unmounted duplicates:
 
@@ -32,26 +22,31 @@ Unmounted duplicates:
 
 ## Verdict
 
-`PARTIALLY_COMPLETE_WITH_ONE_REMAINING_PATH`
+`EFFECTIVELY_COMPLETE`
 
-## Why Not `EFFECTIVELY_COMPLETE`
+## Why This Is Now `EFFECTIVELY_COMPLETE`
 
-The registrar allocator track cannot yet be marked effectively complete because one mounted production-relevant path still:
+All mounted production-relevant registrar allocator families are now either:
 
-- creates queue entries outside `QueueDomainService.allocate_ticket()`;
-- has now been characterized as live-but-broken;
-- relies on a stale `QueueService` import path.
+- corrected and routed through `QueueDomainService.allocate_ticket()`;
+- or explicitly characterized as outside the registrar allocator migration scope.
 
-If that `/registrar/batch` create-action branch did not exist, the remaining registrar allocator surfaces would be only duplicate/unmounted code and the track could be considered effectively complete.
+The former remaining `/registrar/batch` create-action branch no longer blocks the
+track because it now uses the supported boundary architecture instead of a stale
+`QueueService` import path.
 
-## Why Not `NEEDS_ANOTHER_REGISTRAR_SLICE` In The Broad Sense
+## What Still Remains
 
-The track does not need another broad registrar campaign.
+What remains is registrar-adjacent cleanup debt, not a mounted registrar
+allocator migration blocker:
 
-It needs exactly one narrow registrar follow-up slice focused on:
+- duplicate or unmounted registrar helpers
+- broader registrar workflow review if needed for non-allocator reasons
+- non-registrar allocator families such as `qr_queue`, `force_majeure`, and
+  `OnlineDay`
 
-- mounted `/registrar/batch` create-action behavior;
-- `BatchPatientService._create_entry()`;
-- a runtime fix or explicit retirement decision for that branch only.
+## Why Not `PARTIALLY_COMPLETE_WITH_ONE_REMAINING_PATH`
 
-So the remaining work is narrow, not a renewed broad registrar refactor.
+That verdict no longer applies because the only remaining mounted registrar path
+identified in the follow-up review has been fixed and boundary-covered in this
+slice.

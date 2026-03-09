@@ -2,68 +2,41 @@
 
 ## Verdict
 
-Registrar-related direct allocator usage still remains in one production-relevant mounted path.
+No production-relevant registrar direct allocator usage remains after the narrow
+runtime fix for the mounted `/registrar/batch` create-action branch.
 
-That path is now characterization-confirmed as `LIVE_BUT_BROKEN`, not merely suspected from static inspection.
+## Former Mounted Remaining Path
 
-## Production-Relevant Remaining Path
+The previously remaining mounted registrar path was:
 
-### 1. Mounted registrar batch edit/create flow
-
-- Endpoint:
+- endpoint:
   [`backend/app/api/v1/endpoints/registrar_batch.py`](C:/final/backend/app/api/v1/endpoints/registrar_batch.py)
   `batch_update_patient_entries()`
-- Helper:
+- helper:
   [`backend/app/services/batch_patient_service.py`](C:/final/backend/app/services/batch_patient_service.py)
   `_create_entry()`
 
-Current allocation path:
+It used to:
 
-1. mounted `/registrar/batch/patients/{patient_id}/entries/{date}` accepts a batch update;
-2. `BatchPatientService.batch_update()` dispatches `EntryAction(action="create")`;
-3. `_create_entry()` performs:
-   `from app.services.queue_service import QueueService`
-4. `_create_entry()` then calls:
-   `QueueService(self.db).add_to_queue(...)`
+1. import a non-existent `QueueService`;
+2. fail before allocation;
+3. bypass the supported queue boundary architecture.
 
-Why this still counts as direct legacy allocator usage:
+It now:
 
-- it does not use `QueueDomainService.allocate_ticket()`;
-- it does not go through any registrar-specific migrated seam;
-- it targets a legacy-style queue service API rather than the new compatibility boundary.
+1. resolves its queue target inside `BatchPatientService`;
+2. calls `QueueDomainService.allocate_ticket(allocation_mode="create_entry", ...)`;
+3. reaches the supported boundary architecture used by the rest of the migrated
+   registrar allocator track.
 
-## Why This Path Was Not Covered Earlier
+## Production-Relevant Status
 
-Previous registrar slices covered different mounted families:
+Current verdict for registrar production runtime:
 
-- confirmation bridge in `registrar_wizard.py`;
-- batch-only create path in `registrar_integration.py`;
-- wizard same-day cart path in `registrar_wizard.py`.
-
-The `/registrar/batch` create-action path belongs to a separate batch-edit surface (`UI Row ↔ API Entry`) and was therefore outside those slices.
-
-## Risk Assessment
-
-Risk level: `MEDIUM-HIGH`
-
-Why:
-
-- the path is mounted and production-relevant;
-- it bypasses the queue boundary architecture;
-- it is not characterized yet;
-- static inspection shows a concrete runtime drift signal:
-  [`backend/app/services/batch_patient_service.py`](C:/final/backend/app/services/batch_patient_service.py)
-  imports `QueueService`, but [`backend/app/services/queue_service.py`](C:/final/backend/app/services/queue_service.py) exports `QueueBusinessService` and `queue_service`, not `QueueService`.
-
-## Verified Import Drift
-
-This pass verified the import directly in the backend runtime environment:
-
-```text
-ImportError: cannot import name 'QueueService' from 'app.services.queue_service'
-```
-
-That means the remaining mounted registrar allocator path is not only outside the boundary, but is now verified as broken when the create-action branch is exercised.
+- no mounted registrar path is known to bypass `QueueDomainService.allocate_ticket()`
+  while still acting as an active queue-allocation entry point;
+- no mounted registrar path is still known to depend on the broken
+  `QueueService` import.
 
 ## Non-Production Direct Allocator Remains
 
