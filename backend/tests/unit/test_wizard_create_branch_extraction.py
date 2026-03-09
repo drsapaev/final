@@ -34,6 +34,15 @@ class _FakeAssignmentService:
         return self.prepared_assignments[(visit.id, queue_tag)]
 
 
+class _FakeQueueDomainService:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def allocate_ticket(self, *, allocation_mode, **kwargs):
+        self.calls.append((allocation_mode, kwargs))
+        return SimpleNamespace(number=41)
+
+
 @pytest.mark.unit
 def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
     today = date.today()
@@ -92,3 +101,66 @@ def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
     assert visit.status == "open"
     assert fake_assignment_service.calls == [(301, "cardiology_common", today, "desk")]
     assert captured_handoffs == [create_handoff]
+
+
+@pytest.mark.unit
+def test_assign_same_day_queue_numbers_uses_queue_domain_boundary_by_default():
+    today = date.today()
+    visit = _FakeVisit(visit_id=302, visit_date=today)
+    create_handoff = MorningAssignmentCreateBranchHandoff(
+        queue_tag="cardiology_common",
+        daily_queue=SimpleNamespace(id=10),
+        create_entry_kwargs={
+            "daily_queue": SimpleNamespace(id=10),
+            "patient_id": 88,
+            "patient_name": "Boundary Patient",
+            "phone": "+998901010101",
+            "visit_id": 302,
+            "source": "desk",
+            "status": "waiting",
+            "queue_time": object(),
+            "services": [{"id": 1, "code": "K01", "name": "Consult", "price": 100000.0}],
+            "service_codes": ["K01"],
+            "auto_number": True,
+            "commit": False,
+        },
+    )
+    fake_assignment_service = _FakeAssignmentService(
+        {
+            (302, "cardiology_common"): MorningAssignmentPreparedQueueAssignment(
+                create_handoff=create_handoff
+            )
+        }
+    )
+    fake_queue_domain_service = _FakeQueueDomainService()
+
+    service = RegistrarWizardQueueAssignmentService(
+        db=object(),
+        assignment_service_factory=lambda _: fake_assignment_service,
+        queue_domain_service_factory=lambda _: fake_queue_domain_service,
+    )
+
+    queue_numbers = service.assign_same_day_queue_numbers(
+        [visit],
+        target_day=today,
+        source="desk",
+    )
+
+    assert queue_numbers == {
+        302: [
+            {
+                "queue_tag": "cardiology_common",
+                "queue_id": 10,
+                "number": 41,
+                "status": "assigned",
+            }
+        ]
+    }
+    assert visit.status == "open"
+    assert fake_assignment_service.calls == [(302, "cardiology_common", today, "desk")]
+    assert fake_queue_domain_service.calls == [
+        (
+            "create_entry",
+            create_handoff.create_entry_kwargs,
+        )
+    ]

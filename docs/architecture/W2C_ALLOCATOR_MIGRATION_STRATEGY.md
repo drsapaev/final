@@ -160,3 +160,16 @@ Still deferred:
 - broader registrar wizard branches
 - `queue_batch_service.py` as future runtime owner/seam
 - legacy count-based registrar paths
+
+## Wizard Migration Update
+
+Completed in the current slice:
+
+- mounted wizard-family same-day create branch now goes through
+  `QueueDomainService.allocate_ticket()`
+
+Still deferred:
+
+- broader wizard/cart orchestration
+- future-day wizard behavior beyond the mounted same-day branch
+- non-mounted or duplicate wizard service surfaces

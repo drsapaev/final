@@ -308,6 +308,9 @@ Current production callers through `allocate_ticket()`:
 - `backend/app/api/v1/endpoints/registrar_integration.py::create_queue_entries_batch()`
   for mounted batch-only create flow when duplicate gate does not reuse an
   existing specialist-day claim
+- `backend/app/services/registrar_wizard_queue_assignment_service.py`
+  for mounted wizard-family same-day create flow after queue-tag-level reuse
+  and ambiguity checks
 
 ## Phase 2.2 Boundary Limits
 
@@ -348,6 +351,14 @@ Mounted registrar batch-only family is now partially migrated:
 - reuse and ambiguity logic still live in the mounted router path
 - create branch now routes through `QueueDomainService.allocate_ticket()`
 - broader registrar wizard/batch service migration is still deferred
+
+### Registrar wizard note
+
+Mounted wizard-family same-day create branch is now migrated:
+
+- queue-tag-level duplicate/reuse logic remains outside the boundary
+- the create branch now routes through `QueueDomainService.allocate_ticket()`
+- broader wizard/cart orchestration is still outside the queue domain boundary
 
 Notes for the narrowed `W2C-MS-004` slice:
 

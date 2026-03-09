@@ -13,7 +13,7 @@ from app.services.morning_assignment import (
     MorningAssignmentPreparedQueueAssignment,
     MorningAssignmentService,
 )
-from app.services.queue_service import queue_service
+from app.services.queue_domain_service import QueueDomainService
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ class RegistrarWizardQueueAssignmentService:
         *,
         assignment_service_factory: Callable[[Session], MorningAssignmentService]
         | None = None,
+        queue_domain_service_factory: Callable[[Session], QueueDomainService]
+        | None = None,
         create_entry_allocator: Callable[
             [MorningAssignmentCreateBranchHandoff],
             Any,
@@ -36,6 +38,10 @@ class RegistrarWizardQueueAssignmentService:
         self.db = db
         self._assignment_service_factory = (
             assignment_service_factory or (lambda session: MorningAssignmentService(session))
+        )
+        self._queue_domain_service_factory = (
+            queue_domain_service_factory
+            or (lambda session: QueueDomainService(session))
         )
         self._create_entry_allocator = (
             create_entry_allocator or self._allocate_create_branch_handoff
@@ -147,8 +153,9 @@ class RegistrarWizardQueueAssignmentService:
         self,
         handoff: MorningAssignmentCreateBranchHandoff,
     ) -> Any:
-        return queue_service.create_queue_entry(
-            self.db,
+        queue_domain_service = self._queue_domain_service_factory(self.db)
+        return queue_domain_service.allocate_ticket(
+            allocation_mode="create_entry",
             **handoff.create_entry_kwargs,
         )
 
