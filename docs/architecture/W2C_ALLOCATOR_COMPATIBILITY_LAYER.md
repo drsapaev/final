@@ -79,6 +79,7 @@ It is intentionally **not** yet wired into:
 - legacy `OnlineDay` callers
 - broader registrar wizard allocator branches outside the mounted confirmation
   bridge
+- mounted wizard-family same-day create branch before boundary migration
 
 ## Why This Shape Is Safe
 
@@ -136,3 +137,20 @@ This keeps:
 - active-row reuse in the mounted path
 - explicit `409` ambiguity handling in the mounted path
 - numbering and fairness inside the legacy allocator
+
+## Wizard Migration Update
+
+Mounted wizard-family same-day create branch now uses the compatibility
+boundary:
+
+1. `MorningAssignmentService.prepare_wizard_queue_assignment(...)`
+2. `RegistrarWizardQueueAssignmentService._allocate_create_branch_handoff(...)`
+3. `QueueDomainService.allocate_ticket(allocation_mode="create_entry", **kwargs)`
+4. legacy `queue_service.create_queue_entry(...)`
+
+This keeps:
+
+- queue-tag-level claim ownership in the mounted wizard flow
+- canonical active-status reuse before allocation
+- different `queue_tag` fan-out behavior
+- numbering and fairness in the legacy allocator
