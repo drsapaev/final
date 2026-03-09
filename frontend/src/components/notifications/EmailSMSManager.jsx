@@ -673,10 +673,10 @@ const EmailSMSManager = () => {void
                     <p className="text-sm text-gray-600">{template.description}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-blue-600" aria-label="Просмотреть шаблон">
+                    <button className="p-2 text-gray-400 hover:text-blue-600">
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-gray-400 hover:text-blue-600" aria-label="Редактировать шаблон">
+                    <button className="p-2 text-gray-400 hover:text-blue-600">
                       <Edit className="w-4 h-4" />
                     </button>
                   </div>
@@ -706,10 +706,10 @@ const EmailSMSManager = () => {void
                     <p className="text-sm text-gray-600">{template.description}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-green-600" aria-label="Просмотреть шаблон">
+                    <button className="p-2 text-gray-400 hover:text-green-600">
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-gray-400 hover:text-green-600" aria-label="Редактировать шаблон">
+                    <button className="p-2 text-gray-400 hover:text-green-600">
                       <Edit className="w-4 h-4" />
                     </button>
                   </div>
