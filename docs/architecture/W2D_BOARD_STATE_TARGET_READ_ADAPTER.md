@@ -61,6 +61,14 @@ It should start as a skeleton that can produce:
 
 without changing the public `GET /api/v1/board/state` behavior.
 
+That initial seam now exists in:
+- [board_state_read_adapter.py](C:/final/backend/app/services/board_state_read_adapter.py)
+
+Current skeleton scope:
+- typed internal payload only
+- no mounted route switch
+- no real data-source wiring yet
+
 ## Mapping assumptions
 
 Likely mappings for a later route replacement:
