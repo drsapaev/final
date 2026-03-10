@@ -105,7 +105,7 @@ const PrescriptionEditor = ({
                                     <button
               className="prescription-action-btn prescription-action-btn--delete"
               onClick={() => handleDelete(p.id)}
-              title="Удалить">
+              title="Удалить" aria-label="Удалить назначение">
               
                                         <Trash2 size={14} />
                                     </button>
