@@ -56,6 +56,15 @@ class QueuesStatsParityResult:
         return not self.strict_mismatches
 
 
+@dataclass(frozen=True)
+class QueuesStatsReplacementResult:
+    snapshot: QueuesStatsSnapshot
+    strict_source: str
+    matched_queue_ids: list[int] = field(default_factory=list)
+    matched_queue_tags: list[str | None] = field(default_factory=list)
+    mapping_notes: list[str] = field(default_factory=list)
+
+
 def compare_queues_stats(
     db: Session, *, department: str, date_str: str
 ) -> QueuesStatsParityResult:
@@ -95,6 +104,56 @@ def compare_queues_stats(
         mapping_notes=mapping_notes,
         strict_matches=strict_matches,
         compatibility_matches=compatibility_matches,
+    )
+
+
+def build_replacement_queues_stats(
+    db: Session, *, department: str, date_str: str
+) -> QueuesStatsReplacementResult:
+    normalized_department = department.strip()
+    normalized_date = date_str.strip()
+    legacy = load_stats(db, department=normalized_department, date_str=normalized_date)
+    candidate, matched_queue_ids, matched_queue_tags, mapping_notes = (
+        build_candidate_queues_stats(
+            db, department=normalized_department, date_str=normalized_date
+        )
+    )
+
+    if matched_queue_ids:
+        snapshot = QueuesStatsSnapshot(
+            department=legacy.department,
+            date_str=legacy.date_str,
+            is_open=legacy.is_open,
+            start_number=legacy.start_number,
+            last_ticket=candidate.last_ticket,
+            waiting=candidate.waiting,
+            serving=candidate.serving,
+            done=candidate.done,
+        )
+        strict_source = "ssot"
+    else:
+        snapshot = QueuesStatsSnapshot(
+            department=legacy.department,
+            date_str=legacy.date_str,
+            is_open=legacy.is_open,
+            start_number=legacy.start_number,
+            last_ticket=legacy.last_ticket,
+            waiting=legacy.waiting,
+            serving=legacy.serving,
+            done=legacy.done,
+        )
+        strict_source = "legacy_fallback"
+        mapping_notes = [
+            *mapping_notes,
+            "No SSOT queue mapping resolved; preserved legacy strict counters.",
+        ]
+
+    return QueuesStatsReplacementResult(
+        snapshot=snapshot,
+        strict_source=strict_source,
+        matched_queue_ids=matched_queue_ids,
+        matched_queue_tags=matched_queue_tags,
+        mapping_notes=mapping_notes,
     )
 
 

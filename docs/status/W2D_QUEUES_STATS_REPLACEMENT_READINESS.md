@@ -1,6 +1,6 @@
 # W2D queues.stats replacement readiness
 
-Verdict: `READY_WITH_COMPATIBILITY_FALLBACK`
+Verdict: `APPLIED_WITH_COMPATIBILITY_FALLBACK`
 
 ## Evidence
 - legacy-vs-SSOT comparison harness exists:
@@ -9,19 +9,25 @@ Verdict: `READY_WITH_COMPATIBILITY_FALLBACK`
   - [test_queues_stats_parity_harness.py](C:/final/backend/tests/characterization/test_queues_stats_parity_harness.py)
 - strict parity achieved for:
   - `last_ticket`
-  - `waiting`
-  - `serving`
-  - `done`
+- `waiting`
+- `serving`
+- `done`
 
-## Why not fully READY_FOR_NARROW_REPLACEMENT without caveat
+## What is already replaced
+- mounted [queues.py](C:/final/backend/app/api/v1/endpoints/queues.py) `stats()` now serves strict counters from SSOT-backed logic when queue mapping resolves
+- response contract shape is unchanged
+- validation behavior is unchanged
+
+## What remains before full cutover
 Two legacy compatibility fields still lack a clean SSOT owner:
 - `is_open`
 - `start_number`
 
-These fields should stay on legacy fallback or explicit compatibility handling in the first replacement slice.
+There is also a deliberate legacy fallback for strict counters when a legacy department/day request does not resolve to SSOT queues.
 
 ## What this means
-A narrow replacement for `queues.stats` is now reasonable if:
-- strict fields come from the SSOT read-model
-- compatibility fields remain legacy-backed or explicitly deferred
-- mounted contract shape stays unchanged
+The narrow replacement slice is complete, but full OnlineDay retirement is not.
+Before a full cutover, we still need:
+- replacement prep for adjacent `board_state` read surfaces
+- an explicit decision on how unmapped legacy department keys should behave
+- a replacement or retirement path for `is_open` and `start_number`
