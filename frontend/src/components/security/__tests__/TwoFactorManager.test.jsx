@@ -10,11 +10,13 @@ const { getAccessToken, loggerInfo, loggerError } = vi.hoisted(() => ({
   loggerError: vi.fn(),
 }));
 
-vi.mock('../../../utils/tokenManager', () => ({
-  default: {
-    getAccessToken,
-  },
-}));
+vi.mock('../../../utils/tokenManager', () => {
+  return {
+    tokenManager: {
+      getAccessToken
+    }
+  };
+});
 
 vi.mock('../../../utils/logger', () => ({
   default: {
@@ -22,6 +24,29 @@ vi.mock('../../../utils/logger', () => ({
     error: loggerError,
   },
 }));
+
+vi.mock('../../../api/client', () => {
+  return {
+    api: {
+      get: vi.fn(async (url) => {
+        const res = await global.fetch('http://localhost:8000/api/v1' + url, { method: 'GET' });
+        return { data: await res.json() };
+      }),
+      post: vi.fn(async (url, data, config) => {
+        let fullUrl = 'http://localhost:8000/api/v1' + url;
+        if (config?.params?.totp_code) {
+          fullUrl += '?totp_code=' + config.params.totp_code;
+        }
+        const res = await global.fetch(fullUrl, { method: 'POST', body: data });
+        return { data: await res.json() };
+      }),
+      delete: vi.fn(async (url) => {
+        const res = await global.fetch('http://localhost:8000/api/v1' + url, { method: 'DELETE' });
+        return { data: await res.json() };
+      })
+    }
+  };
+});
 
 import TwoFactorManager from '../TwoFactorManager.jsx';
 
@@ -190,7 +215,7 @@ describe('TwoFactorManager', () => {
 
     expect(await screen.findByText('CCCC3333')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/2fa/backup-codes/regenerate',
+      expect.stringContaining('/api/v1/2fa/backup-codes/regenerate'),
       expect.objectContaining({ method: 'POST' })
     );
   });
@@ -255,7 +280,7 @@ describe('TwoFactorManager', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/2fa/devices/7',
+        expect.stringContaining('/api/v1/2fa/devices/7'),
         expect.objectContaining({ method: 'DELETE' })
       );
     });
