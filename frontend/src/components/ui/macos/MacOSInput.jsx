@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef, useImperativeHandle } from 'react';
+import { XCircle } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -13,8 +14,16 @@ const MacOSInput = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
+  const internalRef = useRef(null);
+
+  useImperativeHandle(ref, () => internalRef.current);
+
+  const isControlled = props.value !== undefined;
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(props.defaultValue || '');
+  const currentValue = isControlled ? props.value : uncontrolledValue;
+
+  const hasValue = currentValue !== undefined && currentValue !== null && currentValue !== '';
+
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -55,10 +64,19 @@ const MacOSInput = React.forwardRef(({
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
+  const paddingLeft = Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1];
+
+  let paddingRight = currentSize.padding.split(' ')[1];
+  if (clearable) {
+    paddingRight = '32px';
+  } else if (Icon && iconPosition === 'right') {
+    paddingRight = '40px';
+  }
+
   const inputStyle = {
     width: '100%',
-    paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingLeft,
+    paddingRight,
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -99,20 +117,83 @@ const MacOSInput = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
+  const handleChange = (e) => {
+    if (!isControlled) {
+      setUncontrolledValue(e.target.value);
+    }
+    if (props.onChange) {
+      props.onChange(e);
+    }
+  };
+
+  const handleClear = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isControlled) {
+      setUncontrolledValue('');
+    }
+
+    // Ensure the underlying DOM node is updated so that an onChange event fires properly
+    if (internalRef.current) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      ).set;
+      nativeInputValueSetter.call(internalRef.current, '');
+      const event = new Event('input', { bubbles: true });
+      internalRef.current.dispatchEvent(event);
+    }
+
+    if (onClear) {
+      onClear();
+    }
+
+    // Maintain focus after clearing
+    internalRef.current?.focus();
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       {Icon && (
         <Icon style={iconStyle} />
       )}
       <input
-        ref={ref}
+        ref={internalRef}
         className={className}
         style={inputStyle}
         disabled={disabled}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onChange={handleChange}
         {...props}
       />
+      {clearable && hasValue && !disabled && (
+        <button
+          type="button"
+          onClick={handleClear}
+          aria-label="Clear input"
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            padding: '2px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: 'var(--mac-text-tertiary)',
+            borderRadius: '50%'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--mac-text-secondary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--mac-text-tertiary)'; }}
+        >
+          <XCircle size={14} />
+        </button>
+      )}
     </div>
   );
 });
