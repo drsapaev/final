@@ -256,7 +256,7 @@ export function CardExamples() {
       <RefactoredCard
         variant="outlined"
         clickable
-        onClick={() => console.log('Card clicked!')}
+        onClick={() => {}}
         title="Clickable Card"
       >
         <p>This card is clickable. Click to trigger an action.</p>
