@@ -13,6 +13,8 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.services.queue_service import queue_service
 
+pytestmark = pytest.mark.postgres_pilot
+
 
 def _make_concurrency_queue(test_db, suffix: str) -> tuple[int, str, int, int]:
     SessionLocal = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
@@ -27,30 +29,31 @@ def _make_concurrency_queue(test_db, suffix: str) -> tuple[int, str, int, int]:
             is_active=True,
         )
         session.add(user)
-        session.commit()
-        session.refresh(user)
+        session.flush()
+        user_id = user.id
 
         doctor = Doctor(
-            user_id=user.id,
+            user_id=user_id,
             specialty="cardiology",
             active=True,
         )
         session.add(doctor)
-        session.commit()
-        session.refresh(doctor)
+        session.flush()
+        doctor_id = doctor.id
 
         queue = DailyQueue(
             day=date.today(),
-            specialist_id=doctor.id,
+            specialist_id=doctor_id,
             queue_tag=f"cardiology_{suffix}",
             active=True,
         )
         session.add(queue)
-        session.commit()
-        session.refresh(queue)
+        session.flush()
+        queue_id = queue.id
+        queue_tag = queue.queue_tag
 
         first_entry = OnlineQueueEntry(
-            queue_id=queue.id,
+            queue_id=queue_id,
             number=1,
             patient_name="Baseline",
             source="online",
@@ -58,7 +61,7 @@ def _make_concurrency_queue(test_db, suffix: str) -> tuple[int, str, int, int]:
         )
         session.add(first_entry)
         session.commit()
-        return queue.id, queue.queue_tag, doctor.id, user.id
+        return queue_id, queue_tag, doctor_id, user_id
     finally:
         session.close()
 

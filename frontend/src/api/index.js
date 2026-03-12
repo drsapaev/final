@@ -9,6 +9,7 @@ export * from './setting';
 export * from './ws';
 export * from './health';
 export * from './adminSettings';
+export * from './boardDisplay';
 
 // Совместимость со старыми импортами (`./api/queue`):
 export * from './queue';

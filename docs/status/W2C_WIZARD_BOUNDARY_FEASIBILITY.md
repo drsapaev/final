@@ -1,18 +1,18 @@
 # Wave 2C Wizard Boundary Feasibility
 
-Date: 2026-03-08
-Mode: readiness recheck, docs-only
+Date: 2026-03-09
+Mode: readiness review, docs-only
 
 ## Question
 
-Can the extracted wizard seam be switched to:
+Can mounted wizard-family now be switched to:
 
 - `QueueDomainService.allocate_ticket()`
 
 without changing:
 
 - numbering behavior
-- `queue_time` behavior
+- `queue_time`
 - fairness ordering
 - duplicate semantics
 - source semantics
@@ -20,43 +20,39 @@ without changing:
 
 ## Feasibility Assessment
 
-Not directly yet.
+Not in one clean step yet.
 
-## Why Not Directly
+## Why
 
-`RegistrarWizardQueueAssignmentService` is now the correct outer seam, but it
-still delegates the full create/reuse branch into
-`MorningAssignmentService._assign_queues_for_visit(...)`.
+The outer seam is now explicit, but the exact wizard create-branch handoff is
+still hidden inside shared `MorningAssignmentService._assign_single_queue(...)`.
 
-That shared method still bundles:
+That shared method currently bundles:
 
-- claim resolution
-- active-entry reuse
-- payload preparation
+- queue claim resolution
+- duplicate / reuse gate
+- service-code payload preparation
 - direct `queue_service.create_queue_entry(...)`
 
-So replacing only the outer seam with `QueueDomainService.allocate_ticket()`
-would be incomplete unless wizard-family also extracts the exact create-branch
-handoff from `MorningAssignmentService`.
+So replacing only the outer seam would still require touching shared internal
+morning-assignment logic.
 
 ## What Is Already Feasible
 
-The future migration point is now clear:
+The future migration entry point is now explicit:
 
-- wizard-specific outer seam in `RegistrarWizardQueueAssignmentService`
+- `RegistrarWizardQueueAssignmentService`
 
-## What Still Needs Extraction
+And the target boundary is signature-compatible:
 
-One more narrow wizard-local seam is needed around the create branch, so that
-wizard-family can:
+- `QueueDomainService.allocate_ticket(allocation_mode="create_entry", **kwargs)`
 
-1. keep current claim/reuse behavior
-2. preserve payload shaping
-3. replace only the final create-entry call with
-   `QueueDomainService.allocate_ticket(...)`
+## What Still Needs To Be Extracted
+
+One more wizard-local narrow handoff is needed so that wizard-family can swap
+only the final create-entry branch to `QueueDomainService.allocate_ticket(...)`
+without altering shared morning-assignment behavior.
 
 ## Feasibility Verdict
 
-Boundary migration is feasible after one more narrow extraction.
-
-It is not yet a clean one-step migration from the current extracted seam.
+Wizard boundary migration is feasible after one more narrow extraction.

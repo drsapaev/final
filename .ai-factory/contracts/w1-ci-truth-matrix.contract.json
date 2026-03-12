@@ -1,0 +1,69 @@
+{
+  "contract_version": "1.0",
+  "task_type": "w1-ci-truth-matrix",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "docs/status/**"
+    ],
+    "exclude": [
+      "backend/**",
+      "frontend/**",
+      ".github/workflows/**",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key"
+    ]
+  },
+  "goals": [
+    "Build a current CI/CD truth matrix based on real workflow evidence.",
+    "Create status trackers for Wave 1 without touching application code.",
+    "Document blockers, skips, and dependencies honestly."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 300,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/**",
+      "frontend/**",
+      ".github/workflows/**",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key"
+    ]
+  },
+  "must_run": [
+    "gh run list --workflow ci-cd-unified.yml --limit 12 --json databaseId,displayTitle,event,headBranch,headSha,status,conclusion,createdAt,updatedAt,url",
+    "gh run list --workflow role-system-check.yml --limit 12 --json databaseId,displayTitle,event,headBranch,status,conclusion,createdAt,url",
+    "gh run list --workflow security-scan.yml --limit 12 --json databaseId,displayTitle,event,headBranch,status,conclusion,createdAt,url",
+    "gh run view <latest_failed_main_run> --json url,displayTitle,event,headBranch,headSha,status,conclusion,jobs",
+    "gh run view <latest_failed_main_run> --job <frontend_tests_job_id> --log-failed"
+  ],
+  "must_not_touch": [
+    "application code",
+    "workflow YAML files",
+    "dependency manifests",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs/status/CI_CD_TRUTH_MATRIX_REPORT.md",
+    "docs/status/wave1/W1-T1_STATUS.md",
+    "updated Wave 1 status trackers"
+  ],
+  "stop_conditions": [
+    "Any required update needs changes under backend, frontend, or workflow paths.",
+    "Evidence cannot be collected from GitHub CLI.",
+    "Task scope expands beyond docs and reports."
+  ],
+  "review_notes": [
+    "Hard rule: no code modifications allowed for W1-T1.",
+    "Use exact run IDs and timestamps.",
+    "Mark skipped jobs explicitly instead of treating them as pass."
+  ]
+}

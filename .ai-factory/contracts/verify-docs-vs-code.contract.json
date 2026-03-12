@@ -1,0 +1,68 @@
+{
+  "contract_version": "1.0",
+  "task_type": "verify-docs-vs-code",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "docs/**",
+      "README.md",
+      "backend/openapi.json",
+      "backend/generate_openapi.py",
+      "backend/app/api/**",
+      "frontend/src/api/**",
+      "frontend/src/services/**"
+    ],
+    "exclude": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Compare documentation claims against current code and contracts.",
+    "Fix documentation drift or record verified mismatches honestly.",
+    "Avoid changing application behavior unless a separate contract is approved."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 10,
+    "max_diff_lines": 300,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && python generate_openapi.py",
+    "cd backend && pytest tests/test_openapi_contract.py -q",
+    "If frontend API bindings changed, run: cd frontend && npm run test:run -- src/test/parity/rbacRouteParity.test.js"
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "schema or migration files",
+    "workflow permissions",
+    "domain behavior unless separately approved"
+  ],
+  "required_artifacts": [
+    "verified mismatches list",
+    "docs changed",
+    "commands used for verification"
+  ],
+  "stop_conditions": [
+    "Fixing drift requires a protected-domain behavior change.",
+    "The task becomes a broad docs rewrite.",
+    "Required verification commands cannot run."
+  ],
+  "review_notes": [
+    "Prefer correcting claims over preserving optimistic wording.",
+    "If code and docs diverge in a protected area, record it and escalate."
+  ]
+}

@@ -406,7 +406,7 @@ class EMRV2Service:
 
             # Проверяем существующий шаблон
             existing = db.query(DoctorTreatmentTemplate).filter(
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
                 DoctorTreatmentTemplate.treatment_hash == treatment_hash,
             ).first()
 
@@ -421,7 +421,7 @@ class EMRV2Service:
                 import uuid
                 template = DoctorTreatmentTemplate(
                     id=str(uuid.uuid4()),
-                    doctor_id=str(doctor_id),
+                    doctor_id=doctor_id,
                     icd10_code=icd10_code,
                     treatment_text=normalized,
                     treatment_hash=treatment_hash,

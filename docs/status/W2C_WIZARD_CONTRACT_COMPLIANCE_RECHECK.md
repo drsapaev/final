@@ -1,7 +1,7 @@
 # Wave 2C Wizard Contract Compliance Recheck
 
-Date: 2026-03-08
-Mode: readiness recheck, docs-only
+Date: 2026-03-09
+Mode: readiness review, docs-only
 Status: `preserved`
 
 ## Contracts Reviewed
@@ -12,7 +12,9 @@ Status: `preserved`
 - `docs/architecture/W2C_DUPLICATE_POLICY_CONTRACT.md`
 - `docs/architecture/W2C_QUEUE_NUMBERING_CONTRACT.md`
 
-## Claim Model Check
+## Recheck Results
+
+### Claim model
 
 Still preserved:
 
@@ -20,44 +22,36 @@ Still preserved:
 - `queue_tag`
 - queue day
 
-Runtime evidence:
+The extracted seam does not change wizard-family claim ownership.
 
-- `_resolve_existing_queue_claim_or_raise(...)` still resolves by
-  `patient_id + queue_tag + target_date`
-
-## Active-Status Check
+### Duplicate / reuse semantics
 
 Still preserved:
 
-- `waiting`
-- `called`
-- `in_service`
-- `diagnostics`
+- canonical active statuses:
+  - `waiting`
+  - `called`
+  - `in_service`
+  - `diagnostics`
+- same `queue_tag` active row reuse
+- ambiguity safe-failure behavior
 
-Runtime evidence:
-
-- `WIZARD_DUPLICATE_ACTIVE_STATUSES`
-- `OnlineQueueEntry.status.in_(WIZARD_DUPLICATE_ACTIVE_STATUSES)`
-
-## Reuse Behavior Check
+### Fan-out semantics
 
 Still preserved:
 
-- same `queue_tag` active row is reused
-- different `queue_tag` rows remain allowed
-- ambiguity remains safe-failure, not duplicate creation
+- same specialist + different `queue_tag` values may still create separate rows
 
-## Numbering Check
+### Numbering semantics
 
 Still preserved:
 
-- numbering is unchanged
-- new rows still go through `queue_service.create_queue_entry(..., auto_number=True)`
-- reused rows do not allocate a new number
+- create path still goes through legacy `queue_service.create_queue_entry(..., auto_number=True)`
+- no new numbering branch was introduced
+- reused rows still do not allocate a new number
 - `queue_time` handling remains unchanged
 
 ## Compliance Verdict
 
-The extracted wizard seam did not alter the wizard-family queue contracts.
-
-Contract compliance remains intact after extraction.
+The extracted wizard seam preserves all previously established wizard-family
+contracts.

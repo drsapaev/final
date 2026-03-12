@@ -22,6 +22,7 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.confirmation_datetime import confirmation_utc_now, is_confirmation_expired
 from app.services.feature_flags import is_feature_enabled
 from app.services.registrar_wizard_queue_assignment_service import (
     RegistrarWizardQueueAssignmentService,
@@ -2570,17 +2571,14 @@ def confirm_visit_by_registrar(
             )
 
         # Проверяем что токен не истек
-        if (
-            visit.confirmation_expires_at
-            and visit.confirmation_expires_at < datetime.utcnow()
-        ):
+        if is_confirmation_expired(visit.confirmation_expires_at):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Срок подтверждения истек",
             )
 
         # Подтверждаем визит
-        visit.confirmed_at = datetime.utcnow()
+        visit.confirmed_at = confirmation_utc_now()
         visit.confirmed_by = request.confirmed_by or f"registrar_{current_user.id}"
         visit.status = "confirmed"
 

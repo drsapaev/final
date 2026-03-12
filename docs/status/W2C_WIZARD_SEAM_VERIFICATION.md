@@ -1,7 +1,7 @@
 # Wave 2C Wizard Seam Verification
 
-Date: 2026-03-08
-Mode: readiness recheck, docs-only
+Date: 2026-03-09
+Mode: readiness review, docs-only
 Status: `verified`
 
 ## Runtime Files Reviewed
@@ -11,48 +11,44 @@ Status: `verified`
 - `backend/app/services/morning_assignment.py`
 - `backend/app/services/queue_service.py`
 
-## What Is Now Isolated
+## What Is Verified
 
-Mounted `/registrar/cart` no longer owns the same-day queue-assignment loop
-inline.
+### 1. The mounted endpoint no longer owns the allocator call inline
 
-Current outer call chain:
+`/registrar/cart` now hands same-day queue assignment to:
 
-1. `/registrar/cart`
-2. `RegistrarWizardQueueAssignmentService.assign_same_day_queue_numbers(...)`
-3. `MorningAssignmentService._assign_queues_for_visit(...)`
+- `RegistrarWizardQueueAssignmentService.assign_same_day_queue_numbers(...)`
 
-This means billing/cart orchestration no longer calls `MorningAssignmentService`
-directly from inline endpoint code.
+So invoice/cart orchestration no longer performs the queue-assignment loop
+inline in the endpoint body.
 
-## What Remains Shared
+### 2. The new seam is wizard-specific
 
-The actual queue-row creation decision still lives inside:
+The extracted seam is local to mounted wizard-family runtime, not to batch,
+confirmation, QR, or legacy `OnlineDay` families.
 
-- `MorningAssignmentService._assign_single_queue(...)`
+### 3. A clear migration point now exists
 
-That method still owns:
+The new explicit handoff point is:
+
+- `RegistrarWizardQueueAssignmentService.assign_same_day_queue_numbers(...)`
+
+That is the correct outer seam for any future wizard-family boundary migration.
+
+## What Is Not Yet Isolated
+
+The seam still delegates the full create/reuse branch to shared
+`MorningAssignmentService._assign_queues_for_visit(...)`.
+
+Inside that shared path, the exact create-branch handoff remains bundled with:
 
 - queue claim resolution
-- duplicate/reuse gate
-- queue payload shaping
-- direct `queue_service.create_queue_entry(...)` call
+- active-entry reuse checks
+- payload assembly
+- direct `queue_service.create_queue_entry(...)`
 
-## Verification Result
+## Verification Verdict
 
-The wizard-family now has a real wizard-specific outer seam.
+Allocator surface is now isolated enough at the outer seam level.
 
-That seam is sufficient for:
-
-- localizing wizard-family queue-assignment orchestration
-- isolating the mounted endpoint from inline allocator calls
-
-It is not yet sufficient for:
-
-- swapping the create branch directly to `QueueDomainService.allocate_ticket()`
-  without touching shared `MorningAssignmentService`
-
-## Seam Verdict
-
-Allocator surface is isolated enough at the outer seam level, but not yet at
-the exact create-branch replacement point.
+It is not yet isolated enough at the exact create-branch replacement point.

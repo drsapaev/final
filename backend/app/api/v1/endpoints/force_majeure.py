@@ -7,6 +7,9 @@ API endpoints для системы форс-мажора и возвратов
 2. Массовая отмена с возвратом
 3. Управление заявками на возврат
 4. Управление депозитами пациентов
+
+Этот модуль относится к force_majeure exceptional-domain island и не является
+частью обычного SSOT allocator track вокруг QueueDomainService.allocate_ticket().
 """
 
 from datetime import date, datetime

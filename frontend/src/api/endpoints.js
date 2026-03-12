@@ -119,6 +119,11 @@ export const API_ENDPOINTS = {
     CATEGORIES: '/settings/categories'
   },
 
+  // Табло отображения (новый metadata-first contract)
+  BOARD_DISPLAY: {
+    STATE: (boardKey) => `/display/boards/${boardKey}/state`
+  },
+
   // Уведомления
   NOTIFICATIONS: {
     LIST: '/notifications',

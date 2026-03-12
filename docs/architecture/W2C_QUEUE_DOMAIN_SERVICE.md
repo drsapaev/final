@@ -311,6 +311,9 @@ Current production callers through `allocate_ticket()`:
 - `backend/app/services/registrar_wizard_queue_assignment_service.py`
   for mounted wizard-family same-day create flow after queue-tag-level reuse
   and ambiguity checks
+- `backend/app/services/qr_full_update_queue_assignment_service.py`
+  for mounted QR full-update additional-service create flow after QR-local
+  queue resolution and raw SQL numbering
 
 ## Phase 2.2 Boundary Limits
 
@@ -320,7 +323,7 @@ yet a safe public migration target for all allocator families.
 Still outside the safe boundary:
 
 - registrar wizard split allocation
-- `qr_queue.py` direct SQL allocator branches
+- broader QR follow-up outside the mounted full-update create branch
 - force-majeure transfer allocator
 - all `OnlineDay` legacy allocators
 - broader registrar batch service/runtime ownership beyond the mounted create
@@ -359,6 +362,15 @@ Mounted wizard-family same-day create branch is now migrated:
 - queue-tag-level duplicate/reuse logic remains outside the boundary
 - the create branch now routes through `QueueDomainService.allocate_ticket()`
 - broader wizard/cart orchestration is still outside the queue domain boundary
+
+### QR full-update note
+
+Mounted QR full-update additional-service create branch is now migrated:
+
+- QR-local seam still owns target queue resolution
+- QR-local seam still owns raw SQL numbering and local `queue_time`
+- row creation now routes through `QueueDomainService.allocate_ticket()`
+- broader QR cleanup and allocator redesign remain deferred
 
 Notes for the narrowed `W2C-MS-004` slice:
 

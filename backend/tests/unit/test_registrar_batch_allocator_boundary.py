@@ -56,6 +56,7 @@ def test_registrar_batch_create_uses_queue_domain_boundary(
     registrar_auth_headers,
     test_patient,
     cardio_user,
+    test_doctor,
     test_service,
     monkeypatch,
 ):
@@ -105,7 +106,7 @@ def test_registrar_batch_create_uses_queue_domain_boundary(
     assert call.kwargs["source"] == "desk"
     assert call.kwargs["auto_number"] is True
     assert call.kwargs["commit"] is False
-    assert call.kwargs["daily_queue"].specialist_id == cardio_user.id
+    assert call.kwargs["daily_queue"].specialist_id == test_doctor.id
 
 
 @pytest.mark.unit
@@ -115,10 +116,11 @@ def test_registrar_batch_reuse_path_does_not_call_boundary(
     registrar_auth_headers,
     test_patient,
     cardio_user,
+    test_doctor,
     test_service,
     monkeypatch,
 ):
-    existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
+    existing_queue = _create_daily_queue(db_session, specialist_id=test_doctor.id)
     existing_entry = _create_entry(
         db_session,
         queue_id=existing_queue.id,
@@ -165,10 +167,11 @@ def test_registrar_batch_ambiguity_returns_409_before_boundary_call(
     registrar_auth_headers,
     test_patient,
     cardio_user,
+    test_doctor,
     test_service,
     monkeypatch,
 ):
-    existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
+    existing_queue = _create_daily_queue(db_session, specialist_id=test_doctor.id)
     _create_entry(
         db_session,
         queue_id=existing_queue.id,

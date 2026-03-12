@@ -4,11 +4,12 @@
 
 import os
 import tempfile
-from datetime import date, datetime
+import uuid
+from datetime import UTC, date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import get_db
@@ -49,19 +50,103 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
+def pytest_addoption(parser):
+    """Add a narrow opt-in DB backend switch for test-infra pilot work."""
+    parser.addoption(
+        "--db-backend",
+        action="store",
+        default=os.getenv("TEST_DB_BACKEND", "sqlite"),
+        choices=("sqlite", "postgres"),
+        help="Selects the backend DB only for explicit test-infra pilot runs.",
+    )
+
+
+def _selected_test_db_backend(pytestconfig) -> str:
+    return str(pytestconfig.getoption("--db-backend")).strip().lower()
+
+
+def _create_sqlite_test_engine():
+    """Create the current default SQLite test engine."""
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+
+    return engine, db_path
+
+
+def _get_postgres_test_url() -> str:
+    """Resolve the Postgres URL for opt-in pilot runs."""
+    candidate = os.getenv("TEST_POSTGRES_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if candidate and "postgres" in candidate.lower():
+        return candidate
+
+    try:
+        from app.core.config import settings
+
+        configured = str(getattr(settings, "DATABASE_URL", ""))
+        if configured and "postgres" in configured.lower():
+            return configured
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Postgres pilot requested, but no PostgreSQL DATABASE_URL is configured. "
+        "Set TEST_POSTGRES_DATABASE_URL or DATABASE_URL to a Postgres URL."
+    )
+
+
+def _create_postgres_test_engine():
+    """Create an isolated Postgres engine bound to a temporary schema."""
+    postgres_url = _get_postgres_test_url()
+    schema_name = f"pytest_queue_pilot_{uuid.uuid4().hex[:8]}"
+
+    admin_engine = create_engine(postgres_url, echo=False, future=True, pool_pre_ping=True)
+    with admin_engine.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    engine = create_engine(
+        postgres_url,
+        echo=False,
+        future=True,
+        pool_pre_ping=True,
+        connect_args={"options": f"-csearch_path={schema_name}"},
+    )
+
+    @event.listens_for(engine, "connect")
+    def set_search_path(dbapi_conn, _connection_record):  # type: ignore[no-untyped-def]
+        cursor = dbapi_conn.cursor()
+        cursor.execute(f'SET search_path TO "{schema_name}"')
+        cursor.close()
+
+    @event.listens_for(engine, "checkout")
+    def ensure_search_path(dbapi_conn, _connection_record, _connection_proxy):  # type: ignore[no-untyped-def]
+        cursor = dbapi_conn.cursor()
+        cursor.execute(f'SET search_path TO "{schema_name}"')
+        cursor.close()
+
+    return engine, admin_engine, schema_name
+
+
 @pytest.fixture(scope="session")
-def test_db():
+def test_db(pytestconfig):
     """Создает тестовую базу данных"""
-    # Используем временную файловую БД вместо in-memory
-    # In-memory SQLite не работает в разных потоках даже с check_same_thread=False
-    import os
+    backend = _selected_test_db_backend(pytestconfig)
+    cleanup_path = None
+    admin_engine = None
+    schema_name = None
 
-    # Создаем временный файл БД
-    db_fd, db_path = tempfile.mkstemp(suffix='.db')
-    os.close(db_fd)  # Закрываем файловый дескриптор, SQLAlchemy откроет сам
-
-    # check_same_thread=False позволяет использовать БД в разных потоках (для TestClient)
-    engine = create_engine(f"sqlite:///{db_path}", echo=False, connect_args={"check_same_thread": False})
+    if backend == "postgres":
+        engine, admin_engine, schema_name = _create_postgres_test_engine()
+    else:
+        # Используем временную файловую БД вместо in-memory
+        # In-memory SQLite не работает в разных потоках even with check_same_thread=False
+        # check_same_thread=False позволяет использовать БД в разных потоках (для TestClient)
+        engine, cleanup_path = _create_sqlite_test_engine()
 
     # ✅ КРИТИЧЕСКИ ВАЖНО: Импортируем все модели перед созданием таблиц
     # app.db.base уже импортирует все модели через app.models.__init__
@@ -77,11 +162,18 @@ def test_db():
 
     yield engine
 
-    # Удаляем временный файл БД после тестов
-    try:
-        os.unlink(db_path)
-    except Exception:
-        pass  # Игнорируем ошибки удаления
+    engine.dispose()
+
+    if admin_engine is not None and schema_name is not None:
+        with admin_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        admin_engine.dispose()
+
+    if cleanup_path is not None:
+        try:
+            os.unlink(cleanup_path)
+        except Exception:
+            pass  # Игнорируем ошибки удаления
 
 
 @pytest.fixture(scope="function")
@@ -250,6 +342,10 @@ def test_patient(db_session):
 @pytest.fixture(scope="function")
 def test_doctor(db_session, cardio_user):
     """Создает тестового врача"""
+    existing = db_session.query(Doctor).filter(Doctor.user_id == cardio_user.id).first()
+    if existing:
+        return existing
+
     doctor = Doctor(
         user_id=cardio_user.id,
         specialty="Кардиология",
@@ -294,7 +390,7 @@ def test_visit(db_session, test_patient, test_doctor):
         department="cardiology",
         confirmation_token="test-token-123",
         confirmation_channel="telegram",
-        confirmation_expires_at=datetime.utcnow().replace(hour=23, minute=59),
+        confirmation_expires_at=datetime.now(UTC).replace(hour=23, minute=59),
     )
     db_session.add(visit)
     db_session.commit()
@@ -303,11 +399,11 @@ def test_visit(db_session, test_patient, test_doctor):
 
 
 @pytest.fixture(scope="function")
-def test_daily_queue(db_session, cardio_user):
+def test_daily_queue(db_session, test_doctor):
     """Создает тестовую дневную очередь"""
     queue = DailyQueue(
         day=date.today(),
-        specialist_id=cardio_user.id,
+        specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
     )

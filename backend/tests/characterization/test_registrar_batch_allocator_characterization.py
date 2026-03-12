@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
 from app.models.user import User
@@ -28,7 +29,21 @@ def _create_specialist_user(
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
+
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="Кардиология",
+        active=True,
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(user)
     return user
+
+
+@pytest.fixture(autouse=True)
+def _ensure_cardio_doctor(test_doctor):
+    return test_doctor
 
 
 def _create_service(

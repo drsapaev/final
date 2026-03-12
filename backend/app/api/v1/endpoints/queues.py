@@ -5,6 +5,7 @@ from dataclasses import asdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -14,7 +15,26 @@ from app.services.online_queue import issue_next_ticket
 router = APIRouter(tags=["queues"])
 
 
-@router.get("/stats")
+class QueuesStatsResponse(BaseModel):
+    department: str
+    date_str: str
+    is_open: bool = Field(
+        ...,
+        deprecated=True,
+        description="Legacy compatibility field from the OnlineDay island.",
+    )
+    start_number: int = Field(
+        ...,
+        deprecated=True,
+        description="Legacy compatibility field from the OnlineDay island.",
+    )
+    last_ticket: int
+    waiting: int
+    serving: int
+    done: int
+
+
+@router.get("/stats", response_model=QueuesStatsResponse)
 def stats(
     department: str,
     d: Optional[str] = Query(None),

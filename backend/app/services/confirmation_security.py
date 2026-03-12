@@ -14,6 +14,11 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.models.visit import Visit
+from app.services.confirmation_datetime import (
+    confirmation_utc_now,
+    is_confirmation_expired,
+    normalize_confirmation_datetime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +98,14 @@ class ConfirmationSecurityService:
                     allowed=False, reason="Недействительный токен подтверждения"
                 )
 
-            print(f"DEBUG: Visit found: ID={visit.id}, Status={visit.status}, Expires={visit.confirmation_expires_at}, Now={datetime.utcnow()}")
+            print(
+                "DEBUG: Visit found: "
+                f"ID={visit.id}, Status={visit.status}, "
+                f"Expires={visit.confirmation_expires_at}, Now={confirmation_utc_now()}"
+            )
 
             # 2. Проверяем срок действия токена
-            if (
-                visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.utcnow()
-            ):
+            if is_confirmation_expired(visit.confirmation_expires_at):
                 print("DEBUG: Token expired")
                 self._log_security_event(
                     "expired_token",
@@ -242,7 +248,7 @@ class ConfirmationSecurityService:
         random_part = secrets.token_urlsafe(32)
 
         # Добавляем контекстную информацию для дополнительной безопасности
-        context = f"{visit_id}:{datetime.utcnow().timestamp()}"
+        context = f"{visit_id}:{confirmation_utc_now().timestamp()}"
         context_hash = hashlib.sha256(context.encode()).hexdigest()[:16]
 
         # Комбинируем части
@@ -314,12 +320,13 @@ class ConfirmationSecurityService:
         """
         try:
             # Находим визиты с истекшими токенами
+            current_utc = confirmation_utc_now()
             expired_visits = (
                 self.db.query(Visit)
                 .filter(
                     and_(
                         Visit.status == "pending_confirmation",
-                        Visit.confirmation_expires_at < datetime.utcnow(),
+                        Visit.confirmation_expires_at < current_utc,
                     )
                 )
                 .all()
@@ -362,7 +369,7 @@ class ConfirmationSecurityService:
         Получает статистику безопасности за указанный период
         """
         try:
-            since = datetime.utcnow() - timedelta(hours=hours)
+            since = confirmation_utc_now() - timedelta(hours=hours)
 
             # Здесь должна быть логика получения статистики из таблицы аудита
             # Пока возвращаем заглушку
@@ -439,7 +446,13 @@ class ConfirmationSecurityService:
 
             # 3. Проверяем временные аномалии
             if visit.created_at:
-                time_since_creation = datetime.utcnow() - visit.created_at
+                created_at = normalize_confirmation_datetime(visit.created_at)
+                if created_at is None:
+                    return SecurityCheckResult(
+                        allowed=True, reason="Подозрительная активность не обнаружена"
+                    )
+
+                time_since_creation = confirmation_utc_now() - created_at
                 if (
                     time_since_creation.total_seconds() < 60
                 ):  # Слишком быстро после создания
@@ -475,7 +488,7 @@ class ConfirmationSecurityService:
     def _log_security_event(self, event_type: str, data: dict[str, Any]):
         """Логирует событие безопасности"""
         event = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": confirmation_utc_now().isoformat(),
             "event_type": event_type,
             "data": data,
         }

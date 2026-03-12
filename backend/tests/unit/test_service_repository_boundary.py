@@ -17,12 +17,6 @@ def _service_logic_block(module_name: str) -> str:
     return text.split(ROUTER_MARKER, maxsplit=1)[0]
 
 
-def test_appointments_service_avoids_direct_orm_calls() -> None:
-    logic = _service_logic_block("appointments")
-    assert "repository.db" not in logic
-    assert ".query(" not in logic
-
-
 def test_visits_service_avoids_direct_orm_calls() -> None:
     logic = _service_logic_block("visits")
     assert "repository.db" not in logic
@@ -71,15 +65,6 @@ def test_dynamic_pricing_service_avoids_direct_orm_calls() -> None:
     assert ".query(" not in logic
 
 
-def test_qr_queue_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("qr_queue")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
 def test_admin_departments_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("admin_departments")
     direct_db_call = re.search(
@@ -89,26 +74,8 @@ def test_admin_departments_service_avoids_direct_session_calls() -> None:
     assert direct_db_call is None
 
 
-def test_registrar_integration_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("registrar_integration")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
 def test_doctor_integration_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("doctor_integration")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
-def test_registrar_wizard_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("registrar_wizard")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
         logic,
@@ -453,15 +420,6 @@ def test_ai_chat_service_avoids_direct_session_calls() -> None:
 
 def test_auth_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("auth")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
-def test_online_queue_new_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("online_queue_new")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
         logic,

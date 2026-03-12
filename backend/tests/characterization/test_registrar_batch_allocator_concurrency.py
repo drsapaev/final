@@ -8,11 +8,14 @@ from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy.orm import sessionmaker
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.repositories.queue_batch_repository import QueueBatchRepository
+
+pytestmark = pytest.mark.postgres_pilot
 
 
 def _create_user(session, *, suffix: str) -> User:
@@ -27,6 +30,15 @@ def _create_user(session, *, suffix: str) -> User:
     session.add(user)
     session.commit()
     session.refresh(user)
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="Кардиология",
+        active=True,
+    )
+    session.add(doctor)
+    session.commit()
+    session.refresh(user)
+    setattr(user, "queue_doctor_id", doctor.id)
     return user
 
 
@@ -69,6 +81,7 @@ def test_registrar_batch_concurrency_characterization_repeated_submission_reuses
     registrar_auth_headers,
     test_patient,
     cardio_user,
+    test_doctor,
     test_service,
 ):
     request_payload = {
@@ -130,14 +143,14 @@ def test_registrar_batch_concurrency_characterization_parallel_duplicate_reads_c
         _create_service(seed, suffix=suffix)
         queue = DailyQueue(
             day=date.today(),
-            specialist_id=specialist.id,
+            specialist_id=specialist.queue_doctor_id,
             queue_tag=None,
             active=True,
         )
         seed.add(queue)
         seed.commit()
         seed.refresh(queue)
-        specialist_id = specialist.id
+        specialist_id = specialist.queue_doctor_id
         patient_id = patient.id
         queue_id = queue.id
     finally:

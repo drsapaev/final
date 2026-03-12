@@ -577,6 +577,81 @@ jobs:
         path: backend/htmlcov/
         if-no-files-found: warn
 
+  # --- Postgres pilot guardrail ---
+  postgres-pilot:
+    name: 🐘 Postgres Pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [ci-scope]
+    if: |
+      github.event_name != 'schedule' &&
+      needs.ci-scope.outputs.guardrails_required == 'true'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      TEST_POSTGRES_DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
+      PYTHONIOENCODING: 'utf-8'
+      PYTHONUTF8: '1'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 🐍 Установка Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: 📦 Установка зависимостей
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio pytest-deadfixtures httpx
+
+    - name: 🗄️ Ожидание готовности Postgres
+      run: |
+        cd backend
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        url = os.environ["TEST_POSTGRES_DATABASE_URL"]
+        engine = create_engine(url)
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready for postgres_pilot")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+
+    - name: 🧪 Postgres pilot marker lane
+      run: |
+        cd backend
+        pytest -m postgres_pilot -q -c pytest.ini --db-backend=postgres
+
   # --- Архитектурные boundary тесты ---
   architecture-boundary:
     name: 🧱 Context Boundary Integrity

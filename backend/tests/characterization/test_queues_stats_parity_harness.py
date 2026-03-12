@@ -13,6 +13,8 @@ from app.models.user import User
 from app.services.online_queue import get_or_create_day
 from app.services.queue_stats_parity_harness import compare_queues_stats
 
+pytestmark = pytest.mark.postgres_pilot
+
 
 def _create_department(db_session, *, key: str, name_ru: str) -> Department:
     department = Department(key=key, name_ru=name_ru, active=True)

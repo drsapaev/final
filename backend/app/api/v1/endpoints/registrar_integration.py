@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.crud import clinic as crud_clinic, online_queue as crud_queue
+from app.models.clinic import Doctor
 from app.models.department import Department, DepartmentService
 from app.models.service import Service
 from app.models.user import User
@@ -34,6 +35,48 @@ router = APIRouter()
 
 def _queue_domain_service(db: Session) -> QueueDomainService:
     return QueueDomainService(db)
+
+
+def _resolve_daily_queue_specialist_id_or_raise(
+    db: Session,
+    *,
+    specialist_id: int,
+) -> int:
+    """
+    Canonical DailyQueue owner is doctors.id.
+
+    The mounted registrar batch route historically accepted either doctor.id or
+    user.id and let SQLite mask the difference. Under strict Postgres FK
+    enforcement we normalize both inputs to doctor.id before touching
+    DailyQueue.specialist_id.
+    """
+    doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    if doctor:
+        return doctor.id
+
+    doctor = db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
+    if doctor:
+        logger.info(
+            "[create_queue_entries_batch] Canonicalized user_id=%s to doctor_id=%s",
+            specialist_id,
+            doctor.id,
+        )
+        return doctor.id
+
+    user = db.query(User).filter(User.id == specialist_id).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Специалист с ID {specialist_id} найден в users, но не связан с doctors. "
+                "Невозможно создать очередь без doctor owner."
+            ),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Специалист с ID {specialist_id} не найден (ни в doctors, ни в users)",
+    )
 
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
 
@@ -3113,9 +3156,10 @@ def create_queue_entries_batch(
         today = date.today()
         current_time = datetime.now(timezone)
 
-        # Группируем услуги по specialist_id (один специалист = одна запись в очереди)
-        # ⚠️ ВАЖНО: Конвертируем doctor_id → user_id если нужно
-        services_by_specialist: Dict[int, List[BatchServiceItem]] = {}
+        # Группируем услуги по canonical DailyQueue owner (doctor.id).
+        # Вход по-прежнему может прийти как doctor.id или user.id, но внутренняя
+        # queue ownership semantics остаётся doctors.id.
+        services_by_specialist: Dict[int, Dict[str, Any]] = {}
         for service_item in request.services:
             service = db.query(Service).filter(Service.id == service_item.service_id).first()
             if not service:
@@ -3124,33 +3168,19 @@ def create_queue_entries_batch(
                     detail=f"Услуга с ID {service_item.service_id} не найдена",
                 )
 
-            specialist_id = service_item.specialist_id
+            queue_specialist_id = _resolve_daily_queue_specialist_id_or_raise(
+                db,
+                specialist_id=service_item.specialist_id,
+            )
 
-            # Проверяем, является ли specialist_id user_id или doctor_id
-            # Если это doctor_id, конвертируем в user_id
-            from app.models.clinic import Doctor
-
-            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-            if doctor and doctor.user_id:
-                # Это был doctor_id, конвертируем в user_id
-                specialist_id = doctor.user_id
-                logger.info(
-                    f"[create_queue_entries_batch] Конвертация: doctor_id={service_item.specialist_id} → user_id={specialist_id}"
-                )
-            else:
-                # Проверяем, что specialist_id существует в users
-                from app.models.user import User
-
-                user = db.query(User).filter(User.id == specialist_id).first()
-                if not user:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Специалист с ID {specialist_id} не найден (ни в doctors, ни в users)",
-                    )
-
-            if specialist_id not in services_by_specialist:
-                services_by_specialist[specialist_id] = []
-            services_by_specialist[specialist_id].append(service_item)
+            group = services_by_specialist.setdefault(
+                queue_specialist_id,
+                {
+                    "response_specialist_id": service_item.specialist_id,
+                    "services": [],
+                },
+            )
+            group["services"].append(service_item)
 
         logger.debug(
             f"[create_queue_entries_batch] Группировка услуг: {len(services_by_specialist)} уникальных специалистов"
@@ -3161,21 +3191,25 @@ def create_queue_entries_batch(
         reused_entries_count = 0
         queue_domain_service = _queue_domain_service(db)
 
-        for specialist_id, services_list in services_by_specialist.items():
+        for queue_specialist_id, specialist_group in services_by_specialist.items():
+            specialist_id = specialist_group["response_specialist_id"]
+            services_list = specialist_group["services"]
             # Проверяем, есть ли очередь у специалиста на сегодня
             daily_queue = (
                 db.query(DailyQueue)
                 .filter(
-                    DailyQueue.specialist_id == specialist_id, DailyQueue.day == today
+                    DailyQueue.specialist_id == queue_specialist_id,
+                    DailyQueue.day == today,
                 )
                 .first()
             )
 
-            # Автосоздание DailyQueue (legacy-совместимый путь по specialist_id=user.id)
+            # Автосоздание DailyQueue сохраняет legacy response contract, но сам
+            # queue owner теперь canonicalized to doctors.id.
             if not daily_queue:
                 daily_queue = DailyQueue(
                     day=today,
-                    specialist_id=specialist_id,
+                    specialist_id=queue_specialist_id,
                     active=True,
                     queue_tag=None,
                     online_start_time="07:00",
@@ -3195,7 +3229,8 @@ def create_queue_entries_batch(
                 if existing_entry:
                     logger.warning(
                         f"[create_queue_entries_batch] Пациент {request.patient_id} уже в очереди "
-                        f"к специалисту {specialist_id} (queue_id={daily_queue.id}, entry_id={existing_entry.id}, "
+                        f"к специалисту {specialist_id} / doctor_id={queue_specialist_id} "
+                        f"(queue_id={daily_queue.id}, entry_id={existing_entry.id}, "
                         f"status={existing_entry.status})"
                     )
                     # Пропускаем создание дубликата, но добавляем существующую запись в ответ
@@ -3246,6 +3281,7 @@ def create_queue_entries_batch(
 
                 logger.info(
                     f"[create_queue_entries_batch] [OK] Создана запись: specialist_id={specialist_id}, "
+                    f"doctor_id={queue_specialist_id}, "
                     f"queue_id={queue_entry.queue_id}, number={queue_entry.number}, source={request.source}"
                 )
 

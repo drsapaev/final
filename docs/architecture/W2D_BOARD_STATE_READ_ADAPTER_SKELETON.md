@@ -22,9 +22,22 @@ It currently supports:
 ## What it intentionally does not do yet
 
 - it does not replace mounted [board.py](C:/final/backend/app/api/v1/endpoints/board.py)
-- it does not read from real display-config sources yet
 - it does not read from real SSOT queue sources yet
+- it does not resolve uncertain display fields like `logo`, `is_paused`,
+  `is_closed`, `contrast_default`, or `kiosk_default`
 - it does not attempt full parity with the current UI contract
+
+Current progress after display-wiring slice:
+
+- confirmed display metadata sources are now wired internally
+- announcement input preparation is now wired internally
+- queue-state strict fields are now wired internally
+- compatibility fields remain intentionally separate
+
+Implementation evidence:
+
+- [board_state_read_adapter.py](C:/final/backend/app/services/board_state_read_adapter.py)
+- [test_board_state_display_wiring.py](C:/final/backend/tests/unit/test_board_state_display_wiring.py)
 
 ## Why this helps
 
@@ -40,10 +53,10 @@ The skeleton makes those concerns explicit before any runtime switch.
 
 ## What remains unresolved
 
-- real source wiring for display metadata
-- real source wiring for SSOT queue-state inputs
 - ownership for `is_paused` / `is_closed`
-- exact announcement flattening/mapping rules
+- exact announcement flattening/mapping policy for mounted replacement
+- compatibility-only handling for `is_open` / `start_number` in any later
+  mounted replacement
 - decision on whether future mounted `board_state` should still expose counters
 
 ## Future mounted replacement would still need

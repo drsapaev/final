@@ -1,0 +1,76 @@
+{
+  "contract_version": "1.0",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/services/**",
+      "backend/app/repositories/**",
+      "backend/tests/unit/**",
+      "backend/tests/integration/**"
+    ],
+    "exclude": [
+      "backend/app/services/payment*",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/app/services/auth*",
+      "backend/app/repositories/payment*",
+      "backend/app/repositories/queue*",
+      "backend/app/repositories/emr*",
+      "backend/app/repositories/auth*",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Refactor one bounded module toward cleaner service or repository boundaries.",
+    "Preserve behavior and existing contracts.",
+    "Avoid sweeping architectural changes beyond the selected module."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 10,
+    "max_diff_lines": 350,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/app/services/payment*",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/app/services/auth*",
+      "backend/app/repositories/payment*",
+      "backend/app/repositories/queue*",
+      "backend/app/repositories/emr*",
+      "backend/app/repositories/auth*",
+      "backend/alembic/**",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && pytest <targeted-module-tests>",
+    "cd backend && pytest tests/architecture/test_context_boundaries.py -q",
+    "If API behavior changed, run: cd backend && pytest tests/test_openapi_contract.py -q"
+  ],
+  "must_not_touch": [
+    "auth, payment, queue, or EMR modules",
+    "schema or migrations",
+    "workflow permissions",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "behavior-preservation summary",
+    "list of refactored module files",
+    "targeted test results"
+  ],
+  "stop_conditions": [
+    "The refactor needs protected-domain edits.",
+    "The work requires cross-module architectural changes.",
+    "The task exceeds the approved file or diff budget."
+  ],
+  "review_notes": [
+    "Use this only for bounded refactors with stable behavior.",
+    "Escalate instead of widening into a multi-module redesign."
+  ]
+}

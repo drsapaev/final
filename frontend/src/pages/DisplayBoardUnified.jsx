@@ -16,10 +16,50 @@ import {
   EyeOff } from
 'lucide-react';
 import { api } from '../api/client';
+import { fetchBoardDisplayStateV1 } from '../api/boardDisplay';
 import { openDisplayBoardWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
+
+function buildBoardState({ metadata = null, compatibilitySource = null } = {}) {
+  const source = compatibilitySource && typeof compatibilitySource === 'object'
+    ? compatibilitySource
+    : {};
+
+  return {
+    brand: metadata?.brand || source.brand || source.title || 'Clinic',
+    logo: metadata?.logo || source.logo || source.logo_url || '',
+    is_paused: !!(source.is_paused || source.paused),
+    is_closed: !!(source.is_closed || source.closed),
+    announcement: metadata?.announcement || source.announcement || source.ticker || '',
+    announcement_ru: metadata?.announcement_ru || source.announcement_ru || '',
+    announcement_uz: metadata?.announcement_uz || source.announcement_uz || '',
+    announcement_en: metadata?.announcement_en || source.announcement_en || '',
+    primary_color: metadata?.primary_color || source.primary_color || '',
+    bg_color: metadata?.bg_color || source.bg_color || '',
+    text_color: metadata?.text_color || source.text_color || '',
+    contrast_default:
+      typeof metadata?.contrast_default === 'boolean'
+        ? metadata.contrast_default
+        : !!source.contrast_default,
+    kiosk_default:
+      typeof metadata?.kiosk_default === 'boolean'
+        ? metadata.kiosk_default
+        : !!source.kiosk_default,
+    sound_default:
+      typeof metadata?.sound_default === 'boolean'
+        ? metadata.sound_default
+        : source.sound_default !== false,
+  };
+}
+
+function hasExplicitSoundDefault({ metadata = null, compatibilitySource = null } = {}) {
+  return (
+    typeof metadata?.sound_default === 'boolean' ||
+    typeof compatibilitySource?.sound_default !== 'undefined'
+  );
+}
 /**
  * Объединенное табло очереди с полным функционалом
  * Объединяет функции из DisplayBoard.jsx и QueueBoard.jsx
@@ -147,27 +187,49 @@ export default function DisplayBoardUnified({
 
         // Игнорируем ошибки localStorage
       }}} // Загрузка состояния табло (старое)
-  async function loadBoardState() {try {const st = await api.get('/board/state');if (st && typeof st === 'object') {
-        setBoard({
-          brand: st.brand || st.title || 'Clinic',
-          logo: st.logo || st.logo_url || '',
-          is_paused: !!(st.is_paused || st.paused),
-          is_closed: !!(st.is_closed || st.closed),
-          announcement: st.announcement || st.ticker || '',
-          announcement_ru: st.announcement_ru || '',
-          announcement_uz: st.announcement_uz || '',
-          announcement_en: st.announcement_en || '',
-          primary_color: st.primary_color || '',
-          bg_color: st.bg_color || '',
-          text_color: st.text_color || '',
-          contrast_default: !!st.contrast_default,
-          kiosk_default: !!st.kiosk_default,
-          sound_default: st.sound_default !== false
+  async function loadBoardState() {
+    try {
+      const [metadataResult, legacyResult] = await Promise.allSettled([
+        fetchBoardDisplayStateV1(currentBoardId),
+        api.get('/board/state'),
+      ]);
+
+      const metadata =
+        metadataResult.status === 'fulfilled' &&
+        metadataResult.value &&
+        typeof metadataResult.value === 'object'
+          ? metadataResult.value
+          : null;
+      const legacyState =
+        legacyResult.status === 'fulfilled' &&
+        legacyResult.value &&
+        typeof legacyResult.value === 'object'
+          ? legacyResult.value
+          : null;
+
+      if (metadata || legacyState) {
+        const nextBoardState = buildBoardState({
+          metadata,
+          compatibilitySource: legacyState,
         });
-        if (soundInitial === undefined && typeof st.sound_default !== 'undefined') {
-          setBoardSettings((prev) => ({ ...prev, soundEnabled: st.sound_default !== false }));
+        setBoard(nextBoardState);
+
+        if (
+          soundInitial === undefined &&
+          hasExplicitSoundDefault({
+            metadata,
+            compatibilitySource: legacyState,
+          })
+        ) {
+          setBoardSettings((prev) => ({
+            ...prev,
+            soundEnabled: nextBoardState.sound_default !== false,
+          }));
         }
-        try {localStorage.setItem('board.state', JSON.stringify(st));} catch {
+
+        try {
+          localStorage.setItem('board.state', JSON.stringify(nextBoardState));
+        } catch {
 
 
 
@@ -176,24 +238,23 @@ export default function DisplayBoardUnified({
 
 
           // Игнорируем ошибки localStorage
-        }}} catch {// fallback из кэша
-      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') {
-            setBoard({
-              brand: cached.brand || cached.title || 'Clinic',
-              logo: cached.logo || cached.logo_url || '',
-              is_paused: !!(cached.is_paused || cached.paused),
-              is_closed: !!(cached.is_closed || cached.closed),
-              announcement: cached.announcement || cached.ticker || '',
-              announcement_ru: cached.announcement_ru || '',
-              announcement_uz: cached.announcement_uz || '',
-              announcement_en: cached.announcement_en || '',
-              primary_color: cached.primary_color || '',
-              bg_color: cached.bg_color || '',
-              text_color: cached.text_color || '',
-              contrast_default: !!cached.contrast_default,
-              kiosk_default: !!cached.kiosk_default,
-              sound_default: cached.sound_default !== false
-            });
+        }
+        return;
+      }
+
+      throw new Error('Board state sources returned no data');
+    } catch {
+      // fallback из кэша
+      try {
+        const raw = localStorage.getItem('board.state');
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (cached && typeof cached === 'object') {
+            setBoard(
+              buildBoardState({
+                compatibilitySource: cached,
+              })
+            );
           }
         }
       } catch {
@@ -205,7 +266,9 @@ export default function DisplayBoardUnified({
 
 
         // Игнорируем ошибки localStorage
-      }}} // Загрузка окон/кабинетов (старое)
+      }
+    }
+  } // Загрузка окон/кабинетов (старое)
   async function loadWindows() {try {const st = await api.get('/queue/queue/status');let arr = [];
       if (Array.isArray(st?.windows)) arr = st.windows;else
       if (Array.isArray(st)) arr = st;else

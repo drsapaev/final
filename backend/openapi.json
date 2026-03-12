@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Clinic Manager API",
-    "version": "0.9.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -61,6 +61,28 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/csrf-token": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Csrf Token",
+        "description": "Возвращает CSRF-токен и дублирует его в cookie для frontend bootstrap.\n\nДаже если CSRF middleware отключен, endpoint нужен frontend-клиенту,\nчтобы не шуметь 404 в консоли при state-changing запросах.",
+        "operationId": "get_csrf_token_api_v1_auth_csrf_token_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CSRFTokenResponse"
+                }
               }
             }
           }
@@ -63290,6 +63312,20 @@
         "title": "BulkToggleRequest",
         "description": "Запрос на массовое переключение флагов"
       },
+      "CSRFTokenResponse": {
+        "properties": {
+          "csrf_token": {
+            "type": "string",
+            "title": "Csrf Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CSRFTokenResponse",
+        "description": "Ответ для bootstrap CSRF-токена во frontend."
+      },
       "CabinetInfo": {
         "properties": {
           "cabinet_number": {
@@ -85101,7 +85137,11 @@
         "enum": [
           "light",
           "dark",
-          "auto"
+          "auto",
+          "system",
+          "vibrant",
+          "glass",
+          "gradient"
         ],
         "title": "Theme",
         "description": "Темы интерфейса"
@@ -85499,12 +85539,26 @@
             "title": "Backup Codes"
           },
           "recovery_token": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Recovery Token"
           },
           "expires_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Expires At"
           }
         },
@@ -85512,9 +85566,7 @@
         "required": [
           "qr_code_url",
           "secret_key",
-          "backup_codes",
-          "recovery_token",
-          "expires_at"
+          "backup_codes"
         ],
         "title": "TwoFactorSetupResponse",
         "description": "Ответ на настройку 2FA"
@@ -87174,7 +87226,7 @@
                 "type": "null"
               }
             ],
-            "default": "light"
+            "default": "auto"
           },
           "language": {
             "anyOf": [
@@ -87477,7 +87529,7 @@
                 "type": "null"
               }
             ],
-            "default": "light"
+            "default": "auto"
           },
           "language": {
             "anyOf": [
@@ -87984,6 +88036,45 @@
             ],
             "title": "Full Name"
           },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
           "email": {
             "anyOf": [
               {
@@ -88008,6 +88099,90 @@
               }
             ],
             "title": "Phone"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
           },
           "avatar_url": {
             "anyOf": [
@@ -91323,6 +91498,39 @@
             ],
             "title": "Full Name"
           },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
           "email": {
             "anyOf": [
               {
@@ -91356,6 +91564,84 @@
             ],
             "title": "Avatar Url"
           },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
           "role": {
             "type": "string",
             "title": "Role"
@@ -91387,6 +91673,18 @@
               }
             ],
             "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           },
           "last_login": {
             "anyOf": [

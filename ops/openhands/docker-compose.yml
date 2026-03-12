@@ -1,0 +1,17 @@
+services:
+  openhands:
+    image: ${OPENHANDS_APP_IMAGE:-docker.openhands.dev/openhands/openhands:1.3}
+    container_name: openhands-app
+    pull_policy: always
+    environment:
+      AGENT_SERVER_IMAGE_REPOSITORY: ${AGENT_SERVER_IMAGE_REPOSITORY:-ghcr.io/openhands/agent-server}
+      AGENT_SERVER_IMAGE_TAG: ${AGENT_SERVER_IMAGE_TAG:-1.10.0-python}
+      LOG_ALL_EVENTS: ${LOG_ALL_EVENTS:-true}
+      SANDBOX_VOLUMES: ${OPENHANDS_WORKSPACE_MOUNT:?OPENHANDS_WORKSPACE_MOUNT is required}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${OPENHANDS_STATE_DIR:?OPENHANDS_STATE_DIR is required}:/.openhands
+    ports:
+      - "${OPENHANDS_PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

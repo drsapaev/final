@@ -12,13 +12,13 @@ Mode: behavior-preserving execution
 | `backend/app/api/v1/endpoints/registrar_wizard.py` | broader queue creation branches outside mounted same-day create path | Mounted same-day wizard create path is now migrated through the compatibility boundary, but broader wizard/cart orchestration remains deferred | Mixed logic | Broader registrar family track |
 | `backend/app/services/registrar_wizard_api_service.py` | queue creation branches | Same mixed allocator behavior as router counterpart | Mixed logic | High-risk allocator migration |
 | `backend/app/crud/online_queue.py` | online join helpers | Direct model creation after standalone number lookup | Direct model creation | High-risk allocator migration |
-| `backend/app/api/v1/endpoints/qr_queue.py` | `full_update_online_entry()` branches | Direct SQL allocator branches | Direct SQL / numbering semantics | Review before high-risk allocator migration |
+| `backend/app/api/v1/endpoints/qr_queue.py` | broader QR follow-up outside mounted full-update create branch | Mounted QR full-update create branch is migrated; remaining follow-up is QR-local cleanup, not primary caller ownership | QR cleanup / numbering semantics | Broader QR follow-up |
 | `backend/app/services/qr_queue_api_service.py` | mirror allocator branches | Same mixed direct SQL + service allocator split | Direct SQL / mixed logic | Review before high-risk allocator migration |
 | `backend/app/services/force_majeure_service.py` | `_get_next_queue_number()`, `transfer_entries_to_tomorrow()` | Own transfer allocator with separate status and numbering assumptions | Exceptional flow / numbering semantics | Dedicated force-majeure review |
-| `backend/app/services/online_queue.py` | `issue_next_ticket()` | `OnlineDay` legacy counter | Legacy/OnlineDay | Legacy migration track |
-| `backend/app/api/v1/endpoints/online_queue.py` | legacy online queue endpoints | Delegates to `OnlineDay` counter semantics | Legacy/OnlineDay | Legacy migration track |
-| `backend/app/services/online_queue_api_service.py` | legacy online queue endpoints | Delegates to `OnlineDay` counter semantics | Legacy/OnlineDay | Legacy migration track |
-| `backend/app/crud/queue.py` | `next_ticket_and_insert_entry()` | Stale legacy ticket path | Legacy/stale allocator | Legacy cleanup track |
+| `backend/app/services/online_queue.py` | `issue_next_ticket()` | `OnlineDay` legacy counter; now explicitly isolated from the main queue track | Legacy/OnlineDay island | Separate legacy island |
+| `backend/app/api/v1/endpoints/online_queue.py` | legacy online queue endpoints | Disabled router delegating to `OnlineDay` counter semantics | Legacy/OnlineDay island | Separate legacy island / cleanup later |
+| `backend/app/services/online_queue_api_service.py` | legacy online queue endpoints | Duplicate mirror of disabled `OnlineDay` router | Legacy/OnlineDay island | Separate legacy island / cleanup later |
+| `backend/app/crud/queue.py` | `next_ticket_and_insert_entry()` | Stale legacy ticket path outside the OnlineDay live mounted core | Legacy/stale allocator | Legacy cleanup track |
 | `backend/app/services/online_queue_new_api_service.py` | `join_queue()` and related router-like handlers | Duplicate unmounted module; unsafe to refactor blindly while mounted runtime path lives elsewhere | Shadow/dead-path ambiguity | Human review / cleanup track |
 
 ## Superseded by Phase 2.2 Review
@@ -36,3 +36,9 @@ boundary for queue-row creation.
 Mounted registrar batch-only create path is also no longer deferred. It now
 uses the compatibility boundary while keeping local reuse/ambiguity logic in
 place.
+
+Mounted QR full-update create branch is also no longer deferred. It now uses
+the compatibility boundary while keeping QR-local raw SQL numbering in place.
+
+OnlineDay legacy callers also no longer count against the main allocator-boundary
+track. They now belong to a separate legacy island.

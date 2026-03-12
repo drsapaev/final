@@ -1,0 +1,75 @@
+{
+  "contract_version": "1.0",
+  "task_type": "harden-payments",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/payment*",
+      "backend/app/services/payment*",
+      "backend/app/repositories/payment*",
+      "backend/app/models/payment*",
+      "backend/tests/**payment**",
+      "frontend/src/components/payment/**",
+      "frontend/src/services/payment.js",
+      "frontend/e2e/payment-system.spec.js",
+      "PAYMENT_SYSTEM_FINAL_REPORT.md",
+      "backend/WEBHOOK_SYSTEM_GUIDE.md"
+    ],
+    "exclude": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Audit and harden payment handling with the smallest safe change set.",
+    "Keep provider secrets and production credentials out of scope.",
+    "Require human review for any behavior change."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 260,
+    "must_run_tests": true,
+    "mandatory_human_review": true,
+    "protected_paths": [
+      "backend/app/core/auth.py",
+      "backend/app/core/security.py",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && pytest <targeted-payment-tests>",
+    "cd backend && pytest tests/integration/test_payment_init_e2e.py -q",
+    "cd frontend && npx playwright test frontend/e2e/payment-system.spec.js"
+  ],
+  "must_not_touch": [
+    "provider secrets",
+    "production webhook credentials",
+    "schema or migrations",
+    "workflow permissions"
+  ],
+  "required_artifacts": [
+    "payment hardening summary",
+    "tests run and outcomes",
+    "list of assumptions or gaps that remain"
+  ],
+  "stop_conditions": [
+    "A secret rotation or credential change is required.",
+    "The task expands into a provider integration rewrite.",
+    "The approved file or diff budget would be exceeded."
+  ],
+  "review_notes": [
+    "Human review is mandatory because payments are a protected zone.",
+    "Do not represent security posture as complete if validation is partial."
+  ]
+}

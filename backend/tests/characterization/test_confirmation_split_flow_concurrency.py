@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -13,6 +13,8 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
+
+pytestmark = pytest.mark.postgres_pilot
 
 
 def _make_pending_confirmation_visit(
@@ -63,7 +65,7 @@ def _make_pending_confirmation_visit(
             department="cardiology",
             confirmation_token=f"confirm-token-{suffix}",
             confirmation_channel="telegram",
-            confirmation_expires_at=datetime.utcnow() + timedelta(hours=2),
+            confirmation_expires_at=datetime.now(UTC) + timedelta(hours=2),
         )
         session.add(visit)
         session.commit()

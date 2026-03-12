@@ -1,0 +1,75 @@
+{
+  "contract_version": "1.0",
+  "task_type": "audit-queue",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/queue*.py",
+      "backend/app/services/queue*",
+      "backend/app/repositories/queue*",
+      "backend/app/models/online_queue.py",
+      "backend/tests/**queue**",
+      "frontend/src/components/queue/**",
+      "frontend/src/hooks/useQueueManager.js",
+      "frontend/src/services/queue.js",
+      "docs/QUEUE_SYSTEM_ARCHITECTURE.md",
+      "docs/ONLINE_QUEUE_SYSTEM_GUIDE.md"
+    ],
+    "exclude": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Audit queue consistency across API, services, client, tests, and docs.",
+    "Prefer findings and bounded drift fixes over algorithm rewrites.",
+    "Require human review for any real queue behavior change."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 6,
+    "max_diff_lines": 220,
+    "must_run_tests": true,
+    "mandatory_human_review": true,
+    "protected_paths": [
+      "backend/app/core/auth.py",
+      "backend/app/core/security.py",
+      "backend/app/services/payment*",
+      "backend/app/services/emr*",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && pytest <targeted-queue-tests>",
+    "cd frontend && npm run test:run -- src/api/__tests__/queue.test.js",
+    "If a browser queue flow changed, run: cd frontend && npx playwright test frontend/e2e/queue-system.spec.js"
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "schema or migrations",
+    "workflow permissions",
+    "queue numbering or timing algorithms without explicit approval"
+  ],
+  "required_artifacts": [
+    "queue consistency findings",
+    "tests run and outcomes",
+    "explicit note of any deferred protected fix"
+  ],
+  "stop_conditions": [
+    "The task turns into a queue behavior rewrite.",
+    "A migration or secret change becomes necessary.",
+    "The approved file or diff budget would be exceeded."
+  ],
+  "review_notes": [
+    "Human review is mandatory because queue behavior is a protected zone.",
+    "Use a separate contract for any non-trivial queue behavior change."
+  ]
+}

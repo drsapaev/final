@@ -1,52 +1,44 @@
 # Wave 2C Wizard Billing Coupling Recheck
 
-Date: 2026-03-08
-Mode: readiness recheck, docs-only
+Date: 2026-03-09
+Mode: readiness review, docs-only
 
-## Mounted Runtime Reviewed
+## Question
 
-- `POST /api/v1/registrar/cart`
-- `RegistrarWizardQueueAssignmentService`
+After the outer seam extraction, is billing/cart coupling still the main
+blocker for wizard-family boundary migration?
 
-## Recheck Question
+## Current Mounted Shape
 
-Did extraction materially reduce billing coupling for queue migration
-readiness?
-
-## Current State
-
-The mounted endpoint still owns:
+`/registrar/cart` still owns:
 
 - visit creation
 - invoice creation
 - invoice-visit linking
-- billing calculations
-- final response assembly
+- billing total calculation
+- final response shaping
 
 But it no longer owns the queue-assignment loop inline.
 
-Queue handoff now occurs through a wizard-specific service seam.
-
-## Severity
+## Coupling Severity
 
 Verdict: `MEDIUM`
 
 ## Why Not HIGH
 
-- allocator handoff is no longer inline in the billing-heavy endpoint
-- wizard-family queue assignment now has a dedicated outer seam
-- queue-specific behavior can be reasoned about separately from the cart body
+- queue assignment now has a dedicated wizard-local outer seam
+- allocator orchestration is no longer hidden directly inside the endpoint body
+- migration analysis can focus on the seam instead of the whole cart method
 
 ## Why Not LOW
 
-- queue assignment still happens inside the same mounted request/session
-- billing artifacts and queue artifacts are still committed together
-- the endpoint still returns invoice, visit, and queue data together
+- queue assignment still runs inside the same request/session lifecycle
+- invoice and queue outcomes are still committed together
+- the mounted response still combines billing/visit/queue data
 
-## Coupling Implication
+## Recheck Conclusion
 
-Billing coupling still exists, but it is no longer the main reason to defer all
-queue-boundary work on wizard-family.
+Billing coupling still exists, but it is no longer the sharpest blocker.
 
-The sharper blocker is now the remaining shared create-branch logic inside
+The sharper blocker is the remaining hidden create-branch handoff inside shared
 `MorningAssignmentService`.

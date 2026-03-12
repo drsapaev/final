@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
+from app.services.confirmation_datetime import (
+    confirmation_utc_now,
+    is_confirmation_expired,
+)
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.context_facades.queue_facade import (
     QueueContextFacade,
@@ -183,10 +187,7 @@ class VisitConfirmationService:
                     detail="Визит не найден или уже подтвержден",
                 )
 
-            if (
-                visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.utcnow()
-            ):
+            if is_confirmation_expired(visit.confirmation_expires_at):
                 raise VisitConfirmationDomainError(
                     status_code=400,
                     detail="Срок подтверждения истек",
@@ -235,10 +236,7 @@ class VisitConfirmationService:
                     detail="Визит не найден",
                 )
 
-            if (
-                visit.confirmation_expires_at
-                and visit.confirmation_expires_at < datetime.utcnow()
-            ):
+            if is_confirmation_expired(visit.confirmation_expires_at):
                 raise VisitConfirmationDomainError(
                     status_code=400,
                     detail="Срок подтверждения истек",
@@ -308,7 +306,7 @@ class VisitConfirmationService:
         confirmation_phone: str | None = None,
         confirmation_telegram_id: str | None = None,
     ) -> dict[str, Any]:
-        visit.confirmed_at = datetime.utcnow()
+        visit.confirmed_at = confirmation_utc_now()
         visit.confirmed_by = confirmed_by
         visit.status = "confirmed"
 

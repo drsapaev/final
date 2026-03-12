@@ -1,0 +1,70 @@
+{
+  "contract_version": "1.0",
+  "task_type": "polish-accessibility",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "frontend/src/components/**",
+      "frontend/src/pages/**",
+      "frontend/src/test/**",
+      "frontend/e2e/**",
+      "docs/**"
+    ],
+    "exclude": [
+      "frontend/src/components/auth/**",
+      "frontend/src/components/payment/**",
+      "frontend/src/components/queue/**",
+      "frontend/src/components/emr*/**",
+      "frontend/src/pages/auth/**",
+      "backend/**",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Improve accessibility in non-protected UI surfaces.",
+    "Keep the work limited to verified UX or semantic fixes.",
+    "Avoid broad visual rewrites or protected-domain flows."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 240,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "frontend/src/components/auth/**",
+      "frontend/src/components/payment/**",
+      "frontend/src/components/queue/**",
+      "frontend/src/components/emr*/**",
+      "backend/**",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd frontend && npm run test:run -- <targeted-accessibility-spec>",
+    "If a browser interaction changed, run: cd frontend && npx playwright test <targeted-browser-spec>"
+  ],
+  "must_not_touch": [
+    "auth flows",
+    "payment flows",
+    "queue flows",
+    "EMR flows",
+    "workflow permissions",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "accessibility fixes summary",
+    "tests run and outcomes",
+    "known a11y gaps that remain"
+  ],
+  "stop_conditions": [
+    "The fix requires protected-domain screens or backend logic.",
+    "The task becomes a full UI redesign.",
+    "The approved file or diff budget would be exceeded."
+  ],
+  "review_notes": [
+    "Keep the scope to bounded accessibility improvements.",
+    "Create a separate contract for protected or domain-heavy UI flows."
+  ]
+}

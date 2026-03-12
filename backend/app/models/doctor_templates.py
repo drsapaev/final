@@ -36,7 +36,7 @@ class DoctorTreatmentTemplate(Base):
     __tablename__ = "doctor_treatment_templates"
 
     id = Column(String(36), primary_key=True)
-    doctor_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doctor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     icd10_code = Column(String(10), nullable=False, index=True, comment="Код МКБ-10")
     treatment_text = Column(Text, nullable=False, comment="Текст назначения")
     treatment_hash = Column(String(64), nullable=False, comment="SHA256 для дедупликации")

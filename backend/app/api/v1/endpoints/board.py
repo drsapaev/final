@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+"""Legacy board read model for the OnlineDay compatibility island."""
+
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -9,7 +12,23 @@ from app.services.online_queue import load_stats
 router = APIRouter(prefix="/board", tags=["board"])
 
 
-@router.get("/state", summary="Состояние очереди для табло")
+class BoardLegacyStateResponse(BaseModel):
+    department: str
+    date_str: str
+    is_open: bool
+    start_number: int
+    last_ticket: int
+    waiting: int
+    serving: int
+    done: int
+
+
+@router.get(
+    "/state",
+    response_model=BoardLegacyStateResponse,
+    summary="Legacy board state compatibility route",
+    deprecated=True,
+)
 def board_state(
     department: str = Query(..., min_length=1, max_length=64),
     date: str = Query(..., description="YYYY-MM-DD"),

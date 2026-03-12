@@ -16,9 +16,9 @@ function TabButton({ active, onClick, children }) {
   const st = {
     padding: '8px 12px',
     borderRadius: 10,
-    border: '1px solid var(--border-color)',
-    background: active ? 'var(--accent-color)' : 'var(--bg-primary)',
-    color: active ? 'white' : 'var(--text-primary)',
+    border: '1px solid var(--mac-border)',
+    background: active ? 'var(--mac-accent)' : 'var(--mac-bg-primary)',
+    color: active ? 'var(--mac-text-on-accent)' : 'var(--mac-text-primary)',
     cursor: 'pointer',
     transition: 'all 0.2s ease'
   };
@@ -45,9 +45,8 @@ function Row({ k, v, onSave }) {
  *  - Вкладка "printer": простые пары key/value (если backend поддерживает PUT /settings)
  *  - Вкладка "online_queue": простые пары key/value
  */
-export default function Settings() {void
-  useTheme();void
-  useState('Settings');
+export default function Settings() {
+  useTheme();
   const [tab, setTab] = useState('license');
 
   // license tab
@@ -189,9 +188,9 @@ export default function Settings() {void
     return (
       <span style={{
         padding: '2px 8px', borderRadius: 999,
-        background: licenseOk ? '#ecfdf5' : '#fef2f2',
-        color: licenseOk ? '#065f46' : '#7f1d1d',
-        border: `1px solid ${licenseOk ? '#a7f3d0' : '#fecaca'}`,
+        background: licenseOk ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+        color: licenseOk ? 'var(--mac-success)' : 'var(--mac-error)',
+        border: `1px solid ${licenseOk ? 'var(--mac-success-border)' : 'var(--mac-error-border)'}`,
         fontSize: 12,
         whiteSpace: 'nowrap'
       }}>{st}</span>);
@@ -448,7 +447,7 @@ function ProviderCard({ provider, onEdit, onDelete }) {
             onClick={onDelete}
             style={{
               padding: '4px 8px',
-              background: '#dc3545',
+              background: 'var(--mac-error)',
               color: 'white',
               border: 'none',
               borderRadius: 4,
@@ -497,15 +496,15 @@ function ProviderModal({ provider, onClose, onSave, title }) {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
+      background: 'color-mix(in srgb, var(--mac-bg-primary), black 56%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000
     }}>
       <div style={{
-        background: 'var(--bg-primary)',
-        border: '1px solid var(--border-color)',
+        background: 'var(--mac-bg-primary)',
+        border: '1px solid var(--mac-border)',
         borderRadius: 12,
         padding: 24,
         width: '90%',
@@ -522,7 +521,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               border: 'none',
               fontSize: '20px',
               cursor: 'pointer',
-              color: 'var(--text-primary)'
+              color: 'var(--mac-text-primary)'
             }}>
             
             ×
@@ -540,10 +539,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               style={{
                 width: '100%',
                 padding: 8,
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
-                background: 'var(--bg-primary)',
-                color: 'var(--text-primary)'
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -558,10 +557,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               style={{
                 width: '100%',
                 padding: 8,
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
-                background: 'var(--bg-primary)',
-                color: 'var(--text-primary)'
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -575,10 +574,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               style={{
                 width: '100%',
                 padding: 8,
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
-                background: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
                 resize: 'vertical'
               }} />
             
@@ -594,10 +593,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               style={{
                 width: '100%',
                 padding: 8,
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
-                background: 'var(--bg-primary)',
-                color: 'var(--text-primary)'
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -611,10 +610,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               style={{
                 width: '100%',
                 padding: 8,
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
-                background: 'var(--bg-primary)',
-                color: 'var(--text-primary)'
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -628,10 +627,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               style={{
                 width: '100%',
                 padding: 8,
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
-                background: 'var(--bg-primary)',
-                color: 'var(--text-primary)'
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
               }} />
             
           </div>
@@ -652,9 +651,9 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               onClick={onClose}
               style={{
                 padding: '8px 16px',
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                background: 'var(--mac-bg-secondary)',
+                color: 'var(--mac-text-primary)',
+                border: '1px solid var(--mac-border)',
                 borderRadius: 6,
                 cursor: 'pointer'
               }}>
@@ -665,8 +664,8 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               type="submit"
               style={{
                 padding: '8px 16px',
-                background: 'var(--accent-color)',
-                color: 'white',
+                background: 'var(--mac-accent)',
+                color: 'var(--mac-text-on-accent)',
                 border: 'none',
                 borderRadius: 6,
                 cursor: 'pointer'
@@ -683,10 +682,10 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
 // Стили с использованием CSS переменных
 const card = {
-  border: '1px solid var(--border-color)',
+  border: '1px solid var(--mac-border)',
   borderRadius: 12,
   padding: 12,
-  background: 'var(--bg-primary)',
+  background: 'var(--mac-card-bg)',
   boxShadow: 'var(--shadow-sm)'
 };
 
@@ -699,33 +698,33 @@ const row = {
 
 const inp = {
   padding: '6px 10px',
-  border: '1px solid var(--border-color)',
+  border: '1px solid var(--mac-border)',
   borderRadius: 8,
-  background: 'var(--bg-primary)',
-  color: 'var(--text-primary)'
+  background: 'var(--mac-bg-primary)',
+  color: 'var(--mac-text-primary)'
 };
 
 const btn = {
   padding: '6px 10px',
   borderRadius: 8,
-  border: '1px solid var(--border-color)',
-  background: 'var(--bg-secondary)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--mac-border)',
+  background: 'var(--mac-bg-secondary)',
+  color: 'var(--mac-text-primary)',
   cursor: 'pointer',
   transition: 'all 0.2s ease'
 };
 
 const btnPrimary = {
   ...btn,
-  borderColor: 'var(--accent-color)',
-  background: 'var(--accent-color)',
-  color: 'white'
+  borderColor: 'var(--mac-accent-border)',
+  background: 'var(--mac-accent)',
+  color: 'var(--mac-text-on-accent)'
 };
 
 const errBox = {
-  color: 'var(--danger-color)',
-  background: 'rgba(239, 68, 68, 0.1)',
-  border: '1px solid var(--danger-color)',
+  color: 'var(--mac-error)',
+  background: 'var(--mac-error-bg)',
+  border: '1px solid var(--mac-error-border)',
   borderRadius: 8,
   padding: 8
 };

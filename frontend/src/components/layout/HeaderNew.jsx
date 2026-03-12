@@ -41,7 +41,7 @@ export default function HeaderNew() {
 
   useEffect(() => auth.subscribe(setState), []);
 
-  const { theme, colorScheme, setColorScheme } = useTheme();
+  const { colorScheme, setColorScheme } = useTheme();
 
   const colorSchemes = useMemo(() => COLOR_SCHEMES.map((scheme) => ({
     ...scheme,
@@ -99,32 +99,12 @@ export default function HeaderNew() {
 
   const isRegistrarPanel = location.pathname === '/registrar-panel';
 
-  // Определяем активную кастомную схему
-  const isGlassTheme = colorScheme === 'glass';
-  const isGradientTheme = colorScheme === 'gradient';
-  const isVibrantTheme = colorScheme === 'vibrant';
-  const isCustomTheme = isGlassTheme || isGradientTheme || isVibrantTheme;
-
   const headerStyle = {
-    backgroundColor: isGlassTheme ?
-    'rgba(50, 55, 65, 0.85)' :
-    isGradientTheme || isVibrantTheme ?
-    'var(--mac-bg-toolbar)' :
-    theme === 'dark' ? 'rgba(21,23,28,0.78)' : 'var(--mac-bg-toolbar)',
-    borderBottom: isGlassTheme ?
-    '1px solid rgba(255,255,255,0.25)' :
-    isGradientTheme || isVibrantTheme ?
-    '1px solid var(--mac-separator)' :
-    theme === 'dark' ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--mac-separator)',
+    backgroundColor: 'var(--mac-header-bg)',
+    borderBottom: '1px solid var(--mac-separator)',
     backdropFilter: 'var(--mac-blur-light)',
     WebkitBackdropFilter: 'var(--mac-blur-light)',
-    boxShadow: isGlassTheme ?
-    '0 2px 10px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)' :
-    isGradientTheme || isVibrantTheme ?
-    'var(--mac-shadow-sm)' :
-    theme === 'dark' ?
-    '0 2px 10px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)' :
-    'var(--mac-shadow-sm)',
+    boxShadow: 'var(--mac-shadow-sm)',
     display: 'grid',
     gridTemplateColumns: 'auto 1fr auto',
     alignItems: 'center',
@@ -134,11 +114,7 @@ export default function HeaderNew() {
     padding: '0 16px',
     height: '54px',
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-    backgroundImage: isGlassTheme ?
-    'none' :
-    isGradientTheme || isVibrantTheme ?
-    'none' :
-    theme === 'dark' ? 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0))' : 'none'
+    backgroundImage: 'none'
   };
 
   // Навигация по ролям (как в исходном хедере)
@@ -194,12 +170,10 @@ export default function HeaderNew() {
             alignItems: 'center',
             gap: '6px',
             flexShrink: 0,
-            color: active ?
-            'white' :
-            theme === 'dark' ? 'rgba(255,255,255,0.9)' : 'var(--mac-text-primary)'
+            color: active ? 'white' : 'var(--mac-text-primary)'
           }}>
 
-            <Icon name={item.icon} size="small" style={{ color: active ? 'white' : theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
+            <Icon name={item.icon} size="small" style={{ color: active ? 'white' : 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">{item.label}</span>
           </Button>);
 
@@ -213,9 +187,9 @@ export default function HeaderNew() {
         title="Главная"
         onClick={() => navigate('/registrar-panel?view=welcome')}
         className="hdr-hide-md"
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: 'var(--mac-text-primary)' }}>
 
-            <Icon name="house" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : undefined }} />
+            <Icon name="house" size="small" style={{ color: 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-md">Главная</span>
           </Button>
           <Button
@@ -224,9 +198,9 @@ export default function HeaderNew() {
         title="Онлайн‑записи"
         onClick={() => navigate('/registrar-panel?view=queue')}
         className="hdr-hide-xs"
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: 'var(--mac-text-primary)' }}>
 
-            <Icon name="bell" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
+            <Icon name="bell" size="small" style={{ color: 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">Онлайн‑записи</span>
           </Button>
           <Button
@@ -255,7 +229,7 @@ export default function HeaderNew() {
       style={{
         width: 1,
         alignSelf: 'stretch',
-        background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-separator)'
+        background: 'var(--mac-separator)'
       }} />
 
       {/* 1) Язык */}
@@ -269,7 +243,7 @@ export default function HeaderNew() {
         fontWeight: '600',
         padding: '6px 10px',
         flex: '0 0 auto',
-        border: theme === 'dark' ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--mac-border)',
+        border: '1px solid var(--mac-border)',
         display: 'flex',
         alignItems: 'center',
         gap: '4px'
@@ -346,7 +320,7 @@ export default function HeaderNew() {
               position: 'fixed',
               left: `${menuPos.left}px`,
               top: `${menuPos.top}px`,
-              backgroundColor: isCustomTheme ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+              backgroundColor: 'var(--mac-bg-primary)',
               border: '1px solid var(--mac-border)',
               borderRadius: 'var(--mac-radius-md)',
               padding: '8px',

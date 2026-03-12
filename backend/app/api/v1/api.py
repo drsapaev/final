@@ -36,6 +36,7 @@ from app.api.v1.endpoints import (
     auth,
     authentication,
     billing,
+    board_display_state,
     cardio,
     cashier,
     clinic_management,
@@ -275,6 +276,7 @@ api_router.include_router(
 )
 api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
+api_router.include_router(board_display_state.router, tags=["board-display"])
 api_router.include_router(reports_ep.router, tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])

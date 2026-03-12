@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
@@ -108,6 +109,18 @@ def test_specialists(db_session):
     db_session.commit()
     for specialist in specialists:
         db_session.refresh(specialist)
+
+    for specialist in specialists:
+        doctor = Doctor(
+            user_id=specialist.id,
+            specialty="Кардиология" if "cardio" in specialist.username else "Лаборатория",
+            active=True,
+        )
+        db_session.add(doctor)
+        db_session.flush()
+        setattr(specialist, "queue_doctor_id", doctor.id)
+
+    db_session.commit()
 
     return specialists
 
@@ -308,7 +321,7 @@ class TestQueueBatchAPI:
         today = date.today()
         existing_queue = db_session.query(DailyQueue).filter_by(
             day=today,
-            specialist_id=test_specialists[0].id
+            specialist_id=test_specialists[0].queue_doctor_id
         ).first()
 
         if existing_queue:
@@ -336,8 +349,7 @@ class TestQueueBatchAPI:
 
         # Проверяем что DailyQueue была создана автоматически
         new_queue = db_session.query(DailyQueue).filter_by(
-            day=today,
-            specialist_id=test_specialists[0].id
+            id=response.json()["entries"][0]["queue_id"],
         ).first()
 
         assert new_queue is not None

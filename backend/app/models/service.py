@@ -46,8 +46,8 @@ class Service(Base):
         String(1), nullable=True, index=True
     )  # K, D, C, L, S, O
     service_code: Mapped[str | None] = mapped_column(
-        String(10), nullable=True, unique=True, index=True
-    )  # K01, D02, C03, etc.
+        String(32), nullable=True, unique=True, index=True
+    )  # K01, D02, C03, cardiology_consult, etc.
 
     # Новые поля для админ панели
     category_id: Mapped[int | None] = mapped_column(

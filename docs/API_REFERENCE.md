@@ -428,22 +428,17 @@ Authorization: Bearer <access_token>
 - `PUT /dental/odontogram/{id}` - Update tooth status
 - `GET /dental/odontogram/{id}/history` - Get tooth history
 
-### 💰 Salary Management (`/admin/salary`)
-- `GET /admin/salary/history/{user_id}` - Salary history
-- `POST /admin/salary/change` - Record salary change
-- `GET /admin/salary/payments` - List salary payments
-- `POST /admin/salary/payments` - Record salary payment
-
 ### 🎤 Voice Messages (`/messages`)
 - `POST /messages/audio` - Send voice message
 - `GET /messages/{id}/audio` - Get audio file
 - Voice messages support in chat WebSocket
 
-### 📊 Monitoring (`/admin/monitoring`)
-- `GET /admin/monitoring/query-stats` - Database query stats
-- `GET /admin/monitoring/alerts` - Recent system alerts
-- `GET /admin/monitoring/missing-indexes` - Missing DB indexes
-- `POST /admin/monitoring/reset-query-stats` - Reset stats
+### 📊 System Monitoring (`/system/monitoring`)
+- `GET /system/monitoring/health` - System health snapshot
+- `GET /system/monitoring/metrics/system` - System metrics
+- `GET /system/monitoring/metrics/application` - Application metrics
+- `GET /system/monitoring/alerts` - Recent system alerts
+- `POST /system/monitoring/collect` - Force metrics collection
 
 ---
 

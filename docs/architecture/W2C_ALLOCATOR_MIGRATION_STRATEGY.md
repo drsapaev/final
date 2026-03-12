@@ -28,11 +28,11 @@ Migration must follow this order:
 | Path | Current role | Migration strategy | Risk level |
 |---|---|---|---|
 | `queue_service` path | Main SSOT-style allocator and entry-creation helper | Convert into internal implementation behind `QueueDomainService.allocate_ticket()` first; keep behavior-compatible adapter during transition | Medium |
-| `qr_queue.py` direct SQL allocator | High-risk inline allocator in add-service/update flows | Do not migrate early. First add characterization tests, then replace direct allocation with domain-service orchestration only after duplicate/fairness contract is stable | High |
+| `qr_queue.py` direct SQL allocator | Narrowed QR-local allocator in mounted full-update add-service flow | Mounted full-update create branch is now migrated to `QueueDomainService.allocate_ticket()`; keep QR-local raw SQL numbering in place for now and defer broader QR cleanup | High |
 | Registrar batch path | Modern registrar write path using `create_queue_entry(auto_number=True)` | Mounted batch-only create branch is now migrated to `QueueDomainService.allocate_ticket()`; keep duplicate/reuse logic local and defer broader service/runtime seam migration | Medium |
 | Registrar legacy count-based path | Older desk path with `start_number + current_count` | Treat as legacy compatibility slice. Replace only after characterization tests prove operator-visible behavior can be preserved or intentionally superseded | High |
 | Confirmation flows | Split "get number, then create row" flows | Mounted confirmation family is now migrated to the compatibility boundary for row creation; keep standalone number lookup legacy for now and defer unmounted/duplicate cleanup | Medium |
-| Force majeure transfer allocator | Exceptional tomorrow-transfer allocator | Keep separate initially, but force it to call the same internal reservation primitive once transfer semantics are modeled | High |
+| Force majeure transfer allocator | Exceptional tomorrow-transfer allocator | Treat as a separate exceptional-domain island. Do not force it into the ordinary allocator-boundary rollout; follow its local contract and correction track separately | High |
 | Legacy `OnlineDay` path | Separate queue-counter world | Freeze behind legacy adapter. Do not mix into the first allocator migration. Migrate or retire only in a dedicated legacy track | Very High |
 
 ## Recommended Migration Phases
@@ -73,7 +73,6 @@ Preferred early caller families:
 
 Later only:
 
-- QR full-update / add-service path
 - force-majeure transfer path
 - doctor/registrar queue lifecycle flows if allocator coupling appears
 
@@ -173,3 +172,49 @@ Still deferred:
 - broader wizard/cart orchestration
 - future-day wizard behavior beyond the mounted same-day branch
 - non-mounted or duplicate wizard service surfaces
+
+## QR Migration Update
+
+Completed in the current slice:
+
+- mounted QR full-update additional-service create branch now goes through
+  `QueueDomainService.allocate_ticket()`
+
+Still deferred:
+
+- raw SQL numbering redesign inside the QR-local seam
+- QR session/duplicate-policy cleanup
+- broader QR cleanup outside the mounted full-update create branch
+
+## OnlineDay Isolation Update
+
+Current result:
+
+- `OnlineDay` is now explicitly classified as a separate legacy island
+- it is no longer counted as part of the main allocator-boundary track
+- mounted OnlineDay behavior remains unchanged, but ownership is legacy-only
+
+Implication:
+
+- do not pull OnlineDay into further `QueueDomainService.allocate_ticket()`
+  rollout work
+- handle it later as:
+  - legacy isolation / retirement planning
+  - dead/duplicate cleanup preparation
+
+## Force Majeure Isolation Update
+
+Current result:
+
+- `force_majeure` is now explicitly isolated as an exceptional-domain island
+- it is no longer treated as a pending ordinary allocator-boundary migration
+- main SSOT queue families do not depend on its semantics
+
+Implication:
+
+- do not pull force_majeure into further `QueueDomainService.allocate_ticket()`
+  rollout work as if it were a normal caller family
+- handle it later via:
+  - exceptional-domain correction decisions
+  - dedicated follow-up tests
+  - local cleanup or isolation work only

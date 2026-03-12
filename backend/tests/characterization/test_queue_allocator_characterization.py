@@ -9,6 +9,8 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.force_majeure_service import ForceMajeureService
 from app.services.queue_service import QueueBusinessService, queue_service
 
+pytestmark = pytest.mark.postgres_pilot
+
 
 def _create_daily_queue_and_token(db_session, test_doctor, token_value: str) -> tuple[DailyQueue, QueueToken]:
     daily_queue = DailyQueue(
@@ -168,6 +170,7 @@ def test_registrar_batch_characterization_preserves_desk_source_and_waiting_stat
     registrar_auth_headers,
     test_patient,
     cardio_user,
+    test_doctor,
     test_service,
 ):
     response = client.post(

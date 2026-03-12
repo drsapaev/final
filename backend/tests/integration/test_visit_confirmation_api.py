@@ -1,7 +1,7 @@
 """
 Интеграционные тесты для API подтверждения визитов
 """
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -38,7 +38,7 @@ class TestVisitConfirmationAPI:
     def test_get_visit_info_expired_token(self, client, test_visit):
         """Тест получения информации с истекшим токеном"""
         # Устанавливаем время истечения в прошлом
-        test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        test_visit.confirmation_expires_at = datetime.now(UTC) - timedelta(hours=1)
 
         response = client.get(f"/api/v1/visits/info/{test_visit.confirmation_token}")
 

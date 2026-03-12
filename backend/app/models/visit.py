@@ -30,8 +30,8 @@ class Visit(Base):
     )
 
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="open"
-    )  # open|closed|canceled
+        String(20), nullable=False, default="open"
+    )  # legacy/compat visit vocabulary; see VisitStatus enum and confirmation flows
     notes: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

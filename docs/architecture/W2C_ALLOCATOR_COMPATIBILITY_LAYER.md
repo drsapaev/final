@@ -44,7 +44,7 @@ duplicate checks, and queue-time-window checks inside `queue_service`.
 
 The boundary does **not** yet absorb:
 
-- direct SQL allocators in `qr_queue.py`
+- raw SQL numbering assumptions that still live inside the narrowed QR-local seam
 - mixed allocator logic in `qr_queue_api_service.py`
 - transfer allocator in `force_majeure_service.py`
 - legacy `OnlineDay` / `issue_next_ticket()` paths
@@ -68,6 +68,10 @@ After the confirmation migration slice, the boundary is used in:
 - `backend/app/api/v1/endpoints/registrar_integration.py::create_queue_entries_batch()`
   for the mounted batch-only create branch when no active specialist-day claim
   exists
+- `backend/app/services/registrar_wizard_queue_assignment_service.py`
+  for the mounted wizard-family same-day create branch
+- `backend/app/services/qr_full_update_queue_assignment_service.py`
+  for mounted QR full-update additional-service row creation
 
 This is a limited production rollout.
 
@@ -75,11 +79,10 @@ It is intentionally **not** yet wired into:
 
 - broader registrar batch/runtime service ownership beyond the mounted create branch
 - force-majeure allocator paths
-- direct SQL allocator branches
+- broader QR follow-up outside the mounted full-update create branch
 - legacy `OnlineDay` callers
 - broader registrar wizard allocator branches outside the mounted confirmation
   bridge
-- mounted wizard-family same-day create branch before boundary migration
 
 ## Why This Shape Is Safe
 
@@ -154,3 +157,20 @@ This keeps:
 - canonical active-status reuse before allocation
 - different `queue_tag` fan-out behavior
 - numbering and fairness in the legacy allocator
+
+## QR Full-Update Migration Update
+
+Mounted QR full-update additional-service create branch now uses the
+compatibility boundary:
+
+1. `QRFullUpdateQueueAssignmentService.prepare_create_branch_handoffs(...)`
+2. QR-local raw SQL `MAX(number)+1`
+3. `QueueDomainService.allocate_ticket(allocation_mode="create_entry", **kwargs)`
+4. legacy `queue_service.create_queue_entry(...)`
+
+This keeps:
+
+- consultation `queue_time` preservation
+- independent additional-service rows
+- QR-local numbering semantics
+- QR payload persistence for `birth_year` and `address`
