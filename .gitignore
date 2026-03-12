@@ -89,3 +89,11 @@ backend/mypy_ci_check.txt
 run_*.final.html
 run_latest.html
 wf_page*.html
+
+# Bandit/pip audit reports (exceed pre-commit 300KB limit)
+backend/bandit_wave175_full.txt
+backend/bandit_app_wave15.json
+backend/bandit_app_wave15_post.json
+backend/bandit_app_wave175.json
+backend/bandit_full_wave15_post.json
+backend/pip_audit_wave175.json
