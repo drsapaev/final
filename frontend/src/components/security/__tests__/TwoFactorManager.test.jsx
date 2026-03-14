@@ -13,14 +13,53 @@ const { loggerInfo, loggerError, loggerWarn, loggerLog } = vi.hoisted(() => ({
   loggerLog: vi.fn(),
 }));
 
-vi.mock('../../../utils/tokenManager', () => ({
-  tokenManager: {
-    getAccessToken: vi.fn(() => 'test-token'),
-    getRefreshToken: vi.fn(() => 'test-refresh-token'),
-    clearAll: vi.fn(),
-    setAccessToken: vi.fn(),
-  },
+const { getAccessToken, getRefreshToken, clearAll, setAccessToken } = vi.hoisted(() => ({
+  getAccessToken: vi.fn(() => 'test-token'),
+  getRefreshToken: vi.fn(() => 'test-refresh-token'),
+  clearAll: vi.fn(),
+  setAccessToken: vi.fn(),
 }));
+
+vi.mock('../../../utils/tokenManager', () => {
+  const m = {
+    getAccessToken,
+    getRefreshToken,
+    clearAll,
+    setAccessToken,
+  };
+  return {
+    tokenManager: m,
+    default: m
+  };
+});
+
+vi.mock('../../../api/client', () => {
+  return {
+    api: {
+      get: vi.fn(async (url) => {
+        const res = await global.fetch(url.startsWith('/api') ? url : `/api/v1${url}`, { method: 'GET' });
+        const data = await res.json();
+        return { data };
+      }),
+      post: vi.fn(async (url, data, config) => {
+        let fullUrl = url.startsWith('/api') ? url : `/api/v1${url}`;
+        if (config?.params?.totp_code) {
+          fullUrl += `?totp_code=${config.params.totp_code}`;
+        }
+        const res = await global.fetch(fullUrl, { method: 'POST', body: JSON.stringify(data) });
+        const resData = await res.json();
+        return { data: resData };
+      }),
+      delete: vi.fn(async (url) => {
+        const res = await global.fetch(url.startsWith('/api') ? url : `/api/v1${url}`, { method: 'DELETE' });
+        const data = await res.json();
+        return { data };
+      }),
+      defaults: { headers: { common: {} } },
+      interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+    }
+  };
+});
 
 vi.mock('../../../utils/logger', () => {
   return {
