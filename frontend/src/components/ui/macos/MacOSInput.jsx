@@ -1,4 +1,5 @@
 import React from 'react';
+import { XCircle } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -13,8 +14,7 @@ const MacOSInput = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
-  void clearable;
-  void onClear;
+  const [isFocused, setIsFocused] = React.useState(false);
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -55,10 +55,22 @@ const MacOSInput = React.forwardRef(({
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
+  // Determine if there is a right element taking space
+  const hasRightIcon = Icon && iconPosition === 'right';
+  const showClearButton = clearable && props.value && !disabled;
+  let paddingRight = currentSize.padding.split(' ')[1];
+
+  if (hasRightIcon && showClearButton) {
+     paddingRight = '60px'; // Room for both
+  } else if (hasRightIcon || showClearButton) {
+     paddingRight = '40px'; // Room for one
+  }
+
   const inputStyle = {
     width: '100%',
+    boxSizing: 'border-box',
     paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingRight: paddingRight,
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -88,15 +100,38 @@ const MacOSInput = React.forwardRef(({
   };
 
   const handleFocus = (e) => {
+    setIsFocused(true);
     if (!disabled) {
       e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
       e.target.style.boxShadow = `0 0 0 3px ${error ? 'rgba(255, 59, 48, 0.1)' : 'rgba(0, 122, 255, 0.1)'}`;
     }
+    if (props.onFocus) props.onFocus(e);
   };
 
   const handleBlur = (e) => {
+    setIsFocused(false);
     e.target.style.borderColor = currentVariantStyle.border.split(' ')[2];
     e.target.style.boxShadow = 'none';
+    if (props.onBlur) props.onBlur(e);
+  };
+
+  const clearButtonStyle = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    right: hasRightIcon ? '40px' : '12px',
+    background: 'none',
+    border: 'none',
+    padding: '2px',
+    cursor: 'pointer',
+    color: 'var(--mac-text-tertiary)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '50%',
+    outline: 'none',
+    opacity: isFocused || props.value ? 0.7 : 0,
+    transition: 'opacity 0.2s ease, color 0.2s ease',
   };
 
   return (
@@ -113,6 +148,35 @@ const MacOSInput = React.forwardRef(({
         onBlur={handleBlur}
         {...props}
       />
+      {showClearButton && (
+        <button
+          type="button"
+          aria-label="Clear input"
+          style={clearButtonStyle}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onClear) onClear();
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--mac-text-secondary)';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--mac-text-tertiary)';
+            e.currentTarget.style.opacity = '0.7';
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.boxShadow = '0 0 0 2px var(--mac-accent-blue)';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.opacity = '0.7';
+          }}
+        >
+          <XCircle size={16} />
+        </button>
+      )}
     </div>
   );
 });
