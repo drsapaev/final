@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
+import '../../styles/animations.css';
 
 const FileUpload = ({
   onFilesSelected,
@@ -165,12 +166,16 @@ const FileUpload = ({
 
   return (
     <div className={className}>
-            <div {...getRootProps()} style={containerStyle}>
+            <div {...getRootProps()} style={containerStyle} aria-label="File upload dropzone">
                 <input {...getInputProps()} />
 
                 {converting ?
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <Loader className="animate-spin text-blue-500" size={32} />
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
+        >
+                        <Loader className="animate-spin" size={32} style={{ color: 'var(--mac-accent-blue, #007AFF)' }} />
                         <p style={{ color: 'var(--mac-text-secondary, #8E8E93)', margin: 0 }}>
                             Processing files...
                         </p>
@@ -183,7 +188,7 @@ const FileUpload = ({
               color: isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-text-tertiary, #C7C7CC)',
               marginBottom: '12px'
             }} />
-          
+
                         <p style={{ margin: '0 0 4px', color: 'var(--mac-text-primary, #1D1D1F)', fontWeight: 500 }}>
                             {isDragActive ? 'Drop files here' : 'Click or drag files to upload'}
                         </p>
@@ -281,8 +286,9 @@ const FileUpload = ({
               cursor: 'pointer',
               padding: 0
             }}
-            title="Remove">
-            
+            title="Remove"
+            aria-label="Remove file">
+
                                 <X size={12} />
                             </button>
 
