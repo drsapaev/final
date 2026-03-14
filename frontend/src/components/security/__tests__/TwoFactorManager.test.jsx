@@ -4,24 +4,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
-const { getAccessToken, loggerInfo, loggerError } = vi.hoisted(() => ({
-  getAccessToken: vi.fn(() => 'test-token'),
+import { tokenManager } from '../../../utils/tokenManager';
+
+const { loggerInfo, loggerError, loggerWarn, loggerLog } = vi.hoisted(() => ({
   loggerInfo: vi.fn(),
   loggerError: vi.fn(),
+  loggerWarn: vi.fn(),
+  loggerLog: vi.fn(),
 }));
 
 vi.mock('../../../utils/tokenManager', () => ({
-  default: {
-    getAccessToken,
+  tokenManager: {
+    getAccessToken: vi.fn(() => 'test-token'),
+    getRefreshToken: vi.fn(() => 'test-refresh-token'),
+    clearAll: vi.fn(),
+    setAccessToken: vi.fn(),
   },
 }));
 
-vi.mock('../../../utils/logger', () => ({
-  default: {
-    info: loggerInfo,
-    error: loggerError,
-  },
-}));
+vi.mock('../../../utils/logger', () => {
+  return {
+    default: {
+      info: loggerInfo,
+      error: loggerError,
+      log: loggerLog,
+      warn: loggerWarn,
+    }
+  };
+});
 
 import TwoFactorManager from '../TwoFactorManager.jsx';
 
