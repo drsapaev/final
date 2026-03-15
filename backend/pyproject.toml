@@ -65,7 +65,7 @@ authors = [{ name = "Clinic Team" }]
 readme = "README.md"
 dependencies = [
   "fastapi>=0.121,<0.130",
-  "uvicorn[standard]>=0.29,<0.31",
+  "uvicorn[standard]>=0.29,<0.39",
   "pydantic>=2.7,<2.12",
   "SQLAlchemy>=2.0,<2.1",
   "redis>=5.0,<6.0",
