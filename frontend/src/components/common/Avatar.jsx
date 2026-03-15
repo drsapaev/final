@@ -10,13 +10,25 @@ const roleGradients = {
 };
 
 const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, className = '' }) => {
-    const role = user?.role?.toLowerCase() || 'default';
-    const background = roleGradients[role] || roleGradients.default;
+    const roleKey = user?.role?.toLowerCase() || 'default';
+    const background = roleGradients[roleKey] || roleGradients.default;
     const name = user?.name || user?.full_name || user?.user_name || '?';
     const initials = (name[0] || '?').toUpperCase();
+    const displayRole = user?.role || (roleKey.charAt(0).toUpperCase() + roleKey.slice(1));
+
+    let label = `${name} (${displayRole})`;
+    if (showStatus) {
+        label += isOnline ? ' - В сети' : ' - Не в сети';
+    }
 
     return (
-        <div className={`avatar-wrapper ${className}`} style={{ width: size, height: size }}>
+        <div
+            className={`avatar-wrapper ${className}`}
+            style={{ width: size, height: size }}
+            role="img"
+            aria-label={label}
+            title={label}
+        >
             <div
                 className="avatar-circle"
                 style={{
@@ -25,11 +37,15 @@ const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, classNa
                     height: size,
                     fontSize: Math.max(10, size * 0.4)
                 }}
+                aria-hidden="true"
             >
                 {initials}
             </div>
             {showStatus && (
-                <span className={`avatar-status ${isOnline ? 'online' : 'offline'}`} />
+                <span
+                    className={`avatar-status ${isOnline ? 'online' : 'offline'}`}
+                    aria-hidden="true"
+                />
             )}
         </div>
     );
