@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import importlib.metadata
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import argon2 as _argon2
 from jose import jwt
 from passlib.context import CryptContext
+
+logger = logging.getLogger(__name__)
+
+if "__version__" not in vars(_argon2):
+    _argon2.__version__ = importlib.metadata.version("argon2-cffi")
+    logger.debug("[FIX] Applied argon2 version shim for passlib compatibility")
 
 # Настройки с дефолтами
 try:

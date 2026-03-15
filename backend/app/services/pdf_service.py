@@ -5,6 +5,7 @@
 
 import base64
 import io
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,12 +13,27 @@ from typing import Any
 import qrcode
 from jinja2 import Environment, FileSystemLoader
 
-try:
-    from weasyprint import CSS, HTML
+logger = logging.getLogger(__name__)
+
+WEASYPRINT_AVAILABLE = False
+
+
+def _load_weasyprint_components():
+    """Lazily import WeasyPrint so missing native libs don't break module import."""
+    global WEASYPRINT_AVAILABLE
+
+    try:
+        from weasyprint import CSS as weasy_css
+        from weasyprint import HTML as weasy_html
+    except (ImportError, OSError) as exc:
+        WEASYPRINT_AVAILABLE = False
+        logger.warning(
+            "[FIX] WeasyPrint unavailable for HTML PDF generation: %s", exc
+        )
+        raise
 
     WEASYPRINT_AVAILABLE = True
-except ImportError:
-    WEASYPRINT_AVAILABLE = False
+    return weasy_css, weasy_html
 
 try:
     from reportlab.lib import colors
@@ -82,10 +98,12 @@ class PDFService:
         """
         Генерация PDF из HTML шаблона с помощью WeasyPrint
         """
-        if not WEASYPRINT_AVAILABLE:
+        try:
+            weasy_css, weasy_html = _load_weasyprint_components()
+        except (ImportError, OSError) as exc:
             raise Exception(
-                "WeasyPrint не установлен. Используйте: pip install weasyprint"
-            )
+                f"WeasyPrint недоступен в текущем окружении: {exc}"
+            ) from exc
 
         try:
             # Генерируем QR код если нужен
@@ -101,8 +119,8 @@ class PDFService:
             css_content = self._get_page_css(paper_size)
 
             # Генерируем PDF
-            html_doc = HTML(string=html_content, base_url=str(self.templates_dir))
-            css_doc = CSS(string=css_content)
+            html_doc = weasy_html(string=html_content, base_url=str(self.templates_dir))
+            css_doc = weasy_css(string=css_content)
 
             pdf_bytes = html_doc.write_pdf(stylesheets=[css_doc])
 
