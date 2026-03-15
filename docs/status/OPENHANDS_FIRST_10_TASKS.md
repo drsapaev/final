@@ -1,5 +1,14 @@
 # OpenHands First 10 Tasks
 
+Historical status:
+- this is an early-phase task snapshot from 2026-03-06 and not the current
+  execution queue
+
+Current SSOT:
+- `docs/status/W2D_STATUS_NAVIGATION_INDEX.md`
+- `docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`
+- `docs/status/OPENHANDS_TASK_BACKLOG.md`
+
 Date: 2026-03-06
 
 ## Execution-Ready Set

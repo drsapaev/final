@@ -110,15 +110,6 @@ export const API_ENDPOINTS = {
     TYPES: '/reports/types'
   },
 
-  // Настройки
-  SETTINGS: {
-    LIST: '/settings',
-    GET: (key) => `/settings/${key}`,
-    UPDATE: (key) => `/settings/${key}`,
-    BULK_UPDATE: '/settings/bulk-update',
-    CATEGORIES: '/settings/categories'
-  },
-
   // Табло отображения (новый metadata-first contract)
   BOARD_DISPLAY: {
     STATE: (boardKey) => `/display/boards/${boardKey}/state`
@@ -245,10 +236,6 @@ export const createEndpoints = {
   getReport: (id) => `/reports/${id}`,
   deleteReport: (id) => `/reports/${id}`,
   exportReport: (id) => `/reports/${id}/export`,
-
-  // Настройки
-  getSetting: (key) => `/settings/${key}`,
-  updateSetting: (key) => `/settings/${key}`,
 
   // Уведомления
   getNotification: (id) => `/notifications/${id}`,

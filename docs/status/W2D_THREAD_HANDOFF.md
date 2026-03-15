@@ -1,5 +1,14 @@
 # W2D Thread Handoff
 
+Historical status:
+- this handoff file preserves an earlier re-entry point and should now be read
+  as historical context, not as the primary live queue
+
+Current SSOT:
+- `docs/status/W2D_STATUS_NAVIGATION_INDEX.md`
+- `docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`
+- `docs/status/OPENHANDS_TASK_BACKLOG.md`
+
 Purpose:
 - canonical handoff for continuing the long Post-W2C legacy/deprecation track in a new chat
 - reduce repeated context compression overhead

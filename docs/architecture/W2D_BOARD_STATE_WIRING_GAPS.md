@@ -32,7 +32,6 @@ Narrow fix possible:
 There is evidence of clinic logo storage/upload:
 
 - [admin_clinic.py](C:/final/backend/app/api/v1/endpoints/admin_clinic.py)
-- [admin_clinic_api_service.py](C:/final/backend/app/services/admin_clinic_api_service.py)
 
 But there is no confirmed board-state read owner that maps this into a stable
 `logo` field for the live UI.

@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.post("/check-and-close")
 async def check_and_close_expired_queues(
-    current_user: User = Depends(require_roles(["admin", "registrar"])),
+    current_user: User = Depends(require_roles("admin", "registrar")),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
@@ -41,7 +41,7 @@ async def check_and_close_expired_queues(
 
 @router.get("/pending-close")
 async def get_queues_pending_close(
-    current_user: User = Depends(require_roles(["admin", "registrar"])),
+    current_user: User = Depends(require_roles("admin", "registrar")),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """
@@ -62,7 +62,7 @@ async def get_queues_pending_close(
 @router.post("/force-close/{queue_id}")
 async def force_close_queue(
     queue_id: int,
-    current_user: User = Depends(require_roles(["admin", "registrar"])),
+    current_user: User = Depends(require_roles("admin", "registrar")),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
@@ -84,7 +84,7 @@ async def force_close_queue(
 
 @router.get("/auto-close-status")
 async def get_auto_close_status(
-    current_user: User = Depends(require_roles(["admin"])),
+    current_user: User = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """

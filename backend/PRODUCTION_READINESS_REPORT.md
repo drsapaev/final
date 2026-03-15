@@ -1,17 +1,45 @@
 # Production Readiness Report
 
-**Date:** 2025-12-02  
-**Status:** ✅ **READY FOR PRODUCTION** (with recommendations)
+**Snapshot Date:** 2025-12-02  
+**Reviewed For Drift:** 2026-03-14  
+**Historical Status:** Archived point-in-time readiness snapshot; not the current
+production SSOT or a current go-live approval
+
+**Current SSOT:**
+- `C:/final/docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`
+- `C:/final/docs/status/OPENHANDS_TASK_BACKLOG.md`
+
+**Current Verification Baseline (2026-03-14):**
+- `cd C:\final\backend && pytest tests/test_openapi_contract.py -q` -> `14 passed`
+- `cd C:\final\backend && pytest -q` -> `850 passed, 3 skipped`
+
+**Reader Note:** This document preserves a readiness review from
+`2025-12-02`. It still has historical value, but it must not be treated as the
+current deployment decision memo without re-verifying environment, migrations,
+external integrations, and present-day runbooks.
 
 ---
 
 ## Executive Summary
 
-Все критические задачи по подготовке системы к production завершены. Система прошла 7 из 8 тестов готовности.
+На момент `2025-12-02` этот отчет зафиксировал вывод, что основные
+production-readiness задачи были закрыты и локальный readiness harness прошёл
+`7 из 8` проверок.
+
+Сегодня это нужно читать как historical snapshot, а не как актуальный verdict
+`production ready`. С тех пор кодовая база, test baseline и docs/status SSOT
+существенно изменились.
 
 ---
 
-## ✅ Completed Tasks
+## Historical Snapshot Findings
+
+The sections below preserve what this report claimed at snapshot time.
+
+They are not a substitute for current generated docs, current test signals, or
+today’s deployment checks.
+
+## ✅ Snapshot-Time Completed Tasks
 
 ### 1. Security Improvements
 
@@ -155,7 +183,7 @@
 
 ---
 
-## Test Results
+## Historical Test Results
 
 ```
 ✅ PASS: SECRET_KEY Validation
@@ -170,9 +198,15 @@
 Total: 7/8 tests passed (87.5%)
 ```
 
+Snapshot note:
+- this `7/8` result belongs to the custom readiness harness at the time
+- it is not comparable to today’s broader backend suite baseline
+- use the current verification baseline at the top of this file for present-day
+  repo health signals
+
 ---
 
-## Recommendations
+## Historical Recommendations From The Snapshot
 
 ### High Priority (Before Production)
 
@@ -217,7 +251,10 @@ Total: 7/8 tests passed (87.5%)
 
 ---
 
-## Files Created/Modified
+## Historical File Inventory
+
+These file lists reflect the snapshot-time report and should not be treated as
+the current ownership or current inventory map.
 
 ### New Files
 - `backend/app/services/backup_service.py` - Backup service
@@ -226,7 +263,7 @@ Total: 7/8 tests passed (87.5%)
 - `backend/app/services/telegram_error_handler.py` - Error handling
 - `backend/app/services/patient_validation.py` - Patient validation
 - `backend/app/services/medical_validation.py` - Medical validation
-- `backend/app/api/v1/endpoints/backup_management.py` - Backup API
+- `backend/app/api/v1/endpoints/system_management.py` - System backup API
 - `backend/app/scripts/audit_cascade_deletes.py` - Cascade audit
 - `backend/test_production_readiness.py` - Test suite
 
@@ -245,15 +282,20 @@ Total: 7/8 tests passed (87.5%)
 
 ---
 
-## Conclusion
+## Historical Conclusion
 
-Система готова к production deployment после настройки environment variables и выполнения миграций. Все критические уязвимости устранены, основные функции реализованы и протестированы.
+The original conclusion of this snapshot was that the system was ready for
+production deployment after environment-variable setup and migrations.
 
-**Status:** ✅ **PRODUCTION READY**
+Current caution:
+- treat that statement as an archived 2025-12-02 conclusion only
+- do not use this file by itself as current production approval
+- for current truth, defer to the master plan, the active backlog, generated
+  docs, and the latest verification baseline
 
 ---
 
-## Next Steps
+## Historical Next Steps
 
 1. Настроить environment variables для production
 2. Выполнить миграции базы данных

@@ -1,52 +1,171 @@
-
 # Ops / Deployment
 
-## Быстрый старт (Docker Compose)
+Reviewed For Drift: 2026-03-14
+Status: compose-oriented ops note with current caveats
 
-```bash
-# из project-root/ops/
-docker compose up --build
+## How to use this file
 
-Сервисы:
+This file is not a production approval memo.
 
-Backend: http://localhost:8000  (OpenAPI: http://localhost:8000/docs)
+Use it as a short orientation page for the current Docker/ops surface, then
+confirm current execution status in:
 
-Frontend (Vite dev): http://localhost:5173
+- `C:/final/docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`
+- `C:/final/docs/status/OPENHANDS_TASK_BACKLOG.md`
 
+## What currently exists
 
-Переменные окружения (минимум):
+Repo-backed ops files:
 
-DATABASE_URL=sqlite:////data/app.db — БД в volume backend_data
+- `ops/docker-compose.yml`
+- `ops/backend.Dockerfile`
+- `ops/backend.entrypoint.sh`
+- `ops/frontend.Dockerfile`
+- `ops/.env.example`
 
-AUTH_SECRET=change-me-in-prod — секрет для JWT
+Current compose services:
 
-CORS_ALLOW_ALL=1 — разрешить CORS всем источникам (для локалки)
+- backend
+- frontend
+- postgres
 
-ESC/POS (опционально): PRINTER_TYPE=none|network|usb, PRINTER_NET_HOST, PRINTER_NET_PORT, PRINTER_USB_VID, PRINTER_USB_PID
+Published app endpoints still point to:
 
+- Backend docs: `http://localhost:8000/docs`
+- Backend OpenAPI: `http://localhost:8000/openapi.json`
+- Frontend dev server: `http://localhost:5173`
 
-Volume:
+## Current Caveats
 
-backend_data:/data — хранит SQLite-файл и артефакты
+- `ops/docker-compose.yml` expects `backend/.env.production`, but that file is
+  not committed in the repo.
+- The current compose defaults lean local/dev unless reviewed:
+  - `ENV=dev`
+  - `CORS_ALLOW_ALL=1`
+  - `ADMIN_PASSWORD=admin`
+- Compose still interpolates `AUTH_SECRET`, but the active backend settings
+  validate `SECRET_KEY`.
+- `ops/backend.entrypoint.sh` no longer creates tables or bootstraps admin by
+  default; operators now need explicit schema preparation and explicit
+  `ENSURE_ADMIN=1` or direct `ensure_admin.py` usage if they want bootstrap
+  behavior.
+- Treat the current compose stack as a review-required ops surface, not as a
+  turnkey production recipe.
 
+## Env Files and Responsibilities
 
-Команды
+There are two different env layers in this ops story:
 
-Пересобрать: docker compose build
+### 1. Compose interpolation example
 
-Перезапустить: docker compose up -d --build
+- `ops/.env.example`
 
-Логи backend: docker compose logs -f backend
+Use this as a reference for values that `ops/docker-compose.yml` interpolates.
 
-Логи frontend: docker compose logs -f frontend
+### 2. Backend runtime env file
 
+- `backend/.env.production`
 
-Админ по умолчанию
+The current compose file explicitly expects this file via `env_file`, so
+`ops/.env.example` does not replace it.
 
-Скрипт backend/app/scripts/ensure_admin.py создаёт пользователя admin/admin (настраивается переменными ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL, ADMIN_FULL_NAME).
+## Compose-Oriented Quick Start
 
-Прод
+Canonical commands now live in:
 
-Для прод-сборки фронтенда используйте отдельный Nginx-контейнер с vite build и выдачей статики из dist/.
+- `C:/final/docs/OPERATOR_STARTUP_COMMANDS.md`
 
-Backend рекомендуется запускать за реверс-прокси (Nginx) с TLS и переменными окружения, вынесенными в .env (не коммитить).
+All command examples below assume repository-root execution.
+
+If you are using the current compose stack, review these items before startup:
+
+- `DATABASE_URL`
+- `SECRET_KEY` in `backend/.env.production`
+- legacy `AUTH_SECRET` interpolation in compose
+- `ENV`
+- `CORS_ALLOW_ALL`
+- `ENSURE_ADMIN`
+- admin bootstrap credentials
+
+Then follow the explicit startup flow:
+
+1. prepare schema explicitly
+   - for example:
+     `docker compose -f ops/docker-compose.yml run --rm backend alembic upgrade head`
+2. optionally bootstrap admin explicitly
+   - for example:
+     `docker compose -f ops/docker-compose.yml run --rm backend python app/scripts/ensure_admin.py`
+3. start the stack
+   - `docker compose -f ops/docker-compose.yml up --build`
+
+## Current Service Notes
+
+### Backend
+
+- startup path is `uvicorn` via `ops/backend.entrypoint.sh`
+- current default bind is `0.0.0.0:8000`
+- container startup now assumes schema was prepared explicitly
+- admin bootstrap only runs when `ENSURE_ADMIN=1`
+
+### Frontend
+
+- current container exposes Vite dev server on port `5173`
+- `VITE_API_BASE` defaults to `http://localhost:8000/api/v1`
+
+### Postgres
+
+- current compose defaults target PostgreSQL, not SQLite
+- persistent database data goes to `postgres_data`
+
+### Backend Data Volume
+
+- `backend_data` remains mounted to `/data`
+- if you intentionally override to a SQLite path under `/data`, that volume can
+  still hold app-side artifacts
+
+## Admin Bootstrap
+
+`backend/app/scripts/ensure_admin.py` still exists, but bootstrap is now an
+explicit operator action.
+
+Important caveat:
+
+- `ENSURE_ADMIN=0` is now the default
+- the script defaults to `admin/admin` if you do not override the env vars
+- that is a local/dev convenience, not a production-safe default
+
+If you intentionally want bootstrap, either:
+
+- run:
+  `docker compose -f ops/docker-compose.yml run --rm backend python app/scripts/ensure_admin.py`
+- or set `ENSURE_ADMIN=1` for the startup that should perform bootstrap
+
+If you intentionally want to mutate an existing matched user
+(promote/reactivate/rename/update profile fields), also set:
+
+- `ADMIN_ALLOW_UPDATE=1`
+
+Review these variables before using bootstrap in a serious environment:
+
+- `ENSURE_ADMIN`
+- `ADMIN_ALLOW_UPDATE`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `ADMIN_EMAIL`
+- `ADMIN_FULL_NAME`
+- `ADMIN_RESET_PASSWORD`
+
+## Production Reader Note
+
+For a production-style deployment story, also review:
+
+- `C:/final/backend/SETUP_PRODUCTION.md`
+- `C:/final/backend/PRODUCTION_SETUP_SUMMARY.md`
+- `C:/final/backend/PRODUCTION_READINESS_REPORT.md`
+- `C:/final/backend/PRODUCTION_READINESS_CHECKLIST.md`
+
+## Next Neighboring Doc
+
+The next low-risk env/docs follow-up after this ops note is:
+
+- `backend/env_setup_guide.md`

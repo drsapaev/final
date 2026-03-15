@@ -1212,7 +1212,6 @@
           "visits"
         ],
         "summary": "Создать визит",
-        "description": "Создать визит.\n\nИспользует feature flag USE_CRUD_VISITS для переключения между старой (Table API)\nи новой (CRUD) реализацией. По умолчанию используется старая реализация для безопасности.",
         "operationId": "create_visit_api_v1_visits_visits_post",
         "security": [
           {
@@ -1879,6 +1878,28 @@
         }
       }
     },
+    "/api/v1/services/code-mappings": {
+      "get": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Получить маппинги кодов услуг (SSOT)",
+        "description": "⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.\n\nИспользуется для централизации service code resolution на frontend.\n\nReturns:\n    - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)\n    - code_to_name: Маппинг service code -> display name\n    - category_mapping: Маппинг specialty -> category code (K, D, L, etc.)\n    - specialty_aliases: Алиасы для specialty (derma -> dermatology)",
+        "operationId": "get_service_code_mappings_api_v1_services_code_mappings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceCodeMappingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/services/{service_id}": {
       "get": {
         "tags": [
@@ -2101,28 +2122,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/services/code-mappings": {
-      "get": {
-        "tags": [
-          "services"
-        ],
-        "summary": "Получить маппинги кодов услуг (SSOT)",
-        "description": "⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.\n\nИспользуется для централизации service code resolution на frontend.\n\nReturns:\n    - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)\n    - code_to_name: Маппинг service code -> display name\n    - category_mapping: Маппинг specialty -> category code (K, D, L, etc.)\n    - specialty_aliases: Алиасы для specialty (derma -> dermatology)",
-        "operationId": "get_service_code_mappings_api_v1_services_code_mappings_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceCodeMappingsResponse"
                 }
               }
             }
@@ -11114,7 +11113,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/QueuesStatsResponse"
+                }
               }
             }
           },
@@ -11752,6 +11753,7 @@
         ],
         "summary": "Stats",
         "operationId": "stats_api_v1_appointments_stats_get",
+        "deprecated": true,
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -11907,6 +11909,7 @@
         "summary": "Qrcode Png",
         "description": "Маршрут-заглушка: возвращаем данные для фронта, где уже рисуется QR\n(если у тебя есть реальная генерация PNG — просто замени реализацию тут).",
         "operationId": "qrcode_png_api_v1_appointments_qrcode_get",
+        "deprecated": true,
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -11976,7 +11979,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentQRCodeResponse"
+                }
               }
             }
           },
@@ -21774,8 +21779,9 @@
           "board",
           "board"
         ],
-        "summary": "Состояние очереди для табло",
+        "summary": "Legacy board state compatibility route",
         "operationId": "board_state_api_v1_board_state_get",
+        "deprecated": true,
         "parameters": [
           {
             "name": "department",
@@ -21805,7 +21811,54 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/BoardLegacyStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/display/boards/{board_key}/state": {
+      "get": {
+        "tags": [
+          "board-display",
+          "board-display"
+        ],
+        "summary": "Board display state v1",
+        "operationId": "get_board_display_state_v1_api_v1_display_boards__board_key__state_get",
+        "parameters": [
+          {
+            "name": "board_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "title": "Board Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDisplayStateV1Response"
+                }
               }
             }
           },
@@ -33678,7 +33731,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "format": "binary",
+              "contentMediaType": "application/octet-stream",
               "title": "Zip Data"
             }
           }
@@ -35589,14 +35642,86 @@
         ]
       }
     },
-    "/api/v1/2fa/devices/{device_id}": {
-      "delete": {
+    "/api/v1/2fa/devices": {
+      "get": {
+        "tags": [
+          "two-factor-auth"
+        ],
+        "summary": "Get Trusted Devices",
+        "description": "Получить список доверенных устройств",
+        "operationId": "get_trusted_devices_api_v1_2fa_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorDeviceListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
         "tags": [
           "two-factor-devices"
         ],
-        "summary": "Revoke Device",
-        "description": "Отозвать доступ для устройства",
-        "operationId": "revoke_device_api_v1_2fa_devices__device_id__delete",
+        "summary": "Add Trusted Device",
+        "description": "Добавить доверенное устройство",
+        "operationId": "add_trusted_device_api_v1_2fa_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/2fa/devices/{device_id}": {
+      "delete": {
+        "tags": [
+          "two-factor-auth"
+        ],
+        "summary": "Untrust Device",
+        "description": "Отозвать доверие к устройству",
+        "operationId": "untrust_device_api_v1_2fa_devices__device_id__delete",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -35608,7 +35733,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
+              "type": "integer",
               "title": "Device Id"
             }
           }
@@ -35618,7 +35743,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSuccessResponse"
+                }
               }
             }
           },
@@ -36079,82 +36206,6 @@
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/2fa/devices": {
-      "get": {
-        "tags": [
-          "two-factor-devices"
-        ],
-        "summary": "Get Trusted Devices",
-        "description": "Получить список доверенных устройств",
-        "operationId": "get_trusted_devices_api_v1_2fa_devices_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/DeviceInfo"
-                  },
-                  "type": "array",
-                  "title": "Response Get Trusted Devices Api V1 2Fa Devices Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "two-factor-devices"
-        ],
-        "summary": "Add Trusted Device",
-        "description": "Добавить доверенное устройство",
-        "operationId": "add_trusted_device_api_v1_2fa_devices_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeviceCreateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceInfo"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
               }
             }
           }
@@ -41096,6 +41147,128 @@
             "OAuth2PasswordBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Settings",
+        "description": "Return list of settings for given category.\nExample: GET /api/v1/settings?category=printer",
+        "operationId": "get_settings_api_v1_settings_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Category of settings",
+              "title": "Category"
+            },
+            "description": "Category of settings"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Setting"
+                  },
+                  "title": "Response Get Settings Api V1 Settings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Setting",
+        "description": "Upsert a single system setting for the given category/key pair.\nExample: PUT /api/v1/settings {\"category\":\"printer\",\"key\":\"device_name\",\"value\":\"HP\"}",
+        "operationId": "update_setting_api_v1_settings_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Setting"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/queue/legacy/qrcode": {
@@ -57061,7 +57234,6 @@
           "messages"
         ],
         "summary": "Send Message",
-        "description": "Отправить сообщение пользователю.\n\nПравила доступа:\n- Админы могут писать всем\n- Врачи могут писать пациентам и персоналу\n- Пациенты могут писать врачам, админам и регистраторам\n- Персонал может писать между собой",
         "operationId": "send_message_api_v1_messages_send_post",
         "requestBody": {
           "content": {
@@ -57108,7 +57280,6 @@
           "messages"
         ],
         "summary": "Get Conversations",
-        "description": "Получить список всех бесед текущего пользователя",
         "operationId": "get_conversations_api_v1_messages_conversations_get",
         "responses": {
           "200": {
@@ -57135,7 +57306,6 @@
           "messages"
         ],
         "summary": "Get Conversation",
-        "description": "Получить переписку с конкретным пользователем.\n\nАвтоматически помечает сообщения как прочитанные.",
         "operationId": "get_conversation_api_v1_messages_conversation__user_id__get",
         "security": [
           {
@@ -57210,7 +57380,6 @@
           "messages"
         ],
         "summary": "Get Unread Count",
-        "description": "Получить количество непрочитанных сообщений",
         "operationId": "get_unread_count_api_v1_messages_unread_get",
         "responses": {
           "200": {
@@ -57237,7 +57406,6 @@
           "messages"
         ],
         "summary": "Mark Message Read",
-        "description": "Пометить конкретное сообщение как прочитанное",
         "operationId": "mark_message_read_api_v1_messages__message_id__read_patch",
         "security": [
           {
@@ -57285,7 +57453,6 @@
           "messages"
         ],
         "summary": "Delete Message",
-        "description": "Удалить сообщение (мягкое удаление).\n\nСообщение удаляется только для текущего пользователя,\nу собеседника остаётся видимым.",
         "operationId": "delete_message_api_v1_messages__message_id__delete",
         "security": [
           {
@@ -57331,7 +57498,6 @@
           "messages"
         ],
         "summary": "Toggle Message Reaction",
-        "description": "Добавить/удалить реакцию на сообщение.\nЕсли такая реакция от пользователя уже есть - удаляет её.\nИначе добавляет.",
         "operationId": "toggle_message_reaction_api_v1_messages__message_id__reactions_post",
         "security": [
           {
@@ -57389,7 +57555,6 @@
           "messages"
         ],
         "summary": "Get Available Users",
-        "description": "Получить список пользователей, которым можно написать.\n\nФильтрует по правам доступа текущего пользователя.",
         "operationId": "get_available_users_api_v1_messages_users_available_get",
         "security": [
           {
@@ -57438,7 +57603,6 @@
           "messages"
         ],
         "summary": "Send Voice Message",
-        "description": "Отправить голосовое сообщение\n\nПоддерживаемые форматы: .mp3, .wav, .ogg, .m4a, .webm\nМаксимальный размер: 10 MB\nМаксимальная длительность: 5 минут",
         "operationId": "send_voice_message_api_v1_messages_send_voice_post",
         "requestBody": {
           "content": {
@@ -57485,7 +57649,6 @@
           "messages"
         ],
         "summary": "Stream Voice Message",
-        "description": "Стриминг голосового сообщения\n\nДоступ разрешён только отправителю и получателю сообщения",
         "operationId": "stream_voice_message_api_v1_messages_voice__message_id__stream_get",
         "security": [
           {
@@ -57531,7 +57694,6 @@
           "messages"
         ],
         "summary": "Upload File Message",
-        "description": "Загрузить файл и создать сообщение с ним",
         "operationId": "upload_file_message_api_v1_messages_upload_post",
         "requestBody": {
           "content": {
@@ -57576,7 +57738,6 @@
           "messages"
         ],
         "summary": "Download Chat File",
-        "description": "Скачать файл из чата",
         "operationId": "download_chat_file_api_v1_messages_download__filename__get",
         "security": [
           {
@@ -60129,6 +60290,24 @@
         "title": "AppointmentNotificationRequest",
         "description": "Схема для уведомления о записи"
       },
+      "AppointmentQRCodeResponse": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "data": {
+            "type": "string",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "data"
+        ],
+        "title": "AppointmentQRCodeResponse"
+      },
       "AppointmentReportRequest": {
         "properties": {
           "start_date": {
@@ -61751,11 +61930,216 @@
         "type": "object",
         "title": "BillingSettingsUpdate"
       },
+      "BoardDisplayMetadataV1": {
+        "properties": {
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "announcement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announcement"
+          },
+          "announcement_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announcement Ru"
+          },
+          "announcement_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announcement Uz"
+          },
+          "announcement_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announcement En"
+          },
+          "primary_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Color"
+          },
+          "bg_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bg Color"
+          },
+          "text_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Color"
+          },
+          "contrast_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contrast Default"
+          },
+          "kiosk_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kiosk Default"
+          },
+          "sound_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sound Default"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "BoardDisplayMetadataV1"
+      },
+      "BoardDisplayStateV1Response": {
+        "properties": {
+          "board_key": {
+            "type": "string",
+            "title": "Board Key"
+          },
+          "display_metadata": {
+            "$ref": "#/components/schemas/BoardDisplayMetadataV1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "board_key",
+          "display_metadata"
+        ],
+        "title": "BoardDisplayStateV1Response"
+      },
+      "BoardLegacyStateResponse": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "date_str": {
+            "type": "string",
+            "title": "Date Str"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open"
+          },
+          "start_number": {
+            "type": "integer",
+            "title": "Start Number"
+          },
+          "last_ticket": {
+            "type": "integer",
+            "title": "Last Ticket"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          },
+          "serving": {
+            "type": "integer",
+            "title": "Serving"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department",
+          "date_str",
+          "is_open",
+          "start_number",
+          "last_ticket",
+          "waiting",
+          "serving",
+          "done"
+        ],
+        "title": "BoardLegacyStateResponse"
+      },
       "Body_analyze_dermatoscopy_image_api_v1_ai_analyze_dermatoscopy_post": {
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "metadata": {
@@ -61790,7 +62174,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "image_type": {
@@ -61830,7 +62214,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "metadata": {
@@ -61865,7 +62249,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "metadata": {
@@ -61900,7 +62284,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "metadata": {
@@ -61998,7 +62382,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "target_folder_id": {
@@ -62087,7 +62471,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "image_type": {
@@ -62139,7 +62523,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "lesion_info": {
@@ -62186,7 +62570,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "change_description": {
@@ -62332,7 +62716,7 @@
           },
           "audio_file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Audio File"
           }
         },
@@ -62350,7 +62734,7 @@
           },
           "audio_file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Audio File"
           }
         },
@@ -62427,7 +62811,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -62441,7 +62825,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -62455,7 +62839,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -62469,7 +62853,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "title": {
@@ -62586,7 +62970,7 @@
           },
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -62601,7 +62985,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "title": {
@@ -62626,7 +63010,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -77452,6 +77836,30 @@
       },
       "PaymentProviderUpdate": {
         "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Название провайдера"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Код провайдера"
+          },
           "is_active": {
             "anyOf": [
               {
@@ -81150,6 +81558,58 @@
         ],
         "title": "QueueTokenResponse"
       },
+      "QueuesStatsResponse": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "date_str": {
+            "type": "string",
+            "title": "Date Str"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open",
+            "description": "Legacy compatibility field from the OnlineDay island.",
+            "deprecated": true
+          },
+          "start_number": {
+            "type": "integer",
+            "title": "Start Number",
+            "description": "Legacy compatibility field from the OnlineDay island.",
+            "deprecated": true
+          },
+          "last_ticket": {
+            "type": "integer",
+            "title": "Last Ticket"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          },
+          "serving": {
+            "type": "integer",
+            "title": "Serving"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department",
+          "date_str",
+          "is_open",
+          "start_number",
+          "last_ticket",
+          "waiting",
+          "serving",
+          "done"
+        ],
+        "title": "QueuesStatsResponse"
+      },
       "QuickReceiptRequest": {
         "properties": {
           "patient_name": {
@@ -84360,6 +84820,70 @@
         "title": "SetIncompleteRequest",
         "description": "Запрос на установку статуса incomplete"
       },
+      "Setting": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "category"
+        ],
+        "title": "Setting"
+      },
+      "SettingUpsert": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Category"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "key"
+        ],
+        "title": "SettingUpsert"
+      },
       "ShiftRecommendationsRequest": {
         "properties": {
           "department_data": {
@@ -85367,6 +85891,117 @@
         ],
         "title": "TwoFactorBackupCodesResponse",
         "description": "Ответ со списком backup кодов"
+      },
+      "TwoFactorDeviceListResponse": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/TwoFactorDeviceOut"
+            },
+            "type": "array",
+            "title": "Devices"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "devices",
+          "total"
+        ],
+        "title": "TwoFactorDeviceListResponse",
+        "description": "Ответ со списком устройств 2FA"
+      },
+      "TwoFactorDeviceOut": {
+        "properties": {
+          "device_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Device Name"
+          },
+          "device_type": {
+            "type": "string",
+            "pattern": "^(mobile|desktop|tablet)$",
+            "title": "Device Type"
+          },
+          "device_fingerprint": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 32,
+            "title": "Device Fingerprint"
+          },
+          "trusted": {
+            "type": "boolean",
+            "title": "Trusted",
+            "default": false
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_name",
+          "device_type",
+          "device_fingerprint",
+          "id",
+          "user_id",
+          "created_at"
+        ],
+        "title": "TwoFactorDeviceOut",
+        "description": "Схема для вывода устройства 2FA"
       },
       "TwoFactorDisableRequest": {
         "properties": {
@@ -88720,6 +89355,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

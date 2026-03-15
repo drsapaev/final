@@ -1,384 +1,270 @@
 """
-API Documentation endpoints
+API documentation helper endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from typing import Any
 
-from app.api.deps import get_current_user, get_db
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
+
+from app.api.deps import get_current_user
 from app.models.user import User
 
 router = APIRouter()
 
+_HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}
 
-@router.get("/api-docs", response_class=HTMLResponse)
-async def get_api_docs():
-    """Полная документация API с примерами"""
-    html_content = """
+
+def _iter_operations(schema: dict[str, Any]):
+    for path, path_item in schema.get("paths", {}).items():
+        for method, operation in path_item.items():
+            if method.lower() in _HTTP_METHODS:
+                yield path, method.lower(), operation
+
+
+def _existing_paths(
+    published_paths: dict[str, Any],
+    candidates: list[str],
+    *,
+    limit: int | None = None,
+) -> list[str]:
+    matches: list[str] = []
+    for candidate in candidates:
+        if candidate in published_paths and candidate not in matches:
+            matches.append(candidate)
+        if limit is not None and len(matches) >= limit:
+            break
+    return matches
+
+
+def _top_tag_summaries(schema: dict[str, Any], limit: int = 10) -> list[dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+
+    for path, _method, operation in _iter_operations(schema):
+        for tag in operation.get("tags") or ["untagged"]:
+            bucket = buckets.setdefault(
+                tag,
+                {"tag": tag, "operations": 0, "sample_paths": []},
+            )
+            bucket["operations"] += 1
+            if len(bucket["sample_paths"]) < 3 and path not in bucket["sample_paths"]:
+                bucket["sample_paths"].append(path)
+
+    ordered = sorted(
+        buckets.values(),
+        key=lambda item: (-int(item["operations"]), str(item["tag"])),
+    )
+    return ordered[:limit]
+
+
+def _build_api_docs_html(path_count: int, operation_count: int) -> str:
+    return f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-        <title>Clinic Management System - API Documentation</title>
+        <title>Clinic Manager API Docs Helper</title>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .endpoint { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-            .method { font-weight: bold; color: #007bff; }
-            .path { font-family: monospace; background: #f8f9fa; padding: 5px; }
-            .description { margin: 10px 0; }
-            .example { background: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; }
-            h1, h2 { color: #333; }
-            .auth { color: #dc3545; font-weight: bold; }
-            .public { color: #28a745; font-weight: bold; }
+            body {{ font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }}
+            h1, h2 {{ color: #111827; }}
+            .lead {{ max-width: 920px; line-height: 1.6; }}
+            .note {{ background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px; margin: 16px 0; }}
+            .stats {{ display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }}
+            .stat {{ border: 1px solid #d1d5db; border-radius: 8px; padding: 12px 16px; min-width: 180px; }}
+            .stat strong {{ display: block; font-size: 1.6rem; color: #111827; }}
+            code {{ background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }}
+            ul {{ line-height: 1.8; }}
+            a {{ color: #2563eb; }}
         </style>
     </head>
     <body>
-        <h1>🏥 Clinic Management System - API Documentation</h1>
-        
-        <h2>📋 Аутентификация</h2>
-        <div class="endpoint">
-            <div class="method">POST</div>
-            <div class="path">/api/v1/auth/login</div>
-            <div class="description">Вход в систему</div>
-            <div class="example">
-                {
-                    "username": "admin",
-                    "password": "admin123"
-                }
+        <h1>Clinic Manager API Docs Helper</h1>
+        <p class="lead">
+            This page is a human-friendly landing page for the project API.
+            The canonical contract still lives in the generated documentation:
+            <code>/docs</code>, <code>/redoc</code>, and <code>/openapi.json</code>.
+        </p>
+
+        <div class="note">
+            The older custom docs page drifted away from the live contract.
+            This helper now points readers back to generated sources and only
+            highlights selected live route families.
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <strong>{path_count}</strong>
+                <span>Published paths</span>
+            </div>
+            <div class="stat">
+                <strong>{operation_count}</strong>
+                <span>Published operations</span>
             </div>
         </div>
 
-        <h2>👥 Пользователи</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/users/me</div>
-            <div class="description">Получить информацию о текущем пользователе</div>
-            <div class="auth">Требуется аутентификация</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/users/</div>
-            <div class="description">Получить список всех пользователей</div>
-            <div class="auth">Требуется роль: Admin</div>
-        </div>
-
-        <h2>👤 Пациенты</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/patients/</div>
-            <div class="description">Получить список пациентов</div>
-            <div class="auth">Требуется аутентификация</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">POST</div>
-            <div class="path">/api/v1/patients/</div>
-            <div class="description">Создать нового пациента</div>
-            <div class="example">
-                {
-                    "full_name": "Иван Иванов",
-                    "phone": "+998901234567",
-                    "birth_date": "1990-01-01",
-                    "gender": "male"
-                }
-            </div>
-        </div>
-
-        <h2>🏥 Визиты</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/visits/</div>
-            <div class="description">Получить список визитов</div>
-            <div class="auth">Требуется аутентификация</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">POST</div>
-            <div class="path">/api/v1/visits/</div>
-            <div class="description">Создать новый визит</div>
-            <div class="example">
-                {
-                    "patient_id": 1,
-                    "service_id": 1,
-                    "payment_amount": 100000,
-                    "notes": "Консультация"
-                }
-            </div>
-        </div>
-
-        <h2>💳 Платежи</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/payments/</div>
-            <div class="description">Получить список платежей</div>
-            <div class="auth">Требуется аутентификация</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">POST</div>
-            <div class="path">/api/v1/payments/</div>
-            <div class="description">Создать новый платеж</div>
-            <div class="example">
-                {
-                    "visit_id": 1,
-                    "amount": 100000,
-                    "provider": "payme",
-                    "transaction_id": "txn_123456"
-                }
-            </div>
-        </div>
-
-        <h2>📊 Аналитика</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/analytics/payment-providers</div>
-            <div class="description">Аналитика по провайдерам платежей</div>
-            <div class="auth">Требуется роль: Admin, Doctor, Nurse</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/analytics/appointment-flow</div>
-            <div class="description">Аналитика потока записей</div>
-            <div class="auth">Требуется роль: Admin, Doctor, Nurse</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/analytics/revenue-breakdown</div>
-            <div class="description">Детальная аналитика доходов</div>
-            <div class="auth">Требуется роль: Admin, Doctor, Nurse</div>
-        </div>
-
-        <h2>🔔 Уведомления</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/notifications/templates</div>
-            <div class="description">Получить шаблоны уведомлений</div>
-            <div class="auth">Требуется аутентификация</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">POST</div>
-            <div class="path">/api/v1/notifications/send</div>
-            <div class="description">Отправить уведомление</div>
-            <div class="example">
-                {
-                    "template_id": 1,
-                    "recipient": "user@example.com",
-                    "channel": "email",
-                    "variables": {
-                        "patient_name": "Иван Иванов",
-                        "appointment_date": "2025-01-30"
-                    }
-                }
-            </div>
-        </div>
-
-        <h2>⚙️ Настройки</h2>
-        <div class="endpoint">
-            <div class="method">GET</div>
-            <div class="path">/api/v1/settings/</div>
-            <div class="description">Получить настройки системы</div>
-            <div class="auth">Требуется роль: Admin</div>
-        </div>
-
-        <div class="endpoint">
-            <div class="method">PUT</div>
-            <div class="path">/api/v1/settings/</div>
-            <div class="description">Обновить настройки системы</div>
-            <div class="auth">Требуется роль: Admin</div>
-        </div>
-
-        <h2>🔐 Роли и права доступа</h2>
+        <h2>Canonical generated docs</h2>
         <ul>
-            <li><strong>Admin</strong> - полный доступ ко всем функциям</li>
-            <li><strong>Doctor</strong> - доступ к пациентам, визитам, аналитике</li>
-            <li><strong>Nurse</strong> - доступ к пациентам, визитам, аналитике</li>
-            <li><strong>Registrar</strong> - доступ к пациентам и визитам</li>
-            <li><strong>Cashier</strong> - доступ к платежам</li>
+            <li><a href="/docs">Swagger UI</a></li>
+            <li><a href="/redoc">ReDoc</a></li>
+            <li><a href="/openapi.json">OpenAPI JSON</a></li>
         </ul>
 
-        <h2>📝 Коды ответов</h2>
+        <h2>Custom helper endpoints</h2>
         <ul>
-            <li><strong>200</strong> - Успешный запрос</li>
-            <li><strong>201</strong> - Ресурс создан</li>
-            <li><strong>400</strong> - Неверный запрос</li>
-            <li><strong>401</strong> - Не авторизован</li>
-            <li><strong>403</strong> - Недостаточно прав</li>
-            <li><strong>404</strong> - Ресурс не найден</li>
-            <li><strong>422</strong> - Ошибка валидации</li>
-            <li><strong>500</strong> - Внутренняя ошибка сервера</li>
+            <li><a href="/api/v1/docs/api-schema">/api/v1/docs/api-schema</a> - live schema mirror for the generated OpenAPI document</li>
+            <li><a href="/api/v1/docs/endpoints-summary">/api/v1/docs/endpoints-summary</a> - live admin-only summary built from the current schema</li>
         </ul>
 
-        <h2>🔗 Полезные ссылки</h2>
+        <h2>Selected live route families</h2>
         <ul>
-            <li><a href="/docs">Swagger UI</a> - Интерактивная документация</li>
-            <li><a href="/redoc">ReDoc</a> - Альтернативная документация</li>
-            <li><a href="/api/v1/health">Health Check</a> - Проверка состояния API</li>
+            <li><code>/api/v1/auth/login</code> and <code>/api/v1/auth/minimal-login</code> for Bearer-token login flows</li>
+            <li><code>/api/v1/patients/</code> for patient registry routes</li>
+            <li><code>/api/v1/visits/visits</code> for operational visit routes</li>
+            <li><code>/api/v1/queue/join/start</code> and <code>/api/v1/queue/join/complete</code> for the modern queue join flow</li>
+            <li><code>/api/v1/payments/init</code> and <code>/api/v1/payments/</code> for payment initiation and records</li>
+            <li><code>/api/v1/messages/send</code> and <code>/api/v1/messages/send-voice</code> for messaging</li>
+            <li><code>/api/v1/system/monitoring/health</code> for system monitoring</li>
         </ul>
+
+        <h2>WebSocket families</h2>
+        <p class="lead">
+            WebSocket routes are runtime surfaces and are not represented in the
+            OpenAPI schema. Current mounted families include
+            <code>/ws/queue</code>, <code>/ws/chat</code>, <code>/ws/cashier</code>,
+            <code>/api/v1/ws/notifications/connect</code>, and
+            <code>/api/v1/ws-auth/*</code>.
+        </p>
     </body>
     </html>
     """
-    return HTMLResponse(content=html_content)
+
+
+@router.get("/api-docs", response_class=HTMLResponse)
+async def get_api_docs(request: Request):
+    """Return a small human-readable landing page for API docs."""
+    schema = request.app.openapi()
+    path_count = len(schema.get("paths", {}))
+    operation_count = sum(1 for _ in _iter_operations(schema))
+    return HTMLResponse(content=_build_api_docs_html(path_count, operation_count))
 
 
 @router.get("/api-schema")
-async def get_api_schema():
-    """Получить JSON схему API"""
-    schema = {
-        "openapi": "3.0.0",
-        "info": {
-            "title": "Clinic Management System API",
-            "description": "API для системы управления клиникой",
-            "version": "1.0.0",
-            "contact": {"name": "Clinic Management Team", "email": "admin@clinic.com"},
-        },
-        "servers": [
-            {"url": "http://localhost:8000", "description": "Development server"}
-        ],
-        "paths": {
-            "/api/v1/auth/login": {
-                "post": {
-                    "summary": "Вход в систему",
-                    "description": "Аутентификация пользователя",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/x-www-form-urlencoded": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "username": {"type": "string"},
-                                        "password": {"type": "string"},
-                                    },
-                                    "required": ["username", "password"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Успешная аутентификация",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "access_token": {"type": "string"},
-                                            "token_type": {"type": "string"},
-                                        },
-                                    }
-                                }
-                            },
-                        }
-                    },
-                }
-            },
-            "/api/v1/users/me": {
-                "get": {
-                    "summary": "Получить информацию о текущем пользователе",
-                    "description": "Возвращает данные текущего авторизованного пользователя",
-                    "security": [{"BearerAuth": []}],
-                    "responses": {
-                        "200": {
-                            "description": "Информация о пользователе",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {"type": "integer"},
-                                            "username": {"type": "string"},
-                                            "email": {"type": "string"},
-                                            "role": {"type": "string"},
-                                            "is_active": {"type": "boolean"},
-                                        },
-                                    }
-                                }
-                            },
-                        }
-                    },
-                }
-            },
-        },
-        "components": {
-            "securitySchemes": {
-                "BearerAuth": {
-                    "type": "http",
-                    "scheme": "bearer",
-                    "bearerFormat": "JWT",
-                }
-            }
-        },
-    }
-    return schema
+async def get_api_schema(request: Request):
+    """Return the live generated OpenAPI schema used by /openapi.json."""
+    return request.app.openapi()
 
 
 @router.get("/endpoints-summary")
 async def get_endpoints_summary(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    request: Request,
+    current_user: User = Depends(get_current_user),
 ):
-    """Получить краткое описание всех эндпоинтов"""
+    """Return a live summary of published endpoints for admin readers."""
     if current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-    summary = {
-        "total_endpoints": 45,
-        "categories": {
-            "authentication": {
-                "count": 3,
-                "endpoints": ["/auth/login", "/auth/refresh", "/auth/logout"],
-            },
-            "users": {
-                "count": 8,
-                "endpoints": [
-                    "/users/",
-                    "/users/me",
-                    "/users/{id}",
-                    "/users/{id}/activate",
-                ],
-            },
-            "patients": {
-                "count": 6,
-                "endpoints": ["/patients/", "/patients/{id}", "/patients/search"],
-            },
-            "visits": {
-                "count": 7,
-                "endpoints": [
-                    "/visits/",
-                    "/visits/{id}",
-                    "/visits/patient/{patient_id}",
-                ],
-            },
-            "payments": {
-                "count": 5,
-                "endpoints": ["/payments/", "/payments/{id}", "/payments/webhook"],
-            },
-            "analytics": {
-                "count": 3,
-                "endpoints": [
-                    "/analytics/payment-providers",
-                    "/analytics/appointment-flow",
-                    "/analytics/revenue-breakdown",
-                ],
-            },
-            "notifications": {
-                "count": 10,
-                "endpoints": [
-                    "/notifications/templates",
-                    "/notifications/send",
-                    "/notifications/history",
-                ],
-            },
-            "settings": {"count": 3, "endpoints": ["/settings/", "/settings/{id}"]},
-        },
-        "authentication_required": 42,
-        "public_endpoints": 3,
-        "admin_only": 15,
-        "doctor_nurse_access": 20,
-    }
+    schema = request.app.openapi()
+    paths = schema.get("paths", {})
+    operation_count = sum(1 for _ in _iter_operations(schema))
 
-    return summary
+    route_families = [
+        {
+            "label": "Authentication",
+            "sample_paths": _existing_paths(
+                paths,
+                [
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/minimal-login",
+                    "/api/v1/auth/me",
+                ],
+            ),
+        },
+        {
+            "label": "Patients",
+            "sample_paths": _existing_paths(
+                paths,
+                [
+                    "/api/v1/patients/",
+                    "/api/v1/patients/{patient_id}",
+                    "/api/v1/patients/{patient_id}/appointments",
+                ],
+            ),
+        },
+        {
+            "label": "Queue",
+            "sample_paths": _existing_paths(
+                paths,
+                [
+                    "/api/v1/queue/join/start",
+                    "/api/v1/queue/join/complete",
+                    "/api/v1/queue/status/{specialist_id}",
+                ],
+            ),
+        },
+        {
+            "label": "Payments",
+            "sample_paths": _existing_paths(
+                paths,
+                [
+                    "/api/v1/payments/providers",
+                    "/api/v1/payments/init",
+                    "/api/v1/payments/",
+                ],
+            ),
+        },
+        {
+            "label": "Monitoring",
+            "sample_paths": _existing_paths(
+                paths,
+                [
+                    "/api/v1/system/monitoring/health",
+                    "/api/v1/system/monitoring/metrics/system",
+                    "/api/v1/system/monitoring/alerts",
+                ],
+            ),
+        },
+        {
+            "label": "Messaging",
+            "sample_paths": _existing_paths(
+                paths,
+                [
+                    "/api/v1/messages/send",
+                    "/api/v1/messages/send-voice",
+                    "/api/v1/messages/voice/{message_id}/stream",
+                ],
+            ),
+        },
+    ]
+
+    return {
+        "kind": "generated-openapi-summary",
+        "canonical_sources": {
+            "swagger_ui": "/docs",
+            "redoc": "/redoc",
+            "openapi_json": "/openapi.json",
+        },
+        "custom_docs_endpoints": {
+            "api_docs": "/api/v1/docs/api-docs",
+            "api_schema": "/api/v1/docs/api-schema",
+            "endpoints_summary": "/api/v1/docs/endpoints-summary",
+        },
+        "path_count": len(paths),
+        "operation_count": operation_count,
+        "top_tags": _top_tag_summaries(schema),
+        "sample_route_families": [
+            family for family in route_families if family["sample_paths"]
+        ],
+        "websocket_families": [
+            "/ws/queue",
+            "/ws/chat",
+            "/ws/cashier",
+            "/api/v1/ws/notifications/connect",
+            "/api/v1/ws-auth/*",
+        ],
+        "notes": [
+            "Counts and samples are generated from the current OpenAPI schema, not from a hardcoded snapshot.",
+            "Generated /docs and /openapi.json remain the canonical contract sources.",
+            "WebSocket routes are listed separately because they are not represented in OpenAPI.",
+        ],
+    }

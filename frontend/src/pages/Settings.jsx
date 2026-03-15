@@ -42,7 +42,7 @@ function Row({ k, v, onSave }) {
 /**
  * Settings:
  *  - Вкладка "license": активация сервера и статус (работает даже при REQUIRE_LICENSE=1)
- *  - Вкладка "printer": простые пары key/value (если backend поддерживает PUT /settings)
+ *  - Вкладка "printer": простые пары key/value через live /settings contract
  *  - Вкладка "online_queue": простые пары key/value
  */
 export default function Settings() {
@@ -166,7 +166,7 @@ export default function Settings() {
 
   async function saveKV(category, key, value) {
     try {
-      await api.put('/settings', { body: { category, key, value } });
+      await api.put('/settings', { category, key, value });
       await loadCat(category);
     } catch (e) {
       alert(e?.data?.detail || e?.message || 'Ошибка сохранения');

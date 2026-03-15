@@ -316,7 +316,7 @@ async def update_user_phone(
 
 @router.get("/statistics")
 async def get_verification_statistics(
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
+    current_user: User = Depends(require_roles("Admin", "SuperAdmin"))
 ):
     """Статистика верификаций (только для администраторов)"""
     try:
@@ -339,7 +339,7 @@ async def admin_send_verification_code(
     purpose: str = Query("verification", description="Цель верификации"),
     provider: Optional[str] = Query(None, description="SMS провайдер"),
     message: Optional[str] = Query(None, description="Кастомное сообщение с {code}"),
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
+    current_user: User = Depends(require_roles("Admin", "SuperAdmin")),
 ):
     """Отправка кода верификации администратором"""
     try:

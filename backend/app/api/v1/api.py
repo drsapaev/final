@@ -103,6 +103,7 @@ from app.api.v1.endpoints import (
     reports,
     roles,
     schedule,
+    settings,
     services,
     simple_auth,
     sms_providers,
@@ -380,6 +381,7 @@ api_router.include_router(
 )
 api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(schedule.router, tags=["schedule"])
+api_router.include_router(settings.router, tags=["settings"])
 # Legacy queue router (для обратной совместимости)
 # ⚠️ DEPRECATED: Используйте /queue/qr-tokens/* или /queue/join/* из qr_queue.py
 api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-legacy"])

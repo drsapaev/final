@@ -28,12 +28,18 @@ def _hash_or_plain(pw: str) -> str:
         return pw
 
 
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes"}
+
+
 def ensure_admin() -> dict:
     # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите ADMIN_PASSWORD через переменную окружения!
     username = os.getenv("ADMIN_USERNAME", "admin").strip()
     password = os.getenv("ADMIN_PASSWORD", "admin")  # ⚠️ DEV ONLY: используйте сильный пароль в продакшене!
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
+    allow_update = _env_flag("ADMIN_ALLOW_UPDATE")
+    reset_password = _env_flag("ADMIN_RESET_PASSWORD")
 
     with SessionLocal() as db:  # type: ignore # type: Session
         # Check by username first
@@ -48,6 +54,16 @@ def ensure_admin() -> dict:
             )
 
         if row:
+            if not allow_update:
+                return {
+                    "skipped": True,
+                    "reason": "existing_user_found_requires_ADMIN_ALLOW_UPDATE",
+                    "id": row.id,
+                    "username": row.username,
+                    "email": row.email,
+                    "full_name": row.full_name,
+                    "role": row.role,
+                }
             changed = False
             # Only update email if it's different and doesn't conflict
             if email and row.email != email:
@@ -59,11 +75,7 @@ def ensure_admin() -> dict:
             if full_name and row.full_name != full_name:
                 row.full_name = full_name
                 changed = True
-            if os.getenv("ADMIN_RESET_PASSWORD", "").strip().lower() in {
-                "1",
-                "true",
-                "yes",
-            }:
+            if reset_password:
                 row.hashed_password = _hash_or_plain(password)
                 changed = True
             if row.role != "Admin":
@@ -86,12 +98,23 @@ def ensure_admin() -> dict:
         # Check if email already exists
         existing_email = db.execute(select(User).where(User.email == email)).scalars().first()
         if existing_email:
+            if not allow_update:
+                return {
+                    "skipped": True,
+                    "reason": "existing_email_match_requires_ADMIN_ALLOW_UPDATE",
+                    "id": existing_email.id,
+                    "username": existing_email.username,
+                    "email": existing_email.email,
+                    "full_name": existing_email.full_name,
+                    "role": existing_email.role,
+                }
             # Update existing user to admin
             existing_email.username = username
             existing_email.role = "Admin"
             existing_email.is_active = True
-            existing_email.hashed_password = _hash_or_plain(password)
             existing_email.full_name = full_name
+            if reset_password:
+                existing_email.hashed_password = _hash_or_plain(password)
             db.commit()
             return {
                 "updated": True,

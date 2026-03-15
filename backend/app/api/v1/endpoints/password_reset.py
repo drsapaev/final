@@ -260,7 +260,7 @@ async def validate_reset_token(
 
 @router.get("/statistics")
 async def get_password_reset_statistics(
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
+    current_user: User = Depends(require_roles("Admin", "SuperAdmin"))
 ):
     """Статистика сброса паролей (только для администраторов)"""
     try:

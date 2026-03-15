@@ -1,5 +1,14 @@
 # AI Factory + OpenHands Precheck
 
+Historical status:
+- this precheck is a dated 2026-03-06 environment snapshot and should now be
+  read as setup history, not as the current repo/runtime state
+
+Current SSOT:
+- `docs/status/W2D_STATUS_NAVIGATION_INDEX.md`
+- `docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`
+- `docs/status/OPENHANDS_TASK_BACKLOG.md`
+
 Date: 2026-03-06
 
 ## Scope

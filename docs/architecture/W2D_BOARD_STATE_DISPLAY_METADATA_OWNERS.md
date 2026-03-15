@@ -61,7 +61,6 @@ The following fields still lack a proven backend owner:
 logo upload path, but no confirmed board-state read owner yet:
 
 - [admin_clinic.py](C:/final/backend/app/api/v1/endpoints/admin_clinic.py)
-- [admin_clinic_api_service.py](C:/final/backend/app/services/admin_clinic_api_service.py)
 
 This means `logo` is not blocked by missing storage, but by missing confirmed
 read ownership and adapter semantics.

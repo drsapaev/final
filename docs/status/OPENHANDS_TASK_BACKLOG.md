@@ -1,68 +1,71 @@
 # OpenHands Task Backlog
 
-Date: 2026-03-06
+Updated: 2026-03-14
+Status: aligned execution index
+
+## How to use this file
+
+This backlog is no longer an early Wave 1 / Wave 2 snapshot.
+
+Use [AI_FACTORY_OPENHANDS_MASTER_PLAN.md](C:/final/docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md)
+as the canonical source of truth. This file is now the shorter execution index
+for the current post-W2D phase.
+
+For the shortest navigation entry point into the current status/doc stack, use
+[W2D_STATUS_NAVIGATION_INDEX.md](C:/final/docs/status/W2D_STATUS_NAVIGATION_INDEX.md).
+
+Current program phase:
+
+`legacy reduction + deprecation continuation + bounded cleanup`
 
 ## Status Legend
 
 - `done`
-- `partial`
+- `active`
 - `blocked`
-- `pending human review`
-- `pending`
+- `pending plan-gate`
+- `pending later`
 
-## Backlog
+## Active Execution Index
 
-| ID | Title | Wave | Contract | Risk | Status | Notes |
-|---|---|---|---|---|---|---|
-| W1-T1 | CI/CD truth matrix and status bootstrap | stabilization | `w1-ci-truth-matrix.contract.json` | low | done | Docs-only rule enforced |
-| W1-T2 | Docs vs code ground truth | stabilization | `verify-docs-vs-code.contract.json` | medium | partial | Mismatch inventory completed; no auto-refactor |
-| W1-T3 | Auth/RBAC audit | stabilization | `audit-rbac.contract.json` | high | pending human review | Protected-domain audit with mixed command outcomes |
-| W1-T4 | Security housekeeping baseline | stabilization | `w1-security-housekeeping.contract.json` | high | done | Analysis-only; dependency upgrades intentionally skipped |
-| W15-T1 | Frontend CI blocker fix (`TwoFactorManager` mock/export) | stabilization | `stabilize-ci.contract.json` | medium | done | Full `frontend` test run is green after test-only fix |
-| W15-T2 | Stabilize `test_role_routing.py` | stabilization | `audit-rbac.contract.json` (narrowed) | medium | done | Replaced flaky live check with deterministic RBAC matrix wrapper |
-| W15-T3 | Docs normalization (risk claims) | stabilization | `cleanup-docs.contract.json` (narrowed) | low | partial | High-visibility claims normalized; broad legacy sweep deferred |
-| W15-T4 | Security remediation slice A (frontend deps) | stabilization | `harden-payments.contract.json` (frontend-only narrowed) | high | partial | Reduced audit findings with non-major updates; 1 critical + 3 high remain |
-| W15-T5 | Security remediation slice B (bandit safe fixes) | stabilization | `security-housekeeping` narrowed | high | pending human review | Safe non-protected B324 fixed; remaining high include protected payment paths |
-| W175-T1 | CI stability recheck | gate-readiness | `stabilize-ci.contract.json` (recheck mode) | high | partial | Frontend/RBAC green; backend root `pytest -q` unstable due `test_cart_direct.py` side effects |
-| W175-T2 | Security risk re-evaluation | gate-readiness | `security-housekeeping` recheck | high | done | Security baseline revalidated; no regression from W1.5 |
-| W175-T3 | Protected-zone findings classification | gate-readiness | audit classification | high | done | Payment/template/pdf/encryption findings mapped to classes 1-4 |
-| W175-T4 | jsPDF critical dependency decision | gate-readiness | dependency decision note | high | done | Chosen path: temporary mitigation; major upgrade remains pending |
-| W175-T5 | Wave 2 gate decision | gate-readiness | gate verdict | high | done | `NOT_READY_FOR_WAVE2` with explicit blockers |
-| W2-T1 | Frontend CI blocker fix (`TwoFactorManager` mock) | stabilization | `stabilize-ci.contract.json` | medium | done | Closed by `W15-T1` |
-| W2-T2 | PR backlog consolidation (Palette/Dependabot) | stabilization | `polish-core.contract.json` (narrowed) | medium | pending | Needs human decision on close/supersede |
-| W2-T3 | Frontend/backend contract audit refresh | structural hardening | `audit-contracts.contract.json` | high | pending | Rebuild parity from latest OpenAPI + inventory |
-| W2-T4 | Queue consistency audit | structural hardening | `audit-queue.contract.json` | high | pending human review | Protected queue domain |
-| W2-T5 | Payment hardening audit | structural hardening | `harden-payments.contract.json` | high | pending human review | Protected payment domain |
-| W2-T6 | Service/repository refactor slice (non-protected) | structural hardening | `refactor-module.contract.json` | medium | pending | Must stay outside protected services |
-| W3-T1 | Accessibility batch merge | polish | `polish-accessibility.contract.json` | medium | pending | Non-protected UI surfaces only |
-| W3-T2 | Docs/root cleanup | polish | `cleanup-docs.contract.json` | low | pending | Remove stale optimistic claims |
+| ID | Title | Track | Risk | Status | Notes |
+|---|---|---|---|---|---|
+| W2D-T1 | Review-first duplicate cleanup continuation | legacy reduction | low | done | Detached endpoint/service residues removed across admin, analytics, telegram, mobile, reporting, SMS, and support surfaces |
+| W2D-T2 | Safe cleanup pool exhaustion audit | legacy reduction | low | done | Remaining non-protected candidates no longer pass blind-cleanup gates |
+| W2D-T3 | Master/backlog status sync | docs/status | low | done | Backlog rewritten to match current master plan and execution phase |
+| W2D-T4 | Remaining residue strategic inventory | planning | medium | done | Buckets now split the remaining pool into protected and non-candidate lanes |
+| W2D-T5 | Mixed-risk non-protected residue follow-up | legacy reduction | medium | done | `settings`, `activation`, and `clinic_management` were resolved through dedicated slices |
+| W2D-T6 | Protected-domain residue gates | planning | high | done | Payment, auth, queue, and EMR duplicate candidates are resolved, and the final active `/api/v1/2fa/devices*` parity gate was closed by aligning published OpenAPI to the live runtime/front-end contract without router reordering |
+| W2D-T7 | Product/ops-blocked legacy tails | deprecation | high | blocked | `open_day`, `close_day`, `next_ticket`, `is_paused`, `is_closed` remain intentionally blocked |
+| W2D-T8 | Broader docs consolidation after residue planning | docs | low | active | Protected residue handling is exhausted; status-navigation cleanup is in good shape, the bounded `API_REFERENCE.md` verification track is effectively complete, both mounted custom API-doc helper routers are aligned, the backend-side production docs plus ops-facing compose docs now read as historical, scoped, or caveated documents, the backend env guide/template plus `ops/docker-compose.yml` and `ops/backend.entrypoint.sh` fallback-path wiring are aligned again, the startup policy decision, `ensure_admin.py` helper contract hardening, and operator command normalization are now all complete, so this lane has reached a coherent low-risk stopping point rather than another active behavior slice |
 
-## Wave 1 Notes
+## Stabilized / Archived Tracks
 
-- Hard rule W1-T1: no code modifications.
-- Hard rule W1-T2: mismatch reported, no auto-refactor.
-- Hard rule W1-T4: analysis/remediation plan only, no dependency upgrades.
-- Per-task status artifacts:
-  - `docs/status/wave1/W1-T1_STATUS.md`
-  - `docs/status/wave1/W1-T2_STATUS.md`
-  - `docs/status/wave1/W1-T3_STATUS.md`
-  - `docs/status/wave1/W1-T4_STATUS.md`
+These are no longer the active day-to-day queue:
 
-## Wave 1.5 Notes
+| Track | Status | Notes |
+|---|---|---|
+| AI Factory / OpenHands setup | done | Installed and operationalized |
+| Wave 1 stabilization | done / archived | Truth, docs, and baseline audit work completed |
+| Wave 2C core queue architecture | done | Main allocator architecture track complete |
+| Postgres alignment + `postgres_pilot` guardrail | done / guarded | CI guardrail in place and operational |
 
-- W1.5 status artifacts:
-  - `docs/status/wave15/W15-T1_STATUS.md`
-  - `docs/status/wave15/W15-T2_STATUS.md`
-  - `docs/status/wave15/W15-T3_STATUS.md`
-  - `docs/security/wave15/W15-T4_SECURITY_SLICE_A.md`
-  - `docs/security/wave15/W15-T5_SECURITY_SLICE_B.md`
+## Current Working Rules
 
-## Wave 1.75 Notes
+- cleanup remains review-first and bounded
+- one low-risk candidate at a time
+- no broad refactors
+- no runtime behavior changes unless a slice is explicitly a narrow drift fix
+- no protected-domain cleanup without a separate plan-gate
+- if a candidate fails mount/import/diff proof, it becomes inventory, not a deletion
 
-- W1.75 artifacts:
-  - `docs/status/wave175/W175-T1_CI_STABILITY.md`
-  - `docs/security/wave175/W175_SECURITY_RECHECK.md`
-  - `docs/security/wave175/W175_PROTECTED_ZONE_REVIEW.md`
-  - `docs/security/wave175/W175_JSPDF_RISK_DECISION.md`
-  - `docs/status/WAVE2_GATE_DECISION.md`
-- Gate verdict: `NOT_READY_FOR_WAVE2`.
+## Current Known Good Verification Signal
+
+- `cd C:\final\backend && pytest tests/test_openapi_contract.py -q` -> `14 passed`
+- `cd C:\final\backend && pytest -q` -> `850 passed, 3 skipped`
+
+## Historical Notes
+
+Earlier W1 / W1.5 / W1.75 artifacts remain useful as records, but they are now
+historical context rather than the active backlog. Treat their task tables as
+archived program history, not the current execution queue.

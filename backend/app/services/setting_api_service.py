@@ -25,8 +25,18 @@ class SettingApiService:
     ):
         self.repository = repository or SettingApiRepository(db)
 
-    def get_settings(self, *, category: str):
+    def get_settings(self, *, category: str, limit: int = 100, offset: int = 0):
         try:
-            return self.repository.list_by_category(category=category)
+            return self.repository.list_by_category(
+                category=category,
+                limit=limit,
+                offset=offset,
+            )
+        except Exception as exc:
+            raise SettingApiDomainError(status_code=500, detail=str(exc)) from exc
+
+    def update_setting(self, *, category: str, key: str, value: str | None):
+        try:
+            return self.repository.upsert(category=category, key=key, value=value)
         except Exception as exc:
             raise SettingApiDomainError(status_code=500, detail=str(exc)) from exc
