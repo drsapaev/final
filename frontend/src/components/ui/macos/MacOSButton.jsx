@@ -211,6 +211,7 @@ const MacOSButton = ({
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      aria-busy={loading}
       {...props}
     >
       {loading && (
