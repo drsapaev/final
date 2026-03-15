@@ -299,13 +299,13 @@ const PhotoArchive = ({
         <div className="mt-2 flex gap-1">
                 <button
             onClick={() => handleFileUpdate(file.id, {})}
-            className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+            className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200" title="Редактировать" aria-label="Редактировать файл">
             
                   <Edit className="h-3 w-3 mx-auto" />
                 </button>
                 <button
             onClick={() => handleFileDelete(file.id)}
-            className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
+            className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200" title="Удалить" aria-label="Удалить файл">
             
                   <Trash2 className="h-3 w-3 mx-auto" />
                 </button>
@@ -521,7 +521,7 @@ const PhotoArchive = ({
           {/* Кнопка закрытия */}
           <button
             onClick={() => setShowImageViewer(false)}
-            className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75">
+            className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75" title="Закрыть" aria-label="Закрыть просмотрщик">
             
             <X className="h-6 w-6" />
           </button>
@@ -565,7 +565,7 @@ const PhotoArchive = ({
                     link.download = selectedFile.name;
                     link.click();
                   }}
-                  className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                  className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700" title="Скачать" aria-label="Скачать файл">
                   
                   <Download className="h-4 w-4" />
                 </button>
@@ -621,7 +621,7 @@ const PhotoArchive = ({
             }
             <button
               onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-700">
+              className="p-2 text-gray-500 hover:text-gray-700" title="Закрыть" aria-label="Закрыть">
               
               <X className="h-5 w-5" />
             </button>
@@ -703,19 +703,19 @@ const PhotoArchive = ({
               <div className="flex border border-gray-300 rounded-md">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
+                  className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'text-gray-700'}`} title="Сетка" aria-label="Отображать сеткой">
                   
                   <ImageIcon className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
+                  className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'text-gray-700'}`} title="Список" aria-label="Отображать списком">
                   
                   <FileText className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('timeline')}
-                  className={`px-3 py-2 ${viewMode === 'timeline' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
+                  className={`px-3 py-2 ${viewMode === 'timeline' ? 'bg-blue-500 text-white' : 'text-gray-700'}`} title="Таймлайн" aria-label="Отображать по времени">
                   
                   <Calendar className="h-4 w-4" />
                 </button>
