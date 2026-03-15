@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -35,7 +35,7 @@ class InvoiceCreate(BaseModel):
     visit_id: Optional[int] = None
     appointment_id: Optional[int] = None
     invoice_type: InvoiceType = InvoiceType.STANDARD
-    items: List[InvoiceItemCreate] = Field(..., min_items=1)
+    items: List[InvoiceItemCreate] = Field(..., min_length=1)
     description: Optional[str] = None
     notes: Optional[str] = None
     payment_terms: Optional[str] = None
@@ -141,8 +141,7 @@ class InvoiceResponse(BaseModel):
     is_recurring: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentResponse(BaseModel):
@@ -159,8 +158,7 @@ class PaymentResponse(BaseModel):
     confirmed_at: Optional[datetime]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === API endpoints ===

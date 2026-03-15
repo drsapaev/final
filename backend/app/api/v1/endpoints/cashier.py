@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Generic, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc
 
@@ -43,8 +43,7 @@ class PendingPaymentItem(BaseModel):
     queue_number: Optional[str] = None
     department: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentHistoryItem(BaseModel):
@@ -61,8 +60,7 @@ class PaymentHistoryItem(BaseModel):
     note: Optional[str] = None
     cashier_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 T = TypeVar("T")
@@ -97,8 +95,7 @@ class PaymentResponse(BaseModel):
     paid_at: Optional[datetime] = None
     note: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CancelPaymentRequest(BaseModel):

@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -70,8 +70,7 @@ class RefundRequestResponse(BaseModel):
     processed_at: Optional[datetime] = None
     processed_by_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProcessRefundRequest(BaseModel):
@@ -94,8 +93,7 @@ class DepositResponse(BaseModel):
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepositTransactionResponse(BaseModel):
@@ -109,8 +107,7 @@ class DepositTransactionResponse(BaseModel):
     description: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AddDepositRequest(BaseModel):
