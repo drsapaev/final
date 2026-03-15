@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Strategy"
+  short_description: "Shape offer and page strategy"
+  default_prompt: "Use $landing-strategy to define positioning, objections, and section strategy for a landing page."

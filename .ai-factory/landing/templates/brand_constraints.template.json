@@ -1,0 +1,17 @@
+{
+  "tone": {
+    "voice": [],
+    "must_avoid": []
+  },
+  "visual_direction": {
+    "mood": "",
+    "color_biases": [],
+    "must_avoid": []
+  },
+  "brand_assets": {
+    "logo_paths": [],
+    "image_sources": [],
+    "restricted_claims": []
+  },
+  "compliance_notes": []
+}

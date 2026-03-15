@@ -35,6 +35,8 @@
 |----------|-------------|
 | [AI_ARCHITECTURE_RULE.md](./AI_ARCHITECTURE_RULE.md) | AI architecture rules |
 | [AI_INTEGRATION_GUIDE.md](./AI_INTEGRATION_GUIDE.md) | AI integration |
+| [architecture/AI_LANDING_FACTORY_ARCHITECTURE.md](./architecture/AI_LANDING_FACTORY_ARCHITECTURE.md) | AI-first landing page factory blueprint |
+| [runbooks/AI_LANDING_FACTORY_RUNBOOK.md](./runbooks/AI_LANDING_FACTORY_RUNBOOK.md) | Operational flow for landing runs |
 | [AI_MCP_FRONTEND_INTEGRATION_GUIDE.md](./AI_MCP_FRONTEND_INTEGRATION_GUIDE.md) | MCP frontend |
 | [MCP_INTEGRATION_GUIDE.md](./MCP_INTEGRATION_GUIDE.md) | MCP backend |
 
@@ -118,4 +120,4 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 
 ---
 
-*Last Updated: 2026-02-21*
+*Last Updated: 2026-03-15*

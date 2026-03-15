@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Release"
+  short_description: "Prepare preview and scorecard"
+  default_prompt: "Use $landing-release to assemble QA evidence and a release candidate for a landing page."

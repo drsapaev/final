@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Design Audit"
+  short_description: "Audit hierarchy and consistency"
+  default_prompt: "Use $landing-design-audit to review a landing page for hierarchy, contrast, and consistency."
