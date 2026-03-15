@@ -11,6 +11,7 @@ export { AnimatedTransition } from './native';
 
 // Специализированные компоненты, которые остаются в ui/
 export { default as PhoneInput } from './PhoneInput';
+export { default as FileUpload } from './FileUpload';
 
 // Компоненты из других папок
 export { default as AnimatedLoader } from '../AnimatedLoader';
