@@ -1,5 +1,4 @@
 import React from 'react';
-import { X } from 'lucide-react';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -14,16 +13,8 @@ const MacOSInput = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
-  const showClear = clearable && props.value && !disabled;
-
-  const handleClear = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onClear) {
-      onClear();
-    }
-  };
-
+  void clearable;
+  void onClear;
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -67,7 +58,7 @@ const MacOSInput = React.forwardRef(({
   const inputStyle = {
     width: '100%',
     paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
-    paddingRight: showClear ? '36px' : (Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1]),
+    paddingRight: Icon && iconPosition === 'right' ? '40px' : currentSize.padding.split(' ')[1],
     paddingTop: currentSize.padding.split(' ')[0],
     paddingBottom: currentSize.padding.split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
@@ -108,25 +99,6 @@ const MacOSInput = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
-  const clearButtonStyle = {
-    position: 'absolute',
-    right: '8px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'transparent',
-    border: 'none',
-    padding: '4px',
-    color: 'var(--mac-text-tertiary)',
-    cursor: 'pointer',
-    borderRadius: '50%',
-    transition: 'all 0.2s',
-  };
-
-  const [isClearHovered, setIsClearHovered] = React.useState(false);
-
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       {Icon && (
@@ -141,22 +113,6 @@ const MacOSInput = React.forwardRef(({
         onBlur={handleBlur}
         {...props}
       />
-      {showClear && (
-        <button
-          type="button"
-          onClick={handleClear}
-          style={{
-            ...clearButtonStyle,
-            color: isClearHovered ? 'var(--mac-text-primary)' : 'var(--mac-text-tertiary)',
-            background: isClearHovered ? 'var(--mac-bg-tertiary)' : 'transparent',
-          }}
-          onMouseEnter={() => setIsClearHovered(true)}
-          onMouseLeave={() => setIsClearHovered(false)}
-          aria-label="Clear input"
-        >
-          <X size={14} />
-        </button>
-      )}
     </div>
   );
 });
