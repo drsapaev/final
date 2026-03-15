@@ -275,7 +275,7 @@ export default function HeaderNew() {
         gap: '4px'
       }}>
 
-        <Icon name="magnifyingglass" size="small" />
+        <Icon name="globe" size="small" />
         {lang.toUpperCase()}
       </Button>
 
