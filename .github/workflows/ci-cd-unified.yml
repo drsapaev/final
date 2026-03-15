@@ -453,7 +453,7 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
-        npm install
+        npm ci
     
     - name: 🔍 Линтинг frontend
       run: |
