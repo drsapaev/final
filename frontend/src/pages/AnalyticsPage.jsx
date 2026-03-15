@@ -20,6 +20,20 @@ import {
   Target } from
 'lucide-react';
 
+function buildKpiData(metrics) {
+  return {
+    metrics: Object.fromEntries(
+      metrics.map((metric, index) => [
+        metric.label || `metric_${index}`,
+        {
+          ...metric,
+          format: metric.format === 'visits' ? 'count' : metric.format || 'count'
+        }
+      ])
+    )
+  };
+}
+
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -78,7 +92,7 @@ export default function AnalyticsPage() {
           response = await api.get(`/analytics/dashboard?${params}`);
       }
 
-      setData((prev) => ({ ...prev, [tab]: response }));
+      setData((prev) => ({ ...prev, [tab]: response?.data ?? null }));
     } catch (error) {
       logger.error('Ошибка загрузки аналитики:', error);
     } finally {
@@ -113,7 +127,7 @@ export default function AnalyticsPage() {
         responseType: 'blob'
       });
 
-      const blob = new Blob([response], {
+      const blob = new Blob([response?.data ?? response], {
         type: format === 'json' ? 'application/json' :
         format === 'csv' ? 'text/csv' :
         format === 'pdf' ? 'application/pdf' :
@@ -134,31 +148,31 @@ export default function AnalyticsPage() {
   const renderOverviewTab = () => {
     if (!data.overview) return <div>Загрузка...</div>;
 
-    const { today, month } = data.overview;
+    const { today = {}, month = {} } = data.overview || {};
 
     const metrics = [
     {
       label: 'Визиты сегодня',
-      value: today.visits?.total_visits || 0,
+      value: today?.visits?.total_visits || 0,
       type: 'visits',
       icon: <Calendar size={16} />
     },
     {
       label: 'Доходы сегодня',
-      value: today.revenue?.total_revenue || 0,
+      value: today?.revenue?.total_revenue || 0,
       type: 'revenue',
       format: 'revenue',
       icon: <DollarSign size={16} />
     },
     {
       label: 'Пациенты за месяц',
-      value: month.patients?.total_patients || 0,
+      value: month?.patients?.total_patients || 0,
       type: 'patients',
       icon: <Users size={16} />
     },
     {
       label: 'Конверсия',
-      value: month.visits?.completion_rate || 0,
+      value: month?.visits?.completion_rate || 0,
       type: 'conversion',
       format: 'percentage',
       icon: <TrendingUp size={16} />
@@ -167,7 +181,7 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <KPIMetrics metrics={metrics} />
+        <KPIMetrics data={buildKpiData(metrics)} />
         
         <div style={{
           display: 'grid',
@@ -200,30 +214,34 @@ export default function AnalyticsPage() {
   const renderAppointmentsTab = () => {
     if (!data.appointments) return <div>Загрузка...</div>;
 
-    const { summary, status_distribution, conversion_rates } = data.appointments;
+    const {
+      summary = {},
+      status_distribution = {},
+      conversion_rates = {}
+    } = data.appointments || {};
 
     const metrics = [
     {
       label: 'Всего записей',
-      value: summary.total_appointments,
+      value: summary.total_appointments || 0,
       type: 'visits',
       icon: <Calendar size={16} />
     },
     {
       label: 'Оплачено',
-      value: summary.paid_appointments,
+      value: summary.paid_appointments || 0,
       type: 'visits',
       icon: <DollarSign size={16} />
     },
     {
       label: 'Завершено',
-      value: summary.completed_appointments,
+      value: summary.completed_appointments || 0,
       type: 'visits',
       icon: <Activity size={16} />
     },
     {
       label: 'Конверсия',
-      value: conversion_rates.overall_conversion,
+      value: conversion_rates.overall_conversion || 0,
       type: 'conversion',
       format: 'percentage',
       icon: <TrendingUp size={16} />
@@ -232,7 +250,7 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <KPIMetrics metrics={metrics} />
+        <KPIMetrics data={buildKpiData(metrics)} />
         
         <div style={{
           display: 'grid',
@@ -266,7 +284,13 @@ export default function AnalyticsPage() {
   const renderRevenueTab = () => {
     if (!data.revenue) return <div>Загрузка...</div>;
 
-    const { total_revenue, total_transactions, average_transaction, daily_revenue } = data.revenue;
+    const {
+      total_revenue = 0,
+      total_transactions = 0,
+      average_transaction = 0,
+      daily_revenue = [],
+      provider_breakdown = {}
+    } = data.revenue || {};
 
     const metrics = [
     {
@@ -293,7 +317,7 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <KPIMetrics metrics={metrics} />
+        <KPIMetrics data={buildKpiData(metrics)} />
         
         <div style={{
           display: 'grid',
@@ -315,7 +339,7 @@ export default function AnalyticsPage() {
           
           <AnalyticsDashboard
             title="Доходы по провайдерам"
-            data={Object.entries(data.revenue.provider_breakdown || {}).map(([provider, stats]) => ({
+            data={Object.entries(provider_breakdown).map(([provider, stats]) => ({
               label: provider,
               value: stats.total_amount
             }))}
@@ -330,7 +354,7 @@ export default function AnalyticsPage() {
   const renderProvidersTab = () => {
     if (!data.providers) return <div>Загрузка...</div>;
 
-    const { summary, providers } = data.providers;
+    const { summary = {}, providers = {} } = data.providers || {};
 
     const metrics = [
     {
@@ -363,7 +387,7 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <KPIMetrics metrics={metrics} />
+        <KPIMetrics data={buildKpiData(metrics)} />
         
         <div style={{
           display: 'grid',
@@ -412,7 +436,7 @@ export default function AnalyticsPage() {
         
         <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center' }}>
           <button
-            onClick={exportData}
+            onClick={() => exportData('json')}
             style={{
               padding: '8px 16px',
               background: 'var(--accent-color)',
