@@ -1,114 +1,89 @@
-# Production Setup - Summary
+# Production Setup Summary
 
-## ✅ Completed Steps
+Reviewed For Drift: 2026-03-14
+Status: companion setup summary with current caveats
 
-### 1. Environment Variables ✅
+## What this file is
 
-- **Created:** `backend/.env.example` - Template with all required variables
-- **Created:** `backend/generate_secret_key.py` - Script to generate secure SECRET_KEY
-- **Generated:** Sample SECRET_KEY (see output above)
+This is a shorter companion to:
 
-**Next Steps:**
-1. Copy `.env.example` to `.env`
-2. Run `python generate_secret_key.py` to generate your SECRET_KEY
-3. Add SECRET_KEY to `.env` file
-4. Configure other required variables (FCM, database, etc.)
+- `C:/final/backend/SETUP_PRODUCTION.md`
 
-### 2. Database Migrations ⚠️
+It is no longer a "completed production setup" announcement.
 
-**Status:** Multiple head revisions detected - merge required
+Use it as a quick orientation page, then verify current status in:
 
-**Action Taken:**
-- Created merge migration to resolve multiple heads
-- Migrations ready to apply
+- `C:/final/docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`
+- `C:/final/docs/status/OPENHANDS_TASK_BACKLOG.md`
+- `C:/final/docs/OPERATOR_STARTUP_COMMANDS.md`
 
-**Next Steps:**
-```bash
-cd backend
-alembic upgrade head
-```
+## Current Repo-Backed Assets
 
-### 3. Load Testing ✅
+- `backend/.env.example`
+- `backend/generate_secret_key.py`
+- `backend/load_test.py`
+- `backend/requirements-monitoring.txt`
+- `ops/docker-compose.yml`
+- `ops/backend.entrypoint.sh`
 
-- **Created:** `backend/load_test.py` - Comprehensive load testing tool
+## Current Verified Runtime Signals
 
-**Usage:**
-```bash
-# Basic test
-python load_test.py
+Published API helpers currently include:
 
-# Custom test
-python load_test.py --users 50 --requests 20
+- `GET /api/v1/health`
+- `GET /api/v1/status`
+- `POST /api/v1/system/backup/create`
+- `GET /api/v1/system/backup/list`
 
-# Test specific endpoint
-python load_test.py --endpoint /api/v1/patients/ --users 10 --requests 100
-```
+Current code-backed verification baseline:
 
-**Features:**
-- Concurrent request testing
-- Response time metrics
-- Error rate tracking
-- Status code distribution
-- Customizable concurrency and request counts
+- `pytest tests/test_openapi_contract.py -q` -> `14 passed`
+- `pytest -q` -> `850 passed, 3 skipped`
 
-### 4. Monitoring ✅
+## Current Caveats
 
-- **Created:** `backend/monitoring_config.py` - Monitoring configuration
-- **Created:** `backend/requirements-monitoring.txt` - Monitoring dependencies
+- `backend/.env.production` is not committed, even though `ops/docker-compose.yml`
+  expects it.
+- `ops/docker-compose.yml` still uses `AUTH_SECRET`, while the active app
+  config validates `SECRET_KEY`.
+- `ops/docker-compose.yml` defaults `ENV=dev` and `CORS_ALLOW_ALL=1`, so it
+  should not be treated as a reviewed production-safe default.
+- `ops/backend.entrypoint.sh` no longer performs implicit schema bootstrap, so
+  schema preparation must happen explicitly before startup.
+- `ops/backend.entrypoint.sh` now defaults `ENSURE_ADMIN=0`, so admin
+  bootstrap is opt-in instead of implicit.
+- `gunicorn` is not present in `backend/requirements.txt`; `uvicorn` is the
+  repo-backed runtime dependency.
+- monitoring helpers exist, but `monitoring_config.py` is not auto-imported by
+  `app/main.py`
+- `test_production_readiness.py` is a legacy spot-check, not the canonical
+  repo verification gate
 
-**Features:**
-- Sentry integration for error tracking
-- Prometheus metrics support
-- Structured logging
-- Health check endpoints
-- Alert thresholds configuration
+## Safer Quick Start
 
-**Setup:**
-```bash
-# Install monitoring dependencies
-pip install -r requirements-monitoring.txt
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Generate and set `SECRET_KEY`.
+3. Set `ENV=production`, a production `DATABASE_URL`, strict CORS origins, and
+   `FRONTEND_URL`.
+4. Run `alembic upgrade head`.
+5. Optionally run `python app/scripts/ensure_admin.py` if you intentionally
+   want bootstrap admin creation.
+   If you intentionally want to mutate an existing matched user, also set
+   `ADMIN_ALLOW_UPDATE=1`.
+6. Start with `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4`.
+7. Verify:
+   - `curl http://localhost:8000/api/v1/health`
+   - `curl http://localhost:8000/api/v1/status`
+   - `pytest tests/test_openapi_contract.py -q`
+   - `pytest -q`
+8. Run optional helper checks only if needed:
+   - `python load_test.py`
+   - `python test_production_readiness.py`
+   - backup smoke tests
+   - optional monitoring helper installation
 
-# Configure in .env
-SENTRY_DSN=your-sentry-dsn
-PROMETHEUS_ENABLED=true
-PROMETHEUS_PORT=9090
-```
+## Reference Links
 
-## 📋 Quick Start Checklist
-
-- [ ] Copy `.env.example` to `.env`
-- [ ] Generate and set SECRET_KEY
-- [ ] Configure database URL
-- [ ] Set ENV=production
-- [ ] Configure CORS origins
-- [ ] Run migrations: `alembic upgrade head`
-- [ ] Install monitoring: `pip install -r requirements-monitoring.txt`
-- [ ] Configure monitoring (Sentry, Prometheus)
-- [ ] Run load tests: `python load_test.py`
-- [ ] Verify health: `curl http://localhost:8000/api/v1/health`
-- [ ] Start production server
-
-## 📖 Documentation
-
-- **Full Setup Guide:** `backend/SETUP_PRODUCTION.md`
-- **Production Readiness Report:** `backend/PRODUCTION_READINESS_REPORT.md`
-- **Environment Variables:** `backend/.env.example`
-
-## 🔒 Security Reminders
-
-1. **NEVER commit `.env` to version control**
-2. **Use strong SECRET_KEY** (minimum 32 characters)
-3. **Set ENV=production** in production
-4. **Configure CORS** properly for your domain
-5. **Enable backups:** `AUTO_BACKUP_ENABLED=true`
-6. **Set up monitoring** for error tracking
-
-## 🚀 Next Steps
-
-1. Complete environment variable configuration
-2. Resolve migration heads and run migrations
-3. Run load tests to verify performance
-4. Set up monitoring and alerts
-5. Deploy to production environment
-
-
+- Full setup guide: `C:/final/backend/SETUP_PRODUCTION.md`
+- Historical readiness memo: `C:/final/backend/PRODUCTION_READINESS_REPORT.md`
+- Current execution SSOT: `C:/final/docs/status/AI_FACTORY_OPENHANDS_MASTER_PLAN.md`

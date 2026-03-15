@@ -26,7 +26,19 @@
         "aif-rules",
         "aif-security-checklist",
         "aif-skill-generator",
-        "aif-verify"
+        "aif-verify",
+        "repo-audit",
+        "docs-vs-code-verification",
+        "service-repository-refactor",
+        "ci-cd-stabilization",
+        "auth-rbac-audit",
+        "frontend-backend-contract-audit",
+        "queue-consistency-audit",
+        "payment-hardening",
+        "accessibility-polish",
+        "security-housekeeping",
+        "critical-flow-test-mapping",
+        "docs-cleanup"
       ],
       "mcp": {
         "github": false,

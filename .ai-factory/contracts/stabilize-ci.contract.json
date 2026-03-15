@@ -1,0 +1,62 @@
+{
+  "contract_version": "1.0",
+  "task_type": "stabilize-ci",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      ".github/workflows/**",
+      "backend/scripts/ci/**",
+      "backend/tests/**",
+      "frontend/src/test/**",
+      "frontend/package.json",
+      "backend/requirements.txt"
+    ],
+    "exclude": [
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key"
+    ]
+  },
+  "goals": [
+    "Stabilize a specific failing CI path with the smallest reproducible change.",
+    "Keep permissions and branch-protection assumptions unchanged unless explicitly approved.",
+    "Document the exact failure and why the change resolves it."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 300,
+    "must_run_tests": true,
+    "mandatory_human_review": true,
+    "protected_paths": [
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key"
+    ]
+  },
+  "must_run": [
+    "Reproduce the failing CI command locally or via a narrow equivalent.",
+    "Run: docker compose -f ops/openhands/docker-compose.yml config if the OpenHands wrapper changes.",
+    "Run the closest workflow-local verification command after the fix."
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "branch protection settings outside the repo",
+    "workflow permission escalation without explicit approval"
+  ],
+  "required_artifacts": [
+    "failure summary",
+    "local reproduction notes",
+    "post-fix verification notes"
+  ],
+  "stop_conditions": [
+    "The fix requires new secrets or credential rotation.",
+    "The fix needs broader workflow permission changes.",
+    "The task expands beyond the failing CI slice."
+  ],
+  "review_notes": [
+    "Human review is mandatory for workflow edits in this repo.",
+    "Keep the fix tied to a concrete failing job or flaky path."
+  ]
+}

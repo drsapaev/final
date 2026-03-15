@@ -118,7 +118,7 @@ async def ws_queue_authenticated(
         await websocket.accept()
 
         room = f"{department}:{date}"
-        ws_manager.connect(websocket, room)
+        await ws_manager.connect(websocket, room)
 
         logger.info(
             f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}, дата {date}"
@@ -248,7 +248,7 @@ async def ws_queue_optional_auth(
         await websocket.accept()
 
         room = f"{department}:{date}"
-        ws_manager.connect(websocket, room)
+        await ws_manager.connect(websocket, room)
 
         logger.info(
             f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}"
@@ -428,8 +428,8 @@ async def _broadcast_patient_call(
     }
 
     # Используем существующий ws_manager для рассылки
-    if hasattr(ws_manager, 'broadcast'):
-        await ws_manager.broadcast(room, json.dumps(message))
+    if hasattr(ws_manager, "broadcast"):
+        ws_manager.broadcast(room, message)
 
 
 async def _handle_queue_update(message: dict, department: str, date: str, db: Session):

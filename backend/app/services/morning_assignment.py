@@ -4,7 +4,9 @@
 """
 
 import logging
+from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -19,6 +21,40 @@ from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
+
+WIZARD_DUPLICATE_ACTIVE_STATUSES = (
+    "waiting",
+    "called",
+    "in_service",
+    "diagnostics",
+)
+
+
+class MorningAssignmentClaimError(ValueError):
+    """Raised when a wizard-family queue claim cannot be resolved safely."""
+
+
+@dataclass(frozen=True)
+class MorningAssignmentCreateBranchHandoff:
+    """Wizard-local handoff for the create-entry branch."""
+
+    queue_tag: str
+    daily_queue: DailyQueue
+    create_entry_kwargs: dict[str, Any]
+
+    def build_assigned_payload(self, *, number: int) -> dict[str, Any]:
+        return {
+            "queue_tag": self.queue_tag,
+            "queue_id": self.daily_queue.id,
+            "number": number,
+            "status": "assigned",
+        }
+
+
+@dataclass(frozen=True)
+class MorningAssignmentPreparedQueueAssignment:
+    assignment: dict[str, Any] | None = None
+    create_handoff: MorningAssignmentCreateBranchHandoff | None = None
 
 
 class MorningAssignmentService:
@@ -338,6 +374,44 @@ class MorningAssignmentService:
     ) -> dict[str, any] | None:
         """Присваивает номер в конкретной очереди"""
 
+        prepared_assignment = self.prepare_wizard_queue_assignment(
+            visit,
+            queue_tag,
+            target_date,
+            source=source,
+        )
+        if prepared_assignment is None:
+            return None
+
+        if prepared_assignment.assignment is not None:
+            return prepared_assignment.assignment
+
+        create_handoff = prepared_assignment.create_handoff
+        if create_handoff is None:
+            return None
+
+        queue_entry = queue_service.create_queue_entry(
+            self.db,
+            **create_handoff.create_entry_kwargs,
+        )
+
+        service_codes_for_entry = create_handoff.create_entry_kwargs.get("service_codes", [])
+        logger.info(
+            f"Присвоен номер {queue_entry.number} в очереди {queue_tag} для пациента {visit.patient_id} (через SSOT), услуги: {service_codes_for_entry}"
+        )
+
+        return create_handoff.build_assigned_payload(number=queue_entry.number)
+
+    def prepare_wizard_queue_assignment(
+        self,
+        visit: Visit,
+        queue_tag: str,
+        target_date: date,
+        *,
+        source: str = "morning_assignment",
+    ) -> MorningAssignmentPreparedQueueAssignment | None:
+        """Resolve wizard queue claim and expose create-branch handoff."""
+
         # Определяем врача для очереди
         doctor_id = visit.doctor_id
         doctor = None
@@ -420,8 +494,6 @@ class MorningAssignmentService:
             f"Используем doctor_id={doctor_id} для queue_tag={queue_tag}, visit_id={visit.id}"
         )
 
-        # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для получения/создания очереди
-        # Получаем информацию о враче для defaults
         defaults = {}
         if doctor:
             defaults = {
@@ -433,15 +505,10 @@ class MorningAssignmentService:
                 ),
             }
 
-        # Сначала пытаемся использовать уже созданную очередь на текущую дату.
-        daily_queue = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active == True,
-            )
-            .first()
+        daily_queue, existing_entry = self._resolve_existing_queue_claim_or_raise(
+            patient_id=visit.patient_id,
+            target_date=target_date,
+            queue_tag=queue_tag,
         )
 
         if not daily_queue:
@@ -454,27 +521,34 @@ class MorningAssignmentService:
                 defaults=defaults,
             )
 
-        # Проверяем нет ли уже записи для этого пациента в этой очереди
-        existing_entry = (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                and_(
-                    OnlineQueueEntry.queue_id == daily_queue.id,
-                    OnlineQueueEntry.patient_id == visit.patient_id,
-                )
-            )
-            .first()
-        )
-
         if existing_entry:
             logger.info(f"Пациент {visit.patient_id} уже есть в очереди {queue_tag}")
-            return {
-                "queue_tag": queue_tag,
-                "queue_id": daily_queue.id,
-                "number": existing_entry.number,
-                "status": "existing",
-            }
+            return MorningAssignmentPreparedQueueAssignment(
+                assignment={
+                    "queue_tag": queue_tag,
+                    "queue_id": daily_queue.id,
+                    "number": existing_entry.number,
+                    "status": "existing",
+                }
+            )
 
+        return MorningAssignmentPreparedQueueAssignment(
+            create_handoff=self._build_create_branch_handoff(
+                visit,
+                queue_tag,
+                daily_queue,
+                source=source,
+            )
+        )
+
+    def _build_create_branch_handoff(
+        self,
+        visit: Visit,
+        queue_tag: str,
+        daily_queue: DailyQueue,
+        *,
+        source: str,
+    ) -> MorningAssignmentCreateBranchHandoff:
         # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для создания записи
         # Получаем информацию о пациенте для передачи в create_queue_entry
         patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
@@ -535,33 +609,80 @@ class MorningAssignmentService:
                             "price": float(vs.price) if vs.price else 0,
                         })
 
-        # ✅ ИСПРАВЛЕНО: Используем SSOT метод для создания записи С услугами
-        queue_entry = queue_service.create_queue_entry(
-            self.db,
+        return MorningAssignmentCreateBranchHandoff(
+            queue_tag=queue_tag,
             daily_queue=daily_queue,
-            patient_id=visit.patient_id,
-            patient_name=patient_name,
-            phone=phone,
-            visit_id=visit.id,
-            source=source,  # Источник: зависит от сценария (desk / morning_assignment / confirmation)
-            status="waiting",
-            queue_time=queue_time,  # Бизнес-время регистрации
-            services=services_for_entry,  # ⭐ ДОБАВЛЕНО: услуги с кодами
-            service_codes=service_codes_for_entry,  # ⭐ ДОБАВЛЕНО: коды услуг
-            auto_number=True,  # Автоматически присваиваем номер
-            commit=False,  # Не коммитим сразу, коммит будет в run_morning_assignment
+            create_entry_kwargs={
+                "daily_queue": daily_queue,
+                "patient_id": visit.patient_id,
+                "patient_name": patient_name,
+                "phone": phone,
+                "visit_id": visit.id,
+                "source": source,
+                "status": "waiting",
+                "queue_time": queue_time,
+                "services": services_for_entry,
+                "service_codes": service_codes_for_entry,
+                "auto_number": True,
+                "commit": False,
+            },
         )
 
-        logger.info(
-            f"Присвоен номер {queue_entry.number} в очереди {queue_tag} для пациента {visit.patient_id} (через SSOT), услуги: {service_codes_for_entry}"
+    def _resolve_existing_queue_claim_or_raise(
+        self,
+        *,
+        patient_id: int,
+        target_date: date,
+        queue_tag: str,
+    ) -> tuple[DailyQueue | None, OnlineQueueEntry | None]:
+        active_queues = (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            )
+            .order_by(DailyQueue.id.asc())
+            .all()
         )
 
-        return {
-            "queue_tag": queue_tag,
-            "queue_id": daily_queue.id,
-            "number": queue_entry.number,
-            "status": "assigned",
-        }
+        if not active_queues:
+            return None, None
+
+        active_entries = (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id.in_([queue.id for queue in active_queues]),
+                OnlineQueueEntry.patient_id == patient_id,
+                OnlineQueueEntry.status.in_(WIZARD_DUPLICATE_ACTIVE_STATUSES),
+            )
+            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
+            .all()
+        )
+
+        if len(active_entries) > 1:
+            raise MorningAssignmentClaimError(
+                "Неоднозначная активная запись очереди для queue_tag="
+                f"{queue_tag} и пациента {patient_id}"
+            )
+
+        if len(active_entries) == 1:
+            queue_by_id = {queue.id: queue for queue in active_queues}
+            matched_queue = queue_by_id.get(active_entries[0].queue_id)
+            if matched_queue is None:
+                raise MorningAssignmentClaimError(
+                    "Не удалось безопасно сопоставить активную запись очереди с "
+                    f"queue_tag={queue_tag} и пациентом {patient_id}"
+                )
+            return matched_queue, active_entries[0]
+
+        if len(active_queues) > 1:
+            raise MorningAssignmentClaimError(
+                "Неоднозначная очередь для queue_tag="
+                f"{queue_tag} и пациента {patient_id}"
+            )
+
+        return active_queues[0], None
 
     def get_morning_assignment_stats(
         self, target_date: date | None = None

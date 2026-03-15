@@ -106,6 +106,8 @@ class QueueBusinessService:
         normalized["patient_id"] = normalized.get("patient_id")
         normalized["phone"] = normalized.get("phone")
         normalized["telegram_id"] = normalized.get("telegram_id")
+        normalized["birth_year"] = normalized.get("birth_year")
+        normalized["address"] = normalized.get("address")
         normalized["visit_id"] = normalized.get("visit_id")
         normalized["queue_tag"] = normalized.get("queue_tag")
         normalized["source"] = (normalized.get("source") or "desk").strip().lower()
@@ -941,15 +943,18 @@ class QueueBusinessService:
         patient_name: str | None = None,
         phone: str | None = None,
         telegram_id: str | None = None,
+        birth_year: int | None = None,
+        address: str | None = None,
         visit_id: int | None = None,
         visit_type: str = "paid",
         discount_mode: str = "none",
-        services: list[dict[str, Any]] | None = None,
-        service_codes: list[str] | None = None,
+        services: list[dict[str, Any]] | str | None = None,
+        service_codes: list[str] | str | None = None,
         total_amount: int | None = None,
         source: str = "desk",
         status: str = "waiting",
         queue_time: datetime | None = None,
+        session_id: str | None = None,
         auto_number: bool = False,
         commit: bool = True,
     ) -> OnlineQueueEntry:
@@ -970,6 +975,8 @@ class QueueBusinessService:
             patient_name = normalized.get("patient_name") or patient_name
             phone = normalized.get("phone") or phone
             telegram_id = normalized.get("telegram_id") or telegram_id
+            birth_year = normalized.get("birth_year") or birth_year
+            address = normalized.get("address") or address
             source = normalized.get("source") or source
 
         if number is None or auto_number:
@@ -982,14 +989,14 @@ class QueueBusinessService:
         queue_dt = queue_time or self.get_local_timestamp(db)
 
         # ⭐ session_id для группировки услуг пациента в одной очереди
-        session_id = None
-        if patient_id:
-            session_id = get_or_create_session_id(
-                db, patient_id, queue_obj.id, queue_obj.day
-            )
-        else:
-            # Fallback for entries without patient
-            session_id = None  # Will be filled after flush with entry.id
+        if session_id is None:
+            if patient_id:
+                session_id = get_or_create_session_id(
+                    db, patient_id, queue_obj.id, queue_obj.day
+                )
+            else:
+                # Fallback for entries without patient
+                session_id = None  # Will be filled after flush with entry.id
 
         entry = OnlineQueueEntry(
             queue_id=queue_obj.id,
@@ -998,6 +1005,8 @@ class QueueBusinessService:
             patient_name=patient_name,
             phone=phone,
             telegram_id=telegram_id,
+            birth_year=birth_year,
+            address=address,
             visit_id=visit_id,
             visit_type=visit_type,
             discount_mode=discount_mode,

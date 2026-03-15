@@ -148,8 +148,8 @@ class OnlineQueueEntry(Base):
 
     # Источник записи
     source: Mapped[str] = mapped_column(
-        String(20), default="online", nullable=False
-    )  # online, desk, telegram, confirmation, morning_assignment
+        String(24), default="online", nullable=False
+    )  # e.g. online, desk, confirmation, morning_assignment, batch_update, migration, force_majeure_transfer
 
     # Статус
     status: Mapped[str] = mapped_column(

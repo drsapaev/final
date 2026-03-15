@@ -1,0 +1,62 @@
+{
+  "contract_version": "1.0",
+  "task_id": "W2C-MS-006",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/repositories/queue_read_repository.py",
+      "backend/app/repositories/queue_reorder_api_repository.py",
+      "backend/app/services/queue_domain_service.py",
+      "backend/app/services/queue_reorder_api_service.py",
+      "backend/tests/architecture/test_w2c_queue_boundaries.py",
+      "backend/tests/unit/test_queue_domain_service.py",
+      "backend/tests/unit/test_queue_reorder_api_service.py",
+      "docs/status/wave2c/W2C-MS-006_PLAN.md",
+      "docs/status/wave2c/W2C-MS-006_STATUS.md"
+    ],
+    "exclude": [
+      "backend/app/api/v1/endpoints/qr_queue.py",
+      "backend/app/api/v1/endpoints/registrar_integration.py",
+      "backend/app/api/v1/endpoints/doctor_integration.py",
+      "backend/app/api/v1/endpoints/visits.py",
+      "backend/app/services/queue_service.py",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Introduce a read-only QueueDomainService boundary.",
+    "Move queue snapshot/status reads behind that boundary without touching reorder writes."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 12,
+    "max_diff_lines": 320,
+    "must_run_tests": true,
+    "mandatory_human_review": false
+  },
+  "must_run": [
+    "cd backend && pytest tests/unit/test_queue_domain_service.py tests/unit/test_queue_reorder_api_service.py tests/architecture/test_w2c_queue_boundaries.py -q",
+    "cd backend && pytest -q",
+    "cd backend && pytest tests/test_openapi_contract.py -q"
+  ],
+  "must_not_touch": [
+    "reorder write semantics",
+    "queue mutation handlers",
+    "number allocation logic",
+    "visit-to-queue linkage",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs/status/wave2c/W2C-MS-006_PLAN.md",
+    "docs/status/wave2c/W2C-MS-006_STATUS.md"
+  ],
+  "stop_conditions": [
+    "Need to change reorder write behavior.",
+    "Need to touch queue runtime mutation flows.",
+    "Need to change queue response shapes."
+  ]
+}

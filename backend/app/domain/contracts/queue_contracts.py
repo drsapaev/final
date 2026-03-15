@@ -19,6 +19,14 @@ class QueueTokenSnapshot(BaseModel):
 
 
 class QueueContract(Protocol):
+    def allocate_ticket(
+        self,
+        *,
+        allocation_mode: str = "create_entry",
+        request_id: str | None = None,
+        **kwargs: Any,
+    ) -> Any: ...
+
     def get_queue_token(
         self,
         token_id: int,
@@ -46,6 +54,31 @@ class QueueContractFacade:
     def __init__(self, contract: QueueContract) -> None:
         self._contract = contract
         self._contract_logger = ContractMethodLogger(logger, "queue")
+
+    def allocate_ticket(
+        self,
+        *,
+        allocation_mode: str = "create_entry",
+        request_id: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        self._contract_logger.log_entry(
+            "allocate_ticket",
+            request_id,
+            allocation_mode=allocation_mode,
+        )
+        result = self._contract.allocate_ticket(
+            allocation_mode=allocation_mode,
+            request_id=request_id,
+            **kwargs,
+        )
+        self._contract_logger.log_exit(
+            "allocate_ticket",
+            request_id,
+            allocation_mode=allocation_mode,
+            allocated=result is not None,
+        )
+        return result
 
     def get_queue_token(
         self,

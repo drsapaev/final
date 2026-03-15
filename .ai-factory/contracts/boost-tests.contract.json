@@ -1,0 +1,66 @@
+{
+  "contract_version": "1.0",
+  "task_type": "boost-tests",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/tests/**",
+      "frontend/src/**/__tests__/**",
+      "frontend/src/**/*.test.*",
+      "frontend/src/**/*.spec.*",
+      "frontend/e2e/**"
+    ],
+    "exclude": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Add or tighten tests around an already approved code path.",
+    "Prefer test-only or test-first changes over production behavior changes.",
+    "Document uncovered risk that still remains after the test pass."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 10,
+    "max_diff_lines": 300,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && pytest <targeted-backend-test-selection>",
+    "cd frontend && npm run test:run -- <targeted-frontend-test-selection>",
+    "If browser flow coverage changed, run: cd frontend && npx playwright test <targeted-spec>"
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "unrelated application logic",
+    "schema or migration files",
+    "workflow permissions"
+  ],
+  "required_artifacts": [
+    "list of tests added or updated",
+    "executed test command output summary",
+    "remaining coverage gaps"
+  ],
+  "stop_conditions": [
+    "Improving tests requires wide production refactoring.",
+    "The task needs migration or secret changes.",
+    "The requested scope crosses into protected domains without approval."
+  ],
+  "review_notes": [
+    "Prefer adding tests around the real defect or risk, not broad harness churn.",
+    "If a production fix is needed, stop and open a follow-up contract."
+  ]
+}

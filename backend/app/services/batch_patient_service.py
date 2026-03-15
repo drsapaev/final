@@ -15,13 +15,35 @@ from datetime import date as date_type
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.service import Service
+from app.models.user import User
 from app.models.visit import Visit
+from app.services.queue_domain_service import QueueDomainService
+from app.services.queue_service import get_queue_service
+from app.services.service_mapping import (
+    get_default_service_by_specialty,
+    normalize_service_code,
+    normalize_specialty,
+)
 
 logger = logging.getLogger(__name__)
+
+_BATCH_CREATE_RESOURCE_MAPPING = {
+    "ecg": "ecg_resource",
+    "echokg": "ecg_resource",
+    "lab": "lab_resource",
+    "laboratory": "lab_resource",
+    "general": "general_resource",
+    "cardiology_common": "general_resource",
+    "dermatology": "general_resource",
+    "procedures": "general_resource",
+}
 
 
 # ============================================================================
@@ -304,22 +326,44 @@ class BatchPatientService:
         action: EntryAction
     ) -> EntryResult:
         """Создаёт новую запись"""
-        from app.services.queue_service import QueueService
-
-        # Используем существующий QueueService для создания
-        queue_service = QueueService(self.db)
-
         try:
-            result = queue_service.add_to_queue(
-                patient_id=patient_id,
-                specialty=action.specialty or "general",
-                service_id=action.service_id,
-                service_code=action.service_code,
-                source="batch_update"
+            patient = self._get_patient_or_raise(patient_id)
+            service = self._resolve_create_action_service(action)
+            queue_tag = self._resolve_create_action_queue_tag(
+                action=action,
+                service=service,
+            )
+            daily_queue = self._resolve_create_action_daily_queue(
+                action=action,
+                target_date=target_date,
+                queue_tag=queue_tag,
+                service=service,
+            )
+            service_codes = self._build_create_action_service_codes(
+                action=action,
+                service=service,
+            )
+            services_payload = self._build_create_action_services_payload(
+                service=service,
+                service_codes=service_codes,
+            )
+
+            created_entry = QueueDomainService(self.db).allocate_ticket(
+                allocation_mode="create_entry",
+                daily_queue=daily_queue,
+                patient_id=patient.id,
+                patient_name=patient.short_name(),
+                phone=patient.phone,
+                source="batch_update",
+                status="waiting",
+                services=services_payload,
+                service_codes=service_codes,
+                auto_number=True,
+                commit=False,
             )
 
             return EntryResult(
-                id=result.get("entry_id", 0),
+                id=created_entry.id,
                 status="created"
             )
         except Exception as e:
@@ -329,6 +373,234 @@ class BatchPatientService:
                 status="error",
                 error=str(e)
             )
+
+    def _get_patient_or_raise(self, patient_id: int) -> Patient:
+        patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient:
+            raise ValueError(f"Пациент с ID {patient_id} не найден")
+        return patient
+
+    def _resolve_create_action_service(self, action: EntryAction) -> Service | None:
+        service = None
+
+        if action.service_id:
+            service = (
+                self.db.query(Service)
+                .filter(Service.id == action.service_id)
+                .first()
+            )
+
+        if service is None and action.service_code:
+            normalized_code = normalize_service_code(action.service_code)
+            candidate_codes = {
+                code
+                for code in {action.service_code, normalized_code}
+                if code
+            }
+            service = (
+                self.db.query(Service)
+                .filter(
+                    or_(
+                        Service.service_code.in_(candidate_codes),
+                        Service.code.in_(candidate_codes),
+                    )
+                )
+                .first()
+            )
+
+        if service is None and action.specialty:
+            default_service = get_default_service_by_specialty(self.db, action.specialty)
+            if default_service:
+                service = (
+                    self.db.query(Service)
+                    .filter(Service.id == default_service["id"])
+                    .first()
+                )
+
+        return service
+
+    def _resolve_create_action_queue_tag(
+        self,
+        *,
+        action: EntryAction,
+        service: Service | None,
+    ) -> str:
+        if service and service.queue_tag:
+            return service.queue_tag
+
+        normalized_specialty = normalize_specialty(action.specialty or "")
+        if normalized_specialty:
+            return normalized_specialty
+
+        raise ValueError(
+            "Не удалось определить queue_tag для create-action "
+            "(ожидались service_id, service_code или specialty)"
+        )
+
+    def _resolve_create_action_daily_queue(
+        self,
+        *,
+        action: EntryAction,
+        target_date: date_type,
+        queue_tag: str,
+        service: Service | None,
+    ) -> DailyQueue:
+        queue_service = get_queue_service()
+
+        explicit_specialist_id = action.doctor_id or getattr(service, "doctor_id", None)
+        if explicit_specialist_id:
+            return queue_service.get_or_create_daily_queue(
+                self.db,
+                day=target_date,
+                specialist_id=explicit_specialist_id,
+                queue_tag=queue_tag,
+            )
+
+        active_queues = (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            )
+            .order_by(DailyQueue.id.asc())
+            .all()
+        )
+        if len(active_queues) == 1:
+            return active_queues[0]
+        if len(active_queues) > 1:
+            raise ValueError(
+                "Неоднозначная очередь для create-action "
+                f"(queue_tag={queue_tag}, date={target_date})"
+            )
+
+        resolved_specialist_id = self._resolve_create_action_specialist_id(
+            action=action,
+            queue_tag=queue_tag,
+            service=service,
+        )
+        return queue_service.get_or_create_daily_queue(
+            self.db,
+            day=target_date,
+            specialist_id=resolved_specialist_id,
+            queue_tag=queue_tag,
+        )
+
+    def _resolve_create_action_specialist_id(
+        self,
+        *,
+        action: EntryAction,
+        queue_tag: str,
+        service: Service | None,
+    ) -> int:
+        service_doctor_ids = [
+            doctor_id
+            for (doctor_id,) in (
+                self.db.query(Service.doctor_id)
+                .filter(
+                    Service.active == True,
+                    Service.queue_tag == queue_tag,
+                    Service.doctor_id.isnot(None),
+                )
+                .distinct()
+                .all()
+            )
+            if doctor_id is not None
+        ]
+        if len(service_doctor_ids) == 1:
+            return int(service_doctor_ids[0])
+        if len(service_doctor_ids) > 1:
+            raise ValueError(
+                "Неоднозначный владелец очереди по услугам "
+                f"(queue_tag={queue_tag})"
+            )
+
+        resource_username = _BATCH_CREATE_RESOURCE_MAPPING.get(queue_tag)
+        if resource_username:
+            resource_doctor = (
+                self.db.query(Doctor)
+                .join(User, Doctor.user_id == User.id)
+                .filter(
+                    Doctor.active == True,
+                    User.username == resource_username,
+                    User.is_active == True,
+                )
+                .first()
+            )
+            if resource_doctor:
+                return int(resource_doctor.id)
+
+        specialty_candidates = {
+            candidate.lower()
+            for candidate in {
+                action.specialty or "",
+                normalize_specialty(action.specialty or ""),
+                queue_tag,
+                getattr(service, "queue_tag", "") or "",
+            }
+            if candidate
+        }
+        matching_doctors = [
+            doctor
+            for doctor in self.db.query(Doctor).filter(Doctor.active == True).all()
+            if (doctor.specialty or "").strip().lower() in specialty_candidates
+            or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
+        ]
+
+        if len(matching_doctors) == 1:
+            return int(matching_doctors[0].id)
+        if len(matching_doctors) > 1:
+            raise ValueError(
+                "Неоднозначный врач для create-action "
+                f"(queue_tag={queue_tag}, specialty={action.specialty})"
+            )
+
+        raise ValueError(
+            "Не удалось определить владельца очереди для create-action "
+            f"(queue_tag={queue_tag})"
+        )
+
+    def _build_create_action_service_codes(
+        self,
+        *,
+        action: EntryAction,
+        service: Service | None,
+    ) -> list[str] | None:
+        if action.service_code:
+            normalized_code = normalize_service_code(action.service_code)
+            return [normalized_code] if normalized_code else [action.service_code]
+
+        if service:
+            service_code = service.service_code or service.code
+            if service_code:
+                normalized_code = normalize_service_code(service_code)
+                return [normalized_code] if normalized_code else [service_code]
+
+        return None
+
+    def _build_create_action_services_payload(
+        self,
+        *,
+        service: Service | None,
+        service_codes: list[str] | None,
+    ) -> list[dict[str, Any]] | None:
+        if not service:
+            return None
+
+        code = None
+        if service_codes:
+            code = service_codes[0]
+        elif service.service_code or service.code:
+            code = normalize_service_code(service.service_code or service.code)
+
+        return [
+            {
+                "id": service.id,
+                "code": code,
+                "name": service.name,
+                "price": float(service.price) if service.price else 0,
+            }
+        ]
 
     def _apply_common_updates(
         self,
@@ -384,12 +656,19 @@ class BatchPatientService:
 
         # Собираем данные из OnlineQueueEntry
         for entry in online_entries:
-            if entry.service_code:
-                services.append(entry.service_code)
+            legacy_service_code = getattr(entry, "service_code", None)
+            if legacy_service_code:
+                services.append(legacy_service_code)
+            elif entry.service_codes:
+                services.extend(code for code in entry.service_codes if code)
+
+            queue_tag = getattr(entry, "queue_tag", None)
+            if queue_tag is None and getattr(entry, "queue", None):
+                queue_tag = entry.queue.queue_tag
             queue_numbers.append({
                 "id": entry.id,
                 "number": entry.number,
-                "queue_tag": entry.queue_tag,
+                "queue_tag": queue_tag,
                 "status": entry.status,
                 "queue_time": entry.queue_time.isoformat() if entry.queue_time else None  # ⭐ FIX 13
             })
@@ -403,7 +682,11 @@ class BatchPatientService:
 
         return {
             "patient_id": patient_id,
-            "patient_fio": patient.fio if patient else "",
+            "patient_fio": (
+                patient.short_name()
+                if patient
+                else ""
+            ),
             "patient_phone": patient.phone if patient else "",
             "services": list(set(services)),  # Unique
             "queue_numbers": queue_numbers,

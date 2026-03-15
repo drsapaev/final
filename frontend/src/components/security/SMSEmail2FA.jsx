@@ -39,6 +39,21 @@ const SMSEmail2FA = ({
   const codeLength = 6;
   const resendDelay = 60; // секунд
 
+  const buildRequestUrl = (path, extraParams = {}) => {
+    const params = new URLSearchParams();
+    params.set('method', method);
+    if (phoneNumber) params.set('phone_number', phoneNumber);
+    if (emailAddress) params.set('email_address', emailAddress);
+
+    Object.entries(extraParams).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.set(key, value);
+      }
+    });
+
+    return `${path}?${params.toString()}`;
+  };
+
   useEffect(() => {
     if (timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -54,17 +69,11 @@ const SMSEmail2FA = ({
     setSuccess('');
 
     try {
-      const response = await fetch('/api/v1/2fa/send-code', {
+      const response = await fetch(buildRequestUrl('/api/v1/2fa/send-code'), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          method: method,
-          phone_number: phoneNumber,
-          email_address: emailAddress
-        })
+        }
       });
 
       const data = await response.json();
@@ -94,18 +103,13 @@ const SMSEmail2FA = ({
     setError('');
 
     try {
-      const response = await fetch('/api/v1/2fa/verify-code', {
+      const response = await fetch(buildRequestUrl('/api/v1/2fa/verify-code', {
+        code
+      }), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          method: method,
-          code: code,
-          phone_number: phoneNumber,
-          email_address: emailAddress
-        })
+        }
       });
 
       const data = await response.json();

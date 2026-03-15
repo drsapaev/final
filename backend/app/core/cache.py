@@ -320,7 +320,8 @@ def cached(
             else:
                 # Default key: prefix:function_name:hash(args)
                 args_hash = hashlib.md5(
-                    json.dumps((args, kwargs), default=str, sort_keys=True).encode()
+                    json.dumps((args, kwargs), default=str, sort_keys=True).encode(),
+                    usedforsecurity=False,
                 ).hexdigest()[:8]
                 cache_key = f"{key_prefix}:{func.__name__}:{args_hash}"
 
@@ -343,7 +344,8 @@ def cached(
                 cache_key = key_builder(*args, **kwargs)
             else:
                 args_hash = hashlib.md5(
-                    json.dumps((args, kwargs), default=str, sort_keys=True).encode()
+                    json.dumps((args, kwargs), default=str, sort_keys=True).encode(),
+                    usedforsecurity=False,
                 ).hexdigest()[:8]
                 cache_key = f"{key_prefix}:{func.__name__}:{args_hash}"
             cache_manager.delete(cache_key)

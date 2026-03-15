@@ -1,20 +1,20 @@
 # Frontend-Backend Parity Report
 
-Generated at: 2026-02-25T07:03:34.547174+00:00
+Generated at: 2026-03-06T07:40:50.334373+00:00
 
 ## Summary
 
-- Backend operations total: **1111**
+- Backend operations total: **1112**
 - Frontend calls total: **222**
 - Implemented matches: **128**
 - Partial (unresolved frontend calls): **6**
-- Missing in frontend: **989**
+- Missing in frontend: **990**
 - Frontend orphan calls: **88**
-- Coverage: **11.52%**
+- Coverage: **11.51%**
 
 ## Critical Missing (auth/queue/billing/emr)
 
-- `/api/v1/auth`: **23** missing operations
+- `/api/v1/auth`: **24** missing operations
 - `/api/v1/queue`: **31** missing operations
 - `/api/v1/billing`: **16** missing operations
 - `/api/v1/emr`: **62** missing operations

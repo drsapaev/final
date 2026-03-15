@@ -1,0 +1,74 @@
+{
+  "contract_version": "1.0",
+  "task_type": "w1-security-housekeeping",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "docs/security/**",
+      "docs/status/**",
+      "backend/requirements.txt",
+      "backend/pyproject.toml",
+      "frontend/package.json",
+      "frontend/package-lock.json"
+    ],
+    "exclude": [
+      "backend/app/**",
+      "frontend/src/**",
+      ".github/workflows/**",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key"
+    ]
+  },
+  "goals": [
+    "Run security analysis commands and capture current risk posture.",
+    "Produce a prioritized remediation plan with bounded follow-up slices.",
+    "Avoid any dependency upgrades in this task."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 6,
+    "max_diff_lines": 260,
+    "must_run_tests": true,
+    "mandatory_human_review": true,
+    "protected_paths": [
+      "backend/app/**",
+      "frontend/src/**",
+      ".github/workflows/**",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key"
+    ]
+  },
+  "must_run": [
+    "cd backend && pip-audit --format json",
+    "cd backend && bandit -r . -f json",
+    "cd backend && bandit -r app -lll",
+    "cd frontend && npm audit --json"
+  ],
+  "must_not_touch": [
+    "dependency versions",
+    "application logic",
+    "workflow permissions",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs/security/SECURITY_HOUSEKEEPING_REPORT.md",
+    "docs/status/wave1/W1-T4_STATUS.md",
+    "docs/status/WAVE1_FOUND_ISSUES.md",
+    "docs/status/WAVE1_SAFE_FOLLOWUP_TASKS.md"
+  ],
+  "stop_conditions": [
+    "Remediation requires dependency upgrades in this task.",
+    "Findings require immediate protected-zone code edits.",
+    "Security command execution cannot be reproduced."
+  ],
+  "review_notes": [
+    "Hard rule: dependency upgrades are out of scope.",
+    "Report findings with exact counts and command outcomes.",
+    "Mark this task done only if analysis plus remediation plan are both delivered."
+  ]
+}

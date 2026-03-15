@@ -448,7 +448,7 @@ async def regenerate_backup_codes(
         )
 
 
-@router.get("/devices", response_model=TwoFactorDeviceListResponse, include_in_schema=False)
+@router.get("/devices", response_model=TwoFactorDeviceListResponse)
 async def get_trusted_devices(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -464,7 +464,7 @@ async def get_trusted_devices(
         )
 
 
-@router.delete("/devices/{device_id}")
+@router.delete("/devices/{device_id}", response_model=TwoFactorSuccessResponse)
 async def untrust_device(
     device_id: int,
     db: Session = Depends(get_db),

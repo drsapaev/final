@@ -18,16 +18,7 @@ Most TODO comments are in the following categories:
 
 ## Critical TODOs (Should Address)
 
-### 1. Patient Appointments (`patient_appointments.py`)
-```python
-# Line 311: TODO: Отправить уведомление клинике
-# Line 371: TODO: Проверить доступность слота
-# Line 388: TODO: Отправить уведомление клинике
-```
-**Status**: ✅ Notification service exists but not integrated here
-**Action**: Low priority - notifications work via other channels
-
-### 2. Visit Confirmation (`visit_confirmation.py`)
+### 1. Visit Confirmation (`visit_confirmation.py`)
 ```python
 # Line 73: source_ip=None,  # TODO: получить из request
 # Line 74: user_agent=None,  # TODO: получить из request

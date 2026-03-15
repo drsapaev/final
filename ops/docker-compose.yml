@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -16,13 +14,14 @@ services:
 
   backend:
     build:
-      context: .
+      # Paths are resolved relative to ops/docker-compose.yml.
+      context: ..
       dockerfile: ops/backend.Dockerfile
       target: runtime
     container_name: clinic-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.production
+      - ../backend/.env.production
     environment:
       # Core
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://clinic:clinicpwd@postgres:5432/clinicdb}
@@ -41,6 +40,8 @@ services:
       PRINTER_USB_VID: ${PRINTER_USB_VID:-}
       PRINTER_USB_PID: ${PRINTER_USB_PID:-}
       # Admin bootstrap
+      ENSURE_ADMIN: ${ENSURE_ADMIN:-0}
+      ADMIN_ALLOW_UPDATE: ${ADMIN_ALLOW_UPDATE:-0}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
@@ -56,7 +57,7 @@ services:
       LICENSE_MODE: ${LICENSE_MODE:-activation}      # <— NEW (использовать таблицу activations)
       LICENSE_ALLOW_HEALTH: ${LICENSE_ALLOW_HEALTH:-1}
     volumes:
-      - ./backend:/app:rw
+      - ../backend:/app:rw
       - backend_data:/data
     working_dir: /app
     command: ["/bin/bash", "/entrypoint.sh"]
@@ -67,14 +68,14 @@ services:
 
   frontend:
     build:
-      context: .
+      context: ..
       dockerfile: ops/frontend.Dockerfile
     container_name: clinic-frontend
     restart: unless-stopped
     environment:
       VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000/api/v1}
     volumes:
-      - ./frontend:/app:rw
+      - ../frontend:/app:rw
     working_dir: /app
     ports:
       - "5173:5173"

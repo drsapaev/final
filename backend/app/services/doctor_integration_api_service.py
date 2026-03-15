@@ -24,6 +24,7 @@ from app.models.visit import Visit, VisitService
 from app.repositories.doctor_integration_api_repository import (
     DoctorIntegrationApiRepository,
 )
+from app.services.confirmation_datetime import confirmation_utc_now
 from app.services.notification_service import NotificationService
 from app.services.service_mapping import get_service_code
 
@@ -1200,7 +1201,7 @@ async def schedule_next_visit(
 
         # Генерируем токен подтверждения
         confirmation_token = str(uuid.uuid4())
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = confirmation_utc_now() + timedelta(
             hours=48
         )  # 48 часов на подтверждение
 

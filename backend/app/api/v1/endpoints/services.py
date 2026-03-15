@@ -8,10 +8,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud import service as crud
-from app.models.clinic import Doctor, ServiceCategory
-from app.models.service import Service
-from app.services.service_mapping import normalize_service_code
+from app.models.clinic import Doctor
+from app.services.queue_domain_service import QueueDomainService
+from app.services.services_api_service import ServicesApiService
 
 router = APIRouter(tags=["services"])
 
@@ -161,11 +160,7 @@ async def list_service_categories(
     active: Optional[bool] = Query(default=None),
 ):
     """Получить список всех категорий услуг"""
-    query = db.query(ServiceCategory)
-    if active is not None:
-        query = query.filter(ServiceCategory.active == active)
-    categories = query.order_by(ServiceCategory.name_ru).all()
-    return categories
+    return ServicesApiService(db).list_service_categories(active=active)
 
 
 @router.post(
@@ -177,23 +172,10 @@ async def create_service_category(
     # user=Depends(require_roles("Admin")),
 ):
     """Создать новую категорию услуг"""
-    # Проверяем уникальность кода
-    existing = (
-        db.query(ServiceCategory)
-        .filter(ServiceCategory.code == category_data.code)
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Категория с кодом '{category_data.code}' уже существует",
-        )
-
-    category = ServiceCategory(**category_data.dict())
-    db.add(category)
-    db.commit()
-    db.refresh(category)
-    return category
+    try:
+        return ServicesApiService(db).create_service_category(category_data=category_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.put(
@@ -208,31 +190,15 @@ async def update_service_category(
     # user=Depends(require_roles("Admin")),
 ):
     """Обновить существующую категорию услуг"""
-    category = (
-        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
-    )
-    if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
-
-    # Проверяем уникальность кода при обновлении
-    if category_data.code and category_data.code != category.code:
-        existing = (
-            db.query(ServiceCategory)
-            .filter(ServiceCategory.code == category_data.code)
-            .first()
+    try:
+        return ServicesApiService(db).update_service_category(
+            category_id=category_id,
+            category_data=category_data,
         )
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Категория с кодом '{category_data.code}' уже существует",
-            )
-
-    for field, value in category_data.dict(exclude_unset=True).items():
-        setattr(category, field, value)
-
-    db.commit()
-    db.refresh(category)
-    return category
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/categories/{category_id}", summary="Удалить категорию услуг")
@@ -242,25 +208,12 @@ async def delete_service_category(
     # user=Depends(require_roles("Admin")),
 ):
     """Удалить категорию услуг"""
-    category = (
-        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
-    )
-    if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
-
-    # Проверяем, есть ли связанные услуги
-    services_count = (
-        db.query(Service).filter(Service.category_id == category_id).count()
-    )
-    if services_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Нельзя удалить категорию: к ней привязано {services_count} услуг",
-        )
-
-    db.delete(category)
-    db.commit()
-    return {"message": "Категория успешно удалена"}
+    try:
+        return ServicesApiService(db).delete_service_category(category_id=category_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ==================== УСЛУГИ ====================
@@ -281,14 +234,14 @@ async def list_services(
 ):
     """Получить список услуг с фильтрацией"""
     try:
-        rows = crud.list_services(db, q=q, active=active, limit=limit, offset=offset)
-
-        # Дополнительная фильтрация
-        if category_id is not None:
-            rows = [r for r in rows if getattr(r, 'category_id', None) == category_id]
-        if department:
-            rows = [r for r in rows if getattr(r, 'department', None) == department]
-
+        rows = ServicesApiService(db).list_services(
+            q=q,
+            active=active,
+            category_id=category_id,
+            department=department,
+            limit=limit,
+            offset=offset,
+        )
         return [_row_to_out(r) for r in rows]
     except Exception as e:
         import traceback
@@ -340,48 +293,51 @@ async def get_queue_groups(
         - code_to_group: Маппинг service_code -> group_key (K01 -> cardiology)
         - tab_to_group: Маппинг tab_key -> group_key (cardio -> cardiology)
     """
-    from app.services.service_mapping import QUEUE_GROUPS, get_queue_group_for_service
-    
-    # Build groups from SSOT
-    groups = {}
-    for key, data in QUEUE_GROUPS.items():
-        groups[key] = QueueGroupInfo(
-            display_name=data["display_name"],
-            display_name_uz=data.get("display_name_uz"),
-            service_codes=data.get("service_codes", []),
-            service_prefixes=data.get("service_prefixes", []),
-            exclude_codes=data.get("exclude_codes", []),
-            queue_tag=data["queue_tag"],
-            tab_key=data["tab_key"],
-        )
-    
-    # Build code_to_group mapping
-    code_to_group = {}
-    
-    # Add explicit service codes
-    for key, data in QUEUE_GROUPS.items():
-        for code in data.get("service_codes", []):
-            code_to_group[code] = key
-    
-    # Enrich with actual DB data
-    try:
-        services = db.query(Service).filter(Service.active == True).all()
-        for service in services:
-            if service.service_code:
-                group = get_queue_group_for_service(service.service_code)
-                if group:
-                    code_to_group[service.service_code] = group
-    except Exception:
-        pass  # Use static mappings if DB query fails
-    
-    # Build tab_to_group mapping
-    tab_to_group = {data["tab_key"]: key for key, data in QUEUE_GROUPS.items()}
-    
+    payload = QueueDomainService(db).get_queue_groups_payload()
+    groups = {
+        key: QueueGroupInfo(**value)
+        for key, value in payload["groups"].items()
+    }
     return QueueGroupsResponse(
         groups=groups,
-        code_to_group=code_to_group,
-        tab_to_group=tab_to_group,
+        code_to_group=payload["code_to_group"],
+        tab_to_group=payload["tab_to_group"],
     )
+
+
+# ==================== SERVICE CODE MAPPINGS (SSOT) - MUST BE BEFORE /{service_id} ====================
+
+
+class ServiceCodeMappingsResponse(BaseModel):
+    """Response schema for service code mappings endpoint"""
+
+    specialty_to_code: dict = {}
+    code_to_name: dict = {}
+    category_mapping: dict = {}
+    specialty_aliases: dict = {}
+
+
+@router.get(
+    "/code-mappings",
+    response_model=ServiceCodeMappingsResponse,
+    summary="Получить маппинги кодов услуг (SSOT)",
+)
+async def get_service_code_mappings(
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.
+
+    Используется для централизации service code resolution на frontend.
+
+    Returns:
+        - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)
+        - code_to_name: Маппинг service code -> display name
+        - category_mapping: Маппинг specialty -> category code (K, D, L, etc.)
+        - specialty_aliases: Алиасы для specialty (derma -> dermatology)
+    """
+    payload = QueueDomainService(db).get_service_code_mappings_payload()
+    return ServiceCodeMappingsResponse(**payload)
 
 
 @router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
@@ -391,7 +347,7 @@ async def get_service(
     # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     """Получить конкретную услугу по ID"""
-    service = db.query(Service).filter(Service.id == service_id).first()
+    service = ServicesApiService(db).get_service(service_id=service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Услуга не найдена")
     return _row_to_out(service)
@@ -404,45 +360,11 @@ async def create_service(
     # user=Depends(require_roles("Admin")),
 ):
     """Создать новую услугу"""
-    # Проверяем уникальность кода
-    if service_data.code:
-        existing = db.query(Service).filter(Service.code == service_data.code).first()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Услуга с кодом '{service_data.code}' уже существует",
-            )
-
-    # Проверяем существование категории
-    if service_data.category_id:
-        category = (
-            db.query(ServiceCategory)
-            .filter(ServiceCategory.id == service_data.category_id)
-            .first()
-        )
-        if not category:
-            raise HTTPException(
-                status_code=400, detail="Указанная категория не найдена"
-            )
-
-    # Normalize service codes before creating the service
-    service_dict = service_data.dict()
-    if service_dict.get('code'):
-        service_dict['code'] = normalize_service_code(service_dict['code'])
-    if service_dict.get('service_code'):
-        service_dict['service_code'] = normalize_service_code(
-            service_dict['service_code']
-        )
-    if service_dict.get('category_code'):
-        service_dict['category_code'] = normalize_service_code(
-            service_dict['category_code']
-        )
-
-    service = Service(**service_dict)
-    db.add(service)
-    db.commit()
-    db.refresh(service)
-    return _row_to_out(service)
+    try:
+        service = ServicesApiService(db).create_service(service_data=service_data)
+        return _row_to_out(service)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.put("/{service_id}", response_model=ServiceOut, summary="Обновить услугу")
@@ -453,50 +375,16 @@ async def update_service(
     # user=Depends(require_roles("Admin")),
 ):
     """Обновить существующую услугу"""
-    service = db.query(Service).filter(Service.id == service_id).first()
-    if not service:
-        raise HTTPException(status_code=404, detail="Услуга не найдена")
-
-    # Проверяем уникальность кода при обновлении
-    if service_data.code and service_data.code != service.code:
-        existing = db.query(Service).filter(Service.code == service_data.code).first()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Услуга с кодом '{service_data.code}' уже существует",
-            )
-
-    # Проверяем существование категории
-    if service_data.category_id:
-        category = (
-            db.query(ServiceCategory)
-            .filter(ServiceCategory.id == service_data.category_id)
-            .first()
+    try:
+        service = ServicesApiService(db).update_service(
+            service_id=service_id,
+            service_data=service_data,
         )
-        if not category:
-            raise HTTPException(
-                status_code=400, detail="Указанная категория не найдена"
-            )
-
-    # Normalize service codes before updating
-    update_dict = service_data.dict(exclude_unset=True)
-    if 'code' in update_dict and update_dict['code'] is not None:
-        update_dict['code'] = normalize_service_code(update_dict['code'])
-    if 'service_code' in update_dict and update_dict['service_code'] is not None:
-        update_dict['service_code'] = normalize_service_code(
-            update_dict['service_code']
-        )
-    if 'category_code' in update_dict and update_dict['category_code'] is not None:
-        update_dict['category_code'] = normalize_service_code(
-            update_dict['category_code']
-        )
-
-    for field, value in update_dict.items():
-        setattr(service, field, value)
-
-    db.commit()
-    db.refresh(service)
-    return _row_to_out(service)
+        return _row_to_out(service)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/{service_id}", summary="Удалить услугу")
@@ -506,13 +394,10 @@ async def delete_service(
     # user=Depends(require_roles("Admin")),
 ):
     """Удалить услугу"""
-    service = db.query(Service).filter(Service.id == service_id).first()
-    if not service:
-        raise HTTPException(status_code=404, detail="Услуга не найдена")
-
-    db.delete(service)
-    db.commit()
-    return {"message": "Услуга успешно удалена"}
+    try:
+        return ServicesApiService(db).delete_service(service_id=service_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # ==================== ВРЕМЕННЫЙ ENDPOINT ДЛЯ ВРАЧЕЙ ====================
@@ -537,8 +422,7 @@ async def list_doctors_temp(
     db: Session = Depends(get_db),
 ):
     """Временный endpoint для получения списка врачей"""
-    doctors = db.query(Doctor).filter(Doctor.active == True).all()
-    return doctors
+    return ServicesApiService(db).list_doctors_temp()
 
 
 # ==================== РАЗРЕШЕНИЕ УСЛУГ (SSOT) ====================
@@ -590,90 +474,5 @@ async def resolve_service_endpoint(
 
     return ServiceResolveResponse(**result)
 
-
-# ==================== SERVICE CODE MAPPINGS (SSOT) ====================
-
-
-class ServiceCodeMappingsResponse(BaseModel):
-    """Response schema for service code mappings endpoint"""
-    
-    specialty_to_code: dict = {}
-    code_to_name: dict = {}
-    category_mapping: dict = {}
-    specialty_aliases: dict = {}
-
-
-@router.get(
-    "/code-mappings",
-    response_model=ServiceCodeMappingsResponse,
-    summary="Получить маппинги кодов услуг (SSOT)",
-)
-async def get_service_code_mappings(
-    db: Session = Depends(get_db),
-):
-    """
-    ⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.
-    
-    Используется для централизации service code resolution на frontend.
-    
-    Returns:
-        - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)
-        - code_to_name: Маппинг service code -> display name
-        - category_mapping: Маппинг specialty -> category code (K, D, L, etc.)
-        - specialty_aliases: Алиасы для specialty (derma -> dermatology)
-    """
-    from app.services.service_mapping import SPECIALTY_ALIASES
-    
-    # Static mappings from SSOT
-    specialty_to_code = {
-        "cardiology": "K01",
-        "cardio": "K01",
-        "dermatology": "D01",
-        "derma": "D01",
-        "stomatology": "S01",
-        "dental": "S01",
-        "laboratory": "L01",
-        "lab": "L01",
-        "echokg": "K10",
-        "procedures": "P01",
-        "cosmetology": "C01",
-    }
-    
-    code_to_name = {
-        "K01": "Консультация кардиолога",
-        "K10": "ЭхоКГ",
-        "D01": "Консультация дерматолога",
-        "S01": "Консультация стоматолога",
-        "L01": "Лабораторные анализы",
-        "P01": "Процедуры",
-        "C01": "Косметология",
-    }
-    
-    category_mapping = {
-        "cardiology": "K",
-        "dermatology": "D",
-        "laboratory": "L",
-        "stomatology": "S",
-        "cosmetology": "C",
-        "procedures": "P",
-    }
-    
-    # Try to enrich with actual DB data
-    try:
-        services = db.query(Service).filter(Service.active == True).all()
-        for service in services:
-            if service.service_code and service.name:
-                code_to_name[service.service_code] = service.name
-            if service.queue_tag and service.service_code:
-                specialty_to_code[service.queue_tag] = service.service_code
-    except Exception:
-        pass  # Use static mappings if DB query fails
-    
-    return ServiceCodeMappingsResponse(
-        specialty_to_code=specialty_to_code,
-        code_to_name=code_to_name,
-        category_mapping=category_mapping,
-        specialty_aliases=SPECIALTY_ALIASES,
-    )
 
 

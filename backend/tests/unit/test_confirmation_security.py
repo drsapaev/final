@@ -1,7 +1,7 @@
 """
 Юнит тесты для системы безопасности подтверждения визитов
 """
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 import pytest
@@ -50,7 +50,7 @@ class TestConfirmationSecurityService:
     def test_validate_confirmation_request_expired_token(self, db_session, test_visit):
         """Тест валидации истекшего токена"""
         # Устанавливаем время истечения в прошлом
-        test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        test_visit.confirmation_expires_at = datetime.now(UTC) - timedelta(hours=1)
         db_session.commit()
 
         service = ConfirmationSecurityService(db_session)
@@ -162,7 +162,7 @@ class TestConfirmationSecurityService:
             patient_id=1,
             status="pending_confirmation",
             confirmation_token="expired-token",
-            confirmation_expires_at=datetime.utcnow() - timedelta(hours=1)
+            confirmation_expires_at=datetime.now(UTC) - timedelta(hours=1)
         )
         db_session.add(expired_visit)
         db_session.commit()

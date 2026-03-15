@@ -2,7 +2,7 @@
 E2E тесты для полного сценария работы с визитами:
 Врач назначил → Пациент подтвердил → Номер в очереди выдан
 """
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -286,7 +286,7 @@ class TestE2EVisitFlow:
             department="cardiology",
             confirmation_token="test-registrar-token",
             confirmation_channel="phone",
-            confirmation_expires_at=datetime.utcnow() + timedelta(hours=24)
+            confirmation_expires_at=datetime.now(UTC) + timedelta(hours=24)
         )
         db_session.add(visit)
         db_session.commit()
@@ -456,7 +456,7 @@ class TestE2EVisitFlow:
             status="pending_confirmation",
             confirmation_token="expired-token-123",
             confirmation_channel="telegram",
-            confirmation_expires_at=datetime.utcnow() - timedelta(hours=1)  # Истек час назад
+            confirmation_expires_at=datetime.now(UTC) - timedelta(hours=1)  # Истек час назад
         )
         db_session.add(expired_visit)
         db_session.commit()
@@ -482,7 +482,7 @@ class TestE2EVisitFlow:
             status="pending_confirmation",
             confirmation_token="valid-token-123",
             confirmation_channel="phone",  # Только телефон
-            confirmation_expires_at=datetime.utcnow() + timedelta(hours=24)
+            confirmation_expires_at=datetime.now(UTC) + timedelta(hours=24)
         )
         db_session.add(valid_visit)
         db_session.commit()

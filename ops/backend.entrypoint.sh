@@ -7,31 +7,23 @@ set -euo pipefail
 : "${APP_MODULE:=app.main:app}"
 : "${WORKERS:=1}"
 : "${RELOAD:=0}"
-: "${DATABASE_URL:=sqlite:////data/app.db}"
-: "${ENSURE_ADMIN:=1}"
+# Keep the fallback aligned with backend config/env templates.
+# /data remains available for explicit SQLite overrides, but it is no longer
+# the silent default path for startup.
+: "${DATABASE_URL:=sqlite:///./clinic.db}"
+: "${ENSURE_ADMIN:=0}"
 
 mkdir -p /data
 export DATABASE_URL
 
-echo "[entrypoint] Creating database tables..."
-python -c "
-import sys
-sys.path.insert(0, '.')
-from app.db.base import Base
-from app.db.session import engine
-try:
-    Base.metadata.create_all(bind=engine)
-    print('✅ Database tables created successfully')
-except Exception as e:
-    print(f'⚠️ Error creating tables: {e}')
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-"
+echo "[entrypoint] Schema bootstrap is not part of implicit startup."
+echo "[entrypoint] Expected flow: prepare schema explicitly (for example: alembic upgrade head), then start the app."
 
 if [[ "${ENSURE_ADMIN}" == "1" ]]; then
-  echo "[entrypoint] Ensuring admin user..."
+  echo "[entrypoint] ENSURE_ADMIN=1 -> running explicit admin bootstrap..."
   python app/scripts/ensure_admin.py || echo "⚠️ Warning: Could not ensure admin user"
+else
+  echo "[entrypoint] ENSURE_ADMIN=${ENSURE_ADMIN} -> skipping admin bootstrap by default."
 fi
 
 echo "[entrypoint] Starting Uvicorn ${APP_MODULE} on ${HOST}:${PORT} (workers=${WORKERS}, reload=${RELOAD})"

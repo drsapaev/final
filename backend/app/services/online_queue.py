@@ -27,6 +27,8 @@ from app.models.setting import Setting  # type: ignore[attr-defined]
 #
 # This file is kept for backward compatibility with appointments endpoint.
 # Migration to DailyQueue-based system is planned for future.
+# This module belongs to the OnlineDay legacy island and is intentionally kept
+# outside the main QueueDomainService.allocate_ticket() track.
 # ============================================================================
 
 

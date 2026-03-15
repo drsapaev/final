@@ -23,3 +23,33 @@ class TestSettingApiRepository:
 
         assert {row.key for row in rows} == {"device_name", "paper"}
 
+    def test_upsert_creates_missing_row(self, db_session):
+        repository = SettingApiRepository(db_session)
+
+        row = repository.upsert(
+            category="display_board",
+            key="brand",
+            value="AI Factory Clinic",
+        )
+
+        assert row.category == "display_board"
+        assert row.key == "brand"
+        assert row.value == "AI Factory Clinic"
+        assert (
+            db_session.query(Setting)
+            .filter(Setting.category == "display_board", Setting.key == "brand")
+            .one()
+            .value
+            == "AI Factory Clinic"
+        )
+
+    def test_upsert_updates_existing_row(self, db_session):
+        repository = SettingApiRepository(db_session)
+        existing = Setting(category="printer", key="device_name", value="HP")
+        db_session.add(existing)
+        db_session.commit()
+
+        row = repository.upsert(category="printer", key="device_name", value="Canon")
+
+        assert row.id == existing.id
+        assert row.value == "Canon"

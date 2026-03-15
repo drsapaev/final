@@ -1,0 +1,78 @@
+{
+  "contract_version": "1.0",
+  "task_type": "audit-rbac",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/deps.py",
+      "backend/app/core/auth.py",
+      "backend/app/core/security.py",
+      "backend/app/core/rbac.py",
+      "backend/app/core/role_validation.py",
+      "backend/tests/integration/test_rbac_matrix.py",
+      "backend/test_role_routing.py",
+      "frontend/src/components/auth/**",
+      "frontend/src/components/common/RoleGuard.jsx",
+      "frontend/src/services/auth.js",
+      "frontend/src/stores/auth.js",
+      "docs/AUTHENTICATION_SYSTEM_FINAL_GUIDE.md",
+      "docs/ROLES_AND_ROUTING.md",
+      "docs/ROLE_SYSTEM_PROTECTION.md"
+    ],
+    "exclude": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Audit RBAC and auth assumptions across frontend, backend, tests, and docs.",
+    "Prefer findings, verification notes, and minimal drift fixes over behavior rewrites.",
+    "Treat every auth change as human-review-required."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 6,
+    "max_diff_lines": 200,
+    "must_run_tests": true,
+    "mandatory_human_review": true,
+    "protected_paths": [
+      "backend/app/services/payment*",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && python test_role_routing.py",
+    "cd backend && pytest tests/integration/test_rbac_matrix.py -q",
+    "cd frontend && npm run test:run -- src/test/parity/rbacRouteParity.test.js"
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "payment, queue, or EMR behavior",
+    "schema or migrations",
+    "workflow permissions"
+  ],
+  "required_artifacts": [
+    "RBAC mismatch findings",
+    "tests run and outcomes",
+    "explicit note of any protected changes deferred"
+  ],
+  "stop_conditions": [
+    "The audit requires a broader auth redesign.",
+    "The task would exceed the approved file or diff budget.",
+    "A non-approved protected path must be changed."
+  ],
+  "review_notes": [
+    "Human review is mandatory for all auth or RBAC edits.",
+    "If a fix is needed beyond small drift correction, stop and open a dedicated follow-up contract."
+  ]
+}

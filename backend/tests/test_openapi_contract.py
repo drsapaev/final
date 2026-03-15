@@ -70,3 +70,40 @@ def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
     assert not duplicate_messages, "Duplicate OpenAPI operation IDs found:\n" + "\n".join(
         duplicate_messages
     )
+
+
+def test_openapi_marks_appointments_stats_as_deprecated(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/appointments/stats"]["get"]
+
+    assert operation.get("deprecated") is True
+
+
+def test_openapi_marks_appointments_qrcode_as_deprecated(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/appointments/qrcode"]["get"]
+
+    assert operation.get("deprecated") is True
+
+
+def test_openapi_marks_legacy_board_state_as_deprecated(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/board/state"]["get"]
+
+    assert operation.get("deprecated") is True
+
+
+def test_openapi_marks_queues_stats_compatibility_fields_as_deprecated(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/queues/stats"]["get"]
+    schema_ref = operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+    component_name = schema_ref.split("/")[-1]
+    component = schema["components"]["schemas"][component_name]
+    props = component["properties"]
+
+    assert props["is_open"].get("deprecated") is True
+    assert props["start_number"].get("deprecated") is True
+    assert props["last_ticket"].get("deprecated") is not True
+    assert props["waiting"].get("deprecated") is not True

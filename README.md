@@ -82,6 +82,10 @@
    # Local Postgres DSN example:
    # postgresql+psycopg://clinic:<password>@localhost:5432/clinicdb
    alembic upgrade head
+   # Optional explicit dev admin bootstrap
+   python app/scripts/ensure_admin.py
+   # If you intentionally want to normalize/promote an existing user:
+   # ADMIN_ALLOW_UPDATE=1 python app/scripts/ensure_admin.py
    uvicorn app.main:app --reload
    ```
 
@@ -95,13 +99,31 @@
 ### Docker
 
 ```bash
+# Подготовка схемы БД (явный шаг)
+docker compose -f ops/docker-compose.yml run --rm backend alembic upgrade head
+
+# Опционально: явный bootstrap admin
+docker compose -f ops/docker-compose.yml run --rm backend python app/scripts/ensure_admin.py
+# Если нужен update/promote существующего пользователя:
+# docker compose -f ops/docker-compose.yml run --rm -e ADMIN_ALLOW_UPDATE=1 backend python app/scripts/ensure_admin.py
+
 # Запуск всех сервисов
-docker-compose -f ops/docker-compose.yml up
+docker compose -f ops/docker-compose.yml up
 
 # Или отдельно
 docker build -f ops/backend.Dockerfile -t clinic-backend .
 docker build -f ops/frontend.Dockerfile -t clinic-frontend .
 ```
+
+Важно:
+
+- startup больше не создает схему БД автоматически
+- startup больше не выполняет admin bootstrap по умолчанию
+- если нужен bootstrap admin, это теперь отдельное явное действие оператора
+- update существующего пользователя через `ensure_admin.py` тоже требует
+  явный opt-in (`ADMIN_ALLOW_UPDATE=1`)
+- каноническая карта explicit startup/admin команд теперь живёт в
+  [docs/OPERATOR_STARTUP_COMMANDS.md](C:/final/docs/OPERATOR_STARTUP_COMMANDS.md)
 
 ## 🔧 Конфигурация
 

@@ -1,0 +1,65 @@
+{
+  "contract_version": "1.0",
+  "task_type": "cleanup-docs",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "docs/**",
+      "README.md",
+      "backend/**/*.md",
+      "frontend/**/*.md",
+      "*.md"
+    ],
+    "exclude": [
+      "backend/app/**",
+      "frontend/src/**",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "node_modules/**"
+    ]
+  },
+  "goals": [
+    "Consolidate or clean documentation without changing application behavior.",
+    "Remove optimistic or stale claims unless they are verified.",
+    "Keep link and navigation updates bounded and reviewable."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 12,
+    "max_diff_lines": 500,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/app/**",
+      "frontend/src/**",
+      "backend/alembic/**",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "Manually verify changed links and referenced paths.",
+    "If API docs were changed, run: cd backend && pytest tests/test_openapi_contract.py -q",
+    "If UI behavior claims were changed, run the closest targeted frontend test."
+  ],
+  "must_not_touch": [
+    "application logic",
+    "workflow permissions",
+    "schema or migrations",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs files updated",
+    "list of removed or downgraded claims",
+    "verification commands or manual checks used"
+  ],
+  "stop_conditions": [
+    "Cleaning docs requires protected code changes.",
+    "The work expands into repo-wide documentation restructuring beyond budget.",
+    "Key claims cannot be verified from code or tests."
+  ],
+  "review_notes": [
+    "Prefer accurate partial status over legacy success language.",
+    "If evidence is missing, say so explicitly in the docs."
+  ]
+}

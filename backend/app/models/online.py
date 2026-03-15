@@ -19,6 +19,8 @@ from app.db.base_class import Base  # Base декларативной модел
 #   - New queue features should use DailyQueue (specialist-based) instead
 #   - DailyQueue is the official SSOT for queue system
 #   - Plan to migrate appointments endpoint to DailyQueue in future
+#   - This model belongs to the OnlineDay legacy island and is outside the
+#     QueueDomainService.allocate_ticket() migration track
 #
 # Key Differences:
 #   - OnlineDay: department-based (string), uses Settings table for counters

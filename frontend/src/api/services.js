@@ -544,51 +544,6 @@ export const analyticsService = {
 };
 
 /**
- * Сервис настроек
- */
-export const settingsService = {
-  /**
-   * Получение всех настроек
-   */
-  async getSettings(params = {}) {
-    const queryString = buildQueryString(params);
-    return apiRequest('GET', `${API_ENDPOINTS.SETTINGS.LIST}?${queryString}`);
-  },
-
-  /**
-   * Получение настройки по ключу
-   */
-  async getSetting(key) {
-    return apiRequest('GET', API_ENDPOINTS.SETTINGS.GET(key));
-  },
-
-  /**
-   * Обновление настройки
-   */
-  async updateSetting(key, value) {
-    return apiRequest('PUT', API_ENDPOINTS.SETTINGS.UPDATE(key), {
-      data: { value }
-    });
-  },
-
-  /**
-   * Массовое обновление настроек
-   */
-  async updateSettings(settings) {
-    return apiRequest('POST', API_ENDPOINTS.SETTINGS.BULK_UPDATE, {
-      data: { settings }
-    });
-  },
-
-  /**
-   * Получение категорий настроек
-   */
-  async getCategories() {
-    return apiRequest('GET', API_ENDPOINTS.SETTINGS.CATEGORIES);
-  }
-};
-
-/**
  * Сервис уведомлений
  */
 export const notificationsService = {

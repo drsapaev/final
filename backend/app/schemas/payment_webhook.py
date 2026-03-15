@@ -83,6 +83,8 @@ class PaymentProviderCreate(PaymentProviderBase):
 
 
 class PaymentProviderUpdate(BaseModel):
+    name: str | None = Field(None, description="Название провайдера")
+    code: str | None = Field(None, description="Код провайдера")
     is_active: bool | None = Field(None, description="Активен ли провайдер")
     webhook_url: str | None = Field(None, description="URL для вебхуков")
     api_key: str | None = Field(None, description="API ключ")

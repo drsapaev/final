@@ -43,6 +43,11 @@ class PendingPaymentResponse(BaseModel):
     visit_ids: Optional[TypingList[int]] = None
 
 
+class AppointmentQRCodeResponse(BaseModel):
+    format: str
+    data: str
+
+
 # --- helpers ---------------------------------------------------------------
 
 
@@ -563,7 +568,9 @@ def get_department_schedule(
     return schedule
 
 
-# Сохраняем существующие endpoints для совместимости
+# Legacy OnlineDay island: these endpoints remain mounted for backward
+# compatibility and queue administration, but they are outside the SSOT
+# allocator track built around DailyQueue / OnlineQueueEntry.
 @router.post(
     "/open-day", name="open_day", dependencies=[Depends(deps.require_roles("Admin"))]
 )
@@ -617,7 +624,7 @@ def open_day(
     }
 
 
-@router.get("/stats", name="stats")
+@router.get("/stats", name="stats", deprecated=True)
 def stats(
     department: str = Query(...),
     # принимаем все варианты имени даты; внутри нормализуем к одной строке
@@ -671,7 +678,12 @@ def close_day(
     }
 
 
-@router.get("/qrcode", name="qrcode_png")
+@router.get(
+    "/qrcode",
+    name="qrcode_png",
+    deprecated=True,
+    response_model=AppointmentQRCodeResponse,
+)
 def qrcode_png(
     department: str = Query(...),
     date_str: Optional[str] = Query(None),

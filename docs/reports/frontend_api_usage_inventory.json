@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-25T07:03:34.400251+00:00",
+  "generated_at": "2026-03-06T07:40:52.974764+00:00",
   "frontend_root": "frontend/src",
   "summary": {
     "total_calls": 222,
@@ -184,7 +184,7 @@
     },
     {
       "file": "frontend/src/api/client.js",
-      "line": 214,
+      "line": 230,
       "call": "apiRequest",
       "method": "GET",
       "endpoint_expr": "'/visits'",
@@ -193,7 +193,7 @@
     },
     {
       "file": "frontend/src/api/client.js",
-      "line": 241,
+      "line": 257,
       "call": "api.get",
       "method": "GET",
       "endpoint_expr": "'/auth/me'",
@@ -202,7 +202,7 @@
     },
     {
       "file": "frontend/src/api/client.js",
-      "line": 257,
+      "line": 273,
       "call": "api.post",
       "method": "POST",
       "endpoint_expr": "'/auth/login'",

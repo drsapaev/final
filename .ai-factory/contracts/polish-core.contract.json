@@ -1,0 +1,72 @@
+{
+  "contract_version": "1.0",
+  "task_type": "polish-core",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "frontend/src/components/**",
+      "frontend/src/pages/**",
+      "frontend/src/styles/**",
+      "docs/**"
+    ],
+    "exclude": [
+      "frontend/src/components/auth/**",
+      "frontend/src/components/payment/**",
+      "frontend/src/components/queue/**",
+      "frontend/src/components/emr*/**",
+      "frontend/src/pages/auth/**",
+      "backend/**",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Apply small UX or maintainability polish in non-protected UI surfaces.",
+    "Keep the change narrowly scoped and avoid domain logic rewrites.",
+    "Leave clear notes about anything that was intentionally deferred."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 250,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**",
+      "frontend/src/components/auth/**",
+      "frontend/src/components/payment/**",
+      "frontend/src/components/queue/**",
+      "frontend/src/components/emr*/**"
+    ]
+  },
+  "must_run": [
+    "cd frontend && npm run test:run -- <targeted-vitest-spec>",
+    "If routing or guard logic changed, run: cd frontend && npm run test:run -- src/test/parity/rbacRouteParity.test.js"
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "auth or RBAC logic",
+    "payment logic",
+    "queue logic",
+    "EMR workflows",
+    "workflow permissions"
+  ],
+  "required_artifacts": [
+    "concise change summary",
+    "targeted test results",
+    "note of any deferred polish items"
+  ],
+  "stop_conditions": [
+    "A protected path must be edited.",
+    "The task exceeds the file or diff budget.",
+    "The requested polish requires backend or domain-logic changes."
+  ],
+  "review_notes": [
+    "Keep this task cosmetic or narrowly maintainability-oriented.",
+    "Create a follow-up contract instead of expanding scope."
+  ]
+}

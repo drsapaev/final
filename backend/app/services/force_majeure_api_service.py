@@ -1,4 +1,4 @@
-"""Service layer for force majeure endpoints."""
+"""Service layer for the force_majeure exceptional-domain island."""
 
 from __future__ import annotations
 

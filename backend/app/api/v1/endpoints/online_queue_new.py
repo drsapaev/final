@@ -21,6 +21,7 @@ from app.schemas.online_queue import (
     QueueOpenResponse,
     QueueStatusCheck,
 )
+from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_service import (
     queue_service,
     QueueConflictError,
@@ -33,6 +34,10 @@ from app.services.online_queue_new_service import (
 )
 
 router = APIRouter()
+
+
+def _queue_domain_service(db: Session) -> QueueDomainService:
+    return QueueDomainService(db)
 
 # ===================== ГЕНЕРАЦИЯ QR ТОКЕНОВ =====================
 
@@ -91,10 +96,10 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
     Вступление в онлайн-очередь
     Из detail.md стр. 235: POST /api/online-queue/join { token, phone?, telegram_id? } → номер
     """
-    svc = queue_service
+    svc = _queue_domain_service(db)
     try:
-        join_result = svc.join_queue_with_token(
-            db,
+        join_result = svc.allocate_ticket(
+            allocation_mode="join_with_token",
             token_str=request.token,
             patient_name=request.patient_name,
             phone=request.phone,

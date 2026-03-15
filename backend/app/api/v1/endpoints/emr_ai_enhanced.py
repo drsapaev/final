@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.crud import emr
+from app.crud.emr import emr as emr_crud
 from app.models.user import User
 from app.schemas.emr import EMRCreate, EMRUpdate
 from app.services.emr_ai_enhanced import emr_ai_enhanced
@@ -208,7 +208,7 @@ async def enhance_emr_with_ai(
     """Улучшить EMR с помощью AI"""
     try:
         # Получаем EMR из базы данных
-        emr_record = emr.get(db, id=emr_id)
+        emr_record = emr_crud.get(db, id=emr_id)
         if not emr_record:
             raise HTTPException(status_code=404, detail="EMR не найден")
 

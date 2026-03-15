@@ -1,0 +1,68 @@
+{
+  "contract_version": "1.0",
+  "task_id": "W2A-SR-012",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/visits.py",
+      "backend/app/services/visits_api_service.py",
+      "backend/app/repositories/visits_api_repository.py",
+      "backend/tests/architecture/**",
+      "backend/tests/unit/**",
+      "docs/status/wave2a/**",
+      "docs/status/W2A_EXECUTION_SUMMARY.md",
+      "docs/status/W2A_SERVICE_REPOSITORY_SLICES.md",
+      "docs/architecture/W2A_SERVICE_REPOSITORY_DISCOVERY.md",
+      "docs/architecture/W2A_ARCHITECTURE_GUARDS.md"
+    ],
+    "exclude": [
+      "backend/app/api/v1/endpoints/auth*.py",
+      "backend/app/api/v1/endpoints/payment*.py",
+      "backend/app/api/v1/endpoints/queue*.py",
+      "backend/app/api/v1/endpoints/emr*.py",
+      "backend/app/services/payment*",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/app/services/auth*",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Move read-only visits handlers to service/repository flow.",
+    "Keep write or queue-adjacent visit handlers untouched.",
+    "Preserve existing routes and response shapes."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 10,
+    "max_diff_lines": 320,
+    "must_run_tests": true,
+    "mandatory_human_review": false
+  },
+  "must_run": [
+    "cd backend && pytest -q",
+    "cd backend && pytest tests/test_openapi_contract.py -q",
+    "cd backend && pytest tests/unit -q"
+  ],
+  "must_not_touch": [
+    "visit status/reschedule queue behavior",
+    "auth/payment/EMR business logic",
+    "alembic migrations",
+    "workflow permissions",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs/status/wave2a/W2A-SR-012_PLAN.md",
+    "docs/status/wave2a/W2A-SR-012_STATUS.md",
+    "test summary for this slice"
+  ],
+  "stop_conditions": [
+    "Need to change queue-coupled visit handlers.",
+    "Need to change route paths or response contracts.",
+    "The refactor expands into cross-module visit or queue work."
+  ]
+}

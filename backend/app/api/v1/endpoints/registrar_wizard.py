@@ -22,7 +22,11 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.confirmation_datetime import confirmation_utc_now, is_confirmation_expired
 from app.services.feature_flags import is_feature_enabled
+from app.services.registrar_wizard_queue_assignment_service import (
+    RegistrarWizardQueueAssignmentService,
+)
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import normalize_service_code
@@ -678,44 +682,11 @@ def create_cart_appointments(
         queue_numbers = {}
         today = date.today()
 
-        for visit in created_visits:
-            if visit.visit_date == today and visit.status == "confirmed":
-                try:
-                    # Используем функцию из утренней сборки для присвоения номеров
-                    # [OK] ИСПРАВЛЕНО: Убеждаемся, что VisitService импортирован для использования в morning_assignment
-                    from app.models.visit import VisitService
-                    from app.services.morning_assignment import MorningAssignmentService
-
-                    service = MorningAssignmentService()
-                    service.db = db  # Используем существующую сессию
-                    # Для ручной регистрации через мастера источник должен быть 'desk'
-                    queue_assignments = service._assign_queues_for_visit(
-                        visit,
-                        today,
-                        source="desk",
-                    )
-                    if queue_assignments:
-                        visit.status = "open"  # Готов к приему
-                        queue_numbers[visit.id] = queue_assignments
-                        logger.info(
-                            "REGISTRATION: Визит %d - присвоено %d номеров в очередях (source=desk)",
-                            visit.id,
-                            len(queue_assignments),
-                        )
-                    else:
-                        logger.warning(
-                            "REGISTRATION: Визит %d - не удалось присвоить номера в очередях (source=desk)",
-                            visit.id,
-                        )
-                except Exception as e:
-                    logger.warning(
-                        "REGISTRATION: Ошибка присвоения очередей для визита %d (source=desk): %s",
-                        visit.id,
-                        str(e),
-                        exc_info=True,
-                    )
-                    # Не прерываем создание визита из-за ошибки очередей
-                    continue
+        queue_numbers = RegistrarWizardQueueAssignmentService(db).assign_same_day_queue_numbers(
+            created_visits,
+            target_day=today,
+            source="desk",
+        )
 
         db.commit()
         logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
@@ -2600,17 +2571,14 @@ def confirm_visit_by_registrar(
             )
 
         # Проверяем что токен не истек
-        if (
-            visit.confirmation_expires_at
-            and visit.confirmation_expires_at < datetime.utcnow()
-        ):
+        if is_confirmation_expired(visit.confirmation_expires_at):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Срок подтверждения истек",
             )
 
         # Подтверждаем визит
-        visit.confirmed_at = datetime.utcnow()
+        visit.confirmed_at = confirmation_utc_now()
         visit.confirmed_by = request.confirmed_by or f"registrar_{current_user.id}"
         visit.status = "confirmed"
 
@@ -2619,9 +2587,16 @@ def confirm_visit_by_registrar(
 
         # Если визит на сегодня - присваиваем номера в очередях
         if visit.visit_date == date.today():
-            queue_numbers, print_tickets = _assign_queue_numbers_on_confirmation(
-                db, visit
+            from app.services.visit_confirmation_service import (
+                VisitConfirmationDomainError,
             )
+
+            try:
+                queue_numbers, print_tickets = _assign_queue_numbers_on_confirmation(
+                    db, visit
+                )
+            except VisitConfirmationDomainError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail)
             visit.status = "open"  # Готов к приему
 
         db.commit()
@@ -2650,173 +2625,17 @@ def _assign_queue_numbers_on_confirmation(
     db: Session, visit: Visit
 ) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
-    Присваивает номера в очередях при подтверждении визита на сегодня
-    Возвращает (queue_numbers, print_tickets)
+    Присваивает или переиспользует номера в очередях при подтверждении визита.
+    Возвращает `(queue_numbers, print_tickets)` в прежнем формате registrar API.
     """
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.services.visit_confirmation_service import VisitConfirmationService
 
-    # Получаем услуги визита
-    visit_services = (
-        db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+    service = VisitConfirmationService(db)
+    queue_numbers_list, print_tickets = service.assign_queue_numbers_on_confirmation(
+        visit
     )
-
-    # Определяем уникальные queue_tag из услуг
-    unique_queue_tags = set()
-    for vs in visit_services:
-        service = db.query(Service).filter(Service.id == vs.service_id).first()
-        if service and service.queue_tag:
-            unique_queue_tags.add(service.queue_tag)
-
-    if not unique_queue_tags:
-        department_to_queue = {
-            "cardiology": "cardiology_common",
-            "dermatology": "dermatology",
-            "stomatology": "stomatology",
-            "cosmetology": "cosmetology",
-            "lab": "lab",
-            "ecg": "ecg",
-        }
-        fallback_tag = department_to_queue.get((visit.department or "").lower())
-        if fallback_tag:
-            unique_queue_tags.add(fallback_tag)
-        else:
-            return {}, []
-
-    today = date.today()
-    queue_numbers = {}
-    print_tickets = []
-
-    # Получаем настройки очередей
-    queue_settings = {}  # Можно загрузить из настроек
-
-    for queue_tag in unique_queue_tags:
-        # Определяем врача для очереди
-        doctor_id = visit.doctor_id
-
-        # Для очередей без конкретного врача используем ресурс-врачей
-        if queue_tag == "ecg" and not doctor_id:
-            ecg_resource = (
-                db.query(User)
-                .filter(User.username == "ecg_resource", User.is_active == True)
-                .first()
-            )
-            if ecg_resource:
-                doctor_id = ecg_resource.id
-            else:
-                continue
-
-        elif queue_tag == "lab" and not doctor_id:
-            lab_resource = (
-                db.query(User)
-                .filter(User.username == "lab_resource", User.is_active == True)
-                .first()
-            )
-            if lab_resource:
-                # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
-                lab_doctor = (
-                    db.query(Doctor).filter(Doctor.user_id == lab_resource.id).first()
-                )
-                if lab_doctor:
-                    doctor_id = lab_doctor.id  # Используем doctor_id, а не user_id
-                    logger.info(
-                        f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})"
-                    )
-                else:
-                    logger.warning(
-                        f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors"
-                    )
-                    continue
-            else:
-                continue
-
-        if not doctor_id:
-            continue
-
-        # Получаем или создаем дневную очередь
-        daily_queue = crud_queue.get_or_create_daily_queue(
-            db, today, doctor_id, queue_tag
-        )
-
-        start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
-        next_number = queue_service.get_next_queue_number(
-            db,
-            daily_queue=daily_queue,
-            queue_tag=queue_tag,
-            default_start=start_number,
-        )
-
-        # Создаем запись в очереди
-        # queue_time - бизнес-время регистрации
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
-
-        queue_settings = crud_clinic.get_queue_settings(db)
-        timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
-        queue_time = datetime.now(timezone)
-
-        # ⭐ session_id для группировки услуг пациента в одной очереди
-        session_id = get_or_create_session_id(
-            db, visit.patient_id, daily_queue.id, today
-        ) if visit.patient_id else f"confirmation_{visit.id}"
-
-        queue_entry = OnlineQueueEntry(
-            queue_id=daily_queue.id,
-            patient_id=visit.patient_id,
-            visit_id=visit.id,
-            number=next_number,
-            status="waiting",
-            source="confirmation",  # Источник: подтверждение визита
-            queue_time=queue_time,  # Устанавливаем время регистрации
-            session_id=session_id,  # ⭐ NEW: Session grouping
-        )
-        db.add(queue_entry)
-
-        queue_numbers[queue_tag] = {
-            "queue_tag": queue_tag,
-            "number": next_number,
-            "queue_id": daily_queue.id,
-        }
-
-        # Подготавливаем данные для печати талона
-        queue_names = {
-            "ecg": "ЭКГ",
-            "cardiology_common": "Кардиолог",
-            "dermatology": "Дерматолог",
-            "stomatology": "Стоматолог",
-            "cosmetology": "Косметолог",
-            "lab": "Лаборатория",
-            "general": "Общая очередь",
-        }
-
-        doctor = (
-            db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
-            if visit.doctor_id
-            else None
-        )
-        patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-
-        # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
-        doctor_name = "Без врача"
-        if doctor and doctor.user_id:
-            user = db.query(User).filter(User.id == doctor.user_id).first()
-            doctor_name = (user.full_name or user.username) if user else "Без врача"
-
-        print_tickets.append(
-            {
-                "visit_id": visit.id,
-                "queue_tag": queue_tag,
-                "queue_name": queue_names.get(queue_tag, queue_tag),
-                "queue_number": next_number,
-                "queue_id": daily_queue.id,
-                "patient_id": visit.patient_id,
-                "patient_name": (
-                    patient.short_name() if patient else "Неизвестный пациент"
-                ),
-                "doctor_name": doctor_name,
-                "department": visit.department,
-                "visit_date": visit.visit_date.isoformat(),
-                "visit_time": visit.visit_time,
-            }
-        )
-
+    queue_numbers = {
+        item["queue_tag"]: item
+        for item in queue_numbers_list
+    }
     return queue_numbers, print_tickets

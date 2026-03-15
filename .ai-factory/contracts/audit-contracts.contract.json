@@ -1,0 +1,69 @@
+{
+  "contract_version": "1.0",
+  "task_type": "audit-contracts",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/openapi.json",
+      "backend/generate_openapi.py",
+      "backend/app/api/**",
+      "backend/tests/test_openapi_contract.py",
+      "frontend/src/api/**",
+      "frontend/src/services/**",
+      "frontend/src/test/parity/**",
+      "docs/**"
+    ],
+    "exclude": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "goals": [
+    "Audit frontend-backend contract drift without broad behavior changes.",
+    "Use generated or checked artifacts to verify mismatches.",
+    "Record any protected-domain contract issues honestly."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 250,
+    "must_run_tests": true,
+    "mandatory_human_review": false,
+    "protected_paths": [
+      "backend/alembic/**",
+      "backend/.env",
+      "backend/.secret_key",
+      ".secret_key",
+      ".github/workflows/**"
+    ]
+  },
+  "must_run": [
+    "cd backend && python generate_openapi.py",
+    "cd backend && pytest tests/test_openapi_contract.py -q",
+    "cd frontend && npm run test:run -- src/test/parity/rbacRouteParity.test.js"
+  ],
+  "must_not_touch": [
+    "production secrets",
+    "schema or migrations",
+    "workflow permissions",
+    "protected-domain behavior without approval"
+  ],
+  "required_artifacts": [
+    "contract drift findings",
+    "verification command log",
+    "list of docs or client bindings updated"
+  ],
+  "stop_conditions": [
+    "The fix requires protected auth, payment, queue, or EMR behavior edits.",
+    "The scope expands into a wide API redesign.",
+    "Required verification commands cannot run."
+  ],
+  "review_notes": [
+    "Use this contract to verify or document parity drift.",
+    "Escalate instead of silently changing protected APIs."
+  ]
+}

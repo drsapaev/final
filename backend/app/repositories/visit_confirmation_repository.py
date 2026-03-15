@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import online_queue as crud_queue
 from app.models.clinic import Doctor
+from app.models.online_queue import OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -54,6 +55,19 @@ class VisitConfirmationRepository:
 
     def get_or_create_daily_queue(self, day: date, specialist_id: int, queue_tag: str):
         return crud_queue.get_or_create_daily_queue(self.db, day, specialist_id, queue_tag)
+
+    def get_active_queue_entries(
+        self, *, queue_id: int, active_statuses: tuple[str, ...]
+    ) -> list[OnlineQueueEntry]:
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id == queue_id,
+                OnlineQueueEntry.status.in_(active_statuses),
+            )
+            .order_by(OnlineQueueEntry.number.asc(), OnlineQueueEntry.id.asc())
+            .all()
+        )
 
     def commit(self) -> None:
         self.db.commit()

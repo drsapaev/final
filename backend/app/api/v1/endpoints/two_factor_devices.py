@@ -38,7 +38,7 @@ class DeviceCreateRequest(BaseModel):
     ip_address: str
 
 
-@router.get("/devices", response_model=List[DeviceInfo])
+@router.get("/devices", response_model=List[DeviceInfo], include_in_schema=False)
 async def get_trusted_devices(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -85,7 +85,7 @@ async def add_trusted_device(
         )
 
 
-@router.delete("/devices/{device_id}")
+@router.delete("/devices/{device_id}", include_in_schema=False)
 async def revoke_device(
     device_id: str,
     db: Session = Depends(get_db),

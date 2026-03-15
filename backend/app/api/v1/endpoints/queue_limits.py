@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
+from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_limits_api_service import QueueLimitsApiService
 
 router = APIRouter()
@@ -139,7 +140,7 @@ def get_queue_status_with_limits(
         if day is None:
             day = date.today()
 
-        result = QueueLimitsApiService(db).get_queue_status_with_limits(
+        result = QueueDomainService(db).get_queue_limits_status(
             day=day,
             specialty=specialty,
         )

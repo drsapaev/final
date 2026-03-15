@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -15,7 +15,7 @@ from app.services.visit_confirmation_service import (
 class TestVisitConfirmationService:
     def test_get_visit_info_expired_token(self, db_session, test_visit):
         test_visit.confirmation_token = f"unit-expired-{test_visit.id}"
-        test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        test_visit.confirmation_expires_at = datetime.now(UTC) - timedelta(hours=1)
         db_session.commit()
 
         service = VisitConfirmationService(db_session)
@@ -30,8 +30,8 @@ class TestVisitConfirmationService:
     def test_confirm_by_pwa_phone_mismatch(self, db_session, test_visit):
         test_visit.confirmation_token = f"unit-pwa-{test_visit.id}"
         test_visit.confirmation_channel = "pwa"
-        test_visit.confirmation_expires_at = datetime.utcnow() + timedelta(hours=1)
-        test_visit.created_at = datetime.utcnow() - timedelta(minutes=2)
+        test_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+        test_visit.created_at = datetime.now(UTC) - timedelta(minutes=2)
         db_session.commit()
 
         service = VisitConfirmationService(db_session)
@@ -51,8 +51,8 @@ class TestVisitConfirmationService:
     def test_confirm_by_telegram_success(self, db_session, test_visit):
         test_visit.confirmation_token = f"unit-tg-{test_visit.id}"
         test_visit.confirmation_channel = "telegram"
-        test_visit.confirmation_expires_at = datetime.utcnow() + timedelta(hours=1)
-        test_visit.created_at = datetime.utcnow() - timedelta(minutes=2)
+        test_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(hours=1)
+        test_visit.created_at = datetime.now(UTC) - timedelta(minutes=2)
         db_session.commit()
 
         service = VisitConfirmationService(db_session)

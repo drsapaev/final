@@ -1,6 +1,6 @@
 :root {
   --accent: var(--accent-blue);
-  --bg: #eef3f8;
+  --bg: #f4f5f7;
   --text: #111315;
   --surface: rgba(255, 255, 255, 0.7);
   --glass-stroke: rgba(0, 0, 0, 0.12);
@@ -19,9 +19,9 @@
   --mac-text-primary: #111315;
   --mac-text-secondary: color-mix(in oklab, var(--mac-text-primary), white 40%);
   --mac-text-tertiary: color-mix(in oklab, var(--mac-text-primary), white 65%);
-  --mac-bg-primary: #fbfcfe;
-  --mac-bg-secondary: #f2f5f9;
-  --mac-bg-tertiary: #e7edf4;
+  --mac-bg-primary: #f9fafb;
+  --mac-bg-secondary: #f1f3f5;
+  --mac-bg-tertiary: #e7eaee;
   --mac-bg-toolbar: rgba(255, 255, 255, 0.92);
   --mac-border: rgba(15, 23, 42, 0.1);
   --mac-separator: rgba(0, 0, 0, 0.07);
@@ -29,7 +29,7 @@
   --mac-radius-md: 12px;
   --mac-radius-lg: 20px;
   --mac-blur-light: saturate(180%) blur(18px);
-  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(70, 118, 255, 0.06), transparent 52%), linear-gradient(180deg, #f7f9fc 0%, #e8eef5 100%);
+  --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(140, 140, 152, 0.07), transparent 52%), linear-gradient(180deg, #fbfbfc 0%, #eceff3 100%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -363,8 +363,8 @@
   pointer-events: none;
   z-index: -2;
   background:
-    radial-gradient(circle at 10% 12%, rgba(83, 138, 255, 0.08), transparent 26%),
-    radial-gradient(circle at 88% 14%, rgba(144, 175, 222, 0.1), transparent 22%),
+    radial-gradient(circle at 10% 12%, rgba(120, 122, 138, 0.06), transparent 26%),
+    radial-gradient(circle at 88% 14%, rgba(162, 164, 176, 0.08), transparent 22%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 28%);
 }
 

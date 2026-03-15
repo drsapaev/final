@@ -2068,7 +2068,7 @@ class MockProvider(BaseAIProvider):
         # Выбираем случайный текст на основе размера аудио
         import hashlib
 
-        audio_hash = hashlib.md5(audio_data[:100]).hexdigest()
+        audio_hash = hashlib.md5(audio_data[:100], usedforsecurity=False).hexdigest()
         text_index = int(audio_hash[:2], 16) % len(sample_texts)
         selected_text = sample_texts[text_index]
 

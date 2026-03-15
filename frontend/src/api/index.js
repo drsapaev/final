@@ -5,10 +5,10 @@ export * from './client';
 export * from './endpoints';
 export * from './services';
 export * from './visits';
-export * from './setting';
 export * from './ws';
 export * from './health';
 export * from './adminSettings';
+export * from './boardDisplay';
 
 // Совместимость со старыми импортами (`./api/queue`):
 export * from './queue';
