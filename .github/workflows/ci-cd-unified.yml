@@ -827,7 +827,7 @@ jobs:
     - uses: actions/checkout@v6
     
     - name: 🐳 Настройка Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
     
     - name: 🔍 Проверка Dockerfile'ов
       run: |
