@@ -4,16 +4,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
-const { getAccessToken, loggerInfo, loggerError } = vi.hoisted(() => ({
+const { getAccessToken, getUserData, loggerInfo, loggerError } = vi.hoisted(() => ({
   getAccessToken: vi.fn(() => 'test-token'),
+  getUserData: vi.fn(() => null),
   loggerInfo: vi.fn(),
   loggerError: vi.fn(),
 }));
 
 vi.mock('../../../utils/tokenManager', () => ({
+  tokenManager: {
+    getAccessToken,
+    getUserData,
+  },
   default: {
     getAccessToken,
+    getUserData,
   },
+  getAccessToken,
+  getUserData,
 }));
 
 vi.mock('../../../utils/logger', () => ({
