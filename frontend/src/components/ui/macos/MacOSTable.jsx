@@ -269,6 +269,14 @@ const MacOSTable = ({
                   borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
                 }}
                 onClick={() => handleSort(column)}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && sortable && column.sortable) {
+                    e.preventDefault();
+                    handleSort(column);
+                  }
+                }}
+                tabIndex={sortable && column.sortable ? 0 : undefined}
+                aria-sort={sortable && column.sortable ? (sortColumn === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
                 onMouseEnter={(e) => {
                   if (sortable && column.sortable) {
                     e.target.style.backgroundColor = 'var(--mac-bg-secondary)';

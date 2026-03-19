@@ -1,0 +1,3 @@
+## 2024-05-15 - Make custom table headers accessible
+**Learning:** Table column headers (`<th>`) that contain `onClick` handlers for sorting purposes must be focusable via `tabIndex={0}` and operable via keyboard using `onKeyDown` for Enter/Space. **Crucially**, do not override their native role with `role="button"`, as this breaks structural table navigation for screen readers. Instead, allow them to remain as `columnheader` and use the `aria-sort` attribute (only on sortable columns) to communicate their state.
+**Action:** When creating custom data tables with interactive sortable headers, ensure they mimic standard buttons in keyboard focusability (`tabIndex={0}`, `onKeyDown`) but retain their native `columnheader` role and utilize correct `aria-sort` values.
