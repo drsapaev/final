@@ -109,7 +109,7 @@ def test_doctor_nurse_auth():
         
         try:
             response = requests.post(
-                "http://localhost:8000/api/v1/auth/login",
+                "http://localhost:18000/api/v1/auth/login",
                 data={"username": user['username'], "password": user['password']},
                 timeout=10
             )

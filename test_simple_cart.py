@@ -25,7 +25,7 @@ import json
 from datetime import date, datetime
 
 # Configuration
-API_BASE = "http://localhost:8000"
+API_BASE = "http://localhost:18000"
 AUTH_TOKEN = None
 
 def login_as_registrar():
@@ -204,7 +204,7 @@ def main():
             return False
     except Exception as e:
         print(f"❌ Cannot connect to server: {e}")
-        print("Make sure the server is running on localhost:8000")
+        print("Make sure the server is running on localhost:18000")
         return False
 
     print("✅ Server is running")

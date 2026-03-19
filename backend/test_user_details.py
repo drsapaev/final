@@ -12,7 +12,7 @@ def test_user_details(username, password):
         'grant_type': 'password'
     }
     
-    response = requests.post('http://localhost:8000/api/v1/authentication/login', json=login_data)
+    response = requests.post('http://localhost:18000/api/v1/authentication/login', json=login_data)
     print(f'Статус логина: {response.status_code}')
     
     if response.status_code != 200:
@@ -46,7 +46,7 @@ def test_user_details(username, password):
     
     # Проверяем профиль
     headers = {'Authorization': f'Bearer {token}'}
-    profile_response = requests.get('http://localhost:8000/api/v1/authentication/profile', headers=headers)
+    profile_response = requests.get('http://localhost:18000/api/v1/authentication/profile', headers=headers)
     
     if profile_response.status_code == 200:
         profile = profile_response.json()

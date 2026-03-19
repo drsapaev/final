@@ -157,6 +157,7 @@ import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
+import { getApiOrigin } from '../api/runtime';
 
 
 
@@ -303,7 +304,7 @@ const AdminPanel = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const API_BASE = getApiOrigin();
         const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });

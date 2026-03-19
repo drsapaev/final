@@ -68,7 +68,7 @@ class DoctorTemplatesService:
         try:
             # Проверяем существует ли такой шаблон (включая удалённые - для восстановления)
             stmt = select(DoctorTreatmentTemplate).where(
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
                 DoctorTreatmentTemplate.treatment_hash == treatment_hash,
             )
             result = await self.db.execute(stmt)
@@ -99,7 +99,7 @@ class DoctorTemplatesService:
                 # Создаем новый шаблон
                 template = DoctorTreatmentTemplate(
                     id=str(uuid.uuid4()),
-                    doctor_id=str(doctor_id),
+                    doctor_id=doctor_id,
                     icd10_code=icd10_code,
                     treatment_text=normalized,
                     treatment_hash=treatment_hash,
@@ -145,7 +145,7 @@ class DoctorTemplatesService:
             stmt = (
                 select(DoctorTreatmentTemplate)
                 .where(
-                    DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                    DoctorTreatmentTemplate.doctor_id == doctor_id,
                     DoctorTreatmentTemplate.icd10_code == icd10_code,
                     DoctorTreatmentTemplate.is_deleted == False,
                 )
@@ -223,7 +223,7 @@ class DoctorTemplatesService:
         try:
             stmt = select(DoctorTreatmentTemplate).where(
                 DoctorTreatmentTemplate.id == template_id,
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
             )
             result = await self.db.execute(stmt)
             template = result.scalar_one_or_none()
@@ -254,7 +254,7 @@ class DoctorTemplatesService:
             stmt = (
                 select(DoctorTreatmentTemplate)
                 .where(
-                    DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                    DoctorTreatmentTemplate.doctor_id == doctor_id,
                     DoctorTreatmentTemplate.is_deleted == False,  # ← Только активные
                 )
                 .order_by(DoctorTreatmentTemplate.usage_count.desc())
@@ -299,7 +299,7 @@ class DoctorTemplatesService:
             # Get template
             stmt = select(DoctorTreatmentTemplate).where(
                 DoctorTreatmentTemplate.id == template_id,
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
                 DoctorTreatmentTemplate.is_deleted == False,
             )
             result = await self.db.execute(stmt)
@@ -313,7 +313,7 @@ class DoctorTemplatesService:
 
             # Count existing pinned for this diagnosis
             count_stmt = select(DoctorTreatmentTemplate).where(
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
                 DoctorTreatmentTemplate.icd10_code == template.icd10_code,
                 DoctorTreatmentTemplate.is_pinned == True,
                 DoctorTreatmentTemplate.is_deleted == False,
@@ -350,7 +350,7 @@ class DoctorTemplatesService:
         try:
             stmt = select(DoctorTreatmentTemplate).where(
                 DoctorTreatmentTemplate.id == template_id,
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
             )
             result = await self.db.execute(stmt)
             template = result.scalar_one_or_none()
@@ -395,7 +395,7 @@ class DoctorTemplatesService:
             # Get original template
             stmt = select(DoctorTreatmentTemplate).where(
                 DoctorTreatmentTemplate.id == template_id,
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
             )
             result = await self.db.execute(stmt)
             original = result.scalar_one_or_none()
@@ -414,7 +414,7 @@ class DoctorTemplatesService:
                 # Create new template with same ICD-10
                 # Check if already exists
                 existing_stmt = select(DoctorTreatmentTemplate).where(
-                    DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                    DoctorTreatmentTemplate.doctor_id == doctor_id,
                     DoctorTreatmentTemplate.treatment_hash == new_hash,
                 )
                 existing_result = await self.db.execute(existing_stmt)
@@ -433,7 +433,7 @@ class DoctorTemplatesService:
                 # Create new
                 new_template = DoctorTreatmentTemplate(
                     id=str(uuid.uuid4()),
-                    doctor_id=str(doctor_id),
+                    doctor_id=doctor_id,
                     icd10_code=original.icd10_code,
                     treatment_text=normalized,
                     treatment_hash=new_hash,

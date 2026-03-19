@@ -238,7 +238,7 @@ function DoctorPanel() {
 #### Анализ жалоб с оценкой срочности
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/mcp/complaint/analyze \
+curl -X POST http://localhost:18000/api/v1/mcp/complaint/analyze \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -252,7 +252,7 @@ curl -X POST http://localhost:8000/api/v1/mcp/complaint/analyze \
 #### Пакетная обработка
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/mcp/batch \
+curl -X POST http://localhost:18000/api/v1/mcp/batch \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

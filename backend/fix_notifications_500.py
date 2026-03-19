@@ -13,7 +13,7 @@ def test_notifications_endpoint():
     # Получаем токен admin
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             timeout=10
         )
@@ -43,7 +43,7 @@ def test_notifications_endpoint():
         
         try:
             response = requests.get(
-                f"http://localhost:8000/api/v1{endpoint}",
+                f"http://localhost:18000/api/v1{endpoint}",
                 headers=headers,
                 timeout=10
             )

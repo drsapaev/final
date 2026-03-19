@@ -20,6 +20,7 @@ class TestEMRDoctorHistoryService:
             service.get_history_entries(
                 doctor_id=1,
                 field_name="bad_field",
+                specialty="general",
                 search_text=None,
                 limit=10,
             )
@@ -28,8 +29,13 @@ class TestEMRDoctorHistoryService:
 
     def test_get_history_entries_formats_payload(self):
         record = SimpleNamespace(
-            complaints="Pain in chest",
-            diagnosis="I20.0",
+            data={
+                "complaints": "Pain in chest",
+                "diagnosis": {
+                    "main": "I20.0",
+                    "icd10_code": "I20.0",
+                },
+            },
             created_at=datetime(2026, 1, 1, 10, 0, 0),
         )
         repository = SimpleNamespace(
@@ -40,6 +46,7 @@ class TestEMRDoctorHistoryService:
         entries = service.get_history_entries(
             doctor_id=1,
             field_name="complaints",
+            specialty="cardiology",
             search_text=None,
             limit=10,
         )
@@ -47,4 +54,3 @@ class TestEMRDoctorHistoryService:
         assert len(entries) == 1
         assert entries[0]["content"] == "Pain in chest"
         assert entries[0]["diagnosis"] == "I20.0"
-

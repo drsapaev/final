@@ -15,7 +15,7 @@
 
 ## Frontend (`frontend/.env`)
 - `VITE_APP_NAME` — название в UI.
-- `VITE_API_BASE` — базовый адрес API (например, `http://localhost:8000/api/v1`).
+- `VITE_API_BASE` — базовый адрес API (например, `http://localhost:18000/api/v1`).
 
 ## Быстрый старт (локально)
 ```bash

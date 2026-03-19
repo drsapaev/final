@@ -22,7 +22,7 @@ def test_login():
             print(f"Отправляем данные: {data}")
 
             response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=data, timeout=5
+                "http://localhost:18000/api/v1/auth/login", data=data, timeout=5
             )
 
             print(f"Статус ответа: {response.status_code}")
@@ -43,7 +43,7 @@ def test_login():
                             "Authorization": f"Bearer {token_data['access_token']}"
                         }
                         profile_response = client.get(
-                            "http://localhost:8000/api/v1/auth/me",
+                            "http://localhost:18000/api/v1/auth/me",
                             headers=headers,
                             timeout=5,
                         )

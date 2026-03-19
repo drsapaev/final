@@ -37,7 +37,7 @@ cd C:\final\frontend && npm run dev
 ## 🚀 **ТЕКУЩИЙ СТАТУС:**
 
 ### **Backend API** ✅ РАБОТАЕТ
-- **URL**: http://localhost:8000
+- **URL**: http://localhost:18000
 - **Health Check**: `{"ok": true, "db": "ok"}`
 - **Статус**: ✅ Полностью функционален
 
@@ -89,8 +89,8 @@ npm run dev
 ## 🔐 **ДОСТУП К СИСТЕМЕ:**
 
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+- **Backend API**: http://localhost:18000
+- **API Documentation**: http://localhost:18000/docs
 
 ### **Вход в систему:**
 - **Логин**: admin
@@ -102,7 +102,7 @@ npm run dev
 
 ### **Backend Health Check:**
 ```bash
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 # Возвращает: {"ok":true,"db":"ok"}
 ```
 
@@ -122,7 +122,7 @@ curl http://localhost:5173
 ✅ Система запущена и работает стабильно  
 ✅ Созданы автоматические скрипты для управления  
 ✅ Frontend доступен на http://localhost:5173  
-✅ Backend доступен на http://localhost:8000  
+✅ Backend доступен на http://localhost:18000  
 
 **Система готова к использованию!**
 

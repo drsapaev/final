@@ -69,3 +69,16 @@ class TestAppointmentFlowApiService:
         assert appointment.status == AppointmentStatus.IN_VISIT
         assert state["committed"] is True
         assert state["refreshed"] is True
+
+    def test_resolve_canonical_visit_delegates_to_shared_service(self):
+        canonical_service = SimpleNamespace(
+            resolve_canonical_visit=lambda appointment_id: appointment_id + 1000
+        )
+
+        service = AppointmentFlowApiService(
+            db=None,
+            repository=SimpleNamespace(),
+            canonical_visit_service=canonical_service,
+        )
+
+        assert service.resolve_canonical_visit(appointment_id=12) == 1012

@@ -30,7 +30,7 @@ class Visit(Base):
     )
 
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="open"
+        String(32), nullable=False, default="open"
     )  # open|closed|canceled
     notes: Mapped[str | None] = mapped_column(String(512), nullable=True)
 

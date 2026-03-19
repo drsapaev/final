@@ -8,7 +8,7 @@ def test_auth_debug():
     """Тест авторизации с отладкой"""
     print("🔍 Тестирование авторизации с отладкой...")
     
-    url = "http://localhost:8000/api/v1/auth/minimal-login"
+    url = "http://localhost:18000/api/v1/auth/minimal-login"
     data = {
         "username": "mcp_test",
         "password": "test123"

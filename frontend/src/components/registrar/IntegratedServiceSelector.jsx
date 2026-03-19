@@ -13,6 +13,7 @@ import {
   AlertCircle } from
 'lucide-react';
 import { Card } from '../ui/native';
+import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
@@ -126,7 +127,7 @@ const IntegratedServiceSelector = ({
       try {
         const params = new URLSearchParams();
         // Исключаем фильтрацию по specialty, чтобы не терять группы
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const API_BASE = getApiOrigin();
         const response = await fetch(`${API_BASE}/api/v1/registrar/services?${params}`, {
           headers: {
             'Authorization': `Bearer ${token}`,

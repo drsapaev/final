@@ -38,7 +38,7 @@ python migrate_phrases.py
 ### 3. Проверить готовность врача
 
 ```bash
-curl http://localhost:8000/api/v1/emr/readiness/123
+curl http://localhost:18000/api/v1/emr/readiness/123
 ```
 
 ### 4. Всё! 🎉
@@ -202,7 +202,7 @@ npm test -- useDoctorPhrases.test.js
 
 ```bash
 # Test full flow
-curl -X POST http://localhost:8000/api/v1/emr/phrase-suggest \
+curl -X POST http://localhost:18000/api/v1/emr/phrase-suggest \
   -d '{"field":"complaints","currentText":"Голов","doctorId":123}'
 ```
 
@@ -214,7 +214,7 @@ curl -X POST http://localhost:8000/api/v1/emr/phrase-suggest \
 
 1. Проверить readiness:
    ```bash
-   curl http://localhost:8000/api/v1/emr/readiness/123
+   curl http://localhost:18000/api/v1/emr/readiness/123
    ```
 
 2. Проверить количество фраз:

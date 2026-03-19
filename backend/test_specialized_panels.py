@@ -19,7 +19,7 @@ def test_specialized_panels():
                 "grant_type": "password",
             }
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=login_data, timeout=10
+                "http://localhost:18000/api/v1/auth/login", data=login_data, timeout=10
             )
             if login_response.status_code != 200:
                 print(f"❌ Ошибка логина: {login_response.status_code}")
@@ -40,7 +40,7 @@ def test_specialized_panels():
             # 2.1. Кардиологическая панель
             print("2.1. Кардиологическая панель...")
             cardio_response = client.get(
-                "http://localhost:8000/api/v1/patients?department=Cardio&limit=10",
+                "http://localhost:18000/api/v1/patients?department=Cardio&limit=10",
                 headers=headers,
                 timeout=10,
             )
@@ -56,7 +56,7 @@ def test_specialized_panels():
             # 2.2. Дерматологическая панель
             print("2.2. Дерматологическая панель...")
             derma_response = client.get(
-                "http://localhost:8000/api/v1/patients?department=Derma&limit=10",
+                "http://localhost:18000/api/v1/patients?department=Derma&limit=10",
                 headers=headers,
                 timeout=10,
             )
@@ -72,7 +72,7 @@ def test_specialized_panels():
             # 2.3. Стоматологическая панель
             print("2.3. Стоматологическая панель...")
             dental_response = client.get(
-                "http://localhost:8000/api/v1/patients?department=Dental&limit=10",
+                "http://localhost:18000/api/v1/patients?department=Dental&limit=10",
                 headers=headers,
                 timeout=10,
             )
@@ -88,7 +88,7 @@ def test_specialized_panels():
             # 2.4. Лабораторная панель
             print("2.4. Лабораторная панель...")
             lab_response = client.get(
-                "http://localhost:8000/api/v1/patients?department=Lab&limit=10",
+                "http://localhost:18000/api/v1/patients?department=Lab&limit=10",
                 headers=headers,
                 timeout=10,
             )
@@ -108,7 +108,7 @@ def test_specialized_panels():
             print("3.1. Кардиологические API...")
             try:
                 cardio_api_response = client.get(
-                    "http://localhost:8000/api/v1/cardio/ecg?limit=5",
+                    "http://localhost:18000/api/v1/cardio/ecg?limit=5",
                     headers=headers,
                     timeout=10,
                 )
@@ -122,7 +122,7 @@ def test_specialized_panels():
 
             try:
                 cardio_blood_response = client.get(
-                    "http://localhost:8000/api/v1/cardio/blood-tests?limit=5",
+                    "http://localhost:18000/api/v1/cardio/blood-tests?limit=5",
                     headers=headers,
                     timeout=10,
                 )
@@ -140,7 +140,7 @@ def test_specialized_panels():
             print("3.2. Дерматологические API...")
             try:
                 derma_exam_response = client.get(
-                    "http://localhost:8000/api/v1/derma/examinations?limit=5",
+                    "http://localhost:18000/api/v1/derma/examinations?limit=5",
                     headers=headers,
                     timeout=10,
                 )
@@ -154,7 +154,7 @@ def test_specialized_panels():
 
             try:
                 derma_proc_response = client.get(
-                    "http://localhost:8000/api/v1/derma/procedures?limit=5",
+                    "http://localhost:18000/api/v1/derma/procedures?limit=5",
                     headers=headers,
                     timeout=10,
                 )

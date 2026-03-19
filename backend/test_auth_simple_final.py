@@ -5,7 +5,7 @@
 import requests
 import time
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def test_auth_simple():
     print("🔐 ПРОСТОЙ ТЕСТ АУТЕНТИФИКАЦИИ")

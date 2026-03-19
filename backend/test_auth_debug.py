@@ -33,7 +33,7 @@ def test_auth_debug():
     print("\n2. Тестируем через HTTP запрос...")
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             timeout=10
         )

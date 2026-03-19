@@ -68,8 +68,8 @@ def main():
     if check_server_health():
         print("=" * 50)
         print("✅ СИСТЕМА ГОТОВА К РАБОТЕ!")
-        print("🌐 Сервер доступен по адресу: http://localhost:8000")
-        print("📊 API документация: http://localhost:8000/docs")
+        print("🌐 Сервер доступен по адресу: http://localhost:18000")
+        print("📊 API документация: http://localhost:18000/docs")
         print("=" * 50)
         print("💡 Сервер работает в фоновом режиме")
         print("🔄 Для остановки нажмите Ctrl+C")

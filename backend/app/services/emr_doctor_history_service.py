@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.repositories.emr_doctor_history_repository import EMRDoctorHistoryRepository
+from app.services.emr_contract import (
+    extract_diagnosis_main,
+    get_emr_text_field,
+    normalize_specialty,
+)
 
 
 @dataclass
@@ -40,6 +45,7 @@ class EMRDoctorHistoryService:
         *,
         doctor_id: int,
         field_name: str,
+        specialty: str,
         search_text: str | None,
         limit: int,
     ) -> list[dict]:
@@ -52,22 +58,30 @@ class EMRDoctorHistoryService:
 
         records = self.repository.list_records(
             doctor_id=doctor_id,
-            db_field=db_field,
-            search_text=search_text,
-            limit=limit,
+            specialty=normalize_specialty(specialty),
+            limit=max(limit * 5, limit),
         )
 
         entries: list[dict] = []
+        normalized_search = (search_text or "").strip().lower()
         for record in records:
-            content = getattr(record, db_field, "")
+            content = get_emr_text_field(record.data, db_field)
             if not content:
                 continue
+            if normalized_search and len(normalized_search) >= 3:
+                if normalized_search not in content.lower():
+                    continue
             entries.append(
                 {
                     "content": content[:500],
-                    "diagnosis": record.diagnosis[:200] if record.diagnosis else None,
+                    "diagnosis": (
+                        extract_diagnosis_main(record.data)[:200]
+                        if extract_diagnosis_main(record.data)
+                        else None
+                    ),
                     "created_at": record.created_at.isoformat() if record.created_at else "",
                 }
             )
+            if len(entries) >= limit:
+                break
         return entries
-

@@ -32,6 +32,6 @@
 `alert_manager` cooldown prevents alert storms.
 
 ## Quick Checks
-1. `curl http://localhost:8000/api/v1/observability/metrics | head`
-2. `curl -H "Authorization: Bearer <admin_token>" http://localhost:8000/api/v1/observability/sla`
-3. `curl -H "Authorization: Bearer <admin_token>" http://localhost:8000/api/v1/observability/alerts?hours=1`
+1. `curl http://localhost:18000/api/v1/observability/metrics | head`
+2. `curl -H "Authorization: Bearer <admin_token>" http://localhost:18000/api/v1/observability/sla`
+3. `curl -H "Authorization: Bearer <admin_token>" http://localhost:18000/api/v1/observability/alerts?hours=1`

@@ -7,7 +7,7 @@ import time
 import json
 from datetime import datetime, date, timedelta
 
-BASE_URL_API = "http://localhost:8000/api/v1"
+BASE_URL_API = "http://localhost:18000/api/v1"
 BASE_URL_FRONTEND = "http://localhost:5173"
 
 def test_frontend_availability():

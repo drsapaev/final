@@ -13,8 +13,9 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import { getApiBaseUrl } from '../../api/runtime';
 import logger from '../../utils/logger';
-const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 
 /**
  * Компонент для указания цены стоматологом после лечения

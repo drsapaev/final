@@ -1,0 +1,45 @@
+{
+  "nodes": [
+    {
+      "id": "intake",
+      "depends_on": []
+    },
+    {
+      "id": "strategy",
+      "depends_on": [
+        "intake"
+      ]
+    },
+    {
+      "id": "copy",
+      "depends_on": [
+        "strategy"
+      ]
+    },
+    {
+      "id": "design-system",
+      "depends_on": [
+        "strategy"
+      ]
+    },
+    {
+      "id": "ui-build",
+      "depends_on": [
+        "copy",
+        "design-system"
+      ]
+    },
+    {
+      "id": "audit-swarm",
+      "depends_on": [
+        "ui-build"
+      ]
+    },
+    {
+      "id": "release",
+      "depends_on": [
+        "audit-swarm"
+      ]
+    }
+  ]
+}

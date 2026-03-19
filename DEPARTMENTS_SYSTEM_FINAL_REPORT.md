@@ -210,7 +210,7 @@ Traceback (most recent call last):
 
 2. **Воспроизвести через curl** с полными данными:
    ```bash
-   curl -X POST http://localhost:8000/api/v1/registrar/cart \
+   curl -X POST http://localhost:18000/api/v1/registrar/cart \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{

@@ -5,7 +5,7 @@
 **Дата тестирования:** _________  
 **Тестировщик:** _________  
 **Версия:** 2.0.0  
-**Backend:** http://localhost:8000  
+**Backend:** http://localhost:18000  
 **Frontend:** http://localhost:3000  
 
 ---
@@ -442,7 +442,7 @@ cd backend && uvicorn app.main:app --reload
 cd frontend && npm start
 
 # 2. Проверка MCP здоровья
-curl http://localhost:8000/api/v1/mcp/health
+curl http://localhost:18000/api/v1/mcp/health
 
 # 3. Открыть браузер
 http://localhost:3000

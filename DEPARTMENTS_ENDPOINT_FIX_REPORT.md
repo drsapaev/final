@@ -10,7 +10,7 @@
 Frontend console was showing 404 errors:
 ```
 GET http://localhost:5173/api/v1/departments?active_only=true 404 (Not Found)
-GET http://localhost:8000/api/v1/departments/active 404 (Not Found)
+GET http://localhost:18000/api/v1/departments/active 404 (Not Found)
 ```
 
 **Affected Components**:
@@ -91,7 +91,7 @@ $ python -c "from app.api.v1.api import api_router; print(f'API router has {len(
 
 ### ✅ Endpoint Accessible
 ```bash
-$ curl http://localhost:8000/api/v1/departments
+$ curl http://localhost:18000/api/v1/departments
 > {"detail":"Not authenticated"}  # Correct - authentication required
 ```
 

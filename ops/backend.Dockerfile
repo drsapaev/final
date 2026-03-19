@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # System deps for reportlab / pillow (fonts, jpeg, zlib)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libfreetype6 libjpeg62-turbo zlib1g ca-certificates bash \
+      libfreetype6 libjpeg62-turbo zlib1g ca-certificates bash postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

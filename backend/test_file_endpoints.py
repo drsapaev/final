@@ -11,7 +11,7 @@ def test_file_endpoints():
     # Получаем токен
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -33,7 +33,7 @@ def test_file_endpoints():
     print("\n📁 Тестирование GET /api/v1/files/test...")
     try:
         response = requests.get(
-            "http://localhost:8000/api/v1/files/test",
+            "http://localhost:18000/api/v1/files/test",
             headers=headers,
             timeout=5
         )
@@ -53,7 +53,7 @@ def test_file_endpoints():
     print("\n📁 Тестирование POST /api/v1/files/test-upload...")
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/files/test-upload",
+            "http://localhost:18000/api/v1/files/test-upload",
             headers=headers,
             timeout=5
         )

@@ -276,7 +276,7 @@ cd backend
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # Проверка health
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 ```
 
 ## Troubleshooting

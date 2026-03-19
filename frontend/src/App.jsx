@@ -52,8 +52,6 @@ const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
-const SingleSheetEMRDemo = lazy(() => import('./pages/SingleSheetEMRDemo.jsx'));
-const EMRv2Demo = lazy(() => import('./pages/EMRv2Demo.jsx'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
 const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
 
@@ -65,8 +63,6 @@ import TelegramManager from './components/TelegramManager.jsx';
 import EmailSMSManager from './components/notifications/EmailSMSManager.jsx';
 import TwoFactorManager from './components/security/TwoFactorManager.jsx';
 import FileManager from './components/files/FileManager.jsx';
-import EMRInterface from './components/medical/EMRInterface.jsx';
-import EMRDemo from './pages/EMRDemo.jsx';
 import UserManagement from './components/admin/UserManagement.jsx';
 import IntegrationDemo from './components/integration/IntegrationDemo.jsx';
 
@@ -1158,11 +1154,6 @@ function AppContent() {
 
               {/* Интегрированные скрытые компоненты */}
               <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
-              <Route path="advanced-emr" element={<RequireAuth roles={['Admin', 'Doctor']}><EMRInterface /></RequireAuth>} />
-              {/* EMR Demo - Medical staff only (security fix - contains PHI) */}
-              <Route path="emr-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRDemo /></RequireAuth>} />
-              <Route path="emr-single-sheet" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><SingleSheetEMRDemo /></RequireAuth>} />
-              <Route path="emr-v2-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRv2Demo /></RequireAuth>} />
               <Route path="file-management" element={<RequireAuth roles={['Admin', 'Doctor']}><FileManager /></RequireAuth>} />
               <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
               <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />

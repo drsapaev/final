@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${HOST:=0.0.0.0}"
+: "${PORT:=8000}"
+: "${APP_MODULE:=app.main:app}"
+: "${WORKERS:=1}"
+: "${RELOAD:=0}"
+: "${DATABASE_URL:=sqlite:////data/app.db}"
+: "${ENSURE_ADMIN:=1}"
+: "${RUN_ALEMBIC_ON_START:=0}"
+
+mkdir -p /data
+export DATABASE_URL
+
+if [[ "${RUN_ALEMBIC_ON_START}" == "1" ]]; then
+  echo "[entrypoint] Running alembic upgrade head..."
+  alembic upgrade head
+fi
+
+echo "[entrypoint] Creating database tables..."
+python -c "
+import sys
+sys.path.insert(0, '.')
+from app.db.base import Base
+from app.db.session import engine
+try:
+    Base.metadata.create_all(bind=engine)
+    print('✅ Database tables created successfully')
+except Exception as e:
+    print(f'⚠️ Error creating tables: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
+
+if [[ "${ENSURE_ADMIN}" == "1" ]]; then
+  echo "[entrypoint] Ensuring admin user..."
+  python app/scripts/ensure_admin.py || echo "⚠️ Warning: Could not ensure admin user"
+fi
+
+echo "[entrypoint] Starting Uvicorn ${APP_MODULE} on ${HOST}:${PORT} (workers=${WORKERS}, reload=${RELOAD})"
+exec uvicorn "${APP_MODULE}" \
+  --host "${HOST}" \
+  --port "${PORT}" \
+  --workers "${WORKERS}" \
+  $( [[ "${RELOAD}" == "1" ]] && echo --reload )

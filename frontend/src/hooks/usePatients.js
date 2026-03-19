@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import { getApiOrigin } from '../api/runtime';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
-const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+const API_BASE = getApiOrigin();
 
 const usePatients = () => {
   const [patients, setPatients] = useState([]);

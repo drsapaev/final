@@ -1606,7 +1606,7 @@ function RequireAuth({ roles, children }) {
 
 #### Проблема
 
-65 вхождений `http://localhost:8000` в коде.
+65 вхождений `http://localhost:18000` в коде.
 
 #### Решение
 
@@ -1640,7 +1640,7 @@ function getDefaultApiUrl() {
   }
 
   // Development
-  return 'http://localhost:8000/api/v1';
+  return 'http://localhost:18000/api/v1';
 }
 
 /**
@@ -1652,7 +1652,7 @@ function getDefaultWsUrl() {
     return `${protocol}//${window.location.host}/ws`;
   }
 
-  return 'ws://localhost:8000/ws';
+  return 'ws://localhost:18000/ws';
 }
 
 export default API_CONFIG;
@@ -1662,8 +1662,8 @@ export default API_CONFIG;
 
 ```bash
 # frontend/.env.development
-VITE_API_BASE_URL=http://localhost:8000/api/v1
-VITE_WS_URL=ws://localhost:8000/ws
+VITE_API_BASE_URL=http://localhost:18000/api/v1
+VITE_WS_URL=ws://localhost:18000/ws
 
 # frontend/.env.production
 VITE_API_BASE_URL=/api/v1
@@ -1678,7 +1678,7 @@ VITE_WS_URL=wss://staging.clinic.com/ws
 
 ```javascript
 // БЫЛО
-const API_BASE = 'http://localhost:8000/api/v1'; // ❌
+const API_BASE = 'http://localhost:18000/api/v1'; // ❌
 
 // СТАЛО
 import API_CONFIG from '../config/api';
@@ -1695,7 +1695,7 @@ const api = axios.create({
 
 ```javascript
 // БЫЛО (строка 79)
-const response = await fetch('http://localhost:8000/api/v1/auth/minimal-login', ...); // ❌
+const response = await fetch('http://localhost:18000/api/v1/auth/minimal-login', ...); // ❌
 
 // СТАЛО
 import API_CONFIG from '../../config/api';
@@ -1873,7 +1873,7 @@ const handleSave = async () => {
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob: https:;
   font-src 'self' data:;
-  connect-src 'self' ws://localhost:8000 wss://localhost:8000;
+  connect-src 'self' ws://localhost:18000 wss://localhost:18000;
   frame-ancestors 'none';
   base-uri 'self';
   form-action 'self';

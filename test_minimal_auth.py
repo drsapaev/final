@@ -21,7 +21,7 @@ def test_minimal_login():
         print(f"Sending minimal login request with data: {data}")
         
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/minimal-login",
+            "http://localhost:18000/api/v1/auth/minimal-login",
             json=data,
             headers=headers
         )

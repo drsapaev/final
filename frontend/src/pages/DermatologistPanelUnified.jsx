@@ -35,8 +35,13 @@ import VisitTimeline from '../components/VisitTimeline';
 import { queueService } from '../services/queue';
 import { toast } from 'react-toastify';
 import AIChatWidget from '../components/ai/AIChatWidget';
+import { getApiBaseUrl, getApiOrigin } from '../api/runtime';
+import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+
+const API_BASE = getApiOrigin();
+const API_V1_BASE = getApiBaseUrl();
 
 /**
  * Унифицированная панель дерматолога
@@ -51,9 +56,9 @@ const DermatologistPanelUnified = () => {
   // Синхронизация активной вкладки с URL
   const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
-    // Если есть patientId, переходим на вкладку пациента
+    // Deep-link по patientId требует выбора канонического визита из очереди
     if (params.get('patientId')) {
-      return 'visit';
+      return 'appointments';
     }
     return params.get('tab') || 'appointments';
   }, [location.search]);
@@ -161,8 +166,7 @@ const DermatologistPanelUnified = () => {
     try {
       const token = tokenManager.getAccessToken();
       if (!token) return;
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
+      const response = await fetch(`${API_V1_BASE}/registrar/services`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -211,10 +215,8 @@ const DermatologistPanelUnified = () => {
 
       // Используем комбинированный подход: получаем данные из queues для услуг и из БД для payment_status
       const today = new Date().toISOString().split('T')[0];
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
       // 1. Получаем очереди для информации об услугах
-      const queuesResponse = await fetch(`${API_BASE}/api/v1/registrar/queues/today`, {
+      const queuesResponse = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -232,6 +234,7 @@ const DermatologistPanelUnified = () => {
               queue.entries.forEach((entry) => {
                 allAppointments.push({
                   id: entry.id,
+                  appointment_id: entry.appointment_id || entry.id,
                   patient_id: entry.patient_id,
                   patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
                   patient_phone: entry.phone || '',
@@ -250,7 +253,7 @@ const DermatologistPanelUnified = () => {
                   appointment_time: entry.visit_time || '09:00',
                   status: entry.status || 'waiting',
                   cost: entry.cost || 0,
-                  visit_id: entry.visit_id || entry.id
+                  visit_id: entry.visit_id || null
                 });
               });
             }
@@ -260,7 +263,7 @@ const DermatologistPanelUnified = () => {
 
       // 2. Получаем актуальный payment_status из БД через all-appointments
       try {
-        const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+        const appointmentsResponse = await fetch(`${API_V1_BASE}/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -273,28 +276,35 @@ const DermatologistPanelUnified = () => {
           logger.info('[Dermatology] Получены appointments из БД:', appointmentsDBData.length);
 
           // Создаем карту id -> payment_status
-          const paymentStatusMap = new Map();
+          const appointmentMetaMap = new Map();
           appointmentsDBData.forEach((apt) => {
+            const appointmentMeta = {
+              payment_status: apt.payment_status || 'pending',
+              visit_id: apt.visit_id || null,
+              appointment_id: apt.appointment_id || (apt.source === 'appointments' ? apt.id : null)
+            };
             if (apt.id) {
-              paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
+              appointmentMetaMap.set(apt.id, appointmentMeta);
             }
             if (apt.patient_id && apt.appointment_date) {
               const key = `${apt.patient_id}_${apt.appointment_date}`;
-              paymentStatusMap.set(key, apt.payment_status || 'pending');
+              appointmentMetaMap.set(key, appointmentMeta);
             }
           });
 
           // Обновляем payment_status в наших записях
           allAppointments = allAppointments.map((apt) => {
-            let paymentStatus = paymentStatusMap.get(apt.id);
-            if (!paymentStatus && apt.patient_id && apt.appointment_date) {
+            let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+            if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
               const key = `${apt.patient_id}_${apt.appointment_date}`;
-              paymentStatus = paymentStatusMap.get(key);
+              appointmentMeta = appointmentMetaMap.get(key);
             }
             return {
               ...apt,
-              payment_status: paymentStatus || apt.payment_status || 'pending',
-              payment_type: paymentStatus || apt.payment_type
+              appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+              visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+              payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+              payment_type: appointmentMeta?.payment_status || apt.payment_type
             };
           });
 
@@ -305,7 +315,7 @@ const DermatologistPanelUnified = () => {
       }
 
       // Фильтруем только дерматологические записи
-      const appointmentsData = allAppointments.filter((apt) =>
+      let appointmentsData = allAppointments.filter((apt) =>
       apt.specialty === 'derma' || apt.specialty === 'dermatology'
       );
 
@@ -348,6 +358,19 @@ const DermatologistPanelUnified = () => {
     };
   }, [activeTab, loadDermatologyAppointments]);
 
+  const ensureCanonicalVisitId = useCallback(async (row) => {
+    const appointmentId = row?.appointment_id || row?.id;
+    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+
+    if (visitId) {
+      setAppointments((prev) => prev.map((appointment) =>
+        appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
+      ));
+    }
+
+    return visitId;
+  }, []);
+
   // Функция для получения данных пациента по ID
   const fetchPatientData = useCallback(async (patientId) => {
     if (patientId >= 1000) {
@@ -357,10 +380,8 @@ const DermatologistPanelUnified = () => {
     const token = tokenManager.getAccessToken();
     if (!token) return null;
 
-    const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
     try {
-      const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
+      const response = await fetch(`${API_V1_BASE}/patients/${patientId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -450,19 +471,31 @@ const DermatologistPanelUnified = () => {
   }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
   // Обработчики для таблицы записей
-  const handleAppointmentRowClick = (row) => {
+  const handleAppointmentRowClick = async (row) => {
     logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
+      const visitId = await ensureCanonicalVisitId(row);
+      if (!visitId) {
+        logger.error('[Dermatology] Не удалось определить канонический visit_id', row);
+        return;
+      }
+
       // Создаем объект пациента для переключения на прием
       const patientData = {
-        id: row.id,
+        id: row.appointment_id || row.id,
+        appointment_id: row.appointment_id || row.id,
+        visit_id: visitId,
+        patient_id: row.patient_id,
         patient_name: row.patient_fio,
         phone: row.patient_phone,
         number: row.id,
-        source: 'appointments'
+        source: 'appointments',
+        status: row.status || 'waiting',
+        specialty: row.specialty || 'dermatology'
       };
       setSelectedPatient(patientData);
+      setCurrentAppointment(patientData);
       handleTabChange('visit');
     }
   };
@@ -473,14 +506,13 @@ const DermatologistPanelUnified = () => {
 
     switch (action) {
       case 'view':
-        handleAppointmentRowClick(row);
+        await handleAppointmentRowClick(row);
         break;
       case 'call':
         // Вызвать пациента
         try {
-          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
           const token = tokenManager.getAccessToken();
-          const response = await fetch(apiUrl, {
+          const response = await fetch(`${API_V1_BASE}/registrar/queue/${row.id}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -510,16 +542,27 @@ const DermatologistPanelUnified = () => {
       case 'complete':
         // Завершить приём
         try {
+          const visitId = await ensureCanonicalVisitId(row);
+          if (!visitId) {
+            logger.error('[Dermatology] Нельзя завершить прием без канонического visit_id', row);
+            break;
+          }
+
           const patient = {
-            id: row.id,
+            id: row.appointment_id || row.id,
+            appointment_id: row.appointment_id || row.id,
+            visit_id: visitId,
+            patient_id: row.patient_id,
             patient_name: row.patient_fio,
             phone: row.patient_phone,
             number: row.id,
             source: 'appointments',
-            status: 'in_cabinet'
+            status: 'in_cabinet',
+            specialty: row.specialty || 'dermatology'
           };
           logger.info('[Dermatology] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
+          setCurrentAppointment(patient);
           handleTabChange('visit');
         } catch (error) {
           logger.error('[Dermatology] Ошибка при завершении приёма:', error);
@@ -548,7 +591,7 @@ const DermatologistPanelUnified = () => {
   const loadPatients = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/v1/patients?department=Derma&limit=100', {
+      const response = await fetch(`${API_V1_BASE}/patients?department=Derma&limit=100`, {
         headers: authHeader()
       });
       if (response.ok) {
@@ -564,7 +607,7 @@ const DermatologistPanelUnified = () => {
 
   const loadSkinExaminations = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/derma/examinations?limit=100', {
+      const response = await fetch(`${API_V1_BASE}/derma/examinations?limit=100`, {
         headers: authHeader()
       });
       if (response.ok) {
@@ -578,7 +621,7 @@ const DermatologistPanelUnified = () => {
 
   const loadCosmeticProcedures = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/derma/procedures?limit=100', {
+      const response = await fetch(`${API_V1_BASE}/derma/procedures?limit=100`, {
         headers: authHeader()
       });
       if (response.ok) {
@@ -598,7 +641,7 @@ const DermatologistPanelUnified = () => {
       const token = tokenManager.getAccessToken();
       if (!token) return;
 
-      const skinResponse = await fetch(`/api/v1/dermatology/skin-examinations?patient_id=${patientId}&limit=10`, {
+      const skinResponse = await fetch(`${API_V1_BASE}/dermatology/skin-examinations?patient_id=${patientId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (skinResponse.ok) {
@@ -606,7 +649,7 @@ const DermatologistPanelUnified = () => {
         setSkinExaminations(skinData);
       }
 
-      const cosmeticResponse = await fetch(`/api/v1/dermatology/cosmetic-procedures?patient_id=${patientId}&limit=10`, {
+      const cosmeticResponse = await fetch(`${API_V1_BASE}/dermatology/cosmetic-procedures?patient_id=${patientId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (cosmeticResponse.ok) {
@@ -644,10 +687,8 @@ const DermatologistPanelUnified = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
         // Загружаем данные пациента
-        const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+        const patientResponse = await fetch(`${API_V1_BASE}/patients/${patientIdFromUrl}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -666,8 +707,8 @@ const DermatologistPanelUnified = () => {
           };
 
           setSelectedPatient(patientObj);
-          setActiveTab('visit');
-          toast.info(`Загружен пациент: ${patientObj.patient_name}`);
+          setActiveTab('appointments');
+          toast.info(`Загружен пациент: ${patientObj.patient_name}. Выберите визит с каноническим visit_id.`);
         }
       } catch (error) {
         logger.error('[Dermatology] Не удалось загрузить пациента из URL:', error);
@@ -677,6 +718,51 @@ const DermatologistPanelUnified = () => {
 
     loadPatientFromUrl();
   }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const appointmentId = currentAppointment?.appointment_id || currentAppointment?.id;
+    if (!appointmentId) {
+      setEmr(null);
+      setPrescription(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadCanonicalStatus = async () => {
+      try {
+        const response = await fetch(`${API_V1_BASE}/appointments/${appointmentId}/status`, {
+          headers: {
+            Authorization: `Bearer ${tokenManager.getAccessToken()}`
+          }
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const statusData = await response.json();
+        if (!isMounted) {
+          return;
+        }
+
+        setEmr(statusData.emr || null);
+        setPrescription(statusData.prescription || null);
+
+        if (statusData.visit_id && statusData.visit_id !== currentAppointment?.visit_id) {
+          setCurrentAppointment((prev) => prev ? { ...prev, visit_id: statusData.visit_id } : prev);
+        }
+      } catch (error) {
+        logger.warn('[Dermatology] Не удалось загрузить canonical status:', error);
+      }
+    };
+
+    loadCanonicalStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentAppointment?.appointment_id, currentAppointment?.id, currentAppointment?.visit_id]);
 
 
 
@@ -705,7 +791,8 @@ const DermatologistPanelUnified = () => {
 
   const savePrescription = async (prescriptionData) => {
     try {
-      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/prescription`, {
+      const appointmentId = currentAppointment?.appointment_id || currentAppointment?.id;
+      const response = await fetch(`${API_V1_BASE}/appointments/${appointmentId}/prescription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -811,7 +898,7 @@ const DermatologistPanelUnified = () => {
   const handleSkinExaminationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:8000/api/v1/dermatology/skin-examinations', {
+      const response = await fetch(`${API_V1_BASE}/dermatology/skin-examinations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -846,7 +933,7 @@ const DermatologistPanelUnified = () => {
   const handleCosmeticProcedureSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:8000/api/v1/dermatology/cosmetic-procedures', {
+      const response = await fetch(`${API_V1_BASE}/dermatology/cosmetic-procedures`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1143,7 +1230,7 @@ const DermatologistPanelUnified = () => {
                     Электронная медицинская карта
                   </h4>
                   <EMRContainerV2
-                  visitId={currentAppointment?.id}
+                  visitId={currentAppointment?.visit_id}
                   patientId={currentAppointment?.patient_id}
                   specialty="dermatology" />
 
@@ -1382,7 +1469,7 @@ const DermatologistPanelUnified = () => {
                     Электронная медицинская карта
                   </h3>
                   <EMRContainerV2
-                visitId={currentAppointment?.id}
+                visitId={currentAppointment?.visit_id}
                 patientId={currentAppointment?.patient_id}
                 specialty="dermatology" />
 
@@ -1448,8 +1535,8 @@ const DermatologistPanelUnified = () => {
                 </h3>
                 {/* Загрузчик фото с HEIC поддержкой */}
                 <PhotoUploader
-                visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
-                patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
+                visitId={currentAppointment?.visit_id}
+                patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
                 onDataUpdate={() => {
                   logger.info('Фото обновлены');
                   loadPatientData();
@@ -1470,8 +1557,8 @@ const DermatologistPanelUnified = () => {
                 {/* AI анализ кожи */}
                 <SkinAnalysis
                 photos={photoData}
-                visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
-                patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
+                visitId={currentAppointment?.visit_id}
+                patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
                 onAnalysisComplete={(result) => {
                   logger.info('AI анализ завершен:', result);
                 }} />
@@ -1491,8 +1578,8 @@ const DermatologistPanelUnified = () => {
                 {/* Сравнение фото до и после */}
                 <PhotoComparison
                 photos={photoData}
-                visitId={currentAppointment?.id || selectedPatient?.visitId || 'demo-visit-1'}
-                patientId={currentAppointment?.patient_id || selectedPatient?.patient?.id || 'demo-patient-1'}
+                visitId={currentAppointment?.visit_id}
+                patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
                 onComparisonComplete={(result) => {
                   logger.info('Сравнение завершено:', result);
                 }} />
@@ -2010,7 +2097,7 @@ const DermatologistPanelUnified = () => {
 
                     {/* Шаблоны процедур */}
                     <ProcedureTemplates
-                    visitId={selectedPatient?.visitId || 'demo-visit-1'}
+                    visitId={selectedPatient?.visit_id}
                     onSelectProcedure={(procedure) => {
                       logger.info('Выбрана процедура:', procedure);
                       // Добавляем процедуру в список услуг
@@ -2302,7 +2389,7 @@ const DermatologistPanelUnified = () => {
         {/* PriceOverrideManager Modal */}
         {showPriceOverride && selectedServiceForPriceOverride &&
         <PriceOverrideManager
-          visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
+          visitId={selectedPatient?.visit_id}
           serviceId={selectedServiceForPriceOverride.id}
           serviceName={selectedServiceForPriceOverride.name}
           originalPrice={selectedServiceForPriceOverride.price}

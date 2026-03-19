@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import { getApiOrigin } from '../api/runtime';
 import { tokenManager } from '../utils/tokenManager';
 
 // Единый сервис работы с очередью и приемом пациента
@@ -9,7 +10,7 @@ function getAuthToken() {
 }
 
 async function apiRequest(path, options = {}) {
-  const base = options.absolute ? '' : 'http://localhost:8000';
+  const base = options.absolute ? '' : getApiOrigin();
   const token = getAuthToken();
 
   if (!token) {

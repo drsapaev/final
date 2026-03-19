@@ -34,7 +34,7 @@ def test_complete_system():
     for role in roles:
         try:
             auth_response = requests.post(
-                "http://localhost:8000/api/v1/auth/login",
+                "http://localhost:18000/api/v1/auth/login",
                 data={"username": role, "password": "admin123"},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=5
@@ -64,7 +64,7 @@ def test_complete_system():
         # Тест AI анализа
         try:
             ai_response = requests.post(
-                "http://localhost:8000/api/v1/emr/ai-enhanced/analyze",
+                "http://localhost:18000/api/v1/emr/ai-enhanced/analyze",
                 headers=headers,
                 json={"symptoms": "головная боль, температура"},
                 timeout=5
@@ -82,7 +82,7 @@ def test_complete_system():
         # Тест версионирования
         try:
             versions_response = requests.get(
-                "http://localhost:8000/api/v1/emr/versions/1",
+                "http://localhost:18000/api/v1/emr/versions/1",
                 headers=headers,
                 timeout=5
             )
@@ -106,7 +106,7 @@ def test_complete_system():
         # Тест PWA статуса
         try:
             pwa_response = requests.get(
-                "http://localhost:8000/api/v1/mobile/pwa/status",
+                "http://localhost:18000/api/v1/mobile/pwa/status",
                 headers=headers,
                 timeout=5
             )
@@ -123,7 +123,7 @@ def test_complete_system():
         # Тест офлайн данных
         try:
             offline_response = requests.get(
-                "http://localhost:8000/api/v1/mobile/offline/data",
+                "http://localhost:18000/api/v1/mobile/offline/data",
                 headers=headers,
                 timeout=5
             )
@@ -147,7 +147,7 @@ def test_complete_system():
         # Тест KPI метрик
         try:
             kpi_response = requests.get(
-                "http://localhost:8000/api/v1/analytics/kpi-metrics",
+                "http://localhost:18000/api/v1/analytics/kpi-metrics",
                 headers=headers,
                 timeout=5
             )
@@ -164,7 +164,7 @@ def test_complete_system():
         # Тест предиктивной аналитики
         try:
             predictive_response = requests.get(
-                "http://localhost:8000/api/v1/analytics/predictive",
+                "http://localhost:18000/api/v1/analytics/predictive",
                 headers=headers,
                 timeout=5
             )
@@ -188,7 +188,7 @@ def test_complete_system():
         # Тест SMS 2FA
         try:
             sms_response = requests.post(
-                "http://localhost:8000/api/v1/2fa/sms/send-code",
+                "http://localhost:18000/api/v1/2fa/sms/send-code",
                 headers=headers,
                 json={"phone": "+1234567890"},
                 timeout=5
@@ -206,7 +206,7 @@ def test_complete_system():
         # Тест Email 2FA
         try:
             email_response = requests.post(
-                "http://localhost:8000/api/v1/2fa/email/send-code",
+                "http://localhost:18000/api/v1/2fa/email/send-code",
                 headers=headers,
                 json={"email": "test@example.com"},
                 timeout=5
@@ -231,7 +231,7 @@ def test_complete_system():
         # Тест Telegram шаблонов
         try:
             telegram_response = requests.get(
-                "http://localhost:8000/api/v1/telegram/templates",
+                "http://localhost:18000/api/v1/telegram/templates",
                 headers=headers,
                 timeout=5
             )
@@ -255,7 +255,7 @@ def test_complete_system():
         # Тест Email/SMS статистики
         try:
             email_sms_response = requests.get(
-                "http://localhost:8000/api/v1/email-sms/statistics",
+                "http://localhost:18000/api/v1/email-sms/statistics",
                 headers=headers,
                 timeout=5
             )
@@ -279,7 +279,7 @@ def test_complete_system():
         # Тест файловой статистики
         try:
             files_response = requests.get(
-                "http://localhost:8000/api/v1/files/statistics",
+                "http://localhost:18000/api/v1/files/statistics",
                 headers=headers,
                 timeout=5
             )
@@ -296,7 +296,7 @@ def test_complete_system():
         # Тест загрузки файлов
         try:
             upload_response = requests.post(
-                "http://localhost:8000/api/v1/files/test-upload",
+                "http://localhost:18000/api/v1/files/test-upload",
                 headers=headers,
                 timeout=5
             )

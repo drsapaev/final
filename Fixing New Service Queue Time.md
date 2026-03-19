@@ -6448,7 +6448,7 @@ commitRoot @ react-dom.development.js:26682
 performSyncWorkOnRoot @ react-dom.development.js:26117
 flushSyncCallbacks @ react-dom.development.js:12042
 (анонимный) @ react-dom.development.js:25651
-RegistrarPanel.jsx:1051   GET http://localhost:8000/api/v1/registrar/queues/today?target_date=2025-12-17 net::ERR_CONNECTION_REFUSED
+RegistrarPanel.jsx:1051   GET http://localhost:18000/api/v1/registrar/queues/today?target_date=2025-12-17 net::ERR_CONNECTION_REFUSED
 dispatchXhrRequest @ xhr.js:198
 xhr @ xhr.js:15
 dispatchRequest @ dispatchRequest.js:51
@@ -11072,7 +11072,7 @@ http://localhost:5173/registrar-panel
 http://localhost:5173/src/main.jsx
 http://localhost:5173/src/App.jsx
 http://localhost:5173/src/pages/RegistrarPanel.jsx
-http://localhost:8000/api/v1/patients/360
+http://localhost:18000/api/v1/patients/360
 
 ### Planner Response
 
@@ -13562,13 +13562,13 @@ Updated docs: QR_EDITING_RULES.md, ONLINE_QUEUE_SYSTEM_V2.md, IMPLEMENTATION.md"
 
 Теперь протестирую API endpoint:
 
-*User accepted the command `curl -s http://localhost:8000/api/v1/services/queue-groups | python -c "import sys,json; d=json.load(sys.stdin); print('Groups:', list(d.get('groups',{}).keys())); print('Tab to Group:', d.get('tab_to_group',{})); print('Code count:', len(d.get('code_to_group',{})))"`*
+*User accepted the command `curl -s http://localhost:18000/api/v1/services/queue-groups | python -c "import sys,json; d=json.load(sys.stdin); print('Groups:', list(d.get('groups',{}).keys())); print('Tab to Group:', d.get('tab_to_group',{})); print('Code count:', len(d.get('code_to_group',{})))"`*
 
 ### Planner Response
 
 API возвращает пустые данные — нужно перезапустить сервер backend. Но сначала проверю, нужен ли перезапуск:
 
-*User accepted the command `curl -s http://localhost:8000/api/v1/services/queue-groups`*
+*User accepted the command `curl -s http://localhost:18000/api/v1/services/queue-groups`*
 
 *Checked command status*
 
@@ -13580,11 +13580,11 @@ API возвращает пустые данные — нужно перезап
 
 Нужно перезапустить backend. Проверю его логи и обновлю статус:
 
-*User accepted the command `curl -s --max-time 5 http://localhost:8000/api/v1/services/code-mappings | python -c "import sys,json; d=json.load(sys.stdin); print('API works! Keys:', list(d.keys())[:3])"`*
+*User accepted the command `curl -s --max-time 5 http://localhost:18000/api/v1/services/code-mappings | python -c "import sys,json; d=json.load(sys.stdin); print('API works! Keys:', list(d.keys())[:3])"`*
 
 *User accepted the command ` C:; cd 'C:\final/backend'; & 'c:\final\.venv\Scripts\python.exe' 'c:\Users\Kompyuter-shop\.antigravity\extensions\ms-python.debugpy-2025.14.1-win32-x64\bundled\libs\debugpy\launcher' '52749' '--' 'C:\final/backend/start_server.py' `*
 
-*User accepted the command `curl http://localhost:8000/api/v1/services/queue-groups`*
+*User accepted the command `curl http://localhost:18000/api/v1/services/queue-groups`*
 
 ### User Input
 
@@ -13628,7 +13628,7 @@ API возвращает пустые данные — нужно перезап
 
 *Edited relevant file*
 
-*User accepted the command `curl http://localhost:8000/api/v1/services/queue-groups`*
+*User accepted the command `curl http://localhost:18000/api/v1/services/queue-groups`*
 
 ### User Input
 
@@ -13826,7 +13826,7 @@ queue_time=current_time,  # ⭐ ТЕКУЩЕЕ ВРЕМЯ
 
 ```bash
 # В терминале проверяем запись (замените <patient_id>)
-curl -s "http://localhost:8000/api/v1/registrar/batch/patients/<patient_id>/entries/2024-12-18" | python -c "import sys,json; d=json.load(sys.stdin); [print(f'Entry {e[\"id\"]}: queue_time={e.get(\"queue_time\")}') for e in d.get('entries',[])]"
+curl -s "http://localhost:18000/api/v1/registrar/batch/patients/<patient_id>/entries/2024-12-18" | python -c "import sys,json; d=json.load(sys.stdin); [print(f'Entry {e[\"id\"]}: queue_time={e.get(\"queue_time\")}') for e in d.get('entries',[])]"
 ```
 
 Или в браузере DevTools → Console:

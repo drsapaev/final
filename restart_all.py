@@ -26,8 +26,8 @@ def main():
     
     # 2. Запускаем backend сервер
     print("\n⏳ Запускаем backend сервер...")
-    print("   📍 http://localhost:8000")
-    print("   📖 API Docs: http://localhost:8000/docs")
+    print("   📍 http://localhost:18000")
+    print("   📖 API Docs: http://localhost:18000/docs")
     backend_cmd = "cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
     print(f"\n💡 Команда: {backend_cmd}")
     print("\n📋 Откройте новый терминал и выполните:")

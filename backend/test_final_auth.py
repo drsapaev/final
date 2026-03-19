@@ -13,7 +13,7 @@ def test_final_auth():
     # Тест 1: Health endpoint
     print("1. Тестируем health endpoint...")
     try:
-        response = requests.get("http://localhost:8000/api/v1/health", timeout=5)
+        response = requests.get("http://localhost:18000/api/v1/health", timeout=5)
         print(f"   Статус: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
@@ -26,7 +26,7 @@ def test_final_auth():
     # Тест 2: Status endpoint
     print("\n2. Тестируем status endpoint...")
     try:
-        response = requests.get("http://localhost:8000/api/v1/status", timeout=5)
+        response = requests.get("http://localhost:18000/api/v1/status", timeout=5)
         print(f"   Статус: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
@@ -40,7 +40,7 @@ def test_final_auth():
     print("\n3. Тестируем auth login endpoint...")
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             timeout=10
         )
@@ -58,7 +58,7 @@ def test_final_auth():
     print("\n4. Тестируем authentication login endpoint...")
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/authentication/login",
+            "http://localhost:18000/api/v1/authentication/login",
             json={"username": "admin", "password": "admin123"},
             timeout=10
         )

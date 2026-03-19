@@ -47,9 +47,6 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-# Log settings loaded confirmation (non-blocking)
-logger.debug(f"deps.py: settings loaded, SECRET_KEY starts with: {settings.SECRET_KEY[:5]}")
-
 # Correct tokenUrl to point to our /auth/login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/minimal-login")
 
@@ -80,44 +77,29 @@ def _username_from_token(token: str) -> str | None:
     Tries 'username' field first, then falls back to 'sub' if it's a string.
     """
     try:
-        logger.debug(f"_username_from_token: SECRET_KEY starts with: {settings.SECRET_KEY[:10]}...")
-        logger.debug(f"_username_from_token: token starts with: {token[:50]}...")
-
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=[getattr(settings, "ALGORITHM", "HS256")],
         )
 
-        logger.debug(f"_username_from_token: decoded payload={payload}")
-
         # Сначала пробуем поле 'username'
         username = payload.get("username")
         if isinstance(username, str):
-            logger.debug(f"_username_from_token: found username={username}")
             return username
 
         # Fallback на 'sub' - может быть username или ID
         sub = payload.get("sub")
-        logger.debug(f"_username_from_token: sub={sub}, type={type(sub)}")
         if isinstance(sub, str):
             # Если sub содержит @, то это username
             if '@' in sub:
-                logger.debug(
-                    "_username_from_token: sub contains @, returning as username"
-                )
                 return sub
             # Если sub содержит только цифры, то это ID как строка - возвращаем для поиска по ID
             elif sub.isdigit():
-                logger.debug(
-                    "_username_from_token: sub is digit string, returning for ID search"
-                )
                 return sub
             else:
-                logger.debug("_username_from_token: returning sub as username")
                 return sub
 
-        logger.debug("_username_from_token: no valid username found")
         return None
     except JWTError as e:
         logger.warning("_username_from_token: JWT decode error: %s", e)
@@ -216,11 +198,8 @@ async def get_current_user(
     Works with either async or sync DB sessions returned by get_db().
     Raises 401 on invalid token or missing user.
     """
-    logger.debug(f"get_current_user: START with token={token[:30]}...")
-
     # Пытаемся декодировать токен и поддержать оба варианта: username или числовой sub (user_id)
     username = _username_from_token(token)
-    logger.debug(f"get_current_user: username from token={username}")
     user: User | None = None
 
     try:

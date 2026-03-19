@@ -1811,6 +1811,7 @@ def get_all_appointments(
             .all()
         )
         for apt in appointments:
+            related_visit = None
             # Получаем имя пациента
             patient_fio = None
             if apt.patient_id:
@@ -1911,6 +1912,8 @@ def get_all_appointments(
             result.append(
                 {
                     'id': apt.id,
+                    'appointment_id': apt.id,
+                    'visit_id': related_visit.id if related_visit else None,
                     'patient_id': apt.patient_id,
                     'patient_fio': patient_fio,
                     'doctor_id': apt.doctor_id,
@@ -2139,6 +2142,8 @@ def get_all_appointments(
             result.append(
                 {
                     'id': visit.id + 20000,  # Смещение для избежания конфликтов
+                    'appointment_id': None,
+                    'visit_id': visit.id,
                     'patient_id': visit.patient_id,
                     'patient_fio': patient_fio,
                     'doctor_id': visit.doctor_id,

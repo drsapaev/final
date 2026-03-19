@@ -21,7 +21,7 @@ def test_new_login():
         print(f"Sending login request to /authentication/login with data: {data}")
         
         response = requests.post(
-            "http://localhost:8000/api/v1/authentication/login",
+            "http://localhost:18000/api/v1/authentication/login",
             json=data,
             headers=headers
         )

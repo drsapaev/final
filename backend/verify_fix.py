@@ -5,7 +5,7 @@ import requests
 import json
 import sys
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:18000"
 
 def check_backend_restart():
     print("🔍 Checking if backend was restarted...")

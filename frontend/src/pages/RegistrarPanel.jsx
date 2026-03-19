@@ -14,8 +14,9 @@ import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { getApiOrigin } from '../api/runtime';
 
-const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = getApiOrigin();
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';

@@ -1,16 +1,11 @@
 /**
  * EMR v2 Components
  * 
- * Phase 1: Foundation (reducer, useEMR, basic container)
+ * Phase 1: Foundation (reducer, useEMR)
  * Phase 2: Reliability (autosave, navigation guard, status indicator)
  * Phase 3: Control (history, diff viewer, conflict dialog)
  * Phase 4: UI Migration (modular sections, EMRContainerV2)
  */
-
-// ============================================
-// PHASE 1 - Foundation
-// ============================================
-export { EMRContainer } from './EMRContainer';
 
 // ============================================
 // PHASE 2 - Reliability
@@ -51,7 +46,6 @@ export { useEMR } from '../../hooks/useEMR';
 export { useEMRAutosave } from '../../hooks/useEMRAutosave';
 export { useNavigationGuard, useBeforeUnload } from '../../hooks/useNavigationGuard';
 export { useEMRKeyboard } from '../../hooks/useEMRKeyboard';
-export { useEMRVersion } from '../../hooks/useEMRVersion';
 export { useDoctorHistory } from '../../hooks/useDoctorHistory';
 export { useEMRTelemetry } from '../../hooks/useEMRTelemetry';
 

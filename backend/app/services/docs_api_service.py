@@ -237,7 +237,7 @@ async def get_api_schema():
             "contact": {"name": "Clinic Management Team", "email": "admin@clinic.com"},
         },
         "servers": [
-            {"url": "http://localhost:8000", "description": "Development server"}
+            {"url": "http://localhost:18000", "description": "Development server"}
         ],
         "paths": {
             "/api/v1/auth/login": {

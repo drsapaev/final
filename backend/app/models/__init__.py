@@ -55,7 +55,7 @@ from .doctor_templates import (
 )
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
-from .emr_v2 import SYSTEM_USER_ID, EMRAuditLog, EMRRecord, EMRRevision
+from .emr_v2 import SYSTEM_USER_ID, EMRAuditLog, EMRMigrationLedger, EMRRecord, EMRRevision
 from .emr_version import EMRVersion
 from .family_relation import FamilyRelation, RelationType
 from .file_system import (
@@ -178,6 +178,7 @@ __all__ = [
     "EMRRecord",
     "EMRRevision",
     "EMRAuditLog",
+    "EMRMigrationLedger",
     "SYSTEM_USER_ID",
     "TwoFactorAuth",
     "TwoFactorBackupCode",

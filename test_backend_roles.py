@@ -13,7 +13,7 @@ conn.close()
 # 2. Пытаемся аутентифицироваться как cardio
 print("\n=== Тест аутентификации cardio ===")
 login_response = requests.post(
-    'http://localhost:8000/api/v1/auth/minimal-login',
+    'http://localhost:18000/api/v1/auth/minimal-login',
     json={'username': 'cardio@example.com', 'password': 'cardio123'}
 )
 print(f'Login status: {login_response.status_code}')
@@ -27,7 +27,7 @@ if login_response.status_code == 200:
     # 3. Пытаемся получить доступ к эндпоинту
     print("\n=== Тест доступа к /api/v1/registrar/queues/today ===")
     queues_response = requests.get(
-        'http://localhost:8000/api/v1/registrar/queues/today',
+        'http://localhost:18000/api/v1/registrar/queues/today',
         headers={'Authorization': f'Bearer {token}'}
     )
     print(f'Queues status: {queues_response.status_code}')

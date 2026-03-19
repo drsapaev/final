@@ -3,9 +3,8 @@
  * Provides get, post, put, delete methods with automatic auth
  */
 import logger from '../utils/logger';
+import { buildApiUrl } from '../api/runtime';
 import { tokenManager } from '../utils/tokenManager';
-
-const BASE_URL = 'http://localhost:8000/api/v1';
 
 function getAuthToken() {
   // Использует централизованный tokenManager для единообразия
@@ -22,7 +21,7 @@ async function request(method, path, options = {}) {
   };
 
   // Build URL with params
-  let url = `${BASE_URL}${path}`;
+  let url = buildApiUrl(path);
   if (options.params) {
     const searchParams = new URLSearchParams();
     Object.entries(options.params).forEach(([key, value]) => {

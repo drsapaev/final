@@ -9,10 +9,11 @@
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
 import axios from 'axios';
+import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP === '1';
 
 const api = axios.create({
@@ -66,7 +67,7 @@ async function refreshTokenIfNeeded() {
   refreshPromise = (async () => {
     try {
       logger.log('🔄 Token expiring soon, refreshing...');
-      const response = await axios.post(`${API_BASE}/auth/refresh`, {
+      const response = await axios.post(buildApiUrl('/auth/refresh'), {
         refresh_token: refreshToken
       });
 
@@ -292,7 +293,11 @@ if (existingToken) {
 export {
   api,
   apiClient,
+  getApiOrigin,
   getApiBase,
+  getApiBaseUrl,
+  buildApiUrl,
+  buildWsUrl,
   apiRequest,
   setToken,
   setAuthToken,

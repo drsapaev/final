@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 class APIIntegrationTester:
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:18000"):
         self.base_url = base_url
         self.session = None
         self.auth_token = None

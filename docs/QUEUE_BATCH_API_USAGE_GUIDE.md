@@ -182,7 +182,7 @@ import requests
 
 def add_services_to_queue(patient_id: int, source: str, services: list):
     """Добавить услуги пациенту в очереди"""
-    url = "http://localhost:8000/api/v1/registrar-integration/queue/entries/batch"
+    url = "http://localhost:18000/api/v1/registrar-integration/queue/entries/batch"
 
     payload = {
         "patient_id": patient_id,
@@ -503,7 +503,7 @@ def create_queue_entries_batch(
 #### 1. Базовый запрос
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/registrar-integration/queue/entries/batch" \
+curl -X POST "http://localhost:18000/api/v1/registrar-integration/queue/entries/batch" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -522,7 +522,7 @@ curl -X POST "http://localhost:8000/api/v1/registrar-integration/queue/entries/b
 #### 2. Несколько услуг
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/registrar-integration/queue/entries/batch" \
+curl -X POST "http://localhost:18000/api/v1/registrar-integration/queue/entries/batch" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -543,7 +543,7 @@ curl -X POST "http://localhost:8000/api/v1/registrar-integration/queue/entries/b
 ```python
 import requests
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:18000"
 ACCESS_TOKEN = "your_access_token_here"
 
 def test_batch_queue_creation():

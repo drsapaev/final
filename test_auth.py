@@ -20,7 +20,7 @@ def test_auth():
     print("\n🔍 Тест 2: Проверяем /auth/me...")
     headers = {'Authorization': f'Bearer {token}'}
     try:
-        response = requests.get('http://localhost:8000/api/v1/auth/me', headers=headers)
+        response = requests.get('http://localhost:18000/api/v1/auth/me', headers=headers)
         print(f"Статус: {response.status_code}")
         if response.status_code == 200:
             user_data = response.json()
@@ -37,7 +37,7 @@ def test_auth():
     # Тест 3: Проверяем /admin/wizard-settings
     print("\n🔍 Тест 3: Проверяем /admin/wizard-settings...")
     try:
-        response = requests.get('http://localhost:8000/api/v1/admin/wizard-settings', headers=headers)
+        response = requests.get('http://localhost:18000/api/v1/admin/wizard-settings', headers=headers)
         print(f"Статус: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
@@ -52,7 +52,7 @@ def test_auth():
     # Тест 4: Проверяем /users/users
     print("\n🔍 Тест 4: Проверяем /users/users...")
     try:
-        response = requests.get('http://localhost:8000/api/v1/users/users', headers=headers)
+        response = requests.get('http://localhost:18000/api/v1/users/users', headers=headers)
         print(f"Статус: {response.status_code}")
         if response.status_code == 200:
             data = response.json()

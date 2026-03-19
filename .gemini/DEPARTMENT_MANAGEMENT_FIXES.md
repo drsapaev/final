@@ -12,7 +12,7 @@
 
 ### 3. **Missing API_BASE Constant**
 - **Problem**: `API_BASE` variable was used but not defined
-- **Solution**: Added `const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';`
+- **Solution**: Added `const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:18000';`
 
 ### 4. **Duplicate Handler Functions**
 - **Problem**: Multiple duplicate handler functions existed:
@@ -55,7 +55,7 @@ import {
 
 ### Constants
 ```javascript
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:18000';
 ```
 
 ### Functions Kept

@@ -22,7 +22,9 @@ class TestFileSystemApiService:
             file_type=None,
             patient_id=None,
             appointment_id=None,
+            visit_id=None,
             emr_id=None,
+            emr_record_id=None,
             folder_id=None,
         )
 

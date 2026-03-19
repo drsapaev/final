@@ -7,7 +7,7 @@ import json
 
 def test_api_login():
     """Тестировать API логина"""
-    url = "http://localhost:8000/api/v1/auth/login"
+    url = "http://localhost:18000/api/v1/auth/login"
     
     # Тест с JSON
     print("🔐 Тестирование API логина с JSON...")
@@ -35,7 +35,7 @@ def test_api_login():
 
 def test_api_login_form():
     """Тестировать API логина с form data"""
-    url = "http://localhost:8000/api/v1/auth/login"
+    url = "http://localhost:18000/api/v1/auth/login"
     
     # Тест с form data
     print("\n🔐 Тестирование API логина с form data...")

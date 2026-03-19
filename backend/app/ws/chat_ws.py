@@ -142,7 +142,7 @@ async def chat_websocket_handler(
     """
     WebSocket endpoint для чата.
 
-    Подключение: ws://localhost:8000/ws/chat?token=<JWT_TOKEN>
+    Подключение: ws://localhost:18000/ws/chat?token=<JWT_TOKEN>
     """
 
     logger.info("Chat WebSocket connection attempt. Token provided: %s", bool(token))

@@ -7,7 +7,7 @@ import json
 from datetime import date
 
 # Конфигурация
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:18000"
 REGISTRAR_USERNAME = "registrar@example.com"
 REGISTRAR_PASSWORD = "registrar123"
 

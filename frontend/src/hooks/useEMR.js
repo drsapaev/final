@@ -12,6 +12,7 @@ import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { emrReducer, initialState, emrActions } from '../reducers/emrReducer';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
+import { buildInitialEMRData, normalizeEMRData } from '../utils/emrSpecialty';
 
 // Generate client session ID for smart conflict resolution
 const generateSessionId = () => {
@@ -24,9 +25,10 @@ const generateSessionId = () => {
  * @param {number} visitId - Visit ID to load EMR for
  * @param {Object} options - Configuration options
  * @param {boolean} options.autoLoad - Auto-load on mount (default: true)
+ * @param {string} options.specialty - Canonical specialty for this EMR flow
  * @returns {Object} EMR state and actions
  */
-export function useEMR(visitId, { autoLoad = true } = {}) {
+export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {}) {
     const [state, dispatch] = useReducer(emrReducer, initialState);
     const clientSessionId = useRef(generateSessionId());
     const abortControllerRef = useRef(null);
@@ -47,24 +49,33 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             const response = await apiClient.get(`/v2/emr/${visitId}`, {
                 signal: abortControllerRef.current.signal,
             });
-            dispatch(emrActions.load(response.data));
-            return response.data;
+            const normalizedEmr = {
+                ...response.data,
+                data: normalizeEMRData(response.data?.data, specialty),
+            };
+            dispatch(emrActions.load(normalizedEmr));
+            return normalizedEmr;
         } catch (error) {
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
                 return; // Aborted, ignore
             }
 
             if (error.response?.status === 404) {
-                // No EMR exists yet - start with empty
-                dispatch(emrActions.load(null));
-                return null;
+                const emptyEmr = {
+                    data: buildInitialEMRData(specialty),
+                    version: 1,
+                    row_version: 0,
+                    status: 'draft',
+                };
+                dispatch(emrActions.load(emptyEmr));
+                return emptyEmr;
             }
 
             logger.error('Failed to load EMR:', error);
             dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
             throw error;
         }
-    }, [visitId]);
+    }, [specialty, visitId]);
 
     // =========================================================================
     // SAVE EMR
@@ -76,7 +87,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
 
         try {
             const payload = {
-                data: state.data,
+                data: normalizeEMRData(state.data, specialty),
                 row_version: force ? 0 : state.rowVersion, // 0 = skip lock check
                 client_session_id: clientSessionId.current,
                 is_draft: isDraft,
@@ -103,7 +114,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveError(error.message || 'Ошибка сохранения'));
             throw error;
         }
-    }, [visitId, state.data, state.rowVersion]);
+    }, [specialty, visitId, state.data, state.rowVersion]);
 
     // =========================================================================
     // SIGN EMR
@@ -113,7 +124,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
 
         try {
             const payload = {
-                data: state.data,
+                data: normalizeEMRData(state.data, specialty),
                 row_version: state.rowVersion,
                 client_session_id: clientSessionId.current,
             };
@@ -131,7 +142,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveError(error.message || 'Ошибка подписания'));
             throw error;
         }
-    }, [visitId, state.data, state.rowVersion]);
+    }, [specialty, visitId, state.data, state.rowVersion]);
 
     // =========================================================================
     // AMEND EMR
@@ -147,7 +158,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
 
         try {
             const payload = {
-                data: state.data,
+                data: normalizeEMRData(state.data, specialty),
                 reason: reason.trim(),
                 row_version: state.rowVersion,
             };
@@ -159,7 +170,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveError(error.message || 'Ошибка внесения поправки'));
             throw error;
         }
-    }, [visitId, state.data, state.rowVersion]);
+    }, [specialty, visitId, state.data, state.rowVersion]);
 
     // =========================================================================
     // CONFLICT RESOLUTION

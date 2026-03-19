@@ -34,11 +34,12 @@ import {
 '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
+import { getApiOrigin } from '../../api/runtime';
 import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = getApiOrigin();
 
 const DEFAULT_STATS = {
   appointments_today: 0,

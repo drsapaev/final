@@ -4,9 +4,10 @@
 
 import { useState } from 'react';
 
+import { getApiBaseUrl } from '../api/runtime';
 import logger from '../utils/logger';
 import { tokenManager } from '../utils/tokenManager';
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 
 /**
  * Получить токен авторизации (через централизованный tokenManager)

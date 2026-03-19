@@ -7,7 +7,7 @@ import json
 import os
 from datetime import datetime, date
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def test_backend_comprehensive():
     """Комплексный тест backend"""

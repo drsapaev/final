@@ -662,7 +662,7 @@ If you are enabling the AI-free Doctor Autocomplete feature:
 2. **Key Steps**:
    - Run migrations: `alembic upgrade head`
    - Run batch indexing: `python migrate_phrases.py`
-   - Verify readiness: `curl http://localhost:8000/api/v1/emr/readiness/{doctor_id}`
+   - Verify readiness: `curl http://localhost:18000/api/v1/emr/readiness/{doctor_id}`
 
 See the [Feature README](./DOCTOR_AUTOCOMPLETE_README.md) for more details.
 

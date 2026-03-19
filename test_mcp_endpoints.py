@@ -8,7 +8,7 @@ def test_mcp_endpoints():
     """Тестируем MCP endpoints"""
     print("🔍 Тестирование MCP endpoints...")
     
-    base_url = "http://localhost:8000/api/v1"
+    base_url = "http://localhost:18000/api/v1"
     
     # Сначала получаем токен
     print("🔐 Получение токена авторизации...")

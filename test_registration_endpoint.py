@@ -35,7 +35,7 @@ try:
     print("📤 Отправляем запрос на создание записи...")
 
     response = requests.post(
-        'http://localhost:8000/api/v1/registrar/cart',
+        'http://localhost:18000/api/v1/registrar/cart',
         headers={
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
@@ -57,7 +57,7 @@ try:
         # Проверим, появилась ли запись в API
         print("\n🔍 Проверяем API после создания...")
         api_response = requests.get(
-            'http://localhost:8000/api/v1/registrar/queues/today',
+            'http://localhost:18000/api/v1/registrar/queues/today',
             headers={'Authorization': f'Bearer {token}'},
             timeout=5
         )

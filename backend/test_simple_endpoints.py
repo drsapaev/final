@@ -22,9 +22,9 @@ def test_simple_endpoints():
         print(f"\n{name} ({method} {endpoint}):")
         try:
             if method == "GET":
-                response = requests.get(f"http://localhost:8000{endpoint}", timeout=5)
+                response = requests.get(f"http://localhost:18000{endpoint}", timeout=5)
             else:
-                response = requests.post(f"http://localhost:8000{endpoint}", timeout=5)
+                response = requests.post(f"http://localhost:18000{endpoint}", timeout=5)
             
             print(f"   Статус: {response.status_code}")
             if response.status_code == 200:

@@ -7,7 +7,7 @@ import json
 import os
 from datetime import datetime
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def check_system_health():
     """Проверка общего состояния системы"""

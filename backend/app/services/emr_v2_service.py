@@ -14,10 +14,16 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import desc
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.emr_v2 import EMRAuditLog, EMRRecord, EMRRevision
 from app.models.visit import Visit
+from app.services.emr_contract import (
+    extract_diagnosis_main,
+    extract_icd10_code,
+    normalize_emr_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,14 +154,27 @@ class EMRV2Service:
         Raises:
             ConcurrencyError: If row_version mismatch and different user
         """
+        normalized_data = self._normalize_data(data)
         existing = self.get_by_visit(db, visit_id)
 
         if existing:
             return self._update_emr(
-                db, existing, data, user_id, row_version, client_session_id, is_draft
+                db,
+                existing,
+                normalized_data,
+                user_id,
+                row_version,
+                client_session_id,
+                is_draft,
             )
-        else:
-            return self._create_emr(db, visit_id, data, user_id, client_session_id)
+
+        return self._create_emr(
+            db,
+            visit_id,
+            normalized_data,
+            user_id,
+            client_session_id,
+        )
 
     def _create_emr(
         self,
@@ -166,20 +185,22 @@ class EMRV2Service:
         client_session_id: str | None = None,
     ) -> EMRRecord:
         """Create new EMR"""
+        normalized_data = self._normalize_data(data)
+
         # Get patient_id from visit
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise ValueError(f"Visit {visit_id} not found")
 
         # Extract materialized fields
-        diagnosis_main, icd10_code = self._extract_materialized_fields(data)
+        diagnosis_main, icd10_code = self._extract_materialized_fields(normalized_data)
 
         # Create EMR
         emr = EMRRecord(
             patient_id=visit.patient_id,
             visit_id=visit_id,
             version=1,
-            data=data,
+            data=normalized_data,
             diagnosis_main=diagnosis_main,
             icd10_code=icd10_code,
             status="draft",
@@ -189,17 +210,30 @@ class EMRV2Service:
             last_client_session_id=client_session_id,
         )
         db.add(emr)
-        db.flush()  # Get ID
+        try:
+            db.flush()  # Get ID
+        except IntegrityError:
+            db.rollback()
+            existing = self.get_by_visit(db, visit_id)
+            if existing:
+                logger.warning(
+                    "Concurrent create detected for visit %s; reusing EMR %s",
+                    visit_id,
+                    existing.id,
+                )
+                return existing
+            raise
 
         # Create initial revision
         revision = EMRRevision(
             emr_id=emr.id,
             version=1,
-            data=data,
+            data=normalized_data,
             change_type="created",
             change_summary="Initial creation",
             created_by=user_id,
             created_at=datetime.utcnow(),
+            client_session_id=client_session_id,
         )
         db.add(revision)
 
@@ -229,8 +263,18 @@ class EMRV2Service:
         row_version: int,
         client_session_id: str | None = None,
         is_draft: bool = True,
+        change_type: str = "updated",
+        change_summary_override: str | None = None,
+        new_status: str | None = None,
+        audit_action: str = "update",
+        signed_by: int | None = None,
+        signed_at: datetime | None = None,
     ) -> EMRRecord:
         """Update existing EMR with optimistic locking"""
+        normalized_data = self._normalize_data(
+            data,
+            fallback_specialty=(emr.data or {}).get("specialty"),
+        )
         # ✅ CRITICAL: Signed EMRs cannot be modified via save - must use amend
         if emr.status == "signed":
             raise EMRSignedError(
@@ -260,26 +304,30 @@ class EMRV2Service:
                 )
 
         # Generate change summary
-        change_summary = self._generate_change_summary(emr.data, data)
+        change_summary = change_summary_override or self._generate_change_summary(
+            emr.data,
+            normalized_data,
+        )
 
         # Create revision snapshot before update
         new_version = emr.version + 1
         revision = EMRRevision(
             emr_id=emr.id,
             version=new_version,
-            data=data,
-            change_type="updated",
+            data=normalized_data,
+            change_type=change_type,
             change_summary=change_summary,
             created_by=user_id,
             created_at=datetime.utcnow(),
+            client_session_id=client_session_id,
         )
         db.add(revision)
 
         # Extract materialized fields
-        diagnosis_main, icd10_code = self._extract_materialized_fields(data)
+        diagnosis_main, icd10_code = self._extract_materialized_fields(normalized_data)
 
         # Update EMR
-        emr.data = data
+        emr.data = normalized_data
         emr.version = new_version
         emr.row_version = emr.row_version + 1
         emr.diagnosis_main = diagnosis_main
@@ -288,8 +336,14 @@ class EMRV2Service:
         emr.updated_by = user_id
         emr.last_client_session_id = client_session_id
 
-        if not is_draft and emr.status == "draft":
+        if new_status:
+            emr.status = new_status
+        elif not is_draft and emr.status == "draft":
             emr.status = "in_progress"
+        if signed_by is not None:
+            emr.signed_by = signed_by
+        if signed_at is not None:
+            emr.signed_at = signed_at
 
         # Audit log
         self._log_action(
@@ -297,7 +351,7 @@ class EMRV2Service:
             emr_id=emr.id,
             patient_id=emr.patient_id,
             visit_id=emr.visit_id,
-            action="update",
+            action=audit_action,
             user_id=user_id,
             extra_data={
                 "version": new_version,
@@ -328,45 +382,27 @@ class EMRV2Service:
         if emr.status == "signed":
             raise EMRSignedError("EMR is already signed")
 
-        # Save with update first
+        signed_at = datetime.utcnow()
+
         emr = self._update_emr(
-            db, emr, data, user_id, row_version, client_session_id, is_draft=False
-        )
-
-        # Update status to signed
-        emr.status = "signed"
-        emr.signed_at = datetime.utcnow()
-        emr.signed_by = user_id
-
-        # Create signed revision
-        revision = EMRRevision(
-            emr_id=emr.id,
-            version=emr.version,
-            data=data,
-            change_type="signed",
-            change_summary="EMR signed and finalized",
-            created_by=user_id,
-            created_at=datetime.utcnow(),
-        )
-        db.add(revision)
-
-        # Audit log
-        self._log_action(
             db,
-            emr_id=emr.id,
-            patient_id=emr.patient_id,
-            visit_id=emr.visit_id,
-            action="sign",
-            user_id=user_id,
-            extra_data={"version": emr.version, "signed_at": emr.signed_at.isoformat()},
+            emr,
+            data,
+            user_id,
+            row_version,
+            client_session_id,
+            is_draft=False,
+            change_type="signed",
+            change_summary_override="EMR signed and finalized",
+            new_status="signed",
+            audit_action="sign",
+            signed_by=user_id,
+            signed_at=signed_at,
         )
-
-        db.commit()
-        db.refresh(emr)
 
         # 📜 Learn treatment pattern for personalized clinical memory
         # Only if there's both ICD-10 code and treatment
-        self._learn_treatment_pattern(db, user_id, data)
+        self._learn_treatment_pattern(db, user_id, emr.data)
 
         logger.info(f"Signed EMR {emr.id}")
         return emr
@@ -406,7 +442,7 @@ class EMRV2Service:
 
             # Проверяем существующий шаблон
             existing = db.query(DoctorTreatmentTemplate).filter(
-                DoctorTreatmentTemplate.doctor_id == str(doctor_id),
+                DoctorTreatmentTemplate.doctor_id == doctor_id,
                 DoctorTreatmentTemplate.treatment_hash == treatment_hash,
             ).first()
 
@@ -421,7 +457,7 @@ class EMRV2Service:
                 import uuid
                 template = DoctorTreatmentTemplate(
                     id=str(uuid.uuid4()),
-                    doctor_id=str(doctor_id),
+                    doctor_id=doctor_id,
                     icd10_code=icd10_code,
                     treatment_text=normalized,
                     treatment_hash=treatment_hash,
@@ -454,6 +490,10 @@ class EMRV2Service:
         emr = self.get_by_visit(db, visit_id)
         if not emr:
             raise EMRNotFoundException(f"EMR for visit {visit_id} not found")
+        normalized_data = self._normalize_data(
+            data,
+            fallback_specialty=(emr.data or {}).get("specialty"),
+        )
 
         if emr.status != "signed":
             raise ValueError("Can only amend signed EMRs")
@@ -472,7 +512,7 @@ class EMRV2Service:
             )
 
         # Generate change summary
-        change_summary = self._generate_change_summary(emr.data, data)
+        change_summary = self._generate_change_summary(emr.data, normalized_data)
 
         # Create amendment revision
         # Note: reason is stored in change_summary for DB compatibility
@@ -480,7 +520,7 @@ class EMRV2Service:
         revision = EMRRevision(
             emr_id=emr.id,
             version=new_version,
-            data=data,
+            data=normalized_data,
             change_type="amended",
             change_summary=f"{change_summary} | Reason: {reason}",
             created_by=user_id,
@@ -489,10 +529,10 @@ class EMRV2Service:
         db.add(revision)
 
         # Extract materialized fields
-        diagnosis_main, icd10_code = self._extract_materialized_fields(data)
+        diagnosis_main, icd10_code = self._extract_materialized_fields(normalized_data)
 
         # Update EMR
-        emr.data = data
+        emr.data = normalized_data
         emr.version = new_version
         emr.row_version = emr.row_version + 1
         emr.diagnosis_main = diagnosis_main
@@ -539,6 +579,10 @@ class EMRV2Service:
         target_revision = self.get_revision(db, emr.id, target_version)
         if not target_revision:
             raise ValueError(f"Version {target_version} not found")
+        normalized_target_data = self._normalize_data(
+            target_revision.data,
+            fallback_specialty=(emr.data or {}).get("specialty"),
+        )
 
         # Create restore revision
         new_version = emr.version + 1
@@ -547,7 +591,7 @@ class EMRV2Service:
         revision = EMRRevision(
             emr_id=emr.id,
             version=new_version,
-            data=target_revision.data,
+            data=normalized_target_data,
             change_type="restored",
             change_summary=f"Restored from version {target_version} | Reason: {restore_reason}",
             created_by=user_id,
@@ -557,11 +601,11 @@ class EMRV2Service:
 
         # Extract materialized fields
         diagnosis_main, icd10_code = self._extract_materialized_fields(
-            target_revision.data
+            normalized_target_data
         )
 
         # Update EMR
-        emr.data = target_revision.data
+        emr.data = normalized_target_data
         emr.version = new_version
         emr.row_version = emr.row_version + 1
         emr.diagnosis_main = diagnosis_main
@@ -626,18 +670,19 @@ class EMRV2Service:
         self, data: dict[str, Any]
     ) -> tuple[str | None, str | None]:
         """Extract searchable fields from JSONB data"""
-        diagnosis_main = None
-        icd10_code = None
+        normalized_data = self._normalize_data(data)
+        return (
+            extract_diagnosis_main(normalized_data),
+            extract_icd10_code(normalized_data),
+        )
 
-        if isinstance(data, dict):
-            diagnosis = data.get("diagnosis", {})
-            if isinstance(diagnosis, dict):
-                diagnosis_main = diagnosis.get("main")
-                icd10_code = diagnosis.get("icd10_code")
-            elif isinstance(diagnosis, str):
-                diagnosis_main = diagnosis[:500] if diagnosis else None
-
-        return diagnosis_main, icd10_code
+    def _normalize_data(
+        self,
+        data: dict[str, Any],
+        *,
+        fallback_specialty: str | None = None,
+    ) -> dict[str, Any]:
+        return normalize_emr_data(data, fallback_specialty=fallback_specialty)
 
     def _generate_change_summary(
         self, old_data: dict[str, Any], new_data: dict[str, Any]
@@ -774,6 +819,11 @@ class EMRV2Service:
             extra_data={"version": emr.version},
         )
         db.commit()
+
+    def log_view(self, *args, **kwargs) -> None:
+        """Backward-compatible alias for read/view audit logging."""
+        kwargs.setdefault("action", "view")
+        self.log_read(*args, **kwargs)
 
 
 # Singleton instance
