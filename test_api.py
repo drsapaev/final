@@ -6,7 +6,7 @@ token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLC
 
 try:
     response = requests.get(
-        'http://localhost:8000/api/v1/registrar/queues/today',
+        'http://localhost:18000/api/v1/registrar/queues/today',
         headers={'Authorization': f'Bearer {token}'}
     )
 

@@ -5,7 +5,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def test_mcp_health():
     """Тест здоровья MCP через API"""
@@ -108,12 +108,12 @@ def test_api_docs():
     print("\n🔍 Тестирование API документации...")
     
     try:
-        response = requests.get("http://localhost:8000/docs", timeout=10)
+        response = requests.get("http://localhost:18000/docs", timeout=10)
         print(f"Status Code: {response.status_code}")
         
         if response.status_code == 200:
             print("✅ API документация доступна")
-            print("📖 Откройте http://localhost:8000/docs в браузере")
+            print("📖 Откройте http://localhost:18000/docs в браузере")
             return True
         else:
             print(f"❌ Error: {response.text}")
@@ -177,7 +177,7 @@ def main():
         print("  POST /api/v1/mcp/icd10/suggest - Подсказки МКБ-10")
         print("  POST /api/v1/mcp/lab/interpret - Интерпретация анализов")
         print("  POST /api/v1/mcp/imaging/analyze - Анализ изображений")
-        print("\n🌐 API документация: http://localhost:8000/docs")
+        print("\n🌐 API документация: http://localhost:18000/docs")
     else:
         print(f"⚠️ {total_count - success_count} тестов завершились с ошибками")
     

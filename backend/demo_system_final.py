@@ -6,7 +6,7 @@ import requests
 import json
 from datetime import datetime
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def demo_system():
     print("🎉 ДЕМОНСТРАЦИЯ ПОЛНОСТЬЮ ГОТОВОЙ СИСТЕМЫ УПРАВЛЕНИЯ КЛИНИКОЙ")

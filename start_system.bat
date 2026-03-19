@@ -28,8 +28,8 @@ echo ========================================
 echo    СИСТЕМА ЗАПУЩЕНА!
 echo ========================================
 echo Frontend: http://localhost:5173
-echo Backend:  http://localhost:8000
-echo API Docs: http://localhost:8000/docs
+echo Backend:  http://localhost:18000
+echo API Docs: http://localhost:18000/docs
 echo.
 echo Логин: admin
 echo Пароль: admin123

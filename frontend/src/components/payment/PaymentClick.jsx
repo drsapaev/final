@@ -12,11 +12,12 @@ import {
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
+import { getApiBaseUrl } from '../../api/runtime';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import './PaymentClick.css';
 
-const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 
 const PaymentClick = ({
   isOpen,

@@ -66,6 +66,30 @@ class IntegrityCheckResult(BaseModel):
     error: Optional[str] = None
 
 
+class EMRCutoverBackfillResult(BaseModel):
+    """Результат backfill миграции legacy EMR в canonical v2."""
+
+    success: bool
+    dry_run: bool
+    processed: int
+    migrated: int
+    skipped: int
+    failed: int
+    rebound_prescriptions: int
+    rebound_files: int
+    errors: list[Dict[str, Any]]
+    generated_at: str
+    verification: Optional[Dict[str, Any]] = None
+
+
+class EMRCutoverVerificationResult(BaseModel):
+    """Verification summary for EMR v2 hard cutover."""
+
+    passed: bool
+    checks: Dict[str, Any]
+    generated_at: str
+
+
 # ===================== МИГРАЦИЯ ДАННЫХ =====================
 
 
@@ -91,6 +115,54 @@ def migrate_legacy_queue_data(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка миграции данных: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/admin/migration/emr-cutover/backfill",
+    response_model=EMRCutoverBackfillResult,
+)
+def migrate_legacy_emr_cutover(
+    dry_run: bool = Query(False, description="Только проверить, без записи изменений"),
+    limit: Optional[int] = Query(None, ge=1, le=10000, description="Лимит legacy EMR для одного прогона"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Запускает ledger-driven миграцию legacy EMR -> canonical EMR v2."""
+    try:
+        result = MigrationManagementApiService(db).migrate_legacy_emr_data(
+            dry_run=dry_run,
+            limit=limit,
+        )
+        return EMRCutoverBackfillResult(**result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка EMR cutover backfill: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/admin/migration/emr-cutover/verification",
+    response_model=EMRCutoverVerificationResult,
+)
+def verify_emr_cutover(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Проверяет инварианты hard-cutover для EMR v2."""
+    try:
+        result = MigrationManagementApiService(db).verify_emr_cutover()
+        return EMRCutoverVerificationResult(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка проверки EMR cutover: {str(e)}",
         ) from e
 
 

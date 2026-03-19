@@ -94,7 +94,9 @@ class FileSystemApiService:
         file_type: str | None,
         patient_id: int | None,
         appointment_id: int | None,
+        visit_id: int | None,
         emr_id: int | None,
+        emr_record_id: int | None,
         folder_id: int | None,
     ) -> int:
         return self.repository.count_files(
@@ -103,7 +105,9 @@ class FileSystemApiService:
             file_type=file_type,
             patient_id=patient_id,
             appointment_id=appointment_id,
+            visit_id=visit_id,
             emr_id=emr_id,
+            emr_record_id=emr_record_id,
             folder_id=folder_id,
         )
 

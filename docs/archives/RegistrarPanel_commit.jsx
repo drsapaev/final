@@ -13,7 +13,7 @@ import '../styles/responsive.css';
 import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
 
-const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:18000';
 
 const logger = {
   info: () => { },

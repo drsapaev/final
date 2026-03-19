@@ -12,7 +12,7 @@ def test_role_login(username, password, expected_role):
     try:
         # OAuth2 логин
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={
                 "username": username,
                 "password": password
@@ -28,7 +28,7 @@ def test_role_login(username, password, expected_role):
             
             # Проверяем профиль
             profile_response = requests.get(
-                "http://localhost:8000/api/v1/auth/me",
+                "http://localhost:18000/api/v1/auth/me",
                 headers={"Authorization": f"Bearer {token}"}
             )
             

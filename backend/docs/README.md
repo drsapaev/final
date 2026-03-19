@@ -86,15 +86,15 @@ uvicorn app.main:app --reload
 
 ```bash
 # Проверка состояния системы
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 
 # Просмотр статистики безопасности
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-     http://localhost:8000/api/v1/admin/security/stats
+     http://localhost:18000/api/v1/admin/security/stats
 
 # Запуск утреннего присвоения номеров
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-     http://localhost:8000/api/v1/admin/morning-assignment/run
+     http://localhost:18000/api/v1/admin/morning-assignment/run
 ```
 
 ### 3. Для интеграторов
@@ -104,7 +104,7 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 import { VisitConfirmationAPI } from './api/visit-confirmation';
 
 const api = new VisitConfirmationAPI({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: 'http://localhost:18000/api/v1',
   token: 'your-auth-token'
 });
 

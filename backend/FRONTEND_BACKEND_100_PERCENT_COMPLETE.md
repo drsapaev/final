@@ -239,9 +239,9 @@ npm start
 ```
 
 ### **Доступ:**
-- Backend API: http://localhost:8000
+- Backend API: http://localhost:18000
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:18000/docs
 
 ---
 

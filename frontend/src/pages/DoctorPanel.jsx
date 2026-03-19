@@ -47,6 +47,7 @@ import useDoctorQueue from '../hooks/useDoctorQueue.js';
 import { useAppData } from '../contexts/AppDataContext';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
+import { getApiOrigin } from '../api/runtime';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -254,7 +255,7 @@ const DoctorPanel = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const API_BASE = getApiOrigin();
 
         // Загружаем данные пациента
         const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {

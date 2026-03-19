@@ -13,6 +13,7 @@ import Input from '../components/ui/macos/Input';
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
+import { getApiOrigin } from '../api/runtime';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import {
@@ -92,7 +93,7 @@ const CashierPanel = () => {void
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+          const API_BASE = getApiOrigin();
           const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });

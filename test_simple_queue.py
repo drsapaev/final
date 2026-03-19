@@ -12,7 +12,7 @@ def test_simple_endpoints():
     # Тест 1: Test endpoint
     print("\n1️⃣ Тестируем /queue/test:")
     try:
-        response = requests.get("http://localhost:8000/api/v1/queue/test")
+        response = requests.get("http://localhost:18000/api/v1/queue/test")
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             print(f"   ✅ Response: {response.json()}")
@@ -31,7 +31,7 @@ def test_simple_endpoints():
     
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/queue/join-simple",
+            "http://localhost:18000/api/v1/queue/join-simple",
             json=test_data
         )
         print(f"   Status: {response.status_code}")
@@ -50,7 +50,7 @@ def test_simple_endpoints():
     print("\n3️⃣ Тестируем оригинальный /queue/join:")
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/queue/join",
+            "http://localhost:18000/api/v1/queue/join",
             json=test_data
         )
         print(f"   Status: {response.status_code}")

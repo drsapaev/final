@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { buildWsUrl } from '../../api/runtime';
 import { toast } from 'react-toastify';
 import { usePatients, useFormSubmit, useWebSocket } from '../../hooks/useApi';
 import { validators, validateForm } from '../../utils/errorHandler';
@@ -226,7 +227,7 @@ function NewPatientComponent() {
 // ✅ ПРИМЕР КОМПОНЕНТА С WEBSOCKET
 function RealtimeQueueComponent() {
   const { connected, lastMessage, sendMessage } = useWebSocket(
-    'ws://localhost:8000/api/v1/display/ws/queue/cardiology',
+    buildWsUrl('/api/v1/display/ws/queue/cardiology'),
     {
       onMessage: (message) => {
         logger.log('Получено сообщение очереди:', message);

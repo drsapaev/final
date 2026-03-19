@@ -21,7 +21,7 @@ import aiohttp
 class LoadTester:
     """Load testing tool"""
 
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:18000"):
         self.base_url = base_url.rstrip("/")
         self.results = {
             "total_requests": 0,
@@ -174,8 +174,8 @@ async def main():
     parser = argparse.ArgumentParser(description="Load testing tool")
     parser.add_argument(
         "--url",
-        default="http://localhost:8000",
-        help="Base URL of the API (default: http://localhost:8000)",
+        default="http://localhost:18000",
+        help="Base URL of the API (default: http://localhost:18000)",
     )
     parser.add_argument(
         "--users",

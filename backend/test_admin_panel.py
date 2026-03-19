@@ -22,7 +22,7 @@ def test_admin_panel():
             }
 
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=login_data, timeout=10
+                "http://localhost:18000/api/v1/auth/login", data=login_data, timeout=10
             )
 
             if login_response.status_code != 200:
@@ -44,7 +44,7 @@ def test_admin_panel():
             headers = {"Authorization": f"Bearer {access_token}"}
 
             providers_response = client.get(
-                "http://localhost:8000/api/v1/admin/providers",
+                "http://localhost:18000/api/v1/admin/providers",
                 headers=headers,
                 timeout=10,
             )
@@ -73,7 +73,7 @@ def test_admin_panel():
             }
 
             create_response = client.post(
-                "http://localhost:8000/api/v1/admin/providers",
+                "http://localhost:18000/api/v1/admin/providers",
                 headers={**headers, "Content-Type": "application/json"},
                 json=test_provider,
                 timeout=10,
@@ -93,7 +93,7 @@ def test_admin_panel():
             # 4. Получаем обновленный список провайдеров
             print("\n4. Получаем обновленный список провайдеров...")
             providers_response = client.get(
-                "http://localhost:8000/api/v1/admin/providers",
+                "http://localhost:18000/api/v1/admin/providers",
                 headers=headers,
                 timeout=10,
             )
@@ -113,7 +113,7 @@ def test_admin_panel():
             # 5. Тестируем провайдера
             print(f"\n5. Тестируем провайдера {provider_id}...")
             test_response = client.get(
-                f"http://localhost:8000/api/v1/admin/providers/{provider_id}/test",
+                f"http://localhost:18000/api/v1/admin/providers/{provider_id}/test",
                 headers=headers,
                 timeout=10,
             )
@@ -128,7 +128,7 @@ def test_admin_panel():
             # 6. Удаляем тестового провайдера
             print(f"\n6. Удаляем тестового провайдера {provider_id}...")
             delete_response = client.delete(
-                f"http://localhost:8000/api/v1/admin/providers/{provider_id}",
+                f"http://localhost:18000/api/v1/admin/providers/{provider_id}",
                 headers=headers,
                 timeout=10,
             )

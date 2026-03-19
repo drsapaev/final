@@ -395,3 +395,79 @@ Branch: main (fast plan)
 - `python ops/scripts/check_frontend_backend_parity.py --log-level INFO` (pass)
 - `python -m pytest backend/tests/unit/test_frontend_backend_parity.py backend/tests/unit/test_frontend_backend_parity_gate.py backend/tests/test_openapi_contract.py -q` (15 passed)
 - `npm --prefix frontend run test:run -- src/api/__tests__/adminSettings.test.js src/api/__tests__/queue.test.js src/test/parity/rbacRouteParity.test.js src/pages/__tests__/QueueJoin.accessibility.test.jsx` (16 passed)
+
+---
+
+## Implementation Plan: Local-First Stabilization + VPS Preparation (Phase 10)
+
+Created: 2026-03-19
+Branch: main (fast plan)
+
+### Scope
+
+Пока проект работает локально, использовать уже поднятый host-based staging contour как основной рабочий контур:
+- backend `:18000`
+- frontend `:18080`
+- dedicated staging Postgres `:55432`
+
+Цель этого этапа:
+- закрыть ручную приемку ключевых ролей на локальном staging,
+- закрыть оставшийся вопрос по queue-domain migration/archival,
+- зафиксировать VPS rollout как обязательный следующий этап, но не выполнять его до завершения локальной приемки.
+
+### Deliverables
+
+- Краткий smoke-check evidence по ролям и specialist flows
+- Документированное решение по legacy queue cluster
+- Актуальные env/runbook/roadmap записи для будущего VPS promotion
+- Практический local-first checklist: `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`
+- Четкий local → VPS gate без двусмысленностей
+
+### Tasks
+
+#### Phase 1: Local Acceptance
+
+- [ ] **Task 1: Пройти ручной smoke-check основных ролей**
+  - Проверить: admin, registrar, cashier, lab, doctor specialist flows.
+  - Зафиксировать pass/fail и блокеры.
+
+- [ ] **Task 2: Пройти specialist EMR flows на локальном staging**
+  - Проверить cardiology, dermatology, dentistry, lab.
+  - Подтвердить canonical `visit_id`, specialist-specific sections, history, sign/amend flow.
+
+- [ ] **Task 3: Проверить соседние бизнес-флоу после cutover**
+  - Prescription eligibility
+  - complete-visit/status flows
+  - doctor-history filtering
+  - files and attachments
+
+#### Phase 2: Data Closure
+
+- [ ] **Task 4: Закрыть решение по queue-domain migration**
+  - Либо мигрировать legacy queue cluster в текущую Postgres модель.
+  - Либо заархивировать и явно зафиксировать, что это неканоничный legacy domain.
+
+- [ ] **Task 5: Проверить оставшиеся skipped/legacy-only data paths**
+  - appointments with missing patient refs
+  - orphan message refs
+  - source-only legacy tables
+
+#### Phase 3: VPS Preparation Only
+
+- [ ] **Task 6: Держать VPS rollout kit актуальным**
+  - Проверять `ops/vps/*` и `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md` при изменениях deployment path.
+
+- [ ] **Task 7: Зафиксировать VPS как mandatory next milestone**
+  - `.ai-factory/ROADMAP.md`
+  - `docs/PLAN_CHECKLIST.md`
+  - `.ai-factory/DESCRIPTION.md`
+
+- [ ] **Task 8: Не начинать production rollout до VPS staging**
+  - Production допускается только после отдельного VPS staging contour и повторного green cutover.
+
+### Exit Criteria
+
+- Локальный staging полностью проходит роль-based smoke-check.
+- Решение по queue-domain migration/archival задокументировано.
+- VPS promotion path зафиксирован в каноничных плановых документах.
+- Следующий этап после локальной приемки однозначно определен: VPS staging rollout.

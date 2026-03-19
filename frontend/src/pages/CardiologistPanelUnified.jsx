@@ -29,9 +29,13 @@ import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import { getApiBaseUrl } from '../api/runtime';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
+import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import tokenManager from '../utils/tokenManager';
+
+const API_V1_BASE = getApiBaseUrl();
 
 /**
  * Унифицированная панель кардиолога
@@ -46,9 +50,9 @@ const MacOSCardiologistPanelUnified = () => {
   // Получаем активную вкладку и patientId из URL параметров
   const getInitialTab = () => {
     const params = new URLSearchParams(location.search);
-    // Если есть patientId, переходим на вкладку пациента
+    // Deep-link по patientId требует выбора канонического визита из очереди
     if (params.get('patientId')) {
-      return 'visit';
+      return 'appointments';
     }
     return params.get('tab') || 'appointments';
   };
@@ -111,8 +115,7 @@ const MacOSCardiologistPanelUnified = () => {
       const token = tokenManager.getAccessToken();
 
       // Загружаем ЭКГ пациента
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-      const ecgResponse = await fetch(`${API_BASE}/api/v1/cardio/ecg?patient_id=${patientId}&limit=10`, {
+      const ecgResponse = await fetch(`${API_V1_BASE}/cardio/ecg?patient_id=${patientId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (ecgResponse.ok) {
@@ -121,7 +124,7 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       // Загружаем анализы крови пациента
-      const bloodResponse = await fetch(`${API_BASE}/api/v1/cardio/blood-tests?patient_id=${patientId}&limit=10`, {
+      const bloodResponse = await fetch(`${API_V1_BASE}/cardio/blood-tests?patient_id=${patientId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (bloodResponse.ok) {
@@ -175,8 +178,7 @@ const MacOSCardiologistPanelUnified = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-        const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
+        const response = await fetch(`${API_V1_BASE}/registrar/services`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -206,10 +208,8 @@ const MacOSCardiologistPanelUnified = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
         // Загружаем данные пациента
-        const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+        const patientResponse = await fetch(`${API_V1_BASE}/patients/${patientIdFromUrl}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -228,8 +228,8 @@ const MacOSCardiologistPanelUnified = () => {
           };
 
           setSelectedPatient(patientObj);
-          setActiveTab('visit');
-          setMessage({ type: 'info', text: `Загружен пациент: ${patientObj.patient_name}` });
+          setActiveTab('appointments');
+          setMessage({ type: 'info', text: `Загружен пациент: ${patientObj.patient_name}. Выберите визит с каноническим visit_id.` });
         }
       } catch (error) {
         setMessage({ type: 'error', text: `Не удалось загрузить пациента: ${error.message || ''}`.trim() });
@@ -247,6 +247,19 @@ const MacOSCardiologistPanelUnified = () => {
     params.set('tab', tabId);
     navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
   };
+
+  const ensureCanonicalVisitId = useCallback(async (row) => {
+    const appointmentId = row?.appointment_id || row?.id;
+    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+
+    if (visitId) {
+      setAppointments((prev) => prev.map((appointment) =>
+        appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
+      ));
+    }
+
+    return visitId;
+  }, []);
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
@@ -281,7 +294,7 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
+      const response = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -311,7 +324,7 @@ const MacOSCardiologistPanelUnified = () => {
                 allAppointments.push({
                   id: appointmentId, // Приоритет appointment_id
                   appointment_id: appointmentId, // Явно указываем appointment_id
-                  visit_id: appointmentId, // Добавляем visit_id для сопоставления с БД
+                  visit_id: entry.visit_id || null,
                   patient_id: entry.patient_id,
                   patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
                   patient_phone: entry.phone || '',
@@ -337,7 +350,7 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         // ✅ Фильтруем только кардиологические записи, исключая ЭКГ
-        const appointmentsData = allAppointments.filter((apt) => {
+        let appointmentsData = allAppointments.filter((apt) => {
           // Исключаем записи из очереди ЭКГ
           if (apt.specialty === 'echokg' || apt.specialty === 'ecg') {
             return false;
@@ -371,10 +384,9 @@ const MacOSCardiologistPanelUnified = () => {
         });
 
         // 2. Получаем актуальный payment_status из БД через all-appointments
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
         const today = new Date().toISOString().split('T')[0];
         try {
-          const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+          const appointmentsResponse = await fetch(`${API_V1_BASE}/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -386,32 +398,49 @@ const MacOSCardiologistPanelUnified = () => {
             const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
 
             // Создаем карту id -> payment_status (используем id без смещения, так как бэкенд добавляет +20000 для Visit)
-            const paymentStatusMap = new Map();
+            const appointmentMetaMap = new Map();
             appointmentsDBData.forEach((apt) => {
-              // Для Visit id уже добавлено +20000 в бэкенде, сохраняем как есть
+              const appointmentMeta = {
+                payment_status: apt.payment_status || 'pending',
+                visit_id: apt.visit_id || null,
+                appointment_id: apt.appointment_id || (apt.source === 'appointments' ? apt.id : null)
+              };
               if (apt.id) {
-                paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
+                appointmentMetaMap.set(apt.id, appointmentMeta);
               }
-              // Также сохраняем по patient_id+date для связи (если нужно)
               if (apt.patient_id && apt.appointment_date) {
                 const key = `${apt.patient_id}_${apt.appointment_date}`;
-                paymentStatusMap.set(key, apt.payment_status || 'pending');
+                appointmentMetaMap.set(key, appointmentMeta);
               }
             });
 
-            // Обновляем payment_status в наших записях
+            // Обновляем payment_status и canonical visit_id в наших записях
             allAppointments = allAppointments.map((apt) => {
-              // Пробуем найти по id
-              let paymentStatus = paymentStatusMap.get(apt.id);
-              // Если не нашли, пробуем по patient_id+date
-              if (!paymentStatus && apt.patient_id && apt.appointment_date) {
+              let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+              if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
                 const key = `${apt.patient_id}_${apt.appointment_date}`;
-                paymentStatus = paymentStatusMap.get(key);
+                appointmentMeta = appointmentMetaMap.get(key);
               }
               return {
                 ...apt,
-                payment_status: paymentStatus || apt.payment_status || 'pending',
-                payment_type: paymentStatus || apt.payment_type
+                appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+                visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+                payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+                payment_type: appointmentMeta?.payment_status || apt.payment_type
+              };
+            });
+            appointmentsData = appointmentsData.map((apt) => {
+              let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+              if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
+                const key = `${apt.patient_id}_${apt.appointment_date}`;
+                appointmentMeta = appointmentMetaMap.get(key);
+              }
+              return {
+                ...apt,
+                appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+                visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+                payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+                payment_type: appointmentMeta?.payment_status || apt.payment_type
               };
             });
           }
@@ -480,10 +509,8 @@ const MacOSCardiologistPanelUnified = () => {
     const token = tokenManager.getAccessToken();
     if (!token) return null;
 
-    const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
     try {
-      const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
+      const response = await fetch(`${API_V1_BASE}/patients/${patientId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -576,12 +603,17 @@ const MacOSCardiologistPanelUnified = () => {
   const handleAppointmentRowClick = async (row) => {
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
-      // Создаем объект пациента для переключения на прием
-      // Важно: используем row.id как appointment_id, так как row.id - это ID appointment из таблицы appointments
       const appointmentId = row.appointment_id || row.id;
+      const visitId = await ensureCanonicalVisitId(row);
+      if (!visitId) {
+        setMessage({ type: 'error', text: 'Не удалось определить канонический visit_id для пациента' });
+        return;
+      }
+
       const patientData = {
         id: row.id, // Это appointment ID
         appointment_id: appointmentId, // Явно указываем appointment_id
+        visit_id: visitId,
         patient_id: row.patient_id,
         patient_name: row.patient_fio,
         phone: row.patient_phone,
@@ -597,7 +629,7 @@ const MacOSCardiologistPanelUnified = () => {
       // Если запись завершена - загружаем EMR для просмотра
       const isCompleted = row.status === 'served' || row.status === 'completed' || row.status === 'done';
       if (isCompleted) {
-        await loadEMR(appointmentId);
+        await loadEMR(visitId);
       } else {
         // Для незавершённых записей очищаем EMR
         setEmr(null);
@@ -617,11 +649,17 @@ const MacOSCardiologistPanelUnified = () => {
       case 'view_emr':{
           // Просмотр EMR для завершённой записи
           const appointmentId = row.appointment_id || row.id;
+          const visitId = await ensureCanonicalVisitId(row);
+          if (!visitId) {
+            setMessage({ type: 'error', text: 'Не удалось открыть EMR без канонического visit_id' });
+            break;
+          }
 
           // Создаем объект пациента
           const patientData = {
             id: row.id,
             appointment_id: appointmentId,
+            visit_id: visitId,
             patient_id: row.patient_id,
             patient_name: row.patient_fio,
             phone: row.patient_phone,
@@ -636,7 +674,7 @@ const MacOSCardiologistPanelUnified = () => {
           setSelectedPatient(patientData);
 
           // Загружаем EMR
-          await loadEMR(appointmentId);
+          await loadEMR(visitId);
 
           // Переходим на вкладку visit
           goToTab('visit');
@@ -645,9 +683,8 @@ const MacOSCardiologistPanelUnified = () => {
       case 'call':
         // Вызвать пациента
         try {
-          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
           const token = tokenManager.getAccessToken();
-          const response = await fetch(apiUrl, {
+          const response = await fetch(`${API_V1_BASE}/registrar/queue/${row.id}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -680,10 +717,16 @@ const MacOSCardiologistPanelUnified = () => {
       case 'complete':{
           // Завершить приём
           try {
+            const visitId = await ensureCanonicalVisitId(row);
+            if (!visitId) {
+              setMessage({ type: 'error', text: 'Не удалось завершить приём без канонического visit_id' });
+              break;
+            }
             // Переходим на вкладку визита для завершения
             const patient = {
               id: row.id,
               appointment_id: row.appointment_id || row.id,
+              visit_id: visitId,
               patient_id: row.patient_id,
               patient_name: row.patient_fio,
               phone: row.patient_phone,
@@ -698,7 +741,7 @@ const MacOSCardiologistPanelUnified = () => {
             setSelectedPatient(patient);
 
             // Загружаем EMR если есть
-            await loadEMR(patient.appointment_id);
+            await loadEMR(patient.visit_id);
 
             // Переходим на вкладку visit для завершения
             goToTab('visit');
@@ -784,17 +827,15 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Загрузка EMR для просмотра
-  const loadEMR = async (appointmentId) => {
+  const loadEMR = async (visitId) => {
     try {
       const token = tokenManager.getAccessToken();
-      if (!appointmentId) {
-        setMessage({ type: 'error', text: 'Не указан идентификатор записи для EMR' });
+      if (!visitId) {
+        setMessage({ type: 'error', text: 'Не указан visit_id для EMR v2' });
         return null;
       }
 
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
-      const response = await fetch(`${API_BASE}/api/v1/appointments/${appointmentId}/emr`, {
+      const response = await fetch(`${API_V1_BASE}/v2/emr/${visitId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -932,7 +973,7 @@ const MacOSCardiologistPanelUnified = () => {
   const handleBloodTestSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/v1/cardio/blood-tests', {
+      const response = await fetch(`${API_V1_BASE}/cardio/blood-tests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1207,7 +1248,7 @@ const MacOSCardiologistPanelUnified = () => {
                   Электронная медицинская карта
                 </h3>
                 <EMRContainerV2
-                visitId={selectedPatient?.appointment_id || selectedPatient?.id}
+                visitId={selectedPatient?.visit_id}
                 patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
                 specialty="cardiology" />
 
@@ -1258,16 +1299,16 @@ const MacOSCardiologistPanelUnified = () => {
               </div>
               {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
               <ECGViewer
-              visitId={selectedPatient?.visitId || 'demo-visit-1'}
-              patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
+              visitId={selectedPatient?.visit_id}
+              patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
               onDataUpdate={() => {
                 loadPatientData();
               }} />
 
 
               <EchoForm
-              visitId={selectedPatient?.visitId || 'demo-visit-1'}
-              patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
+              visitId={selectedPatient?.visit_id}
+              patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
               onDataUpdate={() => {
                 loadPatientData();
               }} />

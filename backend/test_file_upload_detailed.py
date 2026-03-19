@@ -13,7 +13,7 @@ def test_file_upload_detailed():
     print("\n🔐 Получение токена...")
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -48,7 +48,7 @@ def test_file_upload_detailed():
     
     try:
         upload_response = requests.post(
-            "http://localhost:8000/api/v1/files/upload",
+            "http://localhost:18000/api/v1/files/upload",
             headers=headers,
             files=files,
             data=data
@@ -73,7 +73,7 @@ def test_file_upload_detailed():
     print("\n📋 Тестирование получения списка файлов...")
     try:
         list_response = requests.get(
-            "http://localhost:8000/api/v1/files/",
+            "http://localhost:18000/api/v1/files/",
             headers=headers
         )
         

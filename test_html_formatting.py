@@ -8,7 +8,7 @@ def test_html_tester_formatting():
     """Тестируем форматирование результатов"""
     print("🔍 Тестирование форматирования результатов...")
     
-    base_url = "http://localhost:8000/api/v1"
+    base_url = "http://localhost:18000/api/v1"
     
     # Получаем токен
     try:

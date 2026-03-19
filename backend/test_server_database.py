@@ -13,7 +13,7 @@ def test_server_database():
     # Тест 1: Health endpoint
     print("1. Тестируем health endpoint...")
     try:
-        response = requests.get("http://localhost:8000/api/v1/health", timeout=5)
+        response = requests.get("http://localhost:18000/api/v1/health", timeout=5)
         print(f"   Статус: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
@@ -27,7 +27,7 @@ def test_server_database():
     print("\n2. Тестируем database info...")
     try:
         # Попробуем endpoint, который может показать информацию о БД
-        response = requests.get("http://localhost:8000/api/v1/status", timeout=5)
+        response = requests.get("http://localhost:18000/api/v1/status", timeout=5)
         print(f"   Статус: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
@@ -40,7 +40,7 @@ def test_server_database():
     # Тест 3: Попробуем простой GET запрос к auth
     print("\n3. Тестируем auth me без токена...")
     try:
-        response = requests.get("http://localhost:8000/api/v1/auth/me", timeout=5)
+        response = requests.get("http://localhost:18000/api/v1/auth/me", timeout=5)
         print(f"   Статус: {response.status_code}")
         print(f"   Ответ: {response.text[:200]}")
     except Exception as e:

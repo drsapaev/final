@@ -217,7 +217,9 @@ class FileSystemService:
                 permission=file_data.permission,
                 patient_id=file_data.patient_id,
                 appointment_id=file_data.appointment_id,
+                visit_id=file_data.visit_id,
                 emr_id=file_data.emr_id,
+                emr_record_id=file_data.emr_record_id,
                 expires_at=file_data.expires_at,
                 file_metadata=file_data.file_metadata,
             )

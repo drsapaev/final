@@ -82,10 +82,10 @@ server: {
     port: 5173,  // ← Frontend порт
     proxy: {
         "/api": {
-            target: "http://localhost:8000",  // ← Proxy на backend
+            target: "http://localhost:18000",  // ← Proxy на backend
         },
         "/ws": {
-            target: "ws://localhost:8000",  // ← WebSocket на backend
+            target: "ws://localhost:18000",  // ← WebSocket на backend
         }
     }
 }
@@ -107,7 +107,7 @@ npm run dev
 
 **Откройте браузер:**
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:8000/docs
+- Backend API: http://localhost:18000/docs
 
 ## ⚠️ Важно
 

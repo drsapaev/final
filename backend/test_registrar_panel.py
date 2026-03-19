@@ -20,7 +20,7 @@ def test_registrar_panel():
                 "grant_type": "password",
             }
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=login_data, timeout=10
+                "http://localhost:18000/api/v1/auth/login", data=login_data, timeout=10
             )
             if login_response.status_code != 200:
                 print(f"❌ Ошибка логина: {login_response.status_code}")
@@ -50,7 +50,7 @@ def test_registrar_panel():
             }
 
             create_patient_response = client.post(
-                "http://localhost:8000/api/v1/patients",
+                "http://localhost:18000/api/v1/patients",
                 headers={**headers, "Content-Type": "application/json"},
                 json=test_patient,
                 timeout=10,
@@ -74,7 +74,7 @@ def test_registrar_panel():
             # 3. Получаем список пациентов
             print("\n3. Получаем список пациентов...")
             patients_response = client.get(
-                "http://localhost:8000/api/v1/patients", headers=headers, timeout=10
+                "http://localhost:18000/api/v1/patients", headers=headers, timeout=10
             )
             print(f"Статус: {patients_response.status_code}")
             if patients_response.status_code == 200:
@@ -101,7 +101,7 @@ def test_registrar_panel():
             }
 
             create_appointment_response = client.post(
-                "http://localhost:8000/api/v1/appointments",
+                "http://localhost:18000/api/v1/appointments",
                 headers={**headers, "Content-Type": "application/json"},
                 json=test_appointment,
                 timeout=10,
@@ -124,7 +124,7 @@ def test_registrar_panel():
             # 5. Получаем список записей
             print("\n5. Получаем список записей...")
             appointments_response = client.get(
-                "http://localhost:8000/api/v1/appointments", headers=headers, timeout=10
+                "http://localhost:18000/api/v1/appointments", headers=headers, timeout=10
             )
             print(f"Статус: {appointments_response.status_code}")
             if appointments_response.status_code == 200:
@@ -140,7 +140,7 @@ def test_registrar_panel():
             # 6. Тестируем поиск пациентов
             print("\n6. Тестируем поиск пациентов...")
             search_response = client.get(
-                "http://localhost:8000/api/v1/patients?q=Иванов",
+                "http://localhost:18000/api/v1/patients?q=Иванов",
                 headers=headers,
                 timeout=10,
             )
@@ -153,7 +153,7 @@ def test_registrar_panel():
             # 7. Получаем записи пациента
             print(f"\n7. Получаем записи пациента {patient_id}...")
             patient_appointments_response = client.get(
-                f"http://localhost:8000/api/v1/patients/{patient_id}/appointments",
+                f"http://localhost:18000/api/v1/patients/{patient_id}/appointments",
                 headers=headers,
                 timeout=10,
             )
@@ -170,7 +170,7 @@ def test_registrar_panel():
             # 8. Удаляем тестовую запись
             print(f"\n8. Удаляем тестовую запись {appointment_id}...")
             delete_appointment_response = client.delete(
-                f"http://localhost:8000/api/v1/appointments/{appointment_id}",
+                f"http://localhost:18000/api/v1/appointments/{appointment_id}",
                 headers=headers,
                 timeout=10,
             )
@@ -184,7 +184,7 @@ def test_registrar_panel():
             # 9. Удаляем тестового пациента
             print(f"\n9. Удаляем тестового пациента {patient_id}...")
             delete_patient_response = client.delete(
-                f"http://localhost:8000/api/v1/patients/{patient_id}",
+                f"http://localhost:18000/api/v1/patients/{patient_id}",
                 headers=headers,
                 timeout=10,
             )

@@ -4,7 +4,7 @@ Final verification - all systems check
 import requests
 import json
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:18000"
 
 print("="*60)
 print("FINAL VERIFICATION - ALL SYSTEMS CHECK")

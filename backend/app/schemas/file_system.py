@@ -55,7 +55,9 @@ class FileBase(BaseModel):
     permission: FilePermissionEnum = FilePermissionEnum.PRIVATE
     patient_id: int | None = None
     appointment_id: int | None = None
+    visit_id: int | None = None
     emr_id: int | None = None
+    emr_record_id: int | None = None
     expires_at: datetime | None = None
 
 
@@ -103,7 +105,9 @@ class FileOut(FileBase):
             "permission": obj.permission.value if hasattr(obj.permission, 'value') else obj.permission,
             "patient_id": obj.patient_id,
             "appointment_id": obj.appointment_id,
+            "visit_id": getattr(obj, "visit_id", None),
             "emr_id": obj.emr_id,
+            "emr_record_id": getattr(obj, "emr_record_id", None),
             "expires_at": obj.expires_at,
             "file_path": obj.file_path,
             "file_size": obj.file_size,
@@ -246,7 +250,9 @@ class FileUploadRequest(BaseModel):
     permission: FilePermissionEnum = FilePermissionEnum.PRIVATE
     patient_id: int | None = None
     appointment_id: int | None = None
+    visit_id: int | None = None
     emr_id: int | None = None
+    emr_record_id: int | None = None
     folder_id: int | None = None
     expires_at: datetime | None = None
     file_metadata: dict[str, Any] | None = None
@@ -275,7 +281,9 @@ class FileSearchRequest(BaseModel):
     permission: FilePermissionEnum | None = None
     patient_id: int | None = None
     appointment_id: int | None = None
+    visit_id: int | None = None
     emr_id: int | None = None
+    emr_record_id: int | None = None
     folder_id: int | None = None
     tags: list[str] | None = None
     date_from: datetime | None = None

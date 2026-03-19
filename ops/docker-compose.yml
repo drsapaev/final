@@ -72,7 +72,7 @@ services:
     container_name: clinic-frontend
     restart: unless-stopped
     environment:
-      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000/api/v1}
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:18000/api/v1}
     volumes:
       - ./frontend:/app:rw
     working_dir: /app

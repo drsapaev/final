@@ -11,7 +11,7 @@ def test_cors():
     # Тест OPTIONS запроса (preflight)
     try:
         response = requests.options(
-            "http://localhost:8000/api/v1/auth/minimal-login",
+            "http://localhost:18000/api/v1/auth/minimal-login",
             headers={
                 'Origin': 'http://localhost:8080',
                 'Access-Control-Request-Method': 'POST',
@@ -36,7 +36,7 @@ def test_cors():
     # Тест обычного запроса
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/minimal-login",
+            "http://localhost:18000/api/v1/auth/minimal-login",
             json={"username": "admin", "password": "admin"},
             headers={
                 'Origin': 'http://localhost:8080',

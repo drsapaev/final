@@ -14,15 +14,15 @@ export default defineConfig({
     },
     allowedHosts: ['localhost', '127.0.0.1'],
     proxy: {
-      // HTTP API -> http://localhost:8000
+      // HTTP API -> http://localhost:18000
       "/api": {
-        target: "http://localhost:8000",
+        target: "http://localhost:18000",
         changeOrigin: true,
         secure: false,
       },
-      // WebSocket -> ws://localhost:8000
+      // WebSocket -> ws://localhost:18000
       "/ws": {
-        target: "ws://localhost:8000",
+        target: "ws://localhost:18000",
         ws: true,
         changeOrigin: true,
         secure: false,

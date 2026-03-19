@@ -311,24 +311,9 @@ class Settings(BaseSettings):
     PRINTER_USB_VID: int | None = None
     PRINTER_USB_PID: int | None = None
 
-    # --- EMR v2 Feature Flags ---
-    EMR_V2_ENABLED: bool = Field(
+    EMR_LEGACY_WRITE_FREEZE: bool = Field(
         default=False,
-        description="Global toggle for EMR v2. If False, v1 is used for everyone."
-    )
-    EMR_V2_ROLLOUT_PERCENTAGE: int = Field(
-        default=0,
-        ge=0,
-        le=100,
-        description="Percentage of users who see EMR v2 (0-100). Only applies if EMR_V2_ENABLED=True."
-    )
-    EMR_V2_ALLOWED_USER_IDS: str = Field(
-        default="",
-        description="Comma-separated list of user IDs with early access to EMR v2 (e.g., '1,5,12')"
-    )
-    EMR_V2_SHADOW_MODE: bool = Field(
-        default=False,
-        description="If True, v2 renders hidden alongside v1 for data comparison (dev mode)"
+        description="Reject legacy appointment-based EMR writes during hard-cutover maintenance windows.",
     )
 
     @field_validator(

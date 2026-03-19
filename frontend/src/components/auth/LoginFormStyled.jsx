@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
-import { api, setToken } from '../../api/client';
+import { api, buildApiUrl, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
@@ -80,7 +80,7 @@ const LoginFormStyled = () => {void
       logger.log('📝 formData:', formData);
 
       // Используем основной backend на порту 8000
-      const response = await fetch('http://localhost:8000/api/v1/auth/minimal-login', {
+      const response = await fetch(buildApiUrl('/auth/minimal-login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

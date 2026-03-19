@@ -23,6 +23,7 @@ class VisitCreate(BaseModel):
     doctor_id: Optional[int] = None
     notes: Optional[str] = None
     planned_date: Optional[date] = None  # <-- новая поддержка
+    department: Optional[str] = None
     source: Optional[str] = Field(default="desk", max_length=20)
 
 
@@ -172,6 +173,23 @@ def create_visit(
             "discount_mode": "none",  # ✅ FIX: Add discount_mode default (from Visit model)
             "approval_status": "none",  # ✅ FIX: Add approval_status default (from Visit model)
         }
+        if payload.department is not None:
+            ins_values["department"] = payload.department
+            try:
+                from app.models.department import Department
+
+                department_row = (
+                    db.query(Department)
+                    .filter(Department.key == payload.department)
+                    .first()
+                )
+                if department_row:
+                    ins_values["department_id"] = department_row.id
+            except Exception:
+                logger.debug(
+                    "Could not resolve department_id for department=%s in legacy table path",
+                    payload.department,
+                )
         # если передали planned_date — добавим в insert (если колонка есть)
         if hasattr(t.c, "planned_date") and payload.planned_date is not None:
             ins_values["planned_date"] = payload.planned_date

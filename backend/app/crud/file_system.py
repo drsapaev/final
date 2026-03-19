@@ -74,7 +74,9 @@ class CRUDFile:
         owner_id: int | None = None,
         patient_id: int | None = None,
         appointment_id: int | None = None,
+        visit_id: int | None = None,
         emr_id: int | None = None,
+        emr_record_id: int | None = None,
         folder_id: int | None = None,
     ) -> list[File]:
         """Получить список файлов с фильтрацией"""
@@ -90,8 +92,12 @@ class CRUDFile:
             query = query.filter(File.patient_id == patient_id)
         if appointment_id:
             query = query.filter(File.appointment_id == appointment_id)
+        if visit_id:
+            query = query.filter(File.visit_id == visit_id)
         if emr_id:
             query = query.filter(File.emr_id == emr_id)
+        if emr_record_id:
+            query = query.filter(File.emr_record_id == emr_record_id)
         if folder_id:
             query = query.filter(File.folder_id == folder_id)
 
@@ -124,8 +130,12 @@ class CRUDFile:
             query = query.filter(File.patient_id == search_request.patient_id)
         if search_request.appointment_id:
             query = query.filter(File.appointment_id == search_request.appointment_id)
+        if search_request.visit_id:
+            query = query.filter(File.visit_id == search_request.visit_id)
         if search_request.emr_id:
             query = query.filter(File.emr_id == search_request.emr_id)
+        if search_request.emr_record_id:
+            query = query.filter(File.emr_record_id == search_request.emr_record_id)
         if search_request.folder_id:
             query = query.filter(File.folder_id == search_request.folder_id)
         if search_request.owner_id:

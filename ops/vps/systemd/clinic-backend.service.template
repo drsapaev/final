@@ -1,0 +1,20 @@
+[Unit]
+Description=Clinic Backend (__APP_ENV__)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=__RUN_AS_USER__
+WorkingDirectory=__APP_ROOT__/backend
+EnvironmentFile=__APP_ROOT__/backend/.env.__APP_ENV__
+Environment=PYTHONPATH=__APP_ROOT__/backend
+ExecStart=__APP_ROOT__/backend/.venv/bin/python start_server.py
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+StandardOutput=append:__APP_ROOT__/output/vps/backend-__APP_ENV__.log
+StandardError=append:__APP_ROOT__/output/vps/backend-__APP_ENV__.err.log
+
+[Install]
+WantedBy=multi-user.target

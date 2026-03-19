@@ -18,16 +18,13 @@ class EMRDoctorHistoryRepository:
         self,
         *,
         doctor_id: int,
-        db_field: str,
-        search_text: str | None,
+        specialty: str,
         limit: int,
     ) -> list[EMRRecord]:
         query = self.db.query(EMRRecord).filter(
             EMRRecord.created_by == doctor_id,
-            getattr(EMRRecord, db_field).isnot(None),
-            getattr(EMRRecord, db_field) != "",
+            EMRRecord.is_active == True,
+            EMRRecord.status.in_(["in_progress", "signed", "amended"]),
+            EMRRecord.data["specialty"].as_string() == specialty,
         )
-        if search_text and len(search_text) >= 3:
-            query = query.filter(getattr(EMRRecord, db_field).ilike(f"%{search_text[:50]}%"))
-        return query.order_by(desc(EMRRecord.updated_at)).limit(limit).all()
-
+        return query.order_by(desc(EMRRecord.updated_at), desc(EMRRecord.created_at)).limit(limit).all()

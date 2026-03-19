@@ -20,7 +20,7 @@ def test_schedule_queue_apis():
                 "grant_type": "password",
             }
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=login_data, timeout=10
+                "http://localhost:18000/api/v1/auth/login", data=login_data, timeout=10
             )
             if login_response.status_code != 200:
                 print(f"❌ Ошибка логина: {login_response.status_code}")
@@ -45,7 +45,7 @@ def test_schedule_queue_apis():
             week_start_str = week_start.strftime("%Y-%m-%d")
 
             weekly_response = client.get(
-                f"http://localhost:8000/api/v1/schedule/weekly?week_start={week_start_str}",
+                f"http://localhost:18000/api/v1/schedule/weekly?week_start={week_start_str}",
                 headers=headers,
                 timeout=10,
             )
@@ -66,7 +66,7 @@ def test_schedule_queue_apis():
             print("\n2.2. Получаем расписание на день...")
             today_str = today.strftime("%Y-%m-%d")
             daily_response = client.get(
-                f"http://localhost:8000/api/v1/schedule/daily?date_str={today_str}",
+                f"http://localhost:18000/api/v1/schedule/daily?date_str={today_str}",
                 headers=headers,
                 timeout=10,
             )
@@ -82,7 +82,7 @@ def test_schedule_queue_apis():
             # 2.3. Получаем доступные слоты
             print("\n2.3. Получаем доступные слоты...")
             slots_response = client.get(
-                f"http://localhost:8000/api/v1/schedule/available-slots?date_str={today_str}&department=ENT",
+                f"http://localhost:18000/api/v1/schedule/available-slots?date_str={today_str}&department=ENT",
                 headers=headers,
                 timeout=10,
             )
@@ -100,7 +100,7 @@ def test_schedule_queue_apis():
             # 2.4. Получаем отделения
             print("\n2.4. Получаем список отделений...")
             dept_response = client.get(
-                "http://localhost:8000/api/v1/schedule/departments",
+                "http://localhost:18000/api/v1/schedule/departments",
                 headers=headers,
                 timeout=10,
             )
@@ -121,7 +121,7 @@ def test_schedule_queue_apis():
             # 3.1. Получаем статус очереди
             print("3.1. Получаем статус очереди...")
             queue_response = client.get(
-                f"http://localhost:8000/api/v1/queue/status?department=ENT&date_str={today_str}",
+                f"http://localhost:18000/api/v1/queue/status?department=ENT&date_str={today_str}",
                 headers=headers,
                 timeout=10,
             )
@@ -141,7 +141,7 @@ def test_schedule_queue_apis():
             # 3.2. Открываем очередь
             print("\n3.2. Открываем очередь...")
             open_response = client.post(
-                "http://localhost:8000/api/v1/queue/open",
+                "http://localhost:18000/api/v1/queue/open",
                 headers={
                     **headers,
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -159,7 +159,7 @@ def test_schedule_queue_apis():
             # 3.3. Добавляем пациента в очередь
             print("\n3.3. Добавляем пациента в очередь...")
             add_response = client.post(
-                "http://localhost:8000/api/v1/queue/add",
+                "http://localhost:18000/api/v1/queue/add",
                 headers={
                     **headers,
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -182,7 +182,7 @@ def test_schedule_queue_apis():
             # 3.4. Вызываем следующего пациента
             print("\n3.4. Вызываем следующего пациента...")
             next_response = client.post(
-                "http://localhost:8000/api/v1/queue/next",
+                "http://localhost:18000/api/v1/queue/next",
                 headers={
                     **headers,
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -200,7 +200,7 @@ def test_schedule_queue_apis():
             # 3.5. Завершаем прием
             print("\n3.5. Завершаем прием...")
             complete_response = client.post(
-                "http://localhost:8000/api/v1/queue/complete",
+                "http://localhost:18000/api/v1/queue/complete",
                 headers={
                     **headers,
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -218,7 +218,7 @@ def test_schedule_queue_apis():
             # 3.6. Получаем список отделений с очередями
             print("\n3.6. Получаем список отделений с очередями...")
             dept_queue_response = client.get(
-                f"http://localhost:8000/api/v1/queue/departments?date_str={today_str}",
+                f"http://localhost:18000/api/v1/queue/departments?date_str={today_str}",
                 headers=headers,
                 timeout=10,
             )
@@ -238,7 +238,7 @@ def test_schedule_queue_apis():
             # 3.7. Закрываем очередь
             print("\n3.7. Закрываем очередь...")
             close_response = client.post(
-                "http://localhost:8000/api/v1/queue/close",
+                "http://localhost:18000/api/v1/queue/close",
                 headers={
                     **headers,
                     "Content-Type": "application/x-www-form-urlencoded",

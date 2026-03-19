@@ -9,9 +9,9 @@ from pathlib import Path
 
 def check_backend():
     """Проверка доступности backend"""
-    print("🔍 Проверка Backend сервера (http://localhost:8000)...")
+    print("🔍 Проверка Backend сервера (http://localhost:18000)...")
     try:
-        response = requests.get("http://localhost:8000/api/v1/health", timeout=3)
+        response = requests.get("http://localhost:18000/api/v1/health", timeout=3)
         if response.status_code == 200:
             data = response.json()
             print("✅ Backend доступен")
@@ -21,7 +21,7 @@ def check_backend():
             print(f"❌ Backend отвечает с кодом {response.status_code}")
             return False
     except requests.exceptions.ConnectionError:
-        print("❌ Backend недоступен на http://localhost:8000")
+        print("❌ Backend недоступен на http://localhost:18000")
         print("   Запустите: cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000")
         return False
     except Exception as e:

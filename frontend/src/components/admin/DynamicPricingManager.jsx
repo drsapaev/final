@@ -31,11 +31,12 @@ import {
 'lucide-react';
 import { toast } from 'react-toastify';
 
+import { getApiOrigin } from '../../api/runtime';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 
 // API base URL with fallback for development
-void (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:8000');
+void getApiOrigin();
 
 const DynamicPricingManager = () => {
   const [activeTab, setActiveTab] = useState('rules');

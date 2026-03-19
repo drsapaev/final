@@ -8,7 +8,7 @@ import json
 def test_health():
     """Тест health endpoint"""
     try:
-        response = requests.get("http://localhost:8000/api/v1/health")
+        response = requests.get("http://localhost:18000/api/v1/health")
         print(f"Health endpoint: {response.status_code}")
         print(f"Response: {response.text}")
         return response.status_code == 200
@@ -32,7 +32,7 @@ def test_login():
         print(f"Sending login request with data: {data}")
         
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             json=data,
             headers=headers
         )

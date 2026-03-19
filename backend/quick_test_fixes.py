@@ -12,7 +12,7 @@ def quick_test_fixes():
     # Получаем токен
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -42,7 +42,7 @@ def quick_test_fixes():
     for endpoint, name in test_endpoints:
         print(f"\n🔍 Тестируем {name}...")
         try:
-            response = requests.get(f"http://localhost:8000{endpoint}", headers=headers, timeout=5)
+            response = requests.get(f"http://localhost:18000{endpoint}", headers=headers, timeout=5)
             
             if response.status_code == 200:
                 print(f"   ✅ {name}: Работает!")

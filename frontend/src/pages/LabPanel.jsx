@@ -8,11 +8,12 @@ import LabReportGenerator from '../components/laboratory/LabReportGenerator';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import EditPatientModal from '../components/common/EditPatientModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
-
-// ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal.jsx';
+import { getApiBaseUrl } from '../api/runtime';
+import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+
+const API_V1_BASE = getApiBaseUrl();
 
 const LabPanel = () => {
   const location = useLocation();
@@ -62,10 +63,6 @@ const LabPanel = () => {
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState({});
-
-  // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
-  const patientModal = useModal();
-  const visitModal = useModal();
   const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
 
   // Автоматическое скрытие сообщений через 5 секунд
@@ -91,8 +88,7 @@ const LabPanel = () => {
     try {
       const token = tokenManager.getAccessToken();
       if (!token) return;
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
+      const response = await fetch(`${API_V1_BASE}/registrar/services`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -111,7 +107,7 @@ const LabPanel = () => {
     try {
       logger.info('[Lab] loadPatients: start');
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/patients?department=Lab&limit=100', { headers: authHeader() });
+      const res = await fetch(`${API_V1_BASE}/patients?department=Lab&limit=100`, { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
         setPatients(data);
@@ -137,7 +133,7 @@ const LabPanel = () => {
   const loadTests = useCallback(async () => {
     try {
       logger.info('[Lab] loadTests: start');
-      const res = await fetch('http://localhost:8000/api/v1/lab/tests?limit=100', { headers: authHeader() });
+      const res = await fetch(`${API_V1_BASE}/lab/tests?limit=100`, { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
         setTests(data);
@@ -160,7 +156,7 @@ const LabPanel = () => {
   const loadResults = useCallback(async () => {
     try {
       logger.info('[Lab] loadResults: start');
-      const res = await fetch('http://localhost:8000/api/v1/lab/results?limit=100', { headers: authHeader() });
+      const res = await fetch(`${API_V1_BASE}/lab/results?limit=100`, { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
         setResults(data);
@@ -181,6 +177,7 @@ const LabPanel = () => {
   }, [authHeader, setMessage]);
 
   const [selectedPatientForResults, setSelectedPatientForResults] = useState(null);
+  const [selectedVisitForResults, setSelectedVisitForResults] = useState(null);
 
   useEffect(() => {
     loadPatients();
@@ -199,8 +196,7 @@ const LabPanel = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-        const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+        const response = await fetch(`${API_V1_BASE}/patients/${patientIdFromUrl}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -261,7 +257,7 @@ const LabPanel = () => {
       }
 
       // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
+      const response = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -286,11 +282,12 @@ const LabPanel = () => {
       if (data && data.queues && Array.isArray(data.queues)) {
         data.queues.forEach(queue => {
           if (queue.entries) {
-            queue.entries.forEach(entry => {
-              allAppointments.push({
-                id: entry.id,
-                visit_id: entry.id, // Добавляем visit_id для сопоставления с БД
-                patient_id: entry.patient_id,
+              queue.entries.forEach(entry => {
+                allAppointments.push({
+                  id: entry.id,
+                  appointment_id: entry.appointment_id || null,
+                  visit_id: entry.visit_id || null,
+                  patient_id: entry.patient_id,
                 patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
                 patient_phone: entry.phone || '',
                 patient_birth_year: entry.patient_birth_year || '',
@@ -315,16 +312,15 @@ const LabPanel = () => {
       }
 
       // Фильтруем только лабораторные записи для отображения
-      const appointmentsData = allAppointments.filter(apt =>
+      let appointmentsData = allAppointments.filter(apt =>
         apt.specialty === 'lab' || apt.specialty === 'laboratory'
       );
       logger.info('[Lab] loadLabAppointments: отфильтровано лабораторных записей', appointmentsData.length);
 
       // 2. Получаем актуальный payment_status из БД через all-appointments
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
       const today = new Date().toISOString().split('T')[0];
       try {
-        const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+        const appointmentsResponse = await fetch(`${API_V1_BASE}/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -337,28 +333,49 @@ const LabPanel = () => {
           logger.info('[Lab] Получены appointments из БД:', appointmentsDBData.length);
 
           // Создаем карту id -> payment_status
-          const paymentStatusMap = new Map();
+          const appointmentMetaMap = new Map();
           appointmentsDBData.forEach(apt => {
+            const appointmentMeta = {
+              payment_status: apt.payment_status || 'pending',
+              visit_id: apt.visit_id || null,
+              appointment_id: apt.appointment_id || (apt.source === 'appointments' ? apt.id : null)
+            };
             if (apt.id) {
-              paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
+              appointmentMetaMap.set(apt.id, appointmentMeta);
             }
             if (apt.patient_id && apt.appointment_date) {
               const key = `${apt.patient_id}_${apt.appointment_date}`;
-              paymentStatusMap.set(key, apt.payment_status || 'pending');
+              appointmentMetaMap.set(key, appointmentMeta);
             }
           });
 
           // Обновляем payment_status в наших записях
           allAppointments = allAppointments.map(apt => {
-            let paymentStatus = paymentStatusMap.get(apt.id);
-            if (!paymentStatus && apt.patient_id && apt.appointment_date) {
+            let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+            if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
               const key = `${apt.patient_id}_${apt.appointment_date}`;
-              paymentStatus = paymentStatusMap.get(key);
+              appointmentMeta = appointmentMetaMap.get(key);
             }
             return {
               ...apt,
-              payment_status: paymentStatus || apt.payment_status || 'pending',
-              payment_type: paymentStatus || apt.payment_type
+              appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+              visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+              payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+              payment_type: appointmentMeta?.payment_status || apt.payment_type
+            };
+          });
+          appointmentsData = appointmentsData.map((apt) => {
+            let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+            if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
+              const key = `${apt.patient_id}_${apt.appointment_date}`;
+              appointmentMeta = appointmentMetaMap.get(key);
+            }
+            return {
+              ...apt,
+              appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+              visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+              payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+              payment_type: appointmentMeta?.payment_status || apt.payment_type
             };
           });
 
@@ -409,6 +426,19 @@ const LabPanel = () => {
     };
   }, [activeTab, loadLabAppointments]);
 
+  const ensureCanonicalVisitId = useCallback(async (row) => {
+    const appointmentId = row?.appointment_id || row?.id;
+    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+
+    if (visitId) {
+      setAppointments((prev) => prev.map((appointment) =>
+        appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
+      ));
+    }
+
+    return visitId;
+  }, []);
+
   // Функция для получения данных пациента по ID
   const fetchPatientData = useCallback(async (patientId) => {
     if (patientId >= 1000) {
@@ -418,10 +448,8 @@ const LabPanel = () => {
     const token = tokenManager.getAccessToken();
     if (!token) return null;
 
-    const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
     try {
-      const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
+      const response = await fetch(`${API_V1_BASE}/patients/${patientId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -511,12 +539,29 @@ const LabPanel = () => {
   }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
   // Обработчики для таблицы записей
-  const handleAppointmentRowClick = (row) => {
+  const handleAppointmentRowClick = async (row) => {
     logger.info('Клик по записи:', row);
-    // Можно открыть детали записи или переключиться на прием
-    if (row.patient_fio) {
-      setActiveTab('tests');
+    if (!row.patient_fio) {
+      return;
     }
+
+    const visitId = await ensureCanonicalVisitId(row);
+    if (!visitId) {
+      setMessage({ type: 'error', text: 'Не удалось определить канонический visit_id для лабораторной записи' });
+      return;
+    }
+
+    setSelectedPatientForResults({
+      id: row.patient_id,
+      name: row.patient_fio,
+      phone: row.patient_phone || '',
+      birthDate: row.patient_birth_year ? `${row.patient_birth_year}-01-01` : ''
+    });
+    setSelectedVisitForResults({
+      id: visitId,
+      appointment_id: row.appointment_id || row.id
+    });
+    handleTabChange('results');
   };
 
   const handleAppointmentActionClick = async (action, row, event) => {
@@ -525,14 +570,13 @@ const LabPanel = () => {
 
     switch (action) {
       case 'view':
-        handleAppointmentRowClick(row);
+        await handleAppointmentRowClick(row);
         break;
       case 'call':
         // Вызвать пациента
         try {
-          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
           const token = tokenManager.getAccessToken();
-          const response = await fetch(apiUrl, {
+          const response = await fetch(`${API_V1_BASE}/registrar/queue/${row.id}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -562,7 +606,7 @@ const LabPanel = () => {
         // Завершить приём
         try {
           logger.info('[Lab] Завершение приёма для:', row.patient_fio);
-          handleTabChange('tests');
+          await handleAppointmentRowClick(row);
         } catch (error) {
           logger.error('[Lab] Ошибка при завершении приёма:', error);
         }
@@ -587,7 +631,7 @@ const LabPanel = () => {
     try {
       logger.info('[Lab] handleTestSubmit: start', testForm);
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/lab/tests', {
+      const res = await fetch(`${API_V1_BASE}/lab/tests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -626,7 +670,7 @@ const LabPanel = () => {
     try {
       logger.info('[Lab] handleResultSubmit: start', resultForm);
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/lab/results', {
+      const res = await fetch(`${API_V1_BASE}/lab/results`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -918,18 +962,24 @@ const LabPanel = () => {
               padding: getSpacing(4),
               backgroundColor: 'var(--mac-bg-secondary)'
             }}>
-              <LabResultsManager
-                patientId={selectedPatientForResults?.id || patientModal.selectedItem?.id || 'demo-patient-1'}
-                visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
-                onUpdate={() => {
-                  logger.info('Результаты обновлены');
-                  setResults(prev => [...prev]);
-                }}
-              />
+              {selectedPatientForResults?.id && selectedVisitForResults?.id ? (
+                <LabResultsManager
+                  patientId={selectedPatientForResults.id}
+                  visitId={selectedVisitForResults.id}
+                  onUpdate={() => {
+                    logger.info('Результаты обновлены');
+                    setResults(prev => [...prev]);
+                  }}
+                />
+              ) : (
+                <Alert severity="info">
+                  Выберите запись из вкладки "Записи", чтобы открыть результаты для канонического визита.
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
+          {results.length > 0 && selectedPatientForResults?.id && selectedVisitForResults?.id && (
             <Card
               variant="filled"
               padding="none"
@@ -955,10 +1005,10 @@ const LabPanel = () => {
               }}>
                 <LabReportGenerator
                   results={results}
-                  patient={selectedPatientForResults || patientModal.selectedItem || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
+                  patient={selectedPatientForResults}
                   doctor={{ name: 'Доктор Иванов', specialty: 'Терапевт' }}
                   clinic={{ name: 'Медицинская клиника' }}
-                  visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
+                  visitId={selectedVisitForResults.id}
                 />
               </CardContent>
             </Card>
@@ -1267,5 +1317,3 @@ const LabPanel = () => {
 };
 
 export default LabPanel;
-
-

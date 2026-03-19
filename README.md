@@ -114,7 +114,7 @@ CORS_DISABLE=1
 WS_DEV_ALLOW=1
 
 # Frontend
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:18000
 ```
 
 ### База данных

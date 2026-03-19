@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Printer, FileText, Receipt, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { Button } from '../ui/native';
+import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 /**
@@ -43,7 +44,7 @@ const PrintButton = ({
   const IconComponent = documentIcons[documentType] || Printer;
   const documentName = documentNames[documentType] || 'Документ';
 
-  const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+  const API_BASE = getApiOrigin();
 
   const handlePrint = async () => {
     try {

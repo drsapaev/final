@@ -1,4 +1,4 @@
-import React, { startTransition, useMemo, useState } from 'react';
+import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -9,7 +9,10 @@ import {
   BarChart3,
   Calendar,
   CheckCircle,
+  ChevronRight,
   Clock,
+  CreditCard,
+  FileText,
   Key,
   MapPin,
   MessageSquare,
@@ -27,35 +30,26 @@ import { LANDING_COPY, buildGlassStyle } from './landingContent';
 import './Landing.css';
 
 const FEATURE_VISUALS = [
-  { icon: Calendar, accent: '#22c55e' },
-  { icon: Users, accent: '#0ea5e9' },
-  { icon: BarChart3, accent: '#f59e0b' },
-  { icon: Shield, accent: '#a855f7' }
+  { icon: FileText, accent: '#0ea5e9' },
+  { icon: Users, accent: '#22c55e' },
+  { icon: Activity, accent: '#f97316' },
+  { icon: CreditCard, accent: '#14b8a6' },
+  { icon: MessageSquare, accent: '#8b5cf6' },
+  { icon: BarChart3, accent: '#f59e0b' }
 ];
 
-const IMPACT_VISUALS = [
-  { icon: Sparkles, accent: '#0ea5e9' },
-  { icon: CheckCircle, accent: '#22c55e' },
-  { icon: ArrowRight, accent: '#f97316' }
-];
+const MODULE_VISUALS = [FileText, Stethoscope, Activity, Users, MessageSquare, CreditCard, BarChart3, Shield];
+const SHOWCASE_VISUALS = [BarChart3, Users, Activity, FileText, CreditCard];
+const SECURITY_VISUALS = [Shield, Users, Key, Activity];
+const INTEGRATION_VISUALS = [MessageSquare, CreditCard, CreditCard, CreditCard, Activity, FileText];
 
 function SurfaceLabel({ children }) {
   return <span className="landing-surface-label">{children}</span>;
 }
 
-function HeroMetric({ value, label, detail }) {
+function SectionHeading({ eyebrow, title, description, align = 'left' }) {
   return (
-    <div className="landing-hero-metric">
-      <strong>{value}</strong>
-      <span>{label}</span>
-      <small>{detail}</small>
-    </div>
-  );
-}
-
-function SectionHeading({ eyebrow, title, description }) {
-  return (
-    <div className="landing-section-heading">
+    <div className={`landing-section-heading landing-section-heading--${align}`}>
       <SurfaceLabel>{eyebrow}</SurfaceLabel>
       <h2>{title}</h2>
       <p>{description}</p>
@@ -63,16 +57,44 @@ function SectionHeading({ eyebrow, title, description }) {
   );
 }
 
-function FeatureCard({ accent, icon: Icon, title, badge, description }) {
+function MetricCard({ value, label, detail, style }) {
   return (
-    <MacOSCard className="landing-feature-card" shadow="large" style={{ borderColor: `${accent}33` }}>
+    <MacOSCard className="landing-metric-card" shadow="large" style={style}>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <small>{detail}</small>
+    </MacOSCard>
+  );
+}
+
+function FeatureCard({ accent, icon: Icon, badge, title, description }) {
+  return (
+    <MacOSCard className="landing-feature-card" shadow="large" style={{ borderColor: `${accent}2f` }}>
       <div className="landing-feature-icon" style={{ background: `${accent}18`, color: accent }}>
         <Icon size={20} />
       </div>
-      <div className="landing-feature-copy">
-        <SurfaceLabel>{badge}</SurfaceLabel>
-        <h3>{title}</h3>
-        <p>{description}</p>
+      <SurfaceLabel>{badge}</SurfaceLabel>
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </MacOSCard>
+  );
+}
+
+function ShowcaseCard({ icon: Icon, label, title, description, style }) {
+  return (
+    <MacOSCard className="landing-showcase-card" shadow="large" style={style}>
+      <div className="landing-showcase-head">
+        <div className="landing-showcase-icon">
+          <Icon size={20} />
+        </div>
+        <SurfaceLabel>{label}</SurfaceLabel>
+      </div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      <div className="landing-showcase-bars" aria-hidden="true">
+        <span />
+        <span />
+        <span />
       </div>
     </MacOSCard>
   );
@@ -90,26 +112,10 @@ function WorkflowStep({ title, description }) {
   );
 }
 
-function ImpactCard({ accent, icon: Icon, title, description }) {
-  return (
-    <MacOSCard className="landing-impact-card" shadow="large">
-      <div className="landing-impact-icon" style={{ color: accent, background: `${accent}14` }}>
-        <Icon size={20} />
-      </div>
-      <h3>{title}</h3>
-      <p>{description}</p>
-    </MacOSCard>
-  );
-}
-
 function ContactRow({ icon: Icon, label, value, href }) {
+  const isExternal = href?.startsWith('http');
   const content = href ? (
-    <a
-      className="landing-contact-link"
-      href={href}
-      target={href.startsWith('http') ? '_blank' : undefined}
-      rel={href.startsWith('http') ? 'noreferrer' : undefined}
-    >
+    <a className="landing-contact-link" href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noreferrer' : undefined}>
       {value}
     </a>
   ) : (
@@ -155,6 +161,21 @@ export default function Landing() {
   const nextLanguage =
     availableLanguages[(currentLanguageIndex + 1) % availableLanguages.length] || availableLanguages[0];
 
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) {
+      return undefined;
+    }
+
+    root.classList.add('landing-root');
+    document.body.classList.add('landing-body');
+
+    return () => {
+      root.classList.remove('landing-root');
+      document.body.classList.remove('landing-body');
+    };
+  }, []);
+
   const handleLanguageCycle = () => {
     if (!nextLanguage?.code) {
       return;
@@ -162,6 +183,13 @@ export default function Landing() {
 
     startTransition(() => {
       setLanguage(nextLanguage.code);
+    });
+  };
+
+  const scrollToSection = (sectionId) => {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
     });
   };
 
@@ -173,10 +201,23 @@ export default function Landing() {
 
       <main className="landing-page">
         <header className="landing-topbar">
-          <div className="landing-status-pill" role="status" aria-live="polite">
-            <Activity size={15} />
-            <span>{copy.liveStatus}</span>
-          </div>
+          <a className="landing-brand" href="#hero" aria-label="MediClinic Pro">
+            <div className="landing-brand-mark" aria-hidden="true">
+              <Stethoscope size={18} />
+            </div>
+            <div>
+              <strong>{t('title')}</strong>
+              <span>{copy.liveStatus}</span>
+            </div>
+          </a>
+
+          <nav className="landing-nav" aria-label={copy.navigationLabel}>
+            {copy.navigation.map((item) => (
+              <button key={item.id} type="button" className="landing-nav-link" onClick={() => scrollToSection(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </nav>
 
           <div className="landing-toolbar">
             <MacOSButton
@@ -201,119 +242,100 @@ export default function Landing() {
               <span className="landing-language-flag">{currentLanguage?.flag || '🌐'}</span>
               <span>{language.toUpperCase()}</span>
             </MacOSButton>
+
+            <MacOSButton variant="primary" size="sm" onClick={() => navigate('/login')} className="landing-header-login">
+              <User size={16} />
+              {copy.headerLogin}
+            </MacOSButton>
           </div>
         </header>
 
-        <section className="landing-hero">
+        <section id="hero" className="landing-hero">
           <MacOSCard className="landing-hero-card" shadow="large" style={heroCardStyle}>
-            <SurfaceLabel>{copy.heroEyebrow}</SurfaceLabel>
-            <h1>{copy.heroTitle}</h1>
-            <p className="landing-hero-description">{copy.heroDescription}</p>
+            <div className="landing-live-badge" role="status" aria-live="polite">
+              <Activity size={15} />
+              <span>{copy.liveStatus}</span>
+            </div>
 
-            <div className="landing-role-pills" aria-label="Supported roles">
-              {copy.rolePills.map((pill) => (
+            <SurfaceLabel>{copy.hero.eyebrow}</SurfaceLabel>
+            <h1>{copy.hero.title}</h1>
+            <p className="landing-hero-description">{copy.hero.description}</p>
+
+            <div className="landing-cta-row">
+              <MacOSButton variant="primary" size="lg" onClick={() => navigate('/login')} className="landing-primary-cta">
+                <User size={18} />
+                {copy.hero.primaryCta}
+              </MacOSButton>
+
+              <MacOSButton variant="outline" size="lg" onClick={() => scrollToSection('screens')} className="landing-secondary-cta">
+                <ArrowRight size={18} />
+                {copy.hero.secondaryCta}
+              </MacOSButton>
+            </div>
+
+            <div className="landing-role-pills" aria-label="Product highlights">
+              {copy.hero.proofChips.map((pill) => (
                 <span key={pill} className="landing-role-pill">
                   {pill}
                 </span>
               ))}
             </div>
 
-            <ul className="landing-hero-points">
-              {copy.heroPoints.map((point) => (
-                <li key={point}>
-                  <CheckCircle size={18} />
-                  <span>{point}</span>
-                </li>
+            <div className="landing-console-metrics">
+              {copy.hero.quickStats.map((item) => (
+                <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
               ))}
-            </ul>
-
-            <div className="landing-cta-row">
-              <MacOSButton variant="primary" size="lg" onClick={() => navigate('/login')} className="landing-primary-cta">
-                <User size={18} />
-                {t('loginButton')}
-              </MacOSButton>
-
-              <MacOSButton variant="outline" size="lg" onClick={() => setShowActivation(true)} className="landing-secondary-cta">
-                <Key size={18} />
-                {t('activateButton')}
-              </MacOSButton>
             </div>
-
-            <p className="landing-hero-footnote">{copy.heroFootnote}</p>
           </MacOSCard>
 
-          <div className="landing-side-column">
-            <MacOSCard className="landing-console-card" shadow="large" style={cardStyle}>
-              <div className="landing-console-header">
-                <div>
-                  <SurfaceLabel>{copy.consoleTitle}</SurfaceLabel>
-                  <h2>{copy.consoleSubtitle}</h2>
-                </div>
-                <div className="landing-console-badge">
-                  <Stethoscope size={18} />
-                </div>
-              </div>
+          <div className="landing-hero-visuals">
+            {copy.hero.visualPanels.map((panel, index) => (
+              <MacOSCard
+                key={panel.title}
+                className={`landing-console-card landing-console-card--${index + 1}`}
+                shadow="large"
+                style={index === 1 ? accentCardStyle : cardStyle}
+              >
+                <SurfaceLabel>{panel.label}</SurfaceLabel>
+                <h2>{panel.title}</h2>
+                <p>{panel.description}</p>
 
-              <div className="landing-console-metrics">
-                {copy.consoleMetrics.map((item) => (
-                  <HeroMetric key={item.label} value={item.value} label={item.label} detail={item.detail} />
-                ))}
-              </div>
-
-              <div className="landing-console-feed">
-                {copy.consoleEvents.map((event) => (
-                  <div key={event.title} className="landing-console-feed-item">
-                    <div className="landing-console-feed-dot" aria-hidden="true" />
-                    <div>
-                      <strong>{event.title}</strong>
-                      <p>{event.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </MacOSCard>
-
-            <MacOSCard className="landing-side-cta-card" shadow="large" style={accentCardStyle}>
-              <SurfaceLabel>{copy.closingTitle}</SurfaceLabel>
-              <p>{copy.closingDescription}</p>
-              <div className="landing-side-cta-actions">
-                <MacOSButton variant="primary" onClick={() => navigate('/login')} className="landing-inline-button">
-                  {t('loginButton')}
-                  <ArrowRight size={16} />
-                </MacOSButton>
-
-                <MacOSButton variant="ghost" onClick={() => setShowActivation(true)} className="landing-inline-button">
-                  <Key size={16} />
-                  {t('activateButton')}
-                </MacOSButton>
-              </div>
-            </MacOSCard>
+                <ul className="landing-console-feed">
+                  {panel.bullets.map((bullet) => (
+                    <li key={bullet} className="landing-console-feed-item">
+                      <CheckCircle size={16} />
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+              </MacOSCard>
+            ))}
           </div>
         </section>
 
-        <section className="landing-metric-strip landing-progressive-section" aria-label="Key product metrics">
-          {copy.metricStrip.map((item) => (
-            <MacOSCard key={item.label} className="landing-metric-card" shadow="large" style={cardStyle}>
-              <strong>{item.value}</strong>
-              <span>{item.label}</span>
-              <small>{item.detail}</small>
-            </MacOSCard>
-          ))}
+        <section className="landing-section landing-progressive-section" aria-label="Operational proof">
+          <SectionHeading eyebrow={copy.trust.eyebrow} title={copy.trust.title} description={copy.trust.description} />
+
+          <div className="landing-metric-strip">
+            {copy.trust.items.map((item) => (
+              <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
+            ))}
+          </div>
         </section>
 
-        <section className="landing-section landing-progressive-section">
-          <SectionHeading eyebrow={copy.featureEyebrow} title={copy.featureTitle} description={copy.featureDescription} />
+        <section id="product" className="landing-section landing-progressive-section">
+          <SectionHeading eyebrow={copy.features.eyebrow} title={copy.features.title} description={copy.features.description} />
 
           <div className="landing-feature-grid">
-            {copy.features.map((feature, index) => {
+            {copy.features.items.map((feature, index) => {
               const visual = FEATURE_VISUALS[index % FEATURE_VISUALS.length];
               return (
                 <FeatureCard
                   key={feature.title}
                   accent={visual.accent}
                   icon={visual.icon}
-                  title={feature.title}
                   badge={feature.badge}
+                  title={feature.title}
                   description={feature.description}
                 />
               );
@@ -321,84 +343,244 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="landing-section landing-operating-grid landing-progressive-section">
+        <section id="workflow" className="landing-section landing-progressive-section">
           <MacOSCard className="landing-section-card" shadow="large" style={cardStyle}>
-            <SectionHeading eyebrow={copy.workflowEyebrow} title={copy.workflowTitle} description={copy.workflowDescription} />
+            <SectionHeading eyebrow={copy.workflow.eyebrow} title={copy.workflow.title} description={copy.workflow.description} />
 
-            <div className="landing-workflow-list">
-              {copy.workflowSteps.map((step) => (
-                <WorkflowStep key={step.title} title={step.title} description={step.description} />
-              ))}
+            <div className="landing-workflow-grid">
+              <div className="landing-workflow-list">
+                {copy.workflow.steps.map((step) => (
+                  <WorkflowStep key={step.title} title={step.title} description={step.description} />
+                ))}
+              </div>
+
+              <div className="landing-flow-card">
+                <SurfaceLabel>{copy.workflow.flowLabel}</SurfaceLabel>
+                <div className="landing-flow-track" aria-label={copy.workflow.flowLabel}>
+                  {copy.workflow.flowNodes.map((item, index) => (
+                    <React.Fragment key={item}>
+                      <span className="landing-flow-chip">{item}</span>
+                      {index < copy.workflow.flowNodes.length - 1 ? <ChevronRight size={16} className="landing-flow-arrow" /> : null}
+                    </React.Fragment>
+                  ))}
+                </div>
+                <p>{copy.workflow.flowSummary}</p>
+              </div>
             </div>
-          </MacOSCard>
-
-          <MacOSCard className="landing-section-card landing-checklist-card" shadow="large" style={cardStyle}>
-            <SectionHeading eyebrow={copy.operationsEyebrow} title={copy.operationsTitle} description={copy.operationsDescription} />
-
-            <ul className="landing-checklist">
-              {copy.operationsChecklist.map((item) => (
-                <li key={item}>
-                  <CheckCircle size={18} />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
           </MacOSCard>
         </section>
 
-        <section className="landing-section landing-progressive-section">
-          <SectionHeading eyebrow={copy.impactEyebrow} title={copy.impactTitle} description={copy.impactDescription} />
+        <section id="modules" className="landing-section landing-progressive-section">
+          <SectionHeading eyebrow={copy.modules.eyebrow} title={copy.modules.title} description={copy.modules.description} />
 
-          <div className="landing-impact-grid">
-            {copy.impactCards.map((card, index) => {
-              const visual = IMPACT_VISUALS[index % IMPACT_VISUALS.length];
+          <div className="landing-module-grid">
+            {copy.modules.items.map((module, index) => {
+              const Icon = MODULE_VISUALS[index % MODULE_VISUALS.length];
               return (
-                <ImpactCard
-                  key={card.title}
-                  accent={visual.accent}
-                  icon={visual.icon}
-                  title={card.title}
-                  description={card.description}
-                />
+                <MacOSCard key={module.title} className="landing-module-card" shadow="large" style={cardStyle}>
+                  <div className="landing-module-icon">
+                    <Icon size={18} />
+                  </div>
+                  <h3>{module.title}</h3>
+                  <p>{module.description}</p>
+                </MacOSCard>
               );
             })}
           </div>
         </section>
 
-        <section className="landing-section landing-contact-grid landing-progressive-section">
-          <MacOSCard className="landing-section-card" shadow="large" style={cardStyle}>
-            <SectionHeading eyebrow={t('contacts')} title={copy.supportTitle} description={copy.contactDescription} />
+        <section id="screens" className="landing-section landing-progressive-section">
+          <SectionHeading eyebrow={copy.screens.eyebrow} title={copy.screens.title} description={copy.screens.description} />
 
-            <div className="landing-contact-list">
-              <ContactRow icon={MapPin} label={copy.contactLabels.address} value={t('address')} />
-              <ContactRow icon={Phone} label={copy.contactLabels.phone} value={t('phone')} href={toTelUrl(t('phone'))} />
-              <ContactRow icon={Clock} label={copy.contactLabels.schedule} value={t('schedule')} />
-              <ContactRow icon={MessageSquare} label={copy.contactLabels.support} value={t('telegram')} href={toTelegramUrl(t('telegram'))} />
+          <div className="landing-showcase-grid">
+            {copy.screens.items.map((item, index) => (
+              <ShowcaseCard
+                key={item.title}
+                icon={SHOWCASE_VISUALS[index % SHOWCASE_VISUALS.length]}
+                label={item.label}
+                title={item.title}
+                description={item.description}
+                style={index === 0 ? accentCardStyle : cardStyle}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="landing-section landing-dual-grid landing-progressive-section">
+          <MacOSCard id="integrations" className="landing-section-card" shadow="large" style={cardStyle}>
+            <SectionHeading
+              eyebrow={copy.integrations.eyebrow}
+              title={copy.integrations.title}
+              description={copy.integrations.description}
+            />
+
+            <div className="landing-integration-grid">
+              {copy.integrations.items.map((item, index) => {
+                const Icon = INTEGRATION_VISUALS[index % INTEGRATION_VISUALS.length];
+                return (
+                  <div key={item.title} className="landing-integration-card">
+                    <div className="landing-integration-icon">
+                      <Icon size={18} />
+                    </div>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{item.detail}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </MacOSCard>
 
-          <MacOSCard className="landing-section-card landing-support-card" shadow="large" style={accentCardStyle}>
-            <SurfaceLabel>{copy.supportTitle}</SurfaceLabel>
-            <p className="landing-support-description">{copy.supportDescription}</p>
+          <MacOSCard id="security" className="landing-section-card" shadow="large" style={cardStyle}>
+            <SectionHeading eyebrow={copy.security.eyebrow} title={copy.security.title} description={copy.security.description} />
 
-            <ul className="landing-support-list">
-              {copy.supportBullets.map((item) => (
-                <li key={item}>
-                  <CheckCircle size={18} />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="landing-security-grid">
+              {copy.security.items.map((item, index) => {
+                const Icon = SECURITY_VISUALS[index % SECURITY_VISUALS.length];
+                return (
+                  <div key={item.title} className="landing-security-card">
+                    <div className="landing-security-icon">
+                      <Icon size={18} />
+                    </div>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </MacOSCard>
+        </section>
 
-            <div className="landing-support-actions">
+        <section className="landing-section landing-progressive-section">
+          <SectionHeading
+            eyebrow={copy.advantages.eyebrow}
+            title={copy.advantages.title}
+            description={copy.advantages.description}
+            align="center"
+          />
+
+          <div className="landing-advantage-grid">
+            <MacOSCard className="landing-advantage-card landing-advantage-card--before" shadow="large" style={cardStyle}>
+              <h3>{copy.advantages.beforeTitle}</h3>
+              <ul className="landing-checklist landing-checklist--negative">
+                {copy.advantages.beforeItems.map((item) => (
+                  <li key={item}>
+                    <span className="landing-checklist-marker landing-checklist-marker--negative" aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </MacOSCard>
+
+            <MacOSCard className="landing-advantage-card landing-advantage-card--after" shadow="large" style={accentCardStyle}>
+              <h3>{copy.advantages.afterTitle}</h3>
+              <ul className="landing-checklist">
+                {copy.advantages.afterItems.map((item) => (
+                  <li key={item}>
+                    <CheckCircle size={18} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </MacOSCard>
+          </div>
+        </section>
+
+        <section id="pricing" className="landing-section landing-progressive-section">
+          <SectionHeading eyebrow={copy.pricing.eyebrow} title={copy.pricing.title} description={copy.pricing.description} align="center" />
+
+          <div className="landing-pricing-grid">
+            {copy.pricing.plans.map((plan) => (
+              <MacOSCard
+                key={plan.name}
+                className={`landing-pricing-card ${plan.featured ? 'landing-pricing-card--featured' : ''}`}
+                shadow="large"
+                style={plan.featured ? accentCardStyle : cardStyle}
+              >
+                <SurfaceLabel>{plan.audience}</SurfaceLabel>
+                <h3>{plan.name}</h3>
+                <div className="landing-plan-price">{plan.price}</div>
+                <p className="landing-plan-note">{plan.note}</p>
+
+                <ul className="landing-checklist">
+                  {plan.features.map((feature) => (
+                    <li key={feature}>
+                      <CheckCircle size={18} />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <MacOSButton
+                  variant={plan.featured ? 'primary' : 'outline'}
+                  size="lg"
+                  onClick={() => setShowActivation(true)}
+                  className="landing-plan-button"
+                >
+                  {plan.cta}
+                </MacOSButton>
+              </MacOSCard>
+            ))}
+          </div>
+
+          <p className="landing-pricing-footnote">{copy.pricing.footnote}</p>
+        </section>
+
+        <section id="faq" className="landing-section landing-progressive-section">
+          <SectionHeading eyebrow={copy.faq.eyebrow} title={copy.faq.title} description={copy.faq.description} />
+
+          <div className="landing-faq-list">
+            {copy.faq.items.map((item) => (
+              <details key={item.question} className="landing-faq-item">
+                <summary>
+                  <span>{item.question}</span>
+                  <ChevronRight size={18} />
+                </summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section id="contact" className="landing-section landing-progressive-section">
+          <MacOSCard className="landing-final-card" shadow="large" style={heroCardStyle}>
+            <div className="landing-final-copy">
+              <SurfaceLabel>{copy.finalCta.eyebrow}</SurfaceLabel>
+              <h2>{copy.finalCta.title}</h2>
+              <p>{copy.finalCta.description}</p>
+
+              <ul className="landing-support-list">
+                {copy.finalCta.bullets.map((item) => (
+                  <li key={item}>
+                    <CheckCircle size={18} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="landing-final-actions">
               <MacOSButton variant="primary" size="lg" onClick={() => navigate('/login')}>
                 <User size={18} />
-                {t('loginButton')}
+                {copy.finalCta.primaryCta}
               </MacOSButton>
               <MacOSButton variant="outline" size="lg" onClick={() => setShowActivation(true)}>
                 <Key size={18} />
-                {t('activateButton')}
+                {copy.finalCta.secondaryCta}
               </MacOSButton>
+
+              <div className="landing-contact-list">
+                <ContactRow icon={MapPin} label={copy.contactLabels.address} value={t('address')} />
+                <ContactRow icon={Phone} label={copy.contactLabels.phone} value={t('phone')} href={toTelUrl(t('phone'))} />
+                <ContactRow icon={Clock} label={copy.contactLabels.schedule} value={t('schedule')} />
+                <ContactRow
+                  icon={MessageSquare}
+                  label={copy.contactLabels.support}
+                  value={t('telegram')}
+                  href={toTelegramUrl(t('telegram'))}
+                />
+              </div>
             </div>
           </MacOSCard>
         </section>
@@ -410,13 +592,28 @@ export default function Landing() {
             </div>
             <div>
               <strong>{t('title')}</strong>
-              <span>{t('footer')}</span>
+              <span>{copy.footer.tagline}</span>
             </div>
+          </div>
+
+          <div className="landing-footer-columns">
+            {copy.footer.groups.map((group) => (
+              <div key={group.title} className="landing-footer-column">
+                <strong>{group.title}</strong>
+                <div className="landing-footer-links">
+                  {group.links.map((link) => (
+                    <a key={link.label} href={link.href} className="landing-footer-link">
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="landing-footer-note">
             <Sparkles size={16} />
-            <span>{copy.closingDescription}</span>
+            <span>{copy.footer.footnote}</span>
           </div>
         </footer>
       </main>

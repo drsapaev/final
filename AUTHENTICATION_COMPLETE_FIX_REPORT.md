@@ -30,7 +30,7 @@
 
 **Исправлено:**
 - ✅ Backend запускается из `C:\final\backend`
-- ✅ Сервер работает на `localhost:8000`
+- ✅ Сервер работает на `localhost:18000`
 
 ### 4. ❌ React Error - Объекты как React children
 **Проблема:** Ошибки валидации Pydantic возвращались как массив объектов
@@ -143,7 +143,7 @@ const credentials = {
 ### Backend API
 ```bash
 # Health check
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 # ✅ {"ok":true,"db":"ok"}
 
 # Создание пользователей
@@ -182,7 +182,7 @@ python create_missing_users.py
 - ❌ **Пустые поля** → ✅ **Исправлено**
 
 ### 🚀 СИСТЕМА ПОЛНОСТЬЮ ФУНКЦИОНАЛЬНА:
-- ✅ **Backend сервер работает** на `localhost:8000`
+- ✅ **Backend сервер работает** на `localhost:18000`
 - ✅ **Все API endpoints корректны**
 - ✅ **Все пользователи созданы** для всех ролей
 - ✅ **Формы входа работают** корректно

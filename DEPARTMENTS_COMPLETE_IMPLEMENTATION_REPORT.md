@@ -284,7 +284,7 @@ python init_departments.py
 ### Получить список отделений (работает)
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/departments
+curl -H "Authorization: Bearer $TOKEN" http://localhost:18000/api/v1/departments
 ```
 
 **Response**:

@@ -28,6 +28,7 @@ import EMRConflictDialog from './EMRConflictDialog';
 import EMRHelpDialog from './EMRHelpDialog';
 import { useAppData } from '../../contexts/AppDataContext';
 import { mcpAPI } from '../../api/mcpClient';
+import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -57,10 +58,12 @@ import './EMRContainerV2.css';
  * @param {Object} props
  * @param {number} props.visitId - Visit ID
  * @param {number} props.patientId - Patient ID
+ * @param {string} props.specialty - Canonical specialty key
  * @param {string} props.patientName - Patient name (for sticky header)
  * @param {React.ComponentType} props.ICD10Component - Optional ICD10 autocomplete
  */
-export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
+export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }) {
+    const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
         data,
         status,
@@ -83,7 +86,31 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         redo,
         reloadFromServer,
         forceOverwrite,
-    } = useEMR(visitId);
+    } = useEMR(visitId, { specialty: canonicalSpecialty });
+
+    if (!visitId) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: для EMR v2 требуется `visitId`.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!specialty || !isCanonicalSpecialty(canonicalSpecialty)) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: передана ненормализованная specialty.
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData();
@@ -653,7 +680,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
-                                onClick={() => saveEMR()}
+                                onClick={() => saveEMR({ isDraft: false })}
                                 disabled={isSaving || !isDirty}
                             >
                                 {isSaving ? '💾 Сохранение...' : '💾 Сохранить'}
@@ -775,6 +802,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
 EMRContainerV2.propTypes = {
     visitId: PropTypes.number.isRequired,
     patientId: PropTypes.number,
+    specialty: PropTypes.string.isRequired,
     ICD10Component: PropTypes.elementType,
 };
 

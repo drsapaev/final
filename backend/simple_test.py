@@ -6,7 +6,7 @@ from datetime import date
 print("🧪 Простой тест создания визита без очередей...")
 
 # Получаем токен
-token_response = requests.post("http://localhost:8000/api/v1/auth/login", data={
+token_response = requests.post("http://localhost:18000/api/v1/auth/login", data={
     "username": "registrar@example.com",
     "password": "registrar123"
 })
@@ -25,7 +25,7 @@ patient_data = {
     "address": "Тестовый адрес, 123"
 }
 
-patient_response = requests.post("http://localhost:8000/api/v1/patients", json=patient_data, headers=headers)
+patient_response = requests.post("http://localhost:18000/api/v1/patients", json=patient_data, headers=headers)
 patient_id = patient_response.json()["id"]
 print(f"✅ Пациент создан: ID {patient_id}")
 
@@ -48,7 +48,7 @@ cart_data = {
     "notes": "Тестовая запись на завтра"
 }
 
-cart_response = requests.post("http://localhost:8000/api/v1/registrar/cart", json=cart_data, headers=headers)
+cart_response = requests.post("http://localhost:18000/api/v1/registrar/cart", json=cart_data, headers=headers)
 print(f"📋 Статус создания визита: {cart_response.status_code}")
 
 if cart_response.status_code == 200:

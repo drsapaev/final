@@ -103,12 +103,24 @@ class File(Base):
         nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve files
+    visit_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("visits.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )  # Canonical visit anchor after EMR v2 cutover
     emr_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("emr.id", ondelete="SET NULL"),
         nullable=True,
         index=True
     )  # ✅ SECURITY: SET NULL to preserve files
+    emr_record_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("emr_records.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )  # Canonical EMR v2 reference
     folder_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("file_folders.id", ondelete="SET NULL"),

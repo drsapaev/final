@@ -12,7 +12,7 @@ def test_json_upload():
     # Получаем токен
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -49,7 +49,7 @@ def test_json_upload():
     try:
         print("📤 Отправляем JSON запрос...")
         upload_response = requests.post(
-            "http://localhost:8000/api/v1/files/upload-json",
+            "http://localhost:18000/api/v1/files/upload-json",
             headers=headers,
             json=data,
             timeout=10

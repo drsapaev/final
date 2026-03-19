@@ -309,12 +309,12 @@
 
 ```bash
 # 1. Врач авторизуется
-curl -X POST "http://localhost:8000/api/v1/authentication/login" \
+curl -X POST "http://localhost:18000/api/v1/authentication/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "doctor", "password": "password"}'
 
 # 2. Назначает визит
-curl -X POST "http://localhost:8000/api/v1/doctor/visits/schedule-next" \
+curl -X POST "http://localhost:18000/api/v1/doctor/visits/schedule-next" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -333,7 +333,7 @@ curl -X POST "http://localhost:8000/api/v1/doctor/visits/schedule-next" \
 ```bash
 # Пациент получает сообщение в Telegram с кнопкой подтверждения
 # При нажатии отправляется запрос:
-curl -X POST "http://localhost:8000/api/v1/telegram/visits/confirm" \
+curl -X POST "http://localhost:18000/api/v1/telegram/visits/confirm" \
   -H "Content-Type: application/json" \
   -d '{
     "token": "received-token-from-message",
@@ -347,7 +347,7 @@ curl -X POST "http://localhost:8000/api/v1/telegram/visits/confirm" \
 ```bash
 # Автоматически запускается каждое утро в 07:00
 # Или вручную администратором:
-curl -X POST "http://localhost:8000/api/v1/admin/morning-assignment/run" \
+curl -X POST "http://localhost:18000/api/v1/admin/morning-assignment/run" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 

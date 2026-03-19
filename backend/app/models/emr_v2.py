@@ -291,6 +291,50 @@ class EMRAuditLog(Base):
         return f"<EMRAuditLog(id={self.id}, emr_id={self.emr_id}, action={self.action}, user_id={self.user_id})>"
 
 
+class EMRMigrationLedger(Base):
+    """Idempotent ledger for legacy -> canonical EMR migration."""
+
+    __tablename__ = "emr_migration_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    legacy_emr_id: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
+    legacy_appointment_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    patient_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    visit_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("visits.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    canonical_emr_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("emr_records.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    migrated_revision_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("emr_revisions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="pending",
+        index=True,
+        comment="pending | migrated | skipped | failed",
+    )
+    source_checksum: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    migrated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("ix_emr_migration_ledger_status_visit", "status", "visit_id"),
+    )
+
+
 # Enforce append-only semantics at ORM level: forbid UPDATE/DELETE for audit logs
 @event.listens_for(EMRAuditLog, "before_update")
 def _prevent_audit_update(mapper, connection, target):  # pragma: no cover - safety

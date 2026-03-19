@@ -5,7 +5,7 @@ token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWdpc3RyYXJAZXhhbXBsZS
 headers = {"Authorization": f"Bearer {token}"}
 
 print("Получаю список услуг...")
-response = requests.get("http://localhost:8000/api/v1/services", headers=headers)
+response = requests.get("http://localhost:18000/api/v1/services", headers=headers)
 
 if response.status_code == 200:
     services = response.json()

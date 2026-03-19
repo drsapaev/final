@@ -3,7 +3,7 @@
 ## 📊 СТАТУС СИСТЕМЫ
 
 ### ✅ BACKEND - 100% ГОТОВ
-- **FastAPI сервер**: Запущен на http://localhost:8000
+- **FastAPI сервер**: Запущен на http://localhost:18000
 - **База данных**: SQLite с полной схемой
 - **Аутентификация**: JWT + OAuth2 + 2FA
 - **API эндпоинты**: Все 50+ эндпоинтов работают
@@ -29,12 +29,12 @@ http://localhost:5173
 
 ### Backend API
 ```
-http://localhost:8000
+http://localhost:18000
 ```
 
 ### API Документация
 ```
-http://localhost:8000/docs
+http://localhost:18000/docs
 ```
 
 ## 🔐 ТЕСТОВЫЕ ПОЛЬЗОВАТЕЛИ

@@ -4,19 +4,19 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def test_api_docs():
     """Тест доступности API документации"""
     print("🔍 Тестирование API документации...")
     
     try:
-        response = requests.get("http://localhost:8000/docs", timeout=10)
+        response = requests.get("http://localhost:18000/docs", timeout=10)
         print(f"Status Code: {response.status_code}")
         
         if response.status_code == 200:
             print("✅ API документация доступна")
-            print("📖 Откройте http://localhost:8000/docs в браузере")
+            print("📖 Откройте http://localhost:18000/docs в браузере")
             return True
         else:
             print(f"❌ Error: {response.text}")
@@ -31,7 +31,7 @@ def test_openapi_schema():
     print("\n🔍 Тестирование OpenAPI схемы...")
     
     try:
-        response = requests.get("http://localhost:8000/openapi.json", timeout=10)
+        response = requests.get("http://localhost:18000/openapi.json", timeout=10)
         print(f"Status Code: {response.status_code}")
         
         if response.status_code == 200:
@@ -63,7 +63,7 @@ def test_server_health():
     print("\n🔍 Тестирование здоровья сервера...")
     
     try:
-        response = requests.get("http://localhost:8000/api/v1/health", timeout=10)
+        response = requests.get("http://localhost:18000/api/v1/health", timeout=10)
         print(f"Status Code: {response.status_code}")
         
         if response.status_code == 200:
@@ -84,7 +84,7 @@ def test_mcp_endpoints_exist():
     print("\n🔍 Проверка существования MCP endpoints...")
     
     try:
-        response = requests.get("http://localhost:8000/openapi.json", timeout=10)
+        response = requests.get("http://localhost:18000/openapi.json", timeout=10)
         
         if response.status_code == 200:
             schema = response.json()
@@ -147,7 +147,7 @@ def test_mcp_requires_auth():
     
     for endpoint in test_endpoints:
         try:
-            response = requests.get(f"http://localhost:8000{endpoint}", timeout=10)
+            response = requests.get(f"http://localhost:18000{endpoint}", timeout=10)
             
             if response.status_code == 401:
                 print(f"✅ {endpoint}: требует авторизацию (401)")
@@ -210,7 +210,7 @@ def main():
         print("  ✅ MCP endpoints зарегистрированы")
         print("  ✅ Авторизация работает корректно")
         print("\n🌐 Следующие шаги:")
-        print("  1. Откройте http://localhost:8000/docs в браузере")
+        print("  1. Откройте http://localhost:18000/docs в браузере")
         print("  2. Авторизуйтесь через /api/v1/auth/minimal-login")
         print("  3. Протестируйте MCP endpoints с токеном")
         print("  4. Используйте MCP в медицинских панелях")

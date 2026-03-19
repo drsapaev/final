@@ -1,5 +1,5 @@
 # === Конфигурация ===
-$ApiRoot = "http://localhost:8000"
+$ApiRoot = "http://localhost:18000"
 $DbFilePath = "C:\final\backend\clinic.db"  # путь к SQLite-файлу (если используется)
 $EnvPath = "C:\final\backend\.env"
 $AuthFile = "C:\final\backend\app\api\v1\endpoints\auth.py"

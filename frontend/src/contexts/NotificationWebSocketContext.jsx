@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import { buildWsUrl } from '../api/runtime';
 import { useToast } from '../components/common/Toast';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
@@ -48,42 +49,7 @@ export function NotificationWebSocketProvider({ children }) {
       return () => {};
     }
 
-    // Determine WebSocket Protocol (ws/wss) based on current page
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use the backend host or default to same-origin with standard port
-    // Simplification: assume backend on port 8000 or proxy. 
-    // Ideally use environment variable.
-    // Given the rest of the app:
-    const host = window.location.hostname;
-    // Standard backend port in dev is 8000. In prod, likely same port.
-    // If we have API_URL environment variable, we should parse it.
-    // For now, let's try a safe bet or a configurable url.
-    // Assuming backend is at localhost:8000 for dev environments.
-
-    // Better strategy: Use a known base URL config if available
-    let wsUrl = `${protocol}//${host}:8000/api/v1/notification-websocket/ws/notifications/connect?token=${token}`;
-
-    // BUT wait, in existing code, endpoints are often referenced via imports.
-    // The endpoint I created is in `app/api/v1/endpoints/notification_websocket.py`
-    // And registered as `notification_websocket.router` with tags=["notification-websocket"].
-    // It does NOT have a prefix in `api.py`.
-    // Wait, let's check api.py again.
-
-    /*
-    api_router.include_router(
-        notification_websocket.router, tags=["notification-websocket"]
-    )
-    */
-
-    // And the router implementation:
-    // @router.websocket("/ws/notifications/connect")
-
-    // So the full path is `/api/v1/ws/notifications/connect`.
-
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-    // Convert http(s) to ws(s)
-    const wsBase = apiBase.replace(/^http/, 'ws');
-    wsUrl = `${wsBase}/ws/notifications/connect?token=${token}`;
+    const wsUrl = `${buildWsUrl('/api/v1/ws/notifications/connect')}?token=${token}`;
 
     const socket = new WebSocket(wsUrl);
     activeSocket = socket;

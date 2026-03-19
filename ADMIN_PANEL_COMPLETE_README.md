@@ -404,7 +404,7 @@ const response = await fetch('/api/v1/admin/clinic/settings', {
 python backend/check_admin.py
 
 # Проверьте backend сервер
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 ```
 
 #### 2. **Ошибки API**
@@ -466,8 +466,8 @@ python -m alembic upgrade head
    - Система: `/admin/system/info`
 
 4. **Документация API:**
-   - OpenAPI: `http://localhost:8000/docs`
-   - ReDoc: `http://localhost:8000/redoc`
+   - OpenAPI: `http://localhost:18000/docs`
+   - ReDoc: `http://localhost:18000/redoc`
 
 ---
 

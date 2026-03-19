@@ -378,7 +378,7 @@ POST /api/v1/registrar-integration/queue/entries/batch
 ### Example:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/registrar-integration/queue/entries/batch" \
+curl -X POST "http://localhost:18000/api/v1/registrar-integration/queue/entries/batch" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{

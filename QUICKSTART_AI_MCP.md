@@ -18,10 +18,10 @@ npm start
 
 ```bash
 # Открыть в браузере
-http://localhost:8000/docs
+http://localhost:18000/docs
 
 # Или curl
-curl http://localhost:8000/api/v1/mcp/health
+curl http://localhost:18000/api/v1/mcp/health
 ```
 
 ✅ Должно вернуть: `{"status": "healthy", "servers": [...]}`

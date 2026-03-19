@@ -8,7 +8,7 @@ from datetime import date
 # Логин
 print("🔐 Вход в систему...")
 login_response = requests.post(
-    "http://localhost:8000/api/v1/authentication/login",
+    "http://localhost:18000/api/v1/authentication/login",
     json={"username": "registrar", "password": "registrar123"}
 )
 
@@ -22,7 +22,7 @@ print(f"✅ Вход выполнен\n")
 
 # Запрос очередей
 today = date.today().strftime('%Y-%m-%d')
-url = f"http://localhost:8000/api/v1/registrar/queues/today?target_date={today}"
+url = f"http://localhost:18000/api/v1/registrar/queues/today?target_date={today}"
 
 print(f"📡 Запрос: GET {url}")
 response = requests.get(

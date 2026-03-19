@@ -6,7 +6,7 @@ Usage:
     python test_queue_batch_manual.py
 
 Requirements:
-    - Backend server должен быть запущен (localhost:8000)
+    - Backend server должен быть запущен (localhost:18000)
     - В БД должны быть пользователи: admin или registrar
     - В БД должны быть пациенты, услуги, специалисты
 """
@@ -15,7 +15,7 @@ import json
 from datetime import date
 
 # Configuration
-API_BASE = "http://localhost:8000/api/v1"
+API_BASE = "http://localhost:18000/api/v1"
 USERNAME = "admin"  # Или "registrar"
 PASSWORD = "admin"  # Замените на реальный пароль
 

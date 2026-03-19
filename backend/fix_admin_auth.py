@@ -96,7 +96,7 @@ def test_admin_auth():
     
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             timeout=10
         )

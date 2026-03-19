@@ -3,7 +3,7 @@ import json
 
 def check_api_response():
     # Получаем данные очередей
-    url = 'http://localhost:8000/api/v1/registrar/queues/today'
+    url = 'http://localhost:18000/api/v1/registrar/queues/today'
     params = {'target_date': '2025-12-01'}
 
     try:

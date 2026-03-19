@@ -74,7 +74,7 @@ Duration:              12500 ms
 ### 2.2 Через API (ADMIN ONLY)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/emr/batch-index \
+curl -X POST http://localhost:18000/api/v1/emr/batch-index \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -86,7 +86,7 @@ curl -X POST http://localhost:8000/api/v1/emr/batch-index \
 ### 2.3 Для конкретного врача
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/emr/index-doctor \
+curl -X POST http://localhost:18000/api/v1/emr/index-doctor \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -102,7 +102,7 @@ curl -X POST http://localhost:8000/api/v1/emr/index-doctor \
 ### 3.1 Через API
 
 ```bash
-curl http://localhost:8000/api/v1/emr/readiness/123
+curl http://localhost:18000/api/v1/emr/readiness/123
 ```
 
 **Response (готов):**
@@ -197,7 +197,7 @@ LIMIT 10;
 ### 6.1 Telemetry Dashboard
 
 ```bash
-curl http://localhost:8000/api/v1/emr/telemetry-stats/123
+curl http://localhost:18000/api/v1/emr/telemetry-stats/123
 ```
 
 **Response:**

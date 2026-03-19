@@ -12,6 +12,7 @@ from app.models.enums import AppointmentStatus
 from app.repositories.appointment_flow_api_repository import (
     AppointmentFlowApiRepository,
 )
+from app.services.canonical_visit_service import CanonicalVisitService
 from app.services.context_facades.emr_facade import (
     EmrContextFacade,
     EmrServiceContractAdapter,
@@ -39,6 +40,7 @@ class AppointmentFlowApiService:
         self,
         db: Session,
         repository: AppointmentFlowApiRepository | None = None,
+        canonical_visit_service: CanonicalVisitService | None = None,
         patient_facade: PatientContextFacade | None = None,
         emr_facade: EmrContextFacade | None = None,
         iam_facade: IamContextFacade | None = None,
@@ -57,6 +59,10 @@ class AppointmentFlowApiService:
             self.emr_facade = EmrContextFacade(
                 EmrServiceContractAdapter(effective_db)
             )
+
+        self.canonical_visit_service = canonical_visit_service
+        if self.canonical_visit_service is None and effective_db is not None:
+            self.canonical_visit_service = CanonicalVisitService(effective_db)
 
         # Built lazily per request actor if not injected explicitly.
         self.iam_facade = iam_facade
@@ -78,6 +84,14 @@ class AppointmentFlowApiService:
         appointment.status = AppointmentStatus.IN_VISIT
         self.repository.commit()
         self.repository.refresh(appointment)
+
+    def resolve_canonical_visit(self, *, appointment_id: int) -> int:
+        if not self.canonical_visit_service:
+            raise AppointmentFlowApiDomainError(
+                500,
+                "Canonical visit resolver is not configured",
+            )
+        return self.canonical_visit_service.resolve_canonical_visit(appointment_id)
 
     def ensure_emr_write_allowed(
         self,

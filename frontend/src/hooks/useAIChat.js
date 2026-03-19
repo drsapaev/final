@@ -9,10 +9,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { api } from '../api/client';
+import { buildWsUrl } from '../api/runtime';
 import logger from '../utils/logger';
 import { tokenManager } from '../utils/tokenManager';
-
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 /**
  * Хук для AI чата
@@ -225,7 +224,7 @@ export const useAIChat = (options = {}) => {
             return;
         }
 
-        const wsUrl = `${WS_BASE_URL}/api/v1/ai/chat/ws?token=${token}`;
+        const wsUrl = `${buildWsUrl('/api/v1/ai/chat/ws')}?token=${token}`;
 
         try {
             wsRef.current = new WebSocket(wsUrl);

@@ -10,6 +10,13 @@ import { TranslationProvider } from '../../hooks/useTranslation';
 import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
 
 function renderLanding() {
+  let root = document.getElementById('root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'root';
+    document.body.appendChild(root);
+  }
+
   return render(
     <MemoryRouter>
       <MacOSThemeProvider>
@@ -19,7 +26,8 @@ function renderLanding() {
           </TranslationProvider>
         </ThemeProvider>
       </MacOSThemeProvider>
-    </MemoryRouter>
+    </MemoryRouter>,
+    { container: root }
   );
 }
 
@@ -29,19 +37,25 @@ describe('Landing', () => {
     localStorage.setItem.mockImplementation(() => undefined);
   });
 
-  it('renders a strong hero, repeated CTA and contact details', () => {
+  it('renders a multi-section SaaS landing with hero, modules, pricing and contacts', () => {
     renderLanding();
 
     expect(
       screen.getByRole('heading', {
-        name: /Единая операционная панель клиники, которая ускоряет каждый прием/i
+        name: /Единая система управления клиникой, которая держит EMR, очередь и платежи в одном ритме/i
       })
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /Войти в систему/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: /Активировать лицензию/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Открыть демо/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Смотреть 2-минутный обзор/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Модули/i })).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
-        name: /Одна система вместо десяти разрозненных инструментов/i
+        name: /Модульная архитектура под реальные направления клиники/i
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: /Три тарифа для малых клиник, растущих команд и сетей/i
       })
     ).toBeInTheDocument();
     expect(screen.getByText(/\+998 \(95\) 104-34-34/i)).toBeInTheDocument();
@@ -56,8 +70,32 @@ describe('Landing', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: /Klinikaning har bir qabuli tezlashadigan yagona operatsion panel/i
+        name: /EMR, navbat va tolovlarni bitta ritmda ushlab turadigan yagona klinika boshqaruv tizimi/i
       })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: /Klinikaning real yonalishlari uchun modulli arxitektura/i
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('applies landing-specific layout classes and cleans them up on unmount', () => {
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.appendChild(root);
+
+    expect(root).not.toHaveClass('landing-root');
+    expect(document.body).not.toHaveClass('landing-body');
+
+    const { unmount } = renderLanding();
+
+    expect(document.getElementById('root')).toHaveClass('landing-root');
+    expect(document.body).toHaveClass('landing-body');
+
+    unmount();
+
+    expect(document.getElementById('root')).not.toHaveClass('landing-root');
+    expect(document.body).not.toHaveClass('landing-body');
   });
 });

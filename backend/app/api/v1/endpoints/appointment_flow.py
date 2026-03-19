@@ -4,22 +4,23 @@ API endpoints для жесткого потока: запись → плате�
 
 import logging
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
+from app.core.config import settings
 from app.models.enums import AppointmentStatus
 from app.models.user import User
-from app.core.audit import extract_model_changes
 from app.schemas.appointment import Appointment
 from app.schemas.emr import (
     EMR,
     EMRCreate,
-    EMRUpdate,
     Prescription,
     PrescriptionCreate,
     PrescriptionUpdate,
@@ -28,6 +29,12 @@ from app.services.appointment_flow_api_service import (
     AppointmentFlowApiDomainError,
     AppointmentFlowApiService,
 )
+from app.services.canonical_visit_service import CanonicalVisitResolutionError
+from app.services.emr_contract import (
+    canonical_emr_to_legacy_payload,
+    legacy_emr_to_v2_data,
+)
+from app.services.emr_v2_service import emr_v2_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +51,80 @@ def convert_datetimes_to_iso(obj):
 
 
 router = APIRouter()
+
+APPOINTMENT_FLOW_READ_ROLES = (
+    "Admin",
+    "Doctor",
+    "Registrar",
+    "Cashier",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "Cardio",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+    "Lab",
+    "Laboratory",
+)
+
+
+class CanonicalVisitResponse(BaseModel):
+    appointment_id: int
+    visit_id: int
+
+
+def _maybe_raise_legacy_write_freeze() -> None:
+    if settings.EMR_LEGACY_WRITE_FREEZE:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Legacy appointment-based EMR writes are temporarily frozen during "
+                "EMR v2 hard cutover. Use canonical /api/v1/v2/emr endpoints."
+            ),
+        )
+
+
+def _resolve_appointment_and_visit(
+    db: Session,
+    appointment_id: int,
+    *,
+    allow_visit_fallback: bool = True,
+) -> tuple[Any, int, AppointmentFlowApiService]:
+    appointment_flow_api_service = AppointmentFlowApiService(db)
+    appointment = crud_appointment.get(db, id=appointment_id)
+
+    if not appointment and allow_visit_fallback:
+        try:
+            appointment, _visit = appointment_flow_api_service.resolve_appointment_from_visit(
+                appointment_id=appointment_id,
+                emr_data=SimpleNamespace(appointment_id=appointment_id),
+            )
+        except AppointmentFlowApiDomainError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+
+    try:
+        visit_id = appointment_flow_api_service.resolve_canonical_visit(
+            appointment_id=appointment.id
+        )
+    except CanonicalVisitResolutionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    return appointment, visit_id, appointment_flow_api_service
+
+
+def _legacy_emr_response(canonical_emr: Any, *, appointment_id: int) -> EMR:
+    return EMR.model_validate(
+        canonical_emr_to_legacy_payload(canonical_emr, appointment_id=appointment_id)
+    )
+
+
+def _canonical_emr_ready(canonical_emr: Any | None) -> bool:
+    return bool(canonical_emr and getattr(canonical_emr, "status", "draft") != "draft")
 
 
 @router.post("/{appointment_id}/start-visit", response_model=Appointment)
@@ -114,19 +195,21 @@ def create_or_update_emr(
     
     ✅ SECURITY: Validates medical data including ICD-10 codes, date ranges, and medical values
     """
+    _maybe_raise_legacy_write_freeze()
+
     logger.info(
-        "[create_or_update_emr] Начало обработки appointment_id=%d, user=%s, role=%s",
+        "[appointment-flow shim] create_or_update_emr appointment_id=%d user=%s role=%s",
         appointment_id,
         current_user.username,
-        getattr(current_user, 'role', 'N/A'),
+        getattr(current_user, "role", "N/A"),
     )
-    
+
     # ✅ SECURITY: Validate medical record data
     from app.services.medical_validation import MedicalValidationService
     from fastapi import HTTPException, status
-    
+
     validation_service = MedicalValidationService()
-    
+
     # Get patient birth date for date validation
     appointment = crud_appointment.get(db, id=appointment_id)
     patient_birth_date = None
@@ -135,10 +218,10 @@ def create_or_update_emr(
         patient = crud_patient.get(db, id=appointment.patient_id)
         if patient:
             patient_birth_date = patient.birth_date
-    
+
     # Convert Pydantic model to dict for validation
     emr_dict = emr_data.model_dump(exclude_unset=True)
-    
+
     # Validate medical record
     is_valid, errors = validation_service.validate_medical_record(emr_dict, patient_birth_date)
     if not is_valid:
@@ -146,39 +229,11 @@ def create_or_update_emr(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Medical record validation errors: {'; '.join(errors)}",
         )
-    
-    appointment = crud_appointment.get(db, id=appointment_id)
-    appointment_flow_api_service = AppointmentFlowApiService(db)
 
-    # Если Appointment не найден, проверяем, может это Visit ID
-    if not appointment:
-        logger.info(
-            "[create_or_update_emr] Appointment %d не найден, проверяем Visit...",
-            appointment_id,
-        )
-        try:
-            appointment, visit = appointment_flow_api_service.resolve_appointment_from_visit(
-                appointment_id=appointment_id,
-                emr_data=emr_data,
-            )
-            logger.info(
-                "[create_or_update_emr] Создан Appointment %d из Visit %d",
-                appointment.id,
-                visit.id,
-            )
-        except AppointmentFlowApiDomainError:
-            logger.warning(
-                "[create_or_update_emr] Запись %d не найдена ни в Appointment, ни в Visit",
-                appointment_id,
-            )
-            raise HTTPException(status_code=404, detail="Запись не найдена")
-    else:
-        logger.info(
-            "[create_or_update_emr] Appointment найден: status=%s",
-            appointment.status,
-        )
-    # Остальные исключения обрабатываются централизованными обработчиками
-    # (exception_handlers.py)
+    appointment, visit_id, appointment_flow_api_service = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+    )
 
     # Проверяем статус записи
     # Разрешаем сохранение EMR если статус: in_visit, in_progress, completed, или called (вызван врачом)
@@ -217,135 +272,23 @@ def create_or_update_emr(
             )
 
     try:
-        # Проверяем, есть ли уже EMR для этой записи
-        logger.info(
-            "[create_or_update_emr] Проверка существующего EMR для appointment_id=%d",
-            appointment_id,
+        canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+        canonical_payload = legacy_emr_to_v2_data(
+            emr_dict,
+            fallback_specialty=getattr(current_user, "specialty", None)
+            or getattr(current_user, "role", None),
         )
-        existing_emr = crud_emr.emr.get_by_appointment(
-            db, appointment_id=appointment_id
+        row_version = canonical_emr.row_version if canonical_emr else 0
+        saved_emr = emr_v2_service.save(
+            db,
+            visit_id=visit_id,
+            data=canonical_payload,
+            user_id=current_user.id,
+            row_version=row_version,
+            client_session_id=f"legacy-appointment-flow:{current_user.id}",
+            is_draft=emr_data.is_draft,
         )
-
-        if existing_emr:
-            logger.info("[create_or_update_emr] EMR найден, обновление...")
-            # Создаем версию перед обновлением
-            try:
-                from app.crud.emr_template import emr_version
-
-                # Очищаем объект от SQLAlchemy внутренних полей перед сериализацией
-                # Используем Pydantic схему для безопасной сериализации
-                from app.schemas.emr import EMR as EMRSchema
-
-                emr_dict = EMRSchema.from_orm(existing_emr).dict()
-
-                # Преобразуем все datetime объекты в ISO строки для JSON сериализации
-                emr_dict_clean = convert_datetimes_to_iso(emr_dict)
-
-                emr_version.create_version(
-                    db,
-                    emr_id=existing_emr.id,
-                    version_data=emr_dict_clean,
-                    change_type="updated",
-                    change_description="Обновление EMR",
-                    changed_by=current_user.id,
-                )
-            except Exception as version_error:
-                logger.warning(
-                    "[create_or_update_emr] Предупреждение: не удалось создать версию: %s",
-                    version_error,
-                    exc_info=True,
-                )
-
-            # Обновляем существующий EMR
-            # ✅ AUDIT LOG: Сохраняем старые данные перед обновлением
-            old_data, _ = extract_model_changes(existing_emr, None)
-            
-            emr_update_dict = emr_data.dict(exclude={"appointment_id"})
-            logger.info(
-                "[create_or_update_emr] Данные для обновления: %s",
-                list(emr_update_dict.keys()),
-            )
-            emr_update = EMRUpdate(**emr_update_dict)
-            updated_emr = crud_emr.emr.update(
-                db, db_obj=existing_emr, obj_in=emr_update
-            )
-            appointment_flow_api_service.finalize_emr_update_audit(
-                request=request,
-                user_id=current_user.id,
-                appointment_id=appointment_id,
-                updated_emr=updated_emr,
-                old_data=old_data,
-            )
-            
-            logger.info("[create_or_update_emr] EMR обновлен успешно")
-            return updated_emr
-        else:
-            logger.info("[create_or_update_emr] EMR не найден, создание нового...")
-            # Создаем новый EMR
-            # Убеждаемся, что appointment_id установлен из URL параметра
-            if emr_data.appointment_id != appointment_id:
-                logger.warning(
-                    "[create_or_update_emr] Предупреждение: appointment_id в данных (%d) != URL (%d), используем URL",
-                    emr_data.appointment_id,
-                    appointment_id,
-                )
-            emr_data.appointment_id = appointment_id
-            logger.info(
-                "[create_or_update_emr] Создание EMR с appointment_id=%d, is_draft=%s",
-                appointment_id,
-                emr_data.is_draft,
-            )
-            try:
-                new_emr = crud_emr.emr.create(db, obj_in=emr_data)
-                logger.info("[create_or_update_emr] EMR создан, id=%d", new_emr.id)
-                appointment_flow_api_service.finalize_emr_create_audit(
-                    request=request,
-                    user_id=current_user.id,
-                    appointment_id=appointment_id,
-                    new_emr=new_emr,
-                )
-            except Exception as create_error:
-                logger.error(
-                    "[create_or_update_emr] Ошибка при создании EMR: %s: %s",
-                    type(create_error).__name__,
-                    create_error,
-                    exc_info=True,
-                )
-                raise
-
-            # Создаем первую версию
-            try:
-                from app.crud.emr_template import emr_version
-
-                # Очищаем объект от SQLAlchemy внутренних полей перед сериализацией
-                # Используем Pydantic схему для безопасной сериализации
-                from app.schemas.emr import EMR as EMRSchema
-
-                emr_dict = EMRSchema.from_orm(new_emr).dict()
-
-                # Преобразуем все datetime объекты в ISO строки для JSON сериализации
-                emr_dict_clean = convert_datetimes_to_iso(emr_dict)
-
-                emr_version.create_version(
-                    db,
-                    emr_id=new_emr.id,
-                    version_data=emr_dict_clean,
-                    change_type="created",
-                    change_description="Создание EMR",
-                    changed_by=current_user.id,
-                )
-            except Exception as version_error:
-                logger.warning(
-                    "[create_or_update_emr] Предупреждение: не удалось создать версию: %s",
-                    version_error,
-                    exc_info=True,
-                )
-
-            logger.info(
-                "[create_or_update_emr] EMR создан успешно, id=%d",
-                new_emr.id,
-            )
-            return new_emr
+        return _legacy_emr_response(saved_emr, appointment_id=appointment.id)
     except HTTPException:
         raise
     # Остальные исключения обрабатываются централизованными обработчиками
@@ -363,41 +306,25 @@ def save_emr(
     
     Также индексирует фразы для Doctor History Autocomplete.
     """
-    emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
-    if not emr:
+    _maybe_raise_legacy_write_freeze()
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+    if not canonical_emr:
         raise HTTPException(status_code=404, detail="EMR не найдена")
 
-    if not emr.is_draft:
-        raise HTTPException(status_code=400, detail="EMR уже сохранена")
+    if canonical_emr.status != "draft":
+        return _legacy_emr_response(canonical_emr, appointment_id=appointment.id)
 
-    saved_emr = crud_emr.emr.save_emr(db, emr_id=emr.id)
-    
-    # 🔥 INDEX PHRASES for Doctor History Autocomplete
-    # Это НЕ генерация - это извлечение фраз для будущих подсказок
-    try:
-        from app.services.emr_phrase_indexer import get_emr_phrase_indexer
-        
-        indexer = get_emr_phrase_indexer(db)
-        specialty = getattr(current_user, 'specialty', None)
-        
-        indexed_count = indexer.index_single_emr(
-            emr_id=saved_emr.id,
-            doctor_id=current_user.id,
-            specialty=specialty
-        )
-        
-        logger.info(
-            "[save_emr] Indexed %d phrases for doctor %d from EMR %d",
-            indexed_count, current_user.id, saved_emr.id
-        )
-    except Exception as index_error:
-        # Не блокируем сохранение если индексация не удалась
-        logger.warning(
-            "[save_emr] Failed to index phrases: %s",
-            index_error
-        )
-    
-    return saved_emr
+    saved_emr = emr_v2_service.save(
+        db,
+        visit_id=visit_id,
+        data=canonical_emr.data,
+        user_id=current_user.id,
+        row_version=canonical_emr.row_version,
+        client_session_id=f"legacy-appointment-flow:{current_user.id}",
+        is_draft=False,
+    )
+    return _legacy_emr_response(saved_emr, appointment_id=appointment.id)
 
 
 @router.get("/{appointment_id}/emr", response_model=Optional[EMR])
@@ -409,8 +336,11 @@ def get_emr(
     """
     Получить EMR по записи
     """
-    emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
-    return emr
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+    if not canonical_emr:
+        return None
+    return _legacy_emr_response(canonical_emr, appointment_id=appointment.id)
 
 
 @router.post("/{appointment_id}/prescription", response_model=Prescription)
@@ -423,13 +353,12 @@ def create_or_update_prescription(
     """
     Создать или обновить рецепт
     """
-    appointment = crud_appointment.get(db, id=appointment_id)
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+    _maybe_raise_legacy_write_freeze()
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
 
     # Проверяем, что есть сохраненная EMR
-    emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
-    if not emr or emr.is_draft:
+    canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+    if not _canonical_emr_ready(canonical_emr):
         raise HTTPException(
             status_code=400, detail="Рецепт можно создать только после сохранения EMR"
         )
@@ -445,23 +374,37 @@ def create_or_update_prescription(
         )
 
     # Проверяем, есть ли уже рецепт
-    existing_prescription = crud_emr.prescription.get_by_appointment(
-        db, appointment_id=appointment_id
+    existing_prescription = crud_emr.prescription.get_by_visit(
+        db, visit_id=visit_id
     )
+    if not existing_prescription:
+        existing_prescription = crud_emr.prescription.get_by_appointment(
+            db, appointment_id=appointment.id
+        )
 
     if existing_prescription:
         # Обновляем существующий рецепт
         prescription_update = PrescriptionUpdate(
-            **prescription_data.dict(exclude={"appointment_id", "emr_id"})
+            **prescription_data.dict(
+                exclude={"appointment_id", "visit_id", "emr_id", "emr_record_id"}
+            )
         )
         updated_prescription = crud_emr.prescription.update(
             db, db_obj=existing_prescription, obj_in=prescription_update
         )
+        updated_prescription.appointment_id = appointment.id
+        updated_prescription.visit_id = visit_id
+        updated_prescription.emr_record_id = canonical_emr.id
+        db.add(updated_prescription)
+        db.commit()
+        db.refresh(updated_prescription)
         return updated_prescription
     else:
         # Создаем новый рецепт
-        prescription_data.appointment_id = appointment_id
-        prescription_data.emr_id = emr.id
+        prescription_data.appointment_id = appointment.id
+        prescription_data.visit_id = visit_id
+        prescription_data.emr_id = None
+        prescription_data.emr_record_id = canonical_emr.id
         new_prescription = crud_emr.prescription.create(db, obj_in=prescription_data)
         return new_prescription
 
@@ -475,9 +418,12 @@ def save_prescription(
     """
     Сохранить рецепт (перевести из черновика)
     """
-    prescription = crud_emr.prescription.get_by_appointment(
-        db, appointment_id=appointment_id
-    )
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    prescription = crud_emr.prescription.get_by_visit(db, visit_id=visit_id)
+    if not prescription:
+        prescription = crud_emr.prescription.get_by_appointment(
+            db, appointment_id=appointment.id
+        )
     if not prescription:
         raise HTTPException(status_code=404, detail="Рецепт не найден")
 
@@ -499,9 +445,12 @@ def get_prescription(
     """
     Получить рецепт по записи
     """
-    prescription = crud_emr.prescription.get_by_appointment(
-        db, appointment_id=appointment_id
-    )
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    prescription = crud_emr.prescription.get_by_visit(db, visit_id=visit_id)
+    if not prescription:
+        prescription = crud_emr.prescription.get_by_appointment(
+            db, appointment_id=appointment.id
+        )
     return prescription
 
 
@@ -514,9 +463,8 @@ def complete_visit(
     """
     Завершить прием (переход in_visit -> completed)
     """
-    appointment = crud_appointment.get(db, id=appointment_id)
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+    _maybe_raise_legacy_write_freeze()
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
 
     # Проверяем, что прием активен
     if appointment.status != AppointmentStatus.IN_VISIT:
@@ -526,8 +474,8 @@ def complete_visit(
         )
 
     # Проверяем, что есть сохраненная EMR
-    emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
-    if not emr or emr.is_draft:
+    canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+    if not _canonical_emr_ready(canonical_emr):
         raise HTTPException(
             status_code=400, detail="Нельзя завершить прием без сохраненной EMR"
         )
@@ -561,32 +509,50 @@ def mark_appointment_paid(
 def get_appointment_status(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(
-        deps.require_roles("Admin", "Doctor", "Registrar", "Cashier")
-    ),
+    current_user: User = Depends(deps.require_roles(*APPOINTMENT_FLOW_READ_ROLES)),
 ) -> Dict[str, Any]:
     """
     Получить полную информацию о статусе записи и связанных данных
     """
-    appointment = crud_appointment.get(db, id=appointment_id)
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
 
     # Получаем связанные данные
-    emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
-    prescription = crud_emr.prescription.get_by_appointment(
-        db, appointment_id=appointment_id
+    canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+    emr = (
+        _legacy_emr_response(canonical_emr, appointment_id=appointment.id)
+        if canonical_emr
+        else None
     )
+    prescription = crud_emr.prescription.get_by_visit(db, visit_id=visit_id)
+    if not prescription:
+        prescription = crud_emr.prescription.get_by_appointment(
+            db, appointment_id=appointment.id
+        )
+    emr_ready = _canonical_emr_ready(canonical_emr)
 
     return {
         "appointment": appointment,
+        "visit_id": visit_id,
         "emr": emr,
         "prescription": prescription,
         "can_start_visit": appointment.status == AppointmentStatus.PAID,
         "can_create_emr": appointment.status
         in [AppointmentStatus.IN_VISIT, AppointmentStatus.COMPLETED],
-        "can_create_prescription": emr and not emr.is_draft,
+        "can_create_prescription": emr_ready,
         "can_complete": appointment.status == AppointmentStatus.IN_VISIT
-        and emr
-        and not emr.is_draft,
+        and emr_ready,
     }
+
+
+@router.get(
+    "/{appointment_id}/canonical-visit",
+    response_model=CanonicalVisitResponse,
+)
+def resolve_canonical_visit(
+    appointment_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles(*APPOINTMENT_FLOW_READ_ROLES)),
+) -> CanonicalVisitResponse:
+    """Resolve appointment-based flows to the single canonical visit identifier."""
+    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    return CanonicalVisitResponse(appointment_id=appointment.id, visit_id=visit_id)

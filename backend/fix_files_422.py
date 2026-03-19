@@ -13,7 +13,7 @@ def test_files_endpoint():
     # Получаем токен admin
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             timeout=10
         )
@@ -45,13 +45,13 @@ def test_files_endpoint():
             if endpoint == "/files/upload":
                 # Для POST запроса
                 response = requests.get(
-                    f"http://localhost:8000/api/v1{endpoint}",
+                    f"http://localhost:18000/api/v1{endpoint}",
                     headers=headers,
                     timeout=10
                 )
             else:
                 response = requests.get(
-                    f"http://localhost:8000/api/v1{endpoint}",
+                    f"http://localhost:18000/api/v1{endpoint}",
                     headers=headers,
                     timeout=10
                 )

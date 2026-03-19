@@ -41,7 +41,7 @@ alembic upgrade head
 python app/scripts/ensure_admin.py
 ```
 
-**API Documentation:** http://localhost:8000/docs (Swagger UI)
+**API Documentation:** http://localhost:18000/docs (Swagger UI)
 
 ### Frontend (React/Vite)
 
@@ -304,7 +304,7 @@ npm run lint:check        # Lint check
 
 **Frontend:**
 - API endpoint configured in `src/api/interceptors.js`
-- Uses `http://localhost:8000` for backend in dev mode
+- Uses `http://localhost:18000` for backend in dev mode
 
 ## Project-Specific Conventions
 

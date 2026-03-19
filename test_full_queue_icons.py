@@ -43,7 +43,7 @@ print("-" * 60)
 
 # Логин
 login_response = requests.post(
-    "http://localhost:8000/api/v1/authentication/login",
+    "http://localhost:18000/api/v1/authentication/login",
     json={"username": "registrar", "password": "registrar123"}
 )
 
@@ -55,7 +55,7 @@ token = login_response.json().get("access_token")
 print(f"✅ Вход выполнен")
 
 # Запрос очередей
-url = f"http://localhost:8000/api/v1/registrar/queues/today?target_date={today}"
+url = f"http://localhost:18000/api/v1/registrar/queues/today?target_date={today}"
 response = requests.get(
     url,
     headers={"Authorization": f"Bearer {token}"}

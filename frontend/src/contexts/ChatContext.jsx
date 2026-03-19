@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import { getWsBaseUrl } from '../api/runtime';
 import auth from '../stores/auth';
 import * as messagesApi from '../api/messages';
 import { pushNotifications } from '../services/pushNotifications';
@@ -163,20 +164,9 @@ export const ChatProvider = ({ children }) => {
         wsRef.current.close();
       }
 
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Используем VITE_API_URL если задан, иначе VITE_WS_HOST, иначе localhost:8000
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      let wsHost = import.meta.env.VITE_WS_HOST;
-      if (!wsHost && apiUrl) {
-        // Извлекаем host из API URL (http://localhost:8000 -> localhost:8000)
-        try {
-          wsHost = new URL(apiUrl).host;
-        } catch {
-          wsHost = 'localhost:8000';
-        }
-      }
-      wsHost = wsHost || 'localhost:8000';
-      const wsUrl = `${wsProtocol}//${wsHost}/ws/chat?token=${latestToken}`;
+      const wsBase = getWsBaseUrl();
+
+      const wsUrl = `${wsBase}/ws/chat?token=${latestToken}`;
 
       // console.log('🔌 [Context] Connecting WS...', wsUrl);
       const ws = new WebSocket(wsUrl);

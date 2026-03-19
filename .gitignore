@@ -91,3 +91,9 @@ run_latest.html
 wf_page*.html
 .ai-factory/landing/runs/*
 !.ai-factory/landing/runs/.gitkeep
+
+# Local staging/runtime artifacts
+output/staging/
+staging-postgres-55432/
+frontend/playwright-report/
+frontend/test-results/

@@ -69,7 +69,7 @@
 sqlite3 clinic.db "SELECT COUNT(*) FROM doctor_phrase_history;"
 
 # 2. Проверить API
-curl http://localhost:8000/api/v1/emr/readiness/123
+curl http://localhost:18000/api/v1/emr/readiness/123
 
 # 3. Запустить индексацию
 python c:\final\backend\migrate_phrases.py

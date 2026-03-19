@@ -10,6 +10,7 @@ import {
   RefreshCw } from
 'lucide-react';
 import { Button, Badge } from '../ui/native';
+import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import { createMarkup } from '../../utils/sanitizer';
@@ -30,7 +31,7 @@ const PrintDialog = ({
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
 
-  const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+  const API_BASE = getApiOrigin();
 
   const loadPrinters = useCallback(async () => {
     try {

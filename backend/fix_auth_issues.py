@@ -66,7 +66,7 @@ def fix_auth_issues():
 
         # Тест /auth/me
         try:
-            response = requests.get('http://localhost:8000/api/v1/auth/me', headers=headers)
+            response = requests.get('http://localhost:18000/api/v1/auth/me', headers=headers)
             print(f"🔍 /auth/me: {response.status_code}")
             if response.status_code == 200:
                 print("✅ /auth/me работает")
@@ -77,7 +77,7 @@ def fix_auth_issues():
 
         # Тест /admin/wizard-settings
         try:
-            response = requests.get('http://localhost:8000/api/v1/admin/wizard-settings', headers=headers)
+            response = requests.get('http://localhost:18000/api/v1/admin/wizard-settings', headers=headers)
             print(f"🔍 /admin/wizard-settings: {response.status_code}")
             if response.status_code == 200:
                 print("✅ /admin/wizard-settings работает")
@@ -90,7 +90,7 @@ def fix_auth_issues():
 
         # Тест /users/users
         try:
-            response = requests.get('http://localhost:8000/api/v1/users/users', headers=headers)
+            response = requests.get('http://localhost:18000/api/v1/users/users', headers=headers)
             print(f"🔍 /users/users: {response.status_code}")
             if response.status_code == 200:
                 print("✅ /users/users работает")

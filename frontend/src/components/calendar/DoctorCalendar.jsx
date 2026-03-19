@@ -18,10 +18,11 @@ import {
 
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = getApiOrigin();
 
 /**
  * Форматирует дату в YYYY-MM-DD

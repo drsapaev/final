@@ -187,7 +187,7 @@ python test_queue_batch_manual.py
 #### Configuration:
 
 ```python
-API_BASE = "http://localhost:8000/api/v1"
+API_BASE = "http://localhost:18000/api/v1"
 USERNAME = "admin"  # Или "registrar"
 PASSWORD = "admin"  # Замените на реальный
 ```
@@ -199,7 +199,7 @@ PASSWORD = "admin"  # Замените на реальный
 # Manual Testing: Batch Queue Entries Endpoint
 ############################################################
 
-ℹ️  API Base: http://localhost:8000/api/v1
+ℹ️  API Base: http://localhost:18000/api/v1
 ℹ️  Username: admin
 ℹ️  Date: 2025-11-25
 
@@ -378,7 +378,7 @@ python test_queue_batch_manual.py
 ```
 
 **Требования**:
-- Backend server запущен (localhost:8000)
+- Backend server запущен (localhost:18000)
 - В БД есть admin или registrar пользователь
 - В БД есть пациенты, услуги, специалисты
 

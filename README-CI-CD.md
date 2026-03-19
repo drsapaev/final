@@ -166,7 +166,7 @@ PRODUCTION_DATABASE_URL=...
 
 ### 📖 Документация
 
-- [API Documentation](http://localhost:8000/docs)
+- [API Documentation](http://localhost:18000/docs)
 - [Тесты модулей](backend/tests/)
 - [Конфигурация](backend/config/)
 

@@ -80,11 +80,11 @@
 ### Проверка API endpoints
 ```bash
 # Проверка здоровья системы
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 # Ответ: {"ok":true,"db":"ok"}
 
 # Проверка провайдеров
-curl http://localhost:8000/api/v1/payments/providers  
+curl http://localhost:18000/api/v1/payments/providers  
 # Ответ: 3 активных провайдера с полной конфигурацией
 ```
 

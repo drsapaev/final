@@ -10,7 +10,7 @@ data = {
 
 try:
     response = requests.post(
-        "http://localhost:8000/api/v1/queue/join",
+        "http://localhost:18000/api/v1/queue/join",
         json=data
     )
     print(f"Status: {response.status_code}")

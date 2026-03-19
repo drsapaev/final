@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 # Базовый URL API
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def test_emr_endpoints():
     """Тестирование EMR endpoints"""
