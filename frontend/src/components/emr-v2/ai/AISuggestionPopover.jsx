@@ -175,7 +175,7 @@ export function AISuggestionPopover({
                 <span className="ai-popover__icon">✨</span>
                 <span className="ai-popover__label">AI предлагает</span>
                 <span className="ai-popover__count">{suggestions.length} вариант{suggestions.length > 1 ? 'а' : ''}</span>
-                <button className="ai-popover__close" onClick={onClose}>×</button>
+                <button className="ai-popover__close" onClick={onClose} aria-label="Закрыть">×</button>
             </div>
 
             {/* Suggestions */}

@@ -181,7 +181,7 @@ export function EMRDiffViewer({
                     📊 Сравнение: v{versionFrom} → v{versionTo}
                 </h3>
                 {onClose && (
-                    <button className="emr-diff__close" onClick={onClose}>
+                    <button className="emr-diff__close" onClick={onClose} aria-label="Закрыть">
                         ×
                     </button>
                 )}

@@ -21,7 +21,7 @@
                     <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--mac-accent)' }}>
                         🛡️ AI-ассистент: Важная информация
                     </h3>
-                    <button className="emr-v2-btn-close" onClick={onClose}>✕</button>
+                    <button className="emr-v2-btn-close" onClick={onClose} aria-label="Закрыть">✕</button>
                 </header>
 
                 <div className="emr-v2-modal-body" style={{ lineHeight: 1.6, color: 'var(--mac-text-primary)' }}>

@@ -136,7 +136,7 @@ export function TreatmentTemplatesPanel({
                 {/* Header */}
                 <div className="treatment-templates-header">
                     <h3>📋 Шаблоны лечения</h3>
-                    <button className="treatment-templates-close" onClick={handleClose}>
+                    <button className="treatment-templates-close" onClick={handleClose} aria-label="Закрыть">
                         ×
                     </button>
                 </div>
