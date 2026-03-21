@@ -35,7 +35,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "password_reset": {"requests": 3, "window": 3600},  # 3 попытки за час
             "password_change": {"requests": 5, "window": 3600},  # 5 попыток за час
             "session": {"requests": 600, "window": 3600},  # auth/session checks
-            "api": {"requests": 100, "window": 3600},  # 100 запросов за час
+            # SPA-панели лаборатории и регистратуры активно опрашивают API.
+            # 100 запросов/час быстро блокируют реальный операторский сценарий.
+            "api": {"requests": 5000, "window": 3600},
         }
 
         # Brute force protection конфигурация

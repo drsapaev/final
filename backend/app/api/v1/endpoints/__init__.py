@@ -7,7 +7,7 @@ ENDPOINT_MODULES = [
     "auth",
     "queues",
     "visits",
-    "lab",
+    "lab_reporting",
     "payments",
     "settings",
     "print",
@@ -25,7 +25,6 @@ ENDPOINT_MODULES = [
     "cardio",
     "derma",
     "dental",
-    "lab_specialized",
 ]
 
 __all__ = ["ENDPOINT_MODULES"]

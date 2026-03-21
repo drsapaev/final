@@ -41,6 +41,17 @@ def _normalize_sqlite_to_sync(url: str) -> str:
     return url
 
 
+def _get_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
 # Получаем URL
 DATABASE_URL = _get_db_url_from_env_or_settings()
 DATABASE_URL = _normalize_sqlite_to_sync(DATABASE_URL)
@@ -72,16 +83,30 @@ def _enable_sqlite_fk(dbapi_conn, connection_record):
             print(f"[app.db.session] ❌ ERROR enabling foreign keys: {e}", file=sys.stderr)
             raise
 
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+_engine_kwargs: dict[str, object] = {
+    "future": True,
+    "echo": False,
+    "pool_pre_ping": True,
+}
+if not _is_sqlite:
+    _engine_kwargs.update(
+        {
+            "pool_size": _get_int_env("DB_POOL_SIZE", 20),
+            "max_overflow": _get_int_env("DB_POOL_OVERFLOW", 40),
+            "pool_timeout": _get_int_env("DB_POOL_TIMEOUT", 60),
+            "pool_recycle": _get_int_env("DB_POOL_RECYCLE", 1800),
+        }
+    )
+
 engine = create_engine(
     DATABASE_URL,
-    future=True,
-    echo=False,
-    pool_pre_ping=True,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
+    **_engine_kwargs,
 )
 
 # ✅ SECURITY: Register event listener for SQLite FK enforcement
-if DATABASE_URL.startswith("sqlite"):
+if _is_sqlite:
     event.listen(engine, "connect", _enable_sqlite_fk)
     print("[app.db.session] Foreign key enforcement enabled for SQLite via event listener", file=sys.stderr)
 

@@ -67,8 +67,7 @@ from app.api.v1.endpoints import (
     force_majeure,
     global_search,
     group_permissions,
-    lab,
-    lab_specialized,
+    lab_reporting,
     medical_equipment,
     messages,
     minimal_auth,
@@ -384,8 +383,9 @@ api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-leg
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
-api_router.include_router(lab.router, tags=["lab"])
-api_router.include_router(lab_specialized.router, tags=["lab_specialized"])
+api_router.include_router(lab_reporting.router, tags=["lab-reporting"])
+# Legacy /lab CRUD and placeholder routers are intentionally not published.
+# The lab reporting template workflow is the only supported public contract.
 api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
 )

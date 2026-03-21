@@ -55,7 +55,13 @@ from .doctor_templates import (
 )
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
-from .emr_v2 import SYSTEM_USER_ID, EMRAuditLog, EMRMigrationLedger, EMRRecord, EMRRevision
+from .emr_v2 import (
+    SYSTEM_USER_ID,
+    EMRAuditLog,
+    EMRMigrationLedger,
+    EMRRecord,
+    EMRRevision,
+)
 from .emr_version import EMRVersion
 from .family_relation import FamilyRelation, RelationType
 from .file_system import (
@@ -73,7 +79,20 @@ from .file_system import (
 from .global_search_audit import GlobalSearchAudit
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
-from .lab import LabOrder, LabResult
+from .lab import (
+    LabCatalogAnalyte,
+    LabCatalogReferenceRange,
+    LabCatalogUnit,
+    LabOrder,
+    LabReportFieldDef,
+    LabReportInstance,
+    LabReportSection,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+    LabReportValue,
+    LabResult,
+    LabTemplateServiceBinding,
+)
 from .message import Message
 from .notification import (
     NotificationHistory,
@@ -202,7 +221,17 @@ __all__ = [
     "Permission",
     "UserGroup",
     "UserPermissionOverride",
+    "LabCatalogUnit",
+    "LabCatalogAnalyte",
+    "LabCatalogReferenceRange",
     "LabOrder",
+    "LabReportTemplate",
+    "LabTemplateServiceBinding",
+    "LabReportTemplateVersion",
+    "LabReportSection",
+    "LabReportFieldDef",
+    "LabReportInstance",
+    "LabReportValue",
     "LabResult",
     "AuditLog",
     "NotificationTemplate",

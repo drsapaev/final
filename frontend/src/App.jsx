@@ -171,11 +171,11 @@ function getPageTitle(path) {
     '/cardiologist': 'Cardiologist Panel',
     '/dermatologist': 'Dermatologist Panel',
     '/dentist': 'Dentist Panel',
-    '/lab-panel': 'Lab Panel',
+    '/lab-panel': 'Лаборатория',
     '/settings': 'Settings',
     '/analytics': 'Analytics'
   };
-  return titles[path] || 'Medical System';
+  return titles[path] || 'Медицинская система';
 }
 
 function getSidebarItems(path) {
@@ -320,11 +320,9 @@ function getSidebarItems(path) {
   // Lab panel specific items (из LabPanel)
   if (path === '/lab-panel') {
     return [
-      { id: 'tests', label: 'Tests', icon: 'testtube.2' },
-      { id: 'results', label: 'Results', icon: 'chart.bar' },
-      { id: 'patients', label: 'Patients', icon: 'person.2' },
-      { id: 'appointments', label: 'Appointments', icon: 'calendar' },
-      { id: 'reports', label: 'Reports', icon: 'doc.text' }
+      { id: 'queue', label: 'Очередь', icon: 'testtube.2' },
+      { id: 'templates', label: 'Шаблоны', icon: 'rectangle.stack.badge.plus' },
+      { id: 'reports', label: 'Бланки', icon: 'doc.text' }
     ];
   }
 
@@ -1015,7 +1013,7 @@ function AppShell() {
                 }
                 // Other navigation logic will be handled by router
               }}
-              header="Medical System"
+              header="Медицинская система"
               style={{
                 background: 'var(--mac-gradient-sidebar)',
                 borderRight: '1px solid var(--mac-separator)',

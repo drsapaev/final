@@ -35,6 +35,7 @@ import { normalizeServicesFromInitialData } from '../../utils/serviceCodeResolve
 import './AppointmentWizardV2.css';
 
 const API_BASE = '/api/v1';
+const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 
 // Категории услуг
 const categories = [
@@ -87,7 +88,7 @@ const AppointmentWizardV2 = ({
 }) => {
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
-  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(1);
@@ -959,14 +960,50 @@ const AppointmentWizardV2 = ({
     return Math.round(total); // Округляем до целых
   };
 
+  const validatePatientFio = (rawFio) => {
+    const normalizedFio = rawFio.trim();
+
+    if (!normalizedFio) {
+      return 'Введите ФИО пациента';
+    }
+
+    if (!PATIENT_NAME_PATTERN.test(normalizedFio)) {
+      return 'ФИО может содержать только буквы, пробелы, дефисы и апостроф';
+    }
+
+    if (/\s{3,}/.test(normalizedFio)) {
+      return 'ФИО содержит слишком много пробелов подряд';
+    }
+
+    const nameParts = normalizedFio.split(/\s+/).filter(Boolean);
+    const lastName = nameParts[0] || '';
+    const firstName = nameParts[1] || (nameParts[0] || '');
+    const middleName = nameParts.length > 2 ? nameParts.slice(2).join(' ') : '';
+
+    if (lastName.length < 2) {
+      return 'Фамилия должна содержать минимум 2 буквы';
+    }
+
+    if (firstName.length < 2) {
+      return 'Имя должно содержать минимум 2 буквы';
+    }
+
+    if (middleName && middleName.length < 2) {
+      return 'Отчество должно содержать минимум 2 буквы';
+    }
+
+    return null;
+  };
+
   // ===================== НАВИГАЦИЯ =====================
 
   const validateStep = (step) => {
     const newErrors = {};
 
     if (step === 1) {
-      if (!wizardData.patient.fio.trim()) {
-        newErrors.fio = 'Введите ФИО пациента';
+      const fioError = validatePatientFio(wizardData.patient.fio);
+      if (fioError) {
+        newErrors.fio = fioError;
       }
       // ✅ Телефон теперь необязателен (дети, пожилые без телефона)
       // Проверяем формат только если телефон указан
@@ -2488,7 +2525,8 @@ const AppointmentWizardV2 = ({
             marginBottom: 'var(--mac-spacing-4)',
             lineHeight: 1.6
           }}>
-            Для создания записей пациентов необходима роль Регистратора или Администратора.
+            Для создания записей пациентов необходима роль Регистратора
+            (включая Receptionist) или Администратора.
           </p>
           <MacOSButton
             onClick={onClose}
@@ -3135,7 +3173,8 @@ const CartStepV2 = ({
       const query = searchQuery.toLowerCase();
       return filtered.filter((service) =>
       service.name.toLowerCase().includes(query) ||
-      service.code && service.code.toLowerCase().includes(query)
+      service.service_code && String(service.service_code).toLowerCase().includes(query) ||
+      !service.service_code && service.code && String(service.code).toLowerCase().includes(query)
       );
     }
 

@@ -19,6 +19,10 @@ from app.crud import clinic as crud_clinic, online_queue as crud_queue
 from app.models.department import Department, DepartmentService
 from app.models.service import Service
 from app.models.user import User
+from app.services.canonical_visit_service import (
+    CanonicalVisitResolutionError,
+    CanonicalVisitService,
+)
 from app.services.queue_service import queue_service
 from app.services.service_mapping import get_service_code
 
@@ -2458,6 +2462,21 @@ def get_today_queues(
                     discount_mode = get_discount_mode_for_appointment(db, appointment)
 
                     source = "desk"  # Appointment обычно создается регистратором
+                    try:
+                        entry_wrapper["visit_id"] = CanonicalVisitService(
+                            db
+                        ).resolve_canonical_visit(
+                            appointment.id,
+                            create_if_missing=False,
+                        )
+                    except CanonicalVisitResolutionError as exc:
+                        if exc.status_code != 404:
+                            logger.warning(
+                                "get_today_queues: failed to resolve canonical visit for appointment_id=%s: %s",
+                                appointment.id,
+                                exc.detail,
+                            )
+                        entry_wrapper["visit_id"] = None
 
                 elif entry_type == "online_queue":
                     # ✅ SSOT FIX: entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
@@ -2847,6 +2866,11 @@ def get_today_queues(
                     {
                         "id": record_id,
                         "appointment_id": appointment_id_value,  # Явно добавляем appointment_id
+                        "visit_id": (
+                            entry_wrapper.get("visit_id")
+                            or getattr(entry_data, "visit_id", None)
+                            or (record_id if entry_type == "visit" else None)
+                        ),
                         "number": queue_entry_number,  # [OK] ИСПРАВЛЕНО: реальный номер из queue_entries
                         "patient_id": patient_id,
                         "patient_name": patient_name,

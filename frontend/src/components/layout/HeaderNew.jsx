@@ -173,7 +173,7 @@ export default function HeaderNew() {
     }}>
 
       <Icon name="stethoscope" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
-      <span className="hdr-hide-xs">Clinic Management</span>
+      <span className="hdr-hide-xs">Управление клиникой</span>
     </Button>;
 
 
