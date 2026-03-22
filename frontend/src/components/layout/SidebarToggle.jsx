@@ -38,6 +38,8 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
         e.target.style.transform = 'scale(1)';
       }}
       title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
+      aria-label={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
+      aria-expanded={!isCollapsed}
     >
       {isCollapsed ? <Menu size={20} /> : <X size={20} />}
     </button>

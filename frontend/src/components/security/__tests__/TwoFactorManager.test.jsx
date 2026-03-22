@@ -14,6 +14,9 @@ vi.mock('../../../utils/tokenManager', () => ({
   default: {
     getAccessToken,
   },
+  tokenManager: {
+    getAccessToken,
+  }
 }));
 
 vi.mock('../../../utils/logger', () => ({

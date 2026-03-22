@@ -282,6 +282,7 @@ export default function Header() {
         <button
           className="interactive-element hover-lift focus-ring"
           onClick={() => navigate('/')}
+          aria-label="На главную"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -488,6 +489,7 @@ export default function Header() {
           <button
             onClick={toggleTheme}
             className="interactive-element hover-lift ripple-effect focus-ring"
+            aria-label="Переключить тему"
             style={{
               width: '40px',
               height: '40px',
