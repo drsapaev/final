@@ -16,6 +16,7 @@ import { usePayments } from '../hooks/usePayments';
 import { getApiOrigin } from '../api/runtime';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import notify from '../services/notify';
 import {
   Dialog,
   DialogTitle,
@@ -428,7 +429,7 @@ const CashierPanel = () => {void
         });
       }
 
-      alert(`✅ Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
+      notify.success(`Оплата успешно обработана. Сумма: ${format(paymentData.amount)}`);
       paymentModal.closeModal();
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
@@ -436,7 +437,7 @@ const CashierPanel = () => {void
     } catch (error) {
       logger.error('Ошибка обработки платежа:', error);
       setPaymentError(error.message || 'Ошибка обработки платежа. Попробуйте позже.');
-      alert(`❌ Ошибка обработки платежа: ${error.message || 'Попробуйте позже'}`);
+      notify.error(`Ошибка обработки платежа: ${error.message || 'Попробуйте позже'}`);
     }
   };
 
@@ -451,7 +452,7 @@ const CashierPanel = () => {void
       setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
-      alert(`❌ Ошибка подтверждения платежа: ${err.message}`);
+      notify.error(`Ошибка подтверждения платежа: ${err.message}`);
     }
   };
 
@@ -469,13 +470,13 @@ const CashierPanel = () => {void
       if (result.success) {
         setCancelDialogOpen(false);
         setConfirmingPaymentId(null);
-        alert('Платёж отменён');
+        notify.info('Платёж отменён');
         setCurrentPage(1); // Reload data
       } else {
-        alert('Ошибка: ' + result.error);
+        notify.error('Ошибка: ' + result.error);
       }
     } catch (error) {
-      alert('Ошибка отмены: ' + error.message);
+      notify.error('Ошибка отмены: ' + error.message);
     }
   };
 
@@ -488,7 +489,7 @@ const CashierPanel = () => {void
     });
 
     if (!result.success) {
-      alert('Ошибка экспорта: ' + (result.error || 'Неизвестная ошибка'));
+      notify.error('Ошибка экспорта: ' + (result.error || 'Неизвестная ошибка'));
     }
   };
 
@@ -518,7 +519,7 @@ const CashierPanel = () => {void
   // ✅ v2.0: Обработчик возврата
   const handleRefund = async () => {
     if (!refundAmount || !refundReason || refundReason.length < 3) {
-      alert('Укажите сумму возврата и причину (минимум 3 символа)');
+      notify.warning('Укажите сумму возврата и причину (минимум 3 символа)');
       return;
     }
     try {
@@ -528,13 +529,13 @@ const CashierPanel = () => {void
       });
       if (result.success) {
         setRefundDialogOpen(false);
-        alert(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
+        notify.success(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
         setCurrentPage(1); // Reload
       } else {
-        alert('Ошибка возврата: ' + result.error);
+        notify.error('Ошибка возврата: ' + result.error);
       }
     } catch (error) {
-      alert('Ошибка: ' + error.message);
+      notify.error('Ошибка: ' + error.message);
     }
   };
 
@@ -542,7 +543,7 @@ const CashierPanel = () => {void
   const handlePrintReceipt = async (paymentId) => {
     const result = await paymentsHook.getReceipt(paymentId);
     if (!result.success) {
-      alert('Ошибка получения чека: ' + result.error);
+      notify.error('Ошибка получения чека: ' + result.error);
     }
   };
 
@@ -557,7 +558,7 @@ const CashierPanel = () => {void
       setHourlyStats(result.data);
       setShowHourlyChart(true);
     } else {
-      alert('Ошибка загрузки статистики: ' + result.error);
+      notify.error('Ошибка загрузки статистики: ' + result.error);
     }
   };
 

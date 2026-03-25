@@ -2,15 +2,14 @@
 import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { buildWsUrl } from '../api/runtime';
-import { useToast } from '../components/common/Toast';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import notify from '../services/notify';
 
 const NotificationWebSocketContext = createContext(null);
 
 export function NotificationWebSocketProvider({ children }) {
   const ws = useRef(null);
-  const { addToast } = useToast();
   const reconnectTimeout = useRef(null);
 
   const handleMessage = useCallback((data) => {
@@ -18,27 +17,18 @@ export function NotificationWebSocketProvider({ children }) {
       const { title, message } = data;
       // Use Toast to show notification
       // meta.type can be 'error', 'success', etc. if needed
-      addToast({
-        title: title,
-        message: message,
-        type: 'info', // Default to info, or map from meta.type
-        duration: 5000
-        // Optional: onClick logic using meta (e.g. navigate to queued item)
+      notify.system({
+        title,
+        message,
+        type: data?.meta?.type || 'info',
+        duration: 5000,
+        browser: document.hidden
       });
-
-      // If browsers support Notification API and permission granted, we could also show system notification
-      if (document.hidden && Notification.permission === 'granted') {
-        new Notification(title, { body: message });
-      }
     } else if (data.type === 'queue_update') {
       // Specific handling for queue updates if needed
-      addToast({
-        title: 'Обновление очереди',
-        message: 'Ваш статус обновлен',
-        type: 'info'
-      });
+      notify.info('Ваш статус обновлен', { title: 'Обновление очереди' });
     }
-  }, [addToast]);
+  }, []);
 
   const connect = useCallback(() => {
     let activeSocket = null;

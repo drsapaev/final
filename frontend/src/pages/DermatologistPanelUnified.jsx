@@ -39,6 +39,7 @@ import { getApiBaseUrl, getApiOrigin } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import notify from '../services/notify';
 
 const API_BASE = getApiOrigin();
 const API_V1_BASE = getApiBaseUrl();
@@ -533,7 +534,7 @@ const DermatologistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
         break;
       case 'print':
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
@@ -2159,7 +2160,7 @@ const DermatologistPanelUnified = () => {
                             });
                             setShowPriceOverride(true);
                           } else {
-                            alert('Сначала выберите услугу');
+                            notify.warning('Сначала выберите услугу');
                           }
                         }}
                         variant="primary"
