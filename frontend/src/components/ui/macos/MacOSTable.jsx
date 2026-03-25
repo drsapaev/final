@@ -131,6 +131,13 @@ const MacOSTable = ({
     }
   };
 
+  const handleKeyDown = (e, column) => {
+    if ((e.key === 'Enter' || e.key === ' ') && sortable && column.sortable) {
+      e.preventDefault();
+      handleSort(column);
+    }
+  };
+
   const renderSortIcon = (column) => {
     if (!sortable || !column.sortable) return null;
     
@@ -200,7 +207,7 @@ const MacOSTable = ({
   if (loading) {
     return (
       <div style={{ overflowX: 'auto' }}>
-        <table className={className} style={tableStyle}>
+        <table className={className} style={tableStyle} aria-busy="true">
           <thead>
             <tr>
               {columns.map((column, index) => (
@@ -261,29 +268,39 @@ const MacOSTable = ({
       <table className={className} style={tableStyle}>
         <thead>
           <tr>
-            {columns.map((column, index) => (
-              <th
-                key={column.key || index}
-                style={{
-                  ...headerStyle,
-                  borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
-                }}
-                onClick={() => handleSort(column)}
-                onMouseEnter={(e) => {
-                  if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = currentVariant.headerBackground;
-                  }
-                }}
-              >
-                {column.title}
-                {renderSortIcon(column)}
-              </th>
-            ))}
+            {columns.map((column, index) => {
+              const isSortable = sortable && column.sortable;
+              const isSorted = sortColumn === column.key;
+              const sortAria = isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none';
+
+              return (
+                <th
+                  key={column.key || index}
+                  style={{
+                    ...headerStyle,
+                    borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
+                  }}
+                  onClick={() => handleSort(column)}
+                  onKeyDown={(e) => handleKeyDown(e, column)}
+                  onMouseEnter={(e) => {
+                    if (isSortable) {
+                      e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isSortable) {
+                      e.target.style.backgroundColor = currentVariant.headerBackground;
+                    }
+                  }}
+                  tabIndex={isSortable ? 0 : undefined}
+                  role="columnheader"
+                  aria-sort={isSortable ? sortAria : undefined}
+                >
+                  {column.title}
+                  {renderSortIcon(column)}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
