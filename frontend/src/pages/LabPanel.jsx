@@ -8,6 +8,7 @@ import { getApiBaseUrl } from '../api/runtime';
 import { labReportingApi } from '../api/labReporting';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -339,6 +340,8 @@ export default function LabPanel() {
         minHeight: '100%'
       }}
     >
+      <NotificationInbox role="lab" title="Inbox лаборатории" />
+
       <Card variant="filled" padding="none">
         <CardHeader
           style={{

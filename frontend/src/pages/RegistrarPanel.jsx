@@ -51,6 +51,7 @@ import { api } from '../api/client';
 
 // ✅ Форс-мажор модальное окно
 import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 const RegistrarPanel = () => {
   // Рендер компонента (debug отключен)
@@ -2881,6 +2882,7 @@ const RegistrarPanel = () => {
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
       <ToastContainer position="bottom-right" />
 
+      <div style={{ margin: '0 1rem 1rem 1rem' }}><NotificationInbox role="registrar" title="Inbox регистратора" /></div>
 
       {/* Skip to content link for screen readers */}
       <a

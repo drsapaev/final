@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Button, Badge, Icon } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText } from 'lucide-react';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 // Simple Skeleton component
 const Skeleton = ({ className = '' }) =>
@@ -50,6 +51,8 @@ const PatientPanel = () => {void
     }}>
 
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+        <NotificationInbox role="patient" title="Мои уведомления" />
 
         {/* Search */}
         <Card style={{

@@ -47,6 +47,7 @@ import useDoctorQueue from '../hooks/useDoctorQueue.js';
 import { useAppData } from '../contexts/AppDataContext';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 import { getApiOrigin } from '../api/runtime';
 
 import logger from '../utils/logger';
@@ -544,6 +545,8 @@ const DoctorPanel = () => {
 
       {/* Основной контент */}
       <main style={contentStyle}>
+        <NotificationInbox role="doctor" title="Inbox врача" />
+
         {/* Вкладки */}
         <div style={tabsStyle}>
           <button

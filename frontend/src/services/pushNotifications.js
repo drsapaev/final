@@ -130,6 +130,45 @@ class PushNotificationService {
     }
   }
 
+
+  /**
+   * Show browser notification for operational/clinical events
+   */
+  showOperationalNotification(notification) {
+    if (!this.isEnabled() || !notification) {
+      return;
+    }
+
+    const title = notification.title || 'Уведомление';
+    const options = {
+      body: notification.message || 'Новое событие',
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: `ops-${notification.domain || 'system'}-${notification.id || Date.now()}`,
+      renotify: true,
+      requireInteraction: notification.type === 'critical' || notification.type === 'error',
+      data: {
+        domain: notification.domain,
+        actionUrl: notification.action_url || null,
+        payload: notification.payload || {}
+      }
+    };
+
+    try {
+      const browserNotification = new Notification(title, options);
+      browserNotification.onclick = () => {
+        window.focus();
+        if (notification.action_url) {
+          window.location.href = notification.action_url;
+        }
+        browserNotification.close();
+      };
+      setTimeout(() => browserNotification.close(), 7000);
+    } catch (error) {
+      logger.error('[PushNotification] Failed to show operational notification:', error);
+    }
+  }
+
   /**
    * Show notification for multiple unread messages
    */
@@ -178,10 +217,15 @@ export function usePushNotifications() {
     pushNotifications.showMessageNotification(message, senderName);
   }, []);
 
+  const showOperationalNotification = useCallback((notification) => {
+    pushNotifications.showOperationalNotification(notification);
+  }, []);
+
   return {
     isSupported,
     isEnabled,
     requestPermission,
-    showNotification
+    showNotification,
+    showOperationalNotification
   };
 }
