@@ -51,6 +51,7 @@ import { getApiOrigin } from '../api/runtime';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 const DoctorPanel = () => {
   const location = useLocation();
   const { isMobile, isTablet } = useBreakpoint();void
@@ -1532,6 +1533,7 @@ const DoctorPanel = () => {
         useWebSocket={false}
         position="bottom-right" />
 
+      <RoleNotificationCenter role="doctor" />
     </div>);
 
 };

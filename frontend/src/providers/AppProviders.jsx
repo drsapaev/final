@@ -7,6 +7,7 @@ import { FormProvider } from '../components/common/Form';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import { NotificationPrompt } from '../components/chat/NotificationPrompt';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
+import { NotificationCenterProvider } from '../contexts/NotificationCenterContext';
 
 /**
  * Главный провайдер для всех контекстов.
@@ -19,14 +20,16 @@ export function AppProviders({ children }) {
         <ChatProvider>
           <ErrorBoundary>
             <ToastProvider>
-              <NotificationWebSocketProvider>
-                <ModalProvider>
+              <NotificationCenterProvider>
+                <NotificationWebSocketProvider>
+                  <ModalProvider>
                   <FormProvider>
                     {children}
                     <NotificationPrompt />
                   </FormProvider>
-                </ModalProvider>
-              </NotificationWebSocketProvider>
+                  </ModalProvider>
+                </NotificationWebSocketProvider>
+              </NotificationCenterProvider>
             </ToastProvider>
           </ErrorBoundary>
         </ChatProvider>

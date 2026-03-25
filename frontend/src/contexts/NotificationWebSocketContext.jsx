@@ -1,10 +1,10 @@
-
 import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { buildWsUrl } from '../api/runtime';
 import { useToast } from '../components/common/Toast';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import { useNotificationCenter } from './NotificationCenterContext';
 
 const NotificationWebSocketContext = createContext(null);
 
@@ -12,39 +12,56 @@ export function NotificationWebSocketProvider({ children }) {
   const ws = useRef(null);
   const { addToast } = useToast();
   const reconnectTimeout = useRef(null);
+  const { appendNotification } = useNotificationCenter();
 
   const handleMessage = useCallback((data) => {
     if (data.type === 'notification') {
-      const { title, message } = data;
-      // Use Toast to show notification
-      // meta.type can be 'error', 'success', etc. if needed
+      const title = data.title || 'Уведомление';
+      const message = data.message || '';
+
       addToast({
-        title: title,
-        message: message,
-        type: 'info', // Default to info, or map from meta.type
+        title,
+        message,
+        type: 'info',
         duration: 5000
-        // Optional: onClick logic using meta (e.g. navigate to queued item)
       });
 
-      // If browsers support Notification API and permission granted, we could also show system notification
+      appendNotification({
+        id: data.id,
+        type: data.event_type || data.notification_type || 'system',
+        title,
+        message,
+        created_at: data.created_at,
+        is_read: false,
+        role: data.target_role || data.role
+      }, 'ws');
+
       if (document.hidden && Notification.permission === 'granted') {
         new Notification(title, { body: message });
       }
     } else if (data.type === 'queue_update') {
-      // Specific handling for queue updates if needed
       addToast({
         title: 'Обновление очереди',
         message: 'Ваш статус обновлен',
         type: 'info'
       });
+
+      appendNotification({
+        id: data.id,
+        type: 'queue_changed',
+        title: 'Обновление очереди',
+        message: data.message || 'Ваш статус в очереди был обновлен.',
+        created_at: data.created_at,
+        is_read: false,
+        role: data.target_role || data.role
+      }, 'ws');
     }
-  }, [addToast]);
+  }, [addToast, appendNotification]);
 
   const connect = useCallback(() => {
     let activeSocket = null;
     const token = tokenManager.getAccessToken();
     if (!token || !tokenManager.isTokenValid()) {
-      // Retry later if no token (e.g. not logged in)
       reconnectTimeout.current = setTimeout(connect, 5000);
       return () => {};
     }
@@ -105,9 +122,9 @@ export function NotificationWebSocketProvider({ children }) {
 
   return (
     <NotificationWebSocketContext.Provider value={{ ws: ws.current }}>
-            {children}
-        </NotificationWebSocketContext.Provider>);
-
+      {children}
+    </NotificationWebSocketContext.Provider>
+  );
 }
 
 NotificationWebSocketProvider.propTypes = {

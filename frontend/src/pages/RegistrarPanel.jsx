@@ -51,6 +51,7 @@ import { api } from '../api/client';
 
 // ✅ Форс-мажор модальное окно
 import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const RegistrarPanel = () => {
   // Рендер компонента (debug отключен)
@@ -2732,7 +2733,8 @@ const RegistrarPanel = () => {
 
             🔄 Повторить
           </button>
-        </div>);
+          <RoleNotificationCenter role="registrar" />
+    </div>);
 
     }
 
@@ -2756,7 +2758,8 @@ const RegistrarPanel = () => {
           <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
             {count} из {paginationInfo.total} записей
           </span>
-        </div>);
+          <RoleNotificationCenter role="registrar" />
+    </div>);
 
     }
 
@@ -2777,7 +2780,8 @@ const RegistrarPanel = () => {
         }}>
           <span>🔄</span>
           <span>Загрузка данных...</span>
-        </div>);
+          <RoleNotificationCenter role="registrar" />
+    </div>);
 
     }
 
@@ -4346,6 +4350,7 @@ const RegistrarPanel = () => {
           loadAppointments({ source: 'force_majeure' });
         }} />
 
+      <RoleNotificationCenter role="registrar" />
     </div>);
 
 };
