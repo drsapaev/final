@@ -3,7 +3,17 @@ import { resolve } from 'node:path';
 
 const panelFiles = [
   'src/pages/AdminPanel.jsx',
-  'src/pages/CashierPanel.jsx'
+  'src/pages/CashierPanel.jsx',
+  'src/pages/DoctorPanel.jsx',
+  'src/pages/RegistrarPanel.jsx',
+  'src/pages/LabPanel.jsx',
+  'src/pages/PatientPanel.jsx',
+  'src/pages/CardiologistPanelUnified.jsx',
+  'src/pages/DermatologistPanelUnified.jsx',
+  'src/pages/DentistPanelUnified.jsx',
+  'src/components/cashier/RefundRequestsTable.jsx',
+  'src/components/payment/CashPaymentModal.jsx',
+  'src/components/laboratory/LabResultsManager.jsx'
 ];
 
 const allowedPatterns = [

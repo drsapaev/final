@@ -47,6 +47,7 @@ import { api } from '../../api/client';
 import { AIButton, AIAssistant } from '../ai';
 
 import logger from '../../utils/logger';
+import notify from '../../services/notify';
 // Категории анализов
 const LAB_CATEGORIES = {
   blood: { name: 'Анализы крови', icon: <TestTube style={{ color: 'var(--mac-accent-red)' }} /> },
@@ -239,7 +240,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
         method: 'telegram'
       });
 
-      alert('Результаты отправлены пациенту');
+      notify.success('Результаты отправлены пациенту');
     } catch (error) {
       logger.error('Ошибка отправки результатов:', error);
     }

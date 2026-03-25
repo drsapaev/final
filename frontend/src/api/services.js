@@ -602,15 +602,6 @@ export const notificationsService = {
   },
 
   /**
-   * Получение уведомления по ID
-   */
-  async getNotification(id) {
-    const list = await this.getNotifications({ limit: 100 });
-    const notifications = Array.isArray(list) ? list : list?.notifications || [];
-    return notifications.find((item) => Number(item.id) === Number(id)) || null;
-  },
-
-  /**
    * Отметка как прочитанное
    */
   async markAsRead(id) {
@@ -619,6 +610,10 @@ export const notificationsService = {
 
   /**
    * Отметка всех как прочитанных
+   * Fallback strategy:
+   * - backend currently exposes mark-read per id
+   * - bulk mark-all endpoint is not available
+   * - iterate unread notifications client-side
    */
   async markAllAsRead() {
     const notifications = await this.getNotifications({ limit: 100 });

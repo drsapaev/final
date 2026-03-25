@@ -22,6 +22,7 @@ import {
 import { Badge } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import notify from '../../services/notify';
 
 const RefundRequestsTable = ({ onRefresh }) => {
   const [requests, setRequests] = useState([]);
@@ -94,7 +95,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Approve error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -124,7 +125,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Reject error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -153,7 +154,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Complete error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }

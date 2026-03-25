@@ -480,7 +480,7 @@ const DentistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        toast.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
         break;
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);

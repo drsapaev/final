@@ -533,7 +533,7 @@ const DermatologistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        toast.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
         break;
       case 'print':
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
@@ -2159,7 +2159,7 @@ const DermatologistPanelUnified = () => {
                             });
                             setShowPriceOverride(true);
                           } else {
-                            alert('Сначала выберите услугу');
+                            toast.warning('Сначала выберите услугу');
                           }
                         }}
                         variant="primary"
