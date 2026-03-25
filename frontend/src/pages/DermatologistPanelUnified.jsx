@@ -39,6 +39,7 @@ import { getApiBaseUrl, getApiOrigin } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_BASE = getApiOrigin();
 const API_V1_BASE = getApiBaseUrl();
@@ -2438,7 +2439,8 @@ const DermatologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
-      </div>
+            <RoleNotificationCenter role="dermatologist" />
+</div>
     </div>);
 
 };

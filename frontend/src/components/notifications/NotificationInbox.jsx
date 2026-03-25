@@ -88,6 +88,6 @@ export default function NotificationInbox({ role, onClose }) {
 }
 
 NotificationInbox.propTypes = {
-  role: PropTypes.oneOf(['doctor', 'registrar', 'lab', 'patient']).isRequired,
+  role: PropTypes.oneOf(['doctor', 'registrar', 'lab', 'patient', 'cardiologist', 'dermatologist', 'dentist', 'admin']).isRequired,
   onClose: PropTypes.func.isRequired
 };

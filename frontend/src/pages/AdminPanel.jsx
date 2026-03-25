@@ -116,6 +116,7 @@ import ServiceCatalog from '../components/admin/ServiceCatalog';
 
 
 import ActivationSystem from '../components/admin/ActivationSystem';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 
 
@@ -4590,6 +4591,7 @@ const AdminPanel = () => {
           isOpen={showHotkeysModal}
           onClose={() => setShowHotkeysModal(false)} />
 
+      <RoleNotificationCenter role="admin" />
       </div>
     </div>);
 

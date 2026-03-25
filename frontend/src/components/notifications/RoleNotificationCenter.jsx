@@ -24,5 +24,5 @@ export default function RoleNotificationCenter({ role }) {
 }
 
 RoleNotificationCenter.propTypes = {
-  role: PropTypes.oneOf(['doctor', 'registrar', 'lab', 'patient']).isRequired
+  role: PropTypes.oneOf(['doctor', 'registrar', 'lab', 'patient', 'cardiologist', 'dermatologist', 'dentist', 'admin']).isRequired
 };

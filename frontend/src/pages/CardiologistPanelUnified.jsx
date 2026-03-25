@@ -34,6 +34,7 @@ import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import tokenManager from '../utils/tokenManager';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -2041,7 +2042,8 @@ const MacOSCardiologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
-      </div>
+            <RoleNotificationCenter role="cardiologist" />
+</div>
     </div>);
 
 };

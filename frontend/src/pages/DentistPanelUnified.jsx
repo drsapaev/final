@@ -46,6 +46,7 @@ import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -1829,7 +1830,7 @@ const DentistPanelUnified = () => {
               specialty="dentistry" />
 
           </Card>
-        </div>);
+</div>);
 
     }
 
@@ -1911,7 +1912,7 @@ const DentistPanelUnified = () => {
             )}
           </div>
         </Card>
-      </div>);
+</div>);
 
   };
 
@@ -2793,7 +2794,7 @@ const DentistPanelUnified = () => {
             )}
           </div>
         </div>
-      </div>);
+</div>);
 
   }
 
@@ -3596,7 +3597,8 @@ const DentistPanelUnified = () => {
         useWebSocket={false}
         position="bottom-right" />
 
-    </div>);
+          <RoleNotificationCenter role="dentist" />
+</div>);
 
 };
 

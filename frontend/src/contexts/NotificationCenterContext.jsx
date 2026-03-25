@@ -9,7 +9,11 @@ export const ROLE_NOTIFICATION_TYPES = {
   doctor: ['diagnostics_return', 'queue_changed', 'lab_critical_result'],
   registrar: ['new_appointment', 'queue_status_changed', 'registrar_system_alert'],
   lab: ['lab_new_study', 'lab_critical_finding', 'lab_result_sent_confirmation'],
-  patient: ['appointment_reminder', 'appointment_rescheduled', 'payment_update', 'result_ready']
+  patient: ['appointment_reminder', 'appointment_rescheduled', 'payment_update', 'result_ready'],
+  cardiologist: ['diagnostics_return', 'queue_changed', 'lab_critical_result'],
+  dermatologist: ['diagnostics_return', 'queue_changed', 'lab_critical_result'],
+  dentist: ['diagnostics_return', 'queue_changed', 'lab_critical_result'],
+  admin: ['registrar_system_alert', 'system_alert', 'security_alert', 'billing_alert']
 };
 
 function normalizeNotification(input, source = 'api') {
