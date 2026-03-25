@@ -89,34 +89,6 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
     } = useEMR(visitId, { specialty: canonicalSpecialty });
 
 
-    // Local UI state
-    const [showHistory, setShowHistory] = useState(false);
-    const [showHelp, setShowHelp] = useState(false);
-    const [selectedVersion, setSelectedVersion] = useState(null);
-    const [showDiff, setShowDiff] = useState(false);
-    const [amendReason, setAmendReason] = useState('');
-    const [showAmendForm, setShowAmendForm] = useState(false);
-    const [experimentalGhostMode, setExperimentalGhostMode] = useState(false);
-
-    // AI Suggestions state
-    const [aiSuggestions, setAiSuggestions] = useState({});
-    const [aiLoading, setAiLoading] = useState({});
-
-    // Autosave setup
-    const { lastAutosave, config: autosaveConfig } = useEMRAutosave({
-        isDirty,
-        isSaving,
-        isSigned,
-        status,
-        saveEMR,
-        debounceMs: DEBOUNCE.autosave,
-        maxWaitMs: 30000,
-        enabled: !isSigned,
-    });
-
-    // Navigation guard
-    useBeforeUnload(isDirty);
-
     if (!visitId) {
         return (
             <div className="emr-v2-container">

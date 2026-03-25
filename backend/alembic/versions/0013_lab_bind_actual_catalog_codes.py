@@ -85,6 +85,16 @@ def upgrade() -> None:
     now = datetime.now(UTC)
 
     for service_code, template_code in DESIRED_REAL_CODE_BINDINGS.items():
+        # Check if the template exists before trying to insert the binding
+        template_exists = bind.execute(
+            sa.text("SELECT 1 FROM lab_report_templates WHERE code = :code"),
+            {"code": template_code}
+        ).scalar()
+
+        if not template_exists:
+            print(f"Skipping actual binding for {service_code} -> {template_code} because template does not exist.")
+            continue
+
         stmt = insert(binding_table).values(
             service_code=service_code,
             template_code=template_code,
