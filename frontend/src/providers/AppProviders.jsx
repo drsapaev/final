@@ -2,6 +2,7 @@ import { TranslationProvider } from '../hooks/useTranslation';
 import { AppDataProvider } from '../contexts/AppDataContext';
 import { ChatProvider } from '../contexts/ChatContext';
 import { ToastProvider } from '../components/common/Toast';
+import { NotificationsViewport } from '../services/notifications/uiNotifications';
 import { ModalProvider } from '../components/common/Modal';
 import { FormProvider } from '../components/common/Form';
 import ErrorBoundary from '../components/common/ErrorBoundary';
@@ -24,6 +25,7 @@ export function AppProviders({ children }) {
                   <FormProvider>
                     {children}
                     <NotificationPrompt />
+                    <NotificationsViewport />
                   </FormProvider>
                 </ModalProvider>
               </NotificationWebSocketProvider>

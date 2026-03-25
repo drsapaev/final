@@ -88,6 +88,20 @@ export default [
       'no-undef': 'off', // Отключаем проверку undefined для тестовых файлов
     },
   },
+
+  {
+    files: ['src/pages/**/*Panel*.{js,jsx,ts,tsx}', 'src/pages/**/*PanelUnified*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-alert': 'warn',
+      'no-restricted-imports': ['warn', {
+        paths: [{
+          name: 'react-toastify',
+          message: 'Используйте notify из services/notifications/uiNotifications вместо прямого toast импорта в panel-level коде.',
+        }],
+      }],
+    },
+  },
+
   {
     // Игнорируемые файлы
     ignores: [

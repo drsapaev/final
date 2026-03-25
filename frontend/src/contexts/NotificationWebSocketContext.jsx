@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { buildWsUrl } from '../api/runtime';
-import { useToast } from '../components/common/Toast';
+import { notify, normalizeNotificationPayload } from '../services/notifications/uiNotifications';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 
@@ -10,35 +10,27 @@ const NotificationWebSocketContext = createContext(null);
 
 export function NotificationWebSocketProvider({ children }) {
   const ws = useRef(null);
-  const { addToast } = useToast();
   const reconnectTimeout = useRef(null);
 
   const handleMessage = useCallback((data) => {
-    if (data.type === 'notification') {
-      const { title, message } = data;
-      // Use Toast to show notification
-      // meta.type can be 'error', 'success', etc. if needed
-      addToast({
-        title: title,
-        message: message,
-        type: 'info', // Default to info, or map from meta.type
-        duration: 5000
-        // Optional: onClick logic using meta (e.g. navigate to queued item)
+    if (data.type === 'notification' || data.type === 'queue_update') {
+      const payload = normalizeNotificationPayload(data, {
+        title: data.type === 'queue_update' ? 'Обновление очереди' : 'Уведомление',
+        message: data.type === 'queue_update' ? 'Ваш статус обновлен' : 'Новое событие',
+        type: data.meta?.type || 'info',
+        source: data.source || 'websocket',
+        entity_type: data.entity_type || data.meta?.entity_type || null,
+        entity_id: data.entity_id || data.meta?.entity_id || null,
+        action_url: data.action_url || data.meta?.action_url || null,
       });
 
-      // If browsers support Notification API and permission granted, we could also show system notification
+      notify.system(payload);
+
       if (document.hidden && Notification.permission === 'granted') {
-        new Notification(title, { body: message });
+        new Notification(payload.title || 'Уведомление', { body: payload.message });
       }
-    } else if (data.type === 'queue_update') {
-      // Specific handling for queue updates if needed
-      addToast({
-        title: 'Обновление очереди',
-        message: 'Ваш статус обновлен',
-        type: 'info'
-      });
     }
-  }, [addToast]);
+  }, []);
 
   const connect = useCallback(() => {
     let activeSocket = null;
