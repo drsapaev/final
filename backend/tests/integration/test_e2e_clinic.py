@@ -252,12 +252,12 @@ def test_e2e_clinic_flow(
     assert emr_id is not None, "EMR ID should not be None"
 
     # Проверяем audit log для создания EMR
+    from app.models.emr_v2 import EMRAuditLog
     audit_log_emr = (
-        db_session.query(UserAuditLog)
+        db_session.query(EMRAuditLog)
         .filter(
-            UserAuditLog.resource_type == "emr",
-            UserAuditLog.resource_id == emr_id,
-            UserAuditLog.action == "CREATE",
+            EMRAuditLog.emr_id == emr_id,
+            EMRAuditLog.action == "create",
         )
         .first()
     )

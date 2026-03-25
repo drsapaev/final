@@ -6,12 +6,12 @@ from pathlib import Path
 ROUTER_MARKER = "# --- API Router moved from app/api/v1/endpoints/"
 
 
-def _service_logic_block(module_name: str) -> str:
+def _service_logic_block(module_name: str, suffix: str = "_api_service.py") -> str:
     service_path = (
         Path(__file__).resolve().parents[2]
         / "app"
         / "services"
-        / f"{module_name}_api_service.py"
+        / f"{module_name}{suffix}"
     )
     text = service_path.read_text(encoding="utf-8")
     return text.split(ROUTER_MARKER, maxsplit=1)[0]
@@ -479,7 +479,7 @@ def test_mobile_service_avoids_direct_session_calls() -> None:
 
 
 def test_lab_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("lab")
+    logic = _service_logic_block("lab_reporting")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
         logic,
@@ -533,7 +533,7 @@ def test_minimal_auth_service_avoids_direct_session_calls() -> None:
 
 
 def test_emr_v2_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("emr_v2")
+    logic = _service_logic_block("emr_v2", suffix="_service.py")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
         logic,
