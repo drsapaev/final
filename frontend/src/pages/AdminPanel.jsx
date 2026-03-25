@@ -101,6 +101,7 @@ import useFinance from '../hooks/useFinance';
 import useReports from '../hooks/useReports';
 import useSettings from '../hooks/useSettings';
 import useSecurity from '../hooks/useSecurity';
+import notify from '../services/notify';
 
 import DoctorModal from '../components/admin/DoctorModal';
 import PatientModal from '../components/admin/PatientModal';
@@ -470,13 +471,13 @@ const AdminPanel = () => {
     if (file) {
       // Проверяем тип файла
       if (!file.type.startsWith('image/')) {
-        alert('Выберите файл изображения');
+        notify.warning('Выберите файл изображения');
         return;
       }
 
       // Проверяем размер (макс 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Размер файла не должен превышать 5MB');
+        notify.warning('Размер файла не должен превышать 5MB');
         return;
       }
 
@@ -621,7 +622,7 @@ const AdminPanel = () => {
         await resetSettings();
       } catch (error) {
         logger.error('Ошибка сброса настроек:', error);
-        alert('Ошибка при сбросе настроек');
+        notify.error('Ошибка при сбросе настроек');
       }
     }
   });void (
@@ -631,7 +632,7 @@ const AdminPanel = () => {
       await exportSettings();
     } catch (error) {
       logger.error('Ошибка экспорта настроек:', error);
-      alert('Ошибка при экспорте настроек');
+      notify.error('Ошибка при экспорте настроек');
     }
   });void (
 
@@ -640,7 +641,7 @@ const AdminPanel = () => {
       await importSettings(file);
     } catch (error) {
       logger.error('Ошибка импорта настроек:', error);
-      alert('Ошибка при импорте настроек');
+      notify.error('Ошибка при импорте настроек');
     }
   });
 
@@ -697,7 +698,7 @@ const AdminPanel = () => {
       await exportSecurityLogs(format);
     } catch (error) {
       logger.error('Ошибка экспорта логов:', error);
-      alert('Ошибка при экспорте логов безопасности');
+      notify.error('Ошибка при экспорте логов безопасности');
     }
   });
 
@@ -743,7 +744,7 @@ const AdminPanel = () => {
         await deleteUser(user.id);
       } catch (error) {
         logger.error('Ошибка удаления пользователя:', error);
-        alert('Ошибка при удалении пользователя');
+        notify.error('Ошибка при удалении пользователя');
       }
     }
   });void (
@@ -807,11 +808,11 @@ const AdminPanel = () => {
     if (window.confirm(`Вы уверены, что хотите деактивировать врача "${doctorName}"?\n\nВрач будет отмечен как неактивный, но останется в базе данных.`)) {
       try {
         await deleteDoctor(doctor.id);
-        alert(`Врач "${doctorName}" успешно деактивирован`);
+        notify.success(`Врач "${doctorName}" успешно деактивирован`);
       } catch (error) {
         logger.error('Ошибка деактивации врача:', error);
         const errorMessage = error.message || 'Неизвестная ошибка';
-        alert(`Ошибка при деактивации врача: ${errorMessage}`);
+        notify.error(`Ошибка при деактивации врача: ${errorMessage}`);
       }
     }
   };
@@ -886,7 +887,7 @@ const AdminPanel = () => {
         await deletePatient(patient.id);
       } catch (error) {
         logger.error('Ошибка удаления пациента:', error);
-        alert('Ошибка при удалении пациента');
+        notify.error('Ошибка при удалении пациента');
       }
     }
   };
@@ -947,7 +948,7 @@ const AdminPanel = () => {
         await deleteAppointment(appointment.id);
       } catch (error) {
         logger.error('Ошибка удаления записи:', error);
-        alert('Ошибка при удалении записи');
+        notify.error('Ошибка при удалении записи');
       }
     }
   };
@@ -1030,7 +1031,7 @@ const AdminPanel = () => {
         await deleteTransaction(transaction.id);
       } catch (error) {
         logger.error('Ошибка удаления транзакции:', error);
-        alert('Ошибка при удалении транзакции');
+        notify.error('Ошибка при удалении транзакции');
       }
     }
   };

@@ -121,12 +121,12 @@ export const API_ENDPOINTS = {
 
   // Уведомления
   NOTIFICATIONS: {
-    LIST: '/notifications',
-    GET: (id) => `/notifications/${id}`,
-    MARK_READ: (id) => `/notifications/${id}/read`,
-    MARK_ALL_READ: '/notifications/mark-all-read',
+    LIST: '/mobile/notifications',
+    GET: (id) => `/mobile/notifications/${id}`,
+    MARK_READ: (id) => `/mobile/notifications/${id}/read`,
+    MARK_ALL_READ: '/mobile/notifications/mark-all-read',
     SEND: '/notifications/send',
-    TYPES: '/notifications/types'
+    TYPES: '/notifications/templates'
   },
 
   // Файлы

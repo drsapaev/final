@@ -30,6 +30,7 @@
     "preview": "cd frontend && npm run preview",
     "test": "cd frontend && npm run test:run",
     "test:frontend": "cd frontend && npm run test:run",
+    "lint:guard:panels": "cd frontend && npm run lint:guard:panels",
     "landing:init": "python scripts/landing_factory/scaffold_run.py",
     "landing:pipeline": "python scripts/landing_factory/run_pipeline.py",
     "landing:scorecard": "python scripts/landing_factory/aggregate_scorecard.py",

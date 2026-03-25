@@ -597,14 +597,17 @@ export const notificationsService = {
    */
   async getNotifications(params = {}) {
     const queryString = buildQueryString(params);
-    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`);
+    const suffix = queryString ? `?${queryString}` : '';
+    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.LIST}${suffix}`);
   },
 
   /**
    * Получение уведомления по ID
    */
   async getNotification(id) {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.GET(id));
+    const list = await this.getNotifications({ limit: 100 });
+    const notifications = Array.isArray(list) ? list : list?.notifications || [];
+    return notifications.find((item) => Number(item.id) === Number(id)) || null;
   },
 
   /**
@@ -618,7 +621,22 @@ export const notificationsService = {
    * Отметка всех как прочитанных
    */
   async markAllAsRead() {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
+    const notifications = await this.getNotifications({ limit: 100 });
+    const items = Array.isArray(notifications)
+      ? notifications
+      : notifications?.notifications || [];
+
+    const unread = items.filter((item) => item && item.read === false);
+    const results = await Promise.allSettled(
+      unread.map((item) => this.markAsRead(item.id))
+    );
+
+    const failed = results.filter((result) => result.status === 'rejected');
+    return {
+      total: items.length,
+      marked: unread.length - failed.length,
+      failed: failed.length
+    };
   },
 
   /**
@@ -634,7 +652,16 @@ export const notificationsService = {
    * Получение типов уведомлений
    */
   async getNotificationTypes() {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.TYPES);
+    try {
+      const templates = await apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.TYPES);
+      if (Array.isArray(templates)) {
+        const uniqueTypes = [...new Set(templates.map((item) => item?.notification_type).filter(Boolean))];
+        return uniqueTypes;
+      }
+      return [];
+    } catch {
+      return [];
+    }
   }
 };
 

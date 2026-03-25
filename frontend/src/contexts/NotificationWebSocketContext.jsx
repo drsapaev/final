@@ -13,32 +13,40 @@ export function NotificationWebSocketProvider({ children }) {
   const { addToast } = useToast();
   const reconnectTimeout = useRef(null);
 
+  const normalizeNotification = useCallback((payload = {}) => {
+    const data = payload.notification || payload;
+    const title = data.title || data.subject || 'Уведомление';
+    const message = data.message || data.content || payload.message || '';
+    const rawType = (data.level || data.severity || data.type || 'info').toLowerCase();
+    const type = ['success', 'error', 'warning', 'info'].includes(rawType)
+      ? rawType
+      : 'info';
+    return { title, message, type };
+  }, []);
+
   const handleMessage = useCallback((data) => {
-    if (data.type === 'notification') {
-      const { title, message } = data;
+    if (data.type === 'notification' || data.type === 'queue_update' || data.type === 'system_alert') {
+      const normalized = normalizeNotification(data);
       // Use Toast to show notification
       // meta.type can be 'error', 'success', etc. if needed
       addToast({
-        title: title,
-        message: message,
-        type: 'info', // Default to info, or map from meta.type
+        title: normalized.title,
+        message: normalized.message,
+        type: normalized.type, // Default to info, or map from meta.type
         duration: 5000
         // Optional: onClick logic using meta (e.g. navigate to queued item)
       });
 
       // If browsers support Notification API and permission granted, we could also show system notification
       if (document.hidden && Notification.permission === 'granted') {
-        new Notification(title, { body: message });
+        new Notification(normalized.title, { body: normalized.message });
       }
-    } else if (data.type === 'queue_update') {
-      // Specific handling for queue updates if needed
-      addToast({
-        title: 'Обновление очереди',
-        message: 'Ваш статус обновлен',
-        type: 'info'
+    } else if (data.type === 'connection_established') {
+      logger.info('[FIX:WS] Notification WebSocket handshake confirmed', {
+        userId: data.user_id
       });
     }
-  }, [addToast]);
+  }, [addToast, normalizeNotification]);
 
   const connect = useCallback(() => {
     let activeSocket = null;
