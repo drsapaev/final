@@ -49,6 +49,7 @@ import {
 
 'lucide-react';
 import tokenManager from '../../utils/tokenManager';
+import { notificationsService } from '../../api/services';
 // import AdvancedCharts from './AdvancedCharts';
 
 const Dashboard = ({ user }) => {
@@ -73,9 +74,7 @@ const Dashboard = ({ user }) => {
       fetch('/api/v1/analytics/dashboard', {
         headers: { 'Authorization': `Bearer ${token}` }
       }),
-      fetch('/api/v1/notifications/history/stats', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }),
+      notificationsService.getHistoryStats(),
       fetch('/api/v1/files/stats', {
         headers: { 'Authorization': `Bearer ${token}` }
       }),
@@ -85,7 +84,7 @@ const Dashboard = ({ user }) => {
       );
 
       const analyticsData = analyticsRes.ok ? await analyticsRes.json() : null;
-      const notificationsData = notificationsRes.ok ? await notificationsRes.json() : null;
+      const notificationsData = notificationsRes;
       const filesData = filesRes.ok ? await filesRes.json() : null;
       const telegramData = telegramRes.ok ? await telegramRes.json() : null;
 

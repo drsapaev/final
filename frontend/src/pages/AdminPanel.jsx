@@ -158,6 +158,7 @@ import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
 import { getApiOrigin } from '../api/runtime';
+import { notificationsService } from '../api/services';
 
 
 
@@ -514,16 +515,41 @@ const AdminPanel = () => {
 
   const recentActivities = recentActivitiesData?.activities || [];
 
-  // Загрузка системных уведомлений с бэкенда
-  const {
-    data: systemAlertsData,
-    loading: systemAlertsLoading,
-    error: systemAlertsError
-  } = useAdminData('/notifications/history/stats?days=7', {
-    refreshInterval: 0,
-    enabled: true,
-    initialData: { recent_activity: [] }
-  });
+  // Загрузка системных уведомлений через централизованный notificationsService
+  const [systemAlertsData, setSystemAlertsData] = useState({ recent_activity: [] });
+  const [systemAlertsLoading, setSystemAlertsLoading] = useState(true);
+  const [systemAlertsError, setSystemAlertsError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSystemAlerts = async () => {
+      try {
+        setSystemAlertsLoading(true);
+        setSystemAlertsError(null);
+        const response = await notificationsService.getHistoryStats({ days: 7 });
+
+        if (isMounted) {
+          setSystemAlertsData(response || { recent_activity: [] });
+        }
+      } catch (error) {
+        if (isMounted) {
+          setSystemAlertsError(error?.message || 'Не удалось загрузить статистику уведомлений');
+          setSystemAlertsData({ recent_activity: [] });
+        }
+      } finally {
+        if (isMounted) {
+          setSystemAlertsLoading(false);
+        }
+      }
+    };
+
+    loadSystemAlerts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Функция для форматирования времени "сколько времени назад"
   const formatTimeAgo = React.useCallback((date) => {

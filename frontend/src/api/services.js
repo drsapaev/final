@@ -590,39 +590,27 @@ export const settingsService = {
 
 /**
  * Сервис уведомлений
+ * Контракт синхронизирован с backend/app/api/v1/endpoints/notifications.py
  */
 export const notificationsService = {
   /**
-   * Получение списка уведомлений
+   * История уведомлений (backend: GET /notifications/history)
    */
-  async getNotifications(params = {}) {
+  async getHistory(params = {}) {
     const queryString = buildQueryString(params);
-    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`);
+    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.HISTORY}?${queryString}`);
   },
 
   /**
-   * Получение уведомления по ID
+   * Статистика уведомлений (backend: GET /notifications/history/stats)
    */
-  async getNotification(id) {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.GET(id));
+  async getHistoryStats(params = {}) {
+    const queryString = buildQueryString(params);
+    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.HISTORY_STATS}?${queryString}`);
   },
 
   /**
-   * Отметка как прочитанное
-   */
-  async markAsRead(id) {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
-  },
-
-  /**
-   * Отметка всех как прочитанных
-   */
-  async markAllAsRead() {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
-  },
-
-  /**
-   * Отправка уведомления
+   * Отправка уведомления (backend: POST /notifications/send)
    */
   async sendNotification(notificationData) {
     return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.SEND, {
@@ -631,10 +619,12 @@ export const notificationsService = {
   },
 
   /**
-   * Получение типов уведомлений
+   * Массовая отправка (backend: POST /notifications/send-bulk)
    */
-  async getNotificationTypes() {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.TYPES);
+  async sendBulkNotification(notificationData) {
+    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.SEND_BULK, {
+      data: notificationData
+    });
   }
 };
 

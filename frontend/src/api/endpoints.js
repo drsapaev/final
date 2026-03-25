@@ -119,14 +119,12 @@ export const API_ENDPOINTS = {
     CATEGORIES: '/settings/categories'
   },
 
-  // Уведомления
+  // Уведомления (backend contract: notifications.py)
   NOTIFICATIONS: {
-    LIST: '/notifications',
-    GET: (id) => `/notifications/${id}`,
-    MARK_READ: (id) => `/notifications/${id}/read`,
-    MARK_ALL_READ: '/notifications/mark-all-read',
+    HISTORY: '/notifications/history',
+    HISTORY_STATS: '/notifications/history/stats',
     SEND: '/notifications/send',
-    TYPES: '/notifications/types'
+    SEND_BULK: '/notifications/send-bulk'
   },
 
   // Файлы
@@ -189,7 +187,7 @@ export const API_ENDPOINTS = {
   WEBSOCKET: {
     CONNECT: '/ws',
     QUEUE_UPDATES: '/ws/queue',
-    NOTIFICATIONS: '/ws/notifications',
+    NOTIFICATIONS: '/ws/notifications/connect',
     APPOINTMENTS: '/ws/appointments'
   }
 };
@@ -244,10 +242,6 @@ export const createEndpoints = {
   // Настройки
   getSetting: (key) => `/settings/${key}`,
   updateSetting: (key) => `/settings/${key}`,
-
-  // Уведомления
-  getNotification: (id) => `/notifications/${id}`,
-  markNotificationRead: (id) => `/notifications/${id}/read`,
 
   // Файлы
   getFile: (id) => `/files/${id}`,
