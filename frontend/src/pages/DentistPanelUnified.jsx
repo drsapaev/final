@@ -41,7 +41,7 @@ import {
 'lucide-react';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
-import { toast } from 'react-toastify';
+import notify from '../utils/notify';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
@@ -480,7 +480,7 @@ const DentistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
         break;
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);
@@ -645,7 +645,7 @@ const DentistPanelUnified = () => {
       return;
     }
 
-    toast.info('Выберите визит с каноническим visit_id во вкладке "Записи".');
+    notify.info('Выберите визит с каноническим visit_id во вкладке "Записи".');
     handleTabChange('appointments');
   };
 
@@ -764,7 +764,7 @@ const DentistPanelUnified = () => {
   const handleVisitProtocol = async (patient) => {
     const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
     if (!visitId) {
-      toast.error('Для протокола визита нужен канонический visit_id. Откройте пациента из вкладки "Записи".');
+      notify.error('Для протокола визита нужен канонический visit_id. Откройте пациента из вкладки "Записи".');
       return;
     }
 
@@ -810,7 +810,7 @@ const DentistPanelUnified = () => {
   const handleTreatmentPlanner = async (patient) => {
     const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
     if (!visitId) {
-      toast.error('План лечения требует канонический visit_id. Откройте пациента из вкладки "Записи".');
+      notify.error('План лечения требует канонический visit_id. Откройте пациента из вкладки "Записи".');
       return;
     }
 
