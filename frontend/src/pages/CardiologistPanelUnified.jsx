@@ -34,6 +34,7 @@ import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import tokenManager from '../utils/tokenManager';
+import notify from '../services/notify';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -708,7 +709,7 @@ const MacOSCardiologistPanelUnified = () => {
       case 'payment':
         // Открыть окно оплаты
         // Здесь можно добавить модальное окно оплаты
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже`);
         break;
       case 'print':
         // Печать талона
