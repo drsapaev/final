@@ -46,6 +46,7 @@ import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -2817,6 +2818,8 @@ const DentistPanelUnified = () => {
       color: 'var(--mac-text-primary)',
       transition: 'background var(--mac-duration-normal) var(--mac-ease)'
     }}>
+      <NotificationInbox role="dentist" title="Inbox стоматолога" />
+
       {renderContent()}
 
       {/* Модальные окна */}

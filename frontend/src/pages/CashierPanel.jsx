@@ -26,6 +26,7 @@ import {
   Alert,
   Skeleton } from
 '../components/ui/macos';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 // ✅ Компоненты для возвратов
 import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
@@ -707,6 +708,8 @@ const CashierPanel = () => {void
 
       <div style={{ padding: '0px' }}>
         <div className="max-w-7xl mx-auto space-y-6">
+          <NotificationInbox role="cashier" title="Inbox кассира" />
+
 
           {/* Filters */}
           <Card

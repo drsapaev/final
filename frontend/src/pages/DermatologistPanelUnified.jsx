@@ -39,6 +39,7 @@ import { getApiBaseUrl, getApiOrigin } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 const API_BASE = getApiOrigin();
 const API_V1_BASE = getApiBaseUrl();
@@ -997,6 +998,8 @@ const DermatologistPanelUnified = () => {
     }}>
 
       <div style={{ padding: '0px' }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+        <NotificationInbox role="dermatologist" title="Inbox дерматолога" />
+
 
 
         {/* Контент вкладок */}

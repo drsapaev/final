@@ -168,6 +168,7 @@ import { MobileNavigation } from '../components/admin/MobileOptimization';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import '../styles/admin-styles.css';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 const AdminPanel = () => {
   const location = useLocation();
@@ -4562,6 +4563,8 @@ const AdminPanel = () => {
   return (
     <div style={pageStyle}>
       <div style={containerStyle}>
+        <NotificationInbox role="admin" title="Inbox администратора" />
+
 
         {/* Навигация теперь через глобальный сайдбар в App.jsx */}
 

@@ -34,6 +34,7 @@ import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import tokenManager from '../utils/tokenManager';
+import NotificationInbox from '../components/notifications/NotificationInbox';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -1034,6 +1035,8 @@ const MacOSCardiologistPanelUnified = () => {
     }}>
 
       <div style={{ padding: '0px' }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+        <NotificationInbox role="cardiologist" title="Inbox кардиолога" />
+
 
         {/* Навигация по вкладкам удалена — управление через сайдбар и URL */}
 

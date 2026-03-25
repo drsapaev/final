@@ -18,14 +18,31 @@ const WS_DOMAIN_MAP = {
 
 const ROLE_DOMAIN_RULES = {
   doctor: new Set(['queue', 'lab', 'system']),
+  cardiologist: new Set(['queue', 'lab', 'system']),
+  dermatologist: new Set(['queue', 'lab', 'system']),
+  dentist: new Set(['queue', 'lab', 'system']),
   registrar: new Set(['appointment', 'queue', 'payment', 'system']),
+  cashier: new Set(['payment', 'appointment', 'system']),
   lab: new Set(['lab', 'queue', 'system']),
-  patient: new Set(['appointment', 'lab', 'payment', 'system'])
+  patient: new Set(['appointment', 'lab', 'payment', 'system']),
+  admin: new Set(['queue', 'lab', 'payment', 'appointment', 'system'])
 };
 
 function resolveRole() {
-  const roleRaw = tokenManager.getRole?.() || localStorage.getItem('userRole') || '';
-  return String(roleRaw).toLowerCase();
+  const roleRaw = tokenManager.getRole?.() || localStorage.getItem('userRole') || tokenManager.getUserData?.()?.role || '';
+  const role = String(roleRaw).toLowerCase();
+
+  if (role.includes('cardio')) return 'cardiologist';
+  if (role.includes('derma')) return 'dermatologist';
+  if (role.includes('dent') || role.includes('stomat')) return 'dentist';
+  if (role.includes('cash')) return 'cashier';
+  if (role.includes('registrar')) return 'registrar';
+  if (role.includes('lab')) return 'lab';
+  if (role.includes('patient')) return 'patient';
+  if (role.includes('admin')) return 'admin';
+  if (role.includes('doctor')) return 'doctor';
+
+  return role;
 }
 
 function mapNotificationPayload(data) {

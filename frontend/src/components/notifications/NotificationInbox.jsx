@@ -9,9 +9,25 @@ const ROLE_RULES = {
     domains: ['queue', 'lab', 'system'],
     keywords: ['diagnostic', 'результат', 'critical', 'критич', 'system']
   },
+  cardiologist: {
+    domains: ['queue', 'lab', 'system'],
+    keywords: ['кардио', 'ecg', 'эхо', 'diagnostic', 'critical']
+  },
+  dermatologist: {
+    domains: ['queue', 'lab', 'system'],
+    keywords: ['дерм', 'кожа', 'биопс', 'diagnostic', 'critical']
+  },
+  dentist: {
+    domains: ['queue', 'lab', 'system'],
+    keywords: ['стомат', 'dental', 'рентген', 'diagnostic', 'critical']
+  },
   registrar: {
     domains: ['appointment', 'queue', 'payment', 'system'],
     keywords: ['запис', 'очеред', 'price', 'system', 'alert']
+  },
+  cashier: {
+    domains: ['payment', 'appointment', 'system'],
+    keywords: ['оплат', 'касс', 'refund', 'invoice', 'payment']
   },
   lab: {
     domains: ['lab', 'queue', 'system'],
@@ -20,6 +36,10 @@ const ROLE_RULES = {
   patient: {
     domains: ['appointment', 'lab', 'payment', 'system'],
     keywords: ['напомин', 'перенос', 'анализ', 'оплат', 'payment']
+  },
+  admin: {
+    domains: ['queue', 'lab', 'payment', 'appointment', 'system'],
+    keywords: ['system', 'alert', 'critical', 'security', 'audit']
   }
 };
 
