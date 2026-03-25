@@ -41,7 +41,7 @@ import {
 'lucide-react';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
-import { toast } from 'react-toastify';
+import { toast, toast as notify } from 'react-toastify';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
@@ -480,7 +480,7 @@ const DentistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция в разработке`);
         break;
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);

@@ -7,6 +7,7 @@
  * - Complete action for approved requests
  */
 import { useState, useEffect, useCallback } from 'react';
+import { toast as notify } from 'react-toastify';
 import {
   Check,
   X,
@@ -94,7 +95,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Approve error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -124,7 +125,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Reject error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -153,7 +154,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Complete error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }

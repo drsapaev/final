@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { toast as notify } from 'react-toastify';
 import {
   FileText,
   User,
@@ -708,7 +709,7 @@ const MacOSCardiologistPanelUnified = () => {
       case 'payment':
         // Открыть окно оплаты
         // Здесь можно добавить модальное окно оплаты
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция в разработке`);
         break;
       case 'print':
         // Печать талона

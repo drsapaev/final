@@ -33,7 +33,7 @@ import PriceOverrideManager from '../components/dermatology/PriceOverrideManager
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import { queueService } from '../services/queue';
-import { toast } from 'react-toastify';
+import { toast, toast as notify } from 'react-toastify';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiBaseUrl, getApiOrigin } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
@@ -315,7 +315,7 @@ const DermatologistPanelUnified = () => {
       }
 
       // Фильтруем только дерматологические записи
-      let appointmentsData = allAppointments.filter((apt) =>
+      const appointmentsData = allAppointments.filter((apt) =>
       apt.specialty === 'derma' || apt.specialty === 'dermatology'
       );
 
@@ -533,7 +533,7 @@ const DermatologistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция в разработке`);
         break;
       case 'print':
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
@@ -2159,7 +2159,7 @@ const DermatologistPanelUnified = () => {
                             });
                             setShowPriceOverride(true);
                           } else {
-                            alert('Сначала выберите услугу');
+                            notify.warning('Сначала выберите услугу');
                           }
                         }}
                         variant="primary"
