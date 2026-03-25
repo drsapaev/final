@@ -119,14 +119,11 @@ export const API_ENDPOINTS = {
     CATEGORIES: '/settings/categories'
   },
 
-  // Уведомления
+  // Уведомления (production-ready inbox/realtime минимум)
   NOTIFICATIONS: {
-    LIST: '/notifications',
-    GET: (id) => `/notifications/${id}`,
-    MARK_READ: (id) => `/notifications/${id}/read`,
-    MARK_ALL_READ: '/notifications/mark-all-read',
-    SEND: '/notifications/send',
-    TYPES: '/notifications/types'
+    HISTORY: '/notifications/history',
+    HISTORY_STATS: '/notifications/history/stats',
+    SEND: '/notifications/send'
   },
 
   // Файлы
@@ -246,8 +243,7 @@ export const createEndpoints = {
   updateSetting: (key) => `/settings/${key}`,
 
   // Уведомления
-  getNotification: (id) => `/notifications/${id}`,
-  markNotificationRead: (id) => `/notifications/${id}/read`,
+  getNotificationHistory: () => `/notifications/history`,
 
   // Файлы
   getFile: (id) => `/files/${id}`,
