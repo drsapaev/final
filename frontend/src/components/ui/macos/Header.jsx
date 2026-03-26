@@ -1,9 +1,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Button } from './Button';
-import { Icon } from './Icon';
-import { Avatar } from './Avatar';
+import Button from './Button';
+import Icon from './Icon';
+import Avatar from './Avatar';
 
 /**
  * macOS-style Header Component
@@ -133,6 +133,7 @@ const Header = React.forwardRef(({
           variant="ghost"
           size="small"
           onClick={onSettingsClick}
+          aria-label="Settings"
           style={{
             width: '32px',
             height: '32px',
@@ -337,6 +338,7 @@ export const HeaderSearch = React.forwardRef(({
         variant="ghost"
         size="small"
         onClick={onClear}
+        aria-label="Clear search"
         style={{
           width: '16px',
           height: '16px',

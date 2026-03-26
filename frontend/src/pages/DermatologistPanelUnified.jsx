@@ -315,7 +315,7 @@ const DermatologistPanelUnified = () => {
       }
 
       // Фильтруем только дерматологические записи
-      let appointmentsData = allAppointments.filter((apt) =>
+      const appointmentsData = allAppointments.filter((apt) =>
       apt.specialty === 'derma' || apt.specialty === 'dermatology'
       );
 
