@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.services.service_mapping import normalize_service_code
 from app.core.audit import log_critical_change, extract_model_changes
-from app.core.logger import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
