@@ -1,9 +1,9 @@
 ---
 name: aif-implement
 description: Execute implementation tasks from the current plan. Works through tasks sequentially, marks completion, and preserves progress for continuation across sessions. Use when user says "implement", "start coding", "execute plan", or "continue implementation".
-argument-hint: '[task-id or "status"]'
+argument-hint: '[--list] [@plan-file] [task-id or "status"]'
 allowed-tools: Read Write Edit Glob Grep Bash TaskList TaskGet TaskUpdate AskUserQuestion Questions
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # Implement - Execute Task Plan
@@ -17,10 +17,38 @@ Execute tasks from the plan, track progress, and enable session continuation.
 **FIRST:** Determine what state we're in:
 
 ```
-1. Check for uncommitted changes (git status)
-2. Check for plan files (.ai-factory/PLAN.md or branch-named)
+1. Parse arguments:
+   - --list → list available plans only (no implementation; STOP)
+   - @<path> → explicit plan file override (highest priority)
+   - <number> → start from specific task
+   - status → status-only mode
+2. Check for uncommitted changes (git status)
 3. Check current branch
 ```
+
+### Step 0.list: List Available Plans (`--list`)
+
+If `$ARGUMENTS` contains `--list`, run read-only plan discovery and stop.
+
+```
+1. Get current branch:
+   git branch --show-current
+2. Convert branch to filename: replace "/" with "-", add ".md"
+3. Check existence of:
+   - .ai-factory/plans/<branch-name>.md
+   - .ai-factory/PLAN.md
+   - .ai-factory/FIX_PLAN.md
+4. Print plan availability summary and usage hints
+5. STOP.
+```
+
+**Important:** In `--list` mode:
+- Do not execute tasks
+- Do not modify files
+- Do not update TaskList statuses
+
+For detailed output format and examples, see:
+- `skills/aif-implement/references/IMPLEMENTATION-GUIDE.md` → "List Available Plans (`--list`)"
 
 ### Step 0.0: Resume / Recovery (after a break or after /clear)
 
@@ -35,37 +63,60 @@ If the user is resuming **the next day**, says the session was **abandoned**, or
 ```
 
 Then reconcile plan/task state:
-- Ensure the current plan file matches the current branch (PLAN.md takes priority; otherwise branch-named plan).
+- Ensure the current plan file matches the current branch (`@plan-file` override wins; otherwise branch-named plan takes priority over `PLAN.md`).
 - Compare `TaskList` statuses vs plan checkboxes.
   - If code changes for a task appear already implemented but the task is not marked completed, verify quickly and then `TaskUpdate(..., status: "completed")` and update the plan checkbox.
   - If a task is marked completed but the corresponding code is missing (rebase/reset happened), mark it back to pending and discuss with the user.
 
 **If uncommitted changes exist:**
 ```
-You have uncommitted changes. Commit them first?
-- [ ] Yes, commit now ($2)
-- [ ] No, stash and continue
-- [ ] Cancel
+AskUserQuestion: You have uncommitted changes. Commit them first?
+
+Options:
+1. Yes, commit now (/aif-commit)
+2. No, stash and continue
+3. Cancel
 ```
 
-**If NO plan file exists (all tasks completed or fresh start):**
+**Based on choice:**
+- Yes → run `/aif-commit`, then continue to plan discovery
+- No → `git stash push -m "aif-implement: stash before plan execution"`, then continue
+- Cancel → inform the user: "Implementation cancelled." → **STOP**
+
+**If NO plan file exists but `.ai-factory/FIX_PLAN.md` exists:**
+
+A fix plan was created by `/aif-fix` in plan mode. Redirect to fix workflow:
 
 ```
-No active plan found.
+Found a fix plan (.ai-factory/FIX_PLAN.md).
 
-Current branch: feature/user-auth
+This plan was created by /aif-fix and should be executed through the fix workflow
+(it creates a patch and handles cleanup automatically).
 
+Running /aif-fix to execute the plan...
+```
+
+→ **Invoke `/aif-fix`** (without arguments — it will detect FIX_PLAN.md and execute it).
+→ **STOP** — do not continue with implement workflow.
+
+**If NO plan file exists AND no FIX_PLAN.md (all tasks completed or fresh start):**
+
+```
+AskUserQuestion: No active plan found. Current branch: <current-branch>.
 What would you like to do?
-- [ ] Start new feature from current branch
-- [ ] Return to main/master and start new feature
-- [ ] Create quick task plan (no branch)
-- [ ] Nothing, just checking status
+
+Options:
+1. Start new feature from current branch
+2. Return to main/master and start new feature
+3. Create quick task plan (no branch)
+4. Nothing, just checking status
 ```
 
-Based on choice:
-- New feature from current → `$2 full <description>`
-- Return to main → `git checkout main && git pull` → `$2 full <description>`
-- Quick task → `$2 fast <description>`
+**Based on choice:**
+- New feature from current → `/aif-plan full <description>`
+- Return to main → `git checkout main`, then `git pull` → `/aif-plan full <description>`
+- Quick task → `/aif-plan fast <description>`
+- Nothing, just checking status → display branch info and recent commits summary → **STOP**
 
 **If plan file exists → continue to Step 0.1**
 
@@ -87,37 +138,89 @@ Based on choice:
 - **ALWAYS follow these rules** when implementing — they override general patterns
 - Rules are short, actionable — treat each as a hard requirement
 
-**Read all patches from `.ai-factory/patches/`** if the directory exists:
-- Use `Glob` to find all `*.md` files in `.ai-factory/patches/`
-- Read each patch to learn from past fixes and mistakes
-- Apply lessons learned: avoid patterns that caused bugs, use patterns that prevented them
-- Pay attention to **Root Cause** and **Prevention** sections — they tell you what NOT to do
+**Read `.ai-factory/skill-context/aif-implement/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including the code
+  you write and how you update plan checkboxes. If a skill-context rule says "code MUST follow X"
+  or "implementation MUST include Y" — you MUST comply. Writing code that violates skill-context
+  rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
+**Patch fallback (limited, only when skill-context is missing):**
+
+- If `.ai-factory/skill-context/aif-implement/SKILL.md` does not exist and `.ai-factory/patches/` exists:
+  - Use `Glob` to find `*.md` files in `.ai-factory/patches/`
+  - Sort patch filenames ascending (lexical), then select the last **10** (or fewer if less exist)
+  - Read those selected patch files only
+  - Prioritize **Root Cause** and **Prevention** sections
+- If skill-context exists, do **not** read all patches by default.
+  - Optionally read a few targeted recent patches only when a task clearly matches a known failure pattern.
 
 **Use this context when implementing:**
 - Follow the specified tech stack
 - Use correct import patterns and conventions
 - Apply proper error handling and logging as specified
-- **Avoid pitfalls documented in patches** — don't repeat past mistakes
+- Avoid pitfalls documented in skill-context rules and relevant fallback patches
 
-### Step 0.1: Find Plan File
+### Step 0.2: Find Plan File
+
+**If `$ARGUMENTS` contains `@<path>`:**
+
+Use this explicit plan file and skip automatic plan discovery.
+
+```
+1. Extract path after "@"
+2. Resolve relative to project root (absolute paths are also valid)
+3. If file does not exist:
+   "Plan file not found: <path>
+    Provide an existing markdown plan file, for example:
+    - /aif-implement @.ai-factory/PLAN.md
+    - /aif-implement @.ai-factory/plans/feature-user-auth.md"
+   → STOP
+4. If file is .ai-factory/FIX_PLAN.md:
+   → invoke /aif-fix (ownership + cleanup workflow) and STOP
+5. Otherwise use this file as the active plan
+```
+
+Then continue with normal execution using the selected plan file.
+
+**If no `@<path>` override is provided, check plan files in this order:**
 
 **Check for plan files in this order:**
 
 ```
-1. .ai-factory/PLAN.md exists? → Use it (from $2 fast)
-2. No .ai-factory/PLAN.md → Check current git branch:
+1. Check current git branch:
    git branch --show-current
-   → Look for .ai-factory/plans/<branch-name>.md (e.g., .ai-factory/plans/feature-user-auth.md)
+   → Convert branch name to filename: replace "/" with "-", add ".md"
+   → Look for .ai-factory/plans/<branch-name>.md (e.g., feature/user-auth → .ai-factory/plans/feature-user-auth.md)
+2. No branch-based plan → Check .ai-factory/PLAN.md
+3. No branch-based plan and no .ai-factory/PLAN.md → Check .ai-factory/FIX_PLAN.md
+   → If exists: invoke /aif-fix (handles its own workflow with patches) and STOP
 ```
 
 **Priority:**
-1. `.ai-factory/PLAN.md` - always takes priority (from `$2 fast`)
-2. Branch-named file - if no .ai-factory/PLAN.md (from `$2 full`)
+1. `@<path>` argument - explicit user-selected plan file
+2. Branch-named file (from `/aif-plan full`) - if it matches current branch
+3. `.ai-factory/PLAN.md` (from `/aif-plan fast`) - fallback when no branch-based plan exists
+4. `.ai-factory/FIX_PLAN.md` - redirect to `/aif-fix` (from `/aif-fix` plan mode)
 
 **Read the plan file** to understand:
 - Context and settings (testing, logging preferences)
 - Commit checkpoints (when to commit)
 - Task dependencies
+- Task checklist format (`- [ ]` / `- [x]`) to keep progress synced
 
 ### Step 1: Load Current State
 
@@ -224,15 +327,18 @@ If during implementation:
 
 If the plan has commit checkpoints and current task is at a checkpoint:
 ```
-✅ Tasks 1-4 completed.
+AskUserQuestion: ✅ Tasks <first>-<last> completed. This is a commit checkpoint. Ready to commit? Suggested message: "<conventional commit message>"
 
-This is a commit checkpoint. Ready to commit?
-Suggested message: "feat: add base models and types"
-
-- [ ] Yes, commit now ($2)
-- [ ] No, continue to next task
-- [ ] Skip all commit checkpoints
+Options:
+1. Yes, commit now (/aif-commit)
+2. No, continue to next task
+3. Skip all commit checkpoints
 ```
+
+**Based on choice:**
+- Yes, commit now → invoke `/aif-commit` with the suggested message, then continue to next task
+- No, continue to next task → proceed to the next task without committing
+- Skip all commit checkpoints → for all subsequent checkpoints within this `/aif-implement` run, skip the prompt automatically and proceed directly to the next task (as if user selected "No, continue to next task" each time). This is in-context memory — resets on `/clear` or new session
 
 **3.9: Move to next task or pause**
 
@@ -248,12 +354,12 @@ Completed: 4/8 tasks
 Next task: #5 - Add pagination support
 
 To resume later, run:
-$2
+/aif-implement
 ```
 
 **To resume (next session):**
 ```
-$2
+/aif-implement
 ```
 → Automatically finds next incomplete task
 
@@ -272,67 +378,103 @@ Files modified:
 - src/services/search.ts (created)
 - src/api/products/search.ts (created)
 - src/types/search.ts (created)
+Documentation: updated existing docs | created docs/<feature-slug>.md | skipped by user | warn-only (Docs: no/unset)
 
 What's next?
 
-1. 🔍 $2 — Verify nothing was missed (recommended)
-2. 💾 $2 — Commit the changes directly
+1. 🔍 /aif-verify — Verify nothing was missed (recommended)
+2. 💾 /aif-commit — Commit the changes directly
 ```
 
 **Check ROADMAP.md progress:**
 
 If `.ai-factory/ROADMAP.md` exists:
 1. Read it
+1.1. If the plan file includes `## Roadmap Linkage` with a non-`none` milestone, prefer that milestone for completion marking
 2. Check if the completed work corresponds to any unchecked milestone
 3. If yes — mark it `[x]` and add entry to the Completed table with today's date
 4. Tell the user which milestone was marked done
 
-### Context Cleanup
+### Context Maintenance (Artifacts)
 
-Context is heavy after implementation. All code changes are saved — suggest freeing space:
+Only do this step when there is something concrete to capture.
+
+**DESCRIPTION.md (allowed in this command):**
+- If this plan introduced new dependencies/integrations or changed the stack, update `.ai-factory/DESCRIPTION.md` with factual deltas only.
+- Do not rewrite unrelated sections.
+
+**ARCHITECTURE.md + AGENTS.md (allowed in this command):**
+- If new modules/layers/folders were added (or dependency rules changed), update `.ai-factory/ARCHITECTURE.md` to reflect the new structure and constraints.
+- If you maintain `AGENTS.md` structure maps or entry points, refresh them only when they are now incorrect.
+
+**ROADMAP.md (allowed, limited):**
+- This command may mark milestone completion when evidence is clear.
+- If milestone mapping is ambiguous, emit `WARN [roadmap] ...` and suggest the owner command:
+  - `/aif-roadmap check`
+  - or `/aif-roadmap <short update request>`
+
+**RULES.md (NOT allowed in this command):**
+- Never edit `.ai-factory/RULES.md` from `/aif-implement`.
+- If you discovered repeatable conventions/pitfalls during implementation, propose up to 3 candidate rules and ask the user to add them via `/aif-rules`.
+- Do not invoke `/aif-rules` automatically (it is user-invoked).
+
+If candidate rules exist:
 
 ```
-AskUserQuestion: Free up context before continuing?
+AskUserQuestion: Capture new project rules in `.ai-factory/RULES.md`?
 
 Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
+1. Yes — output `/aif-rules ...` commands (recommended)
+2. No — skip
 ```
 
-**Suggest verification:**
+**Documentation policy checkpoint (after completion, before plan cleanup):**
 
+Read the plan file setting `Docs: yes/no`.
+
+If plan setting is `Docs: yes`:
 ```
-AskUserQuestion: All tasks complete. Run verification?
+AskUserQuestion: Documentation checkpoint — how should we document this feature?
 
 Options:
-1. Verify first — Run $2 to check completeness (recommended)
-2. Skip to commit — Go straight to $2
+1. Update existing docs (recommended) — invoke /aif-docs
+2. Create a new feature doc page — invoke /aif-docs with feature-page context
+3. Skip documentation
 ```
 
-If user chooses "Verify first" → suggest invoking `$2`.
-If user chooses "Skip to commit" → suggest invoking `$2`.
+Handling:
+- Option 1 → invoke `/aif-docs` to update README/docs based on completed work
+- Option 2 → invoke `/aif-docs` with context to create `docs/<feature-slug>.md`, include sections (Summary, Usage/user-facing behavior, Configuration, API/CLI changes, Examples, Troubleshooting, See Also), and add a README docs-table link
+- Option 3 → do not invoke `/aif-docs`; emit `WARN [docs] Documentation skipped by user`
 
-**Check if documentation needs updating:**
+If plan setting is `Docs: no` or setting is unset:
+- Do **not** show a mandatory docs checkpoint prompt
+- Do **not** invoke `/aif-docs` automatically
+- Emit `WARN [docs] Docs policy is no/unset; skipping documentation checkpoint`
 
-Read the plan file settings. If documentation preference is set to "yes" (from `$2 full` questions), run `$2` to update documentation.
-
-If documentation preference is "no" or not set — skip this step silently.
-
-If documentation preference is "yes":
-```
-📝 Updating project documentation...
-```
-→ Invoke `$2` to analyze changes and update docs.
+**Always include documentation outcome in the final completion output:**
+- `Documentation: updated existing docs`
+- `Documentation: created docs/<feature-slug>.md`
+- `Documentation: skipped by user`
+- `Documentation: warn-only (Docs: no/unset)`
 
 **Handle plan file after completion:**
 
-- **If `.ai-factory/PLAN.md`** (from `$2 fast`):
+- **If `.ai-factory/PLAN.md`** (from `/aif-plan fast`):
   ```
-  Would you like to delete .ai-factory/PLAN.md? (It's no longer needed)
-  - [ ] Yes, delete it
-  - [ ] No, keep it
+  AskUserQuestion: Would you like to delete .ai-factory/PLAN.md? (It's no longer needed)
+
+  Options:
+  1. Yes, delete it
+  2. No, keep it
   ```
+
+  **Based on choice:**
+  - "Yes, delete it" → delete the file:
+    ```bash
+    rm .ai-factory/PLAN.md
+    ```
+  - "No, keep it" → leave the file as is, continue to the next step
 
 - **If branch-named file** (e.g., `.ai-factory/plans/feature-user-auth.md`):
   - Keep it - documents what was done
@@ -355,14 +497,26 @@ You're working in a parallel worktree.
   Worktree:  <current-directory>
   Main repo: <main-repo-path>
 
-Would you like to merge this branch into main and clean up?
-- [ ] Yes, merge and clean up (recommended)
-- [ ] No, I'll handle it manually
+AskUserQuestion: Would you like to merge this branch into main and clean up?
+
+Options:
+1. Yes, merge and clean up (recommended)
+2. No, I'll handle it manually
 ```
 
-If user chooses **"Yes, merge and clean up"**:
+**Based on choice:**
+- "Yes, merge and clean up" → follow the Worktree Merge procedure below
+- "No, I'll handle it manually" → show a reminder:
+  ```
+  To merge and clean up later:
+    cd <main-repo-path>
+    git merge <branch>
+    /aif-plan --cleanup <branch>
+  ```
 
-1. **Ensure everything is committed** — check `git status`. If uncommitted changes exist, suggest `$2` first and wait.
+#### Worktree Merge
+
+1. **Ensure everything is committed** — check `git status`. If uncommitted changes exist, suggest `/aif-commit` first and wait.
 
 2. **Get main repo path:**
    ```bash
@@ -407,13 +561,25 @@ If user chooses **"Yes, merge and clean up"**:
    You're now in: <main-repo-path> (main)
    ```
 
-If user chooses **"No, I'll handle it manually"**, show a reminder:
+→ **STOP** — worktree merged and removed, no further steps needed.
+
+### Final Step — Verify or Commit
+
 ```
-To merge and clean up later:
-  cd <main-repo-path>
-  git merge <branch>
-  $2 --cleanup <branch>
+AskUserQuestion: All tasks complete. What's next?
+
+Options:
+1. Verify first — Run /aif-verify to check completeness (recommended)
+2. Skip to commit — Go straight to /aif-commit
 ```
+
+**Based on choice:**
+- "Verify first" → invoke `/aif-verify` → after it completes, continue to context cleanup below
+- "Skip to commit" → invoke `/aif-commit` → after it completes, continue to context cleanup below
+
+**Context cleanup (after verify or commit):**
+
+Suggest the user to free up context space if needed: `/clear` (full reset) or `/compact` (compress history).
 
 **IMPORTANT: NO summary reports, NO analysis documents, NO wrap-up tasks.**
 
@@ -421,19 +587,32 @@ To merge and clean up later:
 
 ### Start/Resume Implementation
 ```
-$2
+/aif-implement
 ```
 Continues from next incomplete task.
 
+### List Available Plans
+```
+/aif-implement --list
+```
+Lists `.ai-factory/PLAN.md`, `.ai-factory/FIX_PLAN.md`, and current-branch `.ai-factory/plans/<branch>.md` (if present), then exits without implementation.
+
+### Use Explicit Plan File
+```
+/aif-implement @my-custom-plan.md
+/aif-implement @.ai-factory/plans/feature-user-auth.md status
+```
+Uses the provided plan file instead of auto-detecting by branch/default files.
+
 ### Start from Specific Task
 ```
-$2 5
+/aif-implement 5
 ```
 Starts from task #5 (useful for skipping or re-doing).
 
 ### Check Status Only
 ```
-$2 status
+/aif-implement status
 ```
 Shows progress without executing.
 
@@ -444,7 +623,7 @@ Shows progress without executing.
 - ✅ Mark tasks in_progress before starting
 - ✅ Mark tasks completed after finishing
 - ✅ Follow existing code conventions
-- ✅ Follow `$2` guidelines (naming, structure, error handling)
+- ✅ Follow `/aif-best-practices` guidelines (naming, structure, error handling)
 - ✅ Create files mentioned in task description
 - ✅ Handle edge cases mentioned in task
 - ✅ Stop and ask if task is unclear
@@ -457,6 +636,13 @@ Shows progress without executing.
 - ❌ Skip tasks without user permission
 - ❌ Mark incomplete tasks as done
 - ❌ Violate `.ai-factory/ARCHITECTURE.md` conventions for file placement and module boundaries
+
+## Artifact Ownership Boundaries
+
+- Primary ownership in this command: task execution state and plan progress checkboxes.
+- Allowed context artifact updates: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, and roadmap milestone completion in `.ai-factory/ROADMAP.md` when implementation evidence justifies it.
+- Read-only context in this command by default: `.ai-factory/RULES.md`, `.ai-factory/RESEARCH.md`.
+- Context-gate findings should be communicated as `WARN`/`ERROR` outputs only; this does not replace the required verbose implementation logging rules below.
 
 For progress display format, blocker handling, session continuity examples, and full flow examples → see `references/IMPLEMENTATION-GUIDE.md`
 

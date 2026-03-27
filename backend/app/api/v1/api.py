@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
 from app.api.v1.endpoints import (
     admin_ai,
     admin_clinic,
+    admin_finance,
     admin_departments,
     admin_display,
     admin_doctors,
@@ -256,6 +257,8 @@ api_router.include_router(ai_gateway.router, prefix="/ai/v2", tags=["ai-gateway"
 api_router.include_router(ai_chat.router, prefix="/ai/chat", tags=["ai-chat"])
 
 api_router.include_router(ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"])
+
+api_router.include_router(admin_finance.router, tags=["admin-finance"])
 
 
 # MCP (Model Context Protocol) endpoints

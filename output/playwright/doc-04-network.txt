@@ -1,0 +1,11 @@
+[GET] http://127.0.0.1:18005/api/v1/users/me/preferences => [200] OK
+[GET] http://127.0.0.1:18005/api/v1/users/me/preferences => [200] OK
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [200] OK
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [200] OK
+[POST] http://127.0.0.1:18005/api/v1/doctor/queue/6/complete => [500] Internal Server Error
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [200] OK
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [FAILED] net::ERR_CONNECTION_REFUSED
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [FAILED] net::ERR_CONNECTION_REFUSED
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [200] OK
+[POST] http://127.0.0.1:18005/api/v1/doctor/queue/6/complete => [200] OK
+[GET] http://127.0.0.1:18005/api/v1/doctor/general/queue/today => [200] OK

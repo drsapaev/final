@@ -1,5 +1,7 @@
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { ToastContainer } from 'react-toastify';
 import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt } from './components/pwa';
 import { usePWA } from './hooks/usePWA.js';
@@ -9,6 +11,7 @@ import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
 import './styles/macos.css';
+import 'react-toastify/dist/ReactToastify.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
 
@@ -159,11 +162,17 @@ function RequireAuth({ roles, children }) {
   return children || <Outlet />;
 }
 
+RequireAuth.propTypes = {
+  roles: PropTypes.arrayOf(PropTypes.string),
+  children: PropTypes.node
+};
+
 // macOS Helper functions
 function getPageTitle(path) {
   const titles = {
     '/': 'Dashboard',
     '/admin': 'Admin Panel',
+    '/admin/queue-cabinet-management': 'Queue Cabinet Management',
     '/doctor-panel': 'Doctor Panel',
     '/patient-panel': 'Patient Panel',
     '/registrar-panel': 'Registrar Panel',
@@ -208,6 +217,7 @@ function getSidebarItems(path) {
       { id: 'clinic-settings', label: 'Clinic Settings', icon: 'gear' },
       { id: 'queue-settings', label: 'Queue Settings', icon: 'list' }, // ✅ Заменено list.number → list
       { id: 'queue-limits', label: 'Queue Limits', icon: 'shield' },
+      { id: 'queue-cabinet-management', label: 'Queue Cabinet Management', icon: 'building' },
       { id: 'ai-imaging', label: 'AI Imaging', icon: 'camera' },
       { id: 'treatment-recommendations', label: 'Treatment Recommendations', icon: 'heart' },
       { id: 'drug-interactions', label: 'Drug Interactions', icon: 'pill' },
@@ -419,6 +429,10 @@ function getHeaderActions(path) {
   const Icon = ({ name, size = 16 }) => (
     <span style={{ fontSize: `${size}px` }}>{name}</span>
   );
+  Icon.propTypes = {
+    name: PropTypes.node.isRequired,
+    size: PropTypes.number
+  };
 
   // Patient Panel actions
   if (path === '/patient-panel') {
@@ -1117,6 +1131,7 @@ function AppContent() {
               <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/queue-cabinet-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/ai-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/telegram-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/display-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
@@ -1176,6 +1191,15 @@ export default function App() {
       <ThemeProvider>
         <AppProviders>
           <AppContent />
+          <ToastContainer
+            position="bottom-right"
+            autoClose={4000}
+            newestOnTop
+            closeOnClick
+            pauseOnHover
+            draggable
+            theme="colored"
+          />
         </AppProviders>
       </ThemeProvider>
     </MacOSThemeProvider>

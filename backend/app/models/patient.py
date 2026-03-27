@@ -32,6 +32,7 @@ class Patient(Base):
     )  # M|F|X
 
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     doc_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     doc_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     address: Mapped[str | None] = mapped_column(String(512), nullable=True)

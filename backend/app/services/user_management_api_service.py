@@ -32,25 +32,18 @@ class UserManagementApiService:
         preferences_data: dict,
     ) -> dict:
         try:
-            preferences = self.repository.get_preferences_by_user_id(current_user_id)
+            _, preferences, _ = self.repository.ensure_user_support_records(
+                current_user_id
+            )
 
-            if not preferences:
-                preferences = self.repository.create_preferences(
-                    user_id=current_user_id,
-                    theme=self.normalize_theme(preferences_data.get("theme")),
-                    language=preferences_data.get("language", "ru"),
-                    compact_mode=preferences_data.get("compact_mode", False),
-                    sidebar_collapsed=preferences_data.get("sidebar_collapsed", False),
-                )
-            else:
-                if "theme" in preferences_data:
-                    preferences.theme = self.normalize_theme(preferences_data["theme"])
-                if "language" in preferences_data:
-                    preferences.language = preferences_data["language"]
-                if "compact_mode" in preferences_data:
-                    preferences.compact_mode = preferences_data["compact_mode"]
-                if "sidebar_collapsed" in preferences_data:
-                    preferences.sidebar_collapsed = preferences_data["sidebar_collapsed"]
+            if "theme" in preferences_data:
+                preferences.theme = self.normalize_theme(preferences_data["theme"])
+            if "language" in preferences_data:
+                preferences.language = preferences_data["language"]
+            if "compact_mode" in preferences_data:
+                preferences.compact_mode = preferences_data["compact_mode"]
+            if "sidebar_collapsed" in preferences_data:
+                preferences.sidebar_collapsed = preferences_data["sidebar_collapsed"]
 
             emr_keys = [
                 "emr_smart_field_mode",

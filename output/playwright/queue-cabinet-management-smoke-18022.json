@@ -1,0 +1,479 @@
+{
+  "startedAt": "2026-03-26T12:35:22.338Z",
+  "route": "http://127.0.0.1:5173/admin/queue-cabinet-management",
+  "apiBase": "http://127.0.0.1:18022",
+  "headingVisible": true,
+  "initialRowCount": 2,
+  "afterSyncRowCount": 2,
+  "initialCells": [
+    "22.03.2026",
+    "Doctor UserID 7",
+    "general",
+    "QA-RESET",
+    "8",
+    "QA-RESET",
+    "2",
+    "Активна",
+    "Изменить"
+  ],
+  "tempValues": {
+    "cabinet_number": "QA-CAB-18022",
+    "cabinet_floor": "9",
+    "cabinet_building": "QA-CAB-18022"
+  },
+  "savedCells": [
+    "22.03.2026",
+    "Doctor UserID 7",
+    "general",
+    "QA-CAB-18022",
+    "9",
+    "QA-CAB-18022",
+    "2",
+    "Активна",
+    "Изменить"
+  ],
+  "restoredCells": [
+    "22.03.2026",
+    "Doctor UserID 7",
+    "general",
+    "Не указан",
+    "—",
+    "—",
+    "2",
+    "Активна",
+    "Изменить"
+  ],
+  "saveWorked": true,
+  "restoreWorked": true,
+  "consoleMessages": [
+    {
+      "type": "pageerror",
+      "text": "Failed to read the 'localStorage' property from 'Window': Access is denied for this document."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /admin/queue-cabinet-management}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /admin/queue-cabinet-management}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] Service Worker registered: {}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /admin/queue-cabinet-management}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:AUTH] Reusing recent auth session validation {ageMs: 82}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /admin/queue-cabinet-management}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:AUTH] Reusing recent auth session validation {ageMs: 82}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/me/preferences {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/me/preferences {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/me/preferences, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/me/preferences, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] Service Worker already registered: {}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] Service Worker already registered: {}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] Service Worker already registered: {}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /users/me/preferences {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /users/me/preferences {status: 200, data: Object}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:THEME] Loaded color scheme from user preferences {colorScheme: auto}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/stats {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/users {params: Object, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/doctors {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/recent-activities?limit=10 {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /notifications/history/stats?days=7 {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/activity-chart?days=7 {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/users {params: Object, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/doctors {params: undefined, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/stats, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/users, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/doctors, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/recent-activities?limit=10, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /notifications/history/stats?days=7, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/activity-chart?days=7, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/users, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/doctors, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:WS] Notification WebSocket connected"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/users {params: Object, data: undefined}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/users, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /users/users {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /users/users {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: [Array(7) - showing first 5]}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /notifications/history/stats?days=7 {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /users/users {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/doctors {status: 200, data: [Array(8) - showing first 5]}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/recent-activities?limit=10 {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/stats {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/doctors {status: 200, data: [Array(8) - showing first 5]}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: [Array(7) - showing first 5]}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/activity-chart?days=7 {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: [Array(7) - showing first 5]}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: [Array(7) - showing first 5]}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: Array(2)}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: POST /admin/queues/sync-cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/sync-cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "info",
+      "text": "[INFO] [FIX:CSRF] CSRF bootstrap endpoint disabled; using cookie-only mode"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: POST /admin/queues/sync-cabinet-info {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: Array(2)}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: PUT /admin/queues/6/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/6/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: PUT /admin/queues/6/cabinet-info {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: Array(2)}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: PUT /admin/queues/6/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/6/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: PUT /admin/queues/6/cabinet-info {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-info {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔄 API Request: GET /admin/queues/cabinet-statistics {params: Object, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-info, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /admin/queues/cabinet-statistics, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-statistics {status: 200, data: Object}"
+    },
+    {
+      "type": "log",
+      "text": "[LOG] ✅ API Response: GET /admin/queues/cabinet-info {status: 200, data: Array(2)}"
+    }
+  ],
+  "finishedAt": "2026-03-26T12:35:34.650Z"
+}

@@ -1,0 +1,14 @@
+{
+  "ts": "2026-03-26T17:26:53.822Z",
+  "baseUrl": "http://127.0.0.1:18001",
+  "route": "/admin/clinic-management",
+  "loginAttempted": false,
+  "loginSucceeded": false,
+  "overviewLoaded": false,
+  "subtab": null,
+  "subtabLoaded": false,
+  "subtabDataRequestSeen": false,
+  "currentUrl": "http://127.0.0.1:18001/login",
+  "endpointFailures": [],
+  "endpointCalls": []
+}

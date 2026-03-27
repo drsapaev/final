@@ -8,7 +8,7 @@
 - [x] Backend: `GET /api/v1/emr/readiness/{doctor_id}`
 - [x] Backend: Добавлены поля телеметрии в модель `DoctorPhraseHistory`
 - [x] Migration: `20260105_0002_doctor_phrases.py`
-- [x] Migration script: `update_phrase_table.py` (для SQLite)
+- [x] Migration script: `update_phrase_table.py` (для legacy snapshots)
 
 ### Phase 2: Frontend Integration
 - [x] Frontend: `useDoctorPhrases` hook с readiness check
@@ -112,9 +112,9 @@ LIMIT 10;
 
 ## ⚠️ Known Issues
 
-### 1. SQLite Migration
-- **Issue**: `alembic upgrade head` может не работать с SQLite
-- **Fix**: Использовать `python update_phrase_table.py`
+### 1. Legacy snapshot migration
+- **Issue**: Legacy snapshots may need a one-time column sync before import
+- **Fix**: Run `python update_phrase_table.py` before importing legacy data
 
 ### 2. Batch Indexing Performance
 - **Issue**: Индексация 500+ EMR может занять >10 секунд

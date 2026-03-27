@@ -129,3 +129,21 @@ class TestPaymentReadService:
 
         assert f"Номер платежа: {payment.id}" in content
         assert "Провайдер: —" in content
+
+    def test_build_receipt_pdf_returns_pdf_bytes(self, db_session, test_visit):
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=8_000.0,
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.commit()
+        db_session.refresh(payment)
+
+        service = PaymentReadService(db_session)
+        pdf_bytes = service.build_receipt_pdf(payment_id=payment.id)
+
+        assert pdf_bytes.startswith(b"%PDF")
+        assert len(pdf_bytes) > 500

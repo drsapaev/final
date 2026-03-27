@@ -8,6 +8,7 @@ API endpoints для Push-уведомлений о позиции в очере
 3. Настройки уведомлений
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +28,7 @@ from app.services.queue_position_notifications import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ========================= СХЕМЫ =========================
@@ -222,12 +224,37 @@ async def send_diagnostics_return_notification(
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    # Получаем имя специалиста
+    # Doctor identity lives on the related User profile in the current schema.
     specialist_name = "врач"
     if entry.queue and entry.queue.specialist:
         specialist = entry.queue.specialist
-        specialist_name = f"{specialist.last_name} {specialist.first_name}"
-    
+        specialist_user = getattr(specialist, "user", None)
+        if specialist_user and (
+            getattr(specialist_user, "full_name", None)
+            or getattr(specialist_user, "username", None)
+        ):
+            specialist_name = (
+                specialist_user.full_name
+                or specialist_user.username
+            )
+        else:
+            fallback_name = " ".join(
+                part
+                for part in (
+                    getattr(specialist, "last_name", None),
+                    getattr(specialist, "first_name", None),
+                )
+                if part
+            ).strip()
+            if fallback_name:
+                specialist_name = fallback_name
+
+    logger.debug(
+        "[send_diagnostics_return_notification] resolved specialist name '%s' for entry %s",
+        specialist_name,
+        entry_id,
+    )
+
     result = await get_queue_position_service(db).notify_diagnostics_return_needed(
         entry=entry,
         specialist_name=specialist_name

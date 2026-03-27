@@ -62,7 +62,7 @@ def existing_backend_status(port: int) -> str | None:
 def main() -> int:
     env_file = current_dir / ".env"
     host = os.environ.get("BACKEND_HOST", "0.0.0.0")
-    port = int(os.environ.get("BACKEND_PORT", "8000"))
+    port = int(os.environ.get("BACKEND_PORT", "18000"))
     under_debugger = debugger_attached()
     reload_enabled = env_flag("BACKEND_RELOAD", default=not under_debugger)
 

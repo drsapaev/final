@@ -126,6 +126,7 @@ export default function LabPanel() {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [reportHistory, setReportHistory] = useState([]);
+  const [recentReports, setRecentReports] = useState([]);
   const [activeInstance, setActiveInstance] = useState(null);
   const [templateResolution, setTemplateResolution] = useState(null);
   const [templateResolutionLoading, setTemplateResolutionLoading] = useState(false);
@@ -256,6 +257,16 @@ export default function LabPanel() {
     }
   }, [notify]);
 
+  const loadRecentReports = useCallback(async () => {
+    try {
+      const instances = await labReportingApi.listInstances({ limit: 50 });
+      setRecentReports(instances);
+    } catch (error) {
+      logger.error('[LabPanel] loadRecentReports failed', error);
+      notify('error', error.message || 'Не удалось загрузить список лабораторных бланков.');
+    }
+  }, [notify]);
+
   const loadTemplateResolution = useCallback(async (appointment) => {
     if (!appointment) {
       setTemplateResolution(null);
@@ -306,7 +317,8 @@ export default function LabPanel() {
   useEffect(() => {
     loadLabAppointments();
     loadTemplates();
-  }, [loadLabAppointments, loadTemplates]);
+    loadRecentReports();
+  }, [loadLabAppointments, loadRecentReports, loadTemplates]);
 
   useEffect(() => {
     if (selectedAppointment?.patient_id) {
@@ -323,11 +335,15 @@ export default function LabPanel() {
     return () => window.clearTimeout(timer);
   }, [message]);
 
+  const reportsCounter = selectedAppointment || activeInstance
+    ? reportHistory.length
+    : recentReports.length;
+
   const statusCounters = useMemo(() => ({
     queue: appointments.length,
     templates: templates.length,
-    reports: reportHistory.length
-  }), [appointments.length, reportHistory.length, templates.length]);
+    reports: reportsCounter
+  }), [appointments.length, reportsCounter, templates.length]);
 
   return (
     <div
@@ -416,10 +432,12 @@ export default function LabPanel() {
           templateResolution={templateResolution}
           templateResolutionLoading={templateResolutionLoading}
           reportHistory={reportHistory}
+          recentReports={recentReports}
           activeInstance={activeInstance}
           onInstanceChange={setActiveInstance}
           onOpenInstance={loadInstance}
           onRefreshHistory={loadReportHistory}
+          onRefreshRecentReports={loadRecentReports}
           onQueueChanged={loadLabAppointments}
           notify={notify}
         />

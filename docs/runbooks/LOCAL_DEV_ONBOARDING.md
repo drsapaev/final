@@ -3,7 +3,6 @@
 ## Scope
 - Local development setup for backend + frontend.
 - PostgreSQL is the only source of truth for schema/data.
-- SQLite `clinic.db` is not used for active development.
 
 ## Prerequisites
 - Python 3.11+
@@ -35,7 +34,7 @@ Expected:
 Backend:
 ```powershell
 cd c:\final\backend
-uvicorn app.main:app --reload --port 8000
+python run_server.py
 ```
 
 Frontend:

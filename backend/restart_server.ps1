@@ -11,6 +11,8 @@ Write-Host "Шаг 1: Остановка процессов Python..." -Foregrou
 Write-Host ""
 Write-Host "Шаг 2: Запуск сервера..." -ForegroundColor Yellow
 Start-Sleep -Seconds 1
+$env:BACKEND_HOST = "0.0.0.0"
+$env:BACKEND_PORT = "18000"
 
 # Шаг 2: Запускаем сервер
 try {

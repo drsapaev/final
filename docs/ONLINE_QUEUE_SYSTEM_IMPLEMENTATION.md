@@ -560,7 +560,7 @@ queue_time = datetime.now(timezone)
 
 4. **Изменение `specialist_id` в `queue_tokens`**:
    ```sql
-   -- SQLite workaround: пересоздание таблицы
+   -- legacy schema workaround: пересоздание таблицы
    ALTER TABLE queue_tokens ADD COLUMN specialist_id_new INTEGER;
    UPDATE queue_tokens SET specialist_id_new = specialist_id;
    -- ... (полная миграция в файле)

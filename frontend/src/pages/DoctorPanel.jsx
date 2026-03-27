@@ -44,7 +44,6 @@ import {
 import { useModal } from '../hooks/useModal.jsx';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
 import useDoctorQueue from '../hooks/useDoctorQueue.js';
-import { useAppData } from '../contexts/AppDataContext';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiOrigin } from '../api/runtime';
@@ -81,7 +80,6 @@ const DoctorPanel = () => {
   const [filterStatus, setFilterStatus] = useState('all');
 
   // ✅ НОВОЕ: Получаем данные текущего пользователя и очереди
-  const { currentUser } = useAppData();
   const {
     queue: queueEntries,
     stats: queueStats,
@@ -94,23 +92,25 @@ const DoctorPanel = () => {
     sendToDiagnostics,
     markIncomplete,
     completeVisit
-  } = useDoctorQueue(null, currentUser);
+  } = useDoctorQueue('general');
 
   // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
   const callFromDiagnostics = async (entryId) => {
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
+      const apiBase = getApiOrigin();
+      const response = await fetch(`${apiBase}/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+      const result = await response.json().catch(() => null);
       if (response.ok) {
-        logger.log('Push-уведомление отправлено');
+        logger.log('Push-уведомление отправлено', result);
       } else {
-        logger.error('Ошибка отправки уведомления');
+        logger.error('Ошибка отправки уведомления', result);
       }
     } catch (err) {
       logger.error('Ошибка:', err);

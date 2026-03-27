@@ -43,6 +43,59 @@ import {
 
 '../../utils/serviceCodeUtils';
 
+const SERVICE_GROUP_PREFIXES = {
+  cardiology: ['K'],
+  ecg: ['K'],
+  dermatology: ['D'],
+  dental: ['S'],
+  laboratory: ['L'],
+  procedures: ['C', 'P', 'O']
+};
+
+const SERVICE_GROUP_LABELS = {
+  cardiology: 'Кардиология',
+  ecg: 'ЭКГ',
+  dermatology: 'Дерматология',
+  dental: 'Стоматология',
+  laboratory: 'Лаборатория',
+  procedures: 'Процедуры'
+};
+
+const SERVICE_GROUP_ALIASES = {
+  cardio: 'cardiology',
+  cardiology: 'cardiology',
+  derma: 'dermatology',
+  dermatology: 'dermatology',
+  dental: 'dental',
+  dentistry: 'dental',
+  stomatology: 'dental',
+  lab: 'laboratory',
+  laboratory: 'laboratory',
+  ecg: 'ecg',
+  echokg: 'ecg',
+  procedure: 'procedures',
+  procedures: 'procedures',
+  physio: 'procedures',
+  physiotherapy: 'procedures',
+  cosmetology: 'procedures'
+};
+
+const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
+  for (const rawValue of [queueTag, departmentKey, categorySpecialty]) {
+    if (!rawValue) continue;
+    const normalized = String(rawValue).trim().toLowerCase();
+    if (!normalized) continue;
+    if (SERVICE_GROUP_PREFIXES[normalized]) return normalized;
+    if (SERVICE_GROUP_ALIASES[normalized]) {
+      return SERVICE_GROUP_ALIASES[normalized];
+    }
+  }
+
+  return null;
+};
+
+const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey] || [];
+
 const ServiceCatalog = () => {
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
@@ -491,9 +544,14 @@ const ServiceCatalog = () => {
           { key: 'actions', title: 'Действия', width: '8%' }]
           }
           data={filteredServices.map((service) => {
-            const specialty = getCategorySpecialty(service.category_id);
-            const SpecialtyIcon = getSpecialtyIcon(specialty);
-            const doctor = doctors.find((d) => d.id === service.doctor_id);
+              const specialty = getCategorySpecialty(service.category_id);
+              const SpecialtyIcon = getSpecialtyIcon(specialty);
+              const doctor = doctors.find((d) => d.id === service.doctor_id);
+              const canonicalCode = service.service_code || service.code;
+              const hasLegacyCodeMismatch =
+                service.code &&
+                service.service_code &&
+                service.code !== service.service_code;
 
             return {
               id: service.id,
@@ -515,13 +573,22 @@ const ServiceCatalog = () => {
                   }}>
                       {service.name}
                     </div>
-                    {service.code &&
+                    {canonicalCode &&
                   <div style={{
                     fontSize: '14px',
                     color: 'var(--mac-text-secondary)',
                     margin: '2px 0 0 0'
                   }}>
-                        Код: {service.code}
+                        Код: {canonicalCode}
+                      </div>
+                    }
+                    {hasLegacyCodeMismatch &&
+                  <div style={{
+                    fontSize: '12px',
+                    color: 'var(--mac-warning)',
+                    margin: '2px 0 0 0'
+                  }}>
+                        Legacy code: {service.code}
                       </div>
                   }
                   </div>
@@ -637,6 +704,7 @@ const ServiceCatalog = () => {
         doctors={doctors}
         departments={departments}
         queueProfiles={queueProfiles}
+        setMessage={setMessage}
         onSave={handleSaveService}
         onCancel={() => {
           setShowAddForm(false);
@@ -650,7 +718,7 @@ const ServiceCatalog = () => {
 
 // Компонент формы услуги с вкладками
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave, onCancel }) => {
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [formData, setFormData] = useState({
     name: service?.name || '',
@@ -708,7 +776,31 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
     return () => clearTimeout(timeoutId);
   }, [formData.code, service?.id]);
 
-  // Auto-extract category_code from code
+  const selectedFormCategory = categories.find(
+    (category) => category.id === parseInt(formData.category_id, 10)
+  );
+  const selectedServiceGroup = resolveServiceGroup({
+    queueTag: formData.queue_tag,
+    departmentKey: formData.department_key,
+    categorySpecialty: selectedFormCategory?.specialty
+  });
+  const allowedPrefixes = getAllowedPrefixesForGroup(selectedServiceGroup);
+  const normalizedCode = formData.code ? normalizeServiceCode(formData.code) : '';
+  const codePrefix = normalizedCode ? normalizedCode.charAt(0).toUpperCase() : '';
+  const codePrefixMismatch =
+    Boolean(
+      normalizedCode &&
+      isValidServiceCode(normalizedCode) &&
+      allowedPrefixes.length &&
+      codePrefix &&
+      !allowedPrefixes.includes(codePrefix)
+    );
+  const expectedPrefixLabel = allowedPrefixes.length ? allowedPrefixes.join(' / ') : '';
+  const selectedGroupLabel = selectedServiceGroup
+    ? SERVICE_GROUP_LABELS[selectedServiceGroup] || selectedServiceGroup
+    : '';
+
+  // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
   const derivedCategoryCode = formData.code ? formData.code.charAt(0).toUpperCase() : '';
 
   const handleSubmit = (e) => {
@@ -719,16 +811,32 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
       return;
     }
 
+    if (codePrefixMismatch) {
+      const errorText = selectedGroupLabel
+        ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}". Допустимые префиксы: ${expectedPrefixLabel}`
+        : `Код ${normalizedCode} не подходит для выбранной категории услуги. Допустимые префиксы: ${expectedPrefixLabel}`;
+      logger.warn('[FIX:ADM-06] Blocking mismatched service code before save:', {
+        normalizedCode,
+        selectedServiceGroup,
+        allowedPrefixes,
+        category_id: formData.category_id,
+        queue_tag: formData.queue_tag,
+        department_key: formData.department_key
+      });
+      setMessage({ type: 'error', text: errorText });
+      return;
+    }
+
     // Подготавливаем данные для API
-    const normalizedCode = formData.code ? normalizeServiceCode(formData.code) : null;
+    const canonicalCode = normalizedCode || null;
     const apiData = {
       ...formData,
       price: formData.price ? parseFloat(formData.price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
       duration_minutes: parseInt(formData.duration_minutes) || 30,
-      code: normalizedCode,
-      service_code: normalizedCode, // Sync for backwards compatibility
+      code: canonicalCode,
+      service_code: canonicalCode, // Sync for backwards compatibility
       category_code: derivedCategoryCode || null // Auto-derived from code
     };
 
@@ -882,7 +990,20 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
             }
               {derivedCategoryCode &&
             <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
-                  Категория кода: {derivedCategoryCode}
+                  Префикс кода: {derivedCategoryCode}
+                </div>
+            }
+              {selectedGroupLabel && !codePrefixMismatch &&
+            <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+                  Ожидаемый префикс для {selectedGroupLabel}: {expectedPrefixLabel}
+                </div>
+            }
+              {codePrefixMismatch &&
+            <div style={{ fontSize: '12px', color: 'var(--mac-warning)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertCircle size={14} />
+                  {selectedGroupLabel
+                    ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}".`
+                    : `Код ${normalizedCode} не подходит для выбранной группы.`}
                 </div>
             }
             </div>
@@ -1130,6 +1251,7 @@ ServiceForm.propTypes = {
   categories: PropTypes.array,
   doctors: PropTypes.array,
   queueProfiles: PropTypes.array,
+  setMessage: PropTypes.func,
   onSave: PropTypes.func,
   onCancel: PropTypes.func
 };

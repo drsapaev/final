@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Key,
   Plus,
@@ -35,6 +35,24 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const emptyLicenseStats = {
+  total_licenses: 0,
+  active_licenses: 0,
+  expired_licenses: 0,
+  expiring_licenses: 0
+};
+
+const deriveLicenseStats = (licenseList) => {
+  const nextLicenses = Array.isArray(licenseList) ? licenseList : [];
+  return {
+    total_licenses: nextLicenses.length,
+    active_licenses: nextLicenses.filter((license) => license.status === 'active').length,
+    expired_licenses: nextLicenses.filter((license) => license.status === 'expired').length,
+    expiring_licenses: nextLicenses.filter((license) => license.status === 'expiring').length
+  };
+};
+
 const LicenseManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -78,66 +96,27 @@ const LicenseManagement = () => {
   { value: 'enterprise', label: 'Корпоративная' }];
 
 
-  useEffect(() => {
-    loadLicenses();
-    loadStats();
-  }, []);
-
-  const loadLicenses = async () => {
+  const loadLicenses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/licenses');
-      setLicenses(response.data.licenses || []);
+      const response = await api.get('/clinic/licenses');
+      const nextLicenses = Array.isArray(response.data)
+        ? response.data
+        : response.data?.licenses || [];
+      setLicenses(nextLicenses);
+      setStats(deriveLicenseStats(nextLicenses));
     } catch (error) {
       logger.error('Ошибка загрузки лицензий:', error);
-      // Fallback данные
-      setLicenses([
-      {
-        id: 1,
-        name: 'Microsoft Office 365',
-        type: 'subscription',
-        license_key: 'MS-365-XXXX-XXXX-XXXX',
-        vendor: 'Microsoft',
-        status: 'active',
-        purchase_date: '2023-01-01',
-        expiry_date: '2024-12-31',
-        cost: 120000,
-        seats: 10,
-        description: 'Корпоративная подписка Office 365'
-      },
-      {
-        id: 2,
-        name: 'Adobe Creative Suite',
-        type: 'subscription',
-        license_key: 'ADOBE-XXXX-XXXX-XXXX',
-        vendor: 'Adobe',
-        status: 'active',
-        purchase_date: '2023-06-01',
-        expiry_date: '2024-05-31',
-        cost: 200000,
-        seats: 5,
-        description: 'Подписка на Adobe Creative Suite'
-      }]
-      );
+      setLicenses([]);
+      setStats(emptyLicenseStats);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadStats = async () => {
-    try {
-      const response = await api.get('/licenses/stats');
-      setStats(response.data);
-    } catch (error) {
-      logger.error('Ошибка загрузки статистики:', error);
-      setStats({
-        total_licenses: 2,
-        active_licenses: 2,
-        expired_licenses: 0,
-        expiring_licenses: 0
-      });
-    }
-  };
+  useEffect(() => {
+    loadLicenses();
+  }, [loadLicenses]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -145,10 +124,10 @@ const LicenseManagement = () => {
       setSaving(true);
 
       if (editingLicense) {
-        await api.put(`/licenses/${editingLicense.id}`, formData);
+        await api.put(`/clinic/licenses/${editingLicense.id}`, formData);
         setMessage({ type: 'success', text: 'Лицензия обновлена' });
       } else {
-        await api.post('/licenses', formData);
+        await api.post('/clinic/licenses', formData);
         setMessage({ type: 'success', text: 'Лицензия добавлена' });
       }
 
@@ -156,7 +135,6 @@ const LicenseManagement = () => {
       setEditingLicense(null);
       resetForm();
       loadLicenses();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка сохранения лицензии' });
     } finally {
@@ -172,10 +150,9 @@ const LicenseManagement = () => {
 
   const handleDelete = async (licenseId) => {
     try {
-      await api.delete(`/licenses/${licenseId}`);
+      await api.delete(`/clinic/licenses/${licenseId}`);
       setMessage({ type: 'success', text: 'Лицензия удалена' });
       loadLicenses();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка удаления лицензии' });
     }

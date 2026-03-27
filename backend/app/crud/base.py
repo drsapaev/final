@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
@@ -28,13 +31,21 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     # Create
     def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
         data: dict[str, Any] = obj_in.model_dump(exclude_unset=True)
-        # ✅ ИСКЛЮЧАЕМ поля, которых нет в модели Patient
+        # ✅ ИСКЛЮЧАЕМ только schema-only поля, которых реально нет в целевой модели
         # full_name используется только для нормализации ДО создания модели, но не сохраняется в БД
-        # email не существует в модели Patient (есть только в схеме для валидации)
-        fields_to_exclude = ["full_name", "email"]
+        fields_to_exclude = [
+            field
+            for field in ("full_name", "email")
+            if not hasattr(self.model, field)
+        ]
+        if fields_to_exclude:
+            logger.debug(
+                "CRUDBase.create stripping schema-only fields for %s: %s",
+                getattr(self.model, "__name__", str(self.model)),
+                ", ".join(fields_to_exclude),
+            )
         for field in fields_to_exclude:
-            if field in data:
-                del data[field]
+            data.pop(field, None)
 
         # ✅ ЗАЩИТА: Не сохраняем пустые значения для first_name и last_name
         # Это предотвращает случайную перезапись нормализованных данных пустыми строками

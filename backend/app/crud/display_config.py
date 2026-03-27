@@ -8,6 +8,76 @@ from sqlalchemy.orm import Session
 
 from app.models.display_config import DisplayAnnouncement, DisplayBoard, DisplayTheme
 
+DEFAULT_DISPLAY_BOARD_DATA: dict[str, Any] = {
+    "name": "main_board",
+    "display_name": "Главное табло",
+    "location": "Зона ожидания, 1 этаж",
+    "theme": "light",
+    "show_patient_names": "initials",
+    "show_doctor_photos": True,
+    "queue_display_count": 5,
+    "show_announcements": True,
+    "show_banners": True,
+    "show_videos": False,
+    "call_display_duration": 30,
+    "sound_enabled": True,
+    "voice_announcements": False,
+    "voice_language": "ru",
+    "volume_level": 70,
+    "colors": {
+        "primary": "#0066cc",
+        "secondary": "#f8f9fa",
+        "text": "#333333",
+        "background": "#ffffff",
+    },
+    "active": True,
+}
+
+DEFAULT_DISPLAY_THEMES: list[dict[str, Any]] = [
+    {
+        "name": "light",
+        "display_name": "Светлая тема",
+        "css_variables": {
+            "--primary-color": "#0066cc",
+            "--secondary-color": "#f8f9fa",
+            "--text-color": "#333333",
+            "--background-color": "#ffffff",
+            "--border-color": "#dee2e6",
+        },
+        "font_family": "system-ui, sans-serif",
+        "active": True,
+        "is_default": True,
+    },
+    {
+        "name": "dark",
+        "display_name": "Темная тема",
+        "css_variables": {
+            "--primary-color": "#0d6efd",
+            "--secondary-color": "#1a1a1a",
+            "--text-color": "#ffffff",
+            "--background-color": "#000000",
+            "--border-color": "#333333",
+        },
+        "font_family": "system-ui, sans-serif",
+        "active": True,
+        "is_default": False,
+    },
+    {
+        "name": "medical",
+        "display_name": "Медицинская тема",
+        "css_variables": {
+            "--primary-color": "#28a745",
+            "--secondary-color": "#e8f5e8",
+            "--text-color": "#2c3e50",
+            "--background-color": "#f8fff8",
+            "--border-color": "#c3e6cb",
+        },
+        "font_family": "system-ui, sans-serif",
+        "active": True,
+        "is_default": False,
+    },
+]
+
 # ===================== ТАБЛО =====================
 
 
@@ -57,6 +127,19 @@ def update_display_board(
     db.commit()
     db.refresh(board)
     return board
+
+
+def ensure_default_display_config(db: Session) -> None:
+    """Создать дефолтную конфигурацию табло, если таблицы пусты."""
+    if get_display_board_by_name(db, DEFAULT_DISPLAY_BOARD_DATA["name"]) is None:
+        create_display_board(db, DEFAULT_DISPLAY_BOARD_DATA)
+
+    existing_theme_names = {
+        theme.name for theme in db.query(DisplayTheme).all()
+    }
+    for theme_data in DEFAULT_DISPLAY_THEMES:
+        if theme_data["name"] not in existing_theme_names:
+            create_display_theme(db, theme_data)
 
 
 # ===================== ТЕМЫ =====================

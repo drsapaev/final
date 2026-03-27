@@ -268,7 +268,7 @@ const WizardSettings = () => {
               title="Использование нового мастера"
               value={settings.use_new_wizard ? '100%' : '0%'}
               icon={settings.use_new_wizard ? CheckCircle : AlertCircle}
-              color={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'}
+              color={settings.use_new_wizard ? 'green' : 'orange'}
               trend={settings.use_new_wizard ? 'Активен' : 'Неактивен'}
               trendColor={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'} />
 
@@ -277,7 +277,7 @@ const WizardSettings = () => {
               title="Последнее обновление"
               value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : 'Неизвестно'}
               icon={RefreshCw}
-              color="var(--mac-info)"
+              color="blue"
               trend="Настройки"
               trendColor="var(--mac-text-secondary)" />
 

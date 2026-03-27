@@ -10,7 +10,7 @@
 
 1. **Backend**: Python 3.9+, SQLAlchemy
 2. **Frontend**: React 18+
-3. **Database**: PostgreSQL или SQLite
+3. **Database**: PostgreSQL
 4. **Migrations**: Alembic
 
 ---
@@ -37,9 +37,9 @@ SELECT * FROM doctor_phrase_history LIMIT 1;
 - `specialty`
 - `suggestions_shown`, `suggestions_accepted` (telemetry)
 
-### 1.3 Если миграция не сработала (SQLite)
+### 1.3 Если вы обновляете legacy snapshot
 
-Для SQLite можно добавить колонки вручную:
+Для legacy snapshot можно добавить колонки вручную:
 
 ```bash
 python c:\final\backend\update_phrase_table.py

@@ -337,11 +337,13 @@ export const usePayments = () => {
                 responseType: 'blob'
             });
 
-            const blob = new Blob([response.data]);
+            const blob = response.data instanceof Blob
+                ? response.data
+                : new Blob([response.data], { type: 'application/pdf' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `receipt_${paymentId}.txt`;
+            a.download = `receipt_${paymentId}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();

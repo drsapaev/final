@@ -82,3 +82,37 @@ class TestDynamicPricingApiService:
             patient_id=3,
         )
         assert result[0].id == 3
+
+    def test_delete_pricing_rule_cleans_linked_rows_before_delete(self):
+        rule = SimpleNamespace(id=42)
+        calls = []
+
+        class Repository:
+            def get_pricing_rule(self, rule_id):
+                calls.append(("get", rule_id))
+                return rule
+
+            def delete_pricing_rule_dependencies(self, *, rule):
+                calls.append(("cleanup", rule.id))
+
+            def delete_pricing_rule_by_id(self, *, rule_id):
+                calls.append(("delete", rule_id))
+
+            def commit(self):
+                calls.append(("commit", None))
+
+        service = DynamicPricingApiService(
+            db=None,
+            repository=Repository(),
+            pricing_service=None,
+        )
+
+        result = service.delete_pricing_rule(rule_id=42)
+
+        assert result == {"message": "Правило удалено"}
+        assert calls == [
+            ("get", 42),
+            ("cleanup", 42),
+            ("delete", 42),
+            ("commit", None),
+        ]

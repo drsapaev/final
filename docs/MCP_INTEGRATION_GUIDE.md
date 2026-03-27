@@ -105,7 +105,7 @@ DEEPSEEK_API_KEY=your-deepseek-key
 ```bash
 # Backend
 cd backend
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 18000
 
 # Frontend
 cd frontend

@@ -14,7 +14,7 @@ import {
 'lucide-react';
 import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
+import { apiRequest } from '../../api/client';
 import {
   MacOSCard,
   MacOSButton,
@@ -39,35 +39,27 @@ const QueueLimitsManager = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [limitsResponse, statusResponse] = await Promise.all([
-      fetch('/api/admin/queue-limits', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      }),
-      fetch('/api/admin/queue-status', {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      })]
-      );
+      const [limitsResult, statusResult] = await Promise.allSettled([
+        apiRequest('GET', '/admin/queue-limits'),
+        apiRequest('GET', '/admin/queue-status')
+      ]);
 
-      if (limitsResponse.ok) {
-        const limitsData = await limitsResponse.json();
+      if (limitsResult.status === 'fulfilled') {
+        const limitsData = Array.isArray(limitsResult.value) ? limitsResult.value : [];
         setLimits(limitsData);
       } else {
         // ⭐ SSOT: Не используем fallback данные - показываем пустой список
         setLimits([]);
-        logger.warn('API /api/admin/queue-limits не доступен');
+        logger.warn('API /api/v1/admin/queue-limits не доступен', limitsResult.reason);
       }
 
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
+      if (statusResult.status === 'fulfilled') {
+        const statusData = Array.isArray(statusResult.value) ? statusResult.value : [];
         setQueueStatus(statusData);
       } else {
         // ⭐ SSOT: Не используем fallback данные - показываем пустой список
         setQueueStatus([]);
-        logger.warn('API /api/admin/queue-status не доступен');
+        logger.warn('API /api/v1/admin/queue-status не доступен', statusResult.reason);
       }
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
@@ -104,32 +96,21 @@ const QueueLimitsManager = () => {
   const saveChanges = async (specialty) => {
     setSaving(true);
     try {
-      const response = await fetch('/api/admin/queue-limits', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify([{
+      const result = await apiRequest('PUT', '/admin/queue-limits', {
+        data: [{
           specialty: specialty,
           max_per_day: parseInt(editValues.max_per_day),
           start_number: parseInt(editValues.start_number)
-        }])
+        }]
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(result.message);
-        setEditingSpecialty(null);
-        setEditValues({});
-        await loadData(); // Перезагружаем данные
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка сохранения');
-      }
+      toast.success(result.message || 'Настройки сохранены');
+      setEditingSpecialty(null);
+      setEditValues({});
+      await loadData(); // Перезагружаем данные
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      toast.error('Ошибка сохранения изменений');
+      toast.error(error || 'Ошибка сохранения изменений');
     } finally {
       setSaving(false);
     }
@@ -145,28 +126,15 @@ const QueueLimitsManager = () => {
     }
 
     try {
-      const url = specialty ?
-      `/api/admin/reset-queue-limits?specialty=${specialty}` :
-      '/api/admin/reset-queue-limits';
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
+      const result = await apiRequest('POST', '/admin/reset-queue-limits', {
+        params: specialty ? { specialty } : {}
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(result.message);
-        await loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка сброса');
-      }
+      toast.success(result.message || 'Лимиты сброшены');
+      await loadData();
     } catch (error) {
       logger.error('Ошибка сброса:', error);
-      toast.error('Ошибка сброса лимитов');
+      toast.error(error || 'Ошибка сброса лимитов');
     }
   };
 

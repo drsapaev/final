@@ -85,7 +85,8 @@ class DynamicPricingApiService:
 
     def delete_pricing_rule(self, *, rule_id: int) -> dict[str, str]:
         rule = self.get_pricing_rule(rule_id=rule_id)
-        self.repository.delete(rule)
+        self.repository.delete_pricing_rule_dependencies(rule=rule)
+        self.repository.delete_pricing_rule_by_id(rule_id=rule_id)
         self.repository.commit()
         return {"message": "Правило удалено"}
 

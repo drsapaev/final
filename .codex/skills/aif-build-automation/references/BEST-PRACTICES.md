@@ -517,7 +517,7 @@ optimize    → php artisan config:cache + route:cache + view:cache
 When Symfony is detected (`bin/console` exists, `symfony/framework-bundle` in composer.json):
 
 ```
-serve       → symfony server:start (or php -S localhost:18000 -t public/)
+serve       → symfony server:start (or php -S localhost:8000 -t public/)
 migrate     → php bin/console doctrine:migrations:migrate
 cache:clear → php bin/console cache:clear
 routes      → php bin/console debug:router

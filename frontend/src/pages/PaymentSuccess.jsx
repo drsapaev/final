@@ -177,15 +177,27 @@ const PaymentSuccess = () => {
     return names[provider] || provider;
   };
 
+  const normalizePaymentStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+
+    if (normalized === 'paid' || normalized === 'completed' || normalized === 'success') {
+      return 'completed';
+    }
+
+    return normalized;
+  };
+
   const getStatusText = (status) => {
     const texts = {
       pending: 'Ожидает',
       processing: 'Обработка',
       completed: 'Завершен',
+      paid: 'Оплачен',
       failed: 'Неудачно',
       cancelled: 'Отменен'
     };
-    return texts[status] || status;
+    const normalized = String(status || '').toLowerCase();
+    return texts[normalized] || status;
   };
 
   const getStatusColor = (status) => {
@@ -193,10 +205,12 @@ const PaymentSuccess = () => {
       pending: 'warning',
       processing: 'info',
       completed: 'success',
+      paid: 'success',
       failed: 'error',
       cancelled: 'default'
     };
-    return colors[status] || 'default';
+    const normalized = String(status || '').toLowerCase();
+    return colors[normalized] || 'default';
   };
 
   if (loading) {
@@ -233,7 +247,7 @@ const PaymentSuccess = () => {
     );
   }
 
-  const isSuccess = paymentData?.status === 'completed';
+  const isSuccess = normalizePaymentStatus(paymentData?.status) === 'completed';
 
   return (
     <Box maxWidth="md" mx="auto" mt={4} px={2}>

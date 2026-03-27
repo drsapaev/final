@@ -1,0 +1,303 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Управление клиникой" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Управление клиникой
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "admin" [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]:
+            - img [ref=e81]
+            - text: admin
+        - button "Выйти" [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]:
+            - img [ref=e86]
+            - text: Выйти
+    - generic [ref=e89]:
+      - complementary [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e93]: Медицинская система
+          - button "Collapse sidebar" [ref=e94] [cursor=pointer]:
+            - img [ref=e96]
+        - navigation [ref=e99]:
+          - button "Dashboard" [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+            - generic [ref=e104]: Dashboard
+          - button "Analytics" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e109]: Analytics
+          - button "Wait Time Analytics" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e114]: Wait Time Analytics
+          - button "AI Analytics" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+            - generic [ref=e119]: AI Analytics
+          - button "Webhooks" [ref=e120] [cursor=pointer]:
+            - img [ref=e121]
+            - generic [ref=e124]: Webhooks
+          - button "Reports" [ref=e125] [cursor=pointer]:
+            - img [ref=e126]
+            - generic [ref=e129]: Reports
+          - button "System" [ref=e130] [cursor=pointer]:
+            - img [ref=e131]
+            - generic [ref=e134]: System
+          - button "Cloud Printing" [ref=e135] [cursor=pointer]:
+            - img [ref=e136]
+            - generic [ref=e139]: Cloud Printing
+          - button "Medical Equipment" [ref=e140] [cursor=pointer]:
+            - img [ref=e141]
+            - generic [ref=e144]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e145] [cursor=pointer]:
+            - img [ref=e146]
+            - generic [ref=e149]: Dynamic Pricing
+          - button "Billing" [ref=e150] [cursor=pointer]:
+            - img [ref=e151]
+            - generic [ref=e154]: Billing
+          - button "Discount Benefits" [ref=e155] [cursor=pointer]:
+            - img [ref=e156]
+            - generic [ref=e162]: Discount Benefits
+          - button "GraphQL API" [ref=e163] [cursor=pointer]:
+            - img [ref=e164]
+            - generic [ref=e167]: GraphQL API
+          - button "Users" [ref=e168] [cursor=pointer]:
+            - img [ref=e169]
+            - generic [ref=e172]: Users
+          - button "Doctors" [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+            - generic [ref=e177]: Doctors
+          - button "Services" [ref=e178] [cursor=pointer]:
+            - img [ref=e179]
+            - generic [ref=e182]: Services
+          - button "Patients" [ref=e183] [cursor=pointer]:
+            - img [ref=e184]
+            - generic [ref=e187]: Patients
+          - button "Appointments" [ref=e188] [cursor=pointer]:
+            - img [ref=e189]
+            - generic [ref=e192]: Appointments
+          - button "All Free" [ref=e193] [cursor=pointer]:
+            - img [ref=e194]
+            - generic [ref=e197]: All Free
+          - button "Benefit Settings" [ref=e198] [cursor=pointer]:
+            - img [ref=e199]
+            - generic [ref=e202]: Benefit Settings
+          - button "Wizard Settings" [ref=e203] [cursor=pointer]:
+            - img [ref=e204]
+            - generic [ref=e209]: Wizard Settings
+          - button "Payment Providers" [ref=e210] [cursor=pointer]:
+            - img [ref=e211]
+            - generic [ref=e214]: Payment Providers
+          - button "Clinic Management" [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - generic [ref=e219]: Clinic Management
+          - button "Clinic Settings" [ref=e220] [cursor=pointer]:
+            - img [ref=e221]
+            - generic [ref=e224]: Clinic Settings
+          - button "Queue Settings" [ref=e225] [cursor=pointer]:
+            - img [ref=e226]
+            - generic [ref=e229]: Queue Settings
+          - button "Queue Limits" [ref=e230] [cursor=pointer]:
+            - img [ref=e231]
+            - generic [ref=e234]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e235] [cursor=pointer]:
+            - img [ref=e236]
+            - generic [ref=e239]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e240] [cursor=pointer]:
+            - img [ref=e241]
+            - generic [ref=e244]: AI Imaging
+          - button "Treatment Recommendations" [ref=e245] [cursor=pointer]:
+            - img [ref=e246]
+            - generic [ref=e249]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e250] [cursor=pointer]:
+            - img [ref=e251]
+            - generic [ref=e254]: Drug Interactions
+          - button "Risk Assessment" [ref=e255] [cursor=pointer]:
+            - img [ref=e256]
+            - generic [ref=e259]: Risk Assessment
+          - button "Voice to Text" [ref=e260] [cursor=pointer]:
+            - img [ref=e261]
+            - generic [ref=e264]: Voice to Text
+          - button "Smart Scheduling" [ref=e265] [cursor=pointer]:
+            - img [ref=e266]
+            - generic [ref=e269]: Smart Scheduling
+          - button "Quality Control" [ref=e270] [cursor=pointer]:
+            - img [ref=e271]
+            - generic [ref=e274]: Quality Control
+          - button "Analytics Insights" [ref=e275] [cursor=pointer]:
+            - img [ref=e276]
+            - generic [ref=e279]: Analytics Insights
+          - button "Telegram Bot" [ref=e280] [cursor=pointer]:
+            - img [ref=e281]
+            - generic [ref=e284]: Telegram Bot
+          - button "FCM Notifications" [ref=e285] [cursor=pointer]:
+            - img [ref=e286]
+            - generic [ref=e289]: FCM Notifications
+          - button "Phone Verification" [ref=e290] [cursor=pointer]:
+            - img [ref=e291]
+            - generic [ref=e294]: Phone Verification
+          - button "User Data Transfer" [ref=e295] [cursor=pointer]:
+            - img [ref=e296]
+            - generic [ref=e299]: User Data Transfer
+          - button "Group Permissions" [ref=e300] [cursor=pointer]:
+            - img [ref=e301]
+            - generic [ref=e304]: Group Permissions
+          - button "User Export" [ref=e305] [cursor=pointer]:
+            - img [ref=e306]
+            - generic [ref=e309]: User Export
+          - button "Registrar Notifications" [ref=e310] [cursor=pointer]:
+            - img [ref=e311]
+            - generic [ref=e316]: Registrar Notifications
+          - button "AI Settings" [ref=e317] [cursor=pointer]:
+            - img [ref=e318]
+            - generic [ref=e321]: AI Settings
+          - button "Telegram Settings" [ref=e322] [cursor=pointer]:
+            - img [ref=e323]
+            - generic [ref=e326]: Telegram Settings
+          - button "Display Settings" [ref=e327] [cursor=pointer]:
+            - img [ref=e328]
+            - generic [ref=e333]: Display Settings
+          - button "Activation" [ref=e334] [cursor=pointer]:
+            - img [ref=e335]
+            - generic [ref=e338]: Activation
+          - button "Finance" [ref=e339] [cursor=pointer]:
+            - img [ref=e340]
+            - generic [ref=e345]: Finance
+          - button "Security" [ref=e346] [cursor=pointer]:
+            - img [ref=e347]
+            - generic [ref=e350]: Security
+          - button "Settings" [ref=e351] [cursor=pointer]:
+            - img [ref=e352]
+            - generic [ref=e355]: Settings
+      - main [ref=e356]:
+        - generic [ref=e361]:
+          - generic [ref=e362]:
+            - generic [ref=e363]:
+              - generic [ref=e364]:
+                - heading "Всего пользователей" [level=3] [ref=e365]
+                - img [ref=e366]
+              - generic [ref=e371]: "28"
+            - generic [ref=e372]:
+              - generic [ref=e373]:
+                - heading "Врачи" [level=3] [ref=e374]
+                - img [ref=e375]
+              - generic [ref=e379]: "19"
+            - generic [ref=e380]:
+              - generic [ref=e381]:
+                - heading "Пациенты" [level=3] [ref=e382]
+                - img [ref=e383]
+              - generic [ref=e388]: "452"
+            - generic [ref=e389]:
+              - generic [ref=e390]:
+                - heading "Доход" [level=3] [ref=e391]
+                - img [ref=e392]
+              - generic [ref=e395]: 500 UZS
+            - generic [ref=e396]:
+              - generic [ref=e397]:
+                - heading "Записи сегодня" [level=3] [ref=e398]
+                - img [ref=e399]
+              - generic [ref=e401]: "0"
+            - generic [ref=e402]:
+              - generic [ref=e403]:
+                - heading "Ожидают подтверждения" [level=3] [ref=e404]
+                - img [ref=e405]
+              - generic [ref=e408]: "0"
+          - generic [ref=e409]:
+            - generic [ref=e410]:
+              - generic [ref=e411]:
+                - heading "Активность системы" [level=3] [ref=e412]
+                - button "Экспорт" [ref=e413] [cursor=pointer]:
+                  - generic [ref=e414]:
+                    - img [ref=e415]
+                    - text: Экспорт
+              - generic [ref=e418]:
+                - generic [ref=e419]:
+                  - generic [ref=e422]: "21.03"
+                  - generic [ref=e425]: "22.03"
+                  - generic [ref=e428]: "23.03"
+                  - generic [ref=e431]: "24.03"
+                  - generic [ref=e434]: "25.03"
+                  - generic [ref=e437]: "26.03"
+                  - generic [ref=e440]: "27.03"
+                - generic [ref=e441]:
+                  - generic [ref=e442]: "Записи: 1"
+                  - generic [ref=e443]: "Платежи: 0"
+                  - generic [ref=e444]: "Пользователи: 3"
+            - generic [ref=e445]:
+              - generic [ref=e446]:
+                - heading "Последние действия" [level=3] [ref=e447]
+                - button "Все" [ref=e448] [cursor=pointer]:
+                  - generic [ref=e449]:
+                    - img [ref=e450]
+                    - text: Все
+              - generic [ref=e453]:
+                - generic [ref=e454]:
+                  - img [ref=e455]
+                  - generic [ref=e458]:
+                    - paragraph [ref=e459]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e460]: admin • 1 дней назад
+                - generic [ref=e461]:
+                  - img [ref=e462]
+                  - generic [ref=e465]:
+                    - paragraph [ref=e466]: Обновлена запись
+                    - paragraph [ref=e467]: Тестовый Пациент Доктор • 1 дней назад
+                - generic [ref=e468]:
+                  - img [ref=e469]
+                  - generic [ref=e472]:
+                    - paragraph [ref=e473]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e474]: qa_cardio_866085 • 6 дней назад
+                - generic [ref=e475]:
+                  - img [ref=e476]
+                  - generic [ref=e479]:
+                    - paragraph [ref=e480]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e481]: qa_lab_769668 • 6 дней назад
+                - generic [ref=e482]:
+                  - img [ref=e483]
+                  - generic [ref=e486]:
+                    - paragraph [ref=e487]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e488]: Concurrency b8767ab6 • 16 дней назад
+                - generic [ref=e489]:
+                  - img [ref=e490]
+                  - generic [ref=e493]:
+                    - paragraph [ref=e494]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e495]: Concurrency 9d05424f • 16 дней назад
+                - generic [ref=e496]:
+                  - img [ref=e497]
+                  - generic [ref=e500]:
+                    - paragraph [ref=e501]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e502]: Concurrency c576c96a • 16 дней назад
+                - generic [ref=e503]:
+                  - img [ref=e504]
+                  - generic [ref=e507]:
+                    - paragraph [ref=e508]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e509]: Concurrency 6621778a • 16 дней назад
+                - generic [ref=e510]:
+                  - img [ref=e511]
+                  - generic [ref=e514]:
+                    - paragraph [ref=e515]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e516]: Concurrency af98bd7c • 16 дней назад
+                - generic [ref=e517]:
+                  - img [ref=e518]
+                  - generic [ref=e521]:
+                    - paragraph [ref=e522]: Новый пользователь зарегистрирован
+                    - paragraph [ref=e523]: Concurrency 9c30b246 • 16 дней назад
+          - generic [ref=e524]:
+            - generic [ref=e525]:
+              - heading "Системные уведомления" [level=3] [ref=e526]
+              - generic [ref=e527]: "0"
+            - paragraph [ref=e529]: Нет системных уведомлений
+  - region "Notifications Alt+T"

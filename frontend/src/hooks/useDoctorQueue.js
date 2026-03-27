@@ -6,123 +6,73 @@ import { useState, useCallback, useEffect } from 'react';
 import api from '../services/api';
 import logger from '../utils/logger';
 
+const ZERO_STATS = {
+    waiting: 0,
+    called: 0,
+    served: 0,
+    total: 0
+};
+
 /**
- * @param {number|null} doctorId - ID врача (если null, будет получен из текущего пользователя)
- * @param {object|null} currentUser - Текущий пользователь из контекста
+ * @param {string} specialty - Каноническая specialty/queue tag для панели врача
  */
-const useDoctorQueue = (doctorId = null, currentUser = null) => {
+const useDoctorQueue = (specialty = 'general') => {
     const [queue, setQueue] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [resolvedDoctorId, setResolvedDoctorId] = useState(doctorId);
-    const [stats, setStats] = useState({
-        waiting: 0,
-        called: 0,
-        served: 0,
-        total: 0
-    });
-
-    // Получаем doctor_id если не передан явно
-    useEffect(() => {
-        const resolveDoctorId = async () => {
-            if (doctorId) {
-                setResolvedDoctorId(doctorId);
-                return;
-            }
-
-            if (currentUser?.doctor_id) {
-                setResolvedDoctorId(currentUser.doctor_id);
-                return;
-            }
-
-            // Пробуем получить doctor_id через API
-            if (currentUser?.id) {
-                try {
-                    const response = await api.get(`/doctors/by-user/${currentUser.id}`);
-                    if (response.data?.id) {
-                        setResolvedDoctorId(response.data.id);
-                        logger.info('[useDoctorQueue] Resolved doctor_id from API:', response.data.id);
-                    }
-                } catch (err) {
-                    logger.warn('[useDoctorQueue] Could not resolve doctor_id:', err.message);
-                }
-            }
-        };
-
-        resolveDoctorId();
-    }, [doctorId, currentUser]);
+    const [stats, setStats] = useState(ZERO_STATS);
+    const normalizedSpecialty = specialty || 'general';
 
     // Загрузка очереди
     const loadQueue = useCallback(async () => {
-        if (!resolvedDoctorId) {
-            logger.warn('[useDoctorQueue] No doctorId resolved yet');
-            setLoading(false);
-            return;
-        }
-
         setLoading(true);
         setError(null);
 
         try {
-            const today = new Date().toISOString().split('T')[0];
-            const response = await api.get('/registrar/queues/today', {
-                params: { target_date: today }
+            const response = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
+            const entries = Array.isArray(response.data?.entries) ? response.data.entries : [];
+            const apiStats = response.data?.stats || {};
+
+            setQueue(entries);
+            setStats({
+                waiting: apiStats.waiting ?? entries.filter((entry) => entry.status === 'waiting').length,
+                called: apiStats.called ?? entries.filter((entry) => entry.status === 'called').length,
+                served: apiStats.served ?? entries.filter((entry) => entry.status === 'served').length,
+                total: apiStats.total ?? entries.length
             });
 
-            // Находим очередь для этого врача
-            const queues = response.data?.queues || [];
-            const doctorQueue = queues.find(q =>
-                q.specialist_id === resolvedDoctorId ||
-                q.doctor_id === resolvedDoctorId
-            );
-
-            if (doctorQueue) {
-                // Сортируем по priority DESC, queue_time ASC
-                const sortedEntries = [...(doctorQueue.entries || [])].sort((a, b) => {
-                    // Сначала по priority (1 = следующий, идёт первым)
-                    const priorityDiff = (b.priority || 0) - (a.priority || 0);
-                    if (priorityDiff !== 0) return priorityDiff;
-                    // Затем по queue_time
-                    return new Date(a.queue_time || a.created_at) - new Date(b.queue_time || b.created_at);
-                });
-
-                setQueue(sortedEntries);
-                setStats({
-                    waiting: sortedEntries.filter(e => e.status === 'waiting').length,
-                    called: sortedEntries.filter(e => e.status === 'called').length,
-                    served: sortedEntries.filter(e => e.status === 'served').length,
-                    total: sortedEntries.length
-                });
-            } else {
-                setQueue([]);
-                setStats({ waiting: 0, called: 0, served: 0, total: 0 });
-            }
-
-            logger.info('[useDoctorQueue] Loaded queue:', {
-                doctorId: resolvedDoctorId,
-                entries: doctorQueue ? (doctorQueue.entries || []).length : 0
+            logger.info('[useDoctorQueue] Loaded specialty queue:', {
+                specialty: normalizedSpecialty,
+                entries: entries.length,
+                queueIds: response.data?.queue_ids || []
             });
         } catch (err) {
             logger.error('[useDoctorQueue] Error loading queue:', err);
-            setError(err.message || 'Ошибка загрузки очереди');
+            setQueue([]);
+            setStats(ZERO_STATS);
+            setError(err.response?.data?.detail || err.message || 'Ошибка загрузки очереди');
         } finally {
             setLoading(false);
         }
-    }, [resolvedDoctorId]);
+    }, [normalizedSpecialty]);
 
     // Вызвать следующего пациента
     const callNext = useCallback(async () => {
-        if (!resolvedDoctorId) return null;
-
         try {
-            const response = await api.post(`/queue/${resolvedDoctorId}/call-next`);
+            const currentQueue = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
+            const waitingEntry = currentQueue.data?.entries?.find((entry) => entry.status === 'waiting');
+            if (!waitingEntry) {
+                return { success: false, message: 'Нет ожидающих пациентов' };
+            }
+
+            const response = await api.post(`/doctor/queue/${waitingEntry.id}/call`);
             await loadQueue(); // Обновляем очередь
             return response.data;
         } catch (err) {
             logger.error('[useDoctorQueue] Error calling next:', err);
             throw err;
         }
-    }, [resolvedDoctorId, loadQueue]);
+    }, [loadQueue, normalizedSpecialty]);
 
     // Отметить неявку
     const markNoShow = useCallback(async (entryId) => {
@@ -175,10 +125,7 @@ const useDoctorQueue = (doctorId = null, currentUser = null) => {
     // Завершить приём (served)
     const completeVisit = useCallback(async (entryId) => {
         try {
-            // Используем существующий endpoint для изменения статуса
-            const response = await api.post(`/queue/entry/${entryId}/status`, null, {
-                params: { status: 'served' }
-            });
+            const response = await api.post(`/doctor/queue/${entryId}/complete`);
             await loadQueue();
             return response.data;
         } catch (err) {

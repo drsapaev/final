@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
+import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
 import {
   Calendar,
@@ -99,7 +101,8 @@ const ScheduleNextModal = ({
   const loadPatients = async () => {
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch('/api/v1/patients/', {
+      const apiBase = getApiOrigin();
+      const response = await fetch(`${apiBase}/api/v1/patients/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -118,7 +121,8 @@ const ScheduleNextModal = ({
   const loadServices = async () => {
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch('/api/v1/services', {
+      const apiBase = getApiOrigin();
+      const response = await fetch(`${apiBase}/api/v1/services`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -178,7 +182,8 @@ const ScheduleNextModal = ({
       }
 
       const token = tokenManager.getAccessToken();
-      const response = await fetch('/api/v1/doctor/visits/schedule-next', {
+      const apiBase = getApiOrigin();
+      const response = await fetch(`${apiBase}/api/v1/doctor/visits/schedule-next`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -580,6 +585,20 @@ const ScheduleNextModal = ({
       </div>
     </div>);
 
+};
+
+ScheduleNextModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  patient: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  }),
+  theme: PropTypes.shape({
+    getColor: PropTypes.func.isRequired,
+    getSpacing: PropTypes.func.isRequired,
+    getFontSize: PropTypes.func.isRequired
+  }).isRequired,
+  specialtyFilter: PropTypes.oneOf(['cardiology', 'dermatology', 'dentistry', null])
 };
 
 export default ScheduleNextModal;

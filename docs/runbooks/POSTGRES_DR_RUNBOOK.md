@@ -2,7 +2,7 @@
 
 ## Scope
 - Local development database `clinicdb` on PostgreSQL.
-- SQLite `clinic.db` is out of scope and must not be changed.
+- Legacy `clinic.db` snapshot is out of scope and must not be changed.
 
 ## Preconditions
 - PostgreSQL is running and reachable.

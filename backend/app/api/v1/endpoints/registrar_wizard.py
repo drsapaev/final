@@ -1759,6 +1759,8 @@ def get_all_appointments(
 ):
     """Простое объединение appointments + visits для фронтенда"""
     try:
+        from datetime import datetime
+
         from sqlalchemy import func, or_
 
         from app.models.appointment import Appointment
@@ -1772,13 +1774,21 @@ def get_all_appointments(
 
         # Применяем фильтры по дате
         if date_from:
-            appointments_query = appointments_query.filter(
-                Appointment.appointment_date >= date_from
-            )
+            try:
+                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+                appointments_query = appointments_query.filter(
+                    Appointment.appointment_date >= from_date
+                )
+            except ValueError:
+                pass
         if date_to:
-            appointments_query = appointments_query.filter(
-                Appointment.appointment_date <= date_to
-            )
+            try:
+                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+                appointments_query = appointments_query.filter(
+                    Appointment.appointment_date <= to_date
+                )
+            except ValueError:
+                pass
 
         # Применяем поиск
         if search:
@@ -1941,9 +1951,17 @@ def get_all_appointments(
 
         # Применяем фильтры по дате
         if date_from:
-            visits_query = visits_query.filter(Visit.visit_date >= date_from)
+            try:
+                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+                visits_query = visits_query.filter(Visit.visit_date >= from_date)
+            except ValueError:
+                pass
         if date_to:
-            visits_query = visits_query.filter(Visit.visit_date <= date_to)
+            try:
+                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+                visits_query = visits_query.filter(Visit.visit_date <= to_date)
+            except ValueError:
+                pass
 
         # Применяем поиск
         if search:

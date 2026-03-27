@@ -68,6 +68,7 @@ class PatientBase(ORMModel):
     sex: str | None = Field(None, max_length=8)  # M|F|X
     phone: str | None = Field(None, max_length=32)
     email: EmailStr | None = None
+    doc_type: str | None = Field(None, max_length=32)
     doc_number: str | None = Field(None, max_length=64)
     address: str | None = Field(None, max_length=512)
 
@@ -84,6 +85,7 @@ class PatientUpdate(ORMModel):
     sex: str | None = Field(None, max_length=8)
     phone: str | None = Field(None, max_length=32)
     email: EmailStr | None = None
+    doc_type: str | None = Field(None, max_length=32)
     doc_number: str | None = Field(None, max_length=64)
     address: str | None = Field(None, max_length=512)
 

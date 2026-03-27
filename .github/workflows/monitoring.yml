@@ -11,6 +11,24 @@ jobs:
     name: 📊 Мониторинг системы
     runs-on: ubuntu-latest
     continue-on-error: true  # Весь job не блокирует workflow
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
     
     steps:
     - uses: actions/checkout@v6
@@ -36,42 +54,38 @@ jobs:
     - name: 🗄️ Проверка базы данных
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
+        export DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
         
-        echo "🗄️ Проверяем состояние базы данных..."
+        echo "🗄️ Проверяем состояние Postgres..."
         echo "📊 DATABASE_URL: $DATABASE_URL"
         echo "📁 Текущая директория: $(pwd)"
         echo "📁 Содержимое директории:"
         ls -la
-        
-        # Проверяем наличие скрипта
-        if [ ! -f "check_db_workflow.py" ]; then
-          echo "❌ Скрипт check_db_workflow.py не найден!"
-          exit 1
-        fi
-        
-        echo "✅ Скрипт найден, запускаем проверку..."
-        
-        # Запускаем скрипт проверки базы данных с подробным выводом
-        python check_db_workflow.py || {
-          echo "❌ Скрипт проверки БД завершился с ошибкой"
-          echo "📋 Попытка диагностики..."
-          python -c "
-          import sys
-          sys.path.insert(0, '.')
-          try:
-              from app.db.session import engine
-              print('✅ Импорт engine успешен')
-          except Exception as e:
-              print(f'❌ Ошибка импорта engine: {e}')
-          "
-          exit 1
-        }
+        echo "⏳ Ожидаем готовность Postgres..."
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(os.environ["DATABASE_URL"])
+        for i in range(30):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
+            except Exception as e:
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
         
     - name: 🔌 Проверка API эндпоинтов
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
+        export DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
@@ -85,7 +99,7 @@ jobs:
         
         # Запускаем сервер в фоне
         echo "🚀 Запускаем сервер..."
-        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 > server.log 2>&1 &
         server_pid=$!
         echo $server_pid > server.pid
         echo "📊 PID сервера: $server_pid"
@@ -94,7 +108,7 @@ jobs:
         echo "⏳ Ожидаем запуск сервера..."
         for i in {1..30}; do
             echo "🔄 Попытка $i/30..."
-            if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            if curl -s -f "http://127.0.0.1:18000/api/v1/health" > /dev/null 2>&1; then
                 echo "✅ Сервер запущен успешно"
                 break
             fi
@@ -123,7 +137,7 @@ jobs:
         
         for endpoint in "${endpoints[@]}"; do
             echo "🔄 Проверяем ${endpoint}..."
-            response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://127.0.0.1:8000${endpoint}" 2>/dev/null)
+            response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://127.0.0.1:18000${endpoint}" 2>/dev/null)
             if [ "$response" = "200" ]; then
                 echo "✅ ${endpoint}: HTTP ${response}"
             elif [ -n "$response" ]; then
@@ -157,7 +171,7 @@ jobs:
         fi
         
         # Cleanup - убиваем все возможные uvicorn процессы на этом порту
-        pkill -f "uvicorn.*8000" 2>/dev/null || true
+        pkill -f "uvicorn.*18000" 2>/dev/null || true
         
     - name: 📊 Создание отчёта мониторинга
       continue-on-error: true
@@ -171,8 +185,8 @@ jobs:
         echo '' >> monitoring-report.md
         echo '## 🗄️ Состояние базы данных' >> monitoring-report.md
         echo '- **Статус**: ✅ Доступна' >> monitoring-report.md
-        echo '- **Тип**: SQLite' >> monitoring-report.md
-        echo '- **Путь**: ./clinic.db' >> monitoring-report.md
+        echo '- **Тип**: PostgreSQL' >> monitoring-report.md
+        echo '- **База**: clinicdb' >> monitoring-report.md
         echo '' >> monitoring-report.md
         echo '## 🔌 Состояние API' >> monitoring-report.md
         echo '- **Health Check**: ✅ Работает' >> monitoring-report.md

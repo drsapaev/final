@@ -26,6 +26,11 @@ import { MacOSInput, MacOSButton } from '../ui/macos';
 import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { formatDateDisplay } from '../../utils/dateUtils';
+import {
+  formatUzbekPhoneDisplay,
+  isValidUzbekPhone,
+  normalizeUzbekPhoneForApi
+} from '../../utils/phoneUtils';
 import { createQueueEntriesBatch, getDoctorUserId, updateOnlineQueueEntry } from '../../api/queue';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -153,7 +158,9 @@ const AppointmentWizardV2 = ({
             id: initialData.patient_id || initialData.patient?.id || null, // ✅ ИСПРАВЛЕНО: Добавлена проверка patient?.id
             fio: initialData.patient_fio || initialData.patient_name || initialData.patient?.fio || '',
             birth_date: birthDate, // ✅ ИСПРАВЛЕНО: Приоритет полной даты
-            phone: initialData.phone || initialData.patient_phone || initialData.patient?.phone || '',
+            phone: formatUzbekPhoneDisplay(
+              initialData.phone || initialData.patient_phone || initialData.patient?.phone || ''
+            ),
             address: initialData.address || initialData.patient?.address || '',
             gender: (() => {
               // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
@@ -281,16 +288,17 @@ const AppointmentWizardV2 = ({
   // ===================== ПРОВЕРКА ТЕЛЕФОНА =====================
 
   const checkPhoneUniqueness = async (phone) => {
-    // Очищаем номер для проверки (только цифры)
-    const cleanPhone = phone.replace(/\D/g, '');
-    // Проверяем только если номер достаточно длинный (998 + 9 цифр = 12)
-    if (cleanPhone.length < 12) {
+    const normalizedPhone = normalizeUzbekPhoneForApi(phone);
+    const cleanPhone = normalizedPhone.replace(/\D/g, '');
+
+    // Проверяем только если номер уже канонический
+    if (cleanPhone.length !== 12) {
       setPhoneError(null);
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(phone)}`, {
+      const response = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(normalizedPhone)}`, {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
           'Content-Type': 'application/json'
@@ -324,7 +332,7 @@ const AppointmentWizardV2 = ({
   };
 
   const handlePhoneChange = (value) => {
-    const formatted = formatPhoneNumber(value);
+    const formatted = formatUzbekPhoneDisplay(value);
     setWizardData((prev) => ({
       ...prev,
       patient: { ...prev.patient, phone: formatted }
@@ -373,22 +381,6 @@ const AppointmentWizardV2 = ({
   };
 
   // ===================== МАСКИ ВВОДА =====================
-
-  const formatPhoneNumber = (value) => {
-    // Убираем все символы кроме цифр
-    const digits = value.replace(/\D/g, '');
-
-    // Ограничиваем до 12 цифр (998 + 9 цифр номера)
-    const limitedDigits = digits.slice(0, 12);
-
-    // Форматируем как +998 XX XXX XX XX
-    if (limitedDigits.length === 0) return '';
-    if (limitedDigits.length <= 3) return `+${limitedDigits}`;
-    if (limitedDigits.length <= 5) return `+${limitedDigits.slice(0, 3)} ${limitedDigits.slice(3)}`;
-    if (limitedDigits.length <= 8) return `+${limitedDigits.slice(0, 3)} ${limitedDigits.slice(3, 5)} ${limitedDigits.slice(5)}`;
-    if (limitedDigits.length <= 10) return `+${limitedDigits.slice(0, 3)} ${limitedDigits.slice(3, 5)} ${limitedDigits.slice(5, 8)} ${limitedDigits.slice(8)}`;
-    return `+${limitedDigits.slice(0, 3)} ${limitedDigits.slice(3, 5)} ${limitedDigits.slice(5, 8)} ${limitedDigits.slice(8, 10)} ${limitedDigits.slice(10)}`;
-  };
 
   const formatBirthDate = (value) => {
     // Убираем все символы кроме цифр
@@ -1007,8 +999,8 @@ const AppointmentWizardV2 = ({
       }
       // ✅ Телефон теперь необязателен (дети, пожилые без телефона)
       // Проверяем формат только если телефон указан
-      if (wizardData.patient.phone.trim() && !/^\+?[\d\s\-()]+$/.test(wizardData.patient.phone.trim())) {
-        newErrors.phone = 'Неверный формат телефона';
+      if (wizardData.patient.phone.trim() && !isValidUzbekPhone(wizardData.patient.phone)) {
+        newErrors.phone = 'Номер телефона должен быть в формате +998XXXXXXXXX';
       }
       if (!wizardData.patient.gender) {// ✅ Валидация пола
         newErrors.gender = 'Выберите пол';
@@ -1163,6 +1155,10 @@ const AppointmentWizardV2 = ({
 
       // ✅ НОВОЕ: Локальная переменная для patient_id, которую будем заполнять по мере создания/поиска пациента
       let patientId = wizardData.patient.id;
+      const normalizedPhone = wizardData.patient.phone
+        ? normalizeUzbekPhoneForApi(wizardData.patient.phone)
+        : null;
+      const normalizedPhoneDigits = normalizedPhone ? normalizedPhone.replace(/\D/g, '') : '';
 
       // === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===
 
@@ -1171,15 +1167,15 @@ const AppointmentWizardV2 = ({
         logger.log('🔍 Edit mode: patient_id is null, searching for existing patient by phone...');
         logger.log('📞 Patient data:', {
           fio: wizardData.patient.fio,
-          phone: wizardData.patient.phone,
+          phone: normalizedPhone,
           birth_date: wizardData.patient.birth_date
         });
 
         // Ищем пациента по телефону
-        const cleanPhone = wizardData.patient.phone.replace(/\D/g, '');
+        const cleanPhone = normalizedPhoneDigits;
 
         // Попытка 1: Поиск по форматированному номеру
-        let searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
+        let searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(normalizedPhone)}`, {
           headers: {
             'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
             'Content-Type': 'application/json'
@@ -1260,7 +1256,7 @@ const AppointmentWizardV2 = ({
             last_name: wizardData.patient.lastName || '',
             first_name: wizardData.patient.firstName || '',
             middle_name: wizardData.patient.middleName || null,
-            phone: wizardData.patient.phone || null,
+            phone: normalizedPhone,
             address: wizardData.patient.address || null
           };
 
@@ -1314,7 +1310,7 @@ const AppointmentWizardV2 = ({
           last_name: wizardData.patient.lastName || '',
           first_name: wizardData.patient.firstName || '',
           middle_name: wizardData.patient.middleName || null,
-          phone: wizardData.patient.phone || null,
+          phone: normalizedPhone,
           address: wizardData.patient.address || null
         };
 
@@ -1358,12 +1354,12 @@ const AppointmentWizardV2 = ({
 
           // Пациент уже существует или другая ошибка валидации - ищем по номеру телефона
           if (wizardData.patient.phone) {
-            const cleanPhone = wizardData.patient.phone.replace(/\D/g, '');
+            const cleanPhone = normalizedPhoneDigits;
             logger.log(`⚠️ Ищем существующего пациента по номеру телефона: ${wizardData.patient.phone} (clean: ${cleanPhone})`);
 
             // Пробуем искать и по форматированному, и по чистому номеру (если API поддерживает)
             // Обычно API ищет по частичному совпадению или точному
-            const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
+            const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(normalizedPhone)}`, {
               headers: {
                 'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
                 'Content-Type': 'application/json'
@@ -1455,7 +1451,7 @@ const AppointmentWizardV2 = ({
             // Подготавливаем данные пациента
             const patientData = {
               patient_name: wizardData.patient.fio || wizardData.patient.name,
-              phone: wizardData.patient.phone,
+              phone: normalizedPhone,
               birth_year: wizardData.patient.birth_date ?
               parseInt(wizardData.patient.birth_date.split('-')[0]) :
               null,
@@ -1952,7 +1948,7 @@ const AppointmentWizardV2 = ({
         // Обновляем данные пациента через отдельный endpoint
         const patientUpdateData = {
           full_name: wizardData.patient.fio || wizardData.patient.name,
-          phone: wizardData.patient.phone,
+          phone: normalizedPhone,
           birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
           sex: wizardData.patient.gender === 'male' ? 'M' : wizardData.patient.gender === 'female' ? 'F' : null,
           address: wizardData.patient.address
@@ -2865,7 +2861,7 @@ const PatientStepV2 = ({
             color: 'var(--mac-text-tertiary)',
             fontStyle: 'italic'
           }}>
-              Для детей и пожилых можно не указывать
+              Для детей и пожилых можно не указывать. Номер можно вводить без +998 — мы приведём его к формату +998XXXXXXXXX.
             </span>
           }
           {errors.phone &&

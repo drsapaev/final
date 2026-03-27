@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, delete, insert, or_
 from sqlalchemy.orm import Session
 
 from app.models.role_permission import (
@@ -304,15 +304,29 @@ class GroupPermissionsService:
                 return {"success": False, "error": "Роль не найдена"}
 
             # Проверяем, не назначена ли уже роль
-            if role in group.roles:
+            existing = (
+                db.query(group_roles_table)
+                .filter(
+                    group_roles_table.c.group_id == group_id,
+                    group_roles_table.c.role_id == role_id,
+                )
+                .first()
+            )
+            if existing:
                 return {"success": False, "error": "Роль уже назначена группе"}
 
             # Назначаем роль
-            group.roles.append(role)
+            db.execute(
+                insert(group_roles_table).values(
+                    group_id=group_id,
+                    role_id=role_id,
+                    assigned_by=assigned_by_user_id,
+                )
+            )
             db.commit()
 
             # Очищаем кэш для всех пользователей группы
-            self._clear_cache_for_group_users(group)
+            self._clear_cache_for_group_users(db, group_id)
 
             # Логируем изменение
             self._log_permission_change(
@@ -354,15 +368,28 @@ class GroupPermissionsService:
                 return {"success": False, "error": "Роль не найдена"}
 
             # Проверяем, назначена ли роль
-            if role not in group.roles:
+            existing = (
+                db.query(group_roles_table)
+                .filter(
+                    group_roles_table.c.group_id == group_id,
+                    group_roles_table.c.role_id == role_id,
+                )
+                .first()
+            )
+            if not existing:
                 return {"success": False, "error": "Роль не назначена группе"}
 
             # Отзываем роль
-            group.roles.remove(role)
+            db.execute(
+                delete(group_roles_table).where(
+                    group_roles_table.c.group_id == group_id,
+                    group_roles_table.c.role_id == role_id,
+                )
+            )
             db.commit()
 
             # Очищаем кэш для всех пользователей группы
-            self._clear_cache_for_group_users(group)
+            self._clear_cache_for_group_users(db, group_id)
 
             # Логируем изменение
             self._log_permission_change(
@@ -402,11 +429,25 @@ class GroupPermissionsService:
                 return {"success": False, "error": "Группа не найдена"}
 
             # Проверяем, не состоит ли уже в группе
-            if group in user.groups:
+            existing = (
+                db.query(user_groups_table)
+                .filter(
+                    user_groups_table.c.user_id == user_id,
+                    user_groups_table.c.group_id == group_id,
+                )
+                .first()
+            )
+            if existing:
                 return {"success": False, "error": "Пользователь уже состоит в группе"}
 
             # Добавляем в группу
-            user.groups.append(group)
+            db.execute(
+                insert(user_groups_table).values(
+                    user_id=user_id,
+                    group_id=group_id,
+                    added_by=added_by_user_id,
+                )
+            )
             db.commit()
 
             # Очищаем кэш пользователя
@@ -451,11 +492,24 @@ class GroupPermissionsService:
                 return {"success": False, "error": "Группа не найдена"}
 
             # Проверяем, состоит ли в группе
-            if group not in user.groups:
+            existing = (
+                db.query(user_groups_table)
+                .filter(
+                    user_groups_table.c.user_id == user_id,
+                    user_groups_table.c.group_id == group_id,
+                )
+                .first()
+            )
+            if not existing:
                 return {"success": False, "error": "Пользователь не состоит в группе"}
 
             # Удаляем из группы
-            user.groups.remove(group)
+            db.execute(
+                delete(user_groups_table).where(
+                    user_groups_table.c.user_id == user_id,
+                    user_groups_table.c.group_id == group_id,
+                )
+            )
             db.commit()
 
             # Очищаем кэш пользователя
@@ -489,9 +543,18 @@ class GroupPermissionsService:
         if cache_key in self._permissions_cache:
             del self._permissions_cache[cache_key]
 
-    def _clear_cache_for_group_users(self, group: UserGroup):
+    def _clear_cache_for_group_users(self, db: Session, group_id: int):
         """Очистить кэш для всех пользователей группы"""
-        for user in group.users:
+        users = (
+            db.query(User)
+            .join(user_groups_table, User.id == user_groups_table.c.user_id)
+            .filter(
+                user_groups_table.c.group_id == group_id,
+                User.is_active == True,
+            )
+            .all()
+        )
+        for user in users:
             self._clear_user_cache(user.id)
 
     def _log_permission_change(

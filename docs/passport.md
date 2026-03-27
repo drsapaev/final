@@ -440,7 +440,7 @@ Smoke: health, базовые CRUD.
 
 Docker/Compose: backend, frontend, db (Postgres), redis, nginx.
 
-Nginx: /api/ → backend:8000, /* → frontend статика (+ try_files).
+Nginx: /api/ → backend:18000, /* → frontend статика (+ try_files).
 
 Windows: PyInstaller (backend exe) + Inno Setup (установщик), добавление firewall‑правил.
 
@@ -491,4 +491,4 @@ Patient: только свои записи/файлы/оплаты.
 
 Ещё планируется в дальнейшем подключение к DMED, eGOV и страхованию
 
-19) Система активации приложения 
+19) Система активации приложения

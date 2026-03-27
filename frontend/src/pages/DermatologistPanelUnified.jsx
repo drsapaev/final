@@ -35,12 +35,11 @@ import VisitTimeline from '../components/VisitTimeline';
 import { queueService } from '../services/queue';
 import { toast } from 'react-toastify';
 import AIChatWidget from '../components/ai/AIChatWidget';
-import { getApiBaseUrl, getApiOrigin } from '../api/runtime';
+import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
-const API_BASE = getApiOrigin();
 const API_V1_BASE = getApiBaseUrl();
 
 /**
@@ -104,6 +103,7 @@ const DermatologistPanelUnified = () => {
   // Специализированные данные дерматолога
   const [skinExamination, setSkinExamination] = useState({
     patient_id: '',
+    visit_id: '',
     examination_date: '',
     skin_type: '',
     skin_condition: '',
@@ -116,6 +116,7 @@ const DermatologistPanelUnified = () => {
 
   const [cosmeticProcedure, setCosmeticProcedure] = useState({
     patient_id: '',
+    visit_id: '',
     procedure_date: '',
     procedure_type: '',
     area_treated: '',
@@ -315,7 +316,7 @@ const DermatologistPanelUnified = () => {
       }
 
       // Фильтруем только дерматологические записи
-      let appointmentsData = allAppointments.filter((apt) =>
+      const appointmentsData = allAppointments.filter((apt) =>
       apt.specialty === 'derma' || apt.specialty === 'dermatology'
       );
 
@@ -588,6 +589,19 @@ const DermatologistPanelUnified = () => {
     Authorization: `Bearer ${tokenManager.getAccessToken()}`
   }), []);
 
+  const getSelectedPatientId = useCallback(() => (
+    selectedPatient?.patient?.id ||
+    selectedPatient?.patient_id ||
+    currentAppointment?.patient_id ||
+    null
+  ), [currentAppointment?.patient_id, selectedPatient]);
+
+  const getSelectedVisitId = useCallback(() => (
+    currentAppointment?.visit_id ||
+    selectedPatient?.visit_id ||
+    null
+  ), [currentAppointment?.visit_id, selectedPatient]);
+
   const loadPatients = useCallback(async () => {
     try {
       setLoading(true);
@@ -634,32 +648,54 @@ const DermatologistPanelUnified = () => {
     }}, [authHeader]);
 
   const loadPatientData = useCallback(async () => {
-    const patientId = selectedPatient?.patient?.id;
+    const patientId = getSelectedPatientId();
     if (!patientId) return;
 
     try {
       const token = tokenManager.getAccessToken();
       if (!token) return;
 
-      const skinResponse = await fetch(`${API_V1_BASE}/dermatology/skin-examinations?patient_id=${patientId}&limit=10`, {
+      const skinResponse = await fetch(`${API_V1_BASE}/derma/examinations?patient_id=${patientId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (skinResponse.ok) {
         const skinData = await skinResponse.json();
-        setSkinExaminations(skinData);
+        setSkinExaminations(Array.isArray(skinData) ? skinData : []);
       }
 
-      const cosmeticResponse = await fetch(`${API_V1_BASE}/dermatology/cosmetic-procedures?patient_id=${patientId}&limit=10`, {
+      const cosmeticResponse = await fetch(`${API_V1_BASE}/derma/procedures?patient_id=${patientId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (cosmeticResponse.ok) {
         const cosmeticData = await cosmeticResponse.json();
-        setCosmeticProcedures(cosmeticData);
+        setCosmeticProcedures(Array.isArray(cosmeticData) ? cosmeticData : []);
       }
     } catch (error) {
       logger.error('[Dermatology] Ошибка загрузки данных пациента:', error);
     }
-  }, [selectedPatient]);
+  }, [getSelectedPatientId]);
+
+  const openSkinExaminationForm = useCallback(() => {
+    const patientId = getSelectedPatientId();
+    const visitId = getSelectedVisitId();
+    setSkinExamination((prev) => ({
+      ...prev,
+      patient_id: patientId || '',
+      visit_id: visitId || ''
+    }));
+    setShowSkinForm(true);
+  }, [getSelectedPatientId, getSelectedVisitId]);
+
+  const openCosmeticProcedureForm = useCallback(() => {
+    const patientId = getSelectedPatientId();
+    const visitId = getSelectedVisitId();
+    setCosmeticProcedure((prev) => ({
+      ...prev,
+      patient_id: patientId || '',
+      visit_id: visitId || ''
+    }));
+    setShowCosmeticForm(true);
+  }, [getSelectedPatientId, getSelectedVisitId]);
 
   useEffect(() => {
     loadPatients();
@@ -717,7 +753,7 @@ const DermatologistPanelUnified = () => {
     };
 
     loadPatientFromUrl();
-  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.search, getPatientIdFromUrl, selectedPatient?.patient_id]);
 
   useEffect(() => {
     const appointmentId = currentAppointment?.appointment_id || currentAppointment?.id;
@@ -898,19 +934,27 @@ const DermatologistPanelUnified = () => {
   const handleSkinExaminationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_V1_BASE}/dermatology/skin-examinations`, {
+      const payload = {
+        ...skinExamination,
+        patient_id: skinExamination.patient_id || getSelectedPatientId(),
+        visit_id: skinExamination.visit_id || getSelectedVisitId() || null
+      };
+      logger.info('[Dermatology] Сохранение осмотра кожи', payload);
+
+      const response = await fetch(`${API_V1_BASE}/derma/examinations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
-        body: JSON.stringify(skinExamination)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         setShowSkinForm(false);
         setSkinExamination({
           patient_id: '',
+          visit_id: '',
           examination_date: '',
           skin_type: '',
           skin_condition: '',
@@ -922,6 +966,10 @@ const DermatologistPanelUnified = () => {
         });
         loadPatientData();
         toast.success('Осмотр кожи сохранен успешно');
+      } else {
+        const detail = await response.text();
+        logger.error('[Dermatology] Ошибка ответа при сохранении осмотра', { status: response.status, detail });
+        toast.error('Ошибка сохранения осмотра кожи');
       }
     } catch (error) {
       logger.error('Ошибка сохранения осмотра:', error);
@@ -933,19 +981,27 @@ const DermatologistPanelUnified = () => {
   const handleCosmeticProcedureSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_V1_BASE}/dermatology/cosmetic-procedures`, {
+      const payload = {
+        ...cosmeticProcedure,
+        patient_id: cosmeticProcedure.patient_id || getSelectedPatientId(),
+        visit_id: cosmeticProcedure.visit_id || getSelectedVisitId() || null
+      };
+      logger.info('[Dermatology] Сохранение косметической процедуры', payload);
+
+      const response = await fetch(`${API_V1_BASE}/derma/procedures`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         },
-        body: JSON.stringify(cosmeticProcedure)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         setShowCosmeticForm(false);
         setCosmeticProcedure({
           patient_id: '',
+          visit_id: '',
           procedure_date: '',
           procedure_type: '',
           area_treated: '',
@@ -955,6 +1011,10 @@ const DermatologistPanelUnified = () => {
         });
         loadPatientData();
         toast.success('Косметическая процедура сохранена успешно');
+      } else {
+        const detail = await response.text();
+        logger.error('[Dermatology] Ошибка ответа при сохранении процедуры', { status: response.status, detail });
+        toast.error('Ошибка сохранения косметической процедуры');
       }
     } catch (error) {
       logger.error('Ошибка сохранения процедуры:', error);
@@ -1148,7 +1208,11 @@ const DermatologistPanelUnified = () => {
                         variant="outline"
                         onClick={() => {
                           setSelectedPatient(patient);
-                          setSkinExamination({ ...skinExamination, patient_id: patient.id });
+                          setSkinExamination((prev) => ({
+                            ...prev,
+                            patient_id: patient.id,
+                            visit_id: patient.visit_id || ''
+                          }));
                           setShowSkinForm(true);
                         }}
                         style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1160,7 +1224,11 @@ const DermatologistPanelUnified = () => {
                         variant="outline"
                         onClick={() => {
                           setSelectedPatient(patient);
-                          setCosmeticProcedure({ ...cosmeticProcedure, patient_id: patient.id });
+                          setCosmeticProcedure((prev) => ({
+                            ...prev,
+                            patient_id: patient.id,
+                            visit_id: patient.visit_id || ''
+                          }));
                           setShowCosmeticForm(true);
                         }}
                         style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1619,7 +1687,7 @@ const DermatologistPanelUnified = () => {
                     <Activity size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Осмотры кожи
                   </h3>
-                  <MacOSButton onClick={() => setShowSkinForm(true)}>
+                  <MacOSButton onClick={openSkinExaminationForm}>
                     <Plus size={16} style={{ marginRight: '6px' }} />
                     Новый осмотр
                   </MacOSButton>
@@ -1846,7 +1914,7 @@ const DermatologistPanelUnified = () => {
                     <Sparkles size={20} style={{ marginRight: '8px', color: 'var(--mac-pink-500)' }} />
                     Косметические процедуры
                   </h3>
-                  <MacOSButton onClick={() => setShowCosmeticForm(true)}>
+                  <MacOSButton onClick={openCosmeticProcedureForm}>
                     <Plus size={16} style={{ marginRight: '6px' }} />
                     Новая процедура
                   </MacOSButton>

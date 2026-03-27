@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Generic, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc
@@ -17,6 +18,7 @@ from app.api import deps
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.patient import Patient
+from app.services.payment_read_service import PaymentReadService
 
 logger = logging.getLogger(__name__)
 
@@ -1098,73 +1100,17 @@ async def get_payment_receipt(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
 ):
-    """
-    Генерация PDF-чека для платежа.
-    """
-    from fastapi.responses import StreamingResponse
-    import io
-    
+    """Генерация PDF-чека для платежа."""
     try:
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
-        
-        if not payment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Платеж не найден"
-            )
-        
-        # Получаем данные визита и пациента
-        visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None
-        patient = None
-        patient_name = "Неизвестно"
-        
-        if visit:
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-            if patient:
-                patient_name = get_patient_name(patient, patient.id)
-        
-        # Генерируем простой текстовый чек (можно заменить на reportlab для PDF)
-        receipt_content = f"""
-================================
-        КВИТАНЦИЯ ОБ ОПЛАТЕ
-================================
-
-Номер чека: {payment.receipt_no or f"PAY-{payment.id:06d}"}
-Дата: {payment.paid_at.strftime('%d.%m.%Y %H:%M') if payment.paid_at else payment.created_at.strftime('%d.%m.%Y %H:%M')}
-
---------------------------------
-Пациент: {patient_name}
-Визит ID: {payment.visit_id or 'N/A'}
-
---------------------------------
-ПЛАТЕЖНАЯ ИНФОРМАЦИЯ:
-
-Сумма: {payment.amount:,.0f} {payment.currency or 'UZS'}
-Способ оплаты: {'Наличные' if payment.method == 'cash' else 'Карта' if payment.method == 'card' else payment.method}
-Статус: {'Оплачено' if payment.status in ['paid', 'completed'] else 'Возвращено' if payment.status == 'refunded' else payment.status}
-
-{f'Возврат: {payment.refunded_amount:,.0f} UZS' if payment.refunded_amount else ''}
-{f'Причина возврата: {payment.refund_reason}' if payment.refund_reason else ''}
-
---------------------------------
-{payment.note or ''}
-
-================================
-   Спасибо за визит!
-================================
-        """
-        
-        # Возвращаем как текст (для полноценного PDF нужен reportlab)
-        buffer = io.BytesIO(receipt_content.encode('utf-8'))
-        
-        return StreamingResponse(
-            buffer,
-            media_type="text/plain; charset=utf-8",
+        service = PaymentReadService(db)
+        pdf_bytes = service.build_receipt_pdf(payment_id=payment_id)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
             headers={
-                "Content-Disposition": f"attachment; filename=receipt_{payment_id}.txt"
-            }
+                "Content-Disposition": f'attachment; filename="receipt_{payment_id}.pdf"'
+            },
         )
-        
     except HTTPException:
         raise
     except Exception as e:

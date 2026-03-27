@@ -6,6 +6,34 @@ import { api } from './client';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 
+export function isExpectedApiErrorStatus(originalRequest, status) {
+  if (!originalRequest || typeof status !== 'number') {
+    return false;
+  }
+
+  const expectedStatuses = originalRequest.expectedErrorStatuses;
+  return Array.isArray(expectedStatuses) && expectedStatuses.includes(status);
+}
+
+export function isCanceledApiError(error) {
+  return error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError';
+}
+
+export function shouldSuppressApiError(error) {
+  const originalRequest = error?.config;
+  const status = error?.response?.status;
+
+  if (isCanceledApiError(error)) {
+    return true;
+  }
+
+  if (isExpectedApiErrorStatus(originalRequest, status)) {
+    return true;
+  }
+
+  return originalRequest?.silent === true && status === 404;
+}
+
 /**
  * Настройка interceptors для API клиента
  */
@@ -50,6 +78,17 @@ export function setupInterceptors() {
     },
     async (error) => {
       const originalRequest = error.config;
+      const status = error.response?.status;
+
+      if (shouldSuppressApiError(error)) {
+        logger.info('[FIX:API] Suppressing handled API error', {
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          status,
+          canceled: isCanceledApiError(error)
+        });
+        return Promise.reject(error);
+      }
 
       // Импортируем обработчик ошибок
       const { handleError } = await import('../utils/errorHandler');
@@ -63,7 +102,7 @@ export function setupInterceptors() {
 
       // Логируем ошибки
       logger.error(`❌ API Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`, {
-        status: error.response?.status,
+        status,
         data: error.response?.data
       });
 
@@ -165,7 +204,7 @@ export function setupInterceptors() {
       }
 
       // Обработка 404 ошибок (ресурс не найден)
-      if (error.response?.status === 404) {
+      if (status === 404) {
         const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Запрашиваемый ресурс не найден';
         logger.warn(`❌ 404 Not Found: ${errorMessage}`, {
           url: originalRequest?.url,

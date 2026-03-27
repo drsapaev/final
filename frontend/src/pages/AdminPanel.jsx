@@ -157,6 +157,7 @@ import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
+import QueueCabinetManagement from '../components/admin/QueueCabinetManagement';
 import { getApiOrigin } from '../api/runtime';
 
 
@@ -1116,6 +1117,7 @@ const AdminPanel = () => {
     { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
     { to: '/admin/services', label: 'Услуги', icon: Package },
     { to: '/admin/departments', label: 'Отделения', icon: FolderTree },
+    { to: '/admin/queue-cabinet-management', label: 'Кабинеты очередей', icon: Building2 },
     { to: '/admin/patients', label: 'Пациенты', icon: Users },
     { to: '/admin/appointments', label: 'Записи', icon: Calendar },
     { to: '/admin/all-free', label: 'Заявки All Free', icon: AlertTriangle }]
@@ -2475,6 +2477,7 @@ const AdminPanel = () => {
         return <UnifiedReports />;
       case 'clinic-management':
         return <ClinicManagement />;
+      case 'clinic-settings':
       case 'queue-settings':
       case 'queue-limits':
         return <UnifiedSettings />;
@@ -2502,6 +2505,8 @@ const AdminPanel = () => {
         return <CloudPrintingManager />;
       case 'medical-equipment':
         return <MedicalEquipmentManager />;
+      case 'queue-cabinet-management':
+        return <QueueCabinetManagement />;
       case 'graphql-explorer':
         return <GraphQLExplorer />;
       case 'services':{
@@ -4579,7 +4584,7 @@ const AdminPanel = () => {
           transition: 'opacity 0.3s ease, transform 0.4s ease'
         }}>
           <div style={{
-            padding: current === 'analytics' || current === 'clinic-management' || current === 'ai-imaging' || current === 'settings' || current === 'finance' || current === 'reports' || current === 'telegram-bot' || current === 'fcm-notifications' ? '0' : '12px'
+            padding: current === 'analytics' || current === 'clinic-management' || current === 'ai-imaging' || current === 'settings' || current === 'finance' || current === 'reports' || current === 'telegram-bot' || current === 'fcm-notifications' || current === 'queue-cabinet-management' ? '0' : '12px'
           }}>
             {renderContent()}
           </div>

@@ -257,9 +257,8 @@ def create_patient(
     # Нормализованные last_name и first_name гарантированно не пустые (проверено выше)
     from app.schemas.patient import PatientCreate
 
-    # Создаем PatientCreate с нормализованными данными (БЕЗ full_name и email)
+    # Создаем PatientCreate с нормализованными данными (БЕЗ full_name)
     # Это гарантирует, что в БД сохранятся только нормализованные поля
-    # ВАЖНО: email не существует в модели Patient, поэтому не передаем его
     validated_patient = PatientCreate(
         last_name=normalized_last_name,
         first_name=normalized_first_name,
@@ -267,7 +266,8 @@ def create_patient(
         birth_date=patient_in.birth_date,
         sex=patient_in.sex,
         phone=patient_in.phone,
-        # email НЕ передаем - это поле не существует в модели Patient
+        email=patient_in.email,
+        doc_type=patient_in.doc_type,
         doc_number=patient_in.doc_number,
         address=patient_in.address,
         # full_name НЕ передаем - он уже использован для нормализации

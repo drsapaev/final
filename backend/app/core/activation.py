@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 import os
 import platform
 import re
@@ -19,6 +20,8 @@ from app.models.activation import (
     Activation,  # type: ignore[attr-defined]
     ActivationStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------- Машинный идентификатор (серверный) ----------
 
@@ -94,6 +97,12 @@ def issue_key(
 ) -> IssueResult:
     key = generate_key()
     exp = datetime.utcnow() + timedelta(days=int(days))
+    logger.info(
+        "[FIX:ACTIVATION] Issuing activation key %s status=%s days=%s",
+        key,
+        status,
+        days,
+    )
     row = Activation(
         key=key,
         machine_hash=None,
@@ -112,6 +121,8 @@ def issue_key(
     )
     db.add(row)
     db.flush()
+    db.commit()
+    logger.info("[FIX:ACTIVATION] Activation key persisted %s", key)
     return IssueResult(key=key, expiry_date=exp.strftime("%Y-%m-%d"), status=row.status)
 
 

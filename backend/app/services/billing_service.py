@@ -41,6 +41,26 @@ class BillingService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _get_local_timestamp_naive(
+        self, db: Session | None = None, timezone: str | None = None
+    ) -> datetime:
+        """Получить локальный timestamp без tzinfo для DateTime-колонок БД."""
+        local_timestamp = queue_service.get_local_timestamp(
+            db or self.db, timezone=timezone
+        )
+        if local_timestamp.tzinfo is None:
+            return local_timestamp
+        return local_timestamp.replace(tzinfo=None)
+
+    @staticmethod
+    def _normalize_datetime(value: datetime | None) -> datetime | None:
+        """Снять tzinfo с datetime, если он есть, чтобы сравнения были однородными."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value
+        return value.replace(tzinfo=None)
+
     # === Создание счетов ===
 
     def create_invoice(
@@ -70,6 +90,7 @@ class BillingService:
             else 0
         )
         total_amount = subtotal + tax_amount
+        now = self._get_local_timestamp_naive()
 
         # Создаем счет
         invoice = Invoice(
@@ -83,9 +104,8 @@ class BillingService:
             tax_amount=tax_amount,
             total_amount=total_amount,
             balance=total_amount,
-            issue_date=queue_service.get_local_timestamp(self.db),
-            due_date=queue_service.get_local_timestamp(self.db)
-            + timedelta(days=due_days),
+            issue_date=now,
+            due_date=now + timedelta(days=due_days),
             auto_send=auto_send,
             is_auto_generated=True,
             created_by=created_by,
@@ -288,9 +308,7 @@ class BillingService:
 
         # Устанавливаем paid_at если статус "paid"
         if status == PaymentStatus.PAID.value:
-            from app.services.queue_service import queue_service
-
-            payment.paid_at = queue_service.get_local_timestamp(self.db)
+            payment.paid_at = self._get_local_timestamp_naive()
 
         self.db.add(payment)
 
@@ -820,9 +838,7 @@ class BillingService:
 
         # Устанавливаем paid_at если статус "paid"
         if new_status_lower == "paid" and not payment.paid_at:
-            from app.services.queue_service import queue_service
-
-            payment.paid_at = queue_service.get_local_timestamp(self.db)
+            payment.paid_at = self._get_local_timestamp_naive()
 
         # Обновляем метаданные если переданы
         if meta:
@@ -939,7 +955,7 @@ class BillingService:
 
         if invoice.balance <= 0:
             invoice.status = InvoiceStatus.PAID
-            invoice.paid_date = queue_service.get_local_timestamp(self.db)
+            invoice.paid_date = self._get_local_timestamp_naive()
         elif invoice.paid_amount > 0:
             invoice.status = InvoiceStatus.PARTIALLY_PAID
 
@@ -1014,6 +1030,10 @@ class BillingService:
             return
 
         settings = self.get_billing_settings()
+        due_date = self._normalize_datetime(invoice.due_date)
+        if not due_date:
+            return
+        now = self._get_local_timestamp_naive()
 
         # Напоминания до срока оплаты
         if settings.reminder_days_before:
@@ -1021,8 +1041,8 @@ class BillingService:
                 int(d.strip()) for d in settings.reminder_days_before.split(',')
             ]
             for days in days_before:
-                reminder_date = invoice.due_date - timedelta(days=days)
-                if reminder_date > queue_service.get_local_timestamp(self.db):
+                reminder_date = due_date - timedelta(days=days)
+                if reminder_date > now:
                     self._create_reminder(
                         invoice_id=invoice_id,
                         reminder_type='email',
@@ -1038,7 +1058,7 @@ class BillingService:
                 int(d.strip()) for d in settings.reminder_days_after.split(',')
             ]
             for days in days_after:
-                reminder_date = invoice.due_date + timedelta(days=days)
+                reminder_date = due_date + timedelta(days=days)
                 self._create_reminder(
                     invoice_id=invoice_id,
                     reminder_type='email',
@@ -1051,7 +1071,7 @@ class BillingService:
     def send_due_reminders(self) -> int:
         """Отправить напоминания, которые пора отправлять"""
 
-        now = queue_service.get_local_timestamp(self.db)
+        now = self._get_local_timestamp_naive()
 
         # Получаем напоминания к отправке
         reminders = (
@@ -1092,7 +1112,7 @@ class BillingService:
     def create_recurring_invoices(self) -> int:
         """Создать периодические счета"""
 
-        now = queue_service.get_local_timestamp(self.db)
+        now = self._get_local_timestamp_naive()
 
         # Получаем счета для создания периодических
         recurring_invoices = (
@@ -1152,8 +1172,13 @@ class BillingService:
                     self.db.add(new_item)
 
                 # Обновляем дату следующего счета
+                next_invoice_date = self._normalize_datetime(
+                    parent_invoice.next_invoice_date
+                )
+                if not next_invoice_date:
+                    next_invoice_date = now
                 parent_invoice.next_invoice_date = self._calculate_next_recurrence_date(
-                    parent_invoice.next_invoice_date,
+                    next_invoice_date,
                     parent_invoice.recurrence_type,
                     parent_invoice.recurrence_interval,
                 )
@@ -1190,7 +1215,7 @@ class BillingService:
 
     def _generate_invoice_number(self, settings: BillingSettings) -> str:
         """Сгенерировать номер счета"""
-        year = queue_service.get_local_timestamp(self.db).year
+        year = self._get_local_timestamp_naive().year
         number = settings.next_invoice_number
 
         return settings.invoice_number_format.format(
@@ -1199,7 +1224,7 @@ class BillingService:
 
     def _generate_payment_number(self) -> str:
         """Сгенерировать номер платежа"""
-        now = queue_service.get_local_timestamp(self.db)
+        now = self._get_local_timestamp_naive()
         return f"PAY-{now.year}-{now.month:02d}-{now.day:02d}-{now.hour:02d}{now.minute:02d}{now.second:02d}"
 
     def _get_applicable_billing_rules(

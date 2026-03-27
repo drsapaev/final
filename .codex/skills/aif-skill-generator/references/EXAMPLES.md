@@ -109,7 +109,7 @@ Generate coverage visualization:
 
 2. Generate visual report:
    ```bash
-   python ~/.codex/skills/test-coverage/scripts/visualize.py coverage/coverage-final.json
+   python ~/{{skills_dir}}/test-coverage/scripts/visualize.py coverage/coverage-final.json
    ```
 
 3. Opens `coverage-report.html` in browser

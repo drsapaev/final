@@ -1,0 +1,88 @@
+import React from 'react';
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import LabReportWorkbench from '../LabReportWorkbench';
+import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
+import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
+
+vi.mock('../../../api/labReporting', () => ({
+  labReportingApi: {
+    createInstance: vi.fn(),
+    updateInstance: vi.fn(),
+    bulkSaveValues: vi.fn(),
+    markReady: vi.fn(),
+    finalize: vi.fn(),
+    revise: vi.fn(),
+    downloadPdf: vi.fn(),
+    markPrinted: vi.fn(),
+  },
+}));
+
+describe('LabReportWorkbench', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      })),
+    });
+  });
+
+  it('shows recent reports in a fresh lab session and opens the selected form', () => {
+    const onOpenInstance = vi.fn();
+
+    render(
+      <MacOSThemeProvider>
+        <ThemeProvider>
+          <LabReportWorkbench
+            selectedAppointment={null}
+            templates={[]}
+            templateResolution={null}
+            templateResolutionLoading={false}
+            reportHistory={[]}
+            recentReports={[
+              {
+                id: 22,
+                patient_id: 444,
+                visit_id: 728,
+                created_at: '2026-03-21T07:28:20.000Z',
+                status: 'PRINTED',
+                patient_snapshot: { full_name: 'Тестовый Пациент Регистратура' },
+                template: { name: 'ОАК' },
+                flagged_findings_count: 0,
+                critical_findings_count: 0,
+                max_flag_severity: 0,
+              },
+            ]}
+            activeInstance={null}
+            onInstanceChange={vi.fn()}
+            onOpenInstance={onOpenInstance}
+            onRefreshHistory={vi.fn()}
+            onRefreshRecentReports={vi.fn()}
+            onQueueChanged={vi.fn()}
+            notify={vi.fn()}
+          />
+        </ThemeProvider>
+      </MacOSThemeProvider>
+    );
+
+    expect(
+      screen.getByText('Выберите пациента из очереди или откройте уже существующий лабораторный бланк из списка ниже.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Недавние лабораторные бланки')).toBeInTheDocument();
+    expect(screen.getByText(/Тестовый Пациент Регистратура/i)).toBeInTheDocument();
+
+    const reportButton = screen.getByText('ОАК').closest('button');
+    expect(reportButton).not.toBeNull();
+    fireEvent.click(reportButton);
+
+    expect(onOpenInstance).toHaveBeenCalledWith(22);
+  });
+});

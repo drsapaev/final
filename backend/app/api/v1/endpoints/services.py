@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
+import re
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -11,9 +14,14 @@ from app.api.deps import get_db, require_roles
 from app.crud import service as crud
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
-from app.services.service_mapping import normalize_service_code
+from app.services.service_mapping import (
+    get_allowed_service_code_prefixes,
+    normalize_service_code,
+    resolve_queue_group_key,
+)
 
 router = APIRouter(tags=["services"])
+logger = logging.getLogger(__name__)
 
 
 class ServiceCategoryOut(BaseModel):
@@ -116,6 +124,146 @@ class ServiceUpdate(BaseModel):
     )  # ✅ ДОБАВЛЕНО: связь с отделением
 
 
+def _normalize_service_code_payload(payload: dict[str, Any]) -> str | None:
+    """
+    Canonicalize code/service_code to the same normalized value.
+
+    This keeps the catalog from drifting into mixed code representations.
+    """
+
+    raw_code = payload.get("service_code") or payload.get("code")
+    if not raw_code:
+        return None
+
+    if payload.get("code") and payload.get("service_code"):
+        normalized_code = normalize_service_code(payload["code"])
+        normalized_service_code = normalize_service_code(payload["service_code"])
+        if normalized_code != normalized_service_code:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Поля code и service_code должны совпадать "
+                    "и использовать один и тот же код услуги"
+                ),
+            )
+        canonical_code = normalized_code
+    else:
+        canonical_code = normalize_service_code(raw_code)
+
+    payload["code"] = canonical_code
+    payload["service_code"] = canonical_code
+    return canonical_code
+
+
+def _normalize_category_code_value(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    normalized = normalize_service_code(value)
+    if len(normalized) == 1 and normalized.isalpha():
+        return normalized.upper()
+    return normalized
+
+
+def _resolve_category_specialty(
+    db: Session, category_id: int | None
+) -> str | None:
+    if not category_id:
+        return None
+
+    category = (
+        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
+    )
+    if not category:
+        raise HTTPException(status_code=400, detail="Указанная категория не найдена")
+
+    return category.specialty
+
+
+def _validate_service_code_prefix_alignment(
+    *,
+    service_code: str | None,
+    category_specialty: str | None,
+    queue_tag: str | None,
+    department_key: str | None,
+    category_code: str | None,
+) -> None:
+    if not service_code:
+        return
+
+    normalized_code = normalize_service_code(service_code)
+    if not re.match(r"^[A-Z]\d{1,2}$", normalized_code):
+        logger.info(
+            "[FIX:ADM-06] Legacy service code format accepted without prefix validation: %s",
+            normalized_code,
+        )
+        return
+
+    expected_group = resolve_queue_group_key(
+        queue_tag=queue_tag,
+        department_key=department_key,
+        category_specialty=category_specialty,
+        category_code=category_code,
+    )
+    allowed_prefixes = get_allowed_service_code_prefixes(
+        queue_tag=queue_tag,
+        department_key=department_key,
+        category_specialty=category_specialty,
+        category_code=category_code,
+    )
+
+    if expected_group and allowed_prefixes:
+        prefix = normalized_code[0]
+        if prefix not in allowed_prefixes:
+            allowed = ", ".join(sorted(allowed_prefixes))
+            logger.warning(
+                (
+                    "[FIX:ADM-06] Rejecting service code prefix mismatch: "
+                    "code=%s prefix=%s expected_group=%s allowed_prefixes=%s "
+                    "queue_tag=%s department_key=%s category_specialty=%s category_code=%s"
+                ),
+                normalized_code,
+                prefix,
+                expected_group,
+                allowed,
+                queue_tag,
+                department_key,
+                category_specialty,
+                category_code,
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Код услуги {normalized_code} не согласован с выбранной "
+                    f"категорией/очередью {expected_group}. Допустимые префиксы: {allowed}"
+                ),
+            )
+
+    logger.info(
+        "[FIX:ADM-06] Accepted service code prefix: code=%s expected_group=%s allowed_prefixes=%s",
+        normalized_code,
+        expected_group,
+        sorted(allowed_prefixes) if allowed_prefixes else [],
+    )
+
+
+def _should_validate_service_code_alignment(
+    change_set: dict[str, Any],
+    existing_service: Service | None = None,
+) -> bool:
+    routing_fields = {
+        "code",
+        "service_code",
+        "category_id",
+        "queue_tag",
+        "department_key",
+        "category_code",
+    }
+    if existing_service is None:
+        return True
+    return bool(routing_fields.intersection(change_set.keys()))
+
+
 def _row_to_out(r) -> ServiceOut:
     price = None
     try:
@@ -187,7 +335,7 @@ async def create_service_category(
             detail=f"Категория с кодом '{category_data.code}' уже существует",
         )
 
-    category = ServiceCategory(**category_data.dict())
+    category = ServiceCategory(**category_data.model_dump())
     db.add(category)
     db.commit()
     db.refresh(category)
@@ -225,7 +373,7 @@ async def update_service_category(
                 detail=f"Категория с кодом '{category_data.code}' уже существует",
             )
 
-    for field, value in category_data.dict(exclude_unset=True).items():
+    for field, value in category_data.model_dump(exclude_unset=True).items():
         setattr(category, field, value)
 
     db.commit()
@@ -402,29 +550,25 @@ async def create_service(
     # user=Depends(require_roles("Admin")),
 ):
     """Создать новую услугу"""
+    service_dict = service_data.model_dump()
+    canonical_code = _normalize_service_code_payload(service_dict)
+
     # Проверяем уникальность кода
-    if service_data.code:
-        existing = db.query(Service).filter(Service.code == service_data.code).first()
+    if canonical_code:
+        existing = (
+            db.query(Service)
+            .filter(or_(Service.code == canonical_code, Service.service_code == canonical_code))
+            .first()
+        )
         if existing:
             raise HTTPException(
                 status_code=400,
-                detail=f"Услуга с кодом '{service_data.code}' уже существует",
+                detail=f"Услуга с кодом '{canonical_code}' уже существует",
             )
 
     # Проверяем существование категории
-    if service_data.category_id:
-        category = (
-            db.query(ServiceCategory)
-            .filter(ServiceCategory.id == service_data.category_id)
-            .first()
-        )
-        if not category:
-            raise HTTPException(
-                status_code=400, detail="Указанная категория не найдена"
-            )
+    category_specialty = _resolve_category_specialty(db, service_dict.get("category_id"))
 
-    # Normalize service codes before creating the service
-    service_dict = service_data.dict()
     if service_dict.get('code'):
         service_dict['code'] = normalize_service_code(service_dict['code'])
     if service_dict.get('service_code'):
@@ -432,9 +576,17 @@ async def create_service(
             service_dict['service_code']
         )
     if service_dict.get('category_code'):
-        service_dict['category_code'] = normalize_service_code(
+        service_dict['category_code'] = _normalize_category_code_value(
             service_dict['category_code']
         )
+
+    _validate_service_code_prefix_alignment(
+        service_code=canonical_code,
+        category_specialty=category_specialty,
+        queue_tag=service_dict.get("queue_tag"),
+        department_key=service_dict.get("department_key"),
+        category_code=service_dict.get("category_code"),
+    )
 
     service = Service(**service_dict)
     db.add(service)
@@ -455,29 +607,29 @@ async def update_service(
     if not service:
         raise HTTPException(status_code=404, detail="Услуга не найдена")
 
+    update_dict = service_data.model_dump(exclude_unset=True)
+    canonical_code = _normalize_service_code_payload(update_dict)
+
     # Проверяем уникальность кода при обновлении
-    if service_data.code and service_data.code != service.code:
-        existing = db.query(Service).filter(Service.code == service_data.code).first()
+    current_code = service.service_code or service.code
+    if canonical_code and canonical_code != current_code:
+        existing = (
+            db.query(Service)
+            .filter(Service.id != service_id)
+            .filter(or_(Service.code == canonical_code, Service.service_code == canonical_code))
+            .first()
+        )
         if existing:
             raise HTTPException(
                 status_code=400,
-                detail=f"Услуга с кодом '{service_data.code}' уже существует",
+                detail=f"Услуга с кодом '{canonical_code}' уже существует",
             )
 
     # Проверяем существование категории
-    if service_data.category_id:
-        category = (
-            db.query(ServiceCategory)
-            .filter(ServiceCategory.id == service_data.category_id)
-            .first()
-        )
-        if not category:
-            raise HTTPException(
-                status_code=400, detail="Указанная категория не найдена"
-            )
+    category_specialty = _resolve_category_specialty(
+        db, update_dict.get("category_id", service.category_id)
+    )
 
-    # Normalize service codes before updating
-    update_dict = service_data.dict(exclude_unset=True)
     if 'code' in update_dict and update_dict['code'] is not None:
         update_dict['code'] = normalize_service_code(update_dict['code'])
     if 'service_code' in update_dict and update_dict['service_code'] is not None:
@@ -485,8 +637,23 @@ async def update_service(
             update_dict['service_code']
         )
     if 'category_code' in update_dict and update_dict['category_code'] is not None:
-        update_dict['category_code'] = normalize_service_code(
+        update_dict['category_code'] = _normalize_category_code_value(
             update_dict['category_code']
+        )
+
+    if _should_validate_service_code_alignment(update_dict, service):
+        merged_service_code = (
+            update_dict.get("service_code")
+            or update_dict.get("code")
+            or service.service_code
+            or service.code
+        )
+        _validate_service_code_prefix_alignment(
+            service_code=merged_service_code,
+            category_specialty=category_specialty,
+            queue_tag=update_dict.get("queue_tag", service.queue_tag),
+            department_key=update_dict.get("department_key", service.department_key),
+            category_code=update_dict.get("category_code", service.category_code),
         )
 
     for field, value in update_dict.items():

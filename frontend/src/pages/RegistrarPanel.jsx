@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -2879,9 +2879,6 @@ const RegistrarPanel = () => {
 
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
-      <ToastContainer position="bottom-right" />
-
-
       {/* Skip to content link for screen readers */}
       <a
         href="#main-content"

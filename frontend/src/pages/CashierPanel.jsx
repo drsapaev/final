@@ -305,6 +305,12 @@ const CashierPanel = () => {void
     setPendingPage(1);
   }, [dateMode, selectedDate, dateFrom, dateTo, debouncedQuery]);
 
+  const triggerDataReload = useCallback(() => {
+    setCurrentPage(1);
+    setPendingPage(1);
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
 
   const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
 
@@ -334,7 +340,7 @@ const CashierPanel = () => {void
     // Let's just update local lists simply for immediate feedback if possible, but with server-side pagination it's tricky.
     // Correct approach: Call loadData. Since loadData is inside useEffect, we can't call it directly.
     // Triggering a reload of data:
-    setCurrentPage(1); // resetting page is a simple way to reload
+    triggerDataReload();
   };
 
   const handlePaymentError = (error) => {
@@ -470,7 +476,7 @@ const CashierPanel = () => {void
         setCancelDialogOpen(false);
         setConfirmingPaymentId(null);
         alert('Платёж отменён');
-        setCurrentPage(1); // Reload data
+        triggerDataReload();
       } else {
         alert('Ошибка: ' + result.error);
       }
@@ -494,9 +500,7 @@ const CashierPanel = () => {void
 
   // ✅ УЛУЧШЕНИЕ: Кнопка обновления данных
   const handleRefresh = () => {
-    setCurrentPage(1);
-    setPendingPage(1);
-    setRefreshKey((prev) => prev + 1); // Force reload
+    triggerDataReload();
   };
 
   // ✅ v2.0: Состояние для возврата
@@ -528,8 +532,11 @@ const CashierPanel = () => {void
       });
       if (result.success) {
         setRefundDialogOpen(false);
+        setRefundPaymentId(null);
+        setRefundReason('');
+        setRefundAmount('');
         alert(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
-        setCurrentPage(1); // Reload
+        triggerDataReload();
       } else {
         alert('Ошибка возврата: ' + result.error);
       }

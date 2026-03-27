@@ -58,6 +58,8 @@ const UnifiedSettings = () => {
         return <AISettings />;
       case 'display-settings':
         return <DisplayBoardSettings />;
+      case 'clinic-settings':
+        return <ClinicSettings />;
       case 'security':
         return (
           <SecuritySettings

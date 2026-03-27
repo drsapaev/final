@@ -99,6 +99,87 @@ QUEUE_GROUPS = {
     },
 }
 
+QUEUE_GROUP_ALLOWED_PREFIXES = {
+    "cardiology": {"K"},
+    "ecg": {"K"},
+    "dermatology": {"D"},
+    "dental": {"S"},
+    "laboratory": {"L"},
+    "procedures": {"C", "P", "O"},
+}
+
+CATEGORY_CODE_TO_QUEUE_GROUP = {
+    "K": "cardiology",
+    "D": "dermatology",
+    "L": "laboratory",
+    "S": "dental",
+    "C": "procedures",
+    "P": "procedures",
+    "O": "procedures",
+}
+
+SPECIALTY_TO_QUEUE_GROUP = {
+    "stomatology": "dental",
+    "dentistry": "dental",
+    "cosmetology": "procedures",
+}
+
+
+def _queue_group_from_hint(value: str | None) -> str | None:
+    """Resolve queue-group key from queue_tag / department_key / specialty-like hints."""
+    if not value:
+        return None
+
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+
+    if normalized in QUEUE_GROUPS:
+        return normalized
+
+    tab_to_group = {group["tab_key"]: key for key, group in QUEUE_GROUPS.items()}
+    if normalized in tab_to_group:
+        return tab_to_group[normalized]
+
+    specialty = normalize_specialty(normalized)
+    if specialty in QUEUE_GROUPS:
+        return specialty
+    if specialty in tab_to_group:
+        return tab_to_group[specialty]
+
+    return SPECIALTY_TO_QUEUE_GROUP.get(specialty)
+
+
+def resolve_queue_group_key(
+    *,
+    service_code: str | None = None,
+    queue_tag: str | None = None,
+    department_key: str | None = None,
+    category_specialty: str | None = None,
+    category_code: str | None = None,
+) -> str | None:
+    """
+    Resolve the canonical queue-group key for registrar/service routing.
+
+    Explicit routing fields win over code-derived fallbacks because they reflect
+    the tab/queue chosen in admin configuration.
+    """
+
+    for hint in (queue_tag, department_key, category_specialty):
+        resolved = _queue_group_from_hint(hint)
+        if resolved:
+            return resolved
+
+    if service_code:
+        resolved = get_queue_group_for_service(service_code)
+        if resolved:
+            return resolved
+
+    if category_code:
+        return CATEGORY_CODE_TO_QUEUE_GROUP.get(category_code.strip().upper())
+
+    return None
+
 
 def get_queue_group_for_service(code: str) -> str | None:
     """
@@ -162,6 +243,30 @@ def get_services_for_department(department_key: str) -> dict[str, Any]:
 
     group_key = tab_to_group.get(department_key, department_key)
     return QUEUE_GROUPS.get(group_key, {})
+
+def get_allowed_service_code_prefixes(
+    *,
+    queue_tag: str | None = None,
+    department_key: str | None = None,
+    category_specialty: str | None = None,
+    category_code: str | None = None,
+) -> set[str]:
+    """
+    SSOT: Возвращает допустимые буквенные префиксы для кода услуги.
+
+    Используется при сохранении услуг, чтобы code/service_code не расходились
+    с выбранной категорией или очередью в админке.
+    """
+
+    group_key = resolve_queue_group_key(
+        queue_tag=queue_tag,
+        department_key=department_key,
+        category_specialty=category_specialty,
+        category_code=category_code,
+    )
+    if not group_key:
+        return set()
+    return set(QUEUE_GROUP_ALLOWED_PREFIXES.get(group_key, set()))
 
 def normalize_specialty(specialty: str) -> str:
     """

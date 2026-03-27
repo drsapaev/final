@@ -709,7 +709,7 @@ const BenefitSettings = () => {
               title="Окно повторных визитов"
               value={`${settings.repeat_visit_days} дней`}
               icon={Calendar}
-              color="var(--mac-success)"
+              color="blue"
               trend={settings.repeat_visit_discount > 0 ? 'Скидка активна' : 'Скидка неактивна'}
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-text-secondary)'}
             />
@@ -718,7 +718,7 @@ const BenefitSettings = () => {
               title="Скидка на повторные визиты"
               value={`${settings.repeat_visit_discount}%`}
               icon={Percent}
-              color={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
+              color={settings.repeat_visit_discount > 0 ? 'green' : 'orange'}
               trend={settings.repeat_visit_discount > 0 ? 'Применяется' : 'Не применяется'}
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
@@ -727,7 +727,7 @@ const BenefitSettings = () => {
               title="Льготные консультации"
               value={settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
               icon={Shield}
-              color={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
+              color={settings.benefit_consultation_free ? 'green' : 'orange'}
               trend={settings.benefit_consultation_free ? 'Активны' : 'Неактивны'}
               trendColor={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
@@ -736,7 +736,7 @@ const BenefitSettings = () => {
               title="Автоодобрение All Free"
               value={settings.all_free_auto_approve ? 'Включено' : 'Выключено'}
               icon={CheckCircle}
-              color={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
+              color={settings.all_free_auto_approve ? 'orange' : 'blue'}
               trend={settings.all_free_auto_approve ? 'Автоматически' : 'Вручную'}
               trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
             />

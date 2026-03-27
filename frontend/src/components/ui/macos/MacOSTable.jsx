@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { isValidElement, useState } from 'react';
 import PropTypes from 'prop-types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -159,7 +159,25 @@ const MacOSTable = ({
 
   const renderEmptyState = () => {
     if (emptyState) {
-      return emptyState;
+      if (isValidElement(emptyState) && typeof emptyState.type === 'string' && emptyState.type === 'tr') {
+        return emptyState;
+      }
+
+      return (
+        <tr>
+          <td
+            colSpan={columns.length}
+            style={{
+              padding: '48px 16px',
+              textAlign: 'center',
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-base)'
+            }}
+          >
+            {emptyState}
+          </td>
+        </tr>
+      );
     }
     
     return (

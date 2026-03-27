@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { X, Save, CreditCard, DollarSign, Calendar, User, AlertCircle, Receipt, Building } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 
@@ -100,8 +101,15 @@ const FinanceModal = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
+
+    if (!validateForm()) {
+      logger.warn('[FIX:FINANCE-AMOUNT-STEP] Blocked invalid finance submission', {
+        amount: formData.amount,
+        paymentMethod: formData.paymentMethod,
+        status: formData.status
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -118,6 +126,13 @@ const FinanceModal = ({
         notes: formData.notes.trim() || null,
         reference: formData.reference.trim() || null
       };
+
+      logger.info('[FIX:FINANCE-AMOUNT-STEP] Submitting finance transaction', {
+        amount: transactionData.amount,
+        type: transactionData.type,
+        category: transactionData.category,
+        paymentMethod: transactionData.paymentMethod
+      });
 
       await onSave(transactionData);
       onClose();
@@ -136,13 +151,32 @@ const FinanceModal = ({
   };
 
   const getPatientName = (patientId) => {
-    const patient = patients.find(p => p.id === parseInt(patientId));
-    return patient ? `${patient.lastName} ${patient.firstName} ${patient.middleName}` : '';
+    const patient = patients.find((p) => p.id === parseInt(patientId, 10));
+    if (!patient) return '';
+
+    const fullName = [patient.lastName, patient.firstName, patient.middleName]
+      .filter(Boolean)
+      .join(' ');
+    return fullName || patient.fullName || patient.name || '';
   };
 
   const getDoctorName = (doctorId) => {
-    const doctor = doctors.find(d => d.id === parseInt(doctorId));
-    return doctor ? `${doctor.name} (${doctor.specialization})` : '';
+    const doctor = doctors.find((d) => d.id === parseInt(doctorId, 10));
+    if (!doctor) return '';
+
+    const doctorName =
+      doctor.user?.full_name ||
+      doctor.fullName ||
+      doctor.name ||
+      doctor.user?.username ||
+      '';
+    const specialization = doctor.specialty || doctor.specialization || '';
+
+    if (doctorName && specialization) {
+      return `${doctorName} (${specialization})`;
+    }
+
+    return doctorName || specialization || '';
   };
 
   const getIncomeCategories = () => [
@@ -284,10 +318,15 @@ const FinanceModal = ({
                         borderColor: errors.amount ? 'var(--danger-color)' : 'var(--border-color)'
                       }}
                       placeholder="100000"
-                      min="0"
-                      step="1000"
+                      min="1"
+                      step="1"
+                      inputMode="numeric"
+                      aria-describedby="finance-amount-help"
                     />
                   </div>
+                  <p id="finance-amount-help" className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                    Введите сумму целым числом в UZS. Например: 12500.
+                  </p>
                   {errors.amount && (
                     <p className="text-sm text-red-500 mt-1 flex items-center">
                       <AlertCircle className="w-4 h-4 mr-1" />
@@ -410,7 +449,7 @@ const FinanceModal = ({
                       <option value="">Выберите врача</option>
                       {doctors.map(doctor => (
                         <option key={doctor.id} value={doctor.id}>
-                          {doctor.name} - {doctor.specialization}
+                          {getDoctorName(doctor.id) || doctor.user?.full_name || doctor.name || `Врач #${doctor.id}`}
                         </option>
                       ))}
                     </select>
@@ -610,4 +649,26 @@ const FinanceModal = ({
 };
 
 export default FinanceModal;
+
+FinanceModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  transaction: PropTypes.shape({
+    type: PropTypes.string,
+    category: PropTypes.string,
+    amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    description: PropTypes.string,
+    patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    paymentMethod: PropTypes.string,
+    status: PropTypes.string,
+    transactionDate: PropTypes.string,
+    notes: PropTypes.string,
+    reference: PropTypes.string
+  }),
+  onSave: PropTypes.func.isRequired,
+  loading: PropTypes.bool,
+  patients: PropTypes.arrayOf(PropTypes.object),
+  doctors: PropTypes.arrayOf(PropTypes.object)
+};
 

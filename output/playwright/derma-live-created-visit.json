@@ -1,0 +1,322 @@
+{
+  "actor_user": {
+    "id": 25,
+    "username": "derma@example.com",
+    "full_name": "Dermatologist User",
+    "email": "ahmad.kosmet1@gmail.com",
+    "role": "derma",
+    "is_active": true,
+    "is_superuser": false
+  },
+  "patient": {
+    "full_name": null,
+    "last_name": "Пациент",
+    "first_name": "Тест",
+    "middle_name": null,
+    "birth_date": "1990-01-01",
+    "sex": "M",
+    "phone": "+998901234567",
+    "email": null,
+    "doc_number": null,
+    "address": null,
+    "id": 1,
+    "created_at": "2025-08-29T05:36:59+03:00"
+  },
+  "patient_name": "Пациент Тест",
+  "service": {
+    "id": 1,
+    "name": "Консультация дерматолога-косметолога",
+    "code": "D01",
+    "price": 50000,
+    "currency": "UZS",
+    "duration_minutes": 30,
+    "category_id": null,
+    "doctor_id": null,
+    "department_key": null,
+    "category_code": "D",
+    "service_code": "D01",
+    "queue_tag": "dermatology",
+    "is_consultation": true,
+    "group": "dermatology"
+  },
+  "cart_payload": {
+    "patient_id": 1,
+    "discount_mode": "none",
+    "payment_method": "cash",
+    "notes": "SSOT DERM-01 live verify",
+    "visits": [
+      {
+        "department": "dermatology",
+        "visit_date": "2026-03-21",
+        "visit_time": "15:30",
+        "doctor_id": null,
+        "services": [
+          {
+            "service_id": 1,
+            "quantity": 1,
+            "custom_price": null
+          }
+        ],
+        "notes": "SSOT DERM-01 live verify"
+      }
+    ]
+  },
+  "cart_result": {
+    "success": true,
+    "message": "Визиты созданы. Номера в очередях будут присвоены в день визита.",
+    "invoice_id": 318,
+    "visit_ids": [
+      743
+    ],
+    "total_amount": "50000.0",
+    "queue_numbers": {},
+    "print_tickets": [],
+    "created_visits": [
+      {
+        "visit_id": 743,
+        "patient_name": "Пациент Тест",
+        "doctor_name": "Без врача",
+        "visit_date": "2026-03-21",
+        "visit_time": "15:30",
+        "status": "confirmed",
+        "department": "dermatology",
+        "services": [
+          {
+            "name": "Консультация дерматолога-косметолога",
+            "code": "D01",
+            "quantity": 1,
+            "price": 50000
+          }
+        ],
+        "confirmation_required": false,
+        "confirmation_token": null
+      }
+    ]
+  },
+  "queue_snapshot": {
+    "queues": [
+      {
+        "queue_id": 1,
+        "specialist_id": null,
+        "specialist_name": "Врач",
+        "specialty": "laboratory",
+        "cabinet": "N/A",
+        "opened_at": "2026-03-21T19:12:59.713514",
+        "entries": [
+          {
+            "id": 728,
+            "appointment_id": 728,
+            "visit_id": 728,
+            "number": 1,
+            "patient_id": 443,
+            "patient_name": "Тестовый Пациент Регистратура",
+            "patient_birth_year": 1990,
+            "phone": "+998077500599",
+            "address": "Ташкент, тестовый адрес",
+            "services": [
+              "L01"
+            ],
+            "service_codes": [
+              "L01"
+            ],
+            "service_details": [
+              {
+                "id": 10,
+                "code": "L01",
+                "name": "Общий анализ крови",
+                "price": 15000
+              }
+            ],
+            "service_name": null,
+            "service_id": null,
+            "cost": 15000,
+            "payment_status": "paid",
+            "source": "desk",
+            "status": "waiting",
+            "created_at": "2026-03-21T07:18:27.549500+03:00Z",
+            "queue_time": "2026-03-21T07:18:27.549500+03:00Z",
+            "called_at": null,
+            "visit_time": null,
+            "discount_mode": "paid",
+            "type": "visit",
+            "record_type": "visit",
+            "queue_entry_id": null,
+            "department_key": null,
+            "department": "laboratory",
+            "session_id": null
+          }
+        ],
+        "stats": {
+          "total": 1,
+          "waiting": 1,
+          "called": 0,
+          "served": 0,
+          "online_entries": 0
+        }
+      },
+      {
+        "queue_id": 2,
+        "specialist_id": null,
+        "specialist_name": "Врач",
+        "specialty": "cardiology",
+        "cabinet": "N/A",
+        "opened_at": "2026-03-21T19:12:59.720033",
+        "entries": [
+          {
+            "id": 729,
+            "appointment_id": 729,
+            "visit_id": 729,
+            "number": 1,
+            "patient_id": 444,
+            "patient_name": "Тестовый Пациент Доктор",
+            "patient_birth_year": 1991,
+            "phone": "+998082364601",
+            "address": "Ташкент, врачебный сценарий",
+            "services": [
+              "K01"
+            ],
+            "service_codes": [
+              "K01"
+            ],
+            "service_details": [
+              {
+                "id": 2,
+                "code": "K01",
+                "name": "Консультация кардиолога",
+                "price": 50000
+              }
+            ],
+            "service_name": null,
+            "service_id": null,
+            "cost": 50000,
+            "payment_status": "paid",
+            "source": "desk",
+            "status": "called",
+            "created_at": "2026-03-21T08:39:31.587581+03:00Z",
+            "queue_time": "2026-03-21T08:39:31.587581+03:00Z",
+            "called_at": null,
+            "visit_time": null,
+            "discount_mode": "paid",
+            "type": "visit",
+            "record_type": "visit",
+            "queue_entry_id": null,
+            "department_key": "cardiology",
+            "department": "cardiology",
+            "session_id": null
+          }
+        ],
+        "stats": {
+          "total": 1,
+          "waiting": 0,
+          "called": 1,
+          "served": 0,
+          "online_entries": 0
+        }
+      },
+      {
+        "queue_id": 3,
+        "specialist_id": null,
+        "specialist_name": "Врач",
+        "specialty": "dermatology",
+        "cabinet": "N/A",
+        "opened_at": "2026-03-21T19:12:59.732515",
+        "entries": [
+          {
+            "id": 730,
+            "appointment_id": 730,
+            "visit_id": 730,
+            "number": 1,
+            "patient_id": 448,
+            "patient_name": "Админ Пациент Поток",
+            "patient_birth_year": 1990,
+            "phone": "+998905672271",
+            "address": "г. Ташкент, QA street, 15",
+            "services": [
+              "D01"
+            ],
+            "service_codes": [
+              "D01"
+            ],
+            "service_details": [
+              {
+                "id": 1,
+                "code": "D01",
+                "name": "Консультация дерматолога-косметолога",
+                "price": 50000
+              }
+            ],
+            "service_name": null,
+            "service_id": null,
+            "cost": 50000,
+            "payment_status": "pending",
+            "source": "desk",
+            "status": "waiting",
+            "created_at": "2026-03-21T12:56:20.744516+03:00Z",
+            "queue_time": "2026-03-21T12:56:20.744516+03:00Z",
+            "called_at": null,
+            "visit_time": "15:30",
+            "discount_mode": "none",
+            "type": "visit",
+            "record_type": "visit",
+            "queue_entry_id": null,
+            "department_key": null,
+            "department": "dermatology",
+            "session_id": null
+          },
+          {
+            "id": 731,
+            "appointment_id": 731,
+            "visit_id": 731,
+            "number": 2,
+            "patient_id": 1,
+            "patient_name": "Пациент Тест",
+            "patient_birth_year": 1990,
+            "phone": "+998901234567",
+            "address": null,
+            "services": [
+              "D01"
+            ],
+            "service_codes": [
+              "D01"
+            ],
+            "service_details": [
+              {
+                "id": 1,
+                "code": "D01",
+                "name": "Консультация дерматолога-косметолога",
+                "price": 50000
+              }
+            ],
+            "service_name": null,
+            "service_id": null,
+            "cost": 50000,
+            "payment_status": "pending",
+            "source": "desk",
+            "status": "waiting",
+            "created_at": "2026-03-21T13:24:34.081589+03:00Z",
+            "queue_time": "2026-03-21T13:24:34.081589+03:00Z",
+            "called_at": null,
+            "visit_time": "15:30",
+            "discount_mode": "none",
+            "type": "visit",
+            "record_type": "visit",
+            "queue_entry_id": null,
+            "department_key": null,
+            "department": "dermatology",
+            "session_id": null
+          }
+        ],
+        "stats": {
+          "total": 2,
+          "waiting": 2,
+          "called": 0,
+          "served": 0,
+          "online_entries": 0
+        }
+      }
+    ],
+    "total_queues": 3,
+    "date": "2026-03-21"
+  },
+  "visit_id": 743
+}

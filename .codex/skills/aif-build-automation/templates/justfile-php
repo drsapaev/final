@@ -39,7 +39,7 @@ update:
 [group("development")]
 [doc("Start development server")]
 dev: install
-    {{ php }} -S localhost:18000 -t public/
+    {{ php }} -S localhost:8000 -t public/
 
 [group("development")]
 [doc("Start Laravel dev server")]

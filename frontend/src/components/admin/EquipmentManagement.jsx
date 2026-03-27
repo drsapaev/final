@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Wrench,
   Plus,
@@ -33,6 +33,24 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const emptyEquipmentStats = {
+  total_equipment: 0,
+  active_equipment: 0,
+  maintenance_equipment: 0,
+  broken_equipment: 0
+};
+
+const deriveEquipmentStats = (equipmentList) => {
+  const nextEquipment = Array.isArray(equipmentList) ? equipmentList : [];
+  return {
+    total_equipment: nextEquipment.length,
+    active_equipment: nextEquipment.filter((item) => item.status === 'active').length,
+    maintenance_equipment: nextEquipment.filter((item) => item.status === 'maintenance').length,
+    broken_equipment: nextEquipment.filter((item) => item.status === 'broken').length
+  };
+};
+
 const EquipmentManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,82 +97,41 @@ const EquipmentManagement = () => {
   { value: 'other', label: 'Прочее' }];
 
 
-  useEffect(() => {
-    loadEquipment();
-    loadBranches();
-    loadStats();
-  }, []);
-
-  const loadEquipment = async () => {
+  const loadEquipment = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/equipment');
-      setEquipment(response.data.equipment || []);
+      const response = await api.get('/clinic/equipment');
+      const nextEquipment = Array.isArray(response.data)
+        ? response.data
+        : response.data?.equipment || [];
+      setEquipment(nextEquipment);
+      setStats(deriveEquipmentStats(nextEquipment));
     } catch (error) {
       logger.error('Ошибка загрузки оборудования:', error);
-      // Fallback данные
-      setEquipment([
-      {
-        id: 1,
-        name: 'ЭКГ аппарат',
-        type: 'diagnostic',
-        model: 'ECG-2000',
-        serial_number: 'ECG001',
-        branch_id: 1,
-        status: 'active',
-        purchase_date: '2023-01-15',
-        warranty_expiry: '2025-01-15',
-        maintenance_date: '2024-01-15',
-        cost: 150000,
-        description: 'Портативный ЭКГ аппарат'
-      },
-      {
-        id: 2,
-        name: 'УЗИ сканер',
-        type: 'imaging',
-        model: 'US-3000',
-        serial_number: 'US001',
-        branch_id: 1,
-        status: 'active',
-        purchase_date: '2023-03-20',
-        warranty_expiry: '2025-03-20',
-        maintenance_date: '2024-03-20',
-        cost: 500000,
-        description: 'Ультразвуковой сканер'
-      }]
-      );
+      setEquipment([]);
+      setStats(emptyEquipmentStats);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadBranches = async () => {
+  const loadBranches = useCallback(async () => {
     try {
-      const response = await api.get('/branches');
-      setBranches(response.data.branches || []);
+      const response = await api.get('/clinic/branches');
+      const nextBranches = Array.isArray(response.data)
+        ? response.data
+        : response.data?.branches || [];
+      setBranches(nextBranches);
     } catch (error) {
       logger.error('Ошибка загрузки филиалов:', error);
-      setBranches([
-      { id: 1, name: 'Центральный филиал', code: 'CEN001' },
-      { id: 2, name: 'Филиал Чиланзар', code: 'CHI002' }]
-      );
+      setBranches([]);
     }
-  };
+  }, []);
 
-  const loadStats = async () => {
-    try {
-      const response = await api.get('/equipment/stats');
-      setStats(response.data);
-    } catch (error) {
-      logger.error('Ошибка загрузки статистики:', error);
-      setStats({
-        total_equipment: 2,
-        active_equipment: 2,
-        maintenance_equipment: 0,
-        broken_equipment: 0
-      });
-    }
-  };
+  useEffect(() => {
+    loadEquipment();
+    loadBranches();
+  }, [loadEquipment, loadBranches]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -162,10 +139,10 @@ const EquipmentManagement = () => {
       setSaving(true);
 
       if (editingEquipment) {
-        await api.put(`/equipment/${editingEquipment.id}`, formData);
+        await api.put(`/clinic/equipment/${editingEquipment.id}`, formData);
         setMessage({ type: 'success', text: 'Оборудование обновлено' });
       } else {
-        await api.post('/equipment', formData);
+        await api.post('/clinic/equipment', formData);
         setMessage({ type: 'success', text: 'Оборудование добавлено' });
       }
 
@@ -173,7 +150,6 @@ const EquipmentManagement = () => {
       setEditingEquipment(null);
       resetForm();
       loadEquipment();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка сохранения оборудования' });
     } finally {
@@ -189,10 +165,9 @@ const EquipmentManagement = () => {
 
   const handleDelete = async (equipmentId) => {
     try {
-      await api.delete(`/equipment/${equipmentId}`);
+      await api.delete(`/clinic/equipment/${equipmentId}`);
       setMessage({ type: 'success', text: 'Оборудование удалено' });
       loadEquipment();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка удаления оборудования' });
     }

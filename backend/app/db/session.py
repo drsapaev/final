@@ -27,8 +27,8 @@ def _get_db_url_from_env_or_settings() -> str:
     if env_url:
         return env_url
 
-    # 3) fallback
-    return "sqlite:///./clinic.db"
+    # 3) default runtime contour
+    return "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
 
 
 def _normalize_sqlite_to_sync(url: str) -> str:

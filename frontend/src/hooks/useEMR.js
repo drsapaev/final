@@ -48,7 +48,25 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
         try {
             const response = await apiClient.get(`/v2/emr/${visitId}`, {
                 signal: abortControllerRef.current.signal,
+                silent: true,
+                validateStatus: (status) => status === 404 || status >= 200 && status < 300,
             });
+
+            if (response.status === 404) {
+                logger.info('[FIX:EMR404] EMR not found, initializing empty draft', {
+                    visitId,
+                    specialty,
+                });
+                const emptyEmr = {
+                    data: buildInitialEMRData(specialty),
+                    version: 1,
+                    row_version: 0,
+                    status: 'draft',
+                };
+                dispatch(emrActions.load(emptyEmr));
+                return emptyEmr;
+            }
+
             const normalizedEmr = {
                 ...response.data,
                 data: normalizeEMRData(response.data?.data, specialty),
@@ -58,17 +76,6 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
         } catch (error) {
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
                 return; // Aborted, ignore
-            }
-
-            if (error.response?.status === 404) {
-                const emptyEmr = {
-                    data: buildInitialEMRData(specialty),
-                    version: 1,
-                    row_version: 0,
-                    status: 'draft',
-                };
-                dispatch(emrActions.load(emptyEmr));
-                return emptyEmr;
             }
 
             logger.error('Failed to load EMR:', error);

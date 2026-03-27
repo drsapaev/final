@@ -38,6 +38,41 @@ import logger from '../../utils/logger';
 // API base URL with fallback for development
 void getApiOrigin();
 
+const PRICING_RULE_TYPE_LABELS = {
+  time_based: 'По времени',
+  volume_based: 'По объему',
+  seasonal: 'Сезонное',
+  loyalty: 'Лояльность',
+  package: 'Пакетное',
+  dynamic: 'Динамическое'
+};
+
+const normalizePricingEnumValue = (value) =>
+  typeof value === 'string' ? value.toLowerCase() : value;
+
+const buildPricingRulePayload = (form) =>
+  Object.fromEntries(
+    Object.entries({
+      ...form,
+      rule_type: normalizePricingEnumValue(form.rule_type),
+      discount_type: normalizePricingEnumValue(form.discount_type)
+    }).filter(([, value]) => {
+      if (value === '' || value === null || typeof value === 'undefined') {
+        return false;
+      }
+
+      if (Array.isArray(value) && value.length === 0) {
+        return false;
+      }
+
+      if (typeof value === 'number' && Number.isNaN(value)) {
+        return false;
+      }
+
+      return true;
+    })
+  );
+
 const DynamicPricingManager = () => {
   const [activeTab, setActiveTab] = useState('rules');
   const [pricingRules, setPricingRules] = useState([]);
@@ -54,8 +89,8 @@ const DynamicPricingManager = () => {
   const [ruleForm, setRuleForm] = useState({
     name: '',
     description: '',
-    rule_type: 'TIME_BASED',
-    discount_type: 'PERCENTAGE',
+    rule_type: 'time_based',
+    discount_type: 'percentage',
     discount_value: 0,
     start_date: '',
     end_date: '',
@@ -136,14 +171,14 @@ const DynamicPricingManager = () => {
 
   const handleCreateRule = async () => {
     try {
-      await api.post('/dynamic-pricing/pricing-rules', ruleForm);
+      await api.post('/dynamic-pricing/pricing-rules', buildPricingRulePayload(ruleForm));
       toast.success('Правило создано успешно');
       setShowCreateRule(false);
       setRuleForm({
         name: '',
         description: '',
-        rule_type: 'TIME_BASED',
-        discount_type: 'PERCENTAGE',
+        rule_type: 'time_based',
+        discount_type: 'percentage',
         discount_value: 0,
         start_date: '',
         end_date: '',
@@ -325,13 +360,8 @@ const DynamicPricingManager = () => {
                     <MacOSBadge variant={rule.is_active ? 'success' : 'secondary'}>
                       {rule.is_active ? 'Активно' : 'Неактивно'}
                     </MacOSBadge>
-                    <MacOSBadge variant="outline">
-                      {rule.rule_type === 'TIME_BASED' && 'По времени'}
-                      {rule.rule_type === 'VOLUME_BASED' && 'По объему'}
-                      {rule.rule_type === 'SEASONAL' && 'Сезонное'}
-                      {rule.rule_type === 'LOYALTY' && 'Лояльность'}
-                      {rule.rule_type === 'PACKAGE' && 'Пакетное'}
-                      {rule.rule_type === 'DYNAMIC' && 'Динамическое'}
+                  <MacOSBadge variant="outline">
+                      {PRICING_RULE_TYPE_LABELS[normalizePricingEnumValue(rule.rule_type)] || rule.rule_type}
                     </MacOSBadge>
                   </div>
 
@@ -352,7 +382,7 @@ const DynamicPricingManager = () => {
             }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Percent size={12} />
-                      {rule.discount_type === 'PERCENTAGE' ? `${rule.discount_value}%` : `${rule.discount_value} ₽`}
+                      {normalizePricingEnumValue(rule.discount_type) === 'percentage' ? `${rule.discount_value}%` : `${rule.discount_value} ₽`}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Users size={12} />
@@ -494,12 +524,12 @@ const DynamicPricingManager = () => {
             value={ruleForm.rule_type}
             onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })}>
             
-                <option value="TIME_BASED">По времени</option>
-                <option value="VOLUME_BASED">По объему</option>
-                <option value="SEASONAL">Сезонное</option>
-                <option value="LOYALTY">Лояльность</option>
-                <option value="PACKAGE">Пакетное</option>
-                <option value="DYNAMIC">Динамическое</option>
+                <option value="time_based">По времени</option>
+                <option value="volume_based">По объему</option>
+                <option value="seasonal">Сезонное</option>
+                <option value="loyalty">Лояльность</option>
+                <option value="package">Пакетное</option>
+                <option value="dynamic">Динамическое</option>
               </MacOSSelect>
             </div>
 
@@ -517,10 +547,10 @@ const DynamicPricingManager = () => {
             value={ruleForm.discount_type}
             onChange={(e) => setRuleForm({ ...ruleForm, discount_type: e.target.value })}>
             
-                <option value="PERCENTAGE">Процентная</option>
-                <option value="FIXED_AMOUNT">Фиксированная сумма</option>
-                <option value="BUY_X_GET_Y">Купи X получи Y</option>
-                <option value="TIERED">Ступенчатая</option>
+                <option value="percentage">Процентная</option>
+                <option value="fixed_amount">Фиксированная сумма</option>
+                <option value="buy_x_get_y">Купи X получи Y</option>
+                <option value="tiered">Ступенчатая</option>
               </MacOSSelect>
             </div>
 

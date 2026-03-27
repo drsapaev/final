@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Building2,
   Plus,
@@ -27,6 +27,24 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const emptyBranchStats = {
+  total_branches: 0,
+  active_branches: 0,
+  inactive_branches: 0,
+  maintenance_branches: 0
+};
+
+const deriveBranchStats = (branchList) => {
+  const nextBranches = Array.isArray(branchList) ? branchList : [];
+  return {
+    total_branches: nextBranches.length,
+    active_branches: nextBranches.filter((branch) => branch.status === 'active').length,
+    inactive_branches: nextBranches.filter((branch) => branch.status === 'inactive').length,
+    maintenance_branches: nextBranches.filter((branch) => branch.status === 'maintenance').length
+  };
+};
+
 const BranchManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,6 +55,7 @@ const BranchManagement = () => {
   const [editingBranch, setEditingBranch] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
 
   // Форма филиала
   const [formData, setFormData] = useState({
@@ -67,74 +86,91 @@ const BranchManagement = () => {
   { value: 'urology', label: 'Урология' }];
 
 
-  useEffect(() => {
-    loadBranches();
-    loadStats();
-  }, []);
+  const normalizeBranchPhone = (value) => {
+    if (!value) {
+      return '';
+    }
 
-  const loadBranches = async () => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) {
+      return '';
+    }
+
+    if (digits.length === 9) {
+      return `+998${digits}`;
+    }
+
+    if (digits.length === 12 && digits.startsWith('998')) {
+      return `+${digits}`;
+    }
+
+    if (digits.length === 11 && digits.startsWith('8')) {
+      return `+998${digits.slice(1)}`;
+    }
+
+    return null;
+  };
+
+  const formatBranchPhone = (value) => {
+    const normalized = normalizeBranchPhone(value);
+    const canonical = normalized || value?.trim() || '';
+    const digits = canonical.replace(/\D/g, '');
+
+    if (digits.length !== 12 || !digits.startsWith('998')) {
+      return canonical;
+    }
+
+    return `+${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10, 12)}`;
+  };
+
+  const loadBranches = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/branches');
-      setBranches(response.data.branches || []);
+      const response = await api.get('/clinic/branches');
+      const nextBranches = Array.isArray(response.data)
+        ? response.data
+        : response.data?.branches || [];
+      setBranches(nextBranches);
+      setStats(deriveBranchStats(nextBranches));
     } catch (error) {
       logger.error('Ошибка загрузки филиалов:', error);
-      // Fallback данные
-      setBranches([
-      {
-        id: 1,
-        name: 'Центральный филиал',
-        code: 'CEN001',
-        address: 'ул. Навои, 1',
-        phone: '+998 71 123-45-67',
-        email: 'central@clinic.uz',
-        status: 'active',
-        capacity: 100,
-        services_available: ['cardiology', 'dermatology', 'stomatology']
-      },
-      {
-        id: 2,
-        name: 'Филиал Чиланзар',
-        code: 'CHI002',
-        address: 'ул. Чиланзар, 15',
-        phone: '+998 71 234-56-78',
-        email: 'chilanzar@clinic.uz',
-        status: 'active',
-        capacity: 80,
-        services_available: ['cardiology', 'neurology']
-      }]
-      );
+      setBranches([]);
+      setStats(emptyBranchStats);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadStats = async () => {
-    try {
-      const response = await api.get('/branches/stats');
-      setStats(response.data);
-    } catch (error) {
-      logger.error('Ошибка загрузки статистики:', error);
-      // Fallback данные
-      setStats({
-        total_branches: 2,
-        active_branches: 2,
-        inactive_branches: 0,
-        maintenance_branches: 0
-      });
-    }
-  };
+  useEffect(() => {
+    loadBranches();
+  }, [loadBranches]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setSaving(true);
+      setFormErrors({});
+
+      const normalizedPhone = normalizeBranchPhone(formData.phone);
+      if (formData.phone.trim() && normalizedPhone === null) {
+        setFormErrors({ phone: 'Используйте формат +998 71 123 45 67' });
+        setMessage({
+          type: 'error',
+          text: 'Телефон филиала должен быть в формате +998 71 123 45 67'
+        });
+        return;
+      }
+
+      const payload = {
+        ...formData,
+        phone: normalizedPhone || null
+      };
 
       if (editingBranch) {
-        await api.put(`/branches/${editingBranch.id}`, formData);
+        await api.put(`/clinic/branches/${editingBranch.id}`, payload);
         setMessage({ type: 'success', text: 'Филиал обновлен' });
       } else {
-        await api.post('/branches', formData);
+        await api.post('/clinic/branches', payload);
         setMessage({ type: 'success', text: 'Филиал создан' });
       }
 
@@ -142,7 +178,6 @@ const BranchManagement = () => {
       setEditingBranch(null);
       resetForm();
       loadBranches();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка сохранения филиала' });
     } finally {
@@ -153,6 +188,7 @@ const BranchManagement = () => {
   const handleEdit = (branch) => {
     setFormData({
       ...branch,
+      phone: formatBranchPhone(branch.phone || ''),
       services_available: branch.services_available || []
     });
     setEditingBranch(branch);
@@ -161,10 +197,9 @@ const BranchManagement = () => {
 
   const handleDelete = async (branchId) => {
     try {
-      await api.delete(`/branches/${branchId}`);
+      await api.delete(`/clinic/branches/${branchId}`);
       setMessage({ type: 'success', text: 'Филиал удален' });
       loadBranches();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка удаления филиала' });
     }
@@ -181,6 +216,7 @@ const BranchManagement = () => {
       capacity: 50,
       services_available: ['cardiology', 'dermatology', 'stomatology']
     });
+    setFormErrors({});
   };
 
   const getStatusColor = (status) => {
@@ -436,8 +472,21 @@ const BranchManagement = () => {
                 <MacOSInput
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="Введите номер телефона" />
+                onChange={(e) => {
+                  setFormData({ ...formData, phone: e.target.value });
+                  if (formErrors.phone) {
+                    setFormErrors((prev) => ({ ...prev, phone: null }));
+                  }
+                }}
+                placeholder="+998 71 123 45 67"
+                error={formErrors.phone} />
+              <p style={{
+                margin: '4px 0 0 0',
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-text-secondary)'
+              }}>
+                Формат: +998 71 123 45 67
+              </p>
               
               </div>
               <div>
@@ -675,7 +724,7 @@ const BranchManagement = () => {
               color: 'var(--mac-text-secondary)'
             }}>
                     <Phone style={{ width: '16px', height: '16px' }} />
-                    <span>{branch.phone}</span>
+                    <span>{formatBranchPhone(branch.phone)}</span>
                   </div>
             }
                 {branch.email &&

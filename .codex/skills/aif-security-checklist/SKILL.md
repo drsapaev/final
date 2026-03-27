@@ -3,6 +3,7 @@ name: aif-security-checklist
 description: Security audit checklist based on OWASP Top 10 and best practices. Covers authentication, injection, XSS, CSRF, secrets management, and more. Use when reviewing security, before deploy, asking "is this secure", "security check", "vulnerability".
 argument-hint: "[auth|injection|xss|csrf|secrets|api|infra|prompt-injection|race-condition|ignore <item>]"
 allowed-tools: Read Glob Grep Write Edit Bash(npm audit) Bash(grep *)
+disable-model-invocation: false
 ---
 
 # Security Checklist
@@ -11,17 +12,17 @@ Comprehensive security checklist based on OWASP Top 10 (2021) and industry best 
 
 ## Quick Reference
 
-- `$2` — Full audit checklist
-- `$2 auth` — Authentication & sessions
-- `$2 injection` — SQL/NoSQL/Command injection
-- `$2 xss` — Cross-site scripting
-- `$2 csrf` — Cross-site request forgery
-- `$2 secrets` — Secrets & credentials
-- `$2 api` — API security
-- `$2 infra` — Infrastructure security
-- `$2 prompt-injection` — LLM prompt injection
-- `$2 race-condition` — Race conditions & TOCTOU
-- `$2 ignore <item>` — Ignore a specific check item
+- `/aif-security-checklist` — Full audit checklist
+- `/aif-security-checklist auth` — Authentication & sessions
+- `/aif-security-checklist injection` — SQL/NoSQL/Command injection
+- `/aif-security-checklist xss` — Cross-site scripting
+- `/aif-security-checklist csrf` — Cross-site request forgery
+- `/aif-security-checklist secrets` — Secrets & credentials
+- `/aif-security-checklist api` — API security
+- `/aif-security-checklist infra` — Infrastructure security
+- `/aif-security-checklist prompt-injection` — LLM prompt injection
+- `/aif-security-checklist race-condition` — Race conditions & TOCTOU
+- `/aif-security-checklist ignore <item>` — Ignore a specific check item
 
 ## Ignored Items (SECURITY.md)
 
@@ -29,14 +30,14 @@ Before running any audit, **always read** the file `.ai-factory/SECURITY.md` in 
 
 ### How ignoring works
 
-**When the user runs `$2 ignore <item>`:**
+**When the user runs `/aif-security-checklist ignore <item>`:**
 
 1. Read the current `.ai-factory/SECURITY.md` file (create if doesn't exist)
 2. Ask the user for the reason why this item should be ignored
 3. Add the item to the file following the format below
 4. Confirm the item was added
 
-**When running any audit (`$2` or a specific category):**
+**When running any audit (`/aif-security-checklist` or a specific category):**
 
 1. Read `.ai-factory/SECURITY.md` at the start
 2. For each ignored item that matches the current audit scope:
@@ -84,8 +85,32 @@ When audit results are shown, append this section at the end:
 │ no-csrf         │ SPA with token auth, no cookies used │ 2025-03-15 │
 │ no-rate-limit   │ Internal service, behind API gateway │ 2025-03-15 │
 └─────────────────┴──────────────────────────────────────┴────────────┘
-⚠️  2 items ignored. Run `$2` without ignores to see full audit.
+⚠️  2 items ignored. Run `/aif-security-checklist` without ignores to see full audit.
 ```
+
+---
+
+### Project Context
+
+**Read `.ai-factory/skill-context/aif-security-checklist/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including security
+  checklists, the Pre-Deployment Checklist, and SECURITY.md. If a skill-context rule says
+  "checklist MUST include X" or "audit MUST cover Y" — you MUST augment the checklists accordingly.
+  Producing a security report that ignores skill-context rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
 
 ---
 
@@ -94,7 +119,7 @@ When audit results are shown, append this section at the end:
 Run the automated security audit script:
 
 ```bash
-bash ~/.codex/skills/security-checklist/scripts/audit.sh
+bash ~/{{skills_dir}}/security-checklist/scripts/audit.sh
 ```
 
 This checks:

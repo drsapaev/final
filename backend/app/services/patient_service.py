@@ -127,6 +127,14 @@ class PatientService:
         if patient_in.birth_date and not validate_birthdate(patient_in.birth_date):
             raise HTTPException(status_code=400, detail="Некорректная дата рождения")
 
+        logger.debug(
+            "[FIX:ADM-05] Persisting patient document fields",
+            extra={
+                "doc_type": patient_in.doc_type,
+                "doc_number": patient_in.doc_number,
+            },
+        )
+
         validated_patient = PatientCreate(
             last_name=normalized_last_name,
             first_name=normalized_first_name,
@@ -134,6 +142,8 @@ class PatientService:
             birth_date=patient_in.birth_date,
             sex=patient_in.sex,
             phone=patient_in.phone,
+            email=patient_in.email,
+            doc_type=patient_in.doc_type,
             doc_number=patient_in.doc_number,
             address=patient_in.address,
         )

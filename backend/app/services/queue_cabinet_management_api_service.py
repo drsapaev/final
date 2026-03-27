@@ -39,7 +39,8 @@ class QueueCabinetManagementApiService:
     def _resolve_specialist_name(self, specialist_id: int) -> str:
         specialist = self.repository.get_doctor(specialist_id)
         if specialist and specialist.user:
-            return specialist.user.full_name
+            user = specialist.user
+            return user.full_name or user.username or f"Специалист #{specialist_id}"
         return f"Специалист #{specialist_id}"
 
     def get_queues_cabinet_info(
@@ -108,13 +109,13 @@ class QueueCabinetManagementApiService:
             raise QueueCabinetManagementDomainError(404, "Очередь не найдена")
 
         updated = False
-        if cabinet_info.get("cabinet_number") is not None:
+        if "cabinet_number" in cabinet_info:
             queue.cabinet_number = cabinet_info["cabinet_number"]
             updated = True
-        if cabinet_info.get("cabinet_floor") is not None:
+        if "cabinet_floor" in cabinet_info:
             queue.cabinet_floor = cabinet_info["cabinet_floor"]
             updated = True
-        if cabinet_info.get("cabinet_building") is not None:
+        if "cabinet_building" in cabinet_info:
             queue.cabinet_building = cabinet_info["cabinet_building"]
             updated = True
 
@@ -153,13 +154,13 @@ class QueueCabinetManagementApiService:
             cabinet_info = update["cabinet_info"]
             updated = False
 
-            if cabinet_info.get("cabinet_number") is not None:
+            if "cabinet_number" in cabinet_info:
                 queue.cabinet_number = cabinet_info["cabinet_number"]
                 updated = True
-            if cabinet_info.get("cabinet_floor") is not None:
+            if "cabinet_floor" in cabinet_info:
                 queue.cabinet_floor = cabinet_info["cabinet_floor"]
                 updated = True
-            if cabinet_info.get("cabinet_building") is not None:
+            if "cabinet_building" in cabinet_info:
                 queue.cabinet_building = cabinet_info["cabinet_building"]
                 updated = True
 

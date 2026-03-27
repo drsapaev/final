@@ -125,7 +125,11 @@ def update_queue_cabinet_info(
     try:
         return service.update_queue_cabinet_info(
             queue_id=queue_id,
-            cabinet_info=cabinet_info.model_dump() if hasattr(cabinet_info, "model_dump") else cabinet_info.dict(),
+            cabinet_info=(
+                cabinet_info.model_dump(exclude_unset=True)
+                if hasattr(cabinet_info, "model_dump")
+                else cabinet_info.dict(exclude_unset=True)
+            ),
             updated_by=current_user.username,
         )
     except QueueCabinetManagementDomainError as exc:
@@ -152,7 +156,11 @@ def bulk_update_cabinet_info(
     """
     service = QueueCabinetManagementApiService(db)
     try:
-        updates = request.model_dump()["updates"] if hasattr(request, "model_dump") else request.dict()["updates"]
+        updates = (
+            request.model_dump(exclude_unset=True)["updates"]
+            if hasattr(request, "model_dump")
+            else request.dict(exclude_unset=True)["updates"]
+        )
         return service.bulk_update_cabinet_info(
             updates=updates,
             updated_by=current_user.username,

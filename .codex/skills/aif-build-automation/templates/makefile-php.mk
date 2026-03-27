@@ -41,7 +41,7 @@ update: ## Update dependencies
 
 .PHONY: dev
 dev: ## Start development server
-	$(PHP) -S localhost:18000 -t public/
+	$(PHP) -S localhost:8000 -t public/
 
 .PHONY: serve
 serve: ## Start Laravel dev server (requires Laravel)

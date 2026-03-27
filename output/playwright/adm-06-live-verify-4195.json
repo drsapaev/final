@@ -1,0 +1,27 @@
+{
+  "case_id": "ADM-06-LIVE-VERIFY",
+  "stack": {
+    "frontend": "http://127.0.0.1:4195",
+    "backend": "http://127.0.0.1:18009"
+  },
+  "service": {
+    "id": 130,
+    "name": "ADM-06 Live Lab 409003",
+    "code": "L99",
+    "queue_tag": "lab",
+    "department_key": "lab",
+    "category_id": 7,
+    "group": "laboratory"
+  },
+  "primary_source_of_truth": {
+    "surface": "admin services UI",
+    "row_visible": true,
+    "create_feedback": "Услуга создана"
+  },
+  "secondary_source_of_truth": {
+    "surface": "GET /api/v1/registrar/services",
+    "status": 200,
+    "laboratory_count": 1,
+    "procedures_count": 0
+  }
+}

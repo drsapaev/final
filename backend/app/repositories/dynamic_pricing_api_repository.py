@@ -22,6 +22,22 @@ class DynamicPricingApiRepository:
     def add_pricing_rule_service(self, *, rule_id: int, service_id: int) -> None:
         self.db.add(PricingRuleService(rule_id=rule_id, service_id=service_id))
 
+    def delete_pricing_rule_dependencies(self, *, rule: PricingRule) -> None:
+        self.db.query(PricingRuleService).filter(
+            PricingRuleService.rule_id == rule.id
+        ).delete(synchronize_session=False)
+        self.db.query(ServicePackage).filter(
+            ServicePackage.pricing_rule_id == rule.id
+        ).update(
+            {ServicePackage.pricing_rule_id: None},
+            synchronize_session=False,
+        )
+
+    def delete_pricing_rule_by_id(self, *, rule_id: int) -> None:
+        self.db.query(PricingRule).filter(PricingRule.id == rule_id).delete(
+            synchronize_session=False
+        )
+
     def list_pricing_rules(
         self,
         *,

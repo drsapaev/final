@@ -93,6 +93,26 @@ Read these files if present:
 
 Use them to keep outputs aligned with project conventions.
 
+**Read `.ai-factory/skill-context/aif-loop/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including the generated
+  artifact, run state, and evaluation criteria. If a skill-context rule says "artifact MUST include X"
+  or "evaluation MUST check Y" — you MUST comply. Producing loop outputs that violate skill-context
+  rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
 ## Step 0.1: Handle Non-Iteration Commands
 
 If command is `status`, `stop`, `list`, `history`, or `clean`, execute and stop:
@@ -141,7 +161,7 @@ Generate:
   "phase": "A",
   "current_step": "PLAN",
   "task": {
-    "prompt": "OpenAPI 3.1 + DDD notes + JSON examples + PHP controller",
+    "prompt": "OpenAPI 3.1 spec + DDD notes + JSON examples",
     "ideal_result": "..."
   },
   "criteria": {
@@ -346,9 +366,9 @@ After the loop stops (any reason):
 3. Ask user where to save the final artifact (default: keep in `.ai-factory/evolution/<alias>/artifact.md`)
 4. Offer to copy artifact to a user-specified path
 5. Suggest next skills based on artifact type:
-   - API spec -> `$2` to implement it
-   - Code -> `$2` to check it
-   - Docs -> `$2` to integrate it
+   - API spec -> `/aif-plan` to implement it
+   - Code -> `/aif-verify` to check it
+   - Docs -> `/aif-docs` to integrate it
 6. Update `run.json.status` based on stop reason, and if `current.json` points to this loop, delete `current.json` (no active loop remains):
 
 | Stop reason | Status |
@@ -410,7 +430,7 @@ Recommend clearing context to the user in these situations:
 After the iteration summary, append:
 
 ```text
-💡 Context is growing. Recommended: /clear then $2 resume
+💡 Context is growing. Recommended: /clear then /aif-loop resume
    All state is saved on disk — nothing will be lost.
 ```
 
@@ -451,14 +471,14 @@ If `run.json` is missing or unparseable:
 ## Examples
 
 ```text
-$2 new OpenAPI 3.1 + DDD notes + JSON examples + PHP controller
-$2 resume
-$2 resume courses-api-ddd
-$2 status
-$2 stop
-$2 list
-$2 history
-$2 history courses-api-ddd
-$2 clean courses-api-ddd
-$2 clean --all
+/aif-loop new OpenAPI 3.1 spec + DDD notes + JSON examples
+/aif-loop resume
+/aif-loop resume courses-api-ddd
+/aif-loop status
+/aif-loop stop
+/aif-loop list
+/aif-loop history
+/aif-loop history courses-api-ddd
+/aif-loop clean courses-api-ddd
+/aif-loop clean --all
 ```

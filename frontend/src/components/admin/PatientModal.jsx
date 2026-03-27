@@ -499,7 +499,7 @@ const PatientModal = ({
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>
-                Паспортные данные
+                Номер паспорта
               </label>
               <MacOSInput
                 type="text"
@@ -520,6 +520,15 @@ const PatientModal = ({
               }}>
                   <AlertCircle style={{ width: '14px', height: '14px' }} />
                   {errors.passport}
+                </p>
+              }
+              {!errors.passport &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-text-secondary)',
+                marginTop: '4px'
+              }}>
+                  Если поле заполнено, документ будет сохранён как passport.
                 </p>
               }
             </div>

@@ -80,7 +80,7 @@
 ### 🔧 Требования
 
 - Python 3.11+
-- SQLite база данных
+- PostgreSQL база данных
 - FastAPI приложение
 - GitHub Actions
 
@@ -88,7 +88,7 @@
 
 ```bash
 # Основные настройки
-DATABASE_URL=sqlite:///./clinic.db
+DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
 CORS_DISABLE=1
 WS_DEV_ALLOW=1
 

@@ -42,7 +42,7 @@ tasks:
     desc: Start development server
     deps: [install]
     cmds:
-      - '{{.PHP}} -S localhost:18000 -t public/'
+      - '{{.PHP}} -S localhost:8000 -t public/'
 
   serve:
     desc: Start Laravel dev server

@@ -1,8 +1,26 @@
 # Security Scanning Details
 
+## CLI Options
+
+```
+python security-scan.py [--md-only] [--strict] [--allowlist <file.json>] <path>
+```
+
+| Flag | Description |
+|---|---|
+| *(default)* | Scan all supported files (`.md`, `.py`, `.sh`, `.js`, `.ts`, `.yaml`, `.yml`, `.json`) |
+| `--md-only` | Scan only `.md` files (SKILL.md + references) |
+| `--strict` | Do not demote code-block findings — treat markdown examples as real threats |
+| `--allowlist <file.json>` | Suppress known benign findings (see Allowlist Format below) |
+| `--deep` | Alias for default behavior (backward compatibility) |
+
+## Code Block Demotion
+
+In `.md` files, findings inside fenced code blocks (`` ``` ``) are demoted from CRITICAL to WARNING — they are likely documentation examples, not actual attacks. Use `--strict` to disable this behavior.
+
 ## Threat Categories
 
-The scanner checks ALL files in the skill directory (`.md`, `.py`, `.sh`, `.js`, `.ts`, `.yaml`, `.json`) for:
+The scanner checks for:
 
 | Threat Category | Examples | Severity |
 |---|---|---|
@@ -13,9 +31,24 @@ The scanner checks ALL files in the skill directory (`.md`, `.py`, `.sh`, `.js`,
 | Config Tampering | Modifying `.claude/`, `.bashrc`, `.gitconfig` | CRITICAL |
 | Encoded Payloads | Base64 hidden text, hex sequences, zero-width chars | CRITICAL |
 | Social Engineering | "authorized by admin", "debug mode disable safety" | CRITICAL |
+| Scanner Evasion | "false positive", "safe to ignore", "skip scan" | CRITICAL |
 | Unrestricted Shell | `allowed-tools: Bash` without command patterns | WARNING |
 | External Requests | `curl`/`wget` to unknown domains | WARNING |
 | Privilege Escalation | `sudo`, `eval()`, package installs | WARNING |
+
+## Allowlist Format
+
+JSON file with entries that suppress specific findings. Each entry **must** include:
+- `file` — glob pattern for the file (e.g. `"SKILL.md"`, `"references/*.md"`)
+- `severity` — `"CRITICAL"` or `"WARNING"`
+- `description` and/or `match` — at least one to identify the finding
+
+```json
+[
+  {"file": "SKILL.md", "severity": "CRITICAL", "description": "Config tampering: modifies AI agent configuration", "match": "Update .ai"},
+  {"file": "references/*.md", "severity": "CRITICAL", "description": "Fork bomb: denial of service attack"}
+]
+```
 
 ## User Communication Templates
 
@@ -46,7 +79,7 @@ Install anyway? [y/N]
 
 **When using `npx skills install`:**
 ```
-1. npx skills install --agent codex <name>  # Downloads skill
+1. npx skills install {{skills_cli_agent_flag}} <name>  # Downloads skill
 2. LEVEL 1: Run automated scan on installed directory
 3. LEVEL 2: Read and review the skill content semantically
 4. If BLOCKED → remove the skill directory and warn user

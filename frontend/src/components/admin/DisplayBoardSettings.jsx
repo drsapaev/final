@@ -24,9 +24,9 @@ import {
   Edit } from
 'lucide-react';
 import { Card, Button } from '../ui/macos';
+import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,32 +63,26 @@ const DisplayBoardSettings = () => {
 
       // Загружаем табло, темы и статистику
       const [boardsRes, themesRes, statsRes] = await Promise.all([
-      fetch('/api/v1/admin/display/boards', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      }),
-      fetch('/api/v1/admin/display/themes', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      }),
-      fetch('/api/v1/admin/display/stats', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      })]
+      api.get('/admin/display/boards'),
+      api.get('/admin/display/themes'),
+      api.get('/admin/display/stats')]
       );
 
-      if (boardsRes.ok) {
-        const boardsData = await boardsRes.json();
+      if (boardsRes.status >= 200 && boardsRes.status < 300) {
+        const boardsData = boardsRes.data;
         setBoards(boardsData);
         if (boardsData.length > 0) {
           setSelectedBoard(boardsData[0]);
         }
       }
 
-      if (themesRes.ok) {
-        const themesData = await themesRes.json();
+      if (themesRes.status >= 200 && themesRes.status < 300) {
+        const themesData = themesRes.data;
         setThemes(themesData);
       }
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
+      if (statsRes.status >= 200 && statsRes.status < 300) {
+        const statsData = statsRes.data;
         setStats(statsData);
       }
 
@@ -111,17 +105,10 @@ const DisplayBoardSettings = () => {
       setSaving(true);
       setMessage({ type: '', text: '' });
 
-      const response = await fetch(`/api/v1/admin/display/boards/${selectedBoard.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(selectedBoard)
-      });
+      const response = await api.put(`/admin/display/boards/${selectedBoard.id}`, selectedBoard);
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status >= 200 && response.status < 300) {
+        const result = response.data;
         setMessage({ type: 'success', text: result.message });
       } else {
         throw new Error('Ошибка сохранения настроек табло');
@@ -152,17 +139,10 @@ const DisplayBoardSettings = () => {
         }
       };
 
-      const response = await fetch(`/api/v1/admin/display/boards/${selectedBoard.id}/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(testData)
-      });
+      const response = await api.post(`/admin/display/boards/${selectedBoard.id}/test`, testData);
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status >= 200 && response.status < 300) {
+        const result = response.data;
         setTestResults((prev) => ({
           ...prev,
           [testType]: {

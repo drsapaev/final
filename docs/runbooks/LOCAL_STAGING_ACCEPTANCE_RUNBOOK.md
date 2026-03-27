@@ -65,7 +65,7 @@ Current contour:
 
 ## Data Closure
 
-- Queue-domain SQLite gap: archive legacy queue data explicitly as non-canonical. Do not keep a hidden dual source of truth.
+- Queue-domain legacy gap: archive legacy queue data explicitly as non-canonical. Do not keep a hidden dual source of truth.
 - Review remaining skipped legacy rows:
   - appointments with missing patient refs
   - orphan message refs

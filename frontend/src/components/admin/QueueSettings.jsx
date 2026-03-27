@@ -45,6 +45,15 @@ const ICON_MAP = {
   'Zap': Zap
 };
 
+const normalizeNumber = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getNumberSetting = (collection, key, fallback) => (
+  normalizeNumber(collection?.[key], fallback)
+);
+
 const QueueSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,7 +108,15 @@ const QueueSettings = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/queue/settings');
-      setSettings(response.data);
+      const data = response.data || {};
+      setSettings({
+        timezone: data.timezone || 'Asia/Tashkent',
+        queue_start_hour: normalizeNumber(data.queue_start_hour, 7),
+        auto_close_time: data.auto_close_time || '09:00',
+        start_numbers: data.start_numbers || {},
+        max_per_day: data.max_per_day || {},
+        dev_mode_enabled: Boolean(data.dev_mode_enabled),
+      });
     } catch (error) {
       logger.error('Ошибка загрузки настроек очередей:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки настроек очередей' });
@@ -625,12 +642,12 @@ const QueueSettings = () => {
                 }}>
                     <Hash style={{ width: '16px', height: '16px' }} />
                     Стартовый номер
-                  </label>
+                </label>
                   <MacOSInput
                   type="number"
                   min="1"
                   max="100"
-                  value={settings.start_numbers[specialty.key]}
+                  value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
                   style={{ width: '100%' }} />
                 
@@ -656,12 +673,12 @@ const QueueSettings = () => {
                 }}>
                     <Users style={{ width: '16px', height: '16px' }} />
                     Лимит в день
-                  </label>
+                </label>
                   <MacOSInput
                   type="number"
                   min="1"
                   max="100"
-                  value={settings.max_per_day[specialty.key]}
+                  value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
                   style={{ width: '100%' }} />
                 
@@ -696,7 +713,7 @@ const QueueSettings = () => {
                     fontWeight: 'var(--mac-font-weight-medium)',
                     border: '1px solid var(--mac-border)'
                   }}>
-                      {settings.start_numbers[specialty.key]} - {settings.start_numbers[specialty.key] + settings.max_per_day[specialty.key] - 1}
+                      {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
                     </div>
                   </div>
                 </div>

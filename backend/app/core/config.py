@@ -13,11 +13,10 @@ from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSou
 
 logger = logging.getLogger(__name__)
 
-# Calculate absolute path to clinic.db (relative to backend directory)
+# Resolve the backend root so config can load backend/.env consistently.
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> backend/
 _DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
-_DEFAULT_DB_PATH = _BACKEND_DIR / "clinic.db"
-_DEFAULT_DATABASE_URL = f"sqlite:///{_DEFAULT_DB_PATH.as_posix()}"
+_DEFAULT_DATABASE_URL = "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
 
 
 class _CompatibleCorsEnvSettingsSource(EnvSettingsSource):
@@ -66,6 +65,8 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
             "http://localhost:18080",
             "http://127.0.0.1:18080",
             "http://localhost:8080",

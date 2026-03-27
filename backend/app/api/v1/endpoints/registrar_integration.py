@@ -24,7 +24,7 @@ from app.services.canonical_visit_service import (
     CanonicalVisitService,
 )
 from app.services.queue_service import queue_service
-from app.services.service_mapping import get_service_code
+from app.services.service_mapping import get_service_code, resolve_queue_group_key
 
 # [OK] Используем прямой SQL вместо импорта модели для избежания конфликта DailyQueue
 # Проблема: DailyQueue определен в двух местах (queue_old.py и online_queue.py)
@@ -552,6 +552,7 @@ def get_registrar_services(
         categories = crud_clinic.get_service_categories(
             db, specialty=specialty, active_only=active_only
         )
+        category_specialty_by_id = {cat.id: cat.specialty for cat in categories}
 
         # Получаем услуги из основной таблицы
         query = db.query(Service)
@@ -586,6 +587,14 @@ def get_registrar_services(
             "stomatology": [],  # S - Стоматология
             "procedures": [],  # O - Прочие процедуры
         }
+        queue_group_to_registrar_group = {
+            "cardiology": "cardiology",
+            "ecg": "cardiology",
+            "dermatology": "dermatology",
+            "dental": "stomatology",
+            "laboratory": "laboratory",
+            "procedures": "procedures",
+        }
 
         # Простая логика распределения услуг по трём группам
         for service in services:
@@ -618,6 +627,49 @@ def get_registrar_services(
 
             # [OK] НОВАЯ ЛОГИКА: определяем группу по category_code
             category_code = getattr(service, 'category_code', None)
+            category_specialty = category_specialty_by_id.get(service.category_id)
+            resolved_queue_group = resolve_queue_group_key(
+                service_code=service_data["service_code"] or service_data["code"],
+                queue_tag=service_data["queue_tag"],
+                department_key=service_data["department_key"],
+                category_specialty=category_specialty,
+                category_code=category_code,
+            )
+
+            if resolved_queue_group:
+                registrar_group = queue_group_to_registrar_group.get(
+                    resolved_queue_group, "procedures"
+                )
+                fallback_code_group = resolve_queue_group_key(
+                    service_code=service_data["service_code"] or service_data["code"],
+                    category_code=category_code,
+                )
+                if (
+                    any(
+                        [
+                            service_data["queue_tag"],
+                            service_data["department_key"],
+                            category_specialty,
+                        ]
+                    )
+                    and fallback_code_group
+                    and fallback_code_group != resolved_queue_group
+                ):
+                    logger.info(
+                        "[FIX:ADM-06] registrar service grouping overridden by explicit routing: "
+                        "service_id=%s queue_tag=%s department_key=%s category_specialty=%s "
+                        "fallback_group=%s resolved_group=%s",
+                        service.id,
+                        service_data["queue_tag"],
+                        service_data["department_key"],
+                        category_specialty,
+                        fallback_code_group,
+                        resolved_queue_group,
+                    )
+
+                service_data["group"] = registrar_group
+                grouped_services[registrar_group].append(service_data)
+                continue
 
             if category_code:
                 # Используем новую систему кодов

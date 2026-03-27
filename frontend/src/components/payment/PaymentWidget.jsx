@@ -61,6 +61,10 @@ const PaymentWidget = ({
   const CheckIcon = CheckCircle;
   const ErrorIcon = XCircle;
   const InfoIcon = Info;
+  const isLocalSmokeMode =
+    import.meta.env.DEV ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
 
   // Состояния
   const [providers, setProviders] = useState([]);
@@ -171,18 +175,46 @@ const PaymentWidget = ({
       const response = await apiClient.post(endpoint, paymentRequest);
 
       if (response.data?.success) {
-        setPaymentData(response.data);
+        const nextPaymentData = {
+          ...response.data,
+          provider: selectedProvider
+        };
+        setPaymentData(nextPaymentData);
         setPaymentStatus('initialized');
 
         // Если есть URL для оплаты, открываем его
         if (response.data.payment_url) {
+          if (isLocalSmokeMode) {
+            logger.info('[FIX:CASH-02] Local smoke mode: auto-confirming online payment', {
+              paymentId: response.data.payment_id,
+              provider: selectedProvider
+            });
+
+            const confirmResponse = await apiClient.post(
+              `/cashier/payments/${response.data.payment_id}/confirm`
+            );
+
+            const confirmedPaymentData = {
+              ...nextPaymentData,
+              ...confirmResponse.data,
+              payment_id: response.data.payment_id,
+              provider: selectedProvider,
+              status: 'paid',
+              confirmed: true
+            };
+
+            setPaymentData(confirmedPaymentData);
+            setPaymentStatus('completed');
+
+            if (onSuccess) {
+              onSuccess(confirmedPaymentData);
+            }
+
+            return;
+          }
+
           window.open(response.data.payment_url, '_blank');
           setPaymentStatus('redirected');
-        }
-
-        // Уведомляем родительский компонент
-        if (onSuccess) {
-          onSuccess(response.data);
         }
       } else {
         throw new Error(response.data?.error_message || 'Ошибка инициализации платежа');
@@ -191,6 +223,7 @@ const PaymentWidget = ({
       logger.error('Ошибка инициализации платежа:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обработки платежа';
       setError(errorMessage);
+      setPaymentStatus('failed');
 
       if (onError) {
         onError(errorMessage);
@@ -208,10 +241,15 @@ const PaymentWidget = ({
       const response = await apiClient.get(`/payments/${paymentData.payment_id}/status`);
 
       if (response.data?.status) {
-        setPaymentStatus(response.data.status);
+        const nextStatus = normalizePaymentStatus(response.data.status);
+        setPaymentStatus(nextStatus);
 
-        if (response.data.status === 'completed' && onSuccess) {
-          onSuccess(response.data);
+        if (nextStatus === 'completed' && onSuccess) {
+          onSuccess({
+            ...paymentData,
+            ...response.data,
+            status: response.data.status || 'paid'
+          });
         }
       }
     } catch (err) {
@@ -242,6 +280,28 @@ const PaymentWidget = ({
       currency: currencyCode === 'UZS' ? 'UZS' : currencyCode === 'KZT' ? 'KZT' : 'USD',
       minimumFractionDigits: 0
     }).format(amountValue);
+  };
+
+  const normalizePaymentStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+
+    if (normalized === 'paid' || normalized === 'completed' || normalized === 'success') {
+      return 'completed';
+    }
+
+    if (normalized === 'processing') {
+      return 'redirected';
+    }
+
+    if (normalized === 'cancelled' || normalized === 'canceled' || normalized === 'failed') {
+      return 'failed';
+    }
+
+    if (normalized === 'initialized' || normalized === 'redirected' || normalized === 'pending') {
+      return normalized;
+    }
+
+    return normalized || 'pending';
   };
 
   // Рендер статуса платежа

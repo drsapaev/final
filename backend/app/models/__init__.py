@@ -39,12 +39,15 @@ from .clinic import (
     ServiceCategory,
     SystemInfo,
 )
+from .cardio_blood_test import CardioBloodTest
 from .department import (
     Department,
     DepartmentQueueSettings,
     DepartmentRegistrationSettings,
     DepartmentService,
 )
+from .derma_examination import DermaExamination
+from .derma_procedure import DermaProcedure
 from .doctor_phrase_history import DoctorPhraseHistory
 from .doctor_price_override import DoctorPriceOverride
 from .doctor_templates import (
@@ -63,6 +66,7 @@ from .emr_v2 import (
     EMRRevision,
 )
 from .emr_version import EMRVersion
+from .finance import FinanceTransaction
 from .family_relation import FamilyRelation, RelationType
 from .file_system import (
     File,
@@ -136,7 +140,7 @@ from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
 # from .doctor_price_override import DoctorPriceOverride
 # from .webhook import Webhook, WebhookCall, WebhookEvent
 # from .ai_config import AIProvider, AIProviderSettings
-# from .display_config import DisplayBoard, DisplayBanner, DisplayTheme
+from .display_config import DisplayAnnouncement, DisplayBanner, DisplayBoard, DisplayTheme
 # from .print_config import PrintTemplate, PrintJob
 # from .dermatology_photos import DermatologyPhoto
 # from .telegram import TelegramConfig, TelegramUser, TelegramMessage, TelegramTemplate
@@ -186,6 +190,7 @@ __all__ = [
     "PaymentWebhook",
     "PaymentProvider",
     "PaymentTransaction",
+    "FinanceTransaction",
     "Appointment",
     # "QueueTicket", # заменен на DailyQueue, QueueEntry, QueueToken
     "ScheduleTemplate",
@@ -244,6 +249,9 @@ __all__ = [
     "Doctor",
     "Schedule",
     "ServiceCategory",
+    "CardioBloodTest",
+    "DermaExamination",
+    "DermaProcedure",
     "Branch",
     "BranchStatus",
     "Equipment",

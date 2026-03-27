@@ -76,7 +76,7 @@
 ## P6 Local-First Acceptance (Current Active Phase)
 - [x] Local host-based staging remains the primary operating contour (`backend :18000`, `frontend :18080`, dedicated staging Postgres `:55432`).
 - [x] Manual smoke pack is green for roles: admin, registrar, cardiology, dermatology, dentistry, lab, cashier.
-- [x] Remaining SQLite→Postgres queue-domain gap is explicitly closed: legacy queue is archived and documented as non-canonical.
+- [x] Remaining queue-domain gap is explicitly closed: legacy queue is archived and documented as non-canonical.
 - [x] Secrets/config hygiene pass is complete before any VPS move (no accidental local/staging credentials or machine-specific drift in committed runtime docs).
 
 ## STOP/GO Phase Local → VPS

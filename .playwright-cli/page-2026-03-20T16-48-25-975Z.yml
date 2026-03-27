@@ -1,0 +1,164 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Clinic Management" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Clinic Management
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Lab User" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img [ref=e82]
+            - text: Lab User
+        - button "Выйти" [ref=e85] [cursor=pointer]:
+          - generic [ref=e86]:
+            - img [ref=e87]
+            - text: Выйти
+    - generic [ref=e90]:
+      - complementary [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: Medical System
+          - button "Collapse sidebar" [ref=e95] [cursor=pointer]:
+            - img [ref=e97]
+        - navigation [ref=e100]:
+          - button "Tests" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Tests
+          - button "Results" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Results
+          - button "Patients" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Patients
+          - button "Appointments" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Appointments
+          - button "Reports" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e127]: Reports
+      - main [ref=e128]:
+        - generic [ref=e129]:
+          - generic [ref=e130]:
+            - heading "Enterprise Laboratory Panel Очередь 5 Шаблоны 20 Бланки 2" [level=3] [ref=e348]:
+              - generic [ref=e133]:
+                - img [ref=e134]
+                - text: Enterprise Laboratory Panel
+              - generic [ref=e137]:
+                - button "Очередь 5" [ref=e138] [cursor=pointer]:
+                  - generic [ref=e139]:
+                    - img [ref=e140]
+                    - text: Очередь
+                    - generic [ref=e143]: "5"
+                - button "Шаблоны 20" [ref=e144] [cursor=pointer]:
+                  - generic [ref=e145]:
+                    - img [ref=e146]
+                    - text: Шаблоны
+                    - generic [ref=e149]: "20"
+                - button "Бланки 2" [ref=e349] [cursor=pointer]:
+                  - generic [ref=e151]:
+                    - img [ref=e152]
+                    - text: Бланки
+                    - generic [ref=e157]: "2"
+            - generic [ref=e409]: Бланк переведён в READY.
+          - generic [ref=e282]:
+            - generic [ref=e283]:
+              - heading "Редактор лабораторного бланка" [level=3] [ref=e285]:
+                - img [ref=e286]
+                - text: Редактор лабораторного бланка
+              - generic [ref=e292]:
+                - generic [ref=e293]:
+                  - generic [ref=e352]:
+                    - generic [ref=e353]:
+                      - generic [ref=e354]: Абдуллаев Витамин Даврон
+                      - generic [ref=e355]: READY
+                      - generic [ref=e356]: Vitamin D
+                    - generic [ref=e357]: "Визит: 723 | Бланк #12"
+                  - generic [ref=e358]:
+                    - button "Save Draft" [ref=e359] [cursor=pointer]:
+                      - generic [ref=e360]:
+                        - img [ref=e361]
+                        - text: Save Draft
+                    - button "Mark Ready" [ref=e364] [cursor=pointer]:
+                      - generic [ref=e365]:
+                        - img [ref=e366]
+                        - text: Mark Ready
+                    - button "Finalize" [ref=e369] [cursor=pointer]:
+                      - generic [ref=e370]:
+                        - img [ref=e371]
+                        - text: Finalize
+                - generic [ref=e295]:
+                  - generic [ref=e374]:
+                    - generic [ref=e375]: lab_technician_label
+                    - textbox "lab_technician_label" [ref=e376]: Врач лаборант
+                  - generic [ref=e377]:
+                    - generic [ref=e378]: lab_technician_name
+                    - textbox "lab_technician_name" [ref=e379]
+                  - generic [ref=e380]:
+                    - generic [ref=e381]: approver_label
+                    - textbox "approver_label" [ref=e382]: Подпись
+                  - generic [ref=e383]:
+                    - generic [ref=e384]: approver_name
+                    - textbox "approver_name" [ref=e385]
+                - generic [ref=e387]:
+                  - generic [ref=e388]: Тахлил номи
+                  - generic [ref=e390]:
+                    - generic [ref=e391]:
+                      - strong [ref=e392]: Vitamin D (25-OH)
+                      - generic [ref=e394]: "Норма: 30 - 100 ng/mL"
+                    - textbox [ref=e395]: "45.0000"
+                    - generic [ref=e396]: ng/mL
+                    - generic [ref=e397]: ok
+            - generic [ref=e310]:
+              - heading "Доступные бланки пациента" [level=3] [ref=e312]:
+                - img [ref=e313]
+                - text: Доступные бланки пациента
+              - generic [ref=e316]:
+                - generic [ref=e317]:
+                  - button "Все" [ref=e318] [cursor=pointer]:
+                    - generic [ref=e319]: Все
+                  - button "Без флагов" [ref=e320] [cursor=pointer]:
+                    - generic [ref=e321]: Без флагов
+                  - button "С флагами" [ref=e322] [cursor=pointer]:
+                    - generic [ref=e323]: С флагами
+                  - button "Критические" [ref=e324] [cursor=pointer]:
+                    - generic [ref=e325]: Критические
+                - button "Vitamin D 20.03.2026, 18:06:57 PRINTED flagged 1 флагов" [ref=e326] [cursor=pointer]:
+                  - generic [ref=e327]:
+                    - generic [ref=e328]: Vitamin D
+                    - generic [ref=e329]: 20.03.2026, 18:06:57
+                  - generic [ref=e330]:
+                    - generic [ref=e331]: PRINTED
+                    - generic [ref=e332]: flagged
+                    - generic [ref=e333]: 1 флагов
+                - button "Vitamin D 20.03.2026, 18:47:46 READY clean" [ref=e410] [cursor=pointer]:
+                  - generic [ref=e399]:
+                    - generic [ref=e400]: Vitamin D
+                    - generic [ref=e401]: 20.03.2026, 18:47:46
+                  - generic [ref=e402]:
+                    - generic [ref=e403]: READY
+                    - generic [ref=e404]: clean
+  - generic [ref=e334]:
+    - generic [ref=e335]:
+      - img [ref=e336]
+      - generic [ref=e339]:
+        - strong [ref=e340]: Включить уведомления?
+        - generic [ref=e341]: Получайте уведомления о новых сообщениях
+    - generic [ref=e342]:
+      - button "Включить" [ref=e343] [cursor=pointer]
+      - button "Закрыть" [ref=e344] [cursor=pointer]:
+        - img [ref=e345]

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
@@ -123,10 +123,12 @@ export default function LabReportWorkbench({
   templateResolution,
   templateResolutionLoading,
   reportHistory,
+  recentReports,
   activeInstance,
   onInstanceChange,
   onOpenInstance,
   onRefreshHistory,
+  onRefreshRecentReports,
   onQueueChanged,
   notify
 }) {
@@ -166,6 +168,66 @@ export default function LabReportWorkbench({
       return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
     });
   }, [historySeverityFilter, reportHistory]);
+  const filteredRecentReports = useMemo(() => {
+    const items = recentReports.filter((item) => matchesHistoryFilter(item, historySeverityFilter));
+    return [...items].sort((left, right) => {
+      const leftSeverity = historySeverityState(left);
+      const rightSeverity = historySeverityState(right);
+      if (rightSeverity.order !== leftSeverity.order) {
+        return rightSeverity.order - leftSeverity.order;
+      }
+      return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+    });
+  }, [historySeverityFilter, recentReports]);
+  const showRecentReportsBrowser = !selectedAppointment && !activeInstance;
+
+  const handleCreateInstance = useCallback(async (templateIdOverride = null, options = {}) => {
+    const templateId = templateIdOverride || selectedTemplateId;
+    if (!selectedAppointment?.patient_id || !templateId) {
+      notify('error', 'Выберите запись и шаблон.');
+      return;
+    }
+    if (resolutionHasBlockingGap) {
+      notify('error', 'Для выбранных услуг нет настроенного лабораторного бланка. Добавьте mapping service_code -> template.');
+      return;
+    }
+    setSaving(true);
+    setBusyAction('create');
+    try {
+      const instance = await labReportingApi.createInstance({
+        patient_id: selectedAppointment.patient_id,
+        appointment_id: selectedAppointment.appointment_id || null,
+        visit_id: templateResolution?.visit_id || selectedAppointment.visit_id || null,
+        template_id: Number(templateId),
+        service_codes: templateResolution?.service_codes || selectedAppointment.service_codes || [],
+        service_items: (selectedAppointment.service_details || []).map((item) => ({
+          service_id: item.id || null,
+          code: item.code || null,
+          name: item.name || null
+        }))
+      });
+      onInstanceChange(instance);
+      await onRefreshHistory(selectedAppointment.patient_id);
+      await onRefreshRecentReports?.();
+      await onQueueChanged?.();
+      notify('success', options.successMessage || 'Новый лабораторный бланк создан.');
+    } catch (error) {
+      notify('error', error.message);
+    } finally {
+      setSaving(false);
+      setBusyAction(null);
+    }
+  }, [
+    notify,
+    onInstanceChange,
+    onRefreshHistory,
+    onRefreshRecentReports,
+    onQueueChanged,
+    resolutionHasBlockingGap,
+    selectedAppointment,
+    selectedTemplateId,
+    templateResolution
+  ]);
 
   useEffect(() => {
     if (!activeInstance) {
@@ -241,6 +303,7 @@ export default function LabReportWorkbench({
     });
   }, [
     activeInstance,
+    handleCreateInstance,
     notify,
     onOpenInstance,
     reportHistory,
@@ -251,43 +314,6 @@ export default function LabReportWorkbench({
     singleAllowedTemplate,
     templateResolutionLoading
   ]);
-
-  async function handleCreateInstance(templateIdOverride = null, options = {}) {
-    const templateId = templateIdOverride || selectedTemplateId;
-    if (!selectedAppointment?.patient_id || !templateId) {
-      notify('error', 'Выберите запись и шаблон.');
-      return;
-    }
-    if (resolutionHasBlockingGap) {
-      notify('error', 'Для выбранных услуг нет настроенного лабораторного бланка. Добавьте mapping service_code -> template.');
-      return;
-    }
-    setSaving(true);
-    setBusyAction('create');
-    try {
-      const instance = await labReportingApi.createInstance({
-        patient_id: selectedAppointment.patient_id,
-        appointment_id: selectedAppointment.appointment_id || null,
-        visit_id: templateResolution?.visit_id || selectedAppointment.visit_id || null,
-        template_id: Number(templateId),
-        service_codes: templateResolution?.service_codes || selectedAppointment.service_codes || [],
-        service_items: (selectedAppointment.service_details || []).map((item) => ({
-          service_id: item.id || null,
-          code: item.code || null,
-          name: item.name || null
-        }))
-      });
-      onInstanceChange(instance);
-      await onRefreshHistory(selectedAppointment.patient_id);
-      await onQueueChanged?.();
-      notify('success', options.successMessage || 'Новый лабораторный бланк создан.');
-    } catch (error) {
-      notify('error', error.message);
-    } finally {
-      setSaving(false);
-      setBusyAction('');
-    }
-  }
 
   function updateField(fieldKey, value) {
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
@@ -355,6 +381,7 @@ export default function LabReportWorkbench({
       const ready = await labReportingApi.markReady((latest || activeInstance).id);
       onInstanceChange(ready);
       await onRefreshHistory(ready.patient_id);
+      await onRefreshRecentReports?.();
       await onQueueChanged?.();
       notify('success', 'Бланк отмечен как готовый.');
     } catch (error) {
@@ -374,6 +401,7 @@ export default function LabReportWorkbench({
       const finalized = await labReportingApi.finalize((latest || activeInstance).id);
       onInstanceChange(finalized);
       await onRefreshHistory(finalized.patient_id);
+      await onRefreshRecentReports?.();
       await onQueueChanged?.();
       notify('success', 'Бланк финализирован.');
     } catch (error) {
@@ -392,6 +420,7 @@ export default function LabReportWorkbench({
       const revised = await labReportingApi.revise(activeInstance.id);
       onInstanceChange(revised);
       await onRefreshHistory(revised.patient_id);
+      await onRefreshRecentReports?.();
       notify('success', 'Создана ревизия бланка.');
     } catch (error) {
       notify('error', error.message);
@@ -417,6 +446,7 @@ export default function LabReportWorkbench({
       const printed = await labReportingApi.markPrinted(activeInstance.id);
       onInstanceChange(printed);
       await onRefreshHistory(printed.patient_id);
+      await onRefreshRecentReports?.();
       await onQueueChanged?.();
       setPrintFeedback({
         severity: popup ? 'success' : 'warning',
@@ -454,7 +484,11 @@ export default function LabReportWorkbench({
         </CardHeader>
         <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '16px' }}>
           {!selectedAppointment && !activeInstance ? (
-            <Alert severity="info">Выберите пациента из очереди или откройте уже существующий лабораторный бланк.</Alert>
+            <Alert severity="info">
+              {recentReports.length > 0
+                ? 'Выберите пациента из очереди или откройте уже существующий лабораторный бланк из списка ниже.'
+                : 'Выберите пациента из очереди или откройте уже существующий лабораторный бланк.'}
+            </Alert>
           ) : !activeInstance ? (
             <div style={{ display: 'grid', gap: '12px' }}>
               <div style={{ color: 'var(--mac-text-secondary)' }}>
@@ -708,12 +742,12 @@ export default function LabReportWorkbench({
         </CardContent>
       </Card>
 
-      {reportHistory.length > 0 && (
+      {(showRecentReportsBrowser || reportHistory.length > 0) && (
         <Card variant="filled" padding="none">
           <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
             <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Icon name="clock.arrow.circlepath" size={20} />
-              Доступные бланки пациента
+              {showRecentReportsBrowser ? 'Недавние лабораторные бланки' : 'Доступные бланки пациента'}
             </CardTitle>
           </CardHeader>
           <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '12px' }}>
@@ -734,11 +768,16 @@ export default function LabReportWorkbench({
               ))}
             </div>
 
-            {filteredHistory.length === 0 ? (
-              <Alert severity="info">Для выбранного фильтра нет лабораторных бланков.</Alert>
+            {(showRecentReportsBrowser ? filteredRecentReports : filteredHistory).length === 0 ? (
+              <Alert severity="info">
+                {showRecentReportsBrowser
+                  ? 'В лаборатории пока нет сохранённых бланков для повторного открытия.'
+                  : 'Для выбранного фильтра нет лабораторных бланков.'}
+              </Alert>
             ) : (
-              filteredHistory.map((item) => {
+              (showRecentReportsBrowser ? filteredRecentReports : filteredHistory).map((item) => {
                 const severity = historySeverityState(item);
+                const patientLabel = item.patient_snapshot?.full_name || `Пациент #${item.patient_id}`;
                 return (
                 <button
                   key={item.id}
@@ -759,8 +798,15 @@ export default function LabReportWorkbench({
                     <div style={{ display: 'grid', gap: '4px', textAlign: 'left' }}>
                       <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>{item.template?.name || `Бланк #${item.id}`}</div>
                       <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
-                        {new Date(item.created_at).toLocaleString()}
+                        {showRecentReportsBrowser
+                          ? `${patientLabel} | ${new Date(item.created_at).toLocaleString()}`
+                          : new Date(item.created_at).toLocaleString()}
                       </div>
+                      {showRecentReportsBrowser && (
+                        <div style={{ color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
+                          Визит: {item.visit_id || 'без визита'}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <Badge variant={getLabStatusVariant(item.status)}>{formatLabStatus(item.status)}</Badge>
@@ -789,10 +835,12 @@ LabReportWorkbench.propTypes = {
   templateResolution: PropTypes.object,
   templateResolutionLoading: PropTypes.bool,
   reportHistory: PropTypes.array,
+  recentReports: PropTypes.array,
   activeInstance: PropTypes.object,
   onInstanceChange: PropTypes.func.isRequired,
   onOpenInstance: PropTypes.func.isRequired,
   onRefreshHistory: PropTypes.func.isRequired,
+  onRefreshRecentReports: PropTypes.func,
   onQueueChanged: PropTypes.func,
   notify: PropTypes.func.isRequired
 };
@@ -802,6 +850,8 @@ LabReportWorkbench.defaultProps = {
   templateResolution: null,
   templateResolutionLoading: false,
   reportHistory: [],
+  recentReports: [],
+  onRefreshRecentReports: undefined,
   onQueueChanged: undefined,
   activeInstance: null
 };

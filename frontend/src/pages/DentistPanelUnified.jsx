@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button, Badge, Card } from '../components/ui/macos';
 import auth from '../stores/auth.js';
+import { apiClient } from '../api/client';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
 import ToothModal from '../components/dental/ToothModal';
@@ -44,10 +45,59 @@ import '../styles/animations.css';
 import { toast } from 'react-toastify';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
+import {
+  DENTIST_DOCUMENTS_STORAGE_KEY,
+  parseDentistDocuments,
+  upsertDentistVisitProtocol,
+} from '../utils/dentistryDocuments';
+import {
+  buildDentistVisitProtocolCard,
+  buildDentistVisitProtocolSaveRequest,
+  mapDentistVisitProtocolFromEmr,
+  mergeDentistVisitProtocolCards,
+} from '../utils/dentistVisitProtocolBridge';
+import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
 const API_V1_BASE = getApiBaseUrl();
+
+function buildPatientsFromAppointments(appointments) {
+  const patientsById = new Map();
+
+  appointments.forEach((appointment) => {
+    const patientId = appointment.patient_id || appointment.id;
+    if (!patientId || patientsById.has(patientId)) {
+      return;
+    }
+
+    const patientName =
+      appointment.patient_fio || appointment.patient_name || appointment.name || 'Пациент';
+
+    patientsById.set(patientId, {
+      id: patientId,
+      patient_id: patientId,
+      appointment_id: appointment.appointment_id || appointment.id || null,
+      visit_id: appointment.visit_id || null,
+      name: patientName,
+      patient_name: patientName,
+      patient_fio: patientName,
+      phone: appointment.patient_phone || appointment.phone || '',
+      specialty: appointment.specialty || 'dentistry',
+      source: appointment.source || 'appointments',
+    });
+  });
+
+  return Array.from(patientsById.values());
+}
+
+function loadStoredDentistDocuments() {
+  if (typeof window === 'undefined') {
+    return parseDentistDocuments(null);
+  }
+
+  return parseDentistDocuments(window.localStorage.getItem(DENTIST_DOCUMENTS_STORAGE_KEY));
+}
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -114,6 +164,9 @@ const DentistPanelUnified = () => {
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [savedVisitProtocols, setSavedVisitProtocols] = useState(
+    () => loadStoredDentistDocuments().visitProtocols
+  );
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   useState(null);
 
@@ -141,6 +194,110 @@ const DentistPanelUnified = () => {
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        DENTIST_DOCUMENTS_STORAGE_KEY,
+        JSON.stringify({ visitProtocols: savedVisitProtocols })
+      );
+    } catch (error) {
+      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
+    }
+  }, [savedVisitProtocols]);
+
+  const loadDentistVisitProtocolsForPatient = useCallback(async (patient) => {
+    const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
+    if (!patientId) {
+      return [];
+    }
+
+    logger.info('[Dentist] Загружаю протоколы визитов из EMR v2', {
+      patientId,
+      patientName: patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент',
+    });
+
+    const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
+      params: { limit: 20 },
+      silent: true,
+    });
+
+    const summaries = Array.isArray(response.data) ? response.data : [];
+    const records = await Promise.all(
+      summaries.map(async (summary) => {
+        try {
+          const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
+            silent: true,
+            validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+          });
+
+          if (emrResponse.status === 404) {
+            return null;
+          }
+
+          const protocolRecord = mapDentistVisitProtocolFromEmr(
+            emrResponse.data,
+            patient,
+          );
+
+          if (!protocolRecord) {
+            return null;
+          }
+
+          return protocolRecord;
+        } catch (error) {
+          logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
+            patientId,
+            visitId: summary.visit_id,
+            error: error?.message || error,
+          });
+          return null;
+        }
+      })
+    );
+
+    return records.filter(Boolean);
+  }, []);
+
+  const loadDentistVisitProtocolByVisitId = useCallback(async (visitId, patient = null) => {
+    if (!visitId) {
+      return null;
+    }
+
+    try {
+      const response = await apiClient.get(`/v2/emr/${visitId}`, {
+        silent: true,
+        validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+      });
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      const protocolRecord = mapDentistVisitProtocolFromEmr(response.data, patient);
+      if (!protocolRecord) {
+        return null;
+      }
+
+      logger.info('[Dentist] Протокол визита загружен из EMR v2', {
+        visitId,
+        emrId: response.data?.id,
+        status: response.data?.status,
+      });
+
+      return protocolRecord;
+    } catch (error) {
+      logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
+        visitId,
+        error: error?.message || error,
+      });
+      return null;
+    }
+  }, []);
 
   // Формы данных
   const [examinationForm, setExaminationForm] = useState({
@@ -293,7 +450,7 @@ const DentistPanelUnified = () => {
 
         // Фильтруем только стоматологические записи для отображения
         let appointmentsData = allAppointments.filter((apt) =>
-        apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
+          isDentistrySpecialty(apt.specialty)
         );
 
         // 2. Получаем актуальный payment_status из БД через all-appointments
@@ -375,6 +532,10 @@ const DentistPanelUnified = () => {
         });
 
         setAppointmentsTableData(enrichedAppointmentsData);
+        setPatients((prev) => {
+          const derivedPatients = buildPatientsFromAppointments(enrichedAppointmentsData);
+          return derivedPatients.length > 0 ? derivedPatients : prev;
+        });
       }
     } catch (error) {
       logger.error('Ошибка загрузки записей стоматолога:', error);
@@ -586,6 +747,39 @@ const DentistPanelUnified = () => {
     loadServices();
   }, [loadData, loadServices]);
 
+  useEffect(() => {
+    const selectedPatientIdForProtocols =
+      selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
+
+    if (!selectedPatientIdForProtocols) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const hydrateDentistVisitProtocols = async () => {
+      try {
+        const backendProtocols = await loadDentistVisitProtocolsForPatient(selectedPatient);
+        if (cancelled || backendProtocols.length === 0) {
+          return;
+        }
+
+        setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
+      } catch (error) {
+        logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
+          patientId: selectedPatientIdForProtocols,
+          error: error?.message || error,
+        });
+      }
+    };
+
+    hydrateDentistVisitProtocols();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadDentistVisitProtocolsForPatient, selectedPatient]);
+
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
     const loadPatientFromUrl = async () => {
@@ -768,12 +962,15 @@ const DentistPanelUnified = () => {
       return;
     }
 
+    const backendProtocol = await loadDentistVisitProtocolByVisitId(visitId, patient);
     setSelectedPatient({
       ...patient,
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient),
-      visit_id: visitId
+      visit_id: visitId,
+      visitData: backendProtocol?.visitData || patient?.visitData || null,
+      source: backendProtocol?.source || patient?.source || 'appointments',
     });
     setShowVisitProtocol(true);
   };
@@ -795,6 +992,65 @@ const DentistPanelUnified = () => {
   const handleReports = () => {
     setShowReports(true);
   };
+
+  const persistVisitProtocol = useCallback(async (patient, visitData) => {
+    if (!patient?.visit_id) {
+      return;
+    }
+
+    const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
+    const patientName = patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент';
+    const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
+      source: 'local_cache',
+    });
+
+    try {
+      const payload = buildDentistVisitProtocolSaveRequest(patient, visitData, {
+        isDraft: true,
+        rowVersion: 0,
+      });
+      logger.info('[Dentist] Сохраняю протокол визита в EMR v2', {
+        visitId: patient.visit_id,
+        patientId,
+      });
+
+      const response = await apiClient.post(`/v2/emr/${patient.visit_id}`, payload);
+      const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient) || localRecord;
+
+      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
+      return backendRecord;
+    } catch (error) {
+      logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
+        visitId: patient.visit_id,
+        patientName,
+        error: error?.message || error,
+      });
+
+      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
+      return localRecord;
+    }
+  }, []);
+
+  const reopenVisitProtocol = useCallback(async (protocolRecord) => {
+    const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id, protocolRecord);
+
+    if (!backendProtocol && !protocolRecord?.visitData) {
+      toast.error('Не удалось открыть протокол визита: данные не найдены.');
+      return;
+    }
+
+    const selectedProtocol = backendProtocol || protocolRecord;
+    setSelectedPatient({
+      id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
+      patient_id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
+      patient_name: selectedProtocol.patient_name || protocolRecord?.patient_name || 'Пациент',
+      patient_fio: selectedProtocol.patient_name || protocolRecord?.patient_name || 'Пациент',
+      visit_id: selectedProtocol.visit_id || protocolRecord?.visit_id || null,
+      visitData: selectedProtocol.visitData || protocolRecord?.visitData || null,
+      source: selectedProtocol.source || protocolRecord?.source || 'reports',
+    });
+    setShowVisitProtocol(true);
+  }, [loadDentistVisitProtocolByVisitId]);
 
   const handleDentalChart = (patient) => {
     setSelectedPatient({
@@ -2210,6 +2466,79 @@ const DentistPanelUnified = () => {
   // Рендер отчетов
   const renderReports = () =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {savedVisitProtocols.length > 0 &&
+      <Card padding="lg">
+          <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
+            <div>
+              <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>Сохранённые протоколы визитов</h3>
+              <p style={{
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
+                Последние протоколы доступны для повторного открытия без ручной пересборки
+              </p>
+            </div>
+          </div>
+
+          <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '16px'
+        }}>
+            {savedVisitProtocols.map((protocol) =>
+          <div
+            key={protocol.visit_id}
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+                <div>
+                  <div style={{
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '4px'
+              }}>{protocol.patient_name}</div>
+                  <div style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
+                    Визит #{protocol.visit_id} • {new Date(protocol.saved_at).toLocaleString('ru-RU')}
+                  </div>
+                </div>
+                <div style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)',
+              minHeight: '36px'
+            }}>
+                  {protocol.visitData?.chiefComplaint || 'Жалоба не указана'}
+                </div>
+                <Button
+                onClick={() => reopenVisitProtocol(protocol)}
+                style={{
+                  alignSelf: 'flex-start'
+                }}>
+                  Открыть протокол
+                </Button>
+              </div>
+          )}
+          </div>
+        </Card>
+      }
+
       <Card padding="lg">
         <div style={{
         display: 'flex',
@@ -2862,8 +3191,9 @@ const DentistPanelUnified = () => {
         patientName={selectedPatientDisplayName}
         visitId={selectedPatient.visit_id}
         initialData={selectedPatient.visitData}
-        onSave={(visitData) => {
+        onSave={async (visitData) => {
           logger.info('Сохранение протокола визита:', visitData);
+          await persistVisitProtocol(selectedPatient, visitData);
           setShowVisitProtocol(false);
         }}
         onClose={() => setShowVisitProtocol(false)} />
