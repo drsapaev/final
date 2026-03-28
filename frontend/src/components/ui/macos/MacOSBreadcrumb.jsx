@@ -126,7 +126,6 @@ const MacOSBreadcrumb = ({
               padding: 0
             }}
             title={item.title}
-            aria-label={item.label || item.title || 'Breadcrumb link'}
           >
             {itemContent}
           </button>

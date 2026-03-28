@@ -10,12 +10,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import MetaData, select, Table
 from sqlalchemy.orm import Session
 
-import logging
 from app.api.deps import get_db, require_roles
 from app.services.service_mapping import normalize_service_code
 from app.core.audit import log_critical_change, extract_model_changes
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
