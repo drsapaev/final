@@ -51,6 +51,16 @@ def upgrade() -> None:
     for definition in _real_catalog_definitions():
         service_code = definition["service_code"]
         template_code = definition["template_code"]
+
+        # Verify the template actually exists before inserting a binding
+        template_exists = bind.execute(
+            sa.text("SELECT 1 FROM lab_report_templates WHERE code = :code"),
+            {"code": template_code}
+        ).scalar()
+
+        if not template_exists:
+            continue
+
         desired_templates_by_code.setdefault(service_code, set()).add(template_code)
 
         stmt = insert(binding_table).values(

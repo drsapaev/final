@@ -17,6 +17,7 @@ from sqlalchemy import desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.audit import log_critical_change
 from app.models.emr_v2 import EMRAuditLog, EMRRecord, EMRRevision
 from app.models.visit import Visit
 from app.services.emr_contract import (
@@ -246,6 +247,20 @@ class EMRV2Service:
             action="create",
             user_id=user_id,
             extra_data={"version": 1},
+        )
+
+        from app.core.audit import log_audit_event
+        log_audit_event(
+            db=db,
+            user_id=user_id,
+            action="CREATE",
+            table_name="emr",
+            row_id=emr.id,
+            old_values=None,
+            new_values={"status": "draft", "version": 1},
+            request_id=client_session_id or "internal",
+            ip_address="internal",
+            description="EMR created"
         )
 
         db.commit()

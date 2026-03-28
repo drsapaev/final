@@ -1,11 +1,11 @@
 /**
  * EMRContainerV2 - Modular EMR container using v2 sections
- * 
+ *
  * Phase 4 Result:
  * - Uses modular sections instead of inline JSX
  * - SingleSheetEMR stays working until migration complete
  * - All Phase 1-3 features work (autosave, guards, history, conflict)
- * 
+ *
  * Phase 6 Additions:
  * - Keyboard shortcuts (Ctrl+S, Ctrl+Z, Ctrl+Y)
  * - Sticky header
@@ -54,7 +54,7 @@ import './EMRContainerV2.css';
 
 /**
  * EMRContainerV2 Component
- * 
+ *
  * @param {Object} props
  * @param {number} props.visitId - Visit ID
  * @param {number} props.patientId - Patient ID
@@ -88,30 +88,6 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
         forceOverwrite,
     } = useEMR(visitId, { specialty: canonicalSpecialty });
 
-    if (!visitId) {
-        return (
-            <div className="emr-v2-container">
-                <div className="emr-v2-main">
-                    <div className="emr-v2-actions">
-                        Ошибка контракта: для EMR v2 требуется `visitId`.
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (!specialty || !isCanonicalSpecialty(canonicalSpecialty)) {
-        return (
-            <div className="emr-v2-container">
-                <div className="emr-v2-main">
-                    <div className="emr-v2-actions">
-                        Ошибка контракта: передана ненормализованная specialty.
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData();
     const doctorId = currentUser?.id;
@@ -144,6 +120,29 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
     const [aiSuggestions, setAiSuggestions] = useState({});
     const [aiLoading, setAiLoading] = useState({});
 
+
+    if (!visitId) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: для EMR v2 требуется `visitId`.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!specialty || !isCanonicalSpecialty(canonicalSpecialty)) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: передана ненормализованная specialty.
+                    </div>
+                </div>
+            </div>
+        );
     // 🔄 Visit Lifecycle Management - критично для безопасности данных
     const visitLifecycle = useVisitLifecycle(visitId, patientId, {
         invalidateCacheOnChange: true,
@@ -595,23 +594,23 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                         aiLoading={aiLoading.treatment || false}
                     />
 
-                    {/* Recommendations is reused in TreatmentSection above, or separate? 
+                    {/* Recommendations is reused in TreatmentSection above, or separate?
                         EMR V2 usually separates Treatment (Process) and Recommendations (Output).
                         But TreatmentSection title is "Лечение".
-                        If data.treatment doesn't exist in backend, and TreatmentSection uses data.treatment, 
+                        If data.treatment doesn't exist in backend, and TreatmentSection uses data.treatment,
                         then it was broken or binding to undefined.
                         I'll bind it to 'recommendations' for now or 'treatment' if I add it to schema.
                         Wait, earlier view showed 'recommendations' in schema but no 'treatment'.
                         I will assume 'treatment' matches the UI intent for "Plan/Treatment".
                         But if backend lacks it, I should maybe use 'recommendations'.
                         However, usually "Recommendations" is separate.
-                        
+
                         Let's check 'data.treatment' usage in original file.
-                        Original file used 'data.treatment'. 
+                        Original file used 'data.treatment'.
                         If backend doesn't return it, it's undefined.
-                        
+
                         I will stick to 'data.treatment' for text value to avoid breaking existing logic if it exists somewhere else or is dynamic.
-                        BUT I will bind medications to 'medications'. 
+                        BUT I will bind medications to 'medications'.
                     */}
                     <RecommendationsSection
                         value={data.recommendations}

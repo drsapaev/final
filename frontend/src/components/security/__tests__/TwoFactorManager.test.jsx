@@ -4,17 +4,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
-const { getAccessToken, loggerInfo, loggerError } = vi.hoisted(() => ({
+const { getAccessToken, getRefreshToken, setAccessToken, clearAll, loggerInfo, loggerError, getUserData } = vi.hoisted(() => ({
   getAccessToken: vi.fn(() => 'test-token'),
+  getRefreshToken: vi.fn(() => 'refresh-token'),
+  setAccessToken: vi.fn(),
+  clearAll: vi.fn(),
   loggerInfo: vi.fn(),
   loggerError: vi.fn(),
+  getUserData: vi.fn(() => ({ id: 1, name: 'Test User' })),
 }));
 
-vi.mock('../../../utils/tokenManager', () => ({
-  default: {
+vi.mock('../../../utils/tokenManager', () => {
+  const tokenManagerMock = {
     getAccessToken,
-  },
-}));
+    getRefreshToken,
+    setAccessToken,
+    clearAll,
+    getUserData,
+  };
+  return {
+    __esModule: true,
+    tokenManager: tokenManagerMock,
+    default: tokenManagerMock,
+  };
+});
 
 vi.mock('../../../utils/logger', () => ({
   default: {
