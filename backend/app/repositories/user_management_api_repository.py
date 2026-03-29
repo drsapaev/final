@@ -34,6 +34,7 @@ class UserManagementApiRepository:
         language: str,
         compact_mode: bool,
         sidebar_collapsed: bool,
+        security_settings: dict[str, Any] | None = None,
     ) -> UserPreferences:
         preferences = UserPreferences(
             user_id=user_id,
@@ -42,6 +43,7 @@ class UserManagementApiRepository:
             language=language,
             compact_mode=compact_mode,
             sidebar_collapsed=sidebar_collapsed,
+            security_settings=security_settings or {},
         )
         self.db.add(preferences)
         return preferences
@@ -90,9 +92,12 @@ class UserManagementApiRepository:
                 language="ru",
                 compact_mode=False,
                 sidebar_collapsed=False,
+                security_settings={},
             )
         elif preferences.profile_id != profile_id:
             preferences.profile_id = profile_id
+        elif getattr(preferences, "security_settings", None) is None:
+            preferences.security_settings = {}
 
         notification_settings = user.notification_settings
         if not notification_settings:

@@ -1,0 +1,374 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e119]:
+          - img [ref=e120]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e39]
+        - button "Dermatologist User" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - text: Dermatologist User
+        - button "Выйти" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]:
+            - img [ref=e50]
+            - text: Выйти
+    - generic [ref=e53]:
+      - complementary [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Медицинская система
+          - button "Collapse sidebar" [ref=e58] [cursor=pointer]:
+            - img [ref=e60]
+        - navigation [ref=e63]:
+          - button "Queue" [ref=e64] [cursor=pointer]:
+            - img [ref=e65]
+            - generic [ref=e68]: Queue
+          - button "Appointments" [ref=e69] [cursor=pointer]:
+            - img [ref=e70]
+            - generic [ref=e73]: Appointments
+          - button "Visit" [ref=e74] [cursor=pointer]:
+            - img [ref=e75]
+            - generic [ref=e78]: Visit
+          - button "Patients" [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e83]: Patients
+          - button "Photos" [ref=e84] [cursor=pointer]:
+            - img [ref=e85]
+            - generic [ref=e88]: Photos
+          - button "Skin Examination" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e93]: Skin Examination
+          - button "Cosmetic" [ref=e94] [cursor=pointer]:
+            - img [ref=e95]
+            - generic [ref=e99]: Cosmetic
+          - button "AI Assistant" [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+            - generic [ref=e104]: AI Assistant
+          - button "Services" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e109]: Services
+          - button "History" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e116]: History
+      - main [ref=e117]:
+        - generic [ref=e123]:
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - 'heading "Прием пациента: QA Smoke BCDEFG" [level=3] [ref=e128]':
+                - img [ref=e129]
+                - text: "Прием пациента: QA Smoke BCDEFG"
+              - generic [ref=e133]: "Статус:"
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - heading "Прогресс визита" [level=3] [ref=e136]
+                - generic [ref=e138]: 0%
+              - generic [ref=e139]:
+                - generic [ref=e141]:
+                  - img [ref=e143]
+                  - generic [ref=e146]:
+                    - generic [ref=e147]:
+                      - heading "Запись создана" [level=4] [ref=e148]
+                      - generic [ref=e149]: Готово
+                    - paragraph [ref=e150]: Пациент записан на прием
+                - generic [ref=e152]:
+                  - img [ref=e154]
+                  - generic [ref=e156]:
+                    - generic [ref=e157]:
+                      - heading "Оплата" [level=4] [ref=e158]
+                      - generic [ref=e159]: Ожидание
+                    - paragraph [ref=e160]: Ожидание оплаты записи
+                - generic [ref=e162]:
+                  - img [ref=e164]
+                  - generic [ref=e167]:
+                    - generic [ref=e168]:
+                      - heading "Прием у врача" [level=4] [ref=e169]
+                      - generic [ref=e170]: Ожидание
+                    - paragraph [ref=e171]: Начало приема
+                - generic [ref=e173]:
+                  - img [ref=e175]
+                  - generic [ref=e178]:
+                    - generic [ref=e179]:
+                      - heading "ЭМК" [level=4] [ref=e180]
+                      - generic [ref=e181]: Ожидание
+                    - paragraph [ref=e182]: Электронная медицинская карта
+                - generic [ref=e184]:
+                  - img [ref=e186]
+                  - generic [ref=e189]:
+                    - generic [ref=e190]:
+                      - heading "Рецепт" [level=4] [ref=e191]
+                      - generic [ref=e192]: Ожидание
+                    - paragraph [ref=e193]: Назначение препаратов
+              - generic [ref=e196]:
+                - generic [ref=e197]: Текущий статус
+                - generic [ref=e198]: Неизвестно
+              - generic [ref=e201]:
+                - img [ref=e202]
+                - generic [ref=e204]: Следующий шаг
+            - generic [ref=e205]:
+              - heading "Электронная медицинская карта" [level=4] [ref=e206]:
+                - img [ref=e207]
+                - text: Электронная медицинская карта
+              - generic [ref=e211]:
+                - generic [ref=e212]:
+                  - generic [ref=e213]:
+                    - heading "ЭМК v2" [level=2] [ref=e214]
+                    - generic [ref=e215]: "Пациент #455"
+                  - generic [ref=e216]:
+                    - generic "Начните вводить данные" [ref=e217]:
+                      - generic [ref=e218]: Новый документ
+                      - generic "Версия 1" [ref=e219]: v1
+                    - button "❓" [ref=e220] [cursor=pointer]
+                    - button "👻" [ref=e221] [cursor=pointer]
+                    - button "📜" [ref=e222] [cursor=pointer]
+                - generic [ref=e223]:
+                  - button "↩️ Отменить" [disabled] [ref=e224]
+                  - button "↪️ Повторить" [disabled] [ref=e225]
+                  - button "🔄 Обновить" [ref=e226] [cursor=pointer]
+                - generic [ref=e227]:
+                  - generic [ref=e228]:
+                    - generic [ref=e229]:
+                      - button "📋 Жалобы* ▼" [expanded] [ref=e230] [cursor=pointer]:
+                        - generic [ref=e231]: 📋
+                        - generic [ref=e232]: Жалобы*
+                        - generic [ref=e233]: ▼
+                      - button "Мой опыт" [ref=e235] [cursor=pointer]:
+                        - img [ref=e236]
+                        - generic [ref=e240]: Мой опыт
+                    - textbox "Введите жалобы пациента..." [ref=e246]
+                  - generic [ref=e247]:
+                    - generic [ref=e248]:
+                      - button "📖 Анамнез заболевания ▼" [expanded] [ref=e249] [cursor=pointer]:
+                        - generic [ref=e250]: 📖
+                        - generic [ref=e251]: Анамнез заболевания
+                        - generic [ref=e252]: ▼
+                      - button "Мой опыт" [ref=e254] [cursor=pointer]:
+                        - img [ref=e255]
+                        - generic [ref=e259]: Мой опыт
+                    - textbox "История текущего заболевания..." [ref=e265]
+                  - generic [ref=e266]:
+                    - generic [ref=e267]:
+                      - button "👤 Анамнез жизни и параметры ▼" [expanded] [ref=e268] [cursor=pointer]:
+                        - generic [ref=e269]: 👤
+                        - generic [ref=e270]: Анамнез жизни и параметры
+                        - generic [ref=e271]: ▼
+                      - button "Мой опыт" [ref=e273] [cursor=pointer]:
+                        - img [ref=e274]
+                        - generic [ref=e278]: Мой опыт
+                    - generic [ref=e281]:
+                      - generic [ref=e282]:
+                        - heading "Витальные показатели" [level=4] [ref=e283]
+                        - generic [ref=e284]:
+                          - generic [ref=e285]:
+                            - generic [ref=e286]:
+                              - generic [ref=e287]: АД сист.
+                              - spinbutton [ref=e288]
+                            - generic [ref=e289]: /
+                            - generic [ref=e290]:
+                              - generic [ref=e291]: АД диаст.
+                              - spinbutton [ref=e292]
+                            - generic [ref=e293]:
+                              - generic [ref=e294]: Пульс
+                              - spinbutton [ref=e295]
+                            - generic [ref=e296]:
+                              - generic [ref=e297]: SpO₂
+                              - spinbutton [ref=e298]
+                              - generic: "%"
+                          - generic [ref=e299]:
+                            - generic [ref=e300]:
+                              - generic [ref=e301]: Рост
+                              - spinbutton [ref=e302]
+                              - generic: см
+                            - generic [ref=e303]:
+                              - generic [ref=e304]: Вес
+                              - spinbutton [ref=e305]
+                              - generic: кг
+                      - textbox "Хронические заболевания, аллергии, наследственность..." [ref=e307]
+                  - generic [ref=e308]:
+                    - generic [ref=e309]:
+                      - button "🔍 Объективный осмотр ▼" [expanded] [ref=e310] [cursor=pointer]:
+                        - generic [ref=e311]: 🔍
+                        - generic [ref=e312]: Объективный осмотр
+                        - generic [ref=e313]: ▼
+                      - button "Мой опыт" [ref=e315] [cursor=pointer]:
+                        - img [ref=e316]
+                        - generic [ref=e320]: Мой опыт
+                    - generic [ref=e323]:
+                      - generic [ref=e325]:
+                        - generic [ref=e326]:
+                          - button "Тип кожи" [ref=e327] [cursor=pointer]
+                          - button "Состояние" [ref=e328] [cursor=pointer]
+                          - button "Локализация" [ref=e329] [cursor=pointer]
+                          - button "Характеристики" [ref=e330] [cursor=pointer]
+                        - generic [ref=e331]:
+                          - generic [ref=e332]:
+                            - generic [ref=e333]: Нормальная
+                            - generic [ref=e334]:
+                              - button "Норма" [ref=e335] [cursor=pointer]:
+                                - img [ref=e336]
+                              - button "Патология" [ref=e338] [cursor=pointer]:
+                                - img [ref=e339]
+                          - generic [ref=e341]:
+                            - generic [ref=e342]: Сухая
+                            - generic [ref=e343]:
+                              - button "Норма" [ref=e344] [cursor=pointer]:
+                                - img [ref=e345]
+                              - button "Патология" [ref=e347] [cursor=pointer]:
+                                - img [ref=e348]
+                          - generic [ref=e350]:
+                            - generic [ref=e351]: Жирная
+                            - generic [ref=e352]:
+                              - button "Норма" [ref=e353] [cursor=pointer]:
+                                - img [ref=e354]
+                              - button "Патология" [ref=e356] [cursor=pointer]:
+                                - img [ref=e357]
+                          - generic [ref=e359]:
+                            - generic [ref=e360]: Комбинированная
+                            - generic [ref=e361]:
+                              - button "Норма" [ref=e362] [cursor=pointer]:
+                                - img [ref=e363]
+                              - button "Патология" [ref=e365] [cursor=pointer]:
+                                - img [ref=e366]
+                          - generic [ref=e368]:
+                            - generic [ref=e369]: Чувствительная
+                            - generic [ref=e370]:
+                              - button "Норма" [ref=e371] [cursor=pointer]:
+                                - img [ref=e372]
+                              - button "Патология" [ref=e374] [cursor=pointer]:
+                                - img [ref=e375]
+                      - textbox "Общее состояние, кожные покровы, лимфоузлы, органы и системы..." [ref=e379]
+                  - generic [ref=e380]:
+                    - button "🩺 Диагноз* ▼" [expanded] [ref=e382] [cursor=pointer]:
+                      - generic [ref=e383]: 🩺
+                      - generic [ref=e384]: Диагноз*
+                      - generic [ref=e385]: ▼
+                    - generic [ref=e389]:
+                      - generic [ref=e391]:
+                        - textbox "Основной диагноз..." [ref=e392]: "[object Object]"
+                        - button "🧠" [ref=e394] [cursor=pointer]:
+                          - generic [ref=e395]: 🧠
+                      - generic [ref=e397]:
+                        - generic [ref=e398]: Код МКБ-10
+                        - textbox "Код МКБ-10" [ref=e399]:
+                          - /placeholder: например, J06.9
+                  - generic [ref=e400]:
+                    - generic [ref=e401]:
+                      - button "💊 Лечение ▼" [expanded] [ref=e402] [cursor=pointer]:
+                        - generic [ref=e403]: 💊
+                        - generic [ref=e404]: Лечение
+                        - generic [ref=e405]: ▼
+                      - generic [ref=e407]:
+                        - button "Мой опыт" [ref=e408] [cursor=pointer]:
+                          - img [ref=e409]
+                          - text: Мой опыт
+                        - button "📋 Шаблоны" [ref=e413] [cursor=pointer]
+                    - generic [ref=e416]:
+                      - textbox "План лечения, назначения..." [ref=e419]
+                      - generic [ref=e420]:
+                        - heading "Лекарственные назначения" [level=4] [ref=e421]
+                        - button "Добавить назначение" [ref=e423] [cursor=pointer]:
+                          - img [ref=e424]
+                          - text: Добавить назначение
+                  - generic [ref=e425]:
+                    - generic [ref=e426]:
+                      - button "💡 Рекомендации ▼" [expanded] [ref=e427] [cursor=pointer]:
+                        - generic [ref=e428]: 💡
+                        - generic [ref=e429]: Рекомендации
+                        - generic [ref=e430]: ▼
+                      - button "Мой опыт" [ref=e432] [cursor=pointer]:
+                        - img [ref=e433]
+                        - generic [ref=e437]: Мой опыт
+                    - textbox "Рекомендации пациенту, режим, диета..." [ref=e442]
+                  - generic [ref=e443]:
+                    - generic [ref=e444]:
+                      - button "📝 Примечания ▼" [ref=e445] [cursor=pointer]:
+                        - generic [ref=e446]: 📝
+                        - generic [ref=e447]: Примечания
+                        - generic [ref=e448]: ▼
+                      - button "Мой опыт" [ref=e450] [cursor=pointer]:
+                        - img [ref=e451]
+                        - generic [ref=e455]: Мой опыт
+                    - textbox "Дополнительные заметки врача..." [ref=e458]
+                  - generic [ref=e459]:
+                    - button "🧴 Дерматологические данные ▼" [expanded] [ref=e461] [cursor=pointer]:
+                      - generic [ref=e462]: 🧴
+                      - generic [ref=e463]: Дерматологические данные
+                      - generic [ref=e464]: ▼
+                    - generic [ref=e467]:
+                      - generic [ref=e468]:
+                        - generic [ref=e469]: Тип кожи
+                        - combobox [ref=e470] [cursor=pointer]:
+                          - option "Не указан" [selected]
+                          - option "Нормальная"
+                          - option "Сухая"
+                          - option "Жирная"
+                          - option "Комбинированная"
+                          - option "Чувствительная"
+                      - generic [ref=e471]:
+                        - generic [ref=e472]: Состояния
+                        - generic [ref=e473]:
+                          - generic [ref=e474] [cursor=pointer]:
+                            - checkbox "Акне" [ref=e475]
+                            - generic [ref=e476]: Акне
+                          - generic [ref=e477] [cursor=pointer]:
+                            - checkbox "Розацеа" [ref=e478]
+                            - generic [ref=e479]: Розацеа
+                          - generic [ref=e480] [cursor=pointer]:
+                            - checkbox "Экзема" [ref=e481]
+                            - generic [ref=e482]: Экзема
+                          - generic [ref=e483] [cursor=pointer]:
+                            - checkbox "Псориаз" [ref=e484]
+                            - generic [ref=e485]: Псориаз
+                          - generic [ref=e486] [cursor=pointer]:
+                            - checkbox "Пигментация" [ref=e487]
+                            - generic [ref=e488]: Пигментация
+                          - generic [ref=e489] [cursor=pointer]:
+                            - checkbox "Морщины" [ref=e490]
+                            - generic [ref=e491]: Морщины
+                      - generic [ref=e492]:
+                        - generic [ref=e493]:
+                          - generic [ref=e494]: Фото-архив
+                          - button "Загрузить фото" [ref=e495] [cursor=pointer]:
+                            - img [ref=e496]
+                            - text: Загрузить фото
+                        - generic [ref=e499]:
+                          - img [ref=e500]
+                          - paragraph [ref=e504]: Нет загруженных фото
+                      - generic [ref=e505]:
+                        - generic [ref=e506]: Локализация поражений
+                        - generic [ref=e508]:
+                          - textbox "Опишите локализацию поражений..." [ref=e509]
+                          - button "🧠" [ref=e511] [cursor=pointer]:
+                            - generic [ref=e512]: 🧠
+                - generic [ref=e513]:
+                  - button "💾 Сохранить" [disabled] [ref=e514]
+                  - button "✅ Подписать" [ref=e515] [cursor=pointer]
+          - button "💬 AI" [ref=e516] [cursor=pointer]:
+            - generic [ref=e517]: 💬
+            - generic [ref=e518]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e519]:
+    - generic [ref=e520]:
+      - img [ref=e521]
+      - generic [ref=e524]:
+        - strong [ref=e525]: Включить уведомления?
+        - generic [ref=e526]: Получайте уведомления о новых сообщениях
+    - generic [ref=e527]:
+      - button "Включить" [ref=e528] [cursor=pointer]
+      - button "Закрыть" [ref=e529] [cursor=pointer]:
+        - img [ref=e530]

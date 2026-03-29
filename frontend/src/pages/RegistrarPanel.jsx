@@ -40,6 +40,7 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
 
 // Утилиты для работы с датами
 import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
+import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 
 // ⭐ SSOT: Centralized service code resolver
 import { SPECIALTY_TO_CODE, toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
@@ -663,6 +664,40 @@ const RegistrarPanel = () => {
         }, 100);
       }*/}, [appointments]); // Убираем дублирование - filteredAppointments уже определена ниже в коде
   const [showSlotsModal, setShowSlotsModal] = useState(false);const [showQRModal, setShowQRModal] = useState(false);const autoRefresh = true; // Новые состояния для интеграции с админ панелью
+  const resolveRescheduleVisitId = useCallback((appointmentRow) => {
+    return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || appointmentRow?.appointment_id || appointmentRow?.appointment_ids?.[0] || appointmentRow?.id || null;
+  }, []);
+  const removeRescheduledAppointmentFromView = useCallback((appointmentRow, visitId) => {
+    if (!appointmentRow) return;
+
+    const idsToRemove = new Set();
+    [appointmentRow.id, appointmentRow.visit_id, appointmentRow.visitId, appointmentRow.appointment_id, appointmentRow.queue_entry_id, visitId].forEach((id) => {
+      if (id !== undefined && id !== null) {
+        idsToRemove.add(String(id));
+      }
+    });
+    [appointmentRow.visit_ids, appointmentRow.appointment_ids, appointmentRow.queue_entry_ids].forEach((ids) => {
+      if (Array.isArray(ids)) {
+        ids.forEach((id) => {
+          if (id !== undefined && id !== null) {
+            idsToRemove.add(String(id));
+          }
+        });
+      }
+    });
+    if (Array.isArray(appointmentRow.aggregated_ids)) {
+      appointmentRow.aggregated_ids.forEach((id) => {
+        if (id !== undefined && id !== null) {
+          idsToRemove.add(String(id));
+        }
+      });
+    }
+
+    setAppointments((prev) => prev.filter((apt) => {
+      const candidateIds = [apt.id, apt.visit_id, apt.visitId, apt.appointment_id, apt.queue_entry_id];
+      return !candidateIds.some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
+    }));
+  }, []);
   const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [selectedDoctor, setSelectedDoctor] = useState(null);const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Инициализация selectedDoctor первым доступным врачом
   useEffect(() => {if (!selectedDoctor && doctors.length > 0) {setSelectedDoctor(doctors[0]);}}, [doctors, selectedDoctor]); // Переводы
   const translations = { ru: { // Основные
@@ -1144,6 +1179,9 @@ const RegistrarPanel = () => {
             return {
               // SSOT passthrough
               id: entryId,
+              visit_id: fullEntry.visit_id || entry.visit_id || null,
+              appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId,
+              queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
               patient_id: fullEntry.patient_id || entry.patient_id,
               patient_fio: fullEntry.patient_name || entry.patient_name || 'Неизвестный пациент',
               patient_birth_year: fullEntry.patient_birth_year || fullEntry.birth_year || null,
@@ -2147,9 +2185,17 @@ const RegistrarPanel = () => {
       if (!patientGroups[patientKey]) {
         // ✅ ИСПРАВЛЕНО: Проверяем All Free статус для корректного отображения
         const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
+        const initialVisitId = appointment.visit_id || appointment.visitId || appointment.id;
+        const initialQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
 
         patientGroups[patientKey] = {
           id: appointment.id,
+          visit_id: initialVisitId,
+          appointment_id: appointment.appointment_id || appointment.id,
+          queue_entry_id: initialQueueEntryId,
+          visit_ids: initialVisitId !== null && initialVisitId !== undefined ? [initialVisitId] : [],
+          appointment_ids: [appointment.id],
+          queue_entry_ids: initialQueueEntryId !== null && initialQueueEntryId !== undefined ? [initialQueueEntryId] : [],
           patient_id: appointment.patient_id,
           patient_fio: appointment.patient_fio,
           patient_birth_year: appointment.patient_birth_year,
@@ -2191,6 +2237,29 @@ const RegistrarPanel = () => {
         patientGroups[patientKey].aggregated_ids.push(...newIds);
         // Убираем возможные дубликаты
         patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
+        const nextVisitId = appointment.visit_id || appointment.visitId || appointment.id;
+        const nextQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
+        if (nextVisitId !== null && nextVisitId !== undefined) {
+          patientGroups[patientKey].visit_ids.push(nextVisitId);
+          patientGroups[patientKey].visit_ids = [...new Set(patientGroups[patientKey].visit_ids)];
+          if (!patientGroups[patientKey].visit_id) {
+            patientGroups[patientKey].visit_id = nextVisitId;
+          }
+        }
+        if (appointment.id !== null && appointment.id !== undefined) {
+          patientGroups[patientKey].appointment_ids.push(appointment.id);
+          patientGroups[patientKey].appointment_ids = [...new Set(patientGroups[patientKey].appointment_ids)];
+          if (!patientGroups[patientKey].appointment_id) {
+            patientGroups[patientKey].appointment_id = appointment.id;
+          }
+        }
+        if (nextQueueEntryId !== null && nextQueueEntryId !== undefined) {
+          patientGroups[patientKey].queue_entry_ids.push(nextQueueEntryId);
+          patientGroups[patientKey].queue_entry_ids = [...new Set(patientGroups[patientKey].queue_entry_ids)];
+          if (!patientGroups[patientKey].queue_entry_id) {
+            patientGroups[patientKey].queue_entry_id = nextQueueEntryId;
+          }
+        }
 
         // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
         const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
@@ -4202,9 +4271,11 @@ const RegistrarPanel = () => {
               if (!rescheduleData) return;
               try {
                 setShowSlotsModal(false);
-                logger.info(`Перенос визита ${rescheduleData.id} на завтра`);
-                await api.post(`/visits/${rescheduleData.id}/reschedule/tomorrow`);
+                const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                logger.info(`Перенос визита ${targetVisitId} на завтра`);
+                await rescheduleTomorrow(targetVisitId);
                 toast.success('Визит успешно перенесен на завтра');
+                removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
@@ -4228,9 +4299,11 @@ const RegistrarPanel = () => {
 
                 try {
                   setShowSlotsModal(false);
-                  logger.info(`Перенос визита ${rescheduleData.id} на ${dateStr}`);
-                  await api.post(`/visits/${rescheduleData.id}/reschedule`, null, { params: { new_date: dateStr } });
+                  const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                  logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
+                  await rescheduleVisit(targetVisitId, dateStr);
                   toast.success(`Визит перенесен на ${dateStr}`);
+                  removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                   setRescheduleData(null);
                   loadAppointments({ source: 'reschedule_date' });
                 } catch (e) {

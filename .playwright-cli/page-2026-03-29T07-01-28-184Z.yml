@@ -1,0 +1,462 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e119]:
+          - img [ref=e120]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e39]
+        - button "Dermatologist User" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - text: Dermatologist User
+        - button "Выйти" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]:
+            - img [ref=e50]
+            - text: Выйти
+    - generic [ref=e53]:
+      - complementary [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Медицинская система
+          - button "Collapse sidebar" [ref=e58] [cursor=pointer]:
+            - img [ref=e60]
+        - navigation [ref=e63]:
+          - button "Queue" [ref=e64] [cursor=pointer]:
+            - img [ref=e65]
+            - generic [ref=e68]: Queue
+          - button "Appointments" [ref=e69] [cursor=pointer]:
+            - img [ref=e70]
+            - generic [ref=e73]: Appointments
+          - button "Visit" [ref=e74] [cursor=pointer]:
+            - img [ref=e75]
+            - generic [ref=e78]: Visit
+          - button "Patients" [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e83]: Patients
+          - button "Photos" [ref=e84] [cursor=pointer]:
+            - img [ref=e85]
+            - generic [ref=e88]: Photos
+          - button "Skin Examination" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e93]: Skin Examination
+          - button "Cosmetic" [ref=e94] [cursor=pointer]:
+            - img [ref=e95]
+            - generic [ref=e99]: Cosmetic
+          - button "AI Assistant" [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+            - generic [ref=e104]: AI Assistant
+          - button "Services" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e109]: Services
+          - button "History" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e116]: History
+      - main [ref=e117]:
+        - generic [ref=e123]:
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - 'heading "Прием пациента: Тестовый Пациент" [level=3] [ref=e128]':
+                - img [ref=e129]
+                - text: "Прием пациента: Тестовый Пациент"
+              - generic [ref=e133]: "Статус: in_visit"
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - heading "Прогресс визита" [level=3] [ref=e136]
+                - generic [ref=e138]: 67%
+              - generic [ref=e139]:
+                - generic [ref=e141]:
+                  - img [ref=e143]
+                  - generic [ref=e146]:
+                    - generic [ref=e147]:
+                      - heading "Запись создана" [level=4] [ref=e148]
+                      - generic [ref=e149]: Готово
+                    - paragraph [ref=e150]: Пациент записан на прием
+                - generic [ref=e152]:
+                  - img [ref=e154]
+                  - generic [ref=e157]:
+                    - generic [ref=e158]:
+                      - heading "Оплата" [level=4] [ref=e159]
+                      - generic [ref=e160]: Готово
+                    - paragraph [ref=e161]: Ожидание оплаты записи
+                - generic [ref=e163]:
+                  - img [ref=e165]
+                  - generic [ref=e168]:
+                    - generic [ref=e169]:
+                      - heading "Прием у врача" [level=4] [ref=e170]
+                      - generic [ref=e171]: В процессе
+                    - paragraph [ref=e172]: Начало приема
+                - generic [ref=e174]:
+                  - img [ref=e176]
+                  - generic [ref=e179]:
+                    - generic [ref=e180]:
+                      - heading "ЭМК" [level=4] [ref=e181]
+                      - generic [ref=e182]: Готово
+                    - paragraph [ref=e183]: Электронная медицинская карта
+                - generic [ref=e185]:
+                  - img [ref=e187]
+                  - generic [ref=e190]:
+                    - generic [ref=e191]:
+                      - heading "Рецепт" [level=4] [ref=e192]
+                      - generic [ref=e193]: Ожидание
+                    - paragraph [ref=e194]: Назначение препаратов
+              - generic [ref=e196]:
+                - generic [ref=e197]:
+                  - generic [ref=e198]: Текущий статус
+                  - generic [ref=e199]: На приеме
+                - generic [ref=e200]: На приеме
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - img [ref=e203]
+                  - generic [ref=e205]: Следующий шаг
+                - generic [ref=e206]: Оформите рецепт (опционально)
+            - generic [ref=e207]:
+              - heading "Электронная медицинская карта" [level=4] [ref=e208]:
+                - img [ref=e209]
+                - text: Электронная медицинская карта
+              - generic [ref=e213]:
+                - generic [ref=e214]:
+                  - generic [ref=e215]:
+                    - heading "ЭМК v2" [level=2] [ref=e216]
+                    - generic [ref=e217]: "Пациент #455"
+                  - generic [ref=e218]:
+                    - generic "Подписана 11:10:00" [ref=e219]:
+                      - generic [ref=e220]: ✅ Подписана
+                      - generic "Версия 1" [ref=e221]: v1
+                    - button "❓" [ref=e222] [cursor=pointer]
+                    - button "👻" [disabled] [ref=e223]
+                    - button "📜" [ref=e224] [cursor=pointer]
+                - generic [ref=e225]:
+                  - button "↩️ Отменить" [disabled] [ref=e226]
+                  - button "↪️ Повторить" [disabled] [ref=e227]
+                  - button "🔄 Обновить" [ref=e228] [cursor=pointer]
+                - generic [ref=e229]:
+                  - generic:
+                    - generic:
+                      - button "📋 Жалобы* ▼" [expanded]:
+                        - generic: 📋
+                        - generic: Жалобы*
+                        - generic: ▼
+                      - generic:
+                        - button "Мой опыт" [disabled]:
+                          - img
+                          - generic: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - textbox "Введите жалобы пациента..." [disabled]: Пигментные высыпания
+                              - generic: 🔒 Подписано
+                  - generic:
+                    - generic:
+                      - button "📖 Анамнез заболевания ▼" [expanded]:
+                        - generic: 📖
+                        - generic: Анамнез заболевания
+                        - generic: ▼
+                      - generic:
+                        - button "Мой опыт" [disabled]:
+                          - img
+                          - generic: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - textbox "История текущего заболевания..." [disabled]: Сыпь на коже 2 недели
+                  - generic:
+                    - generic:
+                      - button "👤 Анамнез жизни и параметры ▼" [expanded]:
+                        - generic: 👤
+                        - generic: Анамнез жизни и параметры
+                        - generic: ▼
+                      - generic:
+                        - button "Мой опыт" [disabled]:
+                          - img
+                          - generic: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - heading "Витальные показатели" [level=4]
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic: АД сист.
+                                  - spinbutton [disabled]
+                                - generic: /
+                                - generic:
+                                  - generic: АД диаст.
+                                  - spinbutton [disabled]
+                                - generic:
+                                  - generic: Пульс
+                                  - spinbutton [disabled]
+                                - generic:
+                                  - generic: SpO₂
+                                  - spinbutton [disabled]
+                                  - generic: "%"
+                              - generic:
+                                - generic:
+                                  - generic: Рост
+                                  - spinbutton [disabled]
+                                  - generic: см
+                                - generic:
+                                  - generic: Вес
+                                  - spinbutton [disabled]
+                                  - generic: кг
+                          - generic:
+                            - textbox "Хронические заболевания, аллергии, наследственность..." [disabled]: Аллергии отрицает
+                  - generic:
+                    - generic:
+                      - button "🔍 Объективный осмотр ▼" [expanded]:
+                        - generic: 🔍
+                        - generic: Объективный осмотр
+                        - generic: ▼
+                      - generic:
+                        - button "Мой опыт" [disabled]:
+                          - img
+                          - generic: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - button "Тип кожи"
+                                - button "Состояние"
+                                - button "Локализация"
+                                - button "Характеристики"
+                              - generic:
+                                - generic:
+                                  - generic: Нормальная
+                                  - generic:
+                                    - button "Норма":
+                                      - img
+                                    - button "Патология":
+                                      - img
+                                - generic:
+                                  - generic: Сухая
+                                  - generic:
+                                    - button "Норма":
+                                      - img
+                                    - button "Патология":
+                                      - img
+                                - generic:
+                                  - generic: Жирная
+                                  - generic:
+                                    - button "Норма":
+                                      - img
+                                    - button "Патология":
+                                      - img
+                                - generic:
+                                  - generic: Комбинированная
+                                  - generic:
+                                    - button "Норма":
+                                      - img
+                                    - button "Патология":
+                                      - img
+                                - generic:
+                                  - generic: Чувствительная
+                                  - generic:
+                                    - button "Норма":
+                                      - img
+                                    - button "Патология":
+                                      - img
+                          - generic:
+                            - generic:
+                              - textbox "Общее состояние, кожные покровы, лимфоузлы, органы и системы..." [disabled]: Осмотр кожи без острых признаков
+                  - generic:
+                    - generic:
+                      - button "🩺 Диагноз* L70.0 ▼" [expanded]:
+                        - generic: 🩺
+                        - generic: Диагноз*
+                        - generic: L70.0
+                        - generic: ▼
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - textbox "Основной диагноз..." [disabled]: Акне
+                            - generic:
+                              - generic:
+                                - generic: Код МКБ-10
+                                - textbox "Код МКБ-10" [disabled]:
+                                  - /placeholder: например, J06.9
+                                  - text: L70.0
+                  - generic:
+                    - generic:
+                      - button "💊 Лечение ▼" [expanded]:
+                        - generic: 💊
+                        - generic: Лечение
+                        - generic: ▼
+                      - generic:
+                        - generic:
+                          - button "Мой опыт" [disabled]:
+                            - img
+                            - text: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - textbox "План лечения, назначения..." [disabled]
+                          - generic:
+                            - heading "Лекарственные назначения" [level=4]
+                  - generic:
+                    - generic:
+                      - button "💡 Рекомендации ▼" [expanded]:
+                        - generic: 💡
+                        - generic: Рекомендации
+                        - generic: ▼
+                      - generic:
+                        - button "Мой опыт" [disabled]:
+                          - img
+                          - generic: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - textbox "Рекомендации пациенту, режим, диета..." [disabled]: Наблюдение у дерматолога
+                  - generic:
+                    - generic:
+                      - button "📝 Примечания ▼":
+                        - generic: 📝
+                        - generic: Примечания
+                        - generic: ▼
+                      - generic:
+                        - button "Мой опыт" [disabled]:
+                          - img
+                          - generic: Мой опыт
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - textbox "Дополнительные заметки врача..." [disabled]
+                  - generic:
+                    - generic:
+                      - button "🧴 Дерматологические данные ▼" [expanded]:
+                        - generic: 🧴
+                        - generic: Дерматологические данные
+                        - generic: ▼
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Тип кожи
+                            - combobox [disabled]:
+                              - option "Не указан" [selected]
+                              - option "Нормальная"
+                              - option "Сухая"
+                              - option "Жирная"
+                              - option "Комбинированная"
+                              - option "Чувствительная"
+                          - generic:
+                            - generic: Состояния
+                            - generic:
+                              - generic:
+                                - checkbox "Акне" [disabled]
+                                - generic: Акне
+                              - generic:
+                                - checkbox "Розацеа" [disabled]
+                                - generic: Розацеа
+                              - generic:
+                                - checkbox "Экзема" [disabled]
+                                - generic: Экзема
+                              - generic:
+                                - checkbox "Псориаз" [disabled]
+                                - generic: Псориаз
+                              - generic:
+                                - checkbox "Пигментация" [disabled]
+                                - generic: Пигментация
+                              - generic:
+                                - checkbox "Морщины" [disabled]
+                                - generic: Морщины
+                          - generic:
+                            - generic:
+                              - generic: Фото-архив
+                            - generic:
+                              - img
+                              - paragraph: Нет загруженных фото
+                          - generic:
+                            - generic: Локализация поражений
+                            - generic:
+                              - generic:
+                                - textbox "Опишите локализацию поражений..." [disabled]
+                - generic [ref=e230]:
+                  - generic [ref=e231]: ✅ Подписана
+                  - button "📝 Внести поправку" [ref=e232] [cursor=pointer]
+            - generic [ref=e233]:
+              - heading "Рецепт" [level=4] [ref=e234]:
+                - img [ref=e235]
+                - text: Рецепт
+              - generic [ref=e237]:
+                - generic [ref=e239]:
+                  - generic [ref=e240]:
+                    - img [ref=e241]
+                    - generic [ref=e244]:
+                      - heading "Рецепт" [level=2] [ref=e245]
+                      - paragraph [ref=e246]: Тестовый Пациент •
+                  - generic [ref=e248]: Черновик
+                - generic [ref=e249]:
+                  - generic [ref=e250]:
+                    - heading "Назначенные препараты" [level=3] [ref=e251]
+                    - button "Добавить препарат" [ref=e252] [cursor=pointer]:
+                      - img [ref=e253]
+                      - text: Добавить препарат
+                  - generic [ref=e254]: Препараты не назначены
+                - generic [ref=e255]:
+                  - heading "Общие инструкции" [level=3] [ref=e256]
+                  - textbox "Общие рекомендации по приему препаратов..." [ref=e257]
+                - generic [ref=e258]:
+                  - heading "Заметки врача" [level=3] [ref=e259]
+                  - textbox "Внутренние заметки врача..." [ref=e260]
+                - generic [ref=e261]:
+                  - heading "Предпросмотр рецепта" [level=3] [ref=e262]
+                  - generic [ref=e264]:
+                    - generic [ref=e265]: РЕЦЕПТ
+                    - generic [ref=e266]:
+                      - generic [ref=e267]: "Пациент: Тестовый Пациент"
+                      - generic [ref=e268]: "Дата: 29.03.2026"
+                      - generic [ref=e269]: "Врач:"
+                    - generic [ref=e270]: "Подпись врача: _________________"
+                - generic [ref=e273]:
+                  - button "Сохранить рецепт" [disabled]:
+                    - img
+                    - text: Сохранить рецепт
+                  - button "Печать рецепта" [disabled]:
+                    - img
+                    - text: Печать рецепта
+            - button "Завершить прием" [ref=e275] [cursor=pointer]:
+              - generic [ref=e276]:
+                - img [ref=e277]
+                - text: Завершить прием
+          - button "💬 AI" [ref=e280] [cursor=pointer]:
+            - generic [ref=e281]: 💬
+            - generic [ref=e282]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e283]:
+    - generic [ref=e284]:
+      - img [ref=e285]
+      - generic [ref=e288]:
+        - strong [ref=e289]: Включить уведомления?
+        - generic [ref=e290]: Получайте уведомления о новых сообщениях
+    - generic [ref=e291]:
+      - button "Включить" [ref=e292] [cursor=pointer]
+      - button "Закрыть" [ref=e293] [cursor=pointer]:
+        - img [ref=e294]

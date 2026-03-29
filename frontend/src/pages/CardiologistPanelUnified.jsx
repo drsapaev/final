@@ -50,7 +50,13 @@ const MacOSCardiologistPanelUnified = () => {
   // Получаем активную вкладку и patientId из URL параметров
   const getInitialTab = () => {
     const params = new URLSearchParams(location.search);
-    // Deep-link по patientId требует выбора канонического визита из очереди
+    const visitIdParam = params.get('visitId') || params.get('visit_id');
+
+    // Deep-link по visitId должен сразу открывать прием,
+    // а deep-link по patientId по умолчанию ведет в appointments.
+    if (visitIdParam) {
+      return params.get('tab') || 'visit';
+    }
     if (params.get('patientId')) {
       return 'appointments';
     }
@@ -61,6 +67,17 @@ const MacOSCardiologistPanelUnified = () => {
   const getPatientIdFromUrl = useCallback(() => {
     const params = new URLSearchParams(location.search);
     return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
+  const getVisitIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    const visitIdParam = params.get('visitId') || params.get('visit_id');
+    if (!visitIdParam) {
+      return null;
+    }
+
+    const parsed = parseInt(visitIdParam, 10);
+    return Number.isFinite(parsed) ? parsed : null;
   }, [location.search]);
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -105,6 +122,8 @@ const MacOSCardiologistPanelUnified = () => {
   const [showForm, setShowForm] = useState({ open: false, type: 'blood' });
   const [ecgResults, setEcgResults] = useState([]);
   const [bloodTests, setBloodTests] = useState([]);
+  const [patientFiles, setPatientFiles] = useState([]);
+  const [historyFilter, setHistoryFilter] = useState('all');
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
 
   const getSelectedPatientContext = useCallback(() => {
@@ -152,10 +171,10 @@ const MacOSCardiologistPanelUnified = () => {
 
   // ✅ Функция загрузки данных пациента (объявлена до использования)
   const loadPatientData = useCallback(async () => {
-    if (!selectedPatient?.patient?.id && !selectedPatient?.patient_id) return;
+    const { patientId, visitId } = getSelectedPatientContext();
+    if (!patientId) return;
 
     try {
-      const patientId = selectedPatient?.patient?.id || selectedPatient?.patient_id;
       const token = tokenManager.getAccessToken();
 
       // Загружаем ЭКГ пациента
@@ -175,10 +194,39 @@ const MacOSCardiologistPanelUnified = () => {
         const bloodData = await bloodResponse.json();
         setBloodTests(bloodData);
       }
+
+      const fileEndpoints = [
+        `${API_V1_BASE}/files?patient_id=${patientId}&page=1&size=50`,
+      ];
+
+      if (visitId) {
+        fileEndpoints.push(`${API_V1_BASE}/files?visit_id=${visitId}&page=1&size=50`);
+      }
+
+      const mergedFiles = new Map();
+      for (const endpoint of fileEndpoints) {
+        const fileResponse = await fetch(endpoint, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (!fileResponse.ok) {
+          continue;
+        }
+
+        const fileData = await fileResponse.json();
+        const files = Array.isArray(fileData?.files) ? fileData.files : [];
+        files.forEach((file) => {
+          if (file?.id != null) {
+            mergedFiles.set(file.id, file);
+          }
+        });
+      }
+
+      setPatientFiles(Array.from(mergedFiles.values()));
     } catch (error) {
       setMessage({ type: 'error', text: `Не удалось обновить данные пациента: ${error.message || ''}`.trim() });
     }
-  }, [selectedPatient, setMessage]);
+  }, [getSelectedPatientContext, setMessage]);
 
   // ✅ Очистка EMR и visitData при смене пациента
   useEffect(() => {
@@ -205,6 +253,8 @@ const MacOSCardiologistPanelUnified = () => {
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
       setEcgResults([]);
       setBloodTests([]);
+      setPatientFiles([]);
+      setHistoryFilter('all');
     }
   }, [selectedPatient, loadPatientData, authRefreshTick]);
 
@@ -258,9 +308,16 @@ const MacOSCardiologistPanelUnified = () => {
   const hydratePatientFromUrl = useCallback(async () => {
     const patientIdFromUrl = getPatientIdFromUrl();
     if (!patientIdFromUrl) return;
+    const visitIdFromUrl = getVisitIdFromUrl();
 
     const selectedPatientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || null;
-    if (selectedPatientId === patientIdFromUrl) return;
+    const selectedVisitId = selectedPatient?.visit_id || null;
+    if (
+      selectedPatientId === patientIdFromUrl &&
+      (!visitIdFromUrl || selectedVisitId === visitIdFromUrl)
+    ) {
+      return;
+    }
 
     try {
       const token = tokenManager.getAccessToken();
@@ -284,6 +341,7 @@ const MacOSCardiologistPanelUnified = () => {
         patient_name: patientName,
         patient_fio: patientName,
         phone: patientData.phone || prev?.phone || '',
+        visit_id: visitIdFromUrl || prev?.visit_id || null,
         source: prev?.source || 'search',
         specialty: prev?.specialty || 'cardiology'
       }));
@@ -292,7 +350,7 @@ const MacOSCardiologistPanelUnified = () => {
     } catch (error) {
       setMessage({ type: 'error', text: `Не удалось загрузить пациента: ${error.message || ''}`.trim() });
     }
-  }, [getPatientIdFromUrl, selectedPatient]);
+  }, [getPatientIdFromUrl, getVisitIdFromUrl, selectedPatient]);
 
   useEffect(() => {
     hydratePatientFromUrl();
@@ -322,23 +380,33 @@ const MacOSCardiologistPanelUnified = () => {
 
   useEffect(() => {
     const patientIdFromUrl = getPatientIdFromUrl();
-    if (!patientIdFromUrl || appointments.length === 0) {
+    const visitIdFromUrl = getVisitIdFromUrl();
+    if ((!patientIdFromUrl && !visitIdFromUrl) || appointments.length === 0) {
       return;
     }
 
-    const matchingAppointment = appointments.find((appointment) => appointment.patient_id === patientIdFromUrl);
+    const matchingAppointment = appointments.find((appointment) => {
+      if (visitIdFromUrl && appointment.visit_id === visitIdFromUrl) {
+        return true;
+      }
+      return patientIdFromUrl && appointment.patient_id === patientIdFromUrl;
+    });
     if (!matchingAppointment) {
       return;
     }
 
     setSelectedPatient((prev) => {
       const prevPatientId = prev?.patient?.id || prev?.patient_id || null;
-      if (prevPatientId && prevPatientId !== patientIdFromUrl) {
+      const prevVisitId = prev?.visit_id || null;
+      if (patientIdFromUrl && prevPatientId && prevPatientId !== patientIdFromUrl) {
+        return prev;
+      }
+      if (visitIdFromUrl && prevVisitId && prevVisitId !== visitIdFromUrl) {
         return prev;
       }
 
       const nextAppointmentId = matchingAppointment.appointment_id || matchingAppointment.id || prev?.appointment_id || null;
-      const nextVisitId = matchingAppointment.visit_id || prev?.visit_id || null;
+      const nextVisitId = matchingAppointment.visit_id || visitIdFromUrl || prev?.visit_id || null;
       const nextPatientName = matchingAppointment.patient_fio || prev?.patient_name || prev?.patient_fio || '';
       const nextPatient = {
         ...prev,
@@ -366,7 +434,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       return didChange ? nextPatient : prev;
     });
-  }, [appointments, getPatientIdFromUrl]);
+  }, [appointments, getPatientIdFromUrl, getVisitIdFromUrl]);
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
@@ -1135,6 +1203,158 @@ const MacOSCardiologistPanelUnified = () => {
     overflow: 'visible'
   };
 
+  const formatHistoryTimestamp = (value) => {
+    if (!value) {
+      return '—';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return String(value);
+    }
+
+    return parsed.toLocaleString('ru-RU');
+  };
+
+  const getHistoryTimestampValue = (value) => {
+    if (!value) {
+      return 0;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  };
+
+  const formatFileSize = (size) => {
+    if (!size && size !== 0) {
+      return '—';
+    }
+
+    if (size < 1024) {
+      return `${size} B`;
+    }
+
+    if (size < 1024 * 1024) {
+      return `${(size / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const canPreviewAttachment = (file) => {
+    const mimeType = String(file?.mime_type || file?.type || '').toLowerCase();
+    return mimeType.startsWith('image/') || mimeType.startsWith('text/') || mimeType === 'application/pdf';
+  };
+
+  const downloadPatientFile = async (file) => {
+    if (!file?.id) {
+      return;
+    }
+
+    try {
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${API_V1_BASE}/files/${file.id}/download`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Не удалось скачать файл');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.title || file.original_filename || file.filename || `file-${file.id}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage({ type: 'error', text: `Не удалось скачать файл: ${error.message || ''}`.trim() });
+    }
+  };
+
+  const previewPatientFile = async (file) => {
+    if (!file?.id) {
+      return;
+    }
+
+    try {
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${API_V1_BASE}/files/${file.id}/preview`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Предпросмотр недоступен');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!previewWindow) {
+        throw new Error('Браузер заблокировал окно предпросмотра');
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Не удалось открыть файл: ${error.message || ''}`.trim() });
+    }
+  };
+
+  const historyEntries = [
+    ...bloodTests.map((test) => ({
+      id: `blood-${test.id}`,
+      kind: 'labs',
+      title: `Анализ крови — ${test.test_date || '—'}`,
+      subtitle: `Хол: ${test.cholesterol_total || '—'}; LDL: ${test.cholesterol_ldl || '—'}; Глюкоза: ${test.glucose || '—'}`,
+      timestamp: test.test_date || test.created_at || test.updated_at,
+      badgeVariant: 'secondary',
+      meta: test.interpretation || `Тест #${test.id}`,
+    })),
+    ...ecgResults.map((result) => ({
+      id: `ecg-${result.id || result.ecg_date}`,
+      kind: 'ecg',
+      title: `ЭКГ — ${result.ecg_date || '—'}`,
+      subtitle: `Ритм: ${result.rhythm || '—'}, ЧСС: ${result.heart_rate || '—'}`,
+      timestamp: result.ecg_date || result.created_at || result.updated_at,
+      badgeVariant: 'success',
+      meta: result.source || `Запись #${result.id || '—'}`,
+    })),
+    ...patientFiles.map((file) => {
+      const fileLabel = file.title || file.original_filename || file.filename || file.name || `Файл #${file.id}`;
+      const tags = Array.isArray(file.tags) && file.tags.length > 0 ? file.tags.join(', ') : '';
+      const fileType = file.file_type || file.mime_type || file.type || 'attachment';
+
+      return {
+        id: `file-${file.id}`,
+        kind: 'attachments',
+        title: fileLabel,
+        subtitle: `${fileType}${tags ? ` • ${tags}` : ''}`,
+        timestamp: file.created_at || file.updated_at || file.uploaded_at,
+        badgeVariant: 'info',
+        meta: formatFileSize(file.file_size),
+        file,
+      };
+    }),
+  ].sort((left, right) => getHistoryTimestampValue(right.timestamp) - getHistoryTimestampValue(left.timestamp));
+
+  const filteredHistoryEntries = historyFilter === 'all'
+    ? historyEntries
+    : historyEntries.filter((entry) => entry.kind === historyFilter);
+
+  const historyFilterOptions = [
+    { value: 'all', label: 'Все', count: historyEntries.length },
+    { value: 'ecg', label: 'ЭКГ', count: ecgResults.length },
+    { value: 'labs', label: 'Анализы', count: bloodTests.length },
+    { value: 'attachments', label: 'Вложения', count: patientFiles.length },
+  ];
+
+  const selectedPatientLabel = selectedPatient?.patient_name
+    || selectedPatient?.patient?.full_name
+    || selectedPatient?.patient?.name
+    || '—';
+
   return (
     <div style={{
       ...pageStyle,
@@ -1884,7 +2104,7 @@ const MacOSCardiologistPanelUnified = () => {
             </div>
           }
 
-          {/* История (заглушка) */}
+          {/* История и вложения */}
           {activeTab === 'history' &&
           <div style={{
             width: '100%',
@@ -1914,72 +2134,147 @@ const MacOSCardiologistPanelUnified = () => {
 
             <>
                   <MacOSCard style={{ padding: '24px' }}>
-                    <h3 style={{
-                  fontSize: getFontSize('lg'),
-                  fontWeight: '500',
-                  marginBottom: getSpacing('lg'),
-                  color: getColor('text')
-                }}>Хронология записей пациента</h3>
+                    <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: getSpacing('md'),
+                  flexWrap: 'wrap',
+                  marginBottom: getSpacing('lg')
+                }}>
+                      <div>
+                        <h3 style={{
+                      fontSize: getFontSize('lg'),
+                      fontWeight: '500',
+                      marginBottom: getSpacing('xs'),
+                      color: getColor('text')
+                    }}>Хронология записей пациента</h3>
+                        <p style={{ color: getColor('textSecondary') }}>
+                          {selectedPatientLabel}
+                        </p>
+                      </div>
+                      <MacOSButton
+                        variant="outline"
+                        onClick={loadPatientData}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <RefreshCw size={16} />
+                        Обновить
+                      </MacOSButton>
+                    </div>
+
+                    <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: getSpacing('sm'),
+                  marginBottom: getSpacing('lg')
+                }}>
+                      {historyFilterOptions.map((option) => (
+                        <MacOSButton
+                          key={option.value}
+                          variant={historyFilter === option.value ? 'primary' : 'outline'}
+                          onClick={() => setHistoryFilter(option.value)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {option.label}
+                          <MacOSBadge variant="info">{option.count}</MacOSBadge>
+                        </MacOSButton>
+                      ))}
+                    </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
-                      {bloodTests.length === 0 && ecgResults.length === 0 &&
-                  <div style={{ color: getColor('textSecondary') }}>Нет данных по ЭКГ или анализам крови</div>
-                  }
-                      {bloodTests.map((t) =>
-                  <div key={`blood-${t.id}`} style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: getSpacing('md')
-                  }}>
+                      {filteredHistoryEntries.length === 0 && (
+                        <MacOSEmptyState
+                          type="calendar"
+                          title="История пуста"
+                          description="Для выбранного фильтра пока нет записей" />
+                      )}
+
+                      {filteredHistoryEntries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: getSpacing('md'),
+                            padding: getSpacing('md'),
+                            border: `1px solid ${getColor('border')}`,
+                            backgroundColor: getColor('surface'),
+                            borderRadius: '12px'
+                          }}>
                           <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: getColor('secondary', 500),
-                      marginTop: getSpacing('sm')
-                    }} />
-                          <div>
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            backgroundColor: entry.badgeVariant === 'success'
+                              ? getColor('success', 500)
+                              : entry.badgeVariant === 'secondary'
+                                ? getColor('secondary', 500)
+                                : getColor('primary', 500),
+                            marginTop: getSpacing('sm')
+                          }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
-                        fontSize: getFontSize('base'),
-                        fontWeight: '500',
-                        color: getColor('text')
-                      }}>Анализ крови — {t.test_date}</div>
-                            <div style={{
-                        fontSize: getFontSize('sm'),
-                        color: getColor('textSecondary')
-                      }}>
-                              Хол: {t.cholesterol_total}; LDL: {t.cholesterol_ldl}; Глюкоза: {t.glucose}
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: getSpacing('sm'),
+                              flexWrap: 'wrap'
+                            }}>
+                              <div style={{
+                                fontSize: getFontSize('base'),
+                                fontWeight: '500',
+                                color: getColor('text')
+                              }}>{entry.title}</div>
+                              <MacOSBadge variant={entry.badgeVariant}>
+                                {entry.kind === 'attachments'
+                                  ? 'Вложение'
+                                  : entry.kind === 'ecg'
+                                    ? 'ЭКГ'
+                                    : 'Анализ'}
+                              </MacOSBadge>
                             </div>
+                            <div style={{
+                              fontSize: getFontSize('sm'),
+                              color: getColor('textSecondary'),
+                              marginTop: getSpacing('xs')
+                            }}>
+                              {entry.subtitle}
+                            </div>
+                            <div style={{
+                              fontSize: getFontSize('sm'),
+                              color: getColor('textSecondary'),
+                              marginTop: getSpacing('xs'),
+                              display: 'flex',
+                              gap: getSpacing('md'),
+                              flexWrap: 'wrap'
+                            }}>
+                              <span>{formatHistoryTimestamp(entry.timestamp)}</span>
+                              <span>{entry.meta}</span>
+                            </div>
+
+                            {entry.kind === 'attachments' && entry.file && (
+                              <div style={{
+                                marginTop: getSpacing('md'),
+                                display: 'flex',
+                                gap: getSpacing('sm'),
+                                flexWrap: 'wrap'
+                              }}>
+                                {canPreviewAttachment(entry.file) && (
+                                  <MacOSButton
+                                    variant="outline"
+                                    onClick={() => previewPatientFile(entry.file)}>
+                                    Просмотр
+                                  </MacOSButton>
+                                )}
+                                <MacOSButton
+                                  variant="outline"
+                                  onClick={() => downloadPatientFile(entry.file)}>
+                                  Скачать
+                                </MacOSButton>
+                              </div>
+                            )}
                           </div>
                         </div>
-                  )}
-                      {ecgResults.map((e) =>
-                  <div key={`ecg-${e.id || e.ecg_date}`} style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: getSpacing('md')
-                  }}>
-                          <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: getColor('success', 500),
-                      marginTop: getSpacing('sm')
-                    }} />
-                          <div>
-                            <div style={{
-                        fontSize: getFontSize('base'),
-                        fontWeight: '500',
-                        color: getColor('text')
-                      }}>ЭКГ — {e.ecg_date || '—'}</div>
-                            <div style={{
-                        fontSize: getFontSize('sm'),
-                        color: getColor('textSecondary')
-                      }}>
-                              Ритм: {e.rhythm || '—'}, ЧСС: {e.heart_rate || '—'}
-                            </div>
-                          </div>
-                        </div>
-                  )}
+                      ))}
                     </div>
                   </MacOSCard>
 
@@ -2039,12 +2334,29 @@ const MacOSCardiologistPanelUnified = () => {
                       fontSize: getFontSize('sm'),
                       color: getColor('textSecondary'),
                       marginBottom: getSpacing('xs')
+                    }}>Вложения</div>
+                        <div style={{
+                      fontSize: getFontSize('xl'),
+                      fontWeight: '600',
+                      color: getColor('text')
+                    }}>{patientFiles.length}</div>
+                      </div>
+                      <div style={{
+                    padding: getSpacing('md'),
+                    border: `1px solid ${getColor('border')}`,
+                    backgroundColor: getColor('surface'),
+                    borderRadius: '8px'
+                  }}>
+                        <div style={{
+                      fontSize: getFontSize('sm'),
+                      color: getColor('textSecondary'),
+                      marginBottom: getSpacing('xs')
                     }}>Выбранный пациент</div>
                         <div style={{
                       fontSize: getFontSize('xl'),
                       fontWeight: '600',
                       color: getColor('text')
-                    }}>{selectedPatient?.patient_name || '—'}</div>
+                    }}>{selectedPatientLabel}</div>
                       </div>
                     </div>
                   </MacOSCard>

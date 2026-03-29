@@ -14,24 +14,24 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000') do (
 
 echo [2/4] Запуск Backend API...
 cd /d C:\final\backend
-start "Backend API" cmd /k "python -m uvicorn app.main:app --reload --port 8000"
+start "Backend API" cmd /k "python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000"
 
 echo [3/4] Ожидание запуска Backend...
 timeout /t 5 /nobreak >nul
 
 echo [4/4] Запуск Frontend...
 cd /d C:\final\frontend
-start "Frontend" cmd /k "npm run dev"
+start "Frontend" cmd /k "npm run dev -- --host 0.0.0.0 --port 18080"
 
 echo.
 echo ========================================
 echo    СИСТЕМА ЗАПУЩЕНА!
 echo ========================================
-echo Frontend: http://localhost:5173
+echo Frontend: http://localhost:18080
 echo Backend:  http://localhost:18000
 echo API Docs: http://localhost:18000/docs
 echo.
 echo Логин: admin
-echo Пароль: admin123
+echo Пароль: admin
 echo.
 pause

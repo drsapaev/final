@@ -1,0 +1,931 @@
+- generic [ref=e2]:
+  - generic [ref=e667]:
+    - generic [ref=e669]:
+      - button "Управление клиникой" [ref=e671] [cursor=pointer]:
+        - generic [ref=e672]:
+          - img [ref=e673]
+          - text: Управление клиникой
+      - generic [ref=e678]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e679]
+        - generic: ⌘K
+      - generic [ref=e681]:
+        - button "RU" [ref=e683] [cursor=pointer]:
+          - generic [ref=e684]:
+            - img [ref=e685]
+            - text: RU
+        - generic "Онлайн" [ref=e689]:
+          - img [ref=e690]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e693] [cursor=pointer]:
+          - img [ref=e694]
+        - button "Выбрать тему" [ref=e698] [cursor=pointer]:
+          - img [ref=e701]
+        - button "admin" [ref=e703] [cursor=pointer]:
+          - generic [ref=e704]:
+            - img [ref=e705]
+            - text: admin
+        - button "Выйти" [ref=e708] [cursor=pointer]:
+          - generic [ref=e709]:
+            - img [ref=e710]
+            - text: Выйти
+    - generic [ref=e713]:
+      - complementary [ref=e715]:
+        - generic [ref=e716]:
+          - generic [ref=e717]: Медицинская система
+          - button "Collapse sidebar" [ref=e718] [cursor=pointer]:
+            - img [ref=e720]
+        - navigation [ref=e723]:
+          - button "Dashboard" [ref=e724] [cursor=pointer]:
+            - img [ref=e725]
+            - generic [ref=e728]: Dashboard
+          - button "Analytics" [ref=e729] [cursor=pointer]:
+            - img [ref=e730]
+            - generic [ref=e733]: Analytics
+          - button "Wait Time Analytics" [ref=e734] [cursor=pointer]:
+            - img [ref=e735]
+            - generic [ref=e738]: Wait Time Analytics
+          - button "AI Analytics" [ref=e739] [cursor=pointer]:
+            - img [ref=e740]
+            - generic [ref=e743]: AI Analytics
+          - button "Webhooks" [ref=e744] [cursor=pointer]:
+            - img [ref=e745]
+            - generic [ref=e748]: Webhooks
+          - button "Reports" [ref=e749] [cursor=pointer]:
+            - img [ref=e750]
+            - generic [ref=e753]: Reports
+          - button "System" [ref=e754] [cursor=pointer]:
+            - img [ref=e755]
+            - generic [ref=e758]: System
+          - button "Cloud Printing" [ref=e759] [cursor=pointer]:
+            - img [ref=e760]
+            - generic [ref=e763]: Cloud Printing
+          - button "Medical Equipment" [ref=e764] [cursor=pointer]:
+            - img [ref=e765]
+            - generic [ref=e768]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e769] [cursor=pointer]:
+            - img [ref=e770]
+            - generic [ref=e773]: Dynamic Pricing
+          - button "Billing" [ref=e774] [cursor=pointer]:
+            - img [ref=e775]
+            - generic [ref=e778]: Billing
+          - button "Discount Benefits" [ref=e779] [cursor=pointer]:
+            - img [ref=e780]
+            - generic [ref=e786]: Discount Benefits
+          - button "GraphQL API" [ref=e787] [cursor=pointer]:
+            - img [ref=e788]
+            - generic [ref=e791]: GraphQL API
+          - button "Users" [ref=e792] [cursor=pointer]:
+            - img [ref=e793]
+            - generic [ref=e796]: Users
+          - button "Doctors" [ref=e797] [cursor=pointer]:
+            - img [ref=e798]
+            - generic [ref=e801]: Doctors
+          - button "Services" [ref=e802] [cursor=pointer]:
+            - img [ref=e803]
+            - generic [ref=e806]: Services
+          - button "Patients" [ref=e807] [cursor=pointer]:
+            - img [ref=e808]
+            - generic [ref=e811]: Patients
+          - button "Appointments" [ref=e812] [cursor=pointer]:
+            - img [ref=e813]
+            - generic [ref=e816]: Appointments
+          - button "All Free" [ref=e817] [cursor=pointer]:
+            - img [ref=e818]
+            - generic [ref=e821]: All Free
+          - button "Benefit Settings" [ref=e822] [cursor=pointer]:
+            - img [ref=e823]
+            - generic [ref=e826]: Benefit Settings
+          - button "Wizard Settings" [ref=e827] [cursor=pointer]:
+            - img [ref=e828]
+            - generic [ref=e833]: Wizard Settings
+          - button "Payment Providers" [ref=e834] [cursor=pointer]:
+            - img [ref=e835]
+            - generic [ref=e838]: Payment Providers
+          - button "Clinic Management" [ref=e839] [cursor=pointer]:
+            - img [ref=e840]
+            - generic [ref=e843]: Clinic Management
+          - button "Clinic Settings" [ref=e844] [cursor=pointer]:
+            - img [ref=e845]
+            - generic [ref=e848]: Clinic Settings
+          - button "Queue Settings" [ref=e849] [cursor=pointer]:
+            - img [ref=e850]
+            - generic [ref=e853]: Queue Settings
+          - button "Queue Limits" [ref=e854] [cursor=pointer]:
+            - img [ref=e855]
+            - generic [ref=e858]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e859] [cursor=pointer]:
+            - img [ref=e860]
+            - generic [ref=e863]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e864] [cursor=pointer]:
+            - img [ref=e865]
+            - generic [ref=e868]: AI Imaging
+          - button "Treatment Recommendations" [ref=e869] [cursor=pointer]:
+            - img [ref=e870]
+            - generic [ref=e873]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e874] [cursor=pointer]:
+            - img [ref=e875]
+            - generic [ref=e878]: Drug Interactions
+          - button "Risk Assessment" [ref=e879] [cursor=pointer]:
+            - img [ref=e880]
+            - generic [ref=e883]: Risk Assessment
+          - button "Voice to Text" [ref=e884] [cursor=pointer]:
+            - img [ref=e885]
+            - generic [ref=e888]: Voice to Text
+          - button "Smart Scheduling" [ref=e889] [cursor=pointer]:
+            - img [ref=e890]
+            - generic [ref=e893]: Smart Scheduling
+          - button "Quality Control" [ref=e894] [cursor=pointer]:
+            - img [ref=e895]
+            - generic [ref=e898]: Quality Control
+          - button "Analytics Insights" [ref=e899] [cursor=pointer]:
+            - img [ref=e900]
+            - generic [ref=e903]: Analytics Insights
+          - button "Telegram Bot" [ref=e904] [cursor=pointer]:
+            - img [ref=e905]
+            - generic [ref=e908]: Telegram Bot
+          - button "FCM Notifications" [ref=e909] [cursor=pointer]:
+            - img [ref=e910]
+            - generic [ref=e913]: FCM Notifications
+          - button "Phone Verification" [ref=e914] [cursor=pointer]:
+            - img [ref=e915]
+            - generic [ref=e918]: Phone Verification
+          - button "User Data Transfer" [ref=e919] [cursor=pointer]:
+            - img [ref=e920]
+            - generic [ref=e923]: User Data Transfer
+          - button "Group Permissions" [ref=e924] [cursor=pointer]:
+            - img [ref=e925]
+            - generic [ref=e928]: Group Permissions
+          - button "User Export" [ref=e929] [cursor=pointer]:
+            - img [ref=e930]
+            - generic [ref=e933]: User Export
+          - button "Registrar Notifications" [ref=e934] [cursor=pointer]:
+            - img [ref=e935]
+            - generic [ref=e940]: Registrar Notifications
+          - button "AI Settings" [ref=e941] [cursor=pointer]:
+            - img [ref=e942]
+            - generic [ref=e945]: AI Settings
+          - button "Telegram Settings" [ref=e946] [cursor=pointer]:
+            - img [ref=e947]
+            - generic [ref=e950]: Telegram Settings
+          - button "Display Settings" [ref=e951] [cursor=pointer]:
+            - img [ref=e952]
+            - generic [ref=e957]: Display Settings
+          - button "Activation" [ref=e958] [cursor=pointer]:
+            - img [ref=e959]
+            - generic [ref=e962]: Activation
+          - button "Finance" [ref=e963] [cursor=pointer]:
+            - img [ref=e964]
+            - generic [ref=e969]: Finance
+          - button "Security" [ref=e970] [cursor=pointer]:
+            - img [ref=e971]
+            - generic [ref=e974]: Security
+          - button "Settings" [ref=e975] [cursor=pointer]:
+            - img [ref=e976]
+            - generic [ref=e979]: Settings
+      - main [ref=e980]:
+        - generic [ref=e985]:
+          - generic [ref=e986]:
+            - generic [ref=e988]:
+              - generic [ref=e989]:
+                - paragraph [ref=e990]: Всего записей
+                - paragraph [ref=e991]: "6"
+              - img [ref=e992]
+            - generic [ref=e995]:
+              - generic [ref=e996]:
+                - paragraph [ref=e997]: На сегодня
+                - paragraph [ref=e998]: "0"
+              - img [ref=e999]
+            - generic [ref=e1003]:
+              - generic [ref=e1004]:
+                - paragraph [ref=e1005]: На завтра
+                - paragraph [ref=e1006]: "0"
+              - img [ref=e1007]
+            - generic [ref=e1010]:
+              - generic [ref=e1011]:
+                - paragraph [ref=e1012]: Ожидают
+                - paragraph [ref=e1013]: "1"
+              - img [ref=e1014]
+          - generic [ref=e1017]:
+            - generic [ref=e1018]:
+              - heading "Управление записями" [level=2] [ref=e1019]
+              - button "Создать запись" [active] [ref=e1020] [cursor=pointer]:
+                - generic [ref=e1021]:
+                  - img [ref=e1022]
+                  - text: Создать запись
+            - generic [ref=e1023]:
+              - generic [ref=e1024]:
+                - img [ref=e1025]
+                - textbox "Поиск записей..." [ref=e1029]
+              - combobox [ref=e1030] [cursor=pointer]:
+                - option "Все статусы" [selected]
+                - option "Ожидает"
+                - option "Подтверждена"
+                - option "Оплачена"
+                - option "На приеме"
+                - option "Завершена"
+                - option "Отменена"
+                - option "Не явился"
+              - textbox [ref=e1032]
+              - combobox [ref=e1033] [cursor=pointer]:
+                - option "Все врачи" [selected]
+                - option "Concurrency af98bd7c"
+                - option "Concurrency 6621778a"
+                - option "Concurrency c576c96a"
+                - option "Concurrency 9d05424f"
+                - option "ЭКГ Ресурс"
+                - option "qa_cardio_866085"
+                - option "Doctor User"
+                - option "Dentist User"
+            - table [ref=e1036]:
+              - rowgroup [ref=e1037]:
+                - row "Пациент Врач Дата и время Статус Причина Действия" [ref=e1038]:
+                  - columnheader "Пациент" [ref=e1039] [cursor=pointer]
+                  - columnheader "Врач" [ref=e1040] [cursor=pointer]
+                  - columnheader "Дата и время" [ref=e1041] [cursor=pointer]
+                  - columnheader "Статус" [ref=e1042] [cursor=pointer]
+                  - columnheader "Причина" [ref=e1043] [cursor=pointer]
+                  - columnheader "Действия" [ref=e1044] [cursor=pointer]
+              - rowgroup [ref=e1045]:
+                - row "ИАС Иванова Анна Сергеевна +998 90 123 45 67 Иванов Иван Иванович Кардиолог 01.02.2024 10:00 (30 мин) Подтверждена Боли в области сердца, одышка при физической нагру..." [ref=e1046] [cursor=pointer]:
+                  - cell "ИАС Иванова Анна Сергеевна +998 90 123 45 67" [ref=e1047]:
+                    - generic [ref=e1048]:
+                      - generic [ref=e1050]: ИАС
+                      - generic [ref=e1051]:
+                        - paragraph [ref=e1052]: Иванова Анна Сергеевна
+                        - paragraph [ref=e1053]: +998 90 123 45 67
+                  - cell "Иванов Иван Иванович Кардиолог" [ref=e1054]:
+                    - generic [ref=e1055]:
+                      - paragraph [ref=e1056]: Иванов Иван Иванович
+                      - paragraph [ref=e1057]: Кардиолог
+                  - cell "01.02.2024 10:00 (30 мин)" [ref=e1058]:
+                    - generic [ref=e1059]:
+                      - paragraph [ref=e1060]: 01.02.2024
+                      - paragraph [ref=e1061]: 10:00 (30 мин)
+                  - cell "Подтверждена" [ref=e1062]:
+                    - generic [ref=e1063]: Подтверждена
+                  - cell "Боли в области сердца, одышка при физической нагру..." [ref=e1064]:
+                    - paragraph [ref=e1065]: Боли в области сердца, одышка при физической нагру...
+                  - cell [ref=e1066]:
+                    - generic [ref=e1067]:
+                      - button "Редактировать" [ref=e1068]:
+                        - img [ref=e1070]
+                      - button "Удалить" [ref=e1073]:
+                        - img [ref=e1075]
+                - row "ПДА Петров Дмитрий Александрович +998 91 234 56 78 Петрова Мария Сергеевна Дерматолог 01.02.2024 14:30 (45 мин) Оплачена Кожная сыпь на руках и ногах" [ref=e1078] [cursor=pointer]:
+                  - cell "ПДА Петров Дмитрий Александрович +998 91 234 56 78" [ref=e1079]:
+                    - generic [ref=e1080]:
+                      - generic [ref=e1082]: ПДА
+                      - generic [ref=e1083]:
+                        - paragraph [ref=e1084]: Петров Дмитрий Александрович
+                        - paragraph [ref=e1085]: +998 91 234 56 78
+                  - cell "Петрова Мария Сергеевна Дерматолог" [ref=e1086]:
+                    - generic [ref=e1087]:
+                      - paragraph [ref=e1088]: Петрова Мария Сергеевна
+                      - paragraph [ref=e1089]: Дерматолог
+                  - cell "01.02.2024 14:30 (45 мин)" [ref=e1090]:
+                    - generic [ref=e1091]:
+                      - paragraph [ref=e1092]: 01.02.2024
+                      - paragraph [ref=e1093]: 14:30 (45 мин)
+                  - cell "Оплачена" [ref=e1094]:
+                    - generic [ref=e1095]: Оплачена
+                  - cell "Кожная сыпь на руках и ногах" [ref=e1096]:
+                    - paragraph [ref=e1097]: Кожная сыпь на руках и ногах
+                  - cell [ref=e1098]:
+                    - generic [ref=e1099]:
+                      - button "Редактировать" [ref=e1100]:
+                        - img [ref=e1102]
+                      - button "Удалить" [ref=e1105]:
+                        - img [ref=e1107]
+                - row "СМИ Сидорова Мария Ивановна +998 92 345 67 89 Сидоров Сергей Петрович Стоматолог 02.02.2024 09:00 (60 мин) На приеме Плановый осмотр и чистка зубов" [ref=e1110] [cursor=pointer]:
+                  - cell "СМИ Сидорова Мария Ивановна +998 92 345 67 89" [ref=e1111]:
+                    - generic [ref=e1112]:
+                      - generic [ref=e1114]: СМИ
+                      - generic [ref=e1115]:
+                        - paragraph [ref=e1116]: Сидорова Мария Ивановна
+                        - paragraph [ref=e1117]: +998 92 345 67 89
+                  - cell "Сидоров Сергей Петрович Стоматолог" [ref=e1118]:
+                    - generic [ref=e1119]:
+                      - paragraph [ref=e1120]: Сидоров Сергей Петрович
+                      - paragraph [ref=e1121]: Стоматолог
+                  - cell "02.02.2024 09:00 (60 мин)" [ref=e1122]:
+                    - generic [ref=e1123]:
+                      - paragraph [ref=e1124]: 02.02.2024
+                      - paragraph [ref=e1125]: 09:00 (60 мин)
+                  - cell "На приеме" [ref=e1126]:
+                    - generic [ref=e1127]: На приеме
+                  - cell "Плановый осмотр и чистка зубов" [ref=e1128]:
+                    - paragraph [ref=e1129]: Плановый осмотр и чистка зубов
+                  - cell [ref=e1130]:
+                    - generic [ref=e1131]:
+                      - button "Редактировать" [ref=e1132]:
+                        - img [ref=e1134]
+                      - button "Удалить" [ref=e1137]:
+                        - img [ref=e1139]
+                - row "КАВ Козлов Алексей Владимирович +998 93 456 78 90 Иванов Иван Иванович Кардиолог 02.02.2024 11:15 (30 мин) Завершена Контрольный осмотр после операции" [ref=e1142] [cursor=pointer]:
+                  - cell "КАВ Козлов Алексей Владимирович +998 93 456 78 90" [ref=e1143]:
+                    - generic [ref=e1144]:
+                      - generic [ref=e1146]: КАВ
+                      - generic [ref=e1147]:
+                        - paragraph [ref=e1148]: Козлов Алексей Владимирович
+                        - paragraph [ref=e1149]: +998 93 456 78 90
+                  - cell "Иванов Иван Иванович Кардиолог" [ref=e1150]:
+                    - generic [ref=e1151]:
+                      - paragraph [ref=e1152]: Иванов Иван Иванович
+                      - paragraph [ref=e1153]: Кардиолог
+                  - cell "02.02.2024 11:15 (30 мин)" [ref=e1154]:
+                    - generic [ref=e1155]:
+                      - paragraph [ref=e1156]: 02.02.2024
+                      - paragraph [ref=e1157]: 11:15 (30 мин)
+                  - cell "Завершена" [ref=e1158]:
+                    - generic [ref=e1159]: Завершена
+                  - cell "Контрольный осмотр после операции" [ref=e1160]:
+                    - paragraph [ref=e1161]: Контрольный осмотр после операции
+                  - cell [ref=e1162]:
+                    - generic [ref=e1163]:
+                      - button "Редактировать" [ref=e1164]:
+                        - img [ref=e1166]
+                      - button "Удалить" [ref=e1169]:
+                        - img [ref=e1171]
+                - row "НЕД Новикова Елена Дмитриевна +998 94 567 89 01 Козлова Анна Владимировна Терапевт 03.02.2024 15:00 (45 мин) Ожидает оплаты Беременность 24 недели - плановый осмотр" [ref=e1174] [cursor=pointer]:
+                  - cell "НЕД Новикова Елена Дмитриевна +998 94 567 89 01" [ref=e1175]:
+                    - generic [ref=e1176]:
+                      - generic [ref=e1178]: НЕД
+                      - generic [ref=e1179]:
+                        - paragraph [ref=e1180]: Новикова Елена Дмитриевна
+                        - paragraph [ref=e1181]: +998 94 567 89 01
+                  - cell "Козлова Анна Владимировна Терапевт" [ref=e1182]:
+                    - generic [ref=e1183]:
+                      - paragraph [ref=e1184]: Козлова Анна Владимировна
+                      - paragraph [ref=e1185]: Терапевт
+                  - cell "03.02.2024 15:00 (45 мин)" [ref=e1186]:
+                    - generic [ref=e1187]:
+                      - paragraph [ref=e1188]: 03.02.2024
+                      - paragraph [ref=e1189]: 15:00 (45 мин)
+                  - cell "Ожидает оплаты" [ref=e1190]:
+                    - generic [ref=e1191]: Ожидает оплаты
+                  - cell "Беременность 24 недели - плановый осмотр" [ref=e1192]:
+                    - paragraph [ref=e1193]: Беременность 24 недели - плановый осмотр
+                  - cell [ref=e1194]:
+                    - generic [ref=e1195]:
+                      - button "Редактировать" [ref=e1196]:
+                        - img [ref=e1198]
+                      - button "Удалить" [ref=e1201]:
+                        - img [ref=e1203]
+                - row "ПДА Петров Дмитрий Александрович +998 91 234 56 78 Новиков Дмитрий Александрович Хирург 30.01.2024 16:00 (90 мин) Отменена Консультация по поводу операции" [ref=e1206] [cursor=pointer]:
+                  - cell "ПДА Петров Дмитрий Александрович +998 91 234 56 78" [ref=e1207]:
+                    - generic [ref=e1208]:
+                      - generic [ref=e1210]: ПДА
+                      - generic [ref=e1211]:
+                        - paragraph [ref=e1212]: Петров Дмитрий Александрович
+                        - paragraph [ref=e1213]: +998 91 234 56 78
+                  - cell "Новиков Дмитрий Александрович Хирург" [ref=e1214]:
+                    - generic [ref=e1215]:
+                      - paragraph [ref=e1216]: Новиков Дмитрий Александрович
+                      - paragraph [ref=e1217]: Хирург
+                  - cell "30.01.2024 16:00 (90 мин)" [ref=e1218]:
+                    - generic [ref=e1219]:
+                      - paragraph [ref=e1220]: 30.01.2024
+                      - paragraph [ref=e1221]: 16:00 (90 мин)
+                  - cell "Отменена" [ref=e1222]:
+                    - generic [ref=e1223]: Отменена
+                  - cell "Консультация по поводу операции" [ref=e1224]:
+                    - paragraph [ref=e1225]: Консультация по поводу операции
+                  - cell [ref=e1226]:
+                    - generic [ref=e1227]:
+                      - button "Редактировать" [ref=e1228]:
+                        - img [ref=e1230]
+                      - button "Удалить" [ref=e1233]:
+                        - img [ref=e1235]
+          - dialog "Создать запись на прием" [ref=e1238]:
+            - generic [ref=e1239]:
+              - generic [ref=e1240]:
+                - heading "Создать запись на прием" [level=2] [ref=e1241]
+                - button "Закрыть модальное окно" [ref=e1242] [cursor=pointer]:
+                  - img [ref=e1243]
+              - generic [ref=e1247]:
+                - generic [ref=e1248]:
+                  - heading "Основная информация" [level=3] [ref=e1249]
+                  - generic [ref=e1250]:
+                    - generic [ref=e1251]:
+                      - generic [ref=e1252]: Пациент *
+                      - combobox [ref=e1253] [cursor=pointer]:
+                        - option "Выберите пациента" [selected]
+                        - option "Пациент Тест null - +998901234567"
+                        - option "Пациент Тест null - +998901234567"
+                        - option "Пациент Тест null - +998901234567"
+                        - option "Пациент Тест null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Петров Иван null - +998901234567"
+                        - option "Сидорова Мария null - +998901234568"
+                        - option "Сидорова Мария null - +998901234568"
+                        - option "Иванов Иван Иванович - +998901234567"
+                        - option "User Admin System - +7-999-000-0000"
+                        - option "Сапаев Махмудбек null - +998 (91) 388-97-33"
+                        - option "Сапаев Махмудбек null - +998 (91) 388-97-34"
+                        - option "Fkjhk JHGJHjk null - +998 (91) 456-32-15"
+                        - option "Fkjhk JHGJHjg null - +998 (91) 456-32-17"
+                        - option "лорли щшр null - +998 (91) 123-65-49"
+                        - option "Fgygj khoih null - +998 (92) 123-13-65"
+                        - option "Fgmm jlgfj null - +998 (90) 123-65-47"
+                        - option "рла впве null - +998 (90) 124-56-32"
+                        - option "лорп паг null - +998 (97) 126-56-32"
+                        - option "Бабаджанов Ахмад null - +998 (91) 266-66-86"
+                        - option "Сапаров Баходир null - +998 (92) 312-65-65"
+                        - option "Каирмов Ислом null - +998 (90) 111-11-11"
+                        - option "Сапае Мапр null - +998 (91) 236-54-23"
+                        - option "ЩШлорлор щщрщ null - +998 (91) 469-87-55"
+                        - option "ДЛошпшгп опоорь null - +998 (90) 013-23-21"
+                        - option "чсич плропра null - +998 (93) 326-59-84"
+                        - option "ыввар лощ null - +998 (95) 665-65-46"
+                        - option "долод орпол null - +998 (99) 666-65-61"
+                        - option "пор аор null - +998 (91) 236-54-78"
+                        - option "Dfgfjhg sadgsfdj null - +998 (94) 785-32-65"
+                        - option "kjhg null - +998 (98) 235-44-74"
+                        - option "мт нр null - +998 (94) 563-21-45"
+                        - option "ыв вапр null - +998-91-456-78-22"
+                        - option "орор ждль null - +998-91-456-95-41"
+                        - option "счм апт null - +998-90-112-36-54"
+                        - option "Бабаев Шухрат null - +998-97-512-36-52"
+                        - option "Бабаев Шухрат null - +998-94-563-25-47"
+                        - option "Бабаев Шухрат null - +998-94-632-59-11"
+                        - option "Бабаев Шухрат null - +998-94-632-59-13"
+                        - option "Табиб роо null - +998-91-465-46-54"
+                        - option "Малла Соч null - +998-94-632-56-66"
+                        - option "Вепам аар null - +998-97-542-15-42"
+                        - option "Рахимов Аскар null - +998-97-015-63-23"
+                        - option "Сабуров Дилшод null - +998-93-541-25-66"
+                        - option "Аширова ЯЗлы null - +998-91-236-56-66"
+                        - option "Иванов Иван Иванович - +7 (999) 123-45-67"
+                        - option "каримов Ислом null - +998-94-656-66-56"
+                        - option "Лабораторный Тест Тестович - +998-90-111-11-11"
+                        - option "Мапао фдодд null - +998-90-132-16-54"
+                        - option "Каримова Лобар null - +998-91-654-98-72"
+                        - option "Сапаева Ирода null - +998-91-659-95-66"
+                        - option "вапр ывапро null - +998-98-235-43-55"
+                        - option "апр вап null - +998-92-365-68-78"
+                        - option "варрл вапо null - +998-93-456-54-88"
+                        - option "прочий парен null - +998-91-569-85-66"
+                        - option "ЭКГ касал null - +998-91-656-56-55"
+                        - option "дермато про null - +998-97-654-65-33"
+                        - option "Саттрова Жамила null - +998-91-326-45-66"
+                        - option "слоол лоб null - +998-92-665-65-56"
+                        - option "kmjnhbg k,jhn null - +998-94-353-53-43"
+                        - option "впр юлорпав null - +998-96-353-54-52"
+                        - option "щшлгорп зщшдор null - +998-92-665-65-65"
+                        - option "шолдо null - +998-99-626-65-65"
+                        - option "KFkj sdijvsoij null - +998-98-656-65-66"
+                        - option "kjnkj kjk null - +998-99-563-23-15"
+                        - option "htfyjghj iuoihjkmn null - +998-99-935-21-65"
+                        - option "дорп дшр null - +998 61 646 56 56"
+                        - option "АдминТест Админ Тестович - +998901234569"
+                        - option "орп null - +998 13 212 13 21"
+                        - option "влоадл влпадл null - +998 13 656 25 63"
+                        - option "kojpoks pkpok null - +998 (91) 265-65-6"
+                        - option "9ddfgdfg dsfbdfbdfx null - +998 92 655 65 56"
+                        - option "Сабурова Шоира null - +998 45 612 35 65"
+                        - option "Тестов Тест Тестович - +998908789226"
+                        - option "Финальный Тест Тестович - +998903361563"
+                        - option "Казаков Азамат null - +998 93 656 98 74"
+                        - option "Вапаев Нодир null - +998 94 569 86 32"
+                        - option "Шарипов Зокир null - +998 95 123 54 65"
+                        - option "Мадиярова Мадина null - +998 91 589 27 92"
+                        - option "Юля Михайловна null - +998 91 569 75 45"
+                        - option "f;';l lkl, null - +998 (99) 931-21-2"
+                        - option "hdfgj dhgdfjn null - +998 (99) 321-56-5"
+                        - option "Cfgfghb Janna null - +998 92 656 49 89"
+                        - option "Петрова Мария Сергеевна - +998909876543"
+                        - option "Сидоров Александр Петрович - +998931234567"
+                        - option "тохирова Жамила null - +998 92 654 98 75"
+                        - option "Зокирова Салима null - +998 92 123 65 49"
+                        - option "Зокирова Салима null - +998 92 651 65 16"
+                        - option "Ka KU null - +998 92 189 25 96"
+                        - option "Файзуллаев Рахим null - +998 92 789 56 89"
+                        - option "Жаббарова Мохим null - +998 92 468 95 62"
+                        - option "Насиров Аброр null - +998 92 158 96 46"
+                        - option "Раманов Шерзод null - +998 92 649 86 92"
+                        - option "Раманов Ахмад null - +998 92 886 86 88"
+                        - option "ыыв ывпы null - +998 93 659 59 59"
+                        - option "Пациент Тестовый Иванович - +998901234999"
+                        - option "Пациент Тестовый Иванович - +998901752128"
+                        - option "Пациент Тестовый Иванович - +998901756181"
+                        - option "Пациент Тестовый Иванович - +998901845612"
+                        - option "Пациент Тестовый Иванович - +998901112593"
+                        - option "Пациент Тестовый Иванович - +998901921279"
+                        - option "Тест Простой Иванович - +998901716460"
+                        - option "Пациент Тестовый Иванович - +998901739968"
+                        - option "Пациент Тестовый Иванович - +998901754778"
+                        - option "Пациент Тестовый Иванович - +998901614948"
+                        - option "lklkjb dflkj null - +998 96 262 32 62"
+                        - option "Пациент Тестовый Иванович - +998901249675"
+                        - option "Пациент Тестовый Иванович - +998901853603"
+                        - option "dghoij oijoi null - +998 96 262 32 78"
+                        - option "vchmgmh gnfg null - +998 (92) 599-59-5"
+                        - option "fgjfgd dhgfmgn null - +998 96 498 51 11"
+                        - option "Тим Галустян null - +998 96 987 63 36"
+                        - option "Эллп Галакси null - +998 96 258 95 65"
+                        - option "Сабзи Пиёз null - +998 (99) 892-36-5"
+                        - option "Тим Кук null - +998 92 898 96 54"
+                        - option "Тим Кука null - +998 92 365 89 96"
+                        - option "Жажжи Мушук null - +998 92 365 65 95"
+                        - option "дло дл null - +998 92 365 64 84"
+                        - option "нек кро null - +998 92 365 86 63"
+                        - option "Про Плюс null - +998 92 456 97 54"
+                        - option "Апоплек ЛОЕ null - +998 92 014 56 32"
+                        - option "Назарова Озода null - +998 92 780 12 65"
+                        - option "Шарипова Шакар null - +998 92 012 45 69"
+                        - option "Раманов Раман null - +998 92 012 45 15"
+                        - option "Латипова Лобар null - +998 92 065 94 66"
+                        - option "Гофуров Азамат null - +998 92 469 86 65"
+                        - option "Павлов Иван null - +998 92 469 25 69"
+                        - option "РО ПО null - +998 92 089 32 64"
+                        - option "Лора Бене null - +998 92 480 10 02"
+                        - option "Кушаев Азамат null - +998 92 008 78 70"
+                        - option "нано пепе null - +998 92 000 12 35"
+                        - option "Палванова Хосият null - +998 92 010 10 31"
+                        - option "Латипов Искандар null - +998 92 019 65 46"
+                        - option "Шамиева Гозал null - +998 92 004 50 04"
+                        - option "см мв null - +998 92 000 15 15"
+                        - option "ЛД дЛ null - +998 92 001 10 01"
+                        - option "Зафаров Сиёвуш null - +998 92 002 00 14"
+                        - option "Nona Yoyo null - +998 92 010 33 00"
+                        - option "кардио null - +998 90 000 23 65"
+                        - option "дерма null - +998 92 046 99 55"
+                        - option "стом стом null - +998 91 235 66 66"
+                        - option "санамжон null - +998 90 213 56 79"
+                        - option "Самия Сиддикий null - +998 92 303 03 61"
+                        - option "Мифабо Прод null - +998 92 999 66 96"
+                        - option "Туккиз Октябрь null - +998 92 987 98 79"
+                        - option "ЭКГ только null - +998 92 000 15 60"
+                        - option "Пациент ЭКГ null - +998 92 333 33 66"
+                        - option "ЭКГ ЭКГ null - +998 92 004 40 04"
+                        - option "ЭККГГ ЭЭЭ null - +998 92 002 21 10"
+                        - option "нер бер null - +998 92 066 50 02"
+                        - option "ЭЭККГГ КГБ null - +998 92 900 00 90"
+                        - option "Кардио Пепе null - +998 00 156 66 00"
+                        - option "Ун бирЭКГ null - +998 92 500 00 44"
+                        - option "Сардио ПА null - +998 92 500 55 66"
+                        - option "Процедура 1110 null - +998 92 110 10 01"
+                        - option "Cardio 1210 null - +998 92 121 21 00"
+                        - option "Derma 1210 null - +998 92 120 11 01"
+                        - option "Dentist 1210 null - +998 92 121 01 01"
+                        - option "Общий Касал null - +998 92 690 05 99"
+                        - option "Зерипов Комил null - +998 92 005 54 40"
+                        - option "Каримов Акмал null - +998 92 011 00 01"
+                        - option "Абдуллаев Абдулла null - +998 92 030 33 31"
+                        - option "Ганиева Юлдуз null - +998 92 116 66 66"
+                        - option "Пардаева Пардагул null - +998 92 222 01 54"
+                        - option "Таджиев Шавкат null - +998 92 020 22 22"
+                        - option "Сарсенбаев Парвоз null - +998 92 000 01 11"
+                        - option "Шарипов Зариф null - +998 92 001 55 12"
+                        - option "Нараров Аброр null - +998 92 321 32 16"
+                        - option "Талипова Махфуза null - +998 92 989 99 98"
+                        - option "Каримова Юлдуз null - +998 91 395 90 85"
+                        - option "Кардио Касал null - +989 29 999 55 54"
+                        - option "Касал Кардио2 null - +998 92 299 99 99"
+                        - option "Иламанов Якуб null - +998 92 000 33 33"
+                        - option "Дурдиев Абажан null - +998 92 330 00 01"
+                        - option "Ражапова Назокат null - +998 92 004 44 44"
+                        - option "Вапаев Комил null - +998 92 333 33 00"
+                        - option "Сатимов Усмон null - +998 92 331 66 65"
+                        - option "Сариева Сапаргул null - +998 92 044 55 66"
+                        - option "Пищиев Души null - +998 92 111 12 23"
+                        - option "Сабурбаева Фарида null - +998 92 222 22 22"
+                        - option "Лили Пото null - +998 92 000 04 44"
+                        - option "Абдуллаева Гулистон null - +998 92 333 66 57"
+                        - option "Машарипова Лола null - +998 92 158 73 36"
+                        - option "Cnjv Rfcfkkbr null - +998 92 123 65 47"
+                        - option "Ражапова Наргиза - +998945209067"
+                        - option "Кувватов Сила null - +998 92 188 26 47"
+                        - option "Иккинчи Юракча - +998923861753"
+                        - option "Фурст МочеКР - +998923659835"
+                        - option "Мурсалимов Хусин null - +998 92 120 01 14"
+                        - option "Яхши Булади null - +998 92 128 77 90"
+                        - option "Хадича Бабаева null - +998920101122"
+                        - option "Ойбек Паттаев null - +998921254545"
+                        - option "Махмудбек Сапаев null - +998913889733"
+                        - option "Хамидулла Стоматолог null - +998920888800"
+                        - option "Касал Кардио null - +998927773322"
+                        - option "касал Стом null - +998925553322"
+                        - option "Ти Кер null - +998920783652"
+                        - option "Птом СТОМ null - +998920113356"
+                        - option "До Пи null - +998923236522"
+                        - option "Бабажан Ахмедов null - +998922666686"
+                        - option "Касал Куэр null - +998923338855"
+                        - option "Вен Кож null - +998925552211"
+                        - option "Мат Сто null - +998920070101"
+                        - option "Тор Лабора null - +998923536413"
+                        - option "Вена Кожа null - +998921230807"
+                        - option "Кариес Денто null - +998921230808"
+                        - option "Альт Вар null - +998923210810"
+                        - option "кард ЭКГ null - +998923210811"
+                        - option "паса КАСА null - +998920986532"
+                        - option "Ахмад Кожи null - +998920653466"
+                        - option "Духтир Диш null - +998921365852"
+                        - option "Анализов Ладно null - +998920869532"
+                        - option "Шакар Абдуллаева null - +998920887763"
+                        - option "Комил Экранов null - +998923352398"
+                        - option "Санам Шарипова null - +998926138563"
+                        - option "Саттор Хажиев null - +998921478536"
+                        - option "Сахар Креатинин null - +998923756642"
+                        - option "Комила Вапаева null - +998923335236"
+                        - option "Нишатдинг Ахмад null - +998921112243"
+                        - option "Хижрон Ашхади null - +998923125486"
+                        - option "Patient Гучмат null - +998913891111"
+                        - option "Patient Шукуров null - +998912666686"
+                        - option "Паста Кремовая null - +998921356283"
+                        - option "Души Пищиев null - +998923865236"
+                        - option "Patient Абдураззок null - +998912505555"
+                        - option "Patient Какабой null - +998944444444"
+                        - option "ЮракКР Биринчи null - +998921837293"
+                        - option "КожаКР Илк null - +998921345056"
+                        - option "ДериКР Кейинги null - +998928539435"
+                        - option "ЗубКР Первый null - +998923862800"
+                        - option "ДишКр Второй null - +998 92 345 86 15"
+                        - option "АнализКР Секонд null - +998923008500"
+                        - option "СердцаКР Учинчи null - +998928555512"
+                        - option "Бекзод Самандаров null - +998927268580"
+                        - option "специалиста Уч null - +998923330033"
+                        - option "Пациент Тест null - +998 99 911 11 11"
+                        - option "Нуржанов Бекмурат - +998 92 219 44 78"
+                        - option "Зарипова Дилфуза - +998 92 177 89 33"
+                        - option "Номер Ватикано null - +998922251214"
+                        - option "функции Какие null - +998921110074"
+                        - option "Ромон Одамбаев null - +998928881189"
+                        - option "насчёт Вопрос null - +998920002200"
+                        - option "щшо амл null - +998920007844"
+                        - option "вчерашний Причина null - +998921112875"
+                        - option "РО ПО null - +998921445965"
+                        - option "ва ар null - +998922228801"
+                        - option "Анализов Навбат null - +998923551182"
+                        - option "Фамилия Исм null - +998921338323"
+                        - option "Фара ЭКГ null - +998923356525"
+                        - option "null - +998 92 386 98 68"
+                        - option "null - +998 97 000 11 44"
+                        - option "null - +998 92 999 44 88"
+                        - option "null - +998 92 333 58 90"
+                        - option "null - +998 92 056 12 65"
+                        - option "null - +998 92 165 98 74"
+                        - option "null - +998 92 331 02 55"
+                        - option "jk jk null - +998 92 331 22 00"
+                        - option "Юсупова Лайло null - +998 92 165 98 98"
+                        - option "Жумаева Олтиной null - +998 92 005 40 40"
+                        - option "Гафурова Арофат null - +998 92 588 92 00"
+                        - option "Балтабаев Азиз null - +998 92 158 44 75"
+                        - option "Кодиров Шавкат null - +998 92 168 71 16"
+                        - option "Нормухаммедова Гавхар null - +998 92 330 11 50"
+                        - option "Шарипов Дурдибой null - +998 92 166 49 89"
+                        - option "Нуримбетов Нурмамат null - +998 92 300 15 15"
+                        - option "Смад ТЕСТ null - +998 92 555 88 55"
+                        - option "Неро Касалл null - +998 92 165 99 89"
+                        - option "Юсипов Руслан null - +998 92 920 00 87"
+                        - option "Добав Пациент null - 998923333390"
+                        - option "Юлдашева Рохат null - +998 92 665 91 44"
+                        - option "Узичи Духтир null - +998 92 344 00 89"
+                        - option "Тоза касал null - +998 92 188 79 22"
+                        - option "Дадаева Гулистон null - +998 92 168 89 55"
+                        - option "Нуниязова Зевар null - +998 92 194 65 65"
+                        - option "Шамуратова Рохат null - +998 92 311 69 85"
+                        - option "Сапарбаева Хилола null - +998 92 355 22 01"
+                        - option "Таджиев Бахтиёр null - +998 92 995 45 65"
+                        - option "апар вра null - +998 92 145 95 62"
+                        - option "олимова барчин null - +998 92 133 66 55"
+                        - option "Алимова Сожида null - +998 92 510 02 36"
+                        - option "Давронов Мужик null - +998 92 174 48 89"
+                        - option "Териева Анализжон null - +998923885260"
+                        - option "Рахимов Гучмат null - +998926494450"
+                        - option "Давронов Хамдам null - +998 92 000 10 01"
+                        - option "Панаев Гофур null - +998 92 188 74 62"
+                        - option "Сейитова Кундуз null - +998 92 111 22 33"
+                        - option "Сейитова Кундрг null - +998 92 111 22 78"
+                        - option "Тажибаева Раъно null - +998 92 166 82 66"
+                        - option "Тажибаева Рохат null - +998 92 166 82 45"
+                        - option "ДЛО ОЛД null - +998 92 000 00 00"
+                        - option "ДЛО ОЛпсчД null - +998 92 000 00 01"
+                        - option "ДваЛО ОЛпсчД null - +998 92 000 15 66"
+                        - option "ДвоЛО ОЛпД null - +998 92 044 10 00"
+                        - option "ДвоЛО ОЛмпД null - +998 92 044 10 05"
+                        - option "Рузимбетов Собир null - +998 92 331 55 00"
+                        - option "Даминова Турсунгул null - +998 92 666 11 00"
+                        - option "klm knk null - +998 92 156 49 84"
+                        - option "hfd iok null - +998 92 222 44 56"
+                        - option "Дадабаев Сирож null - +998 92 166 05 45"
+                        - option "Абдуллаева Сожида null - +998 92 166 49 98"
+                        - option "Аметова Курбонбика null - +998 92 166 48 78"
+                        - option "Ядимдаева Гули null - +998 92 188 86 54"
+                        - option "Батиров Худаяр null - +998 92 000 11 00"
+                        - option "Рахимбердиева Ойша null - +998 92 166 95 49"
+                        - option "Жураева Гавхар null - +998 92 655 26 11"
+                        - option "Сеттиев Жонибек null - +998 92 166 58 99"
+                        - option "Рашидова Шоира null - +998 92 366 23 22"
+                        - option "Богибеков Дилшод null - +998 92 666 33 22"
+                        - option "Юсупова Шахло null - +998921118891"
+                        - option "Ягмурова Зайнаб null - +998923469190"
+                        - option "Жамаладдинов Рашид null - +998929995831"
+                        - option "Пациент Тестовый Иванович - +998901835172"
+                        - option "Тест Простой Иванович - +998901722850"
+                        - option "Пациент Тестовый Иванович - +998901600934"
+                        - option "Тест Простой Иванович - +998901878105"
+                        - option "Для дж null - 998923558699"
+                        - option "Варри Парри null - +998925550079"
+                        - option "Назаров Ислом null - 998923712230"
+                        - option "Шамсиддинова Лола null - 998923669380"
+                        - option "Хамдамова Наргиза null - 998923885644"
+                        - option "Набижанов Равшан null - +998921887920"
+                        - option "Тошматов Эшмат null - 998921110000"
+                        - option "Куда Анда null - 998923882387"
+                        - option "Ха Фа null - 998921241150"
+                        - option "Да ЛА null - 998921887830"
+                        - option "Ку Ка null - 998923052206"
+                        - option "Хо Да null - 998923056680"
+                        - option "Сабуров Илхом null - 998923556399"
+                        - option "Жалолова Санобар null - 998921227133"
+                        - option "Зарипов Максуд null - 998928227088"
+                        - option "Базарбаев Жумабай null - 998921212222"
+                        - option "Фозилов Каримбой null - 998921114713"
+                        - option "Шарофов Рузимбой null - 998923421193"
+                        - option "Шо На null - 998921007110"
+                        - option "Го Фа null - 998923885100"
+                        - option "Ра но null - 998921882777"
+                        - option "Ноз Дед null - 998923921120"
+                        - option "Хо Жалобы null - 998921889723"
+                        - option "Хавасова Мавлуда null - 998921375562"
+                        - option "Куда Койим null - 998921886103"
+                        - option "Сураб Олган null - +998921774900"
+                        - option "Новый Этап null - 998923359999"
+                        - option "Rvf kj null - +998929998830"
+                        - option "Халлиева Турсунгул null - 998928558808"
+                        - option "Рахмат Ука null - 998925880999"
+                        - option "Шавкатов Сироп null - 998925000668"
+                        - option "Дусимова Гуллола null - +998921554889"
+                        - option "Тест Диагностика null - +998901111111"
+                        - option "Дастонва Жамила null - +998925554910"
+                        - option "Давлетов Элдор null - +998921111144"
+                        - option "Dfgfjhg sadgsfdj null - +998947853214"
+                        - option "Ллпош ваитл null - +998920051553"
+                        - option "jjij iop null - +998924654654"
+                        - option "kjjb uyg null - +998921655463"
+                        - option "шгнек гн null - +998926445589"
+                        - option "46енор ниемк null - +998923559856"
+                        - option "гршол ролб null - +998921447985"
+                        - option "ывап ываит null - +998923447995"
+                        - option "ыукер орпв null - +998923446899"
+                        - option "Шохрухов Рахим null - 998923544212"
+                        - option "Гоп Поп null - 998923865999"
+                        - option "Чакиров Бор null - 998928448008"
+                        - option "Хол Мат null - 998923996553"
+                        - option "Давай Приведи null - 998928775400"
+                        - option "Том Жерри null - 998920775008"
+                        - option "Ощ 9ли null - 998926955638"
+                        - option "Нуриллаева Ширин null - 998920338665"
+                        - option "Вапаев Мухтор null - 998923865531"
+                        - option "Рузимбетов Шухрат null - 998923865633"
+                        - option "Курбанова Угилжон null - 998923865595"
+                        - option "Тестовый Пациент null - 998928552369"
+                        - option "Тестовая Кардио null - 998923009865"
+                        - option "Хово Логи null - 998923885639"
+                        - option "Бахтиёрова Зарнигор null - 998927844655"
+                        - option "Аллабергенова Ровия null - 998925554122"
+                        - option "Хужакулова Санамжон null - 998923841268"
+                        - option "Халиков Баходир null - 998923884653"
+                        - option "Караев Давление null - 998921441111"
+                        - option "Кенжаев Мажид null - 998928774400"
+                        - option "Фамилия Имя null - 998921234566"
+                        - option "Давлетова Нигора null - +998927114766"
+                        - option "Шухратова Нодира null - 998921113382"
+                        - option "Камолов Гайрат null - 998920087700"
+                        - option "Захидова Муборак null - 998923886599"
+                        - option "Давлетова Хусния null - 998923665339"
+                        - option "Самандарова Гулрух null - 998927004656"
+                        - option "Ниёзов Пиёз null - 998921142241"
+                        - option "Пиёзов Женисбек null - 998923622565"
+                        - option "Зиёваддинов Камол null - 998923441277"
+                        - option "Ободов Тохир null - 998929998800"
+                        - option "То Ло null - 998928776431"
+                        - option "Худайбергенов Мумин null - 998921964130"
+                        - option "Сапарова Гулширин null - 998923009600"
+                        - option "Тото Пепе null - 998923880987"
+                        - option "Зохидова Марям null - 998920990889"
+                        - option "Нодиров Зафар null - 998920554006"
+                        - option "Диванов Курси null - 998921117500"
+                        - option "Шеримбетова Амина null - 998923996099"
+                        - option "Ангса Котти null - 998922211001"
+                        - option "Нормалов Меъёр null - 998921225522"
+                        - option "Комов Ким null - 998928999908"
+                        - option "Валиев Омонтой null - 998923111411"
+                        - option "Сатторова Шарифа null - 998923668569"
+                        - option "Санамов Анамжон null - 998923221300"
+                        - option "Латипов Анвар null - 998923320062"
+                        - option "Денталов Ментол null - 998920771103"
+                        - option "Батиров Нодир null - 998921441411"
+                        - option "Давкараева Озода null - 998926005032"
+                        - option "Родов Арка null - 998920330809"
+                        - option "Сапарбаев Уктам null - 998920110352"
+                        - option "Халилова Жамила null - 998926558211"
+                        - option "Саттарова Комила null - 998923314413"
+                        - option "Добавит Всё null - 998929980688"
+                        - option "Султанов Мадиёр null - 998927884500"
+                        - option "Шарипов Исмоил null - 998927117800"
+                        - option "Самандарова Мавлуда null - 998929942877"
+                        - option "Давронов Хамид null - +998927771788"
+                        - option "Камолов Атамурод null - 998928881100"
+                        - option "Каримов Тухтабой null - 998927996601"
+                        - option "Хажиев Хурсанд null - 998925544460"
+                        - option "Жаббарова Эътибор null - 998987112455"
+                        - option "Test Patient null - 998991234567"
+                        - option "Бабаев Шухрат null - 998928811149"
+                        - option "Хатамова Гулнура null - 998927070712"
+                        - option "Бахтиёрова Шахло null - 998923110082"
+                        - option "Ражапбаева Шакаржон null - +998921888466"
+                        - option "Test Patient null - +998901234567"
+                        - option "PDF Smoke Test - +998901234567"
+                        - option "Тестов Тест Тестович - +998901112233"
+                        - option "Абдуллаев Витамин Даврон - +998901112234"
+                        - option "Каримова Гликия Севда - +998901112235"
+                        - option "Саидов Тестостерон Жахон - +998901112236"
+                        - option "Юлдашева ОАМ Ситора - +998901112237"
+                        - option "Смоук Биохимия 029905 - +998907113839"
+                        - option "Смоук Биохимия 029930 - +998905493127"
+                        - option "Смоук Биохимия Очередь7983 - +998909597402"
+                        - option "Тестовый Пациент Регистратура - +998077500599"
+                        - option "Тестовый Пациент Доктор - +998082364601"
+                        - option "Админ Пациент Поток - +998904231981"
+                        - option "Админ Пациент Поток - +998905020901"
+                        - option "Админ Пациент Поток - +998905480981"
+                        - option "Админ Пациент Поток - +998905672271"
+                        - option "06 Пациент 1774163475 DOC QA - +998904163475"
+                        - option "01 Пациент DENT null - +998904146335"
+                        - option "Админов02 Паспорт Проверочный - +998903151020"
+                        - option "Админов99 Паспорт Проверочный - +998905530990"
+                        - option "QA Smoke BCDEFG - +998901234572"
+                    - generic [ref=e1254]:
+                      - generic [ref=e1255]: Врач *
+                      - combobox [ref=e1256] [cursor=pointer]:
+                        - option "Выберите врача"
+                        - option "undefined - undefined" [selected]
+                        - option "undefined - undefined"
+                        - option "undefined - undefined"
+                        - option "undefined - undefined"
+                        - option "undefined - undefined"
+                        - option "undefined - undefined"
+                        - option "undefined - undefined"
+                        - option "undefined - undefined"
+                  - generic [ref=e1257]:
+                    - generic [ref=e1258]:
+                      - generic [ref=e1259]: Дата записи *
+                      - generic [ref=e1260]:
+                        - img
+                        - textbox [ref=e1261]: 2026-03-29
+                    - generic [ref=e1262]:
+                      - generic [ref=e1263]: Время записи *
+                      - generic [ref=e1264]:
+                        - img
+                        - textbox [ref=e1265]: 09:00
+                    - generic [ref=e1266]:
+                      - generic [ref=e1267]: Длительность (мин)
+                      - spinbutton [ref=e1269]: "30"
+                  - generic [ref=e1270]:
+                    - generic [ref=e1271]: Статус записи
+                    - combobox [ref=e1272] [cursor=pointer]:
+                      - option "Ожидает" [selected]
+                      - option "Подтверждена"
+                      - option "Оплачена"
+                      - option "На приеме"
+                      - option "Завершена"
+                      - option "Отменена"
+                      - option "Не явился"
+                - generic [ref=e1273]:
+                  - heading "Детали записи" [level=3] [ref=e1274]
+                  - generic [ref=e1275]:
+                    - generic [ref=e1276]: Причина обращения *
+                    - textbox "Опишите причину обращения к врачу" [ref=e1277]
+                  - generic [ref=e1278]:
+                    - generic [ref=e1279]: Дополнительные заметки
+                    - textbox "Дополнительная информация о записи" [ref=e1280]
+                - generic [ref=e1281]:
+                  - heading "Контактная информация" [level=3] [ref=e1282]
+                  - generic [ref=e1283]:
+                    - generic [ref=e1284]:
+                      - generic [ref=e1285]: Телефон для связи
+                      - generic [ref=e1286]:
+                        - img
+                        - textbox "+998 90 123 45 67" [ref=e1287]
+                    - generic [ref=e1288]:
+                      - generic [ref=e1289]: Email для уведомлений
+                      - generic [ref=e1290]:
+                        - img
+                        - textbox "patient@example.com" [ref=e1291]
+                - generic [ref=e1292]:
+                  - button "Создать запись" [ref=e1293] [cursor=pointer]:
+                    - generic [ref=e1294]:
+                      - img [ref=e1295]
+                      - text: Создать запись
+                  - button "Отмена" [ref=e1299] [cursor=pointer]:
+                    - generic [ref=e1300]: Отмена
+  - region "Notifications Alt+T"

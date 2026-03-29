@@ -3,7 +3,7 @@
  * Просмотр и анализ ЭКГ файлов
  * Согласно MASTER_TODO_LIST строка 247
  */
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -40,6 +40,7 @@ import {
   X,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
@@ -48,10 +49,19 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   const [ecgFiles, setEcgFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerBlobUrl, setViewerBlobUrl] = useState(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [ecgParameters, setEcgParameters] = useState(null);
+
+  useEffect(() => () => {
+    if (viewerBlobUrl) {
+      window.URL.revokeObjectURL(viewerBlobUrl);
+    }
+  }, [viewerBlobUrl]);
 
   // Поддерживаемые форматы
   const acceptedFormats = {
@@ -70,10 +80,17 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('kind', 'ecg');
-        formData.append('visit_id', visitId);
+        formData.append('file_type', 'medical_record');
+        formData.append('title', file.name);
+        formData.append('tags', 'ecg,cardiology');
+        if (patientId) {
+          formData.append('patient_id', patientId);
+        }
+        if (visitId) {
+          formData.append('visit_id', visitId);
+        }
         
-        const response = await api.post(`/visits/${visitId}/files`, formData, {
+        const response = await api.post('/files/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
@@ -85,11 +102,10 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         
         const newFile = {
           id: response.data.id,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          url: response.data.url,
-          uploadedAt: new Date().toISOString(),
+          name: response.data.original_filename || file.name,
+          type: response.data.mime_type || file.type,
+          size: response.data.file_size || file.size,
+          uploadedAt: response.data.created_at || new Date().toISOString(),
           parameters: null,
         };
         
@@ -99,7 +115,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         if (file.type === 'text/xml' || file.name.endsWith('.scp')) {
           await parseECGFileData(file, newFile);
         }
-        
+
         setUploadProgress(0);
         onDataUpdate && onDataUpdate();
         
@@ -137,19 +153,36 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             ? { ...f, parameters: enrichedParams }
             : f
         ));
-        
-        // Отправляем на сервер если нужно
-        try {
-          await api.post(`/visits/${visitId}/ecg/parse`, {
-            file_id: uploadedFile.id,
-            parameters: enrichedParams,
-          });
-        } catch (error) {
-          logger.error('Ошибка сохранения параметров на сервере:', error);
-        }
       }
     } catch (error) {
       logger.error('Ошибка парсинга ЭКГ:', error);
+    }
+  };
+
+  const openFileBlobUrl = async (fileId, mode = 'preview') => {
+    const response = await api.get(`/files/${fileId}/${mode}`, {
+      responseType: 'blob',
+    });
+
+    return window.URL.createObjectURL(response.data);
+  };
+
+  const downloadFile = async (file) => {
+    if (!file?.id) {
+      return;
+    }
+
+    try {
+      const blobUrl = await openFileBlobUrl(file.id, 'download');
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = file.name || 'ecg-file';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      logger.error('Ошибка скачивания файла:', error);
     }
   };
 
@@ -179,13 +212,40 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   };
 
   // Открыть просмотрщик
-  const openViewer = (file) => {
+  const openViewer = async (file) => {
     setSelectedFile(file);
     setViewerOpen(true);
-    
+    setViewerLoading(true);
+    setViewerError('');
+
     if (file.parameters) {
       setEcgParameters(file.parameters);
     }
+
+    try {
+      if (viewerBlobUrl) {
+        window.URL.revokeObjectURL(viewerBlobUrl);
+      }
+
+      const blobUrl = await openFileBlobUrl(file.id, 'preview');
+      setViewerBlobUrl(blobUrl);
+    } catch (error) {
+      logger.info('Предпросмотр файла недоступен, используем только скачивание:', error);
+      setViewerBlobUrl(null);
+      setViewerError('Предпросмотр недоступен для этого файла. Используйте скачивание.');
+    } finally {
+      setViewerLoading(false);
+    }
+  };
+
+  const closeViewer = () => {
+    if (viewerBlobUrl) {
+      window.URL.revokeObjectURL(viewerBlobUrl);
+    }
+    setViewerBlobUrl(null);
+    setViewerLoading(false);
+    setViewerError('');
+    setViewerOpen(false);
   };
 
   // Удалить файл
@@ -384,9 +444,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         
                         <IconButton
                           size="small"
-                          component="a"
-                          href={file.url}
-                          download
+                          onClick={() => downloadFile(file)}
                           title="Скачать"
                         >
                           <Download />
@@ -492,7 +550,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       {/* Диалог просмотра */}
       <Dialog
         open={viewerOpen}
-        onClose={() => setViewerOpen(false)}
+        onClose={closeViewer}
         maxWidth="lg"
         fullWidth
       >
@@ -503,7 +561,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             </Typography>
             <Button 
               variant="outline" 
-              onClick={() => setViewerOpen(false)}
+              onClick={closeViewer}
               style={{ padding: '8px' }}
             >
               <X style={{ width: 16, height: 16 }} />
@@ -515,24 +573,42 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           {selectedFile && (
             <Box>
               {/* Для PDF и изображений показываем превью */}
-              {(selectedFile.type === 'application/pdf' || 
-                selectedFile.type.startsWith('image/')) && (
+              {viewerLoading ? (
+                <Alert severity="info">
+                  Загрузка предпросмотра...
+                </Alert>
+              ) : viewerBlobUrl ? (
                 <Box sx={{ textAlign: 'center' }}>
-                  {selectedFile.type === 'application/pdf' ? (
-                    <iframe
-                      src={selectedFile.url}
-                      width="100%"
-                      height="600px"
-                      title="ECG PDF"
-                    />
+                  {(selectedFile.type === 'application/pdf' || 
+                    selectedFile.type?.startsWith('image/')) ? (
+                    selectedFile.type === 'application/pdf' ? (
+                      <iframe
+                        src={viewerBlobUrl}
+                        width="100%"
+                        height="600px"
+                        title="ECG PDF"
+                      />
+                    ) : (
+                      <img
+                        src={viewerBlobUrl}
+                        alt="ECG"
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
+                    )
                   ) : (
-                    <img
-                      src={selectedFile.url}
-                      alt="ECG"
-                      style={{ maxWidth: '100%', height: 'auto' }}
-                    />
+                    <Alert severity="info">
+                      Предпросмотр доступен только для PDF и изображений.
+                    </Alert>
                   )}
                 </Box>
+              ) : viewerError ? (
+                <Alert severity="warning">
+                  {viewerError}
+                </Alert>
+              ) : (
+                <Alert severity="info">
+                  Файл готов к скачиванию.
+                </Alert>
               )}
               
               {/* Параметры ЭКГ */}
@@ -610,21 +686,22 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           <Button onClick={() => analyzeECG(selectedFile)} disabled={analyzing}>
             AI Анализ
           </Button>
-          <Button
-            component="a"
-            href={selectedFile?.url}
-            download
-            variant="contained"
-          >
+          <Button onClick={() => downloadFile(selectedFile)} variant="contained">
             Скачать
           </Button>
-          <Button onClick={() => setViewerOpen(false)}>
+          <Button onClick={closeViewer}>
             Закрыть
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
+};
+
+ECGViewer.propTypes = {
+  visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onDataUpdate: PropTypes.func,
 };
 
 export default ECGViewer;

@@ -57,6 +57,8 @@ bash ops/vps/scripts/check_health.sh https://staging.example.com http://127.0.0.
 
 ## Typical Production Rollout
 
+> Only run this section after a separate VPS staging contour has passed smoke validation, EMR cutover, and a short soak window. Production rollout stays blocked until staging is green.
+
 ```bash
 cd /opt/clinic
 

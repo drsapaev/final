@@ -295,9 +295,9 @@ def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Visit not found")
 
     visit.status = status_new
-    if status_new == "in_progress":
+    if status_new == "in_progress" and hasattr(visit, "started_at"):
         visit.started_at = datetime.utcnow()
-    if status_new in {"closed", "canceled"}:
+    if status_new in {"closed", "canceled"} and hasattr(visit, "finished_at"):
         visit.finished_at = datetime.utcnow()
     
     # [FIX] Также обновляем статус в очереди, если есть связанная запись
@@ -322,8 +322,8 @@ def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
         doctor_id=visit.doctor_id,
         status=visit.status,
         created_at=visit.created_at,
-        started_at=visit.started_at,
-        finished_at=visit.finished_at,
+        started_at=getattr(visit, "started_at", None),
+        finished_at=getattr(visit, "finished_at", None),
         notes=visit.notes,
         planned_date=visit.visit_date
     )
@@ -336,6 +336,11 @@ def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
     "/visits/{visit_id}/reschedule",
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на конкретную дату (new_date в формате YYYY-MM-DD)",
+)
+@router.post(
+    "/{visit_id}/reschedule",
+    dependencies=[Depends(require_roles("Admin", "Registrar"))],
+    summary="Перенести визит на конкретную дату (legacy alias)",
 )
 def reschedule_visit(
     visit_id: int,
@@ -394,6 +399,11 @@ def reschedule_visit(
     "/visits/{visit_id}/reschedule/tomorrow",
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на завтра (planned_date = today + 1)",
+)
+@router.post(
+    "/{visit_id}/reschedule/tomorrow",
+    dependencies=[Depends(require_roles("Admin", "Registrar"))],
+    summary="Перенести визит на завтра (legacy alias)",
 )
 def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     t = _visits(db)

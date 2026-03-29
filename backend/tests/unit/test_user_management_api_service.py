@@ -159,3 +159,50 @@ class TestUserManagementApiService:
         )
 
         assert preferences.theme == "glass"
+
+    def test_update_current_user_preferences_persists_security_settings_blob(self):
+        profile = SimpleNamespace(id=101, user_id=1, full_name="Bootstrap User")
+        preferences = SimpleNamespace(
+            id=202,
+            user_id=1,
+            profile_id=101,
+            emr_settings=None,
+            security_settings=None,
+            theme="auto",
+            language="ru",
+            compact_mode=False,
+            sidebar_collapsed=False,
+        )
+        notification_settings = SimpleNamespace(id=303, user_id=1, profile_id=101)
+
+        class Repository:
+            def ensure_user_support_records(self, user_id):
+                assert user_id == 1
+                return profile, preferences, notification_settings
+
+            def commit(self):
+                return None
+
+            def refresh(self, instance):
+                return None
+
+            def rollback(self):
+                raise AssertionError("rollback must not be called")
+
+        service = UserManagementApiService(db=None, repository=Repository())
+        service.update_current_user_preferences(
+            current_user_id=1,
+            preferences_data={
+                "security_settings": {
+                    "twoFactorEnabled": True,
+                    "sessionTimeout": 45,
+                    "autoLogout": False,
+                }
+            },
+        )
+
+        assert preferences.security_settings == {
+            "twoFactorEnabled": True,
+            "sessionTimeout": 45,
+            "autoLogout": False,
+        }

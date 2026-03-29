@@ -19,6 +19,8 @@ const generateSessionId = () => {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+const emrCache = new Map();
+
 /**
  * useEMR Hook
  * 
@@ -31,58 +33,100 @@ const generateSessionId = () => {
 export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {}) {
     const [state, dispatch] = useReducer(emrReducer, initialState);
     const clientSessionId = useRef(generateSessionId());
-    const abortControllerRef = useRef(null);
+    const isMountedRef = useRef(true);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    const cacheKey = `${visitId || ''}:${specialty}`;
 
     // =========================================================================
     // LOAD EMR
     // =========================================================================
-    const loadEMR = useCallback(async () => {
+    const loadEMR = useCallback(async (forceRefresh = false) => {
         if (!visitId) return;
 
-        // Cancel any pending request
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
+        const cachedEntry = emrCache.get(cacheKey);
+        if (!forceRefresh) {
+            if (cachedEntry?.data) {
+                if (isMountedRef.current) {
+                    dispatch(emrActions.load(cachedEntry.data));
+                }
+                return cachedEntry.data;
+            }
+
+            if (cachedEntry?.promise) {
+                return cachedEntry.promise;
+            }
+        } else if (cachedEntry?.promise) {
+            return cachedEntry.promise;
         }
-        abortControllerRef.current = new AbortController();
+
+        const loadPromise = (async () => {
+            try {
+                const response = await apiClient.get(`/v2/emr/${visitId}`, {
+                    silent: true,
+                    validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+                });
+
+                if (response.status === 404) {
+                    logger.info('[FIX:EMR404] EMR not found, initializing empty draft', {
+                        visitId,
+                        specialty,
+                    });
+                    const emptyEmr = {
+                        data: buildInitialEMRData(specialty),
+                        version: 1,
+                        row_version: 0,
+                        status: 'draft',
+                    };
+                    emrCache.set(cacheKey, { data: emptyEmr, promise: null });
+                    if (isMountedRef.current) {
+                        dispatch(emrActions.load(emptyEmr));
+                    }
+                    return emptyEmr;
+                }
+
+                const normalizedEmr = {
+                    ...response.data,
+                    data: normalizeEMRData(response.data?.data, specialty),
+                };
+                emrCache.set(cacheKey, { data: normalizedEmr, promise: null });
+                if (isMountedRef.current) {
+                    dispatch(emrActions.load(normalizedEmr));
+                }
+                return normalizedEmr;
+            } catch (error) {
+                logger.error('Failed to load EMR:', error);
+                emrCache.delete(cacheKey);
+                if (isMountedRef.current) {
+                    dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
+                }
+                throw error;
+            }
+        })();
+
+        emrCache.set(cacheKey, {
+            data: cachedEntry?.data || null,
+            promise: loadPromise,
+        });
 
         try {
-            const response = await apiClient.get(`/v2/emr/${visitId}`, {
-                signal: abortControllerRef.current.signal,
-                silent: true,
-                validateStatus: (status) => status === 404 || status >= 200 && status < 300,
-            });
-
-            if (response.status === 404) {
-                logger.info('[FIX:EMR404] EMR not found, initializing empty draft', {
-                    visitId,
-                    specialty,
+            return await loadPromise;
+        } finally {
+            const currentEntry = emrCache.get(cacheKey);
+            if (currentEntry?.promise === loadPromise) {
+                emrCache.set(cacheKey, {
+                    data: currentEntry.data || null,
+                    promise: null,
                 });
-                const emptyEmr = {
-                    data: buildInitialEMRData(specialty),
-                    version: 1,
-                    row_version: 0,
-                    status: 'draft',
-                };
-                dispatch(emrActions.load(emptyEmr));
-                return emptyEmr;
             }
-
-            const normalizedEmr = {
-                ...response.data,
-                data: normalizeEMRData(response.data?.data, specialty),
-            };
-            dispatch(emrActions.load(normalizedEmr));
-            return normalizedEmr;
-        } catch (error) {
-            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-                return; // Aborted, ignore
-            }
-
-            logger.error('Failed to load EMR:', error);
-            dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
-            throw error;
         }
-    }, [specialty, visitId]);
+    }, [cacheKey, specialty, visitId]);
 
     // =========================================================================
     // SAVE EMR
@@ -183,7 +227,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
     // CONFLICT RESOLUTION
     // =========================================================================
     const reloadFromServer = useCallback(async () => {
-        await loadEMR();
+        await loadEMR(true);
         dispatch(emrActions.conflictResolved());
     }, [loadEMR]);
 
@@ -223,12 +267,6 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
         if (autoLoad && visitId) {
             loadEMR();
         }
-
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
     }, [autoLoad, visitId, loadEMR]);
 
     // =========================================================================

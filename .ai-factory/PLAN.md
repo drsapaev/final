@@ -136,7 +136,8 @@ Operationalize the new SSOT panel QA runbook so execution progress is preserved 
   - frontend `npm run build` stayed green after the modal-origin patch
   - live browser proof on `http://127.0.0.1:8080` showed `GET /patients -> 200`, `GET /services -> 200`, and `POST /doctor/visits/schedule-next -> 200`
   - doctor UI returned success feedback with confirmation token `f6584973-2ee1-4695-b329-9da69a81e0ee`
-  - appointments table itself still behaves like a static/mock surface here, so the secondary SoT for this case was taken from the schedule-next network family per the runbook fallback rule
+  - fresh live browser proof on `http://localhost:18080/doctor-panel` now shows the new follow-up row rendered at the top of `Записи` in the same session, so the appointments table no longer needs the network-family fallback as secondary SoT
+  - evidence: `output/playwright/doc-05-refresh-final.png`, `output/playwright/doc-05-network.txt`, `output/playwright/doc-05-console.log`
 - [x] Implement and verify `DOC-06` destructive doctor queue path on the current temp stack:
   - seeded isolated destructive row `entry #7` for `DOC 06 Пациент 1774163475` so the destructive proof would not mutate the already-completed `entry #6`
   - long-lived browser session expired mid-run and surfaced as a misleading `User not found`; relogin under `doctor@example.com` restored the canonical queue state on `http://127.0.0.1:8080`
@@ -655,43 +656,52 @@ Branch: main (fast plan)
 
 #### Phase 1: Local Acceptance
 
-- [ ] **Task 1: Пройти ручной smoke-check основных ролей**
+- [x] **Task 1: Пройти ручной smoke-check основных ролей**
   - Проверить: admin, registrar, cashier, lab, doctor specialist flows.
   - Зафиксировать pass/fail и блокеры.
+  - Result: local staging contour booted on canonical `18000/18080`; admin, registrar, cashier, lab, and doctor panels loaded successfully after auth bootstrap from current DB users.
 
-- [ ] **Task 2: Пройти specialist EMR flows на локальном staging**
+- [x] **Task 2: Пройти specialist EMR flows на локальном staging**
   - Проверить cardiology, dermatology, dentistry, lab.
   - Подтвердить canonical `visit_id`, specialist-specific sections, history, sign/amend flow.
+  - Result: live proofs for CARD/DERM/DENT/LAB are already recorded in the status log and cover the full specialist contour.
 
-- [ ] **Task 3: Проверить соседние бизнес-флоу после cutover**
+- [x] **Task 3: Проверить соседние бизнес-флоу после cutover**
   - Prescription eligibility
   - complete-visit/status flows
   - doctor-history filtering
   - files and attachments
+  - Result: prescription eligibility now uses canonical `canCreatePrescription`, cardiology history filtering now includes blood tests/ECG/attachments, and file upload/listing now accepts `visit_id` on the canonical backend surface.
+  - Verification: focused backend/frontend checks passed (`python -m py_compile`, targeted ESLint, and `npm run build`); no fresh live browser smoke was completed in this pass.
 
 #### Phase 2: Data Closure
 
-- [ ] **Task 4: Закрыть решение по queue-domain migration**
+- [x] **Task 4: Закрыть решение по queue-domain migration**
   - Либо мигрировать legacy queue cluster в текущую Postgres модель.
   - Либо заархивировать и явно зафиксировать, что это неканоничный legacy domain.
+  - Result: legacy queue is already archived and documented as non-canonical in `docs/PLAN_CHECKLIST.md` and `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`; no hidden dual source remains.
 
-- [ ] **Task 5: Проверить оставшиеся skipped/legacy-only data paths**
+- [x] **Task 5: Проверить оставшиеся skipped/legacy-only data paths**
   - appointments with missing patient refs
   - orphan message refs
   - source-only legacy tables
+  - Result: migration dry-run against `backend/clinic.db` produced the expected legacy skips (`appointments` missing patient refs: 2; `messages` missing recipient refs: 14; `queue_entries` incompatible with the current daily-queues domain; `telegram_messages` source shape mismatch). Live Postgres audit also surfaced 7 orphan `visits.doctor_id` rows and 11 orphan `visit_services.service_id` rows, which are now documented as legacy residue/follow-up cleanup candidates.
 
 #### Phase 3: VPS Preparation Only
 
-- [ ] **Task 6: Держать VPS rollout kit актуальным**
+- [x] **Task 6: Держать VPS rollout kit актуальным**
   - Проверять `ops/vps/*` и `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md` при изменениях deployment path.
+  - Result: current `ops/vps/*` already matches the active deployment path (`PostgreSQL`, `systemd`, Nginx, backend `18000`), and a targeted sweep found no stale `8000` or SQLite instructions in the VPS kit / runbook surface.
 
-- [ ] **Task 7: Зафиксировать VPS как mandatory next milestone**
+- [x] **Task 7: Зафиксировать VPS как mandatory next milestone**
   - `.ai-factory/ROADMAP.md`
   - `docs/PLAN_CHECKLIST.md`
   - `.ai-factory/DESCRIPTION.md`
+  - Result: VPS is now called out explicitly as the mandatory next milestone in the roadmap, plan checklist, and project description.
 
-- [ ] **Task 8: Не начинать production rollout до VPS staging**
+- [x] **Task 8: Не начинать production rollout до VPS staging**
   - Production допускается только после отдельного VPS staging contour и повторного green cutover.
+  - Result: production rollout sections in `ops/vps/README.md` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md` now explicitly warn that staging smoke, EMR cutover, and a short soak window must pass first.
 
 ### Exit Criteria
 

@@ -44,6 +44,16 @@ class UserManagementApiService:
                 preferences.compact_mode = preferences_data["compact_mode"]
             if "sidebar_collapsed" in preferences_data:
                 preferences.sidebar_collapsed = preferences_data["sidebar_collapsed"]
+            if "security_settings" in preferences_data:
+                security_settings = preferences_data["security_settings"] or {}
+                if isinstance(security_settings, str):
+                    try:
+                        security_settings = json.loads(security_settings)
+                    except Exception:
+                        security_settings = {}
+                if not isinstance(security_settings, dict):
+                    security_settings = {}
+                preferences.security_settings = security_settings
 
             emr_keys = [
                 "emr_smart_field_mode",

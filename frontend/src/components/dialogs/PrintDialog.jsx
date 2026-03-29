@@ -6,6 +6,38 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+
+const formatPrintServiceLabel = (service) => {
+  if (service == null) return '';
+
+  if (typeof service === 'string' || typeof service === 'number' || typeof service === 'bigint') {
+    return String(service).trim();
+  }
+
+  if (typeof service === 'object') {
+    const candidate =
+      service.service_name ||
+      service.name ||
+      service.code ||
+      service.service_code ||
+      service.label ||
+      service.title ||
+      service.value ||
+      '';
+    return String(candidate).trim();
+  }
+
+  return String(service).trim();
+};
+
+const formatPrintServices = (services) => {
+  if (Array.isArray(services)) {
+    return services.map(formatPrintServiceLabel).filter(Boolean).join(', ');
+  }
+
+  return formatPrintServiceLabel(services);
+};
+
 const PrintDialog = ({
   isOpen,
   onClose,
@@ -179,9 +211,7 @@ const PrintDialog = ({
               margin: 0,
               fontSize: '14px'
             }}>
-                  Услуги: {Array.isArray(documentData.services) ?
-              documentData.services.join(', ') :
-              documentData.services}
+                  Услуги: {formatPrintServices(documentData.services)}
                 </p>
             }
               

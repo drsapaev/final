@@ -163,6 +163,9 @@ class UserPreferences(Base):
     session_timeout: Mapped[int] = mapped_column(Integer, default=30)  # В минутах
     require_2fa: Mapped[bool] = mapped_column(Boolean, default=False)
     auto_logout: Mapped[bool] = mapped_column(Boolean, default=True)
+    security_settings: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
 
     # ============================================
     # EMR PREFERENCES (Smart Autocomplete)

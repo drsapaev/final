@@ -42,6 +42,49 @@ import './AppointmentWizardV2.css';
 const API_BASE = '/api/v1';
 const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 
+const normalizeServiceSelectionValue = (serviceValue) => {
+  if (serviceValue == null) return '';
+
+  if (typeof serviceValue === 'string' || typeof serviceValue === 'number' || typeof serviceValue === 'bigint') {
+    return String(serviceValue).trim();
+  }
+
+  if (typeof serviceValue === 'object') {
+    const candidate =
+      serviceValue.service_code ||
+      serviceValue.code ||
+      serviceValue.name ||
+      serviceValue.label ||
+      serviceValue.title ||
+      serviceValue.service_name ||
+      serviceValue.value ||
+      serviceValue._temp_name ||
+      '';
+    return String(candidate).trim();
+  }
+
+  return String(serviceValue).trim();
+};
+
+const normalizeServiceSelectionName = (serviceValue) => {
+  if (serviceValue == null) return '';
+
+  if (typeof serviceValue === 'object') {
+    const candidate =
+      serviceValue.name ||
+      serviceValue.service_name ||
+      serviceValue.label ||
+      serviceValue.title ||
+      serviceValue.code ||
+      serviceValue.service_code ||
+      serviceValue.value ||
+      '';
+    return String(candidate).trim();
+  }
+
+  return String(serviceValue).trim();
+};
+
 // Категории услуг
 const categories = [
 { id: 'specialists', label: 'Специалисты', icon: '👨‍⚕️' },
@@ -1542,8 +1585,11 @@ const AppointmentWizardV2 = ({
         if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
           logger.log('📋 service_codes пуст, используем services как коды:', initialData.services);
           initialData.services.forEach((serviceValue) => {
-            if (serviceValue) {
-              const normalizedValue = serviceValue.toUpperCase().trim();
+            const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
+            const normalizedRawName = normalizeServiceSelectionName(serviceValue);
+
+            if (normalizedRawValue || normalizedRawName) {
+              const normalizedValue = normalizedRawValue.toUpperCase().trim();
 
               // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
               // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
@@ -1568,7 +1614,7 @@ const AppointmentWizardV2 = ({
 
               // Если не нашли по коду, пробуем по имени (fallback)
               if (!service) {
-                const normalizedName = serviceValue.toLowerCase().trim();
+                const normalizedName = normalizedRawName.toLowerCase().trim();
                 service = servicesData.find((s) =>
                 s.name && s.name.toLowerCase().trim() === normalizedName
                 );
@@ -1580,7 +1626,7 @@ const AppointmentWizardV2 = ({
                   originalServiceCodes.add(service.service_code.toUpperCase().trim());
                 }
                 originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для "${serviceValue}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+                logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
               } else {
                 // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
                 const exampleCodes = servicesData.
@@ -1588,7 +1634,7 @@ const AppointmentWizardV2 = ({
                 slice(0, 10).
                 map((s) => `${s.service_code}: ${s.name}`).
                 join(', ');
-                logger.warn(`  ⚠️ Услуга "${serviceValue}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
+                logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
               }
             }
           });
@@ -1641,9 +1687,12 @@ const AppointmentWizardV2 = ({
         if (Array.isArray(initialData.services) && initialData.services.length > 0) {
           logger.log('📋 Извлечение услуг из services:', initialData.services);
           initialData.services.forEach((serviceValue) => {
-            if (serviceValue) {
-              const normalizedValue = serviceValue.toUpperCase().trim();
-              const normalizedName = serviceValue.toLowerCase().trim();
+            const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
+            const normalizedRawName = normalizeServiceSelectionName(serviceValue);
+
+            if (normalizedRawValue || normalizedRawName) {
+              const normalizedValue = normalizedRawValue.toUpperCase().trim();
+              const normalizedName = normalizedRawName.toLowerCase().trim();
 
               // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
               let service = servicesData.find((s) => {
@@ -1668,9 +1717,9 @@ const AppointmentWizardV2 = ({
                   originalServiceCodes.add(service.service_code.toUpperCase().trim());
                 }
                 originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для "${serviceValue}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+                logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
               } else {
-                logger.warn(`  ⚠️ Услуга "${serviceValue}" не найдена в servicesData (ни по коду, ни по имени)`);
+                logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData (ни по коду, ни по имени)`);
               }
             }
           });

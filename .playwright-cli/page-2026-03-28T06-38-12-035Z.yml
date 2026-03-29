@@ -1,0 +1,35 @@
+- generic [ref=e4]:
+  - heading "🔐 Вход в систему Система управления клиникой" [level=3] [ref=e6]:
+    - generic [ref=e7]: 🔐 Вход в систему
+    - generic [ref=e8]: Система управления клиникой
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - generic [ref=e12]: Тип входа
+        - button "Имя пользователя" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: Имя пользователя
+          - img [ref=e17]
+      - generic [ref=e19]:
+        - generic [ref=e20]: Имя пользователя *
+        - textbox "Введите имя пользователя" [ref=e22]
+      - generic [ref=e23]:
+        - generic [ref=e24]: Пароль *
+        - generic [ref=e25]:
+          - textbox "Введите пароль" [ref=e27]
+          - button "Показать" [ref=e28] [cursor=pointer]:
+            - generic [ref=e29]: Показать
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32] [cursor=pointer]:
+            - checkbox "Запомнить меня"
+            - img
+          - text: Запомнить меня
+        - button "Забыли пароль?" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: Забыли пароль?
+      - button "ВОЙТИ →" [ref=e36] [cursor=pointer]:
+        - generic [ref=e37]: ВОЙТИ →
+    - generic [ref=e38]:
+      - button "Регистрация" [ref=e39] [cursor=pointer]:
+        - generic [ref=e40]: Регистрация
+      - button "Гость" [ref=e41] [cursor=pointer]:
+        - generic [ref=e42]: Гость

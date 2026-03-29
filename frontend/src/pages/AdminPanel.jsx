@@ -170,6 +170,47 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import '../styles/admin-styles.css';
 
+const getAppointmentPatientDisplayName = (appointment) => {
+  const rawName =
+    appointment?.patientName ||
+    appointment?.patient_name ||
+    appointment?.patient?.full_name ||
+    appointment?.patient?.fio ||
+    appointment?.patient?.name ||
+    appointment?.patient?.first_name ||
+    appointment?.patient?.last_name ||
+    'Пациент';
+
+  const normalized = String(rawName).trim();
+  return normalized || 'Пациент';
+};
+
+const getAppointmentDoctorDisplayName = (appointment) => {
+  const rawName =
+    appointment?.doctorName ||
+    appointment?.doctor_name ||
+    appointment?.doctor?.full_name ||
+    appointment?.doctor?.name ||
+    appointment?.doctor?.user?.full_name ||
+    appointment?.doctor?.user?.username ||
+    'Врач';
+
+  const normalized = String(rawName).trim();
+  return normalized || 'Врач';
+};
+
+const getAppointmentDoctorSpecialization = (appointment) => {
+  const rawValue =
+    appointment?.doctorSpecialization ||
+    appointment?.doctor_specialization ||
+    appointment?.specialization ||
+    appointment?.doctor?.specialization ||
+    appointment?.doctor?.specialty ||
+    '';
+
+  return String(rawValue).trim();
+};
+
 const AdminPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -943,7 +984,10 @@ const AdminPanel = () => {
   };
 
   const handleDeleteAppointment = async (appointment) => {
-    if (window.confirm(`Вы уверены, что хотите удалить запись "${appointment.patientName} - ${appointment.doctorName}"?`)) {
+    const patientName = getAppointmentPatientDisplayName(appointment);
+    const doctorName = getAppointmentDoctorDisplayName(appointment);
+
+    if (window.confirm(`Вы уверены, что хотите удалить запись "${patientName} - ${doctorName}"?`)) {
       try {
         await deleteAppointment(appointment.id);
       } catch (error) {
@@ -3450,6 +3494,9 @@ const AdminPanel = () => {
               }
               data={appointments.map((appointment) => ({
                 id: appointment.id,
+                _patientName: getAppointmentPatientDisplayName(appointment),
+                _doctorName: getAppointmentDoctorDisplayName(appointment),
+                _doctorSpecialization: getAppointmentDoctorSpecialization(appointment),
                 patient:
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{
@@ -3466,15 +3513,15 @@ const AdminPanel = () => {
                       fontSize: 'var(--mac-font-size-sm)',
                       fontWeight: 'var(--mac-font-weight-medium)'
                     }}>
-                          {appointment.patientName.split(' ').map((n) => n[0]).join('').toUpperCase()}
+                          {getAppointmentPatientDisplayName(appointment).split(/\s+/).filter(Boolean).map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'П'}
                         </span>
                       </div>
                       <div>
-                        <p style={{
+                    <p style={{
                       fontWeight: 'var(--mac-font-weight-medium)',
                       color: 'var(--mac-text-primary)',
                       margin: 0
-                    }}>{appointment.patientName}</p>
+                    }}>{getAppointmentPatientDisplayName(appointment)}</p>
                         {appointment.phone &&
                     <p style={{
                       fontSize: 'var(--mac-font-size-sm)',
@@ -3491,12 +3538,12 @@ const AdminPanel = () => {
                     fontWeight: 'var(--mac-font-weight-medium)',
                     color: 'var(--mac-text-primary)',
                     margin: 0
-                  }}>{appointment.doctorName}</p>
+                  }}>{getAppointmentDoctorDisplayName(appointment)}</p>
                       <p style={{
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
                     margin: '4px 0 0 0'
-                  }}>{appointment.doctorSpecialization}</p>
+                  }}>{getAppointmentDoctorSpecialization(appointment) || '—'}</p>
                     </div>,
 
                 datetime:

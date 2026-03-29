@@ -28,10 +28,17 @@ def main():
     print("\n⏳ Запускаем backend сервер...")
     print("   📍 http://localhost:18000")
     print("   📖 API Docs: http://localhost:18000/docs")
-    backend_cmd = "cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+    backend_cmd = "cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 18000"
     print(f"\n💡 Команда: {backend_cmd}")
     print("\n📋 Откройте новый терминал и выполните:")
     print(f"   {backend_cmd}")
+
+    frontend_cmd = "cd frontend && npm run dev -- --host 0.0.0.0 --port 18080"
+    print("\n⏳ Запускаем frontend сервер...")
+    print("   📍 http://localhost:18080")
+    print(f"\n💡 Команда: {frontend_cmd}")
+    print("\n📋 Откройте еще один терминал и выполните:")
+    print(f"   {frontend_cmd}")
     
     # 3. Запускаем HTML тестер
     print("\n⏳ Запускаем HTML тестер...")
@@ -51,7 +58,7 @@ def main():
     print("3️⃣  Во втором терминале:")
     print(f"    {tester_cmd}")
     print("4️⃣  Откройте браузер:")
-    print("    http://localhost:8080/mcp_test_v2.html")
+    print("    http://localhost:18080")
     print("5️⃣  Получите токен (mcp_test / test123)")
     print("6️⃣  Тестируйте MCP функции с реальным Gemini AI!")
     print("\n" + "=" * 60)

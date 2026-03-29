@@ -94,6 +94,9 @@ Then manually verify:
 - doctor-history
 
 ## Promote To Production
+
+> Only run production rollout after the separate VPS staging contour has passed smoke validation, EMR cutover, and a short soak window. Do not promote directly from local acceptance.
+
 - Duplicate `.env.staging` into `.env.production`
 - Switch hostnames/domains
 - Point production DB URL to production database

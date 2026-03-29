@@ -190,6 +190,7 @@ class UserPreferencesBase(BaseModel):
     sms_notifications: bool | None = False
     push_notifications: bool | None = True
     desktop_notifications: bool | None = True
+    security_settings: dict[str, Any] | None = None
 
 
 class UserPreferencesCreate(UserPreferencesBase):

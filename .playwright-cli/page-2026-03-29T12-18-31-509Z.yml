@@ -1,0 +1,526 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - link "MediClinic Pro" [ref=e6] [cursor=pointer]:
+      - /url: "#hero"
+      - img [ref=e8]
+      - generic [ref=e12]:
+        - strong [ref=e13]: MediClinic Pro
+        - generic [ref=e14]: Clinic OS для EMR, очереди и платежей
+    - navigation "Навигация лендинга" [ref=e15]:
+      - button "Продукт" [ref=e16] [cursor=pointer]
+      - button "Модули" [ref=e17] [cursor=pointer]
+      - button "Интеграции" [ref=e18] [cursor=pointer]
+      - button "Тарифы" [ref=e19] [cursor=pointer]
+      - button "FAQ" [ref=e20] [cursor=pointer]
+    - generic [ref=e21]:
+      - button "Темная тема" [ref=e22] [cursor=pointer]:
+        - img [ref=e24]
+      - 'button "Сменить язык: Русский -> O''zbek" [ref=e26] [cursor=pointer]':
+        - generic [ref=e27]:
+          - generic [ref=e28]: 🇷🇺
+          - generic [ref=e29]: RU
+      - button "Войти" [ref=e30] [cursor=pointer]:
+        - generic [ref=e31]:
+          - img [ref=e32]
+          - text: Войти
+  - generic [ref=e35]:
+    - generic [ref=e36]:
+      - status [ref=e37]:
+        - img [ref=e38]
+        - generic [ref=e40]: Clinic OS для EMR, очереди и платежей
+      - generic [ref=e41]: Clinic OS для современной клиники
+      - heading "Единая система управления клиникой, которая держит EMR, очередь и платежи в одном ритме." [level=1] [ref=e42]
+      - paragraph [ref=e43]: MediClinic Pro собирает регистратуру, врача, QR-очередь, платежи, Telegram и отчеты в один workflow без ручных разрывов между командами.
+      - generic [ref=e44]:
+        - button "Открыть демо" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - text: Открыть демо
+        - button "Смотреть 2-минутный обзор" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - text: Смотреть 2-минутный обзор
+      - generic "Product highlights" [ref=e54]:
+        - generic [ref=e55]: EMR врача
+        - generic [ref=e56]: QR-очередь
+        - generic [ref=e57]: Telegram-уведомления
+        - generic [ref=e58]: Платежи и отчеты
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - strong [ref=e61]: "4"
+          - generic [ref=e62]: ключевые роли
+          - generic [ref=e63]: регистратура, врач, касса, руководитель
+        - generic [ref=e64]:
+          - strong [ref=e65]: "1"
+          - generic [ref=e66]: единый workflow
+          - generic [ref=e67]: от регистрации до отчетов
+        - generic [ref=e68]:
+          - strong [ref=e69]: 24/7
+          - generic [ref=e70]: операционный контур
+          - generic [ref=e71]: контроль очереди, оплат и статусов
+    - generic [ref=e72]:
+      - generic [ref=e73]:
+        - generic [ref=e74]: Dashboard
+        - heading "Руководитель видит клинику в реальном времени" [level=2] [ref=e75]
+        - paragraph [ref=e76]: Очередь, загрузка кабинетов и сигналы смены собраны в одном окне.
+        - list [ref=e77]:
+          - listitem [ref=e78]:
+            - img [ref=e79]
+            - generic [ref=e82]: Слоты и перегрузка врачей
+          - listitem [ref=e83]:
+            - img [ref=e84]
+            - generic [ref=e87]: Сигналы по задержкам и очереди
+          - listitem [ref=e88]:
+            - img [ref=e89]
+            - generic [ref=e92]: Сводка по выручке и статусам
+      - generic [ref=e93]:
+        - generic [ref=e94]: QR Queue
+        - heading "Регистратура управляет потоком без хаоса в холле" [level=2] [ref=e95]
+        - paragraph [ref=e96]: QR-очередь, табло и маршрутизация пациентов работают как единый сценарий.
+        - list [ref=e97]:
+          - listitem [ref=e98]:
+            - img [ref=e99]
+            - generic [ref=e102]: Проверка записи и создание визита
+          - listitem [ref=e103]:
+            - img [ref=e104]
+            - generic [ref=e107]: Маршрутизация в нужный кабинет
+          - listitem [ref=e108]:
+            - img [ref=e109]
+            - generic [ref=e112]: Прозрачная очередь для пациента
+      - generic [ref=e113]:
+        - generic [ref=e114]: Doctor EMR
+        - heading "Врач ведет прием внутри живой карты пациента" [level=2] [ref=e115]
+        - paragraph [ref=e116]: История болезни, шаблоны осмотров и PDF-документы остаются внутри EMR.
+        - list [ref=e117]:
+          - listitem [ref=e118]:
+            - img [ref=e119]
+            - generic [ref=e122]: Шаблоны осмотров и назначения
+          - listitem [ref=e123]:
+            - img [ref=e124]
+            - generic [ref=e127]: История визитов и вложения
+          - listitem [ref=e128]:
+            - img [ref=e129]
+            - generic [ref=e132]: Документы без ручной перепечатки
+  - region "Operational proof" [ref=e133]:
+    - generic [ref=e134]:
+      - generic [ref=e135]: Что система закрывает с первого дня
+      - heading "Вместо пустых обещаний — конкретный операционный контур" [level=2] [ref=e136]
+      - paragraph [ref=e137]: Каждая карточка показывает не абстрактную “автоматизацию”, а реальный блок клинической работы, который команда использует каждый день.
+    - generic [ref=e138]:
+      - generic [ref=e139]:
+        - strong [ref=e140]: EMR + PDF
+        - generic [ref=e141]: карта приема
+        - generic [ref=e142]: шаблоны осмотров, история болезни, документы
+      - generic [ref=e143]:
+        - strong [ref=e144]: QR Queue
+        - generic [ref=e145]: поток пациентов
+        - generic [ref=e146]: электронная очередь, табло, управление потоками
+      - generic [ref=e147]:
+        - strong [ref=e148]: PayMe / Click / Apelsin
+        - generic [ref=e149]: платежный контур
+        - generic [ref=e150]: касса, чеки и статусы услуг без ручной сверки
+      - generic [ref=e151]:
+        - strong [ref=e152]: Telegram + Reports
+        - generic [ref=e153]: коммуникации и аналитика
+        - generic [ref=e154]: напоминания, отчеты, нагрузка врачей и доходы
+  - generic [ref=e155]:
+    - generic [ref=e156]:
+      - generic [ref=e157]: Основные возможности
+      - heading "Критичные процессы клиники собираются в одной платформе" [level=2] [ref=e158]
+      - paragraph [ref=e159]: "Структура лендинга строится вокруг того, как реально работает клиника: прием, очередь, врач, оплата и контроль руководителя."
+    - generic [ref=e160]:
+      - generic [ref=e161]:
+        - img [ref=e163]
+        - generic [ref=e166]: EMR врача
+        - heading "Живая электронная карта пациента" [level=3] [ref=e167]
+        - paragraph [ref=e168]: Шаблоны осмотров, история болезни, назначения и PDF-документы остаются внутри одного приема.
+      - generic [ref=e169]:
+        - img [ref=e171]
+        - generic [ref=e176]: Регистратура
+        - heading "Быстрая регистрация и поиск пациента" [level=3] [ref=e177]
+        - paragraph [ref=e178]: Создание визита, проверка записи и маршрутизация пациента выполняются без лишних окон.
+      - generic [ref=e179]:
+        - img [ref=e181]
+        - generic [ref=e183]: Очередь
+        - heading "QR-очередь и управление потоками" [level=3] [ref=e184]
+        - paragraph [ref=e185]: Табло, очереди по кабинетам и прозрачный status flow снижают хаос в холле.
+      - generic [ref=e186]:
+        - img [ref=e188]
+        - generic [ref=e190]: Платежи
+        - heading "Касса и чеки внутри клинического сценария" [level=3] [ref=e191]
+        - paragraph [ref=e192]: PayMe, Click и Apelsin работают в одном процессе с услугами, а не отдельно от них.
+      - generic [ref=e193]:
+        - img [ref=e195]
+        - generic [ref=e197]: Уведомления
+        - heading "Telegram и напоминания без ручной рутины" [level=3] [ref=e198]
+        - paragraph [ref=e199]: Команда и пациенты получают нужные сигналы в момент записи, ожидания и завершения приема.
+      - generic [ref=e200]:
+        - img [ref=e202]
+        - generic [ref=e204]: Отчеты
+        - heading "Доходы, нагрузка и статистика по смене" [level=3] [ref=e205]
+        - paragraph [ref=e206]: Руководитель видит, где растет очередь, как загружены врачи и как меняется выручка.
+  - generic [ref=e208]:
+    - generic [ref=e209]:
+      - generic [ref=e210]: Как работает система
+      - heading "Пациент проходит путь от регистратуры до отчета без ручных разрывов" [level=2] [ref=e211]
+      - paragraph [ref=e212]: Для сложного медицинского продукта лучше всего продает не список функций, а четкий end-to-end workflow клиники.
+    - generic [ref=e213]:
+      - generic [ref=e214]:
+        - generic [ref=e217]:
+          - heading "01. Пациент регистрируется" [level=3] [ref=e218]
+          - paragraph [ref=e219]: Регистратура находит пациента, подтверждает запись и запускает визит без бумажных обходов.
+        - generic [ref=e222]:
+          - heading "02. Попадает в очередь" [level=3] [ref=e223]
+          - paragraph [ref=e224]: Система направляет пациента в нужный поток, а табло и команда видят актуальный статус.
+        - generic [ref=e227]:
+          - heading "03. Врач ведет EMR" [level=3] [ref=e228]
+          - paragraph [ref=e229]: Прием, история болезни, документы и шаблоны осмотров остаются в единой карте пациента.
+        - generic [ref=e232]:
+          - heading "04. Платеж и отчеты автоматически" [level=3] [ref=e233]
+          - paragraph [ref=e234]: Касса закрывает услуги, а руководитель сразу получает прозрачную картину по смене и выручке.
+      - generic [ref=e235]:
+        - generic [ref=e236]: Workflow клиники
+        - generic "Workflow клиники" [ref=e237]:
+          - generic [ref=e238]: Пациент
+          - img [ref=e239]
+          - generic [ref=e241]: Регистратура
+          - img [ref=e242]
+          - generic [ref=e244]: Очередь
+          - img [ref=e245]
+          - generic [ref=e247]: Врач
+          - img [ref=e248]
+          - generic [ref=e250]: EMR
+          - img [ref=e251]
+          - generic [ref=e253]: Платеж
+          - img [ref=e254]
+          - generic [ref=e256]: Отчеты
+        - paragraph [ref=e257]: Именно эта цепочка показывает ценность продукта сильнее, чем длинный список модулей без контекста.
+  - generic [ref=e258]:
+    - generic [ref=e259]:
+      - generic [ref=e260]: Модули системы
+      - heading "Модульная архитектура под реальные направления клиники" [level=2] [ref=e261]
+      - paragraph [ref=e262]: Базовый workflow можно усиливать отраслевыми модулями без потери единого контура данных.
+    - generic [ref=e263]:
+      - generic [ref=e264]:
+        - img [ref=e266]
+        - heading "EMR" [level=3] [ref=e269]
+        - paragraph [ref=e270]: История болезни, шаблоны приема, назначения и документы.
+      - generic [ref=e271]:
+        - img [ref=e273]
+        - heading "Стоматология" [level=3] [ref=e277]
+        - paragraph [ref=e278]: Карточка пациента, план лечения и рабочие сценарии врача.
+      - generic [ref=e279]:
+        - img [ref=e281]
+        - heading "Кардиология" [level=3] [ref=e283]
+        - paragraph [ref=e284]: Шаблоны осмотров, контроль показателей и динамика лечения.
+      - generic [ref=e285]:
+        - img [ref=e287]
+        - heading "Дерматология" [level=3] [ref=e292]
+        - paragraph [ref=e293]: Осмотры, фотофиксация и повторные визиты внутри EMR.
+      - generic [ref=e294]:
+        - img [ref=e296]
+        - heading "Лаборатория" [level=3] [ref=e298]
+        - paragraph [ref=e299]: Назначения, статусы анализов и связь результатов с визитом.
+      - generic [ref=e300]:
+        - img [ref=e302]
+        - heading "Рецепты" [level=3] [ref=e304]
+        - paragraph [ref=e305]: Назначения и документы, которые врач формирует прямо в процессе приема.
+      - generic [ref=e306]:
+        - img [ref=e308]
+        - heading "Отчеты" [level=3] [ref=e310]
+        - paragraph [ref=e311]: Доходы, статистика визитов, нагрузка врачей и контроль смен.
+      - generic [ref=e312]:
+        - img [ref=e314]
+        - heading "Финансы" [level=3] [ref=e316]
+        - paragraph [ref=e317]: Касса, статусы оплат, чеки и прозрачная картина по услугам.
+  - generic [ref=e318]:
+    - generic [ref=e319]:
+      - generic [ref=e320]: Скриншоты интерфейса
+      - heading "Интерфейсы, которые команда понимает с первого дня" [level=2] [ref=e321]
+      - paragraph [ref=e322]: "Показываем не красивые абстракции, а реальные рабочие поверхности: dashboard, очередь, EMR, регистратура и аналитика."
+    - generic [ref=e323]:
+      - generic [ref=e324]:
+        - generic [ref=e325]:
+          - img [ref=e327]
+          - generic [ref=e329]: Dashboard
+        - heading "Операционный центр смены" [level=3] [ref=e330]
+        - paragraph [ref=e331]: Очередь, кабинеты, касса и сигналы загрузки в одном экране.
+      - generic [ref=e336]:
+        - generic [ref=e337]:
+          - img [ref=e339]
+          - generic [ref=e344]: Reception
+        - heading "Регистратура без ручной перегонки данных" [level=3] [ref=e345]
+        - paragraph [ref=e346]: Поиск пациента, запись, создание визита и переключение в очередь.
+      - generic [ref=e351]:
+        - generic [ref=e352]:
+          - img [ref=e354]
+          - generic [ref=e356]: Queue
+        - heading "Прозрачная очередь для команды и пациента" [level=3] [ref=e357]
+        - paragraph [ref=e358]: QR-поток, табло и распределение по кабинетам без хаоса в холле.
+      - generic [ref=e363]:
+        - generic [ref=e364]:
+          - img [ref=e366]
+          - generic [ref=e369]: EMR
+        - heading "Прием врача внутри живой карты" [level=3] [ref=e370]
+        - paragraph [ref=e371]: Осмотр, документы и история болезни не распадаются на отдельные инструменты.
+      - generic [ref=e376]:
+        - generic [ref=e377]:
+          - img [ref=e379]
+          - generic [ref=e381]: Analytics
+        - heading "Аналитика по выручке и нагрузке" [level=3] [ref=e382]
+        - paragraph [ref=e383]: Руководитель видит результаты смены, перегрузки и точки роста без ручных отчетов.
+  - generic [ref=e388]:
+    - generic [ref=e389]:
+      - generic [ref=e390]:
+        - generic [ref=e391]: Интеграции
+        - heading "Интеграции, которые двигают поток без ручной работы" [level=2] [ref=e392]
+        - paragraph [ref=e393]: Важна не просто интеграция как факт, а ее место в реальном клиническом сценарии.
+      - generic [ref=e394]:
+        - generic [ref=e395]:
+          - img [ref=e397]
+          - generic [ref=e399]:
+            - strong [ref=e400]: Telegram
+            - text: Напоминания, служебные сигналы и контакт с пациентом.
+        - generic [ref=e401]:
+          - img [ref=e403]
+          - generic [ref=e405]:
+            - strong [ref=e406]: PayMe
+            - text: Быстрые оплаты внутри общего статуса услуги.
+        - generic [ref=e407]:
+          - img [ref=e409]
+          - generic [ref=e411]:
+            - strong [ref=e412]: Click
+            - text: Платежный сценарий без разрыва между кассой и визитом.
+        - generic [ref=e413]:
+          - img [ref=e415]
+          - generic [ref=e417]:
+            - strong [ref=e418]: Apelsin
+            - text: Еще один локальный платежный канал внутри единого процесса.
+        - generic [ref=e419]:
+          - img [ref=e421]
+          - generic [ref=e423]:
+            - strong [ref=e424]: QR check-in
+            - text: Вход пациента в очередь без лишней нагрузки на стойку.
+        - generic [ref=e425]:
+          - img [ref=e427]
+          - generic [ref=e430]:
+            - strong [ref=e431]: PDF / печать
+            - text: Документы и чеки отдаются из системы, а не вручную.
+    - generic [ref=e432]:
+      - generic [ref=e433]:
+        - generic [ref=e434]: Безопасность
+        - heading "Контроль доступа и прозрачность действий для медицинской команды" [level=2] [ref=e435]
+        - paragraph [ref=e436]: "Для медицины важно не только удобство, но и предсказуемость: кто что делал, когда и в каком контексте."
+      - generic [ref=e437]:
+        - generic [ref=e438]:
+          - img [ref=e440]
+          - heading "Audit logs" [level=3] [ref=e442]
+          - paragraph [ref=e443]: Каждое важное действие можно отследить по роли, времени и сценарию.
+        - generic [ref=e444]:
+          - img [ref=e446]
+          - heading "Role system" [level=3] [ref=e451]
+          - paragraph [ref=e452]: Доступ по ролям снижает риск случайных или лишних изменений.
+        - generic [ref=e453]:
+          - img [ref=e455]
+          - heading "Change history" [level=3] [ref=e459]
+          - paragraph [ref=e460]: История изменений помогает разбирать спорные кейсы и внутренние проверки.
+        - generic [ref=e461]:
+          - img [ref=e463]
+          - heading "Backup-ready ops" [level=3] [ref=e465]
+          - paragraph [ref=e466]: Резервный контур и восстановление встроены в операционный подход, а не остаются “на потом”.
+  - generic [ref=e467]:
+    - generic [ref=e468]:
+      - generic [ref=e469]: Преимущества системы
+      - heading "До и после внедрения выглядят как две разные клиники" [level=2] [ref=e470]
+      - paragraph [ref=e471]: Этот блок помогает быстро показать, что продукт убирает хаос не на словах, а в повседневных процессах.
+    - generic [ref=e472]:
+      - generic [ref=e473]:
+        - heading "Без системы" [level=3] [ref=e474]
+        - list [ref=e475]:
+          - listitem [ref=e476]:
+            - generic [ref=e478]: Бумажные карты и разрозненные заметки
+          - listitem [ref=e479]:
+            - generic [ref=e481]: Потеря контекста между регистратурой, врачом и кассой
+          - listitem [ref=e482]:
+            - generic [ref=e484]: Хаос в очереди и непонятный статус пациента
+          - listitem [ref=e485]:
+            - generic [ref=e487]: Отчеты собираются вручную в конце дня
+      - generic [ref=e488]:
+        - heading "С MediClinic Pro" [level=3] [ref=e489]
+        - list [ref=e490]:
+          - listitem [ref=e491]:
+            - img [ref=e492]
+            - generic [ref=e495]: Единый EMR и общая карта пациента для команды
+          - listitem [ref=e496]:
+            - img [ref=e497]
+            - generic [ref=e500]: Прозрачная очередь и понятный маршрут пациента
+          - listitem [ref=e501]:
+            - img [ref=e502]
+            - generic [ref=e505]: Платежи и чеки встроены в клинический сценарий
+          - listitem [ref=e506]:
+            - img [ref=e507]
+            - generic [ref=e510]: Аналитика по смене, доходам и нагрузке без ручной сборки
+  - generic [ref=e511]:
+    - generic [ref=e512]:
+      - generic [ref=e513]: Тарифы
+      - heading "Три тарифа для малых клиник, растущих команд и сетей" [level=2] [ref=e514]
+      - paragraph [ref=e515]: Точные условия зависят от модулей и интеграций, поэтому лендинг показывает понятную рамку выбора без выдуманных цифр.
+    - generic [ref=e516]:
+      - generic [ref=e517]:
+        - generic [ref=e518]: Для малых клиник
+        - heading "Starter" [level=3] [ref=e519]
+        - generic [ref=e520]: По запросу
+        - paragraph [ref=e521]: Быстрый старт для одной команды и базового пациентского потока.
+        - list [ref=e522]:
+          - listitem [ref=e523]:
+            - img [ref=e524]
+            - generic [ref=e527]: Регистратура и запись
+          - listitem [ref=e528]:
+            - img [ref=e529]
+            - generic [ref=e532]: EMR врача
+          - listitem [ref=e533]:
+            - img [ref=e534]
+            - generic [ref=e537]: Очередь пациентов
+          - listitem [ref=e538]:
+            - img [ref=e539]
+            - generic [ref=e542]: Базовые отчеты
+        - button "Запросить демо" [ref=e543] [cursor=pointer]:
+          - generic [ref=e544]: Запросить демо
+      - generic [ref=e545]:
+        - generic [ref=e546]: Для растущих клиник
+        - heading "Professional" [level=3] [ref=e547]
+        - generic [ref=e548]: По запросу
+        - paragraph [ref=e549]: Оптимум для клиник, которым нужен единый контур приема, платежей и аналитики.
+        - list [ref=e550]:
+          - listitem [ref=e551]:
+            - img [ref=e552]
+            - generic [ref=e555]: Все из Starter
+          - listitem [ref=e556]:
+            - img [ref=e557]
+            - generic [ref=e560]: PayMe / Click / Apelsin
+          - listitem [ref=e561]:
+            - img [ref=e562]
+            - generic [ref=e565]: Telegram-уведомления
+          - listitem [ref=e566]:
+            - img [ref=e567]
+            - generic [ref=e570]: Расширенные отчеты и роли
+        - button "Выбрать Professional" [ref=e571] [cursor=pointer]:
+          - generic [ref=e572]: Выбрать Professional
+      - generic [ref=e573]:
+        - generic [ref=e574]: Для сетей клиник
+        - heading "Enterprise" [level=3] [ref=e575]
+        - generic [ref=e576]: По запросу
+        - paragraph [ref=e577]: Многофилиальный контур, дополнительные модули и внедрение под сложный поток.
+        - list [ref=e578]:
+          - listitem [ref=e579]:
+            - img [ref=e580]
+            - generic [ref=e583]: Все из Professional
+          - listitem [ref=e584]:
+            - img [ref=e585]
+            - generic [ref=e588]: Модули по направлениям
+          - listitem [ref=e589]:
+            - img [ref=e590]
+            - generic [ref=e593]: Приоритетная поддержка
+          - listitem [ref=e594]:
+            - img [ref=e595]
+            - generic [ref=e598]: Индивидуальный rollout и SLA
+        - button "Обсудить Enterprise" [ref=e599] [cursor=pointer]:
+          - generic [ref=e600]: Обсудить Enterprise
+    - paragraph [ref=e601]: Финальный состав и стоимость подтверждаем после демо по вашему workflow.
+  - generic [ref=e602]:
+    - generic [ref=e603]:
+      - generic [ref=e604]: FAQ
+      - heading "Вопросы, которые чаще всего задают перед внедрением" [level=2] [ref=e605]
+      - paragraph [ref=e606]: Хороший SaaS-лендинг снимает возражения до звонка или демо, а не перекладывает все на менеджера.
+    - generic [ref=e607]:
+      - group [ref=e608]:
+        - generic "Сколько времени занимает внедрение?" [ref=e609] [cursor=pointer]:
+          - generic [ref=e610]: Сколько времени занимает внедрение?
+          - img [ref=e611]
+      - group [ref=e613]:
+        - generic "Можно ли перенести существующую базу пациентов?" [ref=e614] [cursor=pointer]:
+          - generic [ref=e615]: Можно ли перенести существующую базу пациентов?
+          - img [ref=e616]
+      - group [ref=e618]:
+        - generic "Работает ли система на телефоне?" [ref=e619] [cursor=pointer]:
+          - generic [ref=e620]: Работает ли система на телефоне?
+          - img [ref=e621]
+      - group [ref=e623]:
+        - generic "Подойдет ли платформа для нескольких филиалов?" [ref=e624] [cursor=pointer]:
+          - generic [ref=e625]: Подойдет ли платформа для нескольких филиалов?
+          - img [ref=e626]
+  - generic [ref=e629]:
+    - generic [ref=e630]:
+      - generic [ref=e631]: Финальный CTA
+      - heading "Переведите клинику на единый операционный контур" [level=2] [ref=e632]
+      - paragraph [ref=e633]: "Покажем демо именно по вашему workflow: регистратура, очередь, врач, EMR, платежи и отчеты в одном сценарии."
+      - list [ref=e634]:
+        - listitem [ref=e635]:
+          - img [ref=e636]
+          - generic [ref=e639]: Разберем ваш текущий patient flow и точки потерь
+        - listitem [ref=e640]:
+          - img [ref=e641]
+          - generic [ref=e644]: Покажем релевантные модули и интеграции
+        - listitem [ref=e645]:
+          - img [ref=e646]
+          - generic [ref=e649]: Поможем команде стартовать без долгого переходного периода
+    - generic [ref=e650]:
+      - button "Запросить демо" [ref=e651] [cursor=pointer]:
+        - generic [ref=e652]:
+          - img [ref=e653]
+          - text: Запросить демо
+      - button "Активировать лицензию" [ref=e656] [cursor=pointer]:
+        - generic [ref=e657]:
+          - img [ref=e658]
+          - text: Активировать лицензию
+      - generic [ref=e662]:
+        - generic [ref=e663]:
+          - img [ref=e665]
+          - generic [ref=e668]:
+            - strong [ref=e669]: Адрес
+            - text: г. Ташкент, ул. Беруний
+        - generic [ref=e670]:
+          - img [ref=e672]
+          - generic [ref=e674]:
+            - strong [ref=e675]: Телефон
+            - link "+998 (95) 104-34-34" [ref=e676] [cursor=pointer]:
+              - /url: tel:+998951043434
+        - generic [ref=e677]:
+          - img [ref=e679]
+          - generic [ref=e682]:
+            - strong [ref=e683]: График работы
+            - text: "Пн–Сб: 9:00–17:00"
+        - generic [ref=e684]:
+          - img [ref=e686]
+          - generic [ref=e688]:
+            - strong [ref=e689]: Поддержка
+            - link "@clinic_support" [ref=e690] [cursor=pointer]:
+              - /url: https://t.me/clinic_support
+  - generic [ref=e691]:
+    - generic [ref=e692]:
+      - img [ref=e694]
+      - generic [ref=e698]:
+        - strong [ref=e699]: MediClinic Pro
+        - generic [ref=e700]: EMR, регистратура, очередь, платежи и аналитика в одном контуре.
+    - generic [ref=e701]:
+      - generic [ref=e702]:
+        - strong [ref=e703]: Продукт
+        - generic [ref=e704]:
+          - link "Возможности" [ref=e705] [cursor=pointer]:
+            - /url: "#product"
+          - link "Workflow" [ref=e706] [cursor=pointer]:
+            - /url: "#workflow"
+          - link "Модули" [ref=e707] [cursor=pointer]:
+            - /url: "#modules"
+      - generic [ref=e708]:
+        - strong [ref=e709]: Ресурсы
+        - generic [ref=e710]:
+          - link "Интеграции" [ref=e711] [cursor=pointer]:
+            - /url: "#integrations"
+          - link "Тарифы" [ref=e712] [cursor=pointer]:
+            - /url: "#pricing"
+          - link "FAQ" [ref=e713] [cursor=pointer]:
+            - /url: "#faq"
+    - generic [ref=e714]:
+      - img [ref=e715]
+      - generic [ref=e718]: Подходит для частных клиник, диагностических центров и сетей клиник.

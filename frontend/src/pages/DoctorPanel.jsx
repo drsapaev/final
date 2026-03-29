@@ -245,6 +245,49 @@ const DoctorPanel = () => {
     loadData();
   }, [loadData]);
 
+  const handleScheduleNextSuccess = useCallback((result, submittedFormData) => {
+    const confirmation = result?.confirmation || {};
+    const normalizedPatientId = submittedFormData?.patient_id ? Number(submittedFormData.patient_id) : null;
+    const selectedPatient = normalizedPatientId
+      ? patients.find((patient) => Number(patient.id) === normalizedPatientId)
+      : null;
+    const visitDate = confirmation.visit_date || submittedFormData?.visit_date || '';
+    const visitTime = confirmation.visit_time || submittedFormData?.visit_time || '09:00';
+
+    const nextAppointment = {
+      id: result?.visit_id || Date.now(),
+      patientId: normalizedPatientId,
+      patientName: confirmation.patient_name || selectedPatient?.name || 'Новый пациент',
+      time: visitTime,
+      type:
+        submittedFormData?.discount_mode === 'repeat'
+          ? 'Повторный прием'
+          : submittedFormData?.discount_mode === 'benefit'
+            ? 'Льготный визит'
+            : 'Следующий визит',
+      status: 'scheduled',
+      notes: result?.message || (visitDate ? `Ожидает подтверждения на ${visitDate}` : 'Ожидает подтверждения'),
+      appointmentDate: visitDate,
+      confirmationToken: confirmation.token || null,
+      confirmationChannel: confirmation.channel || submittedFormData?.confirmation_channel || 'telegram',
+      totalAmount: confirmation.total_amount || null,
+      servicesCount: confirmation.services_count || submittedFormData?.services?.length || 1,
+      source: 'schedule-next'
+    };
+
+    setAppointments((prev) => [
+      nextAppointment,
+      ...prev.filter((appointment) => Number(appointment.id) !== Number(nextAppointment.id))
+    ]);
+
+    logger.info('[DOC-05] Appointments table refreshed after schedule-next', {
+      visitId: nextAppointment.id,
+      patientId: nextAppointment.patientId,
+      patientName: nextAppointment.patientName,
+      status: nextAppointment.status
+    });
+  }, [patients]);
+
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
     const loadPatientFromUrl = async () => {
@@ -1520,6 +1563,7 @@ const DoctorPanel = () => {
       <ScheduleNextModal
         isOpen={scheduleNextModal.open}
         onClose={() => setScheduleNextModal({ open: false, patient: null })}
+        onSuccess={handleScheduleNextSuccess}
         patient={scheduleNextModal.patient}
         theme={{ isDark, getColor, getSpacing, getFontSize }} />
 

@@ -17,6 +17,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../api/client';
 import logger from '../utils/logger';
 
+const sectionTemplateCache = new Map();
+
 /**
  * @typedef {Object} SectionTemplate
  * @property {string} id - Template ID
@@ -69,54 +71,103 @@ export function useDoctorSectionTemplates({
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const abortControllerRef = useRef(null);
+    const isMountedRef = useRef(true);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    const cacheKey = `${section || ''}:${icd10Code || ''}:${limit}`;
 
     /**
      * Fetch templates from API
      */
-    const fetchTemplates = useCallback(async () => {
+    const fetchTemplates = useCallback(async (forceRefresh = false) => {
         if (!section) return;
 
-        // Cancel previous request
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
+        const cachedEntry = sectionTemplateCache.get(cacheKey);
+        if (!forceRefresh) {
+            if (cachedEntry?.data) {
+                if (isMountedRef.current) {
+                    setTemplates(cachedEntry.data);
+                    setError(null);
+                    setLoading(false);
+                }
+                return cachedEntry.data;
+            }
+
+            if (cachedEntry?.promise) {
+                return cachedEntry.promise;
+            }
+        } else if (cachedEntry?.promise) {
+            return cachedEntry.promise;
         }
-        abortControllerRef.current = new AbortController();
 
-        setLoading(true);
-        setError(null);
+        if (isMountedRef.current) {
+            setLoading(true);
+            setError(null);
+        }
 
-        try {
+        const loadPromise = (async () => {
             const params = new URLSearchParams();
             if (icd10Code) params.append('icd10_code', icd10Code);
             params.append('limit', limit.toString());
 
-            const response = await apiClient.get(
-                `/section-templates/${section}?${params.toString()}`,
-                { signal: abortControllerRef.current.signal }
-            );
+            try {
+                const response = await apiClient.get(
+                    `/section-templates/${section}?${params.toString()}`
+                );
 
-            setTemplates(response.data.templates || []);
-        } catch (err) {
-            if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+                const templatesData = response.data.templates || [];
+                sectionTemplateCache.set(cacheKey, {
+                    data: templatesData,
+                    promise: null,
+                });
+
+                if (isMountedRef.current) {
+                    setTemplates(templatesData);
+                }
+
+                return templatesData;
+            } catch (err) {
                 logger.error('[useDoctorSectionTemplates] Fetch error:', err);
-                setError(err.message || 'Failed to load templates');
-                setTemplates([]);
+                if (isMountedRef.current) {
+                    setError(err.message || 'Failed to load templates');
+                    setTemplates([]);
+                }
+                sectionTemplateCache.delete(cacheKey);
+                return [];
             }
+        })();
+
+        sectionTemplateCache.set(cacheKey, {
+            data: cachedEntry?.data || null,
+            promise: loadPromise,
+        });
+
+        try {
+            return await loadPromise;
         } finally {
-            setLoading(false);
+            const currentEntry = sectionTemplateCache.get(cacheKey);
+            if (currentEntry?.promise === loadPromise) {
+                sectionTemplateCache.set(cacheKey, {
+                    data: currentEntry.data || null,
+                    promise: null,
+                });
+            }
+
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
-    }, [section, icd10Code, limit]);
+    }, [cacheKey, icd10Code, limit, section]);
 
     // Fetch on mount and when dependencies change
     useEffect(() => {
         fetchTemplates();
-
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
     }, [fetchTemplates]);
 
     /**
@@ -126,7 +177,7 @@ export function useDoctorSectionTemplates({
     const pinTemplate = useCallback(async (templateId) => {
         try {
             await apiClient.post(`/section-templates/${section}/${templateId}/pin`);
-            await fetchTemplates(); // Refresh list
+            await fetchTemplates(true); // Refresh list
             return { success: true };
         } catch (err) {
             logger.error('[useDoctorSectionTemplates] Pin error:', err);
@@ -141,7 +192,7 @@ export function useDoctorSectionTemplates({
     const unpinTemplate = useCallback(async (templateId) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}/pin`);
-            await fetchTemplates();
+            await fetchTemplates(true);
             return { success: true };
         } catch (err) {
             logger.error('[useDoctorSectionTemplates] Unpin error:', err);
@@ -161,7 +212,7 @@ export function useDoctorSectionTemplates({
                 `/section-templates/${section}/${templateId}`,
                 { new_text: newText, mode }
             );
-            await fetchTemplates();
+            await fetchTemplates(true);
             return { success: true, template: response.data };
         } catch (err) {
             logger.error('[useDoctorSectionTemplates] Update error:', err);
@@ -176,7 +227,7 @@ export function useDoctorSectionTemplates({
     const deleteTemplate = useCallback(async (templateId) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}`);
-            await fetchTemplates();
+            await fetchTemplates(true);
             return { success: true };
         } catch (err) {
             logger.error('[useDoctorSectionTemplates] Delete error:', err);

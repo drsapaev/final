@@ -83,7 +83,7 @@
 - [x] GO only if the local acceptance pack is green.
 - [x] GO only if the queue-domain migration/archival decision is closed and documented.
 
-## P7 VPS Promotion (Deferred But Mandatory)
+## P7 VPS Promotion (Deferred But Mandatory Next Milestone)
 - [ ] Linux VPS staging exists with reachable URL, host PostgreSQL, `systemd` backend, Nginx frontend, and TLS.
 - [ ] `ops/vps/*` rollout kit is executed successfully on VPS staging.
 - [ ] `run_emr_cutover.py` is green on VPS staging with `passed == true`.

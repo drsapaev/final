@@ -24,6 +24,7 @@ import {
 const ScheduleNextModal = ({
   isOpen,
   onClose,
+  onSuccess,
   patient,
   theme,
   specialtyFilter = null // Фильтр услуг по специальности
@@ -194,6 +195,30 @@ const ScheduleNextModal = ({
 
       if (response.ok) {
         const result = await response.json();
+        const normalizedFormData = {
+          ...formData,
+          patient_id: formData.patient_id ? Number(formData.patient_id) : null,
+          services: formData.services.map((service) => ({
+            ...service,
+            service_id: service.service_id ? Number(service.service_id) : service.service_id,
+            quantity: Number(service.quantity || 1)
+          }))
+        };
+
+        logger.info('[DOC-05] schedule-next succeeded', {
+          visitId: result?.visit_id,
+          patientId: normalizedFormData.patient_id,
+          confirmationChannel: result?.confirmation?.channel || normalizedFormData.confirmation_channel
+        });
+
+        if (typeof onSuccess === 'function') {
+          try {
+            onSuccess(result, normalizedFormData);
+          } catch (callbackError) {
+            logger.error('[DOC-05] schedule-next success callback failed', callbackError);
+          }
+        }
+
         setSuccess(`Визит успешно назначен! Токен подтверждения: ${result.confirmation.token}`);
 
         // Сброс формы через 2 секунды
@@ -590,6 +615,7 @@ const ScheduleNextModal = ({
 ScheduleNextModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
+  onSuccess: PropTypes.func,
   patient: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
   }),

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import String
+from sqlalchemy import String, func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -1790,6 +1790,14 @@ def get_all_appointments(
             except ValueError:
                 pass
 
+        patient_search_name = func.trim(
+            func.coalesce(Patient.last_name, "")
+            + literal(" ")
+            + func.coalesce(Patient.first_name, "")
+            + literal(" ")
+            + func.coalesce(Patient.middle_name, "")
+        )
+
         # Применяем поиск
         if search:
             # Для поиска по телефону извлекаем только цифры
@@ -1801,7 +1809,7 @@ def get_all_appointments(
                     Patient, Appointment.patient_id == Patient.id
                 ).filter(
                     or_(
-                        Patient.full_name.ilike(f"%{search}%"),
+                        patient_search_name.ilike(f"%{search}%"),
                         Patient.phone.ilike(f"%{search}%"),
                         func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
                             f"%{search_digits}%"
@@ -1813,7 +1821,7 @@ def get_all_appointments(
                 # Если нет цифр, ищем только по ФИО
                 appointments_query = appointments_query.join(
                     Patient, Appointment.patient_id == Patient.id
-                ).filter(Patient.full_name.ilike(f"%{search}%"))
+                ).filter(patient_search_name.ilike(f"%{search}%"))
 
         appointments = (
             appointments_query.order_by(Appointment.created_at.desc())

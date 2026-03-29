@@ -59,4 +59,4 @@ System covers patient lifecycle from registration and queue to visit documentati
   - dedicated staging Postgres cluster on `:55432`
 - EMR v2 hard-cutover has already been rehearsed successfully on the local staging contour.
 - Current local-first execution checklist is maintained in `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
-- VPS rollout is deferred for now, but remains a mandatory next-phase objective and is documented in `ops/vps/README.md` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md`.
+- VPS rollout is deferred for now, but remains the mandatory next milestone after local acceptance and is documented in `ops/vps/README.md` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md`.

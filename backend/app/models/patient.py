@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, func, literal
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -82,4 +83,18 @@ class Patient(Base):
             result
             if result
             else f"Пациент ID={self.id}" if self.id else "Неизвестный пациент"
+        )
+
+    @hybrid_property
+    def full_name(self) -> str:
+        return self.short_name()
+
+    @full_name.expression
+    def full_name(cls):  # type: ignore[no-redef]
+        return func.trim(
+            func.coalesce(cls.last_name, "")
+            + literal(" ")
+            + func.coalesce(cls.first_name, "")
+            + literal(" ")
+            + func.coalesce(cls.middle_name, "")
         )

@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import BenefitSettings from './BenefitSettings';
 import PaymentProviderSettings from './PaymentProviderSettings';
@@ -14,25 +15,68 @@ import ClinicSettings from './ClinicSettings';
 import ColorSchemeSelector from './ColorSchemeSelector.jsx';
 import AccentPicker from '../ui/macos/AccentPicker.jsx';
 
+const stripPasswordFields = (formData) => {
+  const persistedSettings = { ...(formData || {}) };
+  delete persistedSettings.currentPassword;
+  delete persistedSettings.newPassword;
+  delete persistedSettings.confirmPassword;
+
+  return persistedSettings;
+};
+
 const UnifiedSettings = () => {
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'general';
   const [securitySettings, setSecuritySettings] = useState({});
   const [securityLoading, setSecurityLoading] = useState(false);
 
-  // Handler for saving security settings
-  const handleSaveSecuritySettings = useCallback(async (formData) => {
+  const loadSecuritySettings = useCallback(async () => {
     try {
       setSecurityLoading(true);
-      // For now, just log the settings - in production this would call an API
-      logger.log('Saving security settings:', formData);
+      const response = await api.get('/users/me/preferences');
+      const persistedSecuritySettings = response?.data?.security_settings;
+      setSecuritySettings(
+        persistedSecuritySettings && typeof persistedSecuritySettings === 'object'
+          ? persistedSecuritySettings
+          : {}
+      );
+    } catch (error) {
+      logger.warn('Error loading security settings:', error);
+      setSecuritySettings({});
+    } finally {
+      setSecurityLoading(false);
+    }
+  }, []);
 
-      // Update local state
-      setSecuritySettings(formData);
+  // Handler for saving security settings
+  const handleSaveSecuritySettings = useCallback(async (formData, activeTab = 'password') => {
+    try {
+      setSecurityLoading(true);
+      const persistedSecuritySettings = stripPasswordFields(formData);
+      await api.put('/users/me/preferences', {
+        security_settings: persistedSecuritySettings,
+      });
 
-      // Here you would typically save to the backend:
-      // await api.put('/admin/security/settings', formData);
+      setSecuritySettings({
+        ...persistedSecuritySettings,
+        currentPassword: formData.currentPassword || '',
+        newPassword: formData.newPassword || '',
+        confirmPassword: formData.confirmPassword || '',
+      });
 
+      if (activeTab === 'password' && formData.currentPassword && formData.newPassword) {
+        await api.post('/auth/password-change', {
+          current_password: formData.currentPassword,
+          new_password: formData.newPassword,
+        });
+
+        setSecuritySettings({
+          ...persistedSecuritySettings,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+      }
       logger.log('Security settings saved successfully');
     } catch (error) {
       logger.error('Error saving security settings:', error);
@@ -41,6 +85,12 @@ const UnifiedSettings = () => {
       setSecurityLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (section === 'security') {
+      void loadSecuritySettings();
+    }
+  }, [loadSecuritySettings, section]);
 
   const renderSettings = () => {
     switch (section) {

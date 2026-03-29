@@ -1,0 +1,106 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e110]:
+          - img [ref=e111]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e113]
+        - button "Cardiologist User" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - text: Cardiologist User
+        - button "Выйти" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - text: Выйти
+    - generic [ref=e55]:
+      - complementary [ref=e57]:
+        - generic [ref=e58]:
+          - generic [ref=e59]: Медицинская система
+          - button "Collapse sidebar" [ref=e60] [cursor=pointer]:
+            - img [ref=e62]
+        - navigation [ref=e65]:
+          - button "Queue" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Queue
+          - button "Appointments" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e75]: Appointments
+          - button "Visit" [active] [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e80]: Visit
+          - button "ECG" [ref=e81] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: ECG
+          - button "Blood Tests" [ref=e86] [cursor=pointer]:
+            - img [ref=e87]
+            - generic [ref=e90]: Blood Tests
+          - button "AI Assistant" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e95]: AI Assistant
+          - button "Services" [ref=e96] [cursor=pointer]:
+            - img [ref=e97]
+            - generic [ref=e100]: Services
+          - button "History" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e107]: History
+      - main [ref=e108]:
+        - generic [ref=e118]:
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - 'heading "Пациент #" [level=3] [ref=e164]':
+                - img [ref=e165]
+                - text: "Пациент #"
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - generic [ref=e170]: ФИО пациента
+                  - generic [ref=e171]: Тестовый Пациент Доктор
+                - generic [ref=e172]:
+                  - generic [ref=e173]: Телефон
+                  - generic [ref=e174]:
+                    - img [ref=e175]
+                    - generic [ref=e177]: "+998082364601"
+            - generic [ref=e178]:
+              - heading "Электронная медицинская карта" [level=3] [ref=e179]:
+                - img [ref=e180]
+                - text: Электронная медицинская карта
+              - generic [ref=e185]: "Ошибка контракта: для EMR v2 требуется `visitId`."
+            - generic [ref=e187]:
+              - button "Отменить" [ref=e188] [cursor=pointer]:
+                - generic [ref=e189]: Отменить
+              - button "Завершить прием" [ref=e190] [cursor=pointer]:
+                - generic [ref=e191]:
+                  - img [ref=e192]
+                  - text: Завершить прием
+          - button "Открыть настройки" [ref=e141]:
+            - img [ref=e142]
+          - button "💬 AI" [ref=e145] [cursor=pointer]:
+            - generic [ref=e146]: 💬
+            - generic [ref=e147]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e148]:
+    - generic [ref=e149]:
+      - img [ref=e150]
+      - generic [ref=e153]:
+        - strong [ref=e154]: Включить уведомления?
+        - generic [ref=e155]: Получайте уведомления о новых сообщениях
+    - generic [ref=e156]:
+      - button "Включить" [ref=e157] [cursor=pointer]
+      - button "Закрыть" [ref=e158] [cursor=pointer]:
+        - img [ref=e159]

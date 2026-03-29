@@ -1,11 +1,11 @@
 child_table,child_column,parent_table,parent_column,orphans
-visits,patient_id,patients,id,n/a
-visits,doctor_id,users,id,n/a
-visit_services,visit_id,visits,id,n/a
-visit_services,service_id,services,id,n/a
-payments,visit_id,visits,id,n/a
+visits,patient_id,patients,id,0
+visits,doctor_id,users,id,7
+visit_services,visit_id,visits,id,0
+visit_services,service_id,services,id,11
+payments,visit_id,visits,id,0
 payments,patient_id,patients,id,n/a
-schedules,doctor_id,users,id,n/a
+schedules,doctor_id,users,id,0
 schedules,patient_id,patients,id,n/a
 queues,patient_id,patients,id,n/a
 queues,service_id,services,id,n/a

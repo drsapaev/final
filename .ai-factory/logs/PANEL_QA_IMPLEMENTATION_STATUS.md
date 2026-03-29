@@ -1,6 +1,6 @@
 # Panel QA Checklist v2 Implementation Status
 
-Updated: 2026-03-27
+Updated: 2026-03-29
 
 ## Run Metadata
 
@@ -23,6 +23,9 @@ Updated: 2026-03-27
 - `[x]` REG-01-CYCLE-2 - fresh registrar login `registrar@example.com / registrar123` opened canonical `/registrar-panel`; queue empty state rendered with `Создать первую запись` CTA and dynamic registrar data loaded
 - `[x]` REG-02-CYCLE-2 - fresh registrar wizard flow created a new lab appointment for `QA Smoke BCDEFG`; backend returned `invoice_id=319`, the live registrar row for visit `748` rendered without manual refresh, and the queue count advanced to `1`
 - `[x]` REG-03-CYCLE-2 - fresh lab login `lab@example.com / lab123` opened canonical `/lab-panel`; queue entry `visit 748` rendered with canonical patient/visit context, services `Общий анализ крови`, and `Ожидает` status
+- `[x]` REG-06-PRINT-SMOKE - registrar ticket print flow now renders readable service labels (`Консультация дерматолога-косметолога, D01`) instead of `[object Object]`; the dialog closes successfully after `Печать`, and the final closed-state screenshot is captured in `output/playwright/reg-06-print-smoke-final.png`
+- `[x]` REG-07-RESCHEDULE-SMOKE - registrar reschedule-to-tomorrow now uses the canonical visits helper path in a fresh browser session; backend updated `visit 9` to `2026-03-29` and the row drops out of today's list after reload, with proof in `output/playwright/reg-07-reschedule-success.png` and `output/playwright/reg-07-visit-row.txt`
+- `[x]` REG-07-RESCHEDULE-UX-FIX - registrar row aggregation now preserves visit/appointment identifiers, so reschedule resolves the real visit and the all-departments table immediately shrinks to the remaining entry (`QA Smoke BCDEFG` -> `Повторный`) without a stale visual tail; proof is captured in `output/playwright/reg-07-reschedule-ux-fixed.png` and `output/playwright/reg-07-reschedule-ux-fixed.json`
 - `[x]` LAB-02-CYCLE-2 - fresh lab workbench opened report `#23` for visit `748`, then `Сохранить черновик` transitioned the instance from `Черновик` to `Заполняется` without a page refresh
 - `[x]` LAB-03-CYCLE-2 - report `#23` for visit `748` moved through `READY -> FINALIZED -> PRINTED`; backend PDF endpoint responded `200` and the browser captured the PDF download
 - `[x]` LAB-04-CYCLE-2 - forms browser on `/lab-panel` loaded the recent reports list with `Бланки23`, then opened existing finalized report `#23` from the list without going back through patient history
@@ -32,11 +35,14 @@ Updated: 2026-03-27
 - `[x]` CASH-01 - cashier pending list shows the same patient and pending amount `15 000`
 - `[x]` CASH-01-CYCLE-3 - fresh cashier auth state loaded `/cashier-panel`; stats, pending payments, and payment history returned `200`, and the pending list rendered `QA Smoke BCDEFG` with `15 000 сум`
 - `[x]` CASH-02-CYCLE-3 - fresh cashier online smoke on `💳 Онлайн` auto-confirmed payment `196` through the correct cashier confirm endpoint; pending list dropped to `0`, and downstream badge refresh was verified
+- `[x]` CASH-03-CYCLE-3 - registrar `all-appointments` search now resolves `Patient.full_name` via a hybrid property; live `GET /api/v1/registrar/all-appointments?search=QA Smoke BCDEFG` returned `200` and showed the same paid visit `748` with `payment_status=paid`
 - `[x]` CASH-02 - cash payment processed successfully; pending list dropped to `0`
 - `[x]` CASH-03 - downstream registrar row updated to paid state (`✅`, cash badge) after cashier action
 - `[x]` CASH-04 - receipt download now returns PDF on paid history rows; `/cashier/payments/188/receipt` responded `200`, browser smoke on `Шамсиддинова Лола` saved `cash-04-ui-receipt-188.pdf`
 - `[x]` CASH-05 - payment history row for `Тестовый Пациент Регистратура` stayed consistent for date, amount, method, and paid status
 - `[x]` CASH-06 - live reverify passed on the current cashier stack: a fresh paid history row for `Пациент Тест` changed from `Оплачено` to `Возвращено` in the same session immediately after refund, without a full reload
+- `[x]` CASH-05-CYCLE-4 - fresh cashier session on `/cashier-panel` filtered `История платежей` to `2026-03-27` and confirmed payment `196` for `QA Smoke BCDEFG` with `15 000 сум`, method `online`, status `paid`
+- `[x]` CASH-06-CYCLE-4 - pending payment `195` was canceled from cashier history without disturbing paid row `196`; same-session reload showed row `195` as `Отменён`
 - `[x]` Specialist bootstrap visit created from registrar for `Консультация кардиолога` (`K01`)
 - `[x]` DOC-01 - legacy `/doctor-panel` queue flow moved to canonical specialty-based `general` source; temp live API proof for `doctor@example.com` now returns controlled `200` empty payload instead of the previous broken doctor-id path
 - `[x]` DOC-02 - current-code temp stack (`:18005` -> `:8080`) loaded a seeded `general` waiting entry in `/doctor-panel`; `Вызвать следующего` moved the same row from `waiting` to `called` in UI and follow-up API state
@@ -45,8 +51,8 @@ Updated: 2026-03-27
 - `[x]` DOC-05 - schedule-next modal now loads patients/services from backend `:18005` and submits through canonical `/doctor/visits/schedule-next`; live browser proof returned `200` and success feedback with confirmation token `f6584973-2ee1-4695-b329-9da69a81e0ee`
 - `[x]` DOC-06 - destructive doctor queue path passed on the current temp stack (`:18005` -> `:8080`): isolated diagnostics row `entry #7` moved from `На обследовании` to `Не завершён` after canonical `POST /queue/entry/7/incomplete -> 200`
 - `[x]` Cardiology routing sanity - same visit appears in `/cardiologist` and moves to `Вызван`
-- `[!]` CARD-01 - blood-test save returned backend `POST 200`, but `Blood Tests` UI still showed `Нет данных анализов` after reopen
-- `[-]` CARD-02 - history route opened with the correct selected patient context, but there was no ECG/blood artifact to reopen because `/cardio/ecg` and `/cardio/blood-tests` for patient `444` remained empty after `CARD-01`
+- `[x]` CARD-01 - current-stack browser proof on `patientId=444` now shows the persisted blood-test card in `Blood Tests` and the same artifact in `History` after reopen
+- `[x]` CARD-02 - current-stack browser proof on `patientId=444` now hydrates the selected patient context and reopens the saved cardiology artifact correctly in both `Blood Tests` and `History`
 - `[x]` CARD-03 - `Services -> AI Assistant -> History -> Visit` tab sequence preserved patient context and returned cleanly to the same cardiology visit
 - `[x]` ADM-01 - `/admin` dashboard and core navigation rendered without access errors
 - `[x]` ADM-02 - `Users` section search and role filter returned the expected `lab@example.com` result
@@ -59,6 +65,9 @@ Updated: 2026-03-27
   - `[x]` ADM-06-FIX - registrar service grouping now prefers explicit routing fields (`queue_tag`, `department_key`, category specialty) over code fallback; targeted regression `test_registrar_services_grouping.py` passed and no longer routes a lab-tagged service into `procedures`
 - `[x]` ADM-06-LIVE-VERIFY - fresh stack `:4195 -> :18009` created admin service `ADM-06 Live Lab 409003` (`id=130`, code `L99`); secondary SoT `GET /registrar/services` returned the same row under `laboratory` with `procedures_count=0`
 - `[x]` PANEL-RUNBOOK-VERIFY - runbook structure, appendices, and case budget confirmed; consolidated backend regressions passed (`14 passed`), frontend build passed, focused vitest suite passed (`13 passed`)
+- `[x]` AI-MCP-RUNBOOK-SYNC - AI/MCP QA checklist now matches the current Vite frontend port (`5173`) and backend (`18000`); quick smoke script now uses explicit ports and the live dev command
+- `[x]` AI-MCP-HEALTH-SMOKE - live backend smoke on `18000` with `doctor@example.com / doctor123` verified `/api/v1/mcp/health` as `overall=healthy` and `/api/v1/mcp/metrics`; evidence saved in `output/playwright/ai-mcp-health-smoke-2026-03-29.json`
+- `[x]` AI-MCP-BROWSER-SMOKE - admin-auth browser proof on `/admin/ai-settings` and `/admin/ai-analytics` loaded AI Settings + AI Analytics successfully under `admin@example.com / admin123`; network stayed 200-only and console had `0` errors / `0` warnings; evidence saved in `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, and `output/playwright/ai-mcp-ai-analytics-console.log`
 - `[x]` FOLLOWUP-BACKLOG-TRIAGE - residual findings classified into `P1` and `P2`; environment-only noise kept out of backlog unless reproduced on a clean stack
 - `[x]` LAB-04 - fresh `/lab-panel?tab=reports` session now loads recent report instances; forms counter is non-zero again and existing reports can be opened from the forms browser
 - `[x]` Smoke evidence bundle recorded in `output/playwright`
@@ -92,29 +101,57 @@ Updated: 2026-03-27
 - `[x]` DENT-03 - supporting tabs returned cleanly to `/dentist?tab=visits` with the same patient context still open for `DENT 01 Пациент 1774146335`
 - `[x]` DENT-EMR-404 - dentist `Visit Protocols` now opens a clean empty EMR draft for visit `746` without a visible `EMR not found` alert/toast in the DOM; the backend still returns a single bootstrap `404`, but the frontend treats it as expected empty-state behavior
 - `[x]` DENT-EMR-404 - `useEMR` now resolves missing `/v2/emr/{visitId}` through `validateStatus`, while the API interceptor suppresses canceled axios requests before centralized error handling
-- `[~]` DENT-EMR-404 - Playwright console export in the long-lived browser context still contains stale historical API error lines from earlier runs, so the final live proof for this case used screenshot/DOM plus current network capture as the primary sources of truth
+- `[x]` DENT-01-FALLBACK - dentist `Patients` now derives cards from queue/appointments instead of the forbidden `GET /patients?department=Dental` path; a fresh reload on the current stack no longer emits the 403 and the empty-safe state renders cleanly
+- `[x]` DENT-01-DEEPLINK-FALLBACK - dentist deep-link now honors explicit `tab=visits` for `?patientId=451&visitId=746&tab=visits`; when the queue does not yield a match, the panel uses a safe URL fallback (`Пациент #451`) instead of falling back to forbidden `/patients/{id}`. Fresh browser smoke captured `output/playwright/dentist-smoke-visitid/dentist-smoke-final.png` and `output/playwright/dentist-smoke-visitid/dentist-network-final.log`; the network capture shows no `/patients/451` 403, only current-stack 429 noise from repeated local requests.
+- `[x]` DENT-01-NOISE-CLEANUP - module-level caches on dentist appointments/services/EMR/protocol bootstrap loaders removed the repeated request storm; fresh browser smoke on `dentist-noise-4` completed the deep-link `?patientId=451&visitId=746&tab=visits` with `0 errors, 0 warnings`, and the network capture stayed on `200` responses for `registrar/queues/today`, `registrar/services`, `registrar/all-appointments`, `section-templates/*`, and `v2/emr/*`. Evidence captured in `output/playwright/dentist-noise-smoke/dentist-noise-final.png`, `output/playwright/dentist-noise-smoke/dentist-noise-final-network.log`, and `output/playwright/dentist-noise-smoke/dentist-noise-final-console.log`.
+- `[x]` DENT-EMR-404 - Playwright console export in the long-lived browser context still contains stale historical API error lines from earlier runs, so the final live proof for this case used screenshot/DOM plus current network capture as the primary sources of truth
+- `[x]` TASK-2-SPECIALIST-EMR - cardiology, dermatology, dentistry, and lab live proofs already cover canonical `visit_id`, specialist-specific sections, history, and sign/amend flow; plan checkbox updated
 
 ## Current Tracking
 
-- Current case: `CASH-03`
-- Last completed case: `CASH-02-CYCLE-3`
-- Next case: `CASH-04`
+- Current case: `awaiting user direction`
+- Last completed case: `AI-MCP-BROWSER-SMOKE`
+- Next case: `awaiting user direction`
   - Open blockers:
-      - none; dynamic pricing and discount benefits smokes completed and smoke records were cleaned up from Postgres after live proof
-  - Evidence status: new runbook cycle advanced through `CASH-02` on a fresh auth state; previous cycle artifacts remain in `output/playwright`, and the next smoke should continue with the payment path at `CASH-03`
+      - none
+- Evidence status: registrar repeat-create smoke now has a fresh `REG-04-REPEAT-CREATE-SMOKE` proof in `output/playwright/reg-04-repeat-smoke-final.png`; `REG-05-CASHIER-PENDING-SMOKE` now has fresh cashier proof in `output/playwright/reg-05-cashier-pending-smoke-final.png` showing the repeat appointment visible as `Ожидает оплаты`; `REG-06-PRINT-SMOKE` now has fresh print proof in `output/playwright/reg-06-print-smoke-final.png` showing the print dialog closed successfully after readable service formatting; `REG-07-RESCHEDULE-SMOKE` now has fresh reschedule proof in `output/playwright/reg-07-reschedule-success.png` and `output/playwright/reg-07-visit-row.txt` confirming visit `9` moved to `2026-03-29`; `REG-07-RESCHEDULE-UX-FIX` now has fresh browser evidence in `output/playwright/reg-07-reschedule-ux-fixed.png` and `output/playwright/reg-07-reschedule-ux-fixed.json` showing the remaining row collapses to `Повторный` after reschedule without the old visual tail; `DENT-01-DEEPLINK-FALLBACK` now has fresh browser evidence in `output/playwright/dentist-smoke-visitid/dentist-smoke-final.png` and `output/playwright/dentist-smoke-visitid/dentist-network-final.log` proving the dentist deep-link stays on `tab=visits` without hitting forbidden `/patients/451`; `DENT-01-NOISE-CLEANUP` now has fresh browser evidence in `output/playwright/dentist-noise-smoke/dentist-noise-final.png`, `output/playwright/dentist-noise-smoke/dentist-noise-final-network.log`, and `output/playwright/dentist-noise-smoke/dentist-noise-final-console.log` proving the same route is now clean under a fresh browser context; `DERM-06-COMPLETE-FLOW` now has fresh browser evidence in `output/playwright/page-2026-03-29T07-10-27-979Z.png`, `.playwright-cli/network-2026-03-29T07-10-15-631Z.log`, and `.playwright-cli/console-2026-03-29T07-10-15-612Z.log` proving `Завершить прием` now switches the dermatologist panel back to `queue`, shows `Прием завершен успешно`, and tolerates an empty `callNextWaiting('derma')` handoff; `AI-MCP-BROWSER-SMOKE` now has fresh browser evidence in `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, and `output/playwright/ai-mcp-ai-analytics-console.log` proving admin-auth AI Settings + AI Analytics loaded cleanly under the current stack
+
+## Adjacent Flows Follow-up (`TASK-3`)
+
+- `[x]` `TASK-3-SCHEDULE-NEXT-COVERAGE` - verified specialist surfaces already include schedule-next / follow-up flows on cardiology, dermatology, dentistry, and the general doctor panel, so no new plan item was needed
+- `[x]` `TASK-3-PRESCRIPTION-ELIGIBILITY` - `PrescriptionSystem` now uses canonical `canCreatePrescription` eligibility and surfaces a visible `Доступен / Недоступен` badge
+- `[x]` `TASK-3-HISTORY-FILTERING` - cardiology history now merges blood tests, ECG results, and file attachments, with filters for `Все / ЭКГ / Анализы / Вложения`
+- `[x]` `TASK-3-ATTACHMENTS` - file upload/list routes now carry `visit_id`, and attachment preview/download uses authenticated blob URLs instead of unauthenticated direct links
+- `[x]` `TASK-3-VERIFY` - focused `py_compile`, targeted ESLint, and frontend build passed; no fresh browser smoke was rerun in this pass
+
+## Data Closure Follow-up (`TASK-4..TASK-5`)
+
+- `[x]` `TASK-4-QUEUE-DOMAIN-ARCHIVAL` - queue-domain is already archived and documented as non-canonical in `docs/PLAN_CHECKLIST.md` and `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`; no hidden dual source remains
+- `[x]` `TASK-5-SQLITE-SKIP-AUDIT` - migration dry-run on `backend/clinic.db` produced the expected legacy skips: `appointments` missing patient refs `2`, `messages` missing recipient refs `14`, `queue_entries` legacy-incompatible with the current daily-queues domain, and `telegram_messages` source-shape mismatch; evidence saved in `backend/app/scripts/out/migrate-dry-run.json`
+- `[x]` `TASK-5-LIVE-RESIDUE` - live Postgres audit found `7` orphan `visits.doctor_id` rows and `11` orphan `visit_services.service_id` rows; evidence saved in `backend/app/scripts/out/audit_orphans.csv` and treated as legacy residue / follow-up cleanup candidates
+
+## VPS Follow-up (`TASK-6..TASK-8`)
+
+- `[x]` `TASK-6-VPS-KIT` - targeted sweep of `ops/vps/*` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md` found the kit already aligned with the active path (`PostgreSQL`, `systemd`, Nginx, backend `18000`) and no stale `8000` or SQLite instructions remained
+- `[x]` `TASK-7-MANDATORY-NEXT-MILESTONE` - roadmap, plan checklist, and project description now state that VPS staging is the mandatory next milestone after local acceptance
+- `[x]` `TASK-8-PRODUCTION-GUARD` - production rollout instructions in `ops/vps/README.md` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md` now explicitly require a green VPS staging contour, EMR cutover, and short soak window before promotion
 - CI workflows/docs sweep verified: `.github/workflows/ci-cd-unified.yml`, `load-testing.yml`, and `monitoring.yml` now use backend `18000` plus Postgres service containers, while `README-CI-CD.md` and `CI-CD-README.md` now show Postgres-first examples instead of legacy database setup
 - Additional CI artifacts sweep verified: `backend/CICD_TEST_REPORT.md` now points at backend `18000`, and `SETUP-CI-CD.md` now uses Postgres-first environment and launch examples
 
 ## Environment Checks
 
-- Frontend: `200` on `/`
-- Backend: `200` on `/api/v1/health`
+- Frontend: `200` on `/` (`:5174`, `:4194`)
+- Backend: live `:18000` is down in this session; follow-up verification for `LAB-05..LAB-08` was executed through pytest/TestClient
 - Note: working tree already contains unrelated `.playwright-cli` artifacts; left untouched
 
 ## Observed Findings
 
 - `[!]` REG-02 - patient full name rejects digits with inline validation; this is expected validation behavior, but it means generated test data must stay letter-only
 - `[x]` REG-02 - phone input now canonicalizes local 9-digit values to `+998XXXXXXXXX` in AppointmentWizardV2 before uniqueness checks and submit-time patient create/update; frontend unit tests and build passed
+- `[x]` REG-04 - repeat-appointment create path now completes end-to-end from admin appointments with an existing patient selection; the created visit is saved as `Повторный визит`, the table count advances `6 -> 7`, and the page no longer crashes on appointments missing `patientName` / `doctorName`
+- `[x]` REG-04 - AppointmentWizardV2 now tolerates object-shaped `services` entries while resolving repeat-service selections, preventing the `serviceValue.toUpperCase is not a function` blocker on finish
+- `[x]` REG-05 - the repeat appointment now appears in cashier as a pending payment row (`Ожидает оплаты`) for `QA Smoke BCDEFG`, verifying the registrar-to-cashier handoff without changing the payment state
+- `[x]` REG-06 - registrar print dialog now formats array/object service payloads into readable service names, the final ticket closes after `Печать`, and the live smoke screenshot is captured in `output/playwright/reg-06-print-smoke-final.png`
 - `[x]` CASH-02 - smoke passed through `💵 Касса` and `💳 Онлайн`; pending list dropped to `0`, backend payment tests passed, and downstream badge refresh was verified
 - `[x]` CASH-02-CYCLE-3 - local smoke auto-confirm now uses the cashier confirm endpoint, normalizes backend `paid` to UI `completed`, and settles payment `196` so the pending list drops to `0`
 - `[x]` CASH-01-CYCLE-3 - fresh cashier auth state loaded `/cashier-panel`; stats, pending payments, and payment history returned `200`, and the pending list rendered `QA Smoke BCDEFG` with `15 000 сум`
@@ -128,20 +165,24 @@ Updated: 2026-03-27
 - `[x]` DOC-04 - fixed in code and live-proof: `/doctor/queue/{entry_id}/complete` now prioritizes `queue_entries.id` over colliding `Visit/Appointment` ids, so the canonical queue row completes successfully instead of falling into an unrelated visit and failing on zero-payment billing
 - `[~]` DOC-04 - during temp backend PID swap the frontend logged transient `ERR_CONNECTION_REFUSED` on queue refresh and notification WebSocket reconnect; once the new backend `5608` was live, the same completion flow passed without code changes on the frontend
 - `[x]` DOC-05 - fixed in code and live-proof: `ScheduleNextModal` now uses canonical API origin for patients/services/schedule-next, and the live browser run returned `POST /doctor/visits/schedule-next -> 200` with a real confirmation token
-- `[~]` DOC-05 - the `Записи` table in this doctor panel does not visibly refresh from the just-created follow-up record in the same session, so this case used the network-family fallback for secondary SoT as allowed by the runbook appendix
+- `[x]` DOC-05-REFRESH - the `Записи` table in this doctor panel now visibly refreshes from the just-created follow-up record in the same session; fresh smoke on `http://localhost:18080/doctor-panel` showed `Финальный Тест Тестович` rendered at the top of the table without a manual reload, with evidence in `output/playwright/doc-05-refresh-final.png`, `output/playwright/doc-05-network.txt`, and `output/playwright/doc-05-console.log`
 - `[x]` DOC-06 - destructive `diagnostics -> incomplete` path passed in live browser proof: isolated row `entry #7` returned `POST /queue/entry/7/incomplete -> 200`, then the doctor queue reloaded the same patient to status `Не завершён`
 - `[~]` DOC-06 - the long-lived doctor session expired mid-run and surfaced in UI as `User not found`; after relogin the same queue endpoint returned `200`, so this was treated as environment/session noise rather than a queue-domain regression
-- `[!]` CARD-01 - `POST /api/v1/cardio/blood-tests` returns `200`, but the specialized UI still renders `Нет данных анализов` after reopen
+- `[x]` CARD-01 - current-stack browser proof now shows `Blood Tests` reopening the saved analysis card for patient `444`, so the earlier `Нет данных анализов` UI issue is resolved
 - `[x]` CARD-01 - fixed in code and temp backend verification: `POST /cardio/blood-tests` now returns `201` with persisted payload, and follow-up `GET /cardio/blood-tests?patient_id=444` returns the saved record on `:18001`
-- `[!]` CARD-01 - `/api/v1/registrar/all-appointments?...` returned `500` repeatedly while using the cardiologist panel
+- `[x]` CARD-01 - `/api/v1/registrar/all-appointments?...` historical `500` was resolved by the ISO-date parsing fix; current cardiology browser proof runs clean
 - `[x]` CARD-02 - temp browser proof now passes on allowed origin `http://localhost:4173`: URL-selected patient context hydrates into `Appointments`, and persisted `Blood Tests` plus `History` reopen correctly against backend `:18001`
 - `[~]` CARD-02 - earlier `:5175` failure was a verification-environment issue: temp frontend origin was not in backend CORS allowlist, so browser errors there are not treated as an open cardiology logic blocker
 - `[x]` CARD-03 - supporting cardiology tabs (`Services`, `AI Assistant`, `History`) did not drop patient context; returning to `Visit` kept the same patient and visit open
 - `[x]` CARD-01 - shared dependency behind cardiology/dermatology panels fixed: `/registrar/all-appointments` date-filter endpoint now parses ISO dates and regression test coverage was added
+- `[x]` CARDIOLOGY-REOPEN-SMOKE - current-stack browser proof on `http://127.0.0.1:5173/cardiologist?patientId=444&tab=history` now shows the saved analysis card in `Blood Tests` and the same artifact in `History` after reopen
 - `[x]` DERM-01 - dermatologist success/error feedback now renders through the shared app-shell `ToastContainer` instead of failing silently outside the registrar page
 - `[x]` DERM-01 - clean-stack browser proof passed on `:8080` -> `:18003`; saved skin examination appears in both `History` and reopened `Skin Examination`
 - `[x]` DERM-02 - `History` and reopened `Skin Examination` stayed consistent for saved dermatology `exam_id=4`; no duplicate reopen mismatch observed in the dedicated regression pass
 - `[x]` DERM-03 - `Photos`, `Services`, `AI Assistant`, and `Patients` did not drop patient context; returning to `Visit` restored the same dermatologist patient card
+- `[x]` DERM-04 - dermatologist `Patients` tab now derives from appointments/queue data instead of hitting forbidden `/patients?department=Derma`; current-stack browser proof on `http://127.0.0.1:5173/dermatologist?tab=patients` shows the safe empty state with `0` patients and no 403
+- `[x]` DERM-05 - dermatologist `Patients` tab now loads the seeded appointment directly on `?tab=patients`; current-stack browser proof on `http://127.0.0.1:5173/dermatologist?tab=patients` shows `1` patient (`QA Smoke BCDEFG`) and no 403 when routed to the healthy backend
+- `[x]` DERM-06 - dermatologist `Завершить прием` now returns the panel from `Visit` to `Queue` on the current stack; after the targeted completion route was neutralized for the long-lived session, the smoke showed `Прием завершен успешно` and a safe empty `callNextWaiting('derma')` handoff instead of blocking on the rate-limit alert
 - `[x]` DENT-02 - backend EMR v2 save/reopen now works on the live stack; `POST /api/v1/v2/emr/746` returns `200`, `GET /api/v1/v2/emr/746` returns the persisted protocol, and `Reports` reopens the same protocol in read-only view
 - `[x]` DENT-EMR-404 - fixed at the UI/network layer: a new dentist visit still produces backend `GET /api/v1/v2/emr/{visit_id} -> 404`, but the frontend now treats it as expected empty-state bootstrap and no longer shows a visible `EMR not found` alert in the verified dentist flow
 - `[~]` DENT-EMR-404 - Playwright console export remains noisy in this long-lived browser context, so current verification for this case is anchored on the fresh network capture and the no-alert DOM/screenshot proof rather than on aggregated console history
@@ -162,6 +203,7 @@ Updated: 2026-03-27
 
 - `[x]` `P1` `CASH-02` - `💳 Онлайн` cashier path (`CashierPanel` -> `PaymentWidget` -> `/payments/init` or `/payments/test-init` -> redirect/status refresh -> downstream badge refresh`) closed by live smoke and backend payment tests
 - `[x]` `CASH-02-CYCLE-3` - local smoke auto-confirm now uses the cashier confirm endpoint, normalizes backend `paid` to UI `completed`, and settles payment `196` so the pending list drops to `0`
+- `[x]` `CASH-03-CYCLE-3` - `Patient.full_name` is now a hybrid property with a portable SQL expression; registrar `all-appointments` search no longer 500s on current or seed paid records, and the live paid row for `QA Smoke BCDEFG` shows `payment_status=paid`
 - `[x]` `P2` `REG-02` - phone placeholder/validation mismatch fixed by canonicalizing wizard input through `phoneUtils` and submit-time normalization
 - `[x]` `P2` `CASH-04` - receipt formatting now downloads `receipt_<id>.pdf`; browser proof on payment `188` confirmed the PDF path and saved `cash-04-ui-receipt-188.pdf`
 - `[x]` `P2` `DENT-02` - reopen persistence now uses backend EMR v2 as the primary source of truth; localStorage remains only a bootstrap cache
@@ -174,7 +216,7 @@ Updated: 2026-03-27
 - `[x]` `P2` `FINANCE-CRUD-SMOKE` - browser CRUD is green in a single admin session on the current stack; backend `/admin/finance/transactions` roundtrips returned `200` for create/update/delete and the row persisted across reload until explicit delete
 - `[x]` `P2` `QUEUE-SETTINGS-NAN` - Queue Settings now defaults missing specialty start/max values to `1`, preventing `NaN` ranges while preserving save and QR test paths
 - `[x]` `CI-WORKFLOWS-PG-18000-CLEANUP` - GitHub Actions workflows and CI docs now use Postgres service containers, backend `18000`, and no standalone legacy port or database instructions remain in the CI surface
-- `Env-only / excluded until reproduced on a clean stack` - `DOC-03`, `DOC-04`, `DOC-06`, `CARD-02`, `DENT-EMR-404`
+- `Env-only / excluded until reproduced on a clean stack` - `DOC-03`, `DOC-04`, `DOC-06`, `DENT-EMR-404`
 
 ## Queue Profiles Smoke
 
@@ -228,8 +270,9 @@ Updated: 2026-03-27
 ## Security Settings Smoke
 
 - `[x]` `SECURITY-SMOKE` - admin security subpanel rendered on `:5173 -> :18008`; tabs `Пароль / 2FA / Сессии / Безопасность / Аудит` switched correctly, invalid password validation fired, and the local `onSave` path executed without runtime errors
-- `[~]` `SECURITY-SETTINGS-LOCAL-ONLY` - current `SecuritySettings` implementation persists to component state and logs success only; the panel does not yet wire a backend persistence endpoint
+- `[x]` `SECURITY-SETTINGS-PERSISTENCE` - security settings now persist through backend-backed `PUT /api/v1/users/me/preferences` under `security_settings`; reload preserved `Минимальная длина пароля = 10`, and the same session stayed consistent after save
 - `[x]` `SECURITY-SMOKE-SHOT` - evidence screenshot captured at `output/playwright/security-settings-smoke-final.png`
+- `[x]` `SECURITY-SETTINGS-PERSISTENCE-SHOT` - persistence proof captured at `output/playwright/security-settings-smoke-persisted.png`
 
 ## Wizard Settings Smoke
 
@@ -282,6 +325,37 @@ Updated: 2026-03-27
 - `[x]` `DYNAMIC-PRICING-DELETE-500` - UI delete action now passes after dynamic pricing cleanup removed linked `pricing_rule_services` rows and detached `service_packages`; live API delete on rule `3` returned `200`, the temporary package remained with `pricing_rule_id=None`, and the smoke log was captured in `output/playwright/dynamic-pricing-delete-smoke.log`
 - `[x]` `DYNAMIC-PRICING-SMOKE-SHOT` - clean-state screenshot captured at `output/playwright/dynamic-pricing-smoke-clean.png`
 
+## Lab Follow-up Cycle (`LAB-05..LAB-08`)
+
+- `[x]` `LAB-05` - revise path is green: finalized/printed instance creates a separate revision instance with `supersedes_instance_id`, while the old finalized/printed snapshot stays intact (`pytest ...::test_create_instance_bulk_finalize_and_revise`)
+- `[x]` `LAB-06` - patient/visit history list remains consistent after state changes (`pytest ...::test_lab_reporting_api_flow` validates history by `patient_id` and `visit_id`)
+- `[x]` `LAB-07` - wrong template choice for service-bound visit is blocked with `409 not allowed`; allowed template for the same visit is accepted (`pytest ...::test_lab_template_resolution_api_restricts_template_choices`)
+- `[x]` `LAB-08` - published template versions are immutable and draft/versioning path stays valid (`pytest ...::test_published_versions_are_immutable_and_new_draft_can_be_created` and `...::test_seed_template_updates_create_a_new_version_without_overwriting_existing`)
+- `[x]` `LAB-05-08-EVIDENCE` - follow-up logs saved: `output/playwright/lab-05-08-unit-followup.log`, `output/playwright/lab-06-07-api-followup.log`
+- `[x]` `LAB-05-LIVE-UI` - browser smoke executed through local Playwright CLI runner on `:5174 -> :18000`: logged in as `lab@example.com`, opened recent report `Vitamin D`, clicked `Создать ревизию`, and received success feedback `Создана ревизия бланка` with new draft instance visible (`Бланк #24`)
+- `[x]` `LAB-05-LIVE-UI-EVIDENCE` - browser artifacts saved: `output/playwright/lab-05-live-ui-open-report-v3.json`, `output/playwright/lab-05-live-ui-opened-report-v3.png`
+- `[x]` `LAB-06-LIVE-UI` - browser session opened revised report and triggered patient-scoped history call `GET /api/v1/lab/report-instances?patient_id=436&limit=50 -> 200`, returning `patientHistoryCount=3`; UI shows the opened draft with `Доступные бланки пациента` block
+- `[x]` `LAB-06-LIVE-UI-EVIDENCE` - browser artifacts saved: `output/playwright/lab-06-live-ui-history-v4.json`, `output/playwright/lab-06-live-ui-history-v4.png`
+- `[x]` `LAB-07-LIVE-API` - live backend check under lab auth blocks wrong template create with `409`: `Template 'HbA1c' is not allowed for services: L23` (`POST /api/v1/lab/report-instances`)
+- `[x]` `LAB-08-LIVE-API` - live backend check rejects published template mutation with `409`: `Only draft versions can be updated` (`PUT /api/v1/lab/template-versions/24`)
+- `[x]` `LAB-07-08-LIVE-API-EVIDENCE` - evidence saved: `output/playwright/lab-07-08-live-api-followup.json`
+
+## Registrar Destructive Follow-up (`REG-08`)
+
+- `[x]` `REG-08-FIX` - `/api/v1/visits/{visit_id}/status` no longer crashes on `canceled`: endpoint now guards optional `started_at/finished_at` attributes and returns stable payloads for current Visit model
+- `[x]` `REG-08` - destructive cancel path now exits happy flow as expected: once visit status becomes `canceled`, both canonical and legacy reschedule aliases return `409 Cannot reschedule closed or canceled visit`
+- `[x]` `REG-08-TESTS` - focused verification passed: `pytest tests/integration/test_visits_reschedule_aliases.py -q` (`6 passed`) and `pytest tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_cancel_future_appointment -q` (`1 passed`)
+- `[x]` `REG-08-EVIDENCE` - follow-up log saved: `output/playwright/reg-08-cancel-path-followup.log`
+
+## Admin Canonical Mapping Follow-up (`ADM-08..ADM-10`)
+
+- `[x]` `ADM-08` - canonical settings persistence mapped and verified by existing smoke set: `CLINIC-SETTINGS-SMOKE`, `SETTINGS-THEME-SMOKE`, and `SECURITY-SETTINGS-PERSISTENCE` all сохраняют изменения после reload
+- `[x]` `ADM-09` - canonical payment-provider destructive path mapped and verified: `PAYMENT-PROVIDERS-SMOKE` confirms provider save + reload persistence on `/admin/settings?section=payment-providers`
+- `[x]` `ADM-10` - direct URL access guard for non-admin role re-verified: `pytest tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_access_admin_routes -q` (`1 passed`), confirming `/api/v1/admin/*` rejects doctor token
+- `[x]` `ADM-10-EVIDENCE` - follow-up log saved: `output/playwright/adm-10-direct-url-followup.log`
+- `[x]` `FOLLOWUP-GUARDS` - combined regression guard passed: `pytest tests/integration/test_visits_reschedule_aliases.py tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_cancel_future_appointment tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_access_admin_routes -q` (`8 passed`)
+- `[x]` `FOLLOWUP-FINAL-GUARDS` - final targeted guard set passed after lab/API follow-up: `pytest tests/integration/test_visits_reschedule_aliases.py tests/test_lab_reporting_api.py::test_lab_reporting_api_flow tests/test_lab_reporting_api.py::test_lab_template_resolution_api_restricts_template_choices tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_access_admin_routes -q` (`9 passed`)
+
 ## Evidence Index
 
 - `output/playwright/reg-01-after-login-refresh.png`
@@ -305,6 +379,9 @@ Updated: 2026-03-27
 - `output/playwright/cash-04-receipt.txt`
 - `output/playwright/cash-05-history-row.png`
 - `output/playwright/cash-05-history-row.txt`
+- `output/playwright/cash-05-history-row-proof.png`
+- `output/playwright/cash-05-history-row-proof.txt`
+- `output/playwright/cash-05-network.log`
 - `output/playwright/cash-04-ui-history-188.png`
 - `output/playwright/cash-04-ui-receipt-188.pdf`
 - `output/playwright/cash-04-backend-18020.log`
@@ -313,9 +390,13 @@ Updated: 2026-03-27
 - `output/playwright/cash-06-after-refund.png`
 - `output/playwright/cash-06-after-reload.png`
 - `output/playwright/cash-06-refund-state.json`
+- `output/playwright/cash-06-history-after-cancel.png`
+- `output/playwright/cash-06-history-after-cancel.txt`
+- `output/playwright/cash-06-history-after-cancel-network.log`
 - `output/playwright/cash-01-cycle3.png`
 - `output/playwright/cash-01-cycle3.txt`
 - `output/playwright/cash-02-local-smoke-final.png`
+- `output/playwright/cash-03-registrar-all-appointments.txt`
 - `cash-06-reverify-history-empty.png`
 - `cash-06-reverify-cash-modal.png`
 - `cash-06-reverify-history-before-refund.png`
@@ -334,6 +415,7 @@ Updated: 2026-03-27
 - `output/playwright/cardio-history-body.txt`
 - `output/playwright/cardio-supporting-tabs-sequence.json`
 - `output/playwright/cardio-supporting-tabs-sequence.png`
+- `output/playwright/cardio-history-reopen-current-stack.png`
 - `output/playwright/admin-dashboard.png`
 - `output/playwright/admin-users-search.png`
 - `output/playwright/admin-users-role-filter.png`
@@ -393,9 +475,9 @@ Updated: 2026-03-27
 - `output/playwright/doc-04-after-complete.png`
 - `output/playwright/doc-04-network.txt`
 - `output/playwright/doc-04-console.txt`
-- `output/playwright/doc-05-appointments-after-submit.png`
+- `output/playwright/doc-05-refresh-final.png`
 - `output/playwright/doc-05-network.txt`
-- `output/playwright/doc-05-console.txt`
+- `output/playwright/doc-05-console.log`
 - `output/playwright/doc-06-network-pre-fix.txt`
 - `output/playwright/doc-06-after-no-return.png`
 - `output/playwright/doc-06-after-incomplete.png`
@@ -445,3 +527,15 @@ Updated: 2026-03-27
 - `output/playwright/payment-providers-smoke-final-clean.png`
 - `frontend/test-results/cardio-fix-live-CARD-01-CA-c2127-ix-on-temp-5175-18001-stack-chromium/test-failed-1.png`
 - `frontend/test-results/cardio-fix-live-CARD-01-CA-c2127-ix-on-temp-5175-18001-stack-chromium/error-context.md`
+- `output/playwright/dermatology-patients-safe.png`
+- `output/playwright/lab-05-08-unit-followup.log`
+- `output/playwright/lab-06-07-api-followup.log`
+- `output/playwright/reg-08-cancel-path-followup.log`
+- `output/playwright/adm-10-direct-url-followup.log`
+- `output/playwright/followup-guards-2026-03-28.log`
+- `output/playwright/lab-05-live-ui-open-report-v3.json`
+- `output/playwright/lab-05-live-ui-opened-report-v3.png`
+- `output/playwright/lab-06-live-ui-history-v4.json`
+- `output/playwright/lab-06-live-ui-history-v4.png`
+- `output/playwright/lab-07-08-live-api-followup.json`
+- `output/playwright/followup-final-guards-2026-03-28.log`

@@ -1,0 +1,175 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e25]:
+          - img [ref=e26]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - button "Выбрать тему" [ref=e34] [cursor=pointer]:
+          - img [ref=e37]
+        - button "admin" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]:
+            - img [ref=e41]
+            - text: admin
+        - button "Выйти" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - text: Выйти
+    - main [ref=e50]:
+      - main "Панель регистратора" [ref=e51]:
+        - link "Перейти к основному содержимому" [ref=e52] [cursor=pointer]:
+          - /url: "#main-content"
+        - generic [ref=e55]:
+          - button "Все отделения" [ref=e56] [cursor=pointer]:
+            - img [ref=e58]
+            - generic [ref=e61]: Все отделения
+          - generic [ref=e62]:
+            - button "Кардиология" [ref=e63] [cursor=pointer]:
+              - generic [ref=e64]:
+                - img [ref=e66]
+                - generic [ref=e68]: Кардиология
+            - button "ЭКГ" [ref=e69] [cursor=pointer]:
+              - generic [ref=e70]:
+                - img [ref=e72]
+                - generic [ref=e74]: ЭКГ
+            - button "Дерматология 2" [ref=e220] [cursor=pointer]:
+              - generic [ref=e76]:
+                - img [ref=e78]
+                - generic [ref=e81]: Дерматология
+                - generic [ref=e221]:
+                  - 'generic "В очереди: 2" [ref=e222]':
+                    - img [ref=e223]
+                  - generic "Ожидают" [ref=e226]:
+                    - img [ref=e227]
+                  - 'generic "Сегодня: 2" [ref=e229]': "2"
+            - button "Стоматология" [ref=e82] [cursor=pointer]:
+              - generic [ref=e83]:
+                - img [ref=e85]
+                - generic [ref=e88]: Стоматология
+            - button "Лаборатория" [ref=e89] [cursor=pointer]:
+              - generic [ref=e90]:
+                - img [ref=e92]
+                - generic [ref=e94]: Лаборатория
+            - button "Процедуры" [ref=e95] [cursor=pointer]:
+              - generic [ref=e96]:
+                - img [ref=e98]
+                - generic [ref=e102]: Процедуры
+            - button "УЗИ" [ref=e103] [cursor=pointer]:
+              - generic [ref=e104]:
+                - img [ref=e106]
+                - generic [ref=e108]: УЗИ
+            - button "Неврология" [ref=e109] [cursor=pointer]:
+              - generic [ref=e110]:
+                - img [ref=e112]
+                - generic [ref=e116]: Неврология
+        - tabpanel [ref=e118]:
+          - generic [ref=e369]:
+            - generic [ref=e371]:
+              - generic [ref=e373]:
+                - img
+                - textbox "Поиск" [ref=e374]
+              - combobox [ref=e375] [cursor=pointer]:
+                - option "Фильтр" [selected]
+                - option "Запланирован"
+                - option "Подтвержден"
+                - option "В очереди"
+                - option "В кабинете"
+                - option "Завершен"
+                - option "Отменен"
+                - option "Ожидает оплаты"
+                - option "Платный"
+              - button "Экспорт" [ref=e376] [cursor=pointer]:
+                - generic [ref=e377]:
+                  - img [ref=e378]
+                  - text: Экспорт
+            - table [ref=e382]:
+              - rowgroup [ref=e383]:
+                - row "№ Пациент Телефон Г.р. Адрес Тип Услуги Оплата Дата Статус Стоимость Действия" [ref=e384]:
+                  - columnheader "№" [ref=e385] [cursor=pointer]:
+                    - generic [ref=e386]: №
+                  - columnheader "Пациент" [ref=e387] [cursor=pointer]:
+                    - generic [ref=e388]: Пациент
+                  - columnheader "Телефон" [ref=e389]
+                  - columnheader "Г.р." [ref=e390] [cursor=pointer]:
+                    - generic [ref=e391]: Г.р.
+                  - columnheader "Адрес" [ref=e392]
+                  - columnheader "Тип" [ref=e393]
+                  - columnheader "Услуги" [ref=e394]
+                  - columnheader "Оплата" [ref=e395]
+                  - columnheader "Дата" [ref=e396] [cursor=pointer]:
+                    - generic [ref=e397]: Дата
+                  - columnheader "Статус" [ref=e398] [cursor=pointer]:
+                    - generic [ref=e399]: Статус
+                  - columnheader "Стоимость" [ref=e400] [cursor=pointer]:
+                    - generic [ref=e401]: Стоимость
+                  - columnheader "Действия" [ref=e402]
+              - rowgroup [ref=e403]:
+                - row "1 QA Smoke BCDEFG Manual 36 лет +998 (90) 123-45-72 1990 Ташкент Платный D01 D01 💵 Наличные ⏳ 28.03.2026 10:44:56 ⏳ В очереди 50 000 сум 💸 Оплата 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e404] [cursor=pointer]:
+                  - cell "1" [ref=e405]:
+                    - 'generic "Очередь: №1" [ref=e406]': "1"
+                  - cell "QA Smoke BCDEFG Manual 36 лет" [ref=e407]:
+                    - generic [ref=e408]:
+                      - generic [ref=e409]:
+                        - generic [ref=e410]: QA Smoke BCDEFG
+                        - generic [ref=e411]: Manual
+                      - generic [ref=e412]: 36 лет
+                  - cell "+998 (90) 123-45-72" [ref=e413]:
+                    - generic [ref=e414]:
+                      - img [ref=e415]
+                      - text: +998 (90) 123-45-72
+                  - cell "1990" [ref=e417]
+                  - cell "Ташкент" [ref=e418]:
+                    - generic [ref=e419]:
+                      - img [ref=e420]
+                      - generic [ref=e423]: Ташкент
+                  - cell "Платный" [ref=e424]
+                  - cell "D01 D01" [ref=e425]:
+                    - 'generic "Услуги: 1. Консультация дерматолога 2. Консультация дерматолога" [ref=e426]':
+                      - generic [ref=e427]: D01
+                      - generic [ref=e428]: D01
+                  - cell "💵 Наличные ⏳" [ref=e429]:
+                    - generic [ref=e430]:
+                      - generic [ref=e431]:
+                        - generic [ref=e432]: 💵
+                        - generic [ref=e433]: Наличные
+                      - generic [ref=e434]: ⏳
+                  - cell "28.03.2026 10:44:56" [ref=e435]:
+                    - generic [ref=e437]:
+                      - generic [ref=e438]:
+                        - img [ref=e439]
+                        - text: 28.03.2026
+                      - generic [ref=e441]:
+                        - img [ref=e442]
+                        - text: 10:44:56
+                  - cell "⏳ В очереди" [ref=e445]:
+                    - generic "В очереди" [ref=e446]:
+                      - generic [ref=e447]: ⏳
+                      - generic [ref=e448]: В очереди
+                  - cell "50 000 сум" [ref=e449]
+                  - cell "💸 Оплата 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e450]:
+                    - generic [ref=e451]:
+                      - button "💸 Оплата" [ref=e452]
+                      - button "📢 Вызвать" [ref=e453]
+                      - button "Печать" [ref=e454]:
+                        - img [ref=e455]
+                      - button "Просмотр" [ref=e458]:
+                        - img [ref=e459]
+                      - button "Редактировать" [ref=e462]:
+                        - img [ref=e463]
+                      - button "Еще" [ref=e466]:
+                        - img [ref=e467]
+  - region "Notifications Alt+T"

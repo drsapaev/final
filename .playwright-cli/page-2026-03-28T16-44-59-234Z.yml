@@ -1,0 +1,148 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e133]:
+          - img [ref=e134]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e136]
+        - button "Dentist User" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - text: Dentist User
+        - button "Выйти" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]:
+            - img [ref=e50]
+            - text: Выйти
+    - generic [ref=e53]:
+      - complementary [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Медицинская система
+          - button "Collapse sidebar" [ref=e58] [cursor=pointer]:
+            - img [ref=e60]
+        - navigation [ref=e63]:
+          - button "Dashboard" [ref=e64] [cursor=pointer]:
+            - img [ref=e65]
+            - generic [ref=e68]: Dashboard
+          - button "Patients" [ref=e69] [cursor=pointer]:
+            - img [ref=e70]
+            - generic [ref=e73]: Patients
+          - button "Appointments" [ref=e74] [cursor=pointer]:
+            - img [ref=e75]
+            - generic [ref=e78]: Appointments
+          - button "Examinations" [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e83]: Examinations
+          - button "Diagnoses" [ref=e84] [cursor=pointer]:
+            - img [ref=e85]
+            - generic [ref=e88]: Diagnoses
+          - button "Visit Protocols" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e95]: Visit Protocols
+          - button "Photo Archive" [ref=e96] [cursor=pointer]:
+            - img [ref=e97]
+            - generic [ref=e100]: Photo Archive
+          - button "Templates" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Templates
+          - button "Reports" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Reports
+          - button "Dental Chart" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Dental Chart
+          - button "Treatment Plans" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Treatment Plans
+          - button "Prosthetics" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e125]: Prosthetics
+          - button "AI Assistant" [ref=e126] [cursor=pointer]:
+            - img [ref=e127]
+            - generic [ref=e130]: AI Assistant
+      - main [ref=e131]:
+        - generic [ref=e142]:
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - heading "Записи к стоматологу" [level=3] [ref=e146]:
+                - img [ref=e147]
+                - text: Записи к стоматологу
+              - generic [ref=e149]:
+                - generic [ref=e150]: "Всего: 0"
+                - generic [ref=e151]: "Ожидают: 0"
+                - generic [ref=e152]: "Вызваны: 0"
+                - generic [ref=e153]: "Приняты: 0"
+                - button "Обновить" [ref=e154] [cursor=pointer]:
+                  - generic [ref=e155]:
+                    - img [ref=e156]
+                    - text: Обновить
+            - generic [ref=e161]:
+              - generic [ref=e163]:
+                - generic [ref=e165]:
+                  - img
+                  - textbox "Поиск" [ref=e166]
+                - combobox [ref=e167] [cursor=pointer]:
+                  - option "Фильтр" [selected]
+                  - option "Запланирован"
+                  - option "Подтвержден"
+                  - option "В очереди"
+                  - option "В кабинете"
+                  - option "Завершен"
+                  - option "Отменен"
+                  - option "Ожидает оплаты"
+                  - option "Платный"
+                - button "Экспорт" [ref=e168] [cursor=pointer]:
+                  - generic [ref=e169]:
+                    - img [ref=e170]
+                    - text: Экспорт
+              - table [ref=e174]:
+                - rowgroup [ref=e175]:
+                  - row "№ Пациент Г.р. Тип Услуги Оплата Дата Статус Стоимость Действия" [ref=e176]:
+                    - columnheader "№" [ref=e177] [cursor=pointer]:
+                      - generic [ref=e178]: №
+                    - columnheader "Пациент" [ref=e179] [cursor=pointer]:
+                      - generic [ref=e180]: Пациент
+                    - columnheader "Г.р." [ref=e181] [cursor=pointer]:
+                      - generic [ref=e182]: Г.р.
+                    - columnheader "Тип" [ref=e183]
+                    - columnheader "Услуги" [ref=e184]
+                    - columnheader "Оплата" [ref=e185]
+                    - columnheader "Дата" [ref=e186] [cursor=pointer]:
+                      - generic [ref=e187]: Дата
+                    - columnheader "Статус" [ref=e188] [cursor=pointer]:
+                      - generic [ref=e189]: Статус
+                    - columnheader "Стоимость" [ref=e190] [cursor=pointer]:
+                      - generic [ref=e191]: Стоимость
+                    - columnheader "Действия" [ref=e192]
+                - rowgroup [ref=e193]:
+                  - row "Нет данных" [ref=e194]:
+                    - cell "Нет данных" [ref=e195]
+          - button "💬 AI" [ref=e196] [cursor=pointer]:
+            - generic [ref=e197]: 💬
+            - generic [ref=e198]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e199]:
+    - generic [ref=e200]:
+      - img [ref=e201]
+      - generic [ref=e204]:
+        - strong [ref=e205]: Включить уведомления?
+        - generic [ref=e206]: Получайте уведомления о новых сообщениях
+    - generic [ref=e207]:
+      - button "Включить" [ref=e208] [cursor=pointer]
+      - button "Закрыть" [ref=e209] [cursor=pointer]:
+        - img [ref=e210]
