@@ -200,7 +200,7 @@ const MacOSMetricCard = ({
   };
 
   const renderLoading = () =>
-  <div style={cardStyle}>
+  <div style={cardStyle} aria-busy="true">
       <div style={headerStyle}>
         <div style={{
         width: '60%',

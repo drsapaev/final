@@ -142,6 +142,7 @@ const Button = React.forwardRef(({
       className={className}
       style={combinedStyle}
       disabled={disabled || loading}
+      aria-busy={loading}
       {...props}>
       
       {loading &&
