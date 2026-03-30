@@ -15,7 +15,9 @@ const { apiMock } = vi.hoisted(() => {
 });
 
 vi.mock('../../api/client.js', () => ({
+  default: apiMock,
   api: apiMock,
+  apiClient: apiMock,
 }));
 
 function ThemeHarness() {
