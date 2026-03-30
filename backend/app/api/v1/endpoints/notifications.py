@@ -55,6 +55,42 @@ def _combine_date_and_time(date_value, time_value: str | None) -> datetime:
     return datetime.combine(date_value, parsed_time)
 
 
+def _validate_recipient_scope(
+    *,
+    platform_service,
+    current_user: User,
+    recipient_id: Optional[int],
+    recipient_type: Optional[str],
+) -> None:
+    expected_recipient_id = current_user.id
+    expected_recipient_type = platform_service.resolve_panel_role_for_user(current_user)
+    normalized_recipient_type = platform_service.normalize_role(recipient_type)
+
+    if recipient_id is not None and recipient_id != expected_recipient_id:
+        logger.warning(
+            "[Notifications] rejected cross-recipient inbox request",
+            extra={
+                "current_user_id": current_user.id,
+                "requested_recipient_id": recipient_id,
+                "requested_recipient_type": recipient_type,
+            },
+        )
+        raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+    if normalized_recipient_type and expected_recipient_type:
+        if normalized_recipient_type != expected_recipient_type:
+            logger.warning(
+                "[Notifications] rejected mismatched inbox recipient type",
+                extra={
+                    "current_user_id": current_user.id,
+                    "requested_recipient_id": recipient_id,
+                    "requested_recipient_type": recipient_type,
+                    "expected_recipient_type": expected_recipient_type,
+                },
+            )
+            raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+
 def get_or_create_notification_settings(db: Session, user_id: int):
     settings = crud_user_notification_settings.get_by_user_id(db, user_id=user_id)
     if settings:
@@ -395,15 +431,12 @@ async def get_notification_history(
 ):
     """Получение inbox/history текущего пользователя."""
     platform_service = get_notification_platform_service(db)
-    if recipient_id is not None and recipient_id != current_user.id:
-        logger.warning(
-            "[Notifications] ignoring cross-recipient inbox request",
-            extra={
-                "current_user_id": current_user.id,
-                "requested_recipient_id": recipient_id,
-                "requested_recipient_type": recipient_type,
-            },
-        )
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
 
     return platform_service.get_inbox(
         current_user=current_user,
@@ -428,11 +461,19 @@ async def sync_notifications(
     search: Optional[str] = Query(None),
     cursor: Optional[int] = Query(None),
     limit: int = Query(50, ge=1, le=200),
+    recipient_id: Optional[int] = Query(None),
+    recipient_type: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Cursor-based inbox resync."""
     platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
     return platform_service.get_inbox(
         current_user=current_user,
         role=role,
@@ -450,11 +491,19 @@ async def sync_notifications(
 async def get_unread_notification_count(
     role: Optional[str] = Query(None),
     department_key: Optional[str] = Query(None),
+    recipient_id: Optional[int] = Query(None),
+    recipient_type: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Server-authoritative unread counts."""
     platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
     return platform_service.get_unread_counts(
         current_user=current_user,
         role=role,
@@ -538,11 +587,19 @@ async def archive_notification(
 async def mark_all_notifications_read(
     role: Optional[str] = Query(None),
     department_key: Optional[str] = Query(None),
+    recipient_id: Optional[int] = Query(None),
+    recipient_type: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Mark all notifications as read for the current user."""
     platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
     count = await platform_service.mark_all_read(
         current_user=current_user,
         role=role,

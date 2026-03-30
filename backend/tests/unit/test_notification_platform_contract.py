@@ -3,8 +3,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from fastapi import HTTPException
 import pytest
 
+from app.api.v1.endpoints.notifications import _validate_recipient_scope
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.services.notification_platform_service import NotificationPlatformService
 
@@ -105,3 +107,30 @@ async def test_notification_platform_service_creates_persistent_delivery_and_ded
     )
     assert archived_inbox["total"] == 1
     assert archived_inbox["items"][0]["delivery_status"] == "archived"
+
+
+def test_notification_history_scope_rejects_cross_recipient_requests(
+    db_session,
+    admin_user,
+):
+    service = NotificationPlatformService(db_session)
+
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_recipient_scope(
+            platform_service=service,
+            current_user=admin_user,
+            recipient_id=admin_user.id + 1,
+            recipient_type='admin',
+        )
+
+    assert exc_info.value.status_code == 403
+
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_recipient_scope(
+            platform_service=service,
+            current_user=admin_user,
+            recipient_id=admin_user.id,
+            recipient_type='doctor',
+        )
+
+    assert exc_info.value.status_code == 403

@@ -15,10 +15,12 @@ FRONTEND_CENTER_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationCent
 FRONTEND_WS_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationWebSocketContext.jsx"
 FRONTEND_INBOX_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "NotificationInbox.jsx"
 FRONTEND_PROMPT_JSX = ROOT / "frontend" / "src" / "components" / "chat" / "NotificationPrompt.jsx"
+FRONTEND_ROLE_CENTER_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "RoleNotificationCenter.jsx"
 ADMIN_PANEL = ROOT / "frontend" / "src" / "pages" / "AdminPanel.jsx"
 CARDIO_PANEL = ROOT / "frontend" / "src" / "pages" / "CardiologistPanelUnified.jsx"
 DENTIST_PANEL = ROOT / "frontend" / "src" / "pages" / "DentistPanelUnified.jsx"
 DERMA_PANEL = ROOT / "frontend" / "src" / "pages" / "DermatologistPanelUnified.jsx"
+LAB_PANEL = ROOT / "frontend" / "src" / "pages" / "LabPanel.jsx"
 
 ROUTE_PATTERN = re.compile(r'@router\.(get|post|put|patch|delete)\("([^"]+)"')
 
@@ -96,6 +98,7 @@ def test_frontend_notifications_context_and_inbox_use_canonical_delivery_model()
     center = FRONTEND_CENTER_JSX.read_text(encoding="utf-8")
     inbox = FRONTEND_INBOX_JSX.read_text(encoding="utf-8")
     ws = FRONTEND_WS_JSX.read_text(encoding="utf-8")
+    role_center = FRONTEND_ROLE_CENTER_JSX.read_text(encoding="utf-8")
 
     for marker in [
         "queue_update: 'queue_changed'",
@@ -129,6 +132,13 @@ def test_frontend_notifications_context_and_inbox_use_canonical_delivery_model()
     ]:
         assert marker in ws
 
+    for marker in [
+        "getProfile()",
+        "recipient_id",
+        "recipient_type",
+    ]:
+        assert marker in role_center
+
 
 @pytest.mark.unit
 def test_frontend_notifications_prompt_uses_safe_notification_checks() -> None:
@@ -141,7 +151,7 @@ def test_frontend_notifications_prompt_uses_safe_notification_checks() -> None:
 
 @pytest.mark.unit
 def test_role_panels_use_shared_notification_center_without_direct_toasts() -> None:
-    page_files = [ADMIN_PANEL, CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL]
+    page_files = [ADMIN_PANEL, CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL, LAB_PANEL]
 
     for path in page_files:
         content = path.read_text(encoding="utf-8")

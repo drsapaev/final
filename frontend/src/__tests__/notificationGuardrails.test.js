@@ -16,7 +16,8 @@ const PANEL_FILES = [
   'pages/AdminPanel.jsx',
   'pages/CardiologistPanelUnified.jsx',
   'pages/DentistPanelUnified.jsx',
-  'pages/DermatologistPanelUnified.jsx'
+  'pages/DermatologistPanelUnified.jsx',
+  'pages/LabPanel.jsx'
 ];
 
 function read(filePath) {
