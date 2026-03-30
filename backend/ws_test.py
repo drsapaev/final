@@ -13,7 +13,7 @@ async def test_ws_noauth():
     """Тест WebSocket без аутентификации"""
     print("🔌 Тестирую /ws/noauth...")
     try:
-async with websockets.connect("ws://127.0.0.1:18000/ws/noauth") as ws:
+        async with websockets.connect("ws://127.0.0.1:18000/ws/noauth") as ws:
             # Получаем приветственное сообщение
             msg = await ws.recv()
             data = json.loads(msg)
@@ -35,7 +35,7 @@ async def test_ws_queue():
     print("\n🔌 Тестирую /ws/queue...")
     try:
         # Подключаемся с параметрами и заголовками
-uri = "ws://127.0.0.1:18000/ws/queue?department=ENT&date=2025-08-28"
+        uri = "ws://127.0.0.1:18000/ws/queue?department=ENT&date=2025-08-28"
         headers = {"Origin": "http://localhost:5173"}
         async with websockets.connect(uri, additional_headers=headers) as ws:
             # Получаем приветственное сообщение
@@ -55,7 +55,7 @@ async def test_ws_dev_queue():
     """Тест dev WebSocket очереди"""
     print("\n🔌 Тестирую /ws/dev-queue...")
     try:
-uri = "ws://127.0.0.1:18000/ws/dev-queue?department=ENT&date=2025-08-28"
+        uri = "ws://127.0.0.1:18000/ws/dev-queue?department=ENT&date=2025-08-28"
         headers = {"Origin": "http://localhost:5173"}
         async with websockets.connect(uri, additional_headers=headers) as ws:
             # Получаем приветственное сообщение
