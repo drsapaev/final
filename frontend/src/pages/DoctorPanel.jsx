@@ -47,6 +47,7 @@ import useDoctorQueue from '../hooks/useDoctorQueue.js';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiOrigin } from '../api/runtime';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -1576,6 +1577,7 @@ const DoctorPanel = () => {
         useWebSocket={false}
         position="bottom-right" />
 
+      <RoleNotificationCenter role="doctor" />
     </div>);
 
 };

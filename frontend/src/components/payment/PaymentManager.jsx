@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { CreditCard, DollarSign, Receipt, Clock, CheckCircle } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
+import notify from '../../services/notify';
 import './PaymentManager.css';
 
 const API_BASE = '/api/v1';
@@ -48,11 +48,11 @@ const PaymentManager = ({
         const data = await response.json();
         setInvoices(data);
       } else {
-        toast.error('Ошибка загрузки счетов');
+        notify.error('Ошибка загрузки счетов');
       }
     } catch (error) {
       logger.error('Ошибка загрузки счетов:', error);
-      toast.error('Ошибка загрузки данных');
+      notify.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ const PaymentManager = ({
   // Создание нового счета для оплаты
   const createPaymentInvoice = async () => {
     if (!paymentAmount || paymentAmount <= 0) {
-      toast.error('Введите корректную сумму оплаты');
+      notify.error('Введите корректную сумму оплаты');
       return;
     }
 
@@ -93,14 +93,14 @@ const PaymentManager = ({
           setShowPayMePayment(true);
         }
 
-        toast.success('Счет создан, переходим к оплате');
+        notify.success('Счет создан, переходим к оплате');
       } else {
         const errorData = await response.json();
-        toast.error(`Ошибка создания счета: ${errorData.detail || 'Неизвестная ошибка'}`);
+        notify.error(`Ошибка создания счета: ${errorData.detail || 'Неизвестная ошибка'}`);
       }
     } catch (error) {
       logger.error('Ошибка создания счета:', error);
-      toast.error('Ошибка создания счета');
+      notify.error('Ошибка создания счета');
     } finally {
       setLoading(false);
     }
@@ -120,7 +120,7 @@ const PaymentManager = ({
 
   // Обработчики успешной оплаты
   const handlePaymentSuccess = (paymentData) => {
-    toast.success('Оплата завершена успешно!');
+    notify.success('Оплата завершена успешно!');
     setShowClickPayment(false);
     setShowPayMePayment(false);
     loadPendingInvoices(); // Обновляем список счетов
@@ -132,7 +132,7 @@ const PaymentManager = ({
   };
 
   const handlePaymentError = (error) => {
-    toast.error(`Ошибка оплаты: ${error.message}`);
+    notify.error(`Ошибка оплаты: ${error.message}`);
     setShowClickPayment(false);
     setShowPayMePayment(false);
   };

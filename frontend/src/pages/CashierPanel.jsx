@@ -17,6 +17,7 @@ import { getApiOrigin } from '../api/runtime';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
+import notify from '../services/notify';
 import {
   Dialog,
   DialogTitle,
@@ -436,7 +437,7 @@ const CashierPanel = () => {void
         });
       }
 
-      alert(`✅ Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
+      notify.success(`Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
       paymentModal.closeModal();
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
@@ -445,7 +446,7 @@ const CashierPanel = () => {void
       logger.error('Ошибка обработки платежа:', error);
       const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
       setPaymentError(message);
-      alert(`❌ ${message}`);
+      notify.error(message);
     }
   };
 
@@ -460,7 +461,7 @@ const CashierPanel = () => {void
       setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
-      alert(`❌ ${getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.')}`);
+      notify.error(getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -478,13 +479,13 @@ const CashierPanel = () => {void
       if (result.success) {
         setCancelDialogOpen(false);
         setConfirmingPaymentId(null);
-        alert('Платёж отменён');
+        notify.info('Платёж отменён');
         triggerDataReload();
       } else {
-        alert(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+        notify.error(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
       }
     } catch (error) {
-      alert(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -497,7 +498,7 @@ const CashierPanel = () => {void
     });
 
       if (!result.success) {
-        alert(
+        notify.error(
           getErrorMessage(
             result.error,
             'Не удалось экспортировать платежи. Проверьте соединение и попробуйте снова.'
@@ -530,7 +531,7 @@ const CashierPanel = () => {void
   // ✅ v2.0: Обработчик возврата
   const handleRefund = async () => {
     if (!refundAmount || !refundReason || refundReason.length < 3) {
-      alert('Укажите сумму возврата и причину (минимум 3 символа)');
+      notify.warning('Укажите сумму возврата и причину (минимум 3 символа)');
       return;
     }
     try {
@@ -543,13 +544,13 @@ const CashierPanel = () => {void
         setRefundPaymentId(null);
         setRefundReason('');
         setRefundAmount('');
-        alert(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
+        notify.success(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
         triggerDataReload();
       } else {
-        alert(getErrorMessage(result.error, 'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'));
+        notify.error(getErrorMessage(result.error, 'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'));
       }
     } catch (error) {
-      alert(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -557,7 +558,7 @@ const CashierPanel = () => {void
   const handlePrintReceipt = async (paymentId) => {
     const result = await paymentsHook.getReceipt(paymentId);
     if (!result.success) {
-      alert(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -572,7 +573,7 @@ const CashierPanel = () => {void
       setHourlyStats(result.data);
       setShowHourlyChart(true);
     } else {
-      alert(getErrorMessage(result.error, 'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(result.error, 'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'));
     }
   };
 

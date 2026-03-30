@@ -33,12 +33,13 @@ import PriceOverrideManager from '../components/dermatology/PriceOverrideManager
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import { queueService } from '../services/queue';
-import { toast } from 'react-toastify';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import notify from '../services/notify';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -635,7 +636,7 @@ const DermatologistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
         break;
       case 'print':
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
@@ -931,7 +932,7 @@ const DermatologistPanelUnified = () => {
           setCurrentAppointment(nextPatient);
           setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
           urlResolutionRef.current.notified = false;
-          toast.info(`Загружен пациент: ${patientObj.patient_name}. Выберите визит с каноническим visit_id.`);
+          notify.info(`Загружен пациент: ${patientObj.patient_name}. Выберите визит с каноническим visit_id.`);
           return true;
         };
 
@@ -959,7 +960,7 @@ const DermatologistPanelUnified = () => {
           setSelectedPatient(null);
           setCurrentAppointment(null);
           setActiveTab('appointments');
-          toast.info(
+          notify.info(
             visitIdFromUrl
               ? 'Не удалось найти визит в очереди дерматологии. Выберите запись вручную.'
               : 'Пациент не найден в очереди дерматологии. Выберите запись вручную.'
@@ -967,7 +968,7 @@ const DermatologistPanelUnified = () => {
         }
       } catch (error) {
         logger.error('[Dermatology] Не удалось загрузить пациента из URL:', error);
-        toast.error('Не удалось загрузить пациента');
+        notify.error('Не удалось загрузить пациента');
       }
     };
 
@@ -1066,14 +1067,14 @@ const DermatologistPanelUnified = () => {
       if (response.ok) {
         const savedPrescription = await response.json();
         setPrescription(savedPrescription);
-        toast.success('Рецепт сохранен успешно!');
+        notify.success('Рецепт сохранен успешно!');
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Ошибка при сохранении рецепта');
+        notify.error(error.detail || 'Ошибка при сохранении рецепта');
       }
     } catch (error) {
       logger.error('DermatologistPanel: Save prescription error:', error);
-      toast.error('Ошибка при сохранении рецепта');
+      notify.error('Ошибка при сохранении рецепта');
     }
   };
 
@@ -1083,10 +1084,10 @@ const DermatologistPanelUnified = () => {
   const handleAISuggestion = (type, suggestion) => {
     if (type === 'icd10') {
       setVisitData({ ...visitData, icd10: suggestion });
-      toast.success('Код МКБ-10 добавлен из AI предложения');
+        notify.success('Код МКБ-10 добавлен из AI предложения');
     } else if (type === 'diagnosis') {
       setVisitData({ ...visitData, diagnosis: suggestion });
-      toast.success('Диагноз добавлен из AI предложения');
+        notify.success('Диагноз добавлен из AI предложения');
     }
   };
 
@@ -1096,7 +1097,7 @@ const DermatologistPanelUnified = () => {
     const entryId = selectedPatient?.id || currentAppointment?.id;
     if (!entryId) {
       logger.error('[Dermатology] handleSaveVisit: нет entryId');
-      toast.error('Не выбран пациент для завершения приема');
+      notify.error('Не выбран пациент для завершения приема');
       return;
     }
 
@@ -1124,7 +1125,7 @@ const DermatologistPanelUnified = () => {
       await queueService.completeVisit(entryId, visitPayload);
       logger.info('[Dermatology] handleSaveVisit: completeVisit OK');
 
-      toast.success('Прием завершен успешно');
+      notify.success('Прием завершен успешно');
 
       // Очищаем форму и состояние
       setSelectedPatient(null);
@@ -1141,7 +1142,7 @@ const DermatologistPanelUnified = () => {
         const next = await queueService.callNextWaiting('derma');
         logger.info('[Dermatology] callNextWaiting(derma): result', next);
         if (next?.success) {
-          toast.success(`Вызван следующий пациент №${next.entry.number}`);
+            notify.success(`Вызван следующий пациент №${next.entry.number}`);
         }
       } catch (err) {
         logger.warn('[Dermatology] callNextWaiting(derma): failed', err);
@@ -1149,7 +1150,7 @@ const DermatologistPanelUnified = () => {
 
     } catch (error) {
       logger.error('[Dermatology] handleSaveVisit: error', error);
-      toast.error(error.message || 'Ошибка при завершении приема');
+      notify.error(error.message || 'Ошибка при завершении приема');
     } finally {
       logger.info('[Dermatology] handleSaveVisit: finish');
       setLoading(false);
@@ -1191,15 +1192,15 @@ const DermatologistPanelUnified = () => {
           treatment_plan: ''
         });
         loadPatientData();
-        toast.success('Осмотр кожи сохранен успешно');
+        notify.success('Осмотр кожи сохранен успешно');
       } else {
         const detail = await response.text();
         logger.error('[Dermatology] Ошибка ответа при сохранении осмотра', { status: response.status, detail });
-        toast.error('Ошибка сохранения осмотра кожи');
+        notify.error('Ошибка сохранения осмотра кожи');
       }
     } catch (error) {
       logger.error('Ошибка сохранения осмотра:', error);
-      toast.error('Ошибка сохранения осмотра кожи');
+      notify.error('Ошибка сохранения осмотра кожи');
     }
   };
 
@@ -1236,15 +1237,15 @@ const DermatologistPanelUnified = () => {
           follow_up: ''
         });
         loadPatientData();
-        toast.success('Косметическая процедура сохранена успешно');
+        notify.success('Косметическая процедура сохранена успешно');
       } else {
         const detail = await response.text();
         logger.error('[Dermatology] Ошибка ответа при сохранении процедуры', { status: response.status, detail });
-        toast.error('Ошибка сохранения косметической процедуры');
+        notify.error('Ошибка сохранения косметической процедуры');
       }
     } catch (error) {
       logger.error('Ошибка сохранения процедуры:', error);
-      toast.error('Ошибка сохранения косметической процедуры');
+      notify.error('Ошибка сохранения косметической процедуры');
     }
   };
 
@@ -2453,7 +2454,7 @@ const DermatologistPanelUnified = () => {
                             });
                             setShowPriceOverride(true);
                           } else {
-                            alert('Сначала выберите услугу');
+                            notify.warning('Сначала выберите услугу');
                           }
                         }}
                         variant="primary"
@@ -2732,6 +2733,7 @@ const DermatologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
+        <RoleNotificationCenter role="dermatologist" />
       </div>
     </div>);
 

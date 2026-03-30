@@ -593,32 +593,19 @@ export const settingsService = {
  */
 export const notificationsService = {
   /**
-   * Получение списка уведомлений
+   * История уведомлений (inbox): GET /notifications/history
+   */
+  async getHistory(params = {}) {
+    const queryString = buildQueryString(params);
+    const suffix = queryString ? `?${queryString}` : '';
+    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.HISTORY}${suffix}`);
+  },
+
+  /**
+   * Обратная совместимость: getNotifications -> history
    */
   async getNotifications(params = {}) {
-    const queryString = buildQueryString(params);
-    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`);
-  },
-
-  /**
-   * Получение уведомления по ID
-   */
-  async getNotification(id) {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.GET(id));
-  },
-
-  /**
-   * Отметка как прочитанное
-   */
-  async markAsRead(id) {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
-  },
-
-  /**
-   * Отметка всех как прочитанных
-   */
-  async markAllAsRead() {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
+    return notificationsService.getHistory(params);
   },
 
   /**
@@ -631,10 +618,31 @@ export const notificationsService = {
   },
 
   /**
-   * Получение типов уведомлений
+   * Метод не поддерживается backend контрактом /notifications
+   */
+  async getNotification() {
+    throw new Error('[FIX:NOTIFICATIONS] get by id is not supported by /notifications contract');
+  },
+
+  /**
+   * Метод не поддерживается backend контрактом /notifications
+   */
+  async markAsRead() {
+    throw new Error('[FIX:NOTIFICATIONS] mark as read is not supported by /notifications contract');
+  },
+
+  /**
+   * Метод не поддерживается backend контрактом /notifications
+   */
+  async markAllAsRead() {
+    throw new Error('[FIX:NOTIFICATIONS] mark all as read is not supported by /notifications contract');
+  },
+
+  /**
+   * Метод не поддерживается backend контрактом /notifications
    */
   async getNotificationTypes() {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.TYPES);
+    throw new Error('[FIX:NOTIFICATIONS] notification types are not supported by /notifications contract');
   }
 };
 

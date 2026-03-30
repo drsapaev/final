@@ -10,11 +10,11 @@ import {
   Printer } from
 'lucide-react';
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
-import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { getApiBaseUrl } from '../../api/runtime';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
+import notify from '../../services/notify';
 import './PaymentPayMe.css';
 
 const API_BASE = getApiBaseUrl();
@@ -157,7 +157,7 @@ const PaymentPayMe = ({
         clearPolling();
         setPaymentState('failed');
         setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
-        toast.error('Время ожидания истекло');
+        notify.error('Время ожидания истекло');
       }
     }, pollingIntervalMs);
   };
@@ -175,7 +175,7 @@ const PaymentPayMe = ({
         // Получаем данные для печати талонов
         await loadPrintTickets();
 
-        toast.success('Платёж успешно завершён!');
+        notify.success('Платёж успешно завершён!');
 
         // Показываем принтер талонов если есть талоны для печати
         if (printTickets.length > 0) {
@@ -615,7 +615,7 @@ const PaymentPayMe = ({
           onClose={() => setShowTicketPrinter(false)}
           onAllPrinted={() => {
             setShowTicketPrinter(false);
-            toast.success('Все талоны напечатаны!');
+            notify.success('Все талоны напечатаны!');
           }} />
         
       </ModernDialog>

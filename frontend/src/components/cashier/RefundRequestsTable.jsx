@@ -20,6 +20,7 @@ import {
   CreditCard } from
 'lucide-react';
 import { Badge } from '../ui/macos';
+import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 
@@ -94,7 +95,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Approve error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -124,7 +125,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Reject error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -153,7 +154,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Complete error:', err);
-      alert('Ошибка: ' + err.message);
+      notify.error('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
