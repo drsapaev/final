@@ -591,34 +591,83 @@ export const settingsService = {
 /**
  * Сервис уведомлений
  */
+function appendQuery(endpoint, params = {}) {
+  const queryString = buildQueryString(params);
+  return queryString ? `${endpoint}?${queryString}` : endpoint;
+}
+
 export const notificationsService = {
   /**
-   * Получение списка уведомлений
+   * Persistent inbox
+   */
+  async getInbox(params = {}) {
+    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.INBOX, params));
+  },
+
+  /**
+   * Cursor-based inbox sync
+   */
+  async getSync(params = {}) {
+    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.SYNC, params));
+  },
+
+  /**
+   * Legacy compatibility alias
+   */
+  async getHistory(params = {}) {
+    return notificationsService.getInbox(params);
+  },
+
+  /**
+   * Backward compatibility for older callers
    */
   async getNotifications(params = {}) {
-    const queryString = buildQueryString(params);
-    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`);
+    return notificationsService.getInbox(params);
   },
 
   /**
-   * Получение уведомления по ID
+   * Server-authoritative unread counts
    */
-  async getNotification(id) {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.GET(id));
+  async getUnreadCount(params = {}) {
+    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.UNREAD_COUNT, params));
   },
 
   /**
-   * Отметка как прочитанное
+   * Mark a notification as seen
+   */
+  async markSeen(id) {
+    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_SEEN(id));
+  },
+
+  /**
+   * Mark a notification as read
    */
   async markAsRead(id) {
     return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
   },
 
   /**
-   * Отметка всех как прочитанных
+   * Archive a notification
    */
-  async markAllAsRead() {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
+  async archiveNotification(id) {
+    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.ARCHIVE(id));
+  },
+
+  /**
+   * Mark all notifications as read
+   */
+  async markAllAsRead(params = {}) {
+    return apiRequest('POST', appendQuery(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ, params));
+  },
+
+  /**
+   * Notification stats for admin dashboards
+   */
+  async getStats(days = 7) {
+    return apiRequest(
+      'GET',
+      appendQuery(API_ENDPOINTS.NOTIFICATIONS.HISTORY_STATS, { days })
+    );
   },
 
   /**
@@ -631,10 +680,17 @@ export const notificationsService = {
   },
 
   /**
-   * Получение типов уведомлений
+   * Method intentionally unsupported by the canonical contract
+   */
+  async getNotification() {
+    throw new Error('[FIX:NOTIFICATIONS] get by id is not supported by /notifications contract');
+  },
+
+  /**
+   * Method intentionally unsupported by the canonical contract
    */
   async getNotificationTypes() {
-    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.TYPES);
+    throw new Error('[FIX:NOTIFICATIONS] notification types are not supported by /notifications contract');
   }
 };
 

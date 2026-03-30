@@ -99,6 +99,8 @@ from .lab import (
 )
 from .message import Message
 from .notification import (
+    NotificationDelivery,
+    NotificationEvent,
     NotificationHistory,
     NotificationTemplate,
 )
@@ -239,6 +241,8 @@ __all__ = [
     "LabReportValue",
     "LabResult",
     "AuditLog",
+    "NotificationEvent",
+    "NotificationDelivery",
     "NotificationTemplate",
     "NotificationHistory",
     "Message",

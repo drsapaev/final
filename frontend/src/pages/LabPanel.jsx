@@ -9,6 +9,7 @@ import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_V1_BASE = getApiBaseUrl();
 
@@ -464,6 +465,8 @@ export default function LabPanel() {
           notify={notify}
         />
       )}
+
+      <RoleNotificationCenter role="lab" />
     </div>
   );
 }

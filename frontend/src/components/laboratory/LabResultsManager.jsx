@@ -46,6 +46,7 @@ import {
 import { api } from '../../api/client';
 import { AIButton, AIAssistant } from '../ai';
 
+import notify from '../../services/notify';
 import logger from '../../utils/logger';
 // Категории анализов
 const LAB_CATEGORIES = {
@@ -239,7 +240,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
         method: 'telegram'
       });
 
-      alert('Результаты отправлены пациенту');
+      notify.success('Результаты отправлены пациенту');
     } catch (error) {
       logger.error('Ошибка отправки результатов:', error);
     }

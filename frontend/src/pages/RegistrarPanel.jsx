@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -16,6 +15,8 @@ import '../styles/dark-theme-visibility-fix.css';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getApiOrigin } from '../api/runtime';
+import notify from '../services/notify';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_BASE = getApiOrigin();
 
@@ -976,7 +977,7 @@ const RegistrarPanel = () => {
 
     } catch (error) {
       logger.error('Ошибка загрузки интегрированных данных:', error);
-      toast.error('Ошибка загрузки данных из админ панели');
+      notify.error('Ошибка загрузки данных из админ панели');
     } finally {
 
 
@@ -1344,7 +1345,7 @@ const RegistrarPanel = () => {
             }return demoAppointments;});});
         // Показываем уведомление пользователю только при первой загрузке
         if (appointmentsCount === 0) {
-          toast('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
+          notify.info('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
         }
       }
     } finally {
@@ -1741,7 +1742,7 @@ const RegistrarPanel = () => {
           _locallyModified: false
         } : apt
         ));
-        toast.success('Пациент вызван успешно!');
+        notify.success('Пациент вызван успешно!');
 
         // Перезагружаем данные для синхронизации с сервером
         await loadAppointments({ source: 'start_visit_success' });
@@ -1752,7 +1753,7 @@ const RegistrarPanel = () => {
       }
     } catch (error) {
       logger.error('RegistrarPanel: Start visit API error:', error);
-          toast.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
+          notify.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
     }
   }, [loadAppointments]);
 
@@ -1907,17 +1908,17 @@ const RegistrarPanel = () => {
           message += `. Ошибок: ${failedCount}`;
         }
 
-        toast.success(message);
+        notify.success(message);
         // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
         setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
         return paymentResults;
       } else {
-        toast.error('Не удалось оплатить записи');
+        notify.error('Не удалось оплатить записи');
         return paymentResults;
       }
     } catch (error) {
       logger.error('RegistrarPanel: Payment error:', error);
-      toast.error('Ошибка при оплате');
+      notify.error('Ошибка при оплате');
     }
   };
 
@@ -1925,12 +1926,12 @@ const RegistrarPanel = () => {
   const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '') => {
     try {
       if (!appointmentId || Number(appointmentId) <= 0) {
-        toast.error('Некорректный идентификатор записи');
+        notify.error('Некорректный идентификатор записи');
         return;
       }
       const token = tokenManager.getAccessToken();
       if (!token) {
-        toast.error('Требуется вход в систему');
+        notify.error('Требуется вход в систему');
         return;
       }
       let url = '';
@@ -1965,7 +1966,7 @@ const RegistrarPanel = () => {
           _cancelReason: reason
         } : apt
         ));
-        toast.success('Запись отменена (локально)');
+        notify.success('Запись отменена (локально)');
         return { id: appointmentId, status: 'cancelled' };
       } else if (status === 'confirmed') {
         // Пока нет API для подтверждения, обновляем локально
@@ -1977,7 +1978,7 @@ const RegistrarPanel = () => {
           _locallyModified: true
         } : apt
         ));
-        toast.success('Запись подтверждена (локально)');
+        notify.success('Запись подтверждена (локально)');
         return { id: appointmentId, status: 'confirmed' };
       } else if (status === 'no_show') {
         // Пока нет API для неявки, обновляем локально
@@ -1990,7 +1991,7 @@ const RegistrarPanel = () => {
           _noShowReason: reason
         } : apt
         ));
-        toast.success('Отмечено как неявка (локально)');
+        notify.success('Отмечено как неявка (локально)');
         return { id: appointmentId, status: 'no_show' };
       } else if (status === 'in_cabinet') {
         if (isFromVisits) {
@@ -2001,7 +2002,7 @@ const RegistrarPanel = () => {
         }
       } else {
         logger.info('Неподдерживаемый статус:', status);
-        toast.error('Изменение данного статуса не поддерживается');
+        notify.error('Изменение данного статуса не поддерживается');
         return;
       }
 
@@ -2033,11 +2034,11 @@ const RegistrarPanel = () => {
       ));
 
       await loadAppointments({ source: 'status_update' });
-      toast.success('Статус обновлен');
+      notify.success('Статус обновлен');
       return updatedAppointment;
     } catch (error) {
       logger.error('RegistrarPanel: Update status error:', error);
-      toast.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
       return null;
     }
   }, [loadAppointments]);
@@ -2057,8 +2058,8 @@ const RegistrarPanel = () => {
     const successCount = results.filter((r) => r.status === 'fulfilled').length;
     const failCount = results.length - successCount;
 
-    if (successCount > 0) toast.success(`Обновлено: ${successCount}`);
-    if (failCount > 0) toast.error(`Ошибок: ${failCount}`);
+    if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
+    if (failCount > 0) notify.error(`Ошибок: ${failCount}`);
     setAppointmentsSelected(new Set());
   }, [appointmentsSelected, updateAppointmentStatus]);
 
@@ -2924,14 +2925,14 @@ const RegistrarPanel = () => {
         break;
       case 'in_cabinet':
         await updateAppointmentStatus(row.id, 'in_cabinet');
-        toast.success('Пациент отправлен в кабинет');
+        notify.success('Пациент отправлен в кабинет');
         break;
       case 'call':
         await handleStartVisit(row);
         break;
       case 'complete':
         await updateAppointmentStatus(row.id, 'done');
-        toast.success('Приём завершён');
+        notify.success('Приём завершён');
         break;
       case 'payment':
         setPaymentDialog({ open: true, row, paid: false, source: 'context' });
@@ -3163,7 +3164,7 @@ const RegistrarPanel = () => {
                             const csvContent = generateCSV(appointments);
                             const filename = `appointments_${getLocalDateString()}.csv`;
                             downloadCSV(csvContent, filename);
-                            toast.success(`Экспортировано ${appointments.length} записей`);
+                            notify.success(`Экспортировано ${appointments.length} записей`);
                           }}
                           style={{
                             display: 'flex',
@@ -3267,7 +3268,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });toast.success('Данные обновлены');}}
+                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="gear" size="small" />
@@ -4122,7 +4123,7 @@ const RegistrarPanel = () => {
 
             if (failCount > 0) {
               logger.warn(`⚠️ Отменено ${successCount}/${idsToCancel.length} записей, ${failCount} ошибок`);
-              toast.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
+              notify.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
             } else {
               logger.info(`✅ Все ${successCount} записи успешно отменены на сервере`);
             }
@@ -4131,9 +4132,9 @@ const RegistrarPanel = () => {
 
             // Если это 404 после всех попыток
             if (error.response?.status === 404) {
-        toast.error(`Не удалось найти запись ${appointmentId} в базе данных`);
+        notify.error(`Не удалось найти запись ${appointmentId} в базе данных`);
             } else {
-      toast.error(getErrorMessage(error, 'Не удалось обновить статус на сервере. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, 'Не удалось обновить статус на сервере. Проверьте соединение и попробуйте снова.'));
             }
             // Don't return here, still update locally to remove from view or let the user know
           }
@@ -4246,12 +4247,12 @@ const RegistrarPanel = () => {
             const message = wizardEditMode ?
             'Запись успешно обновлена!' :
             'Запись успешно создана!';
-            toast.success(message);
+            notify.success(message);
           } catch (error) {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана
             setShowWizard(false);
-            toast.success('Запись создана! Обновите страницу для отображения изменений.');
+            notify.success('Запись создана! Обновите страницу для отображения изменений.');
           }
         }} />
 
@@ -4293,13 +4294,13 @@ const RegistrarPanel = () => {
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
                 logger.info(`Перенос визита ${targetVisitId} на завтра`);
                 await rescheduleTomorrow(targetVisitId);
-                toast.success('Визит успешно перенесен на завтра');
+                notify.success('Визит успешно перенесен на завтра');
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
                 logger.error('Ошибка переноса на завтра:', e);
-    toast.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+    notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
               }
             }}>
                 🌅 {t('tomorrow')}
@@ -4312,7 +4313,7 @@ const RegistrarPanel = () => {
               if (dateStr) {
                 // Simple validation YYYY-MM-DD
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                  toast.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                  notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
                   return;
                 }
 
@@ -4321,13 +4322,13 @@ const RegistrarPanel = () => {
                   const targetVisitId = resolveRescheduleVisitId(rescheduleData);
                   logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
                   await rescheduleVisit(targetVisitId, dateStr);
-                  toast.success(`Визит перенесен на ${dateStr}`);
+                  notify.success(`Визит перенесен на ${dateStr}`);
                   removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                   setRescheduleData(null);
                   loadAppointments({ source: 'reschedule_date' });
                 } catch (e) {
                   logger.error('Ошибка переноса на дату:', e);
-    toast.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+    notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
                 }
               }
             }}>
@@ -4431,9 +4432,11 @@ const RegistrarPanel = () => {
         specialistName={forceMajeureModal.specialistName}
         onSuccess={(action, result) => {
           logger.info('[RegistrarPanel] Force majeure action completed:', action, result);
-          toast.success(action === 'transfer' ? 'Записи перенесены на завтра' : 'Записи отменены с возвратом');
+          notify.success(action === 'transfer' ? 'Записи перенесены на завтра' : 'Записи отменены с возвратом');
           loadAppointments({ source: 'force_majeure' });
         }} />
+
+      <RoleNotificationCenter role="registrar" />
 
     </div>);
 

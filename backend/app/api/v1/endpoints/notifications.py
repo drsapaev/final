@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -6,10 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.crud import patient as patient_crud, visit as visit_crud
-from app.crud.notification import (
-    crud_notification_history,
-    crud_notification_template,
-)
+from app.crud.notification import crud_notification_template
 from app.crud.user_management import (
     user_notification_settings as crud_user_notification_settings,
     user_profile as crud_user_profile,
@@ -17,8 +15,10 @@ from app.crud.user_management import (
 from app.models.user import User
 from app.schemas.notification import (
     BulkNotificationRequest,
-    NotificationHistory,
+    NotificationInboxResponse,
+    NotificationMutationResponse,
     NotificationStatsResponse,
+    NotificationUnreadCountResponse,
     NotificationTemplate,
     NotificationTemplateCreate,
     NotificationTemplateUpdate,
@@ -30,8 +30,65 @@ from app.schemas.user_management import (
     UserNotificationSettingsUpdate,
 )
 from app.services.notifications import notification_sender_service
+from app.services.notification_platform_service import get_notification_platform_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _combine_date_and_time(date_value, time_value: str | None) -> datetime:
+    if date_value is None:
+        return datetime.utcnow()
+
+    if not time_value:
+        return datetime.combine(date_value, datetime.min.time())
+
+    try:
+        parsed_time = datetime.strptime(time_value, "%H:%M").time()
+    except ValueError:
+        logger.warning(
+            "[Notifications] falling back to midnight for invalid visit time",
+            extra={"date": date_value.isoformat(), "time": time_value},
+        )
+        parsed_time = datetime.min.time()
+
+    return datetime.combine(date_value, parsed_time)
+
+
+def _validate_recipient_scope(
+    *,
+    platform_service,
+    current_user: User,
+    recipient_id: Optional[int],
+    recipient_type: Optional[str],
+) -> None:
+    expected_recipient_id = current_user.id
+    expected_recipient_type = platform_service.resolve_panel_role_for_user(current_user)
+    normalized_recipient_type = platform_service.normalize_role(recipient_type)
+
+    if recipient_id is not None and recipient_id != expected_recipient_id:
+        logger.warning(
+            "[Notifications] rejected cross-recipient inbox request",
+            extra={
+                "current_user_id": current_user.id,
+                "requested_recipient_id": recipient_id,
+                "requested_recipient_type": recipient_type,
+            },
+        )
+        raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+    if normalized_recipient_type and expected_recipient_type:
+        if normalized_recipient_type != expected_recipient_type:
+            logger.warning(
+                "[Notifications] rejected mismatched inbox recipient type",
+                extra={
+                    "current_user_id": current_user.id,
+                    "requested_recipient_id": recipient_id,
+                    "requested_recipient_type": recipient_type,
+                    "expected_recipient_type": expected_recipient_type,
+                },
+            )
+            raise HTTPException(status_code=403, detail="Нет прав доступа")
 
 
 def get_or_create_notification_settings(db: Session, user_id: int):
@@ -71,6 +128,8 @@ async def send_appointment_reminder(
         appointment_date,
         doctor_name,
         department,
+        db,
+        patient_id,
     )
 
     return {
@@ -104,10 +163,12 @@ async def send_visit_confirmation(
         notification_sender_service.send_visit_confirmation,
         patient.email,
         patient.phone,
-        visit.date,
+        _combine_date_and_time(visit.visit_date, visit.visit_time),
         "Врач",  # TODO: получить имя врача
         "Отделение",  # TODO: получить название отделения
         queue_number,
+        db,
+        visit.patient_id,
     )
 
     return {
@@ -144,8 +205,10 @@ async def send_payment_notification(
         patient.phone,
         amount,
         currency,
-        visit.date,
+        _combine_date_and_time(visit.visit_date, visit.visit_time),
         "Врач",  # TODO: получить имя врача
+        db,
+        visit.patient_id,
     )
 
     return {
@@ -171,6 +234,8 @@ async def send_queue_update(
         department,
         current_number,
         estimated_wait,
+        None,
+        db,
     )
 
     return {
@@ -188,11 +253,18 @@ async def send_system_alert(
     message: str,
     details: Optional[Dict[str, Any]] = None,
     current_user: User = Depends(require_roles(["admin"])),
+    db: Session = Depends(get_db),
 ):
     """Отправка системного оповещения (только для админов)"""
     # Отправляем уведомление в фоновом режиме
     background_tasks.add_task(
-        notification_sender_service.send_system_alert, alert_type, message, details
+        notification_sender_service.send_system_alert,
+        alert_type,
+        message,
+        details,
+        db,
+        current_user.id,
+        current_user.role,
     )
 
     return {
@@ -340,27 +412,206 @@ async def delete_notification_template(
     return {"message": "Шаблон удален"}
 
 
-# История уведомлений
-@router.get("/history", response_model=List[NotificationHistory])
+# История уведомлений и inbox
+@router.get("/inbox", response_model=NotificationInboxResponse)
+@router.get("/history", response_model=NotificationInboxResponse)
 async def get_notification_history(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    role: Optional[str] = Query(None),
+    status: str = Query("all"),
+    event_type: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    department_key: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    cursor: Optional[int] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
     recipient_id: Optional[int] = Query(None),
     recipient_type: Optional[str] = Query(None),
-    notification_type: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Получение истории уведомлений"""
-    if recipient_id and recipient_type:
-        return crud_notification_history.get_by_recipient(
-            db, recipient_id=recipient_id, recipient_type=recipient_type, limit=limit
+    """Получение inbox/history текущего пользователя."""
+    platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
+
+    return platform_service.get_inbox(
+        current_user=current_user,
+        role=role,
+        status=status,
+        event_type=event_type,
+        severity=severity,
+        department_key=department_key,
+        search=search,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.get("/sync", response_model=NotificationInboxResponse)
+async def sync_notifications(
+    role: Optional[str] = Query(None),
+    status: str = Query("all"),
+    event_type: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    department_key: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    cursor: Optional[int] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    recipient_id: Optional[int] = Query(None),
+    recipient_type: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cursor-based inbox resync."""
+    platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
+    return platform_service.get_inbox(
+        current_user=current_user,
+        role=role,
+        status=status,
+        event_type=event_type,
+        severity=severity,
+        department_key=department_key,
+        search=search,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.get("/unread-count", response_model=NotificationUnreadCountResponse)
+async def get_unread_notification_count(
+    role: Optional[str] = Query(None),
+    department_key: Optional[str] = Query(None),
+    recipient_id: Optional[int] = Query(None),
+    recipient_type: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Server-authoritative unread counts."""
+    platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
+    return platform_service.get_unread_counts(
+        current_user=current_user,
+        role=role,
+        department_key=department_key,
+    )
+
+
+@router.post("/{delivery_id}/seen", response_model=NotificationMutationResponse)
+async def mark_notification_seen(
+    delivery_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark a notification as seen."""
+    platform_service = get_notification_platform_service(db)
+    try:
+        delivery = await platform_service.mark_seen(
+            current_user=current_user, delivery_id=delivery_id
         )
-    elif status:
-        return crud_notification_history.get_by_status(db, status=status, limit=limit)
-    else:
-        return crud_notification_history.get_multi(db, skip=skip, limit=limit)
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Уведомление не найдено")
+
+    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    return NotificationMutationResponse(
+        id=delivery.delivery_id,
+        delivery_status=delivery.delivery_status,
+        unread_count=unread_count,
+        message="Уведомление отмечено как просмотренное",
+    )
+
+
+@router.post("/{delivery_id}/read", response_model=NotificationMutationResponse)
+async def mark_notification_read(
+    delivery_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark a notification as read."""
+    platform_service = get_notification_platform_service(db)
+    try:
+        delivery = await platform_service.mark_read(
+            current_user=current_user, delivery_id=delivery_id
+        )
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Уведомление не найдено")
+
+    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    return NotificationMutationResponse(
+        id=delivery.delivery_id,
+        delivery_status=delivery.delivery_status,
+        unread_count=unread_count,
+        message="Уведомление отмечено как прочитанное",
+    )
+
+
+@router.post("/{delivery_id}/archive", response_model=NotificationMutationResponse)
+async def archive_notification(
+    delivery_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Archive a notification."""
+    platform_service = get_notification_platform_service(db)
+    try:
+        delivery = await platform_service.archive(
+            current_user=current_user, delivery_id=delivery_id
+        )
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Уведомление не найдено")
+
+    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    return NotificationMutationResponse(
+        id=delivery.delivery_id,
+        delivery_status=delivery.delivery_status,
+        unread_count=unread_count,
+        message="Уведомление архивировано",
+    )
+
+
+@router.post("/mark-all-read", response_model=NotificationMutationResponse)
+async def mark_all_notifications_read(
+    role: Optional[str] = Query(None),
+    department_key: Optional[str] = Query(None),
+    recipient_id: Optional[int] = Query(None),
+    recipient_type: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark all notifications as read for the current user."""
+    platform_service = get_notification_platform_service(db)
+    _validate_recipient_scope(
+        platform_service=platform_service,
+        current_user=current_user,
+        recipient_id=recipient_id,
+        recipient_type=recipient_type,
+    )
+    count = await platform_service.mark_all_read(
+        current_user=current_user,
+        role=role,
+        department_key=department_key,
+    )
+    unread_count = platform_service.get_unread_counts(current_user=current_user)["total"]
+    return NotificationMutationResponse(
+        id="mark-all-read",
+        delivery_status="read",
+        unread_count=unread_count,
+        message=f"Отмечено как прочитанное: {count}",
+    )
 
 
 @router.get("/history/stats", response_model=NotificationStatsResponse)
@@ -369,9 +620,9 @@ async def get_notification_stats(
     current_user: User = Depends(require_roles(["admin"])),
     db: Session = Depends(get_db),
 ):
-    """Получение статистики уведомлений"""
-    stats = crud_notification_history.get_stats(db, days=days)
-    recent_activity = crud_notification_history.get_recent(db, hours=24, limit=10)
+    """Получение статистики уведомлений."""
+    platform_service = get_notification_platform_service(db)
+    stats = platform_service.get_stats(days=days)
 
     return NotificationStatsResponse(
         total_sent=stats["total_sent"],
@@ -380,7 +631,7 @@ async def get_notification_stats(
         pending=stats["pending"],
         by_channel=stats["by_channel"],
         by_type=stats["by_type"],
-        recent_activity=recent_activity,
+        recent_activity=stats["recent_activity"],
     )
 
 
@@ -422,7 +673,7 @@ async def update_user_notification_settings(
 
 
 # Отправка уведомлений с шаблонами
-@router.post("/send", response_model=List[NotificationHistory])
+@router.post("/send", response_model=dict[str, Any])
 async def send_notification(
     background_tasks: BackgroundTasks,
     request: SendNotificationRequest,

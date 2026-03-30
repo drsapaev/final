@@ -20,6 +20,7 @@ from app.crud.user_management import (
 from app.models.notification import NotificationHistory
 from app.models.user import User
 from app.schemas.notification import NotificationHistoryCreate
+from app.services.notification_platform_service import get_notification_platform_service
 from app.services.fcm_service import get_fcm_service
 from app.services.notification_websocket import get_notification_ws_manager
 from app.services.telegram.bot import telegram_bot
@@ -47,6 +48,9 @@ class NotificationSenderService:
 
         # Интеграция с FCM
         self.fcm_service = get_fcm_service()
+
+    def _platform_service(self, db: Session):
+        return get_notification_platform_service(db)
 
     async def send_email(
         self, to_email: str, subject: str, body: str, html_body: str | None = None
@@ -151,45 +155,60 @@ class NotificationSenderService:
     ) -> bool:
         """Отправка Push-уведомления (Mobile + WebSocket)"""
         try:
-            # --- WebSocket Integration ---
-            # Attempt to send to connected WebSocket client (In-App Notification)
-            # We try this regardless of DB/User presence if we have user_id,
-            # but user_id is integer so we can try.
-            try:
-                ws_manager = get_notification_ws_manager()
-                ws_payload = {
-                    "type": "notification",
-                    "title": title,
-                    "message": message,
-                    "data": data,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-                await ws_manager.send_json(ws_payload, user_id)
-            except Exception as ws_e:
-                logger.warning(f"Failed to send WebSocket notification to user {user_id}: {ws_e}")
-            # -----------------------------
+            notification_type = data.get("type", "notification") if data else "notification"
+            platform_payload = {
+                "type": notification_type,
+                "title": title,
+                "message": message,
+                "data": data or {},
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
-            # Если передан db, пытаемся отправить Mobile Push и сохранить историю
             if db:
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
+                    logger.warning(
+                        "Push target user not found",
+                        extra={"user_id": user_id, "notification_type": notification_type},
+                    )
                     return False
 
-                # Сохраняем в историю
+                platform_service = self._platform_service(db)
+                await platform_service.record_delivery_for_user(
+                    user=user,
+                    event_type=notification_type,
+                    title=title,
+                    message=message,
+                    source_module="notifications",
+                    recipient_type="patient" if (user.role or "").lower() == "patient" else "user",
+                    payload_snapshot={
+                        "title": title,
+                        "message": message,
+                        "metadata": data or {},
+                    },
+                    transport_type=notification_type,
+                )
+
+                # Legacy audit trail remains for external/mobile channels.
                 try:
                     notification_data = {
-                        "recipient_type": "patient", # Предполагаем пациента
+                        "recipient_type": "patient",
                         "recipient_id": user_id,
                         "recipient_contact": "mobile_app",
-                        "notification_type": data.get("type", "push") if data else "push",
+                        "notification_type": notification_type,
                         "channel": "mobile",
                         "subject": title,
                         "content": message,
                         "status": "sent",
                     }
-                    crud_notification_history.create(db, obj_in=NotificationHistoryCreate(**notification_data))
+                    crud_notification_history.create(
+                        db, obj_in=NotificationHistoryCreate(**notification_data)
+                    )
                 except Exception as hist_e:
-                    logger.error(f"Failed to save notification history: {hist_e}")
+                    logger.error(
+                        "Failed to save notification history",
+                        extra={"user_id": user_id, "error": str(hist_e)},
+                    )
 
                 # Отправляем FCM только если есть токен
                 if user.device_token:
@@ -198,6 +217,15 @@ class NotificationSenderService:
                         title=title,
                         body=message,
                         data=data or {},
+                    )
+            else:
+                try:
+                    ws_manager = get_notification_ws_manager()
+                    await ws_manager.send_json(platform_payload, user_id)
+                except Exception as ws_e:
+                    logger.warning(
+                        "Failed to send WebSocket notification without DB",
+                        extra={"user_id": user_id, "error": str(ws_e)},
                     )
 
             return True
@@ -212,6 +240,8 @@ class NotificationSenderService:
         appointment_date: datetime,
         doctor_name: str,
         department: str,
+        db: Session | None = None,
+        patient_id: int | None = None,
     ) -> dict[str, bool]:
         """Отправка напоминания о записи"""
         subject = "Напоминание о записи к врачу"
@@ -244,6 +274,24 @@ class NotificationSenderService:
         # Отправляем уведомления
         results = {}
 
+        if db and patient_id:
+            from app.models.patient import Patient
+
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.user_id:
+                await self.send_push(
+                    user_id=patient.user_id,
+                    title=subject,
+                    message=f"Запись к {doctor_name} {appointment_date.strftime('%d.%m.%Y в %H:%M')}",
+                    data={
+                        "type": "appointment_reminder",
+                        "appointment_date": appointment_date.isoformat(),
+                        "doctor_name": doctor_name,
+                        "department": department,
+                    },
+                    db=db,
+                )
+
         if patient_email:
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
@@ -262,6 +310,8 @@ class NotificationSenderService:
         doctor_name: str,
         department: str,
         queue_number: int | None = None,
+        db: Session | None = None,
+        patient_id: int | None = None,
     ) -> dict[str, bool]:
         """Отправка подтверждения визита"""
         subject = "Подтверждение визита к врачу"
@@ -305,6 +355,25 @@ class NotificationSenderService:
         # Отправляем уведомления
         results = {}
 
+        if db and patient_id:
+            from app.models.patient import Patient
+
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.user_id:
+                await self.send_push(
+                    user_id=patient.user_id,
+                    title=subject,
+                    message=f"Ваш визит к {doctor_name} подтверждён на {visit_date.strftime('%d.%m.%Y в %H:%M')}",
+                    data={
+                        "type": "visit_confirmation",
+                        "visit_date": visit_date.isoformat(),
+                        "doctor_name": doctor_name,
+                        "department": department,
+                        "queue_number": queue_number,
+                    },
+                    db=db,
+                )
+
         if patient_email:
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
@@ -332,11 +401,26 @@ class NotificationSenderService:
             doctor_name = appointment.doctor.name if appointment.doctor else "Врач"
             specialty = appointment.doctor.specialty if appointment.doctor else ""
             visit_date_str = appointment.appointment_date.strftime('%d.%m.%Y в %H:%M')
+            appointment_datetime = appointment.appointment_date
+            if appointment.appointment_time:
+                try:
+                    appointment_datetime = datetime.combine(
+                        appointment.appointment_date,
+                        datetime.strptime(appointment.appointment_time, "%H:%M").time(),
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Failed to parse appointment time for notification",
+                        extra={
+                            "appointment_id": appointment_id,
+                            "appointment_time": appointment.appointment_time,
+                        },
+                    )
 
             # --- Push Notification Logic ---
             if appointment.patient and appointment.patient.user_id:
                 user = db.query(User).filter(User.id == appointment.patient.user_id).first()
-                if user and user.device_token:
+                if user:
                     title = "Запись подтверждена"
                     message = f"Ваша запись к врачу {doctor_name} на {visit_date_str} подтверждена"
 
@@ -364,9 +448,11 @@ class NotificationSenderService:
             return await self.send_visit_confirmation(
                 patient_email=patient_email,
                 patient_phone=patient_phone,
-                visit_date=appointment.appointment_date,
+                visit_date=appointment_datetime,
                 doctor_name=doctor_name,
-                department=specialty, # Using specialty as department for notification text
+                department=appointment.department or specialty,
+                db=db,
+                patient_id=appointment.patient_id,
             )
 
         except Exception as e:
@@ -381,6 +467,8 @@ class NotificationSenderService:
         currency: str,
         visit_date: datetime,
         doctor_name: str,
+        db: Session | None = None,
+        patient_id: int | None = None,
     ) -> dict[str, bool]:
         """Отправка уведомления об оплате"""
         subject = "Подтверждение оплаты"
@@ -413,6 +501,25 @@ class NotificationSenderService:
         # Отправляем уведомления
         results = {}
 
+        if db and patient_id:
+            from app.models.patient import Patient
+
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.user_id:
+                await self.send_push(
+                    user_id=patient.user_id,
+                    title=subject,
+                    message=f"Оплата {amount} {currency} за визит к {doctor_name} подтверждена",
+                    data={
+                        "type": "payment_notification",
+                        "amount": amount,
+                        "currency": currency,
+                        "visit_date": visit_date.isoformat(),
+                        "doctor_name": doctor_name,
+                    },
+                    db=db,
+                )
+
         if patient_email:
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
@@ -432,28 +539,51 @@ class NotificationSenderService:
         db: Session | None = None,
     ) -> bool:
         """Отправка обновления очереди (Telegram + Push)"""
-        message = f"""
-        📊 <b>Обновление очереди</b>
+        message = (
+            f"📊 Обновление очереди\n\n"
+            f"Отделение: {department}\n"
+            f"Текущий номер: {current_number}\n"
+            f"Примерное время ожидания: {estimated_wait}\n"
+            f"Обновлено: {datetime.now().strftime('%H:%M:%S')}"
+        )
 
-        🏥 Отделение: {department}
-        🎫 Текущий номер: {current_number}
-        ⏱️ Примерное время ожидания: {estimated_wait}
+        if db:
+            platform_service = self._platform_service(db)
+            if patient_id:
+                from app.models.patient import Patient
 
-        Обновлено: {datetime.now().strftime('%H:%M:%S')}
-        """
-
-        # Основная рассылка (в канал/чат отделения, если есть - пока только return telegram logic)
-        # TODO: Если это обновление для КОНКРЕТНОГО пациента (mobile view), отправляем ему лично.
-
-        if patient_id and db:
-             # Отправка конкретному пациенту
-
-             # Push logic if patient has user linked
-             # Assuming patient_id is ID from Patient model
-             # We need User object.
-             # This method signature originally was for GENERAL update.
-             # MobileNotificationService had send_queue_update(patient_id, queue_position, specialty)
-             pass
+                patient = db.query(Patient).filter(Patient.id == patient_id).first()
+                if patient and patient.user_id:
+                    await self.send_push(
+                        user_id=patient.user_id,
+                        title="Обновление очереди",
+                        message=f"Ваша очередь обновлена: #{current_number}",
+                        data={
+                            "type": "queue_update",
+                            "department": department,
+                            "current_number": current_number,
+                            "estimated_wait": estimated_wait,
+                        },
+                        db=db,
+                    )
+            else:
+                targets = platform_service.resolve_users_for_department(department)
+                await platform_service.record_delivery_for_users(
+                    users=targets,
+                    event_type="queue_update",
+                    title="Обновление очереди",
+                    message=message,
+                    source_module="queue",
+                    recipient_type="user",
+                    severity="info",
+                    priority="normal",
+                    payload_snapshot={
+                        "department": department,
+                        "current_number": current_number,
+                        "estimated_wait": estimated_wait,
+                    },
+                    transport_type="queue_update",
+                )
 
         return await self.send_telegram(message)
 
@@ -482,10 +612,10 @@ class NotificationSenderService:
              message = f"Ваша позиция в очереди к {specialty}: #{queue_position}"
 
              # Push
-             if user.device_token:
-                 await self.send_push(
-                     user_id=user.id,
-                     title=title,
+             if user:
+                  await self.send_push(
+                      user_id=user.id,
+                      title=title,
                      message=message,
                      data={
                          "type": "queue_update",
@@ -508,7 +638,13 @@ class NotificationSenderService:
             return False
 
     async def send_system_alert(
-        self, alert_type: str, message: str, details: dict[str, Any] | None = None
+        self,
+        alert_type: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+        db: Session | None = None,
+        actor_id: int | None = None,
+        actor_role: str | None = None,
     ) -> bool:
         """Отправка системного оповещения"""
         alert_message = f"""
@@ -524,6 +660,28 @@ class NotificationSenderService:
                 alert_message += f"• {key}: {value}\n"
 
         alert_message += f"\nВремя: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
+
+        if db:
+            platform_service = self._platform_service(db)
+            admins = platform_service.resolve_users_for_role("admin")
+            await platform_service.record_delivery_for_users(
+                users=admins,
+                event_type="system_alert",
+                title=f"Системное оповещение: {alert_type}",
+                message=message,
+                source_module="system",
+                recipient_type="user",
+                severity="critical" if alert_type.lower() in {"critical", "security"} else "warning",
+                priority="urgent" if alert_type.lower() in {"critical", "security"} else "high",
+                actor_id=actor_id,
+                actor_role=actor_role,
+                payload_snapshot={
+                    "alert_type": alert_type,
+                    "message": message,
+                    "details": details or {},
+                },
+                transport_type="system_alert",
+            )
 
         return await self.send_telegram(alert_message)
 
@@ -580,10 +738,40 @@ class NotificationSenderService:
             content=content,
             related_entity_type=related_entity_type,
             related_entity_id=related_entity_id,
-            metadata=template_data,
+            notification_metadata=template_data,
         )
 
         history = crud_notification_history.create(db, obj_in=history_data)
+
+        if db and recipient_id is not None:
+            platform_service = self._platform_service(db)
+            recipient_user = None
+            if recipient_type == "patient":
+                from app.models.patient import Patient
+
+                patient = db.query(Patient).filter(Patient.id == recipient_id).first()
+                if patient and patient.user_id:
+                    recipient_user = db.query(User).filter(User.id == patient.user_id).first()
+            else:
+                recipient_user = db.query(User).filter(User.id == recipient_id).first()
+
+            if recipient_user:
+                await platform_service.record_delivery_for_user(
+                    user=recipient_user,
+                    event_type=notification_type,
+                    title=subject or "Уведомление",
+                    message=content,
+                    source_module="notifications",
+                    recipient_type=recipient_type,
+                    severity="info",
+                    priority="normal",
+                    entity_type=related_entity_type,
+                    entity_id=related_entity_id,
+                    payload_snapshot={
+                        "template_data": template_data,
+                    },
+                    transport_type=channel,
+                )
 
         # Отправляем уведомление
         success = False
@@ -805,9 +993,6 @@ class NotificationSenderService:
 
         return results
 
-
-        return results
-
     # === Business Logic Methods (Merged from Mobile/Telegram Services) ===
 
     async def send_lab_results_notification(
@@ -835,7 +1020,7 @@ class NotificationSenderService:
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
             # Push
-            if user.device_token:
+            if user:
                 results["push"] = await self.send_push(
                     user_id=user.id,
                     title=subject,
@@ -884,7 +1069,7 @@ class NotificationSenderService:
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
             # Push
-            if user.device_token:
+            if user:
                 results["push"] = await self.send_push(
                     user_id=user.id,
                     title=subject,
@@ -933,7 +1118,7 @@ class NotificationSenderService:
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
             # Push
-            if user.device_token:
+            if user:
                 results["push"] = await self.send_push(
                     user_id=user.id,
                     title=subject,
