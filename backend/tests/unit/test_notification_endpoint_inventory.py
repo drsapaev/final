@@ -7,51 +7,143 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-NOTIFICATIONS_ENDPOINTS_JS = ROOT / "frontend" / "src" / "api" / "endpoints.js"
-NOTIFICATIONS_SERVICES_JS = ROOT / "frontend" / "src" / "api" / "services.js"
 BACKEND_NOTIFICATIONS_PY = ROOT / "backend" / "app" / "api" / "v1" / "endpoints" / "notifications.py"
-
+BACKEND_WS_PY = ROOT / "backend" / "app" / "api" / "v1" / "endpoints" / "notification_websocket.py"
+FRONTEND_ENDPOINTS_JS = ROOT / "frontend" / "src" / "api" / "endpoints.js"
+FRONTEND_SERVICES_JS = ROOT / "frontend" / "src" / "api" / "services.js"
+FRONTEND_CENTER_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationCenterContext.jsx"
+FRONTEND_WS_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationWebSocketContext.jsx"
+FRONTEND_INBOX_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "NotificationInbox.jsx"
+FRONTEND_PROMPT_JSX = ROOT / "frontend" / "src" / "components" / "chat" / "NotificationPrompt.jsx"
+ADMIN_PANEL = ROOT / "frontend" / "src" / "pages" / "AdminPanel.jsx"
+CARDIO_PANEL = ROOT / "frontend" / "src" / "pages" / "CardiologistPanelUnified.jsx"
+DENTIST_PANEL = ROOT / "frontend" / "src" / "pages" / "DentistPanelUnified.jsx"
+DERMA_PANEL = ROOT / "frontend" / "src" / "pages" / "DermatologistPanelUnified.jsx"
 
 ROUTE_PATTERN = re.compile(r'@router\.(get|post|put|patch|delete)\("([^"]+)"')
 
 
 @pytest.mark.unit
-def test_backend_notifications_minimal_inbox_contract_surface() -> None:
+def test_backend_notifications_surface_exposes_persistent_inbox_and_state_routes() -> None:
     content = BACKEND_NOTIFICATIONS_PY.read_text(encoding="utf-8")
     routes = {(method.upper(), path) for method, path in ROUTE_PATTERN.findall(content)}
 
-    assert ("GET", "/history") in routes
-    assert ("POST", "/send") in routes
+    expected_routes = {
+        ("GET", "/inbox"),
+        ("GET", "/history"),
+        ("GET", "/sync"),
+        ("GET", "/unread-count"),
+        ("GET", "/history/stats"),
+        ("POST", "/{delivery_id}/seen"),
+        ("POST", "/{delivery_id}/read"),
+        ("POST", "/{delivery_id}/archive"),
+        ("POST", "/mark-all-read"),
+        ("POST", "/send"),
+    }
+
+    assert expected_routes.issubset(routes)
 
 
 @pytest.mark.unit
-def test_backend_notifications_does_not_expose_legacy_rest_paths() -> None:
-    content = BACKEND_NOTIFICATIONS_PY.read_text(encoding="utf-8")
-    assert '@router.get("/{id}")' not in content
-    assert '@router.post("/{id}/read")' not in content
-    assert '@router.post("/mark-all-read")' not in content
-    assert '@router.get("/types")' not in content
+def test_backend_websocket_surface_keeps_notification_sync_and_ack_envelopes() -> None:
+    content = BACKEND_WS_PY.read_text(encoding="utf-8")
+
+    for marker in [
+        "connection_established",
+        "notification_seen_ack",
+        "notification_read_ack",
+        "notification_archive_ack",
+        "notification_mark_all_read_ack",
+        "notification_sync_response",
+    ]:
+        assert marker in content
 
 
 @pytest.mark.unit
-def test_frontend_notifications_endpoints_follow_backend_minimal_contract() -> None:
-    content = NOTIFICATIONS_ENDPOINTS_JS.read_text(encoding="utf-8")
+def test_frontend_notifications_api_contract_matches_backend_surface() -> None:
+    endpoints = FRONTEND_ENDPOINTS_JS.read_text(encoding="utf-8")
+    services = FRONTEND_SERVICES_JS.read_text(encoding="utf-8")
 
-    assert "HISTORY: '/notifications/history'" in content
-    assert "HISTORY_STATS: '/notifications/history/stats'" in content
-    assert "SEND: '/notifications/send'" in content
+    for marker in [
+        "INBOX: '/notifications/inbox'",
+        "HISTORY: '/notifications/history'",
+        "SYNC: '/notifications/sync'",
+        "UNREAD_COUNT: '/notifications/unread-count'",
+        "MARK_ALL_READ: '/notifications/mark-all-read'",
+        "HISTORY_STATS: '/notifications/history/stats'",
+        "SEND: '/notifications/send'",
+        "MARK_SEEN: (id) => `/notifications/${id}/seen`",
+        "MARK_READ: (id) => `/notifications/${id}/read`",
+        "ARCHIVE: (id) => `/notifications/${id}/archive`",
+    ]:
+        assert marker in endpoints
 
-    notifications_block = content.split('NOTIFICATIONS: {', 1)[1].split('},', 1)[0]
-
-    assert "MARK_ALL_READ" not in notifications_block
-    assert "MARK_READ" not in notifications_block
-    assert "TYPES" not in notifications_block
+    for marker in [
+        "getInbox(",
+        "getSync(",
+        "getUnreadCount(",
+        "markSeen(",
+        "markAsRead(",
+        "archiveNotification(",
+        "markAllAsRead(",
+        "sendNotification(",
+    ]:
+        assert marker in services
 
 
 @pytest.mark.unit
-def test_frontend_notifications_service_uses_history_and_send_only() -> None:
-    content = NOTIFICATIONS_SERVICES_JS.read_text(encoding="utf-8")
+def test_frontend_notifications_context_and_inbox_use_canonical_delivery_model() -> None:
+    center = FRONTEND_CENTER_JSX.read_text(encoding="utf-8")
+    inbox = FRONTEND_INBOX_JSX.read_text(encoding="utf-8")
+    ws = FRONTEND_WS_JSX.read_text(encoding="utf-8")
 
-    assert "API_ENDPOINTS.NOTIFICATIONS.HISTORY" in content
-    assert "API_ENDPOINTS.NOTIFICATIONS.SEND" in content
-    assert "[FIX:NOTIFICATIONS]" in content
+    for marker in [
+        "queue_update: 'queue_changed'",
+        "payment_success: 'payment_notification'",
+        "loadNotifications",
+        "markAllAsRead",
+        "markAsSeen",
+        "markAsRead",
+        "archiveNotification",
+        "getUnreadCount",
+    ]:
+        assert marker in center
+
+    for marker in [
+        "aria-label={`Открыть уведомление: ${item.title}`}",
+        "all: 'unset'",
+        "type=\"button\"",
+        "Прочитать все",
+        "Прочитать",
+        "Архив",
+    ]:
+        assert marker in inbox
+
+    for marker in [
+        "queue_update",
+        "notification_sync_response",
+        "notification_seen_ack",
+        "notification_read_ack",
+        "notification_archive_ack",
+        "notification_mark_all_read_ack",
+    ]:
+        assert marker in ws
+
+
+@pytest.mark.unit
+def test_frontend_notifications_prompt_uses_safe_notification_checks() -> None:
+    content = FRONTEND_PROMPT_JSX.read_text(encoding="utf-8")
+
+    assert "typeof Notification !== 'undefined'" in content
+    assert "notification-prompt-dismissed" in content
+    assert "notify.warning(" in content
+
+
+@pytest.mark.unit
+def test_role_panels_use_shared_notification_center_without_direct_toasts() -> None:
+    page_files = [ADMIN_PANEL, CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL]
+
+    for path in page_files:
+        content = path.read_text(encoding="utf-8")
+        assert "RoleNotificationCenter" in content
+        assert "react-toastify" not in content

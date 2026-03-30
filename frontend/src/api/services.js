@@ -591,21 +591,83 @@ export const settingsService = {
 /**
  * Сервис уведомлений
  */
+function appendQuery(endpoint, params = {}) {
+  const queryString = buildQueryString(params);
+  return queryString ? `${endpoint}?${queryString}` : endpoint;
+}
+
 export const notificationsService = {
   /**
-   * История уведомлений (inbox): GET /notifications/history
+   * Persistent inbox
    */
-  async getHistory(params = {}) {
-    const queryString = buildQueryString(params);
-    const suffix = queryString ? `?${queryString}` : '';
-    return apiRequest('GET', `${API_ENDPOINTS.NOTIFICATIONS.HISTORY}${suffix}`);
+  async getInbox(params = {}) {
+    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.INBOX, params));
   },
 
   /**
-   * Обратная совместимость: getNotifications -> history
+   * Cursor-based inbox sync
+   */
+  async getSync(params = {}) {
+    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.SYNC, params));
+  },
+
+  /**
+   * Legacy compatibility alias
+   */
+  async getHistory(params = {}) {
+    return notificationsService.getInbox(params);
+  },
+
+  /**
+   * Backward compatibility for older callers
    */
   async getNotifications(params = {}) {
-    return notificationsService.getHistory(params);
+    return notificationsService.getInbox(params);
+  },
+
+  /**
+   * Server-authoritative unread counts
+   */
+  async getUnreadCount(params = {}) {
+    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.UNREAD_COUNT, params));
+  },
+
+  /**
+   * Mark a notification as seen
+   */
+  async markSeen(id) {
+    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_SEEN(id));
+  },
+
+  /**
+   * Mark a notification as read
+   */
+  async markAsRead(id) {
+    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
+  },
+
+  /**
+   * Archive a notification
+   */
+  async archiveNotification(id) {
+    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.ARCHIVE(id));
+  },
+
+  /**
+   * Mark all notifications as read
+   */
+  async markAllAsRead(params = {}) {
+    return apiRequest('POST', appendQuery(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ, params));
+  },
+
+  /**
+   * Notification stats for admin dashboards
+   */
+  async getStats(days = 7) {
+    return apiRequest(
+      'GET',
+      appendQuery(API_ENDPOINTS.NOTIFICATIONS.HISTORY_STATS, { days })
+    );
   },
 
   /**
@@ -618,28 +680,14 @@ export const notificationsService = {
   },
 
   /**
-   * Метод не поддерживается backend контрактом /notifications
+   * Method intentionally unsupported by the canonical contract
    */
   async getNotification() {
     throw new Error('[FIX:NOTIFICATIONS] get by id is not supported by /notifications contract');
   },
 
   /**
-   * Метод не поддерживается backend контрактом /notifications
-   */
-  async markAsRead() {
-    throw new Error('[FIX:NOTIFICATIONS] mark as read is not supported by /notifications contract');
-  },
-
-  /**
-   * Метод не поддерживается backend контрактом /notifications
-   */
-  async markAllAsRead() {
-    throw new Error('[FIX:NOTIFICATIONS] mark all as read is not supported by /notifications contract');
-  },
-
-  /**
-   * Метод не поддерживается backend контрактом /notifications
+   * Method intentionally unsupported by the canonical contract
    */
   async getNotificationTypes() {
     throw new Error('[FIX:NOTIFICATIONS] notification types are not supported by /notifications contract');

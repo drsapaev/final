@@ -121,7 +121,14 @@ export const API_ENDPOINTS = {
 
   // Уведомления
   NOTIFICATIONS: {
+    INBOX: '/notifications/inbox',
     HISTORY: '/notifications/history',
+    SYNC: '/notifications/sync',
+    UNREAD_COUNT: '/notifications/unread-count',
+    MARK_SEEN: (id) => `/notifications/${id}/seen`,
+    MARK_READ: (id) => `/notifications/${id}/read`,
+    ARCHIVE: (id) => `/notifications/${id}/archive`,
+    MARK_ALL_READ: '/notifications/mark-all-read',
     HISTORY_STATS: '/notifications/history/stats',
     SEND: '/notifications/send'
   },
@@ -243,6 +250,7 @@ export const createEndpoints = {
   updateSetting: (key) => `/settings/${key}`,
 
   // Уведомления
+  getNotificationInbox: () => '/notifications/inbox',
   getNotificationHistory: () => '/notifications/history',
 
   // Файлы
