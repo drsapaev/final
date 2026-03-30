@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.audit import extract_model_changes
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
 from app.core.config import settings
@@ -273,6 +274,9 @@ def create_or_update_emr(
 
     try:
         canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
+        old_data = None
+        if canonical_emr is not None:
+            old_data, _ = extract_model_changes(canonical_emr, None)
         canonical_payload = legacy_emr_to_v2_data(
             emr_dict,
             fallback_specialty=getattr(current_user, "specialty", None)
@@ -288,6 +292,31 @@ def create_or_update_emr(
             client_session_id=f"legacy-appointment-flow:{current_user.id}",
             is_draft=emr_data.is_draft,
         )
+        if canonical_emr is None:
+            logger.info(
+                "[FIX:EMR_AUDIT] Logging CREATE user audit for EMR %d on appointment %d",
+                saved_emr.id,
+                appointment.id,
+            )
+            appointment_flow_api_service.finalize_emr_create_audit(
+                request=request,
+                user_id=current_user.id,
+                appointment_id=appointment.id,
+                new_emr=saved_emr,
+            )
+        else:
+            logger.info(
+                "[FIX:EMR_AUDIT] Logging UPDATE user audit for EMR %d on appointment %d",
+                saved_emr.id,
+                appointment.id,
+            )
+            appointment_flow_api_service.finalize_emr_update_audit(
+                request=request,
+                user_id=current_user.id,
+                appointment_id=appointment.id,
+                updated_emr=saved_emr,
+                old_data=old_data,
+            )
         return _legacy_emr_response(saved_emr, appointment_id=appointment.id)
     except HTTPException:
         raise
@@ -298,6 +327,7 @@ def create_or_update_emr(
 @router.post("/{appointment_id}/emr/save", response_model=EMR)
 def save_emr(
     appointment_id: int,
+    request: Request,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
@@ -307,10 +337,15 @@ def save_emr(
     Также индексирует фразы для Doctor History Autocomplete.
     """
     _maybe_raise_legacy_write_freeze()
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, appointment_flow_api_service = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+    )
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
     if not canonical_emr:
         raise HTTPException(status_code=404, detail="EMR не найдена")
+
+    old_data, _ = extract_model_changes(canonical_emr, None)
 
     if canonical_emr.status != "draft":
         return _legacy_emr_response(canonical_emr, appointment_id=appointment.id)
@@ -323,6 +358,18 @@ def save_emr(
         row_version=canonical_emr.row_version,
         client_session_id=f"legacy-appointment-flow:{current_user.id}",
         is_draft=False,
+    )
+    logger.info(
+        "[FIX:EMR_AUDIT] Logging UPDATE user audit for saved EMR %d on appointment %d",
+        saved_emr.id,
+        appointment.id,
+    )
+    appointment_flow_api_service.finalize_emr_update_audit(
+        request=request,
+        user_id=current_user.id,
+        appointment_id=appointment.id,
+        updated_emr=saved_emr,
+        old_data=old_data,
     )
     return _legacy_emr_response(saved_emr, appointment_id=appointment.id)
 
