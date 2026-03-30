@@ -7,7 +7,6 @@ import {
   Activity,
   ArrowRight,
   BarChart3,
-  Calendar,
   CheckCircle,
   ChevronRight,
   Clock,
@@ -28,6 +27,7 @@ import {
 import AppActivation from '../components/activation/AppActivation';
 import { LANDING_COPY, buildGlassStyle } from './landingContent';
 import './Landing.css';
+import PropTypes from 'prop-types';
 
 const FEATURE_VISUALS = [
   { icon: FileText, accent: '#0ea5e9' },
@@ -47,6 +47,12 @@ function SurfaceLabel({ children }) {
   return <span className="landing-surface-label">{children}</span>;
 }
 
+
+SurfaceLabel.propTypes = {
+  ...(SurfaceLabel.propTypes || {}),
+  children: PropTypes.any,
+};
+
 function SectionHeading({ eyebrow, title, description, align = 'left' }) {
   return (
     <div className={`landing-section-heading landing-section-heading--${align}`}>
@@ -57,6 +63,15 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }) {
   );
 }
 
+
+SectionHeading.propTypes = {
+  ...(SectionHeading.propTypes || {}),
+  align: PropTypes.any,
+  description: PropTypes.any,
+  eyebrow: PropTypes.any,
+  title: PropTypes.any,
+};
+
 function MetricCard({ value, label, detail, style }) {
   return (
     <MacOSCard className="landing-metric-card" shadow="large" style={style}>
@@ -66,6 +81,15 @@ function MetricCard({ value, label, detail, style }) {
     </MacOSCard>
   );
 }
+
+
+MetricCard.propTypes = {
+  ...(MetricCard.propTypes || {}),
+  detail: PropTypes.any,
+  label: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+};
 
 function FeatureCard({ accent, icon: Icon, badge, title, description }) {
   return (
@@ -79,6 +103,16 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }) {
     </MacOSCard>
   );
 }
+
+
+FeatureCard.propTypes = {
+  ...(FeatureCard.propTypes || {}),
+  accent: PropTypes.any,
+  badge: PropTypes.any,
+  description: PropTypes.any,
+  icon: PropTypes.any,
+  title: PropTypes.any,
+};
 
 function ShowcaseCard({ icon: Icon, label, title, description, style }) {
   return (
@@ -100,6 +134,16 @@ function ShowcaseCard({ icon: Icon, label, title, description, style }) {
   );
 }
 
+
+ShowcaseCard.propTypes = {
+  ...(ShowcaseCard.propTypes || {}),
+  description: PropTypes.any,
+  icon: PropTypes.any,
+  label: PropTypes.any,
+  style: PropTypes.any,
+  title: PropTypes.any,
+};
+
 function WorkflowStep({ title, description }) {
   return (
     <div className="landing-workflow-step">
@@ -111,6 +155,13 @@ function WorkflowStep({ title, description }) {
     </div>
   );
 }
+
+
+WorkflowStep.propTypes = {
+  ...(WorkflowStep.propTypes || {}),
+  description: PropTypes.any,
+  title: PropTypes.any,
+};
 
 function ContactRow({ icon: Icon, label, value, href }) {
   const isExternal = href?.startsWith('http');
@@ -134,6 +185,16 @@ function ContactRow({ icon: Icon, label, value, href }) {
     </div>
   );
 }
+
+
+ContactRow.propTypes = {
+  ...(ContactRow.propTypes || {}),
+  href: PropTypes.any,
+  icon: PropTypes.any,
+  label: PropTypes.any,
+  startsWith: PropTypes.any,
+  value: PropTypes.any,
+};
 
 function toTelegramUrl(handle) {
   const sanitizedHandle = String(handle || '').trim().replace(/^@/, '');

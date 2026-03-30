@@ -14,7 +14,7 @@
  * 6. Accessibility-first approach
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { unifiedTheme } from '@/theme/unifiedTheme';
 
@@ -121,6 +121,17 @@ const RefactoredCard = ({
     ...style,
   };
 
+  const handleCardKeyDown = (event) => {
+    if (!clickable) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick?.(event);
+    }
+  };
+
   // ═══════════════════════════════════════════════════════════════════
   // HEADER STYLES (if card has header)
   // ═══════════════════════════════════════════════════════════════════
@@ -178,11 +189,14 @@ const RefactoredCard = ({
 
   return (
     <article
+      className={className}
       style={cardStyles}
       onMouseEnter={() => hoverable && setIsHovered(true)}
       onMouseLeave={() => hoverable && setIsHovered(false)}
       onClick={clickable ? onClick : undefined}
+      onKeyDown={clickable ? handleCardKeyDown : undefined}
       role={clickable ? 'button' : 'region'}
+      tabIndex={clickable ? 0 : undefined}
       {...props}
     >
       {/* Header section */}
@@ -256,7 +270,7 @@ export function CardExamples() {
       <RefactoredCard
         variant="outlined"
         clickable
-        onClick={() => console.log('Card clicked!')}
+        onClick={() => {}}
         title="Clickable Card"
       >
         <p>This card is clickable. Click to trigger an action.</p>

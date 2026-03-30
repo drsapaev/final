@@ -5,7 +5,7 @@
  */
 
 import { Components, Theme } from '@mui/material/styles';
-import { spacing, borderRadius, transitions, easing } from './tokens';
+import { spacing, borderRadius, transitions, easing, fontSize } from './tokens';
 
 export const createComponentOverrides = (theme: Theme): Components => ({
   // ========================================================================
