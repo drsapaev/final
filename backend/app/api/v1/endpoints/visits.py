@@ -1,6 +1,7 @@
 # app/api/v1/endpoints/visits.py
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, datetime, timedelta
 from typing import List, Optional
@@ -15,6 +16,7 @@ from app.services.service_mapping import normalize_service_code
 from app.core.audit import log_critical_change, extract_model_changes
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Pydantic fallbacks (если полноценные схемы уже есть в app.schemas, в следующих шагах заменим)

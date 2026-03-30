@@ -43,6 +43,12 @@ import PrescriptionEditor from './PrescriptionEditor';
 import ExaminationMatrix from './ExaminationMatrix';
 import ICD10Autocomplete from './ICD10Autocomplete';
 import { useEMRAI } from '../../hooks/useEMRAI';
+import {
+  backendTemplateMatches,
+  buildBackendTemplateSnippet,
+  loadBackendEmrTemplates,
+  mergeTemplateSuggestions,
+} from '../../hooks/useEMRTemplateLibrary';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import TreatmentTemplates from './TreatmentTemplates';
 import logger from '../../utils/logger';
@@ -227,20 +233,29 @@ const mockEMRTemplates = async (text, fieldName) => {
 
   const lowerText = text.toLowerCase();
   const fieldTemplates = FIELD_TEMPLATES[fieldName] || FIELD_TEMPLATES.complaints;
+  const backendTemplates = await loadBackendEmrTemplates();
+  const backendSuggestions = backendTemplates
+    .filter((template) => backendTemplateMatches(fieldName, lowerText, template))
+    .map((template, index) => ({
+      id: template.id ?? `emr-template-${index}`,
+      text: buildBackendTemplateSnippet(template),
+      source: template.is_public ? 'EMR template library' : 'EMR user template',
+    }))
+    .filter((template) => template.text);
 
   // Поиск по ключевым словам
   for (const [keyword, templates] of Object.entries(fieldTemplates)) {
     if (keyword !== '_default' && lowerText.includes(keyword)) {
-      return templates;
+      return mergeTemplateSuggestions(backendSuggestions, templates);
     }
   }
 
   // Default шаблоны если есть
   if (fieldTemplates._default && text.length >= 5) {
-    return fieldTemplates._default;
+    return mergeTemplateSuggestions(backendSuggestions, fieldTemplates._default);
   }
 
-  return [];
+  return backendSuggestions;
 };
 
 // ============================================

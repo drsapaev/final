@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
 
 from alembic import op
+from app.services.lab_seed_data import DEFAULT_LAB_TEMPLATE_DEFINITIONS
 from app.services.lab_template_binding_seed_data import (
     DEFAULT_LAB_TEMPLATE_BINDING_DEFINITIONS,
 )
@@ -33,6 +34,41 @@ binding_table = sa.table(
     sa.column("updated_at", sa.DateTime(timezone=True)),
 )
 
+template_table = sa.table(
+    "lab_report_templates",
+    sa.column("code", sa.String(length=64)),
+    sa.column("name", sa.String(length=255)),
+    sa.column("family", sa.String(length=64)),
+    sa.column("description", sa.String(length=1000)),
+    sa.column("is_active", sa.Boolean()),
+    sa.column("created_at", sa.DateTime(timezone=True)),
+    sa.column("updated_at", sa.DateTime(timezone=True)),
+)
+
+
+def _seed_missing_templates(bind, now: datetime) -> None:
+    existing_codes = {
+        row.code
+        for row in bind.execute(sa.select(template_table.c.code)).mappings().all()
+    }
+
+    for definition in DEFAULT_LAB_TEMPLATE_DEFINITIONS:
+        template_code = definition["code"]
+        if template_code in existing_codes:
+            continue
+
+        bind.execute(
+            insert(template_table).values(
+                code=template_code,
+                name=definition["name"],
+                family=definition["family"],
+                description=definition.get("description"),
+                is_active=definition.get("is_active", True),
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
 
 def _real_catalog_definitions():
     return [
@@ -46,6 +82,7 @@ def _real_catalog_definitions():
 def upgrade() -> None:
     bind = op.get_bind()
     now = datetime.now(UTC)
+    _seed_missing_templates(bind, now)
     desired_templates_by_code: dict[str, set[str]] = {}
 
     for definition in _real_catalog_definitions():

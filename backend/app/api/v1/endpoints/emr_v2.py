@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.audit import extract_model_changes, log_critical_change
 from app.models.user import User
 from app.schemas.emr_v2 import (
     EMRAmendRequest,
@@ -283,6 +284,11 @@ async def save_emr(
     - If row_version mismatch but same user/session: allows (autosave)
     """
     try:
+        existing_emr = emr_v2_service.get_by_visit(db, visit_id)
+        old_data = None
+        if existing_emr is not None:
+            old_data, _ = extract_model_changes(existing_emr, None)
+
         emr = emr_v2_service.save(
             db,
             visit_id=visit_id,
@@ -292,6 +298,19 @@ async def save_emr(
             client_session_id=payload.client_session_id,
             is_draft=payload.is_draft,
         )
+        _, new_data = extract_model_changes(None, emr)
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="CREATE" if existing_emr is None else "UPDATE",
+            table_name="emr",
+            row_id=emr.id,
+            old_data=old_data,
+            new_data=new_data,
+            request=request,
+            description=f"Сохранен EMR ID={emr.id} для визита {visit_id}",
+        )
+        db.commit()
         return emr
     except ConcurrencyError as e:
         raise HTTPException(
