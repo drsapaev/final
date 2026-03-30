@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { HelpCircle, Keyboard, X } from 'lucide-react';
 import { Card, Button } from '../ui/native';
+import PropTypes from 'prop-types';
 
 /**
  * Компонент контекстных подсказок для админ панели
@@ -68,6 +69,14 @@ const HelpTooltip = ({ content, shortcuts = [], position = 'top' }) => {
       )}
     </div>
   );
+};
+
+
+HelpTooltip.propTypes = {
+  ...(HelpTooltip.propTypes || {}),
+  content: PropTypes.any,
+  position: PropTypes.any,
+  shortcuts: PropTypes.any,
 };
 
 /**
@@ -154,6 +163,13 @@ export const HotkeysModal = ({ isOpen, onClose }) => {
       </Card>
     </div>
   );
+};
+
+
+HotkeysModal.propTypes = {
+  ...(HotkeysModal.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
 };
 
 export default HelpTooltip;

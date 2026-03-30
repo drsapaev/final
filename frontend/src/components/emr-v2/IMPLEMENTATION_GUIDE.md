@@ -212,7 +212,7 @@ import { EMRContainerV2 } from '../components/emr-v2';
 
 - [EMR_V2_OPTIMIZATION_REPORT.md](./EMR_V2_OPTIMIZATION_REPORT.md) - Полный отчет по оптимизации
 - [Backend EMR v2 Schema](../../../backend/app/schemas/emr_v2.py) - Схема данных
-- [ExaminationMatrix](../../emr/ExaminationMatrix.jsx) - Матрица быстрого ввода
+- [ExaminationMatrix](./sections/ExaminationMatrix.jsx) - Матрица быстрого ввода
 
 ---
 

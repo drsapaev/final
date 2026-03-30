@@ -5,10 +5,11 @@
  * - Section receives data + setField (from parent)
  * - Section does NOT know about API, versions, autosave
  * - Section is testable in isolation
- * - No new logic - just transfer from SingleSheetEMR
+ * - No new logic - just transfer from legacy EMR
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import './EMRSection.css';
 
 /**
@@ -75,3 +76,15 @@ export function EMRSection({
 }
 
 export default EMRSection;
+
+EMRSection.propTypes = {
+    title: PropTypes.node,
+    icon: PropTypes.node,
+    children: PropTypes.node,
+    defaultOpen: PropTypes.bool,
+    badge: PropTypes.node,
+    headerAction: PropTypes.node,
+    className: PropTypes.string,
+    required: PropTypes.bool,
+    disabled: PropTypes.bool,
+};

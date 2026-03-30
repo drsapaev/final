@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const LoadingSkeleton = ({ 
   type = 'default', 
   count = 1, 
@@ -127,6 +128,16 @@ const LoadingSkeleton = ({
       ))}
     </div>
   );
+};
+
+
+LoadingSkeleton.propTypes = {
+  ...(LoadingSkeleton.propTypes || {}),
+  className: PropTypes.any,
+  count: PropTypes.any,
+  height: PropTypes.any,
+  type: PropTypes.any,
+  width: PropTypes.any,
 };
 
 export default LoadingSkeleton;

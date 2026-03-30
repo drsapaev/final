@@ -1,5 +1,6 @@
 // Translation Context and Hook
 import { createContext, useContext, useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 const TranslationContext = createContext();
 
 export const useTranslation = () => {
@@ -229,4 +230,10 @@ export const TranslationProvider = ({ children }) => {
       {children}
     </TranslationContext.Provider>
   );
+};
+
+
+TranslationProvider.propTypes = {
+  ...(TranslationProvider.propTypes || {}),
+  children: PropTypes.any,
 };

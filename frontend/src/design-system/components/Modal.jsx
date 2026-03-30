@@ -4,6 +4,7 @@
  */
 import { useEffect } from 'react';
 import { colors, typography, spacing } from '../theme';
+import PropTypes from 'prop-types';
 
 const Modal = ({
   isOpen = false,
@@ -210,6 +211,22 @@ const Modal = ({
       </div>
     </div>
   );
+};
+
+
+Modal.propTypes = {
+  ...(Modal.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  closeOnEscape: PropTypes.any,
+  closeOnOverlayClick: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  showCloseButton: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  title: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default Modal;

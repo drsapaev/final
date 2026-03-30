@@ -1,4 +1,5 @@
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 /**
  * Компонент для анимированных переходов
@@ -44,6 +45,16 @@ const AnimatedTransition = ({
       {children}
     </div>
   );
+};
+
+
+AnimatedTransition.propTypes = {
+  ...(AnimatedTransition.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  duration: PropTypes.any,
+  show: PropTypes.any,
+  type: PropTypes.any,
 };
 
 export default AnimatedTransition;

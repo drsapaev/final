@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Printer, X, Calendar, CreditCard } from 'lucide-react';
 import { Button, Badge } from './ui';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import PropTypes from 'prop-types';
 
 const AppointmentsTable = ({
   appointments = [],
@@ -674,6 +675,15 @@ const AppointmentsTable = ({
       </table>
     </div>);
 
+};
+
+
+AppointmentsTable.propTypes = {
+  ...(AppointmentsTable.propTypes || {}),
+  appointments: PropTypes.any,
+  appointmentsSelected: PropTypes.any,
+  headerHeight: PropTypes.any,
+  setAppointmentsSelected: PropTypes.any,
 };
 
 export default AppointmentsTable;

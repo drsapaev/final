@@ -1,24 +1,24 @@
 /**
- * EMRTextField - Универсальный компонент поля EMR с шаблонами
+ * ComplaintsField - Эталонное поле «Жалобы»
  * 
- * Используется для всех текстовых полей:
- * - Жалобы
- * - Анамнез заболевания
- * - Анамнез жизни
- * - Объективный статус
- * - Диагноз
- * - План
+ * v2.0 - Multi-suggestion support:
+ * - AI возвращает 2-3 варианта из ранее заполненных шаблонов
+ * - Врач выбирает один из вариантов или продолжает вводить
+ * - Подсказки основаны на истории EMR, а не на генерации
  * 
- * Особенности:
- * - AI показывает 2-3 варианта из ранее заполненных шаблонов
- * - После выбора варианта шаблоны закрываются
- * - Повторное появление только после нового ввода
+ * Состояния:
+ * 1. ПУСТО - placeholder, auto-focus
+ * 2. В ПРОЦЕССЕ - печать, auto-save hint
+ * 3. AI ПОДСКАЗКИ - несколько вариантов после паузы
+ * 4. ЗАПОЛНЕНО - blur, готово к подписи
+ * 5. ПОДПИСАНО - read-only
+ * 6. ОШИБКА - при попытке подписать пустое
  */
 
-import PropTypes from 'prop-types';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import './EMRTextField.css';
-import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
+import './ComplaintsField.css';
+import logger from '../../../utils/logger';
 
 // Debounce hook
 const useDebounce = (value, delay) => {
@@ -32,7 +32,7 @@ const useDebounce = (value, delay) => {
     return debouncedValue;
 };
 
-const EMRTextField = ({
+const ComplaintsField = ({
     // Data
     value = '',
     onChange,
@@ -40,34 +40,30 @@ const EMRTextField = ({
     // State
     isEditable = true,
 
-    // AI - возвращает массив вариантов [{id, text, source}]
+    // AI - теперь возвращает массив вариантов
     aiEnabled = true,
-    onRequestAI,
+    onRequestAI,          // (text) => Promise<Array<{id, text, source}>> - 2-3 варианта из шаблонов
 
     // Validation
     error,
 
     // UX
     autoFocus = false,
-    onFieldTouch,
+    onFieldTouch,         // для telemetry
     onBlur,
 
-    // Labels & Config
-    label = null,
-    placeholder = 'Введите текст...',
-    fieldName = 'field',
-    multiline = true,
-    rows = 3
+    // Labels
+    label = 'Жалобы',
+    placeholder = 'Введите жалобы пациента...'
 }) => {
     const textareaRef = useRef(null);
-    const lastAcceptedValueRef = useRef(''); // Трекинг принятого значения
 
     // Local state
     const [isFocused, setIsFocused] = useState(false);
-    const [aiSuggestions, setAiSuggestions] = useState([]);
-    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [aiSuggestions, setAiSuggestions] = useState([]); // Массив вариантов
+    const [selectedIndex, setSelectedIndex] = useState(0);   // Выбранный вариант
     const [isLoadingAI, setIsLoadingAI] = useState(false);
-    const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+    const [lastSavedAt, setLastSavedAt] = useState(null);
 
     // Debounced value for AI suggestions (1.5 sec delay)
     const debouncedValue = useDebounce(value, 1500);
@@ -84,18 +80,13 @@ const EMRTextField = ({
 
     // Request AI suggestions after pause
     useEffect(() => {
-        if (!aiEnabled || !isEditable || !isFocused || suggestionsDismissed) return;
+        if (!aiEnabled || !isEditable || !isFocused) return;
         if (!debouncedValue || debouncedValue.length < 5) {
             setAiSuggestions([]);
             return;
         }
 
-        // Не запрашивать если значение не изменилось после принятия
-        if (debouncedValue === lastAcceptedValueRef.current) {
-            return;
-        }
-
-        // Не запрашивать если уже есть подсказки
+        // Don't request if already has suggestions for this value
         if (aiSuggestions.length > 0) return;
 
         const requestSuggestions = async () => {
@@ -103,7 +94,7 @@ const EMRTextField = ({
 
             setIsLoadingAI(true);
             try {
-                const suggestions = await onRequestAI(debouncedValue, fieldName);
+                const suggestions = await onRequestAI(debouncedValue);
                 if (Array.isArray(suggestions) && suggestions.length > 0) {
                     setAiSuggestions(suggestions);
                     setSelectedIndex(0);
@@ -116,31 +107,27 @@ const EMRTextField = ({
         };
 
         requestSuggestions();
-    }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI, fieldName, suggestionsDismissed, aiSuggestions.length]);
+    }, [debouncedValue, aiEnabled, isEditable, isFocused, onRequestAI, aiSuggestions.length]);
 
-    // Сброс при изменении значения пользователем
+    // Clear AI suggestions when value changes
     useEffect(() => {
-        // Если новое значение отличается от принятого - разрешаем новые подсказки
-        if (value !== lastAcceptedValueRef.current) {
-            setSuggestionsDismissed(false);
-            setAiSuggestions([]);
-            setSelectedIndex(0);
-        }
+        setAiSuggestions([]);
+        setSelectedIndex(0);
     }, [value]);
 
     // Handlers
     const handleChange = useCallback((e) => {
         onChange?.(e.target.value);
-        onFieldTouch?.(fieldName);
-    }, [onChange, onFieldTouch, fieldName]);
+        onFieldTouch?.('complaints');
+    }, [onChange, onFieldTouch]);
 
     const handleFocus = useCallback(() => {
         setIsFocused(true);
-        setSuggestionsDismissed(false); // Разрешаем подсказки при фокусе
     }, []);
 
     const handleBlur = useCallback(() => {
         setIsFocused(false);
+        setLastSavedAt(new Date());
         onBlur?.();
     }, [onBlur]);
 
@@ -151,25 +138,18 @@ const EMRTextField = ({
         const separator = value.trim().endsWith('.') ? ' ' : ', ';
         const newValue = value.trim() + separator + suggestion.text;
 
-        // Запоминаем принятое значение чтобы не показывать подсказки сразу
-        lastAcceptedValueRef.current = newValue;
-
         onChange?.(newValue);
         setAiSuggestions([]);
-        setSuggestionsDismissed(true); // Блокируем повторное появление
 
         // Keep focus in field, cursor at end
         if (textareaRef.current) {
             textareaRef.current.focus();
-            setTimeout(() => {
-                textareaRef.current?.setSelectionRange(newValue.length, newValue.length);
-            }, 0);
+            textareaRef.current.setSelectionRange(newValue.length, newValue.length);
         }
     }, [value, onChange]);
 
     const handleDismissAI = useCallback(() => {
         setAiSuggestions([]);
-        setSuggestionsDismissed(true);
     }, []);
 
     const handleKeyDown = useCallback((e) => {
@@ -189,7 +169,7 @@ const EMRTextField = ({
         }
 
         // Enter or Tab to accept selected suggestion
-        if ((e.key === 'Enter' && e.altKey) || (e.key === 'Tab' && aiSuggestions.length > 0 && !e.shiftKey)) {
+        if ((e.key === 'Enter' && e.altKey) || (e.key === 'Tab' && aiSuggestions.length > 0)) {
             e.preventDefault();
             handleAcceptSuggestion(aiSuggestions[selectedIndex]);
             return;
@@ -215,20 +195,18 @@ const EMRTextField = ({
 
     // Compute CSS classes
     const fieldClasses = [
-        'emr-text-field',
-        isFocused && 'emr-text-field--focused',
-        !isEditable && 'emr-text-field--readonly',
-        error && 'emr-text-field--error'
+        'complaints-field',
+        isFocused && 'complaints-field--focused',
+        !isEditable && 'complaints-field--readonly',
+        error && 'complaints-field--error'
     ].filter(Boolean).join(' ');
 
-    const InputComponent = multiline ? 'textarea' : 'input';
-
     return (
-        <div className="emr-text-wrapper">
-            <label className="emr-text-label">{label}</label>
+        <div className="complaints-wrapper">
+            <label className="complaints-label">{label}</label>
 
-            <div className="emr-text-container">
-                <InputComponent
+            <div className="complaints-container">
+                <textarea
                     ref={textareaRef}
                     className={fieldClasses}
                     value={value}
@@ -238,24 +216,34 @@ const EMRTextField = ({
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     disabled={!isEditable}
-                    rows={multiline ? rows : undefined}
+                    rows={3}
                 />
+
+                {/* Auto-save indicator */}
+                {isFocused && isEditable && !error && (
+                    <div className="complaints-autosave">
+                        {lastSavedAt
+                            ? `💾 Сохранено ${lastSavedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+                            : '💾 Auto-save через 3 сек'
+                        }
+                    </div>
+                )}
 
                 {/* Error message */}
                 {error && (
-                    <div className="emr-text-error">
+                    <div className="complaints-error">
                         ⚠️ {error}
                     </div>
                 )}
 
                 {/* AI Suggestions - Multiple variants */}
                 {aiSuggestions.length > 0 && isEditable && (
-                    <div className="emr-text-suggestions">
-                        <div className="emr-text-suggestions__header">
-                            <span className="emr-text-suggestions__icon">📋</span>
-                            <span className="emr-text-suggestions__title">Варианты из шаблонов:</span>
+                    <div className="complaints-ai-suggestions">
+                        <div className="complaints-ai-header">
+                            <span className="complaints-ai-header__icon">📋</span>
+                            <span className="complaints-ai-header__title">Варианты из шаблонов:</span>
                             <button
-                                className="emr-text-suggestions__close"
+                                className="complaints-ai-header__close"
                                 onClick={handleDismissAI}
                                 tabIndex={-1}
                             >
@@ -263,24 +251,24 @@ const EMRTextField = ({
                             </button>
                         </div>
 
-                        <div className="emr-text-suggestions__list">
+                        <div className="complaints-ai-list">
                             {aiSuggestions.map((suggestion, idx) => (
                                 <button
                                     key={suggestion.id || idx}
-                                    className={`emr-text-suggestions__item ${idx === selectedIndex ? 'emr-text-suggestions__item--selected' : ''}`}
+                                    className={`complaints-ai-item ${idx === selectedIndex ? 'complaints-ai-item--selected' : ''}`}
                                     onClick={() => handleAcceptSuggestion(suggestion)}
                                     tabIndex={-1}
                                 >
-                                    <span className="emr-text-suggestions__number">{idx + 1}</span>
-                                    <span className="emr-text-suggestions__text">{suggestion.text}</span>
+                                    <span className="complaints-ai-item__number">{idx + 1}</span>
+                                    <span className="complaints-ai-item__text">{suggestion.text}</span>
                                     {suggestion.source && (
-                                        <span className="emr-text-suggestions__source">{suggestion.source}</span>
+                                        <span className="complaints-ai-item__source">{suggestion.source}</span>
                                     )}
                                 </button>
                             ))}
                         </div>
 
-                        <div className="emr-text-suggestions__footer">
+                        <div className="complaints-ai-footer">
                             <span>↑↓ выбор</span>
                             <span>Alt+Enter принять</span>
                             <span>Esc закрыть</span>
@@ -290,14 +278,14 @@ const EMRTextField = ({
 
                 {/* AI Loading indicator */}
                 {isLoadingAI && (
-                    <div className="emr-text-loading">
+                    <div className="complaints-ai-loading">
                         🔍 Ищу похожие записи...
                     </div>
                 )}
 
                 {/* Read-only indicator */}
                 {!isEditable && (
-                    <div className="emr-text-readonly">
+                    <div className="complaints-readonly-badge">
                         🔒 Подписано
                     </div>
                 )}
@@ -306,7 +294,9 @@ const EMRTextField = ({
     );
 };
 
-EMRTextField.propTypes = {
+export default ComplaintsField;
+
+ComplaintsField.propTypes = {
     value: PropTypes.string,
     onChange: PropTypes.func,
     isEditable: PropTypes.bool,
@@ -316,11 +306,6 @@ EMRTextField.propTypes = {
     autoFocus: PropTypes.bool,
     onFieldTouch: PropTypes.func,
     onBlur: PropTypes.func,
-    label: PropTypes.node,
+    label: PropTypes.string,
     placeholder: PropTypes.string,
-    fieldName: PropTypes.string,
-    multiline: PropTypes.bool,
-    rows: PropTypes.number
 };
-
-export default EMRTextField;

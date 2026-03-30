@@ -1,5 +1,6 @@
 import { Menu, X } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * Кнопка переключения сайдбара
@@ -42,6 +43,14 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
       {isCollapsed ? <Menu size={20} /> : <X size={20} />}
     </button>
   );
+};
+
+
+SidebarToggle.propTypes = {
+  ...(SidebarToggle.propTypes || {}),
+  className: PropTypes.any,
+  isCollapsed: PropTypes.any,
+  onToggle: PropTypes.any,
 };
 
 export default SidebarToggle;

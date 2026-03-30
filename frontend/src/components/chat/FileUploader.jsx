@@ -2,6 +2,7 @@
 import { useRef } from 'react';
 import { Paperclip } from 'lucide-react';
 import './FileUploader.css';
+import PropTypes from 'prop-types';
 
 const FileUploader = ({ onUpload, disabled }) => {
   const fileInputRef = useRef(null);
@@ -35,6 +36,13 @@ const FileUploader = ({ onUpload, disabled }) => {
             </button>
         </div>);
 
+};
+
+
+FileUploader.propTypes = {
+  ...(FileUploader.propTypes || {}),
+  disabled: PropTypes.any,
+  onUpload: PropTypes.any,
 };
 
 export default FileUploader;

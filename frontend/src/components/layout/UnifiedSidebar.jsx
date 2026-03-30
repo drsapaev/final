@@ -6,6 +6,7 @@ import auth from '../../stores/auth.js';
 import '../../styles/sidebar-buttons.css';
 import '../../styles/cursor-effects.css';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 /**
  * Унифицированный сайдбар в стиле MediLab
@@ -518,6 +519,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       </div>
     </aside>);
 
+};
+
+
+UnifiedSidebar.propTypes = {
+  ...(UnifiedSidebar.propTypes || {}),
+  isCollapsed: PropTypes.any,
+  onToggle: PropTypes.any,
 };
 
 export default UnifiedSidebar;

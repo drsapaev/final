@@ -21,6 +21,7 @@ import {
   MacOSSelect,
   MacOSCheckbox } from
 '../ui/macos';
+import PropTypes from 'prop-types';
 
 const ReportGenerator = ({
   onGenerateReport,
@@ -563,6 +564,18 @@ const ReportGenerator = ({
       </div>
     </div>);
 
+};
+
+
+ReportGenerator.propTypes = {
+  ...(ReportGenerator.propTypes || {}),
+  dateRange: PropTypes.any,
+  loading: PropTypes.any,
+  onDateRangeChange: PropTypes.any,
+  onGenerateReport: PropTypes.any,
+  onReportTypeChange: PropTypes.any,
+  reportTypes: PropTypes.any,
+  selectedReportType: PropTypes.any,
 };
 
 export default ReportGenerator;

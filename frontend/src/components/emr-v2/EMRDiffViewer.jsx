@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRDiffViewer.css';
@@ -267,3 +268,10 @@ export function EMRDiffViewer({
 }
 
 export default EMRDiffViewer;
+
+EMRDiffViewer.propTypes = {
+    visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    versionFrom: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    versionTo: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onClose: PropTypes.func,
+};

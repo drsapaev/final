@@ -10,8 +10,9 @@
  */
 
 import { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
-import ComplaintsField from '../../emr/ComplaintsField';
+import ComplaintsField from './ComplaintsField';
 import { api } from '../../../api/client';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
@@ -130,3 +131,13 @@ export function ComplaintsSection({
 }
 
 export default ComplaintsSection;
+
+ComplaintsSection.propTypes = {
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    disabled: PropTypes.bool,
+    required: PropTypes.bool,
+    defaultOpen: PropTypes.bool,
+    doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    specialty: PropTypes.oneOf(['general', 'cardiology', 'dermatology', 'dentist', 'dentistry']),
+};

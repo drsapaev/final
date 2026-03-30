@@ -16,6 +16,7 @@ import {
   FileImage } from
 
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Форма объективного осмотра для стоматологической ЭМК
@@ -872,6 +873,14 @@ const ExaminationForm = ({
       </div>
     </div>);
 
+};
+
+
+ExaminationForm.propTypes = {
+  ...(ExaminationForm.propTypes || {}),
+  initialData: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
 };
 
 export default ExaminationForm;

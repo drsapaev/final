@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 // Простая нативная реализация тултипа без сторонних зависимостей
 const Tooltip = React.forwardRef(({ 
@@ -77,6 +78,18 @@ const Tooltip = React.forwardRef(({
     </span>
   );
 });
+
+
+Tooltip.propTypes = {
+  ...(Tooltip.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  content: PropTypes.any,
+  contentClassName: PropTypes.any,
+  delay: PropTypes.any,
+  disabled: PropTypes.any,
+  position: PropTypes.any,
+};
 
 Tooltip.displayName = 'Tooltip';
 

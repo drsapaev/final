@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
 import { Button } from '../ui';
 import { Menu, X } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const ResponsiveNavigation = ({
   items = [],
@@ -147,6 +148,16 @@ const ResponsiveNavigation = ({
       )}
     </div>);
 
+};
+
+
+ResponsiveNavigation.propTypes = {
+  ...(ResponsiveNavigation.propTypes || {}),
+  activeItem: PropTypes.any,
+  className: PropTypes.any,
+  items: PropTypes.any,
+  onItemClick: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default ResponsiveNavigation;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete
@@ -526,6 +527,13 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       {step === 3 && renderStep3()}
     </div>);
 
+};
+
+
+TwoFactorSetup.propTypes = {
+  ...(TwoFactorSetup.propTypes || {}),
+  onCancel: PropTypes.any,
+  onComplete: PropTypes.any,
 };
 
 export default TwoFactorSetup;

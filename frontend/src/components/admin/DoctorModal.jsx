@@ -12,6 +12,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const DoctorModal = ({
   isOpen,
   onClose,
@@ -483,6 +484,16 @@ const DoctorModal = ({
       </form>
     </MacOSModal>);
 
+};
+
+
+DoctorModal.propTypes = {
+  ...(DoctorModal.propTypes || {}),
+  doctor: PropTypes.any,
+  isOpen: PropTypes.any,
+  loading: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
 };
 
 export default DoctorModal;

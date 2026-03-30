@@ -11,6 +11,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 
@@ -235,3 +236,16 @@ export function TreatmentTemplatesPanel({
 }
 
 export default TreatmentTemplatesPanel;
+
+TreatmentTemplatesButton.propTypes = {
+    onClick: PropTypes.func,
+    disabled: PropTypes.bool,
+};
+
+TreatmentTemplatesPanel.propTypes = {
+    specialty: PropTypes.string,
+    currentValue: PropTypes.string,
+    onApply: PropTypes.func,
+    onClose: PropTypes.func,
+    isOpen: PropTypes.bool,
+};

@@ -1,4 +1,5 @@
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * Базовая медицинская карточка в стиле MediLab
@@ -53,6 +54,17 @@ const MedicalCard = ({
       {children}
     </div>);
 
+};
+
+
+MedicalCard.propTypes = {
+  ...(MedicalCard.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  hover: PropTypes.any,
+  padding: PropTypes.any,
+  shadow: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default MedicalCard;

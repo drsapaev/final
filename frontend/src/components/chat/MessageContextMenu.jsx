@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { Copy, Reply, Trash, Forward } from 'lucide-react';
 import './MessageContextMenu.css';
+import PropTypes from 'prop-types';
 
 const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }) => {
     const menuRef = useRef(null);
@@ -47,6 +48,17 @@ const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }) => {
             )}
         </div>
     );
+};
+
+
+MessageContextMenu.propTypes = {
+  ...(MessageContextMenu.propTypes || {}),
+  isOwn: PropTypes.any,
+  message: PropTypes.any,
+  onAction: PropTypes.any,
+  onBlur: PropTypes.any,
+  x: PropTypes.any,
+  y: PropTypes.any,
 };
 
 export default MessageContextMenu;

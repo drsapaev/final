@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const MacOSTab = ({
   tabs,
   activeTab,
@@ -185,6 +186,20 @@ const MacOSTab = ({
       }
     </div>);
 
+};
+
+
+MacOSTab.propTypes = {
+  ...(MacOSTab.propTypes || {}),
+  activeTab: PropTypes.any,
+  className: PropTypes.any,
+  map: PropTypes.any,
+  onTabChange: PropTypes.any,
+  orientation: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  tabs: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default MacOSTab;

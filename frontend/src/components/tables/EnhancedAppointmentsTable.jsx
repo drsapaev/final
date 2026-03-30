@@ -37,6 +37,7 @@ import logger from '../../utils/logger';
 
 // ⭐ SSOT: Centralized service code resolver
 import { LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName } from '../../utils/serviceCodeResolver';
+import PropTypes from 'prop-types';
 
 const SESSION_COLORS = [
   '#3B82F6', // blue
@@ -2347,6 +2348,23 @@ const EnhancedAppointmentsTable = ({
 
     </div>);
 
+};
+
+
+EnhancedAppointmentsTable.propTypes = {
+  ...(EnhancedAppointmentsTable.propTypes || {}),
+  data: PropTypes.any,
+  language: PropTypes.any,
+  loading: PropTypes.any,
+  onActionClick: PropTypes.any,
+  onRowClick: PropTypes.any,
+  onRowSelect: PropTypes.any,
+  outerBorder: PropTypes.any,
+  selectedRows: PropTypes.any,
+  services: PropTypes.any,
+  showCheckboxes: PropTypes.any,
+  theme: PropTypes.any,
+  view: PropTypes.any,
 };
 
 export default EnhancedAppointmentsTable;

@@ -6,6 +6,7 @@ import PaymentPayMe from './PaymentPayMe';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
 import './PaymentManager.css';
+import PropTypes from 'prop-types';
 
 const API_BASE = '/api/v1';
 
@@ -300,6 +301,16 @@ const PaymentManager = ({
       
     </>);
 
+};
+
+
+PaymentManager.propTypes = {
+  ...(PaymentManager.propTypes || {}),
+  initialAmount: PropTypes.any,
+  invoiceId: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  patientInfo: PropTypes.any,
 };
 
 export default PaymentManager;

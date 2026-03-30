@@ -11,6 +11,7 @@ import {
   RefreshCw } from
 'lucide-react';
 import { Card } from '../ui/native';
+import PropTypes from 'prop-types';
 
 const EmptyState = ({
   type = 'default',
@@ -95,6 +96,17 @@ const EmptyState = ({
       </div>
     </Card>);
 
+};
+
+
+EmptyState.propTypes = {
+  ...(EmptyState.propTypes || {}),
+  action: PropTypes.any,
+  className: PropTypes.any,
+  description: PropTypes.any,
+  icon: PropTypes.any,
+  title: PropTypes.any,
+  type: PropTypes.any,
 };
 
 export default EmptyState;

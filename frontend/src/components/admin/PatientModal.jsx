@@ -9,6 +9,7 @@ import {
   MacOSTextarea,
   MacOSModal } from
 '../ui/macos';
+import PropTypes from 'prop-types';
 
 const PatientModal = ({
   isOpen,
@@ -733,6 +734,16 @@ const PatientModal = ({
       </form>
     </MacOSModal>);
 
+};
+
+
+PatientModal.propTypes = {
+  ...(PatientModal.propTypes || {}),
+  isOpen: PropTypes.any,
+  loading: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  patient: PropTypes.any,
 };
 
 export default PatientModal;

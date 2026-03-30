@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const ModernStatistics = ({ appointments, onExport, onRefresh }) => {
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', marginBottom: '20px' }}>
@@ -8,6 +9,15 @@ const ModernStatistics = ({ appointments, onExport, onRefresh }) => {
       <button onClick={onExport}>Экспорт</button>
     </div>
   );
+};
+
+
+ModernStatistics.propTypes = {
+  ...(ModernStatistics.propTypes || {}),
+  appointments: PropTypes.any,
+  length: PropTypes.any,
+  onExport: PropTypes.any,
+  onRefresh: PropTypes.any,
 };
 
 export default ModernStatistics;

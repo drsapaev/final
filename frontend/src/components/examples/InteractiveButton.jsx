@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
+import PropTypes from 'prop-types';
 
 /**
  * Пример интерактивной кнопки с эффектами наведения
@@ -120,6 +121,16 @@ const InteractiveButton = ({
       </style>
     </button>);
 
+};
+
+
+InteractiveButton.propTypes = {
+  ...(InteractiveButton.propTypes || {}),
+  children: PropTypes.any,
+  onClick: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default InteractiveButton;

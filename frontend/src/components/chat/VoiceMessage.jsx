@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const VoiceMessage = ({ message, fileUrl }) => {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -207,6 +208,14 @@ const VoiceMessage = ({ message, fileUrl }) => {
             </div>
         </div>
     );
+};
+
+
+VoiceMessage.propTypes = {
+  ...(VoiceMessage.propTypes || {}),
+  fileUrl: PropTypes.any,
+  message: PropTypes.any,
+  voice_duration: PropTypes.any,
 };
 
 export default VoiceMessage;

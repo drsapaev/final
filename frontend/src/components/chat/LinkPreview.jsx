@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import './LinkPreview.css';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const LinkPreview = ({ url }) => {
     const [preview, setPreview] = useState(null);
@@ -49,6 +50,12 @@ const LinkPreview = ({ url }) => {
             </div>
         </a>
     );
+};
+
+
+LinkPreview.propTypes = {
+  ...(LinkPreview.propTypes || {}),
+  url: PropTypes.any,
 };
 
 export default LinkPreview;

@@ -3,7 +3,7 @@
  * 
  * Phase 4 Result:
  * - Uses modular sections instead of inline JSX
- * - SingleSheetEMR stays working until migration complete
+ * - Legacy single-sheet EMR has been retired
  * - All Phase 1-3 features work (autosave, guards, history, conflict)
  * 
  * Phase 6 Additions:
@@ -87,30 +87,6 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
         reloadFromServer,
         forceOverwrite,
     } = useEMR(visitId, { specialty: canonicalSpecialty });
-
-    if (!visitId) {
-        return (
-            <div className="emr-v2-container">
-                <div className="emr-v2-main">
-                    <div className="emr-v2-actions">
-                        Ошибка контракта: для EMR v2 требуется `visitId`.
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (!specialty || !isCanonicalSpecialty(canonicalSpecialty)) {
-        return (
-            <div className="emr-v2-container">
-                <div className="emr-v2-main">
-                    <div className="emr-v2-actions">
-                        Ошибка контракта: передана ненормализованная specialty.
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData();
@@ -433,6 +409,30 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
         canSign: !isDirty && !isSaving && !isSigned,
         enabled: true,
     });
+
+    if (!visitId) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: для EMR v2 требуется `visitId`.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!specialty || !isCanonicalSpecialty(canonicalSpecialty)) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: передана ненормализованная specialty.
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const handleAmend = async () => {
         if (amendReason.trim().length >= 10) {

@@ -1,6 +1,7 @@
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { colors } from '../theme/tokens';
+import PropTypes from 'prop-types';
 
 const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
   const { isDark, toggleTheme, getSpacing } = useTheme();
@@ -53,6 +54,14 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
       {isDark ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
     </button>);
 
+};
+
+
+ThemeToggle.propTypes = {
+  ...(ThemeToggle.propTypes || {}),
+  className: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default ThemeToggle;

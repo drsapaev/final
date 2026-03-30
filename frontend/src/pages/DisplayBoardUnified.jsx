@@ -20,6 +20,7 @@ import { openDisplayBoardWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Объединенное табло очереди с полным функционалом
  * Объединяет функции из DisplayBoard.jsx и QueueBoard.jsx
@@ -1061,6 +1062,21 @@ export default function DisplayBoardUnified({
     </div>);
 
 }
+
+
+DisplayBoardUnified.propTypes = {
+  ...(DisplayBoardUnified.propTypes || {}),
+  announcement: PropTypes.any,
+  boardId: PropTypes.any,
+  contrast: PropTypes.any,
+  dateStr: PropTypes.any,
+  department: PropTypes.any,
+  fontScale: PropTypes.any,
+  kiosk: PropTypes.any,
+  lang: PropTypes.any,
+  refreshMs: PropTypes.any,
+  soundInitial: PropTypes.any,
+};
 
 // Вспомогательные функции (старые)
 function todayStr() {

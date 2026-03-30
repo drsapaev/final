@@ -6,6 +6,7 @@ import { MacOSCard, MacOSButton, MacOSInput } from '../../components/ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 /**
  * Компонент для обязательной смены пароля при первом входе
@@ -297,3 +298,9 @@ export default function ChangePasswordRequired({ currentPassword }) {
         </div>
     );
 }
+
+
+ChangePasswordRequired.propTypes = {
+  ...(ChangePasswordRequired.propTypes || {}),
+  currentPassword: PropTypes.any,
+};

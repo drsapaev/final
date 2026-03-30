@@ -21,6 +21,7 @@ import {
 
 'lucide-react';
 import { MacOSCard, MacOSButton, MacOSBadge, MacOSInput, MacOSSelect } from '../ui/macos';
+import PropTypes from 'prop-types';
 
 const SecurityMonitor = ({
   data = {},
@@ -891,6 +892,14 @@ const SecurityMonitor = ({
       }
     </div>);
 
+};
+
+
+SecurityMonitor.propTypes = {
+  ...(SecurityMonitor.propTypes || {}),
+  data: PropTypes.any,
+  loading: PropTypes.any,
+  onRefresh: PropTypes.any,
 };
 
 export default SecurityMonitor;

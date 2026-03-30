@@ -13,6 +13,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { History, Pin, Edit2, Trash2, X, Save, Plus } from 'lucide-react';
 import { useDoctorSectionTemplates, SECTION_LABELS } from '../../hooks/useDoctorSectionTemplates';
 import './DoctorTemplatesPanel.css';
@@ -309,3 +310,18 @@ export function DoctorTemplatesButton({
 }
 
 export default DoctorTemplatesPanel;
+
+DoctorTemplatesPanel.propTypes = {
+    section: PropTypes.string,
+    icd10Code: PropTypes.string,
+    onApply: PropTypes.func,
+    onClose: PropTypes.func,
+    isOpen: PropTypes.bool,
+};
+
+DoctorTemplatesButton.propTypes = {
+    onClick: PropTypes.func,
+    disabled: PropTypes.bool,
+    hasTemplates: PropTypes.bool,
+    count: PropTypes.number,
+};

@@ -2,6 +2,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import MedicalCard from './MedicalCard';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * Карточка метрики для дашборда в стиле MediLab
@@ -101,6 +102,18 @@ const MetricCard = ({
       </div>
     </MedicalCard>
   );
+};
+
+
+MetricCard.propTypes = {
+  ...(MetricCard.propTypes || {}),
+  change: PropTypes.any,
+  className: PropTypes.any,
+  color: PropTypes.any,
+  compact: PropTypes.any,
+  iconName: PropTypes.any,
+  title: PropTypes.any,
+  value: PropTypes.any,
 };
 
 export default MetricCard;

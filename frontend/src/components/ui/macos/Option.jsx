@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 /**
  * macOS-style Option Component
@@ -50,6 +51,16 @@ const Option = React.forwardRef(({
     </option>
   );
 });
+
+
+Option.propTypes = {
+  ...(Option.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  disabled: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+};
 
 Option.displayName = 'Option';
 

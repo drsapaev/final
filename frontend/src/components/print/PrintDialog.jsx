@@ -14,6 +14,7 @@ import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import { createMarkup } from '../../utils/sanitizer';
+import PropTypes from 'prop-types';
 /**
  * Диалог печати с выбором принтера и предварительным просмотром
  * Основа: passport.md стр. 1925-2063
@@ -330,6 +331,16 @@ const PrintDialog = ({
       </div>
     </div>);
 
+};
+
+
+PrintDialog.propTypes = {
+  ...(PrintDialog.propTypes || {}),
+  documentData: PropTypes.any,
+  documentType: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onPrint: PropTypes.any,
 };
 
 export default PrintDialog;

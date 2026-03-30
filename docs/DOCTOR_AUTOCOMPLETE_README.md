@@ -67,9 +67,9 @@ app/
 
 ```
 src/
-├── components/emr/
-│   ├── EMRSmartField.jsx              # Smart field with doctor history
-│   └── EMRSmartField.css
+├── components/emr-v2/sections/
+│   ├── EMRSmartFieldV2.jsx            # Smart field with doctor history
+│   └── EMRSmartFieldV2.css
 └── hooks/
     └── useDoctorPhrases.js            # Hook with readiness check
 ```

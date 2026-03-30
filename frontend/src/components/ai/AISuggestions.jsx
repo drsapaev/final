@@ -3,6 +3,7 @@ import { Card, CardContent, Typography, Alert, Badge, Button } from '../../compo
 import { Brain, Hospital, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import AIClinicalText from './AIClinicalText';
+import PropTypes from 'prop-types';
 
 const AISuggestions = ({
   suggestions = [],
@@ -46,6 +47,13 @@ const AISuggestions = ({
         padding: '4px 8px', borderRadius: 9999, fontSize: 12
       }}>{children}</span>);
 
+  };
+
+
+  Pill.propTypes = {
+    ...(Pill.propTypes || {}),
+    children: PropTypes.any,
+    color: PropTypes.any,
   };
 
   const getRelevanceVariant = (relevance) => {
@@ -167,6 +175,19 @@ const AISuggestions = ({
       </CardContent>
     </Card>);
 
+};
+
+
+AISuggestions.propTypes = {
+  ...(AISuggestions.propTypes || {}),
+  clinicalRecommendations: PropTypes.any,
+  fallbackProvider: PropTypes.any,
+  maxHeight: PropTypes.any,
+  onSelect: PropTypes.any,
+  showConfidence: PropTypes.any,
+  suggestions: PropTypes.any,
+  title: PropTypes.any,
+  type: PropTypes.any,
 };
 
 export default AISuggestions;

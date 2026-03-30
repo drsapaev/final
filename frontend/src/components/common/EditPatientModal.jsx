@@ -1,6 +1,7 @@
 // Stub component for EditPatientModal
 // This component has been replaced by AppointmentWizardV2
 // Keeping this stub to prevent build errors in legacy panel filesimport logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const EditPatientModal = ({ isOpen, onClose }) => {
     // This is a stub - the actual functionality is now in AppointmentWizardV2
     logger.warn('EditPatientModal is deprecated. Use AppointmentWizardV2 instead.');
@@ -32,6 +33,13 @@ const EditPatientModal = ({ isOpen, onClose }) => {
             </div>
         </div>
     );
+};
+
+
+EditPatientModal.propTypes = {
+  ...(EditPatientModal.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
 };
 
 export default EditPatientModal;
