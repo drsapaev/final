@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * macOS-style Paper Component
@@ -66,6 +67,17 @@ const Paper = React.forwardRef(({
     </div>);
 
 });
+
+
+Paper.propTypes = {
+  ...(Paper.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  elevation: PropTypes.any,
+  square: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Paper.displayName = 'Paper';
 

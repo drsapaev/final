@@ -21,6 +21,7 @@ import {
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './ModernTabs.css';
+import PropTypes from 'prop-types';
 
 // Маппинг иконок из lucide-react
 // ⭐ SSOT: icon names from QueueProfile.icon field
@@ -379,6 +380,16 @@ const ModernTabs = ({
       {/* Информационная панель убрана для стиля Edge */}
     </div>);
 
+};
+
+
+ModernTabs.propTypes = {
+  ...(ModernTabs.propTypes || {}),
+  activeTab: PropTypes.any,
+  departmentStats: PropTypes.any,
+  language: PropTypes.any,
+  onProfilesLoaded: PropTypes.any,
+  onTabChange: PropTypes.any,
 };
 
 export default ModernTabs;

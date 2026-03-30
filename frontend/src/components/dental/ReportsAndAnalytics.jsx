@@ -43,6 +43,7 @@ import {
 
   X } from
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Отчеты и аналитика для стоматологической ЭМК
@@ -606,6 +607,12 @@ const ReportsAndAnalytics = ({
       </div>
     </div>);
 
+};
+
+
+ReportsAndAnalytics.propTypes = {
+  ...(ReportsAndAnalytics.propTypes || {}),
+  onClose: PropTypes.any,
 };
 
 export default ReportsAndAnalytics;

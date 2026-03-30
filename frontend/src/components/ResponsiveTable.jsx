@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
+import PropTypes from 'prop-types';
 
 const ResponsiveTable = ({
   data = [],
@@ -430,6 +431,19 @@ const ResponsiveTable = ({
       </table>
     </div>);
 
+};
+
+
+ResponsiveTable.propTypes = {
+  ...(ResponsiveTable.propTypes || {}),
+  actions: PropTypes.any,
+  className: PropTypes.any,
+  columns: PropTypes.any,
+  data: PropTypes.any,
+  onRowClick: PropTypes.any,
+  onRowSelect: PropTypes.any,
+  selectedRows: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default ResponsiveTable;

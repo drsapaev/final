@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSCheckbox = React.forwardRef(({
   className,
@@ -143,6 +144,21 @@ const MacOSCheckbox = React.forwardRef(({
     </div>);
 
 });
+
+
+MacOSCheckbox.propTypes = {
+  ...(MacOSCheckbox.propTypes || {}),
+  checked: PropTypes.any,
+  className: PropTypes.any,
+  description: PropTypes.any,
+  disabled: PropTypes.any,
+  error: PropTypes.any,
+  label: PropTypes.any,
+  onChange: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 MacOSCheckbox.displayName = 'MacOSCheckbox';
 

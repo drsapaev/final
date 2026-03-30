@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const variantStyle = (severity) => {
   switch (severity) {
     case 'success':
@@ -25,6 +26,14 @@ const Alert = ({ children, severity = 'info', style = {}, ...props }) => {
       {children}
     </div>
   );
+};
+
+
+Alert.propTypes = {
+  ...(Alert.propTypes || {}),
+  children: PropTypes.any,
+  severity: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default Alert;

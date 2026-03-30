@@ -12,6 +12,7 @@ import {
 
   CheckCircle } from
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI
@@ -203,6 +204,13 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
       )}
     </Paper>);
 
+};
+
+
+AIClinicalText.propTypes = {
+  ...(AIClinicalText.propTypes || {}),
+  content: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default AIClinicalText;

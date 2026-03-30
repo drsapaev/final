@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * macOS-style Badge Component
@@ -105,6 +106,16 @@ const Badge = React.forwardRef(({
     </span>);
 
 });
+
+
+Badge.propTypes = {
+  ...(Badge.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Badge.displayName = 'macOS Badge';
 

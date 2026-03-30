@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernAlert.css';
+import PropTypes from 'prop-types';
 
 const ModernAlert = ({
   type = 'info',
@@ -166,6 +167,22 @@ const ModernAlert = ({
       )}
     </div>
   );
+};
+
+
+ModernAlert.propTypes = {
+  ...(ModernAlert.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  collapsible: PropTypes.any,
+  defaultExpanded: PropTypes.any,
+  dismissible: PropTypes.any,
+  icon: PropTypes.any,
+  onDismiss: PropTypes.any,
+  size: PropTypes.any,
+  title: PropTypes.any,
+  type: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default ModernAlert;

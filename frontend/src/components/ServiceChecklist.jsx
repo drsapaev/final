@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const ServiceChecklist = ({ value = [], onChange, department }) => {
   const services = {
     cardio: [
@@ -66,6 +67,15 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
       ))}
     </div>
   );
+};
+
+
+ServiceChecklist.propTypes = {
+  ...(ServiceChecklist.propTypes || {}),
+  department: PropTypes.any,
+  onChange: PropTypes.any,
+  toLowerCase: PropTypes.any,
+  value: PropTypes.any,
 };
 
 export default ServiceChecklist;

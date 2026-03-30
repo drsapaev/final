@@ -20,6 +20,7 @@ import {
 
 
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
@@ -954,6 +955,15 @@ const VisitProtocol = ({
       </div>
     </div>);
 
+};
+
+
+VisitProtocol.propTypes = {
+  ...(VisitProtocol.propTypes || {}),
+  initialData: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  patientName: PropTypes.any,
 };
 
 export default VisitProtocol;

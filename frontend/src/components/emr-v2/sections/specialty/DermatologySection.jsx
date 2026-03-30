@@ -9,6 +9,7 @@
  * - Шаблоны косметологических процедур
  */
 
+import PropTypes from 'prop-types';
 import { useState, useCallback, useRef } from 'react';
 import { Camera, X, Image as ImageIcon, Sparkles } from 'lucide-react';
 import EMRSection from '../EMRSection';
@@ -280,3 +281,12 @@ export function DermatologySection({
 }
 
 export default DermatologySection;
+
+DermatologySection.propTypes = {
+  photos: PropTypes.array,
+  skinType: PropTypes.string,
+  conditions: PropTypes.array,
+  localization: PropTypes.object,
+  onChange: PropTypes.func,
+  disabled: PropTypes.bool,
+};

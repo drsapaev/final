@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 const Select = React.forwardRef(({ 
   children,
@@ -39,6 +40,16 @@ const Select = React.forwardRef(({
   );
 });
 
+
+Select.propTypes = {
+  ...(Select.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  error: PropTypes.any,
+  size: PropTypes.any,
+  variant: PropTypes.any,
+};
+
 Select.displayName = 'Select';
 
 const Option = React.forwardRef(({ 
@@ -54,6 +65,13 @@ const Option = React.forwardRef(({
     {children}
   </option>
 ));
+
+
+Option.propTypes = {
+  ...(Option.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+};
 
 Option.displayName = 'Option';
 

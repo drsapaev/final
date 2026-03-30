@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 
 const Toast = React.forwardRef(({
   message,
@@ -148,6 +149,19 @@ const Toast = React.forwardRef(({
 
 });
 
+
+Toast.propTypes = {
+  ...(Toast.propTypes || {}),
+  autoClose: PropTypes.any,
+  className: PropTypes.any,
+  duration: PropTypes.any,
+  message: PropTypes.any,
+  onClose: PropTypes.any,
+  position: PropTypes.any,
+  style: PropTypes.any,
+  type: PropTypes.any,
+};
+
 Toast.displayName = 'Toast';
 
 // Toast Container Component
@@ -182,6 +196,14 @@ export const ToastContainer = ({ children, position = 'top-right', maxToasts = 5
       )}
     </div>);
 
+};
+
+
+ToastContainer.propTypes = {
+  ...(ToastContainer.propTypes || {}),
+  children: PropTypes.any,
+  maxToasts: PropTypes.any,
+  position: PropTypes.any,
 };
 
 export default Toast;

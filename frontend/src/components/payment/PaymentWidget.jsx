@@ -43,6 +43,7 @@ import { api as apiClient, getToken } from '../../api/client';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const PaymentWidget = ({
   visitId,
@@ -530,6 +531,18 @@ const PaymentWidget = ({
       </CardContent>
     </Card>);
 
+};
+
+
+PaymentWidget.propTypes = {
+  ...(PaymentWidget.propTypes || {}),
+  amount: PropTypes.any,
+  currency: PropTypes.any,
+  description: PropTypes.any,
+  onCancel: PropTypes.any,
+  onError: PropTypes.any,
+  onSuccess: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default PaymentWidget;

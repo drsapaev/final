@@ -10,6 +10,7 @@ import { apiClient } from '../../api/client';
 import { useSnackbar } from 'notistack';
 import logger from '../../utils/logger';
 import './AIChatWindow.css';
+import PropTypes from 'prop-types';
 
 const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
   const [messages, setMessages] = useState([
@@ -255,6 +256,14 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
         </div>,
     document.body
   );
+};
+
+
+AIChatWindow.propTypes = {
+  ...(AIChatWindow.propTypes || {}),
+  contextData: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
 };
 
 export default AIChatWindow;

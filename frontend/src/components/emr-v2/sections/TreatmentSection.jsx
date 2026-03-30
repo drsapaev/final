@@ -18,7 +18,7 @@ import { History, Pin, Edit2 } from 'lucide-react';
 import EMRSection from './EMRSection';
 import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import { TreatmentTemplatesButton, TreatmentTemplatesPanel } from '../templates';
-import PrescriptionEditor from '../../emr/PrescriptionEditor';
+import PrescriptionEditor from './PrescriptionEditor';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTemplates';
 import logger from '../../../utils/logger';

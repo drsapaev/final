@@ -22,6 +22,7 @@ import {
   Columns,
   Layout } from
 'lucide-react';
+import PropTypes from 'prop-types';
 
 const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -470,6 +471,14 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
       </CardContent>
     </Card>);
 
+};
+
+
+PhotoComparison.propTypes = {
+  ...(PhotoComparison.propTypes || {}),
+  afterPhoto: PropTypes.any,
+  beforePhoto: PropTypes.any,
+  metadata: PropTypes.any,
 };
 
 export default PhotoComparison;

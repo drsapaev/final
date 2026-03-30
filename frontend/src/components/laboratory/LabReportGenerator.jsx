@@ -35,6 +35,7 @@ import 'jspdf-autotable';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const LabReportGenerator = ({
   results = [],
   patient = {},
@@ -403,6 +404,16 @@ const LabReportGenerator = ({
       </Card>
     </Box>);
 
+};
+
+
+LabReportGenerator.propTypes = {
+  ...(LabReportGenerator.propTypes || {}),
+  clinic: PropTypes.any,
+  doctor: PropTypes.any,
+  patient: PropTypes.any,
+  results: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default LabReportGenerator;

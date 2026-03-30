@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { Smile } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
     const [showPicker, setShowPicker] = useState(false);
@@ -64,6 +65,13 @@ const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
             )}
         </div>
     );
+};
+
+
+EmojiPicker.propTypes = {
+  ...(EmojiPicker.propTypes || {}),
+  disabled: PropTypes.any,
+  onEmojiSelect: PropTypes.any,
 };
 
 export default EmojiPicker;

@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 const MacOSSelect = React.forwardRef(({
   className,
@@ -137,6 +138,22 @@ const MacOSSelect = React.forwardRef(({
     </select>
   );
 });
+
+
+MacOSSelect.propTypes = {
+  ...(MacOSSelect.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  disabled: PropTypes.any,
+  error: PropTypes.any,
+  onChange: PropTypes.any,
+  options: PropTypes.any,
+  placeholder: PropTypes.any,
+  restProps: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 MacOSSelect.displayName = 'MacOSSelect';
 

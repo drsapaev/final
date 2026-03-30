@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 const Spinner = React.forwardRef(({ 
   size = 'md',
@@ -39,6 +40,14 @@ const Spinner = React.forwardRef(({
     </div>
   );
 });
+
+
+Spinner.propTypes = {
+  ...(Spinner.propTypes || {}),
+  className: PropTypes.any,
+  color: PropTypes.any,
+  size: PropTypes.any,
+};
 
 Spinner.displayName = 'Spinner';
 
@@ -91,6 +100,14 @@ const DotsSpinner = React.forwardRef(({
   );
 });
 
+
+DotsSpinner.propTypes = {
+  ...(DotsSpinner.propTypes || {}),
+  className: PropTypes.any,
+  color: PropTypes.any,
+  size: PropTypes.any,
+};
+
 DotsSpinner.displayName = 'DotsSpinner';
 
 const PulseSpinner = React.forwardRef(({ 
@@ -131,6 +148,14 @@ const PulseSpinner = React.forwardRef(({
     </div>
   );
 });
+
+
+PulseSpinner.propTypes = {
+  ...(PulseSpinner.propTypes || {}),
+  className: PropTypes.any,
+  color: PropTypes.any,
+  size: PropTypes.any,
+};
 
 PulseSpinner.displayName = 'PulseSpinner';
 

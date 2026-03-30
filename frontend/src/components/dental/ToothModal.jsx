@@ -40,6 +40,7 @@ import LocalHospital from '@mui/icons-material/LocalHospital';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 // Процедуры для зуба
 const TOOTH_PROCEDURES = {
   EXAMINATION: { id: 'examination', name: 'Осмотр', price: 20000 },
@@ -398,6 +399,18 @@ const ToothModal = ({
       </DialogActions>
     </Dialog>
   );
+};
+
+
+ToothModal.propTypes = {
+  ...(ToothModal.propTypes || {}),
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  open: PropTypes.any,
+  patientId: PropTypes.any,
+  toothData: PropTypes.any,
+  toothNumber: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default ToothModal;

@@ -3,6 +3,7 @@ import { Card, Button, Badge } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
 import { AnimatedTransition } from '../../hooks/useAnimation';
+import PropTypes from 'prop-types';
 
 /**
  * Пример интерактивной панели с эффектами наведения и анимациями
@@ -174,6 +175,17 @@ const InteractivePanel = ({
   );
 };
 
+
+InteractivePanel.propTypes = {
+  ...(InteractivePanel.propTypes || {}),
+  actions: PropTypes.any,
+  children: PropTypes.any,
+  className: PropTypes.any,
+  onClick: PropTypes.any,
+  status: PropTypes.any,
+  title: PropTypes.any,
+};
+
 /**
  * Пример интерактивной панели с несколькими состояниями
  */
@@ -296,6 +308,14 @@ export const StateInteractivePanel = ({
       </style>
     </Card>
   );
+};
+
+
+StateInteractivePanel.propTypes = {
+  ...(StateInteractivePanel.propTypes || {}),
+  initialState: PropTypes.any,
+  states: PropTypes.any,
+  title: PropTypes.any,
 };
 
 export default InteractivePanel;

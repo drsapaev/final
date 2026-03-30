@@ -5,6 +5,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Send, Trash2 } from 'lucide-react';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const VoiceRecorder = ({ onSend, onCancel }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -196,6 +197,13 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
             )}
         </div>
     );
+};
+
+
+VoiceRecorder.propTypes = {
+  ...(VoiceRecorder.propTypes || {}),
+  onCancel: PropTypes.any,
+  onSend: PropTypes.any,
 };
 
 export default VoiceRecorder;

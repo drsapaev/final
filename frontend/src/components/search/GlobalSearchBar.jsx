@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 // Debounce hook
 function useDebounce(value, delay) {
@@ -481,3 +482,9 @@ export default function GlobalSearchBar({ className = '' }) {
         </div>);
 
 }
+
+
+GlobalSearchBar.propTypes = {
+  ...(GlobalSearchBar.propTypes || {}),
+  className: PropTypes.any,
+};

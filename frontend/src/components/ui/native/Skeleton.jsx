@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 const Skeleton = React.forwardRef(({ 
   className = '', 
@@ -30,6 +31,13 @@ const Skeleton = React.forwardRef(({
     />
   );
 });
+
+
+Skeleton.propTypes = {
+  ...(Skeleton.propTypes || {}),
+  className: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Skeleton.displayName = 'Skeleton';
 

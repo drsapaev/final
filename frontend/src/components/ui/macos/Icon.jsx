@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * macOS-style Icon Component
@@ -499,6 +500,17 @@ const Icon = React.forwardRef(({
     </svg>);
 
 });
+
+
+Icon.propTypes = {
+  ...(Icon.propTypes || {}),
+  className: PropTypes.any,
+  color: PropTypes.any,
+  name: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Icon.displayName = 'macOS Icon';
 

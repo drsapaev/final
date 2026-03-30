@@ -16,6 +16,7 @@ import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import notify from '../../services/notify';
 import './PaymentPayMe.css';
+import PropTypes from 'prop-types';
 
 const API_BASE = getApiBaseUrl();
 
@@ -622,6 +623,19 @@ const PaymentPayMe = ({
       }
   </>);
 
+};
+
+
+PaymentPayMe.propTypes = {
+  ...(PaymentPayMe.propTypes || {}),
+  currency: PropTypes.any,
+  invoiceId: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onError: PropTypes.any,
+  onSuccess: PropTypes.any,
+  toLocaleString: PropTypes.any,
+  totalAmount: PropTypes.any,
 };
 
 export default PaymentPayMe;

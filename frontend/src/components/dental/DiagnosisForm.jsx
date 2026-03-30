@@ -18,6 +18,7 @@ import {
 
   Send } from
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Форма диагнозов и назначений для стоматологической ЭМК
@@ -772,6 +773,15 @@ const DiagnosisForm = ({
       </div>
     </div>);
 
+};
+
+
+DiagnosisForm.propTypes = {
+  ...(DiagnosisForm.propTypes || {}),
+  initialData: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  patientName: PropTypes.any,
 };
 
 export default DiagnosisForm;

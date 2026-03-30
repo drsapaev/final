@@ -42,6 +42,7 @@ import Schedule from '@mui/icons-material/Schedule';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const TreatmentPlanner = ({ visitId, onUpdate }) => {
   const [treatmentPlan, setTreatmentPlan] = useState({
     name: '',
@@ -300,6 +301,13 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
       </Dialog>
     </Box>
   );
+};
+
+
+TreatmentPlanner.propTypes = {
+  ...(TreatmentPlanner.propTypes || {}),
+  onUpdate: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default TreatmentPlanner;

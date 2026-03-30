@@ -1,5 +1,6 @@
 import React from 'react';
 import { XCircle } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSInput = React.forwardRef(({
   className,
@@ -179,6 +180,24 @@ const MacOSInput = React.forwardRef(({
     </div>
   );
 });
+
+
+MacOSInput.propTypes = {
+  ...(MacOSInput.propTypes || {}),
+  className: PropTypes.any,
+  clearable: PropTypes.any,
+  disabled: PropTypes.any,
+  error: PropTypes.any,
+  icon: PropTypes.any,
+  iconPosition: PropTypes.any,
+  onBlur: PropTypes.any,
+  onClear: PropTypes.any,
+  onFocus: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 MacOSInput.displayName = 'MacOSInput';
 

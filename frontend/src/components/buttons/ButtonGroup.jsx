@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ButtonGroup.css';
+import PropTypes from 'prop-types';
 
 const ButtonGroup = ({
   children,
@@ -45,6 +46,17 @@ const ButtonGroup = ({
       {cloneChildren()}
     </div>);
 
+};
+
+
+ButtonGroup.propTypes = {
+  ...(ButtonGroup.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  orientation: PropTypes.any,
+  size: PropTypes.any,
+  spacing: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default ButtonGroup;

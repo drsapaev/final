@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
+import PropTypes from 'prop-types';
 
 const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
   const [printedTickets, setPrintedTickets] = useState(new Set());
@@ -195,6 +196,18 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
       </div>
     </div>);
 
+};
+
+
+MultipleTicketsPrinter.propTypes = {
+  ...(MultipleTicketsPrinter.propTypes || {}),
+  forEach: PropTypes.any,
+  length: PropTypes.any,
+  map: PropTypes.any,
+  onAllPrinted: PropTypes.any,
+  onClose: PropTypes.any,
+  some: PropTypes.any,
+  tickets: PropTypes.any,
 };
 
 export default MultipleTicketsPrinter;

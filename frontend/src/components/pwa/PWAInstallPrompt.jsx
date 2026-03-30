@@ -21,6 +21,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { usePWA } from '../../hooks/usePWA';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const PWAInstallPrompt = ({ onClose }) => {
   const {
     isInstallable,
@@ -187,6 +188,12 @@ const PWAInstallPrompt = ({ onClose }) => {
       </Box>
     </Slide>
   );
+};
+
+
+PWAInstallPrompt.propTypes = {
+  ...(PWAInstallPrompt.propTypes || {}),
+  onClose: PropTypes.any,
 };
 
 export default PWAInstallPrompt;

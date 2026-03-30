@@ -1,4 +1,5 @@
 import { ACCENT_OPTIONS, useMacOSTheme } from '../../../theme/macosTheme.jsx';
+import PropTypes from 'prop-types';
 
 const LABELS = {
   blue: 'Blue',
@@ -56,5 +57,13 @@ export default function AccentPicker({ size = 22, className = '', style = {} }) 
     </div>
   );
 }
+
+
+AccentPicker.propTypes = {
+  ...(AccentPicker.propTypes || {}),
+  className: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+};
 
 

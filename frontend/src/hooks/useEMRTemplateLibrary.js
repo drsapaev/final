@@ -20,7 +20,7 @@ export async function loadBackendEmrTemplates() {
       .then((response) => (Array.isArray(response) ? response : []))
       .catch((error) => {
         logger.debug(
-          '[SingleSheetEMR] Backend EMR templates unavailable',
+          '[EMRTemplateLibrary] Backend EMR templates unavailable',
           error?.message || error,
         );
         return [];

@@ -5,6 +5,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { designTokens, getToken } from '../tokens/design-tokens';
+import PropTypes from 'prop-types';
 
 const ThemeContext = createContext();
 
@@ -223,6 +224,12 @@ export const ThemeProvider = ({ children }) => {
       {children}
     </ThemeContext.Provider>);
 
+};
+
+
+ThemeProvider.propTypes = {
+  ...(ThemeProvider.propTypes || {}),
+  children: PropTypes.any,
 };
 
 export default ThemeProvider;

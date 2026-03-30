@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
@@ -86,3 +87,10 @@ export function NotesSection({
 }
 
 export default NotesSection;
+
+NotesSection.propTypes = {
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    disabled: PropTypes.bool,
+    defaultOpen: PropTypes.bool,
+};

@@ -29,6 +29,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
   const [echoData, setEchoData] = useState({
     // Левый желудочек
@@ -323,6 +324,15 @@ const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
       </CardContent>
     </Card>);
 
+};
+
+
+EchoForm.propTypes = {
+  ...(EchoForm.propTypes || {}),
+  initialData: PropTypes.any,
+  onSave: PropTypes.any,
+  patientId: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default EchoForm;

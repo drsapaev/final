@@ -6,6 +6,7 @@ import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
+import PropTypes from 'prop-types';
 
 const App = lazy(() => import('./App.jsx'));
 
@@ -18,6 +19,12 @@ function PublicProviders({ children }) {
     </MacOSThemeProvider>
   );
 }
+
+
+PublicProviders.propTypes = {
+  ...(PublicProviders.propTypes || {}),
+  children: PropTypes.any,
+};
 
 function AppBridge() {
   return (

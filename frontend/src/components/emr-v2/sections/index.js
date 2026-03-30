@@ -14,6 +14,10 @@
 export { EMRSection } from './EMRSection';
 export { EMRTextField } from './EMRTextField';
 export { EMRSmartFieldV2 } from './EMRSmartFieldV2';
+export { default as ComplaintsField } from './ComplaintsField';
+export { default as ExaminationMatrix } from './ExaminationMatrix';
+export { default as VitalsWidget } from './VitalsWidget';
+export { default as PrescriptionEditor } from './PrescriptionEditor';
 
 // Phase 4.1 - Simple text sections
 export { ComplaintsSection } from './ComplaintsSection';

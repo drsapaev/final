@@ -26,6 +26,7 @@ import {
 
 
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Архив фото и рентгенов для стоматологической ЭМК
@@ -778,6 +779,16 @@ const PhotoArchive = ({
       {renderImageViewer()}
     </div>);
 
+};
+
+
+PhotoArchive.propTypes = {
+  ...(PhotoArchive.propTypes || {}),
+  initialData: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  patientId: PropTypes.any,
+  patientName: PropTypes.any,
 };
 
 export default PhotoArchive;

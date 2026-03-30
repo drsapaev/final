@@ -10,7 +10,7 @@ import { useState, useMemo, useCallback } from 'react';
 
 import EMRSection from './EMRSection';
 import EMRSmartFieldV2 from './EMRSmartFieldV2';
-import ExaminationMatrix from '../../emr/ExaminationMatrix';
+import ExaminationMatrix from './ExaminationMatrix';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';

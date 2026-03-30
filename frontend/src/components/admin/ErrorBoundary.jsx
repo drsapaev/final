@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -84,5 +85,11 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
+
+ErrorBoundary.propTypes = {
+  ...(ErrorBoundary.propTypes || {}),
+  children: PropTypes.any,
+};
 
 export default ErrorBoundary;

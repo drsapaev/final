@@ -1,5 +1,6 @@
 import { Card } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * Базовый компонент для разделов админ панели
@@ -91,6 +92,18 @@ const AdminSection = ({
       </Card>
     </div>
   );
+};
+
+
+AdminSection.propTypes = {
+  ...(AdminSection.propTypes || {}),
+  actions: PropTypes.any,
+  children: PropTypes.any,
+  className: PropTypes.any,
+  description: PropTypes.any,
+  error: PropTypes.any,
+  loading: PropTypes.any,
+  title: PropTypes.any,
 };
 
 export default AdminSection;

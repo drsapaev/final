@@ -28,7 +28,7 @@ DON'T:
 ## 📁 Files You Can Safely Modify
 
 ### ✅ SAFE (UI/Performance):
-- `frontend/src/components/emr/EMRSmartField.css` - Styling
+- `frontend/src/components/emr-v2/sections/EMRSmartFieldV2.css` - Styling
 - Database indexes (add, not remove)
 - Telemetry dashboard queries
 - Error handling logic

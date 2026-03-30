@@ -19,6 +19,7 @@ import { MacOSCard, MacOSButton, MacOSLoadingSkeleton } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 /**
  * Селектор услуг для панели врача
  * Использует справочник из админ панели согласно passport.md стр. 1254
@@ -509,6 +510,16 @@ const DoctorServiceSelector = ({
       }
     </div>);
 
+};
+
+
+DoctorServiceSelector.propTypes = {
+  ...(DoctorServiceSelector.propTypes || {}),
+  canEditPrices: PropTypes.any,
+  className: PropTypes.any,
+  onServicesChange: PropTypes.any,
+  selectedServices: PropTypes.any,
+  specialty: PropTypes.any,
 };
 
 export default DoctorServiceSelector;

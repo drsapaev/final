@@ -48,6 +48,7 @@ import {
 '@mui/icons-material';
 import apiClient from '../../api/client';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 // Типы связей с иконками и названиями
 const RELATION_TYPES = {
@@ -250,6 +251,15 @@ export default function FamilyRelationsCard({
 }
 
 
+FamilyRelationsCard.propTypes = {
+  ...(FamilyRelationsCard.propTypes || {}),
+  canEdit: PropTypes.any,
+  onFamilyChange: PropTypes.any,
+  patientId: PropTypes.any,
+  patientName: PropTypes.any,
+};
+
+
 /**
  * Диалог добавления новой связи
  */
@@ -430,3 +440,12 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         </Dialog>);
 
 }
+
+AddRelationDialog.propTypes = {
+  ...(AddRelationDialog.propTypes || {}),
+  onClose: PropTypes.any,
+  onSuccess: PropTypes.any,
+  open: PropTypes.any,
+  patientId: PropTypes.any,
+  patientName: PropTypes.any,
+};

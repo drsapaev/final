@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 // Simple macOS-style Skeleton placeholder
 const Skeleton = ({ width = '100%', height = 16, variant = 'rect', style = {}, ...props }) => {
   const radius = variant === 'circle' ? '50%' : 8;
@@ -18,6 +19,15 @@ const Skeleton = ({ width = '100%', height = 16, variant = 'rect', style = {}, .
       {...props}
     />
   );
+};
+
+
+Skeleton.propTypes = {
+  ...(Skeleton.propTypes || {}),
+  height: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+  width: PropTypes.any,
 };
 
 export default Skeleton;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 const Textarea = React.forwardRef(({ 
   className = '', 
@@ -44,6 +45,16 @@ const Textarea = React.forwardRef(({
     />
   );
 });
+
+
+Textarea.propTypes = {
+  ...(Textarea.propTypes || {}),
+  className: PropTypes.any,
+  error: PropTypes.any,
+  resize: PropTypes.any,
+  size: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Textarea.displayName = 'Textarea';
 

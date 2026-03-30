@@ -4,6 +4,7 @@ import { Button } from '../ui/native';
 import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Компонент кнопки печати с поддержкой разных типов документов
  * Основа: detail.md стр. 3721-3888
@@ -146,6 +147,21 @@ const PrintButton = ({
       }
     </div>);
 
+};
+
+
+PrintButton.propTypes = {
+  ...(PrintButton.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  documentData: PropTypes.any,
+  documentType: PropTypes.any,
+  onPrintComplete: PropTypes.any,
+  onPrintError: PropTypes.any,
+  onPrintStart: PropTypes.any,
+  printerName: PropTypes.any,
+  size: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default PrintButton;

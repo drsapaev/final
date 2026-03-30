@@ -20,9 +20,9 @@ import {
   CreditCard } from
 'lucide-react';
 import { Badge } from '../ui/macos';
-import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 
 const RefundRequestsTable = ({ onRefresh }) => {
   const [requests, setRequests] = useState([]);
@@ -95,7 +95,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Approve error:', err);
-      notify.error('Ошибка: ' + err.message);
+      alert('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -125,7 +125,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Reject error:', err);
-      notify.error('Ошибка: ' + err.message);
+      alert('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -154,7 +154,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Complete error:', err);
-      notify.error('Ошибка: ' + err.message);
+      alert('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -420,6 +420,12 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
         </div>);
 
+};
+
+
+RefundRequestsTable.propTypes = {
+  ...(RefundRequestsTable.propTypes || {}),
+  onRefresh: PropTypes.any,
 };
 
 export default RefundRequestsTable;

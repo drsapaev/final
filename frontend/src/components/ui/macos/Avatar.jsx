@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 function getInitials(name) {
   if (!name) return '';
   const parts = String(name).trim().split(/\s+/);
@@ -61,6 +62,17 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
       )}
     </div>
   );
+};
+
+
+Avatar.propTypes = {
+  ...(Avatar.propTypes || {}),
+  className: PropTypes.any,
+  name: PropTypes.any,
+  size: PropTypes.any,
+  src: PropTypes.any,
+  status: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default Avatar;

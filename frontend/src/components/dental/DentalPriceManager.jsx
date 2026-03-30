@@ -15,6 +15,7 @@ import { toast } from 'react-toastify';
 
 import { getApiBaseUrl } from '../../api/runtime';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const API_BASE = getApiBaseUrl();
 
 /**
@@ -331,6 +332,18 @@ const DentalPriceManager = ({
       </div>
     </div>);
 
+};
+
+
+DentalPriceManager.propTypes = {
+  ...(DentalPriceManager.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onPriceSet: PropTypes.any,
+  originalPrice: PropTypes.any,
+  serviceId: PropTypes.any,
+  serviceName: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default DentalPriceManager;

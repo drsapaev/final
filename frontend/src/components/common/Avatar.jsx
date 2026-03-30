@@ -1,4 +1,5 @@
 import './Avatar.css';
+import PropTypes from 'prop-types';
 
 const roleGradients = {
     admin: 'linear-gradient(135deg, #667eea, #764ba2)',
@@ -49,6 +50,20 @@ const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, classNa
             )}
         </div>
     );
+};
+
+
+Avatar.propTypes = {
+  ...(Avatar.propTypes || {}),
+  className: PropTypes.any,
+  full_name: PropTypes.any,
+  isOnline: PropTypes.any,
+  name: PropTypes.any,
+  role: PropTypes.any,
+  showStatus: PropTypes.any,
+  size: PropTypes.any,
+  user: PropTypes.any,
+  user_name: PropTypes.any,
 };
 
 export default Avatar;

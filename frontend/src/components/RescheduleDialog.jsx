@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { rescheduleVisit, rescheduleTomorrow } from '../api/visits';
+import PropTypes from 'prop-types';
 
 /**
  * Диалог переноса визита.
@@ -132,6 +133,17 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
     </div>
   );
 }
+
+
+RescheduleDialog.propTypes = {
+  ...(RescheduleDialog.propTypes || {}),
+  id: PropTypes.any,
+  onClose: PropTypes.any,
+  onRescheduled: PropTypes.any,
+  open: PropTypes.any,
+  planned_date: PropTypes.any,
+  visit: PropTypes.any,
+};
 
 /* styles */
 const backdrop = {

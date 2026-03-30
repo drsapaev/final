@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { CreditCard, DollarSign, Receipt, Clock, CheckCircle } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
-import notify from '../../services/notify';
 import './PaymentManager.css';
+import PropTypes from 'prop-types';
 
 const API_BASE = '/api/v1';
 
@@ -48,11 +49,11 @@ const PaymentManager = ({
         const data = await response.json();
         setInvoices(data);
       } else {
-        notify.error('Ошибка загрузки счетов');
+        toast.error('Ошибка загрузки счетов');
       }
     } catch (error) {
       logger.error('Ошибка загрузки счетов:', error);
-      notify.error('Ошибка загрузки данных');
+      toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
     }
@@ -61,7 +62,7 @@ const PaymentManager = ({
   // Создание нового счета для оплаты
   const createPaymentInvoice = async () => {
     if (!paymentAmount || paymentAmount <= 0) {
-      notify.error('Введите корректную сумму оплаты');
+      toast.error('Введите корректную сумму оплаты');
       return;
     }
 
@@ -93,14 +94,14 @@ const PaymentManager = ({
           setShowPayMePayment(true);
         }
 
-        notify.success('Счет создан, переходим к оплате');
+        toast.success('Счет создан, переходим к оплате');
       } else {
         const errorData = await response.json();
-        notify.error(`Ошибка создания счета: ${errorData.detail || 'Неизвестная ошибка'}`);
+        toast.error(`Ошибка создания счета: ${errorData.detail || 'Неизвестная ошибка'}`);
       }
     } catch (error) {
       logger.error('Ошибка создания счета:', error);
-      notify.error('Ошибка создания счета');
+      toast.error('Ошибка создания счета');
     } finally {
       setLoading(false);
     }
@@ -120,7 +121,7 @@ const PaymentManager = ({
 
   // Обработчики успешной оплаты
   const handlePaymentSuccess = (paymentData) => {
-    notify.success('Оплата завершена успешно!');
+    toast.success('Оплата завершена успешно!');
     setShowClickPayment(false);
     setShowPayMePayment(false);
     loadPendingInvoices(); // Обновляем список счетов
@@ -132,7 +133,7 @@ const PaymentManager = ({
   };
 
   const handlePaymentError = (error) => {
-    notify.error(`Ошибка оплаты: ${error.message}`);
+    toast.error(`Ошибка оплаты: ${error.message}`);
     setShowClickPayment(false);
     setShowPayMePayment(false);
   };
@@ -300,6 +301,16 @@ const PaymentManager = ({
       
     </>);
 
+};
+
+
+PaymentManager.propTypes = {
+  ...(PaymentManager.propTypes || {}),
+  initialAmount: PropTypes.any,
+  invoiceId: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  patientInfo: PropTypes.any,
 };
 
 export default PaymentManager;

@@ -21,6 +21,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const API_BASE = getApiOrigin();
 
@@ -450,6 +451,16 @@ const DoctorCalendar = ({
       `}</style>
         </div>);
 
+};
+
+
+DoctorCalendar.propTypes = {
+  ...(DoctorCalendar.propTypes || {}),
+  compact: PropTypes.any,
+  department: PropTypes.any,
+  doctorId: PropTypes.any,
+  onSelectSlot: PropTypes.any,
+  onViewAppointment: PropTypes.any,
 };
 
 export default DoctorCalendar;
