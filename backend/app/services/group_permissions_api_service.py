@@ -7,14 +7,6 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models.role_permission import (
-    Role,
-    UserGroup,
-    group_roles_table,
-    user_groups_table,
-    user_roles_table,
-)
-from app.models.user import User
 from app.repositories.group_permissions_api_repository import GroupPermissionsApiRepository
 from app.services.group_permissions_service import get_group_permissions_service
 
@@ -44,27 +36,8 @@ class GroupPermissionsApiService:
             raise GroupPermissionsApiDomainError(404, "Пользователь не найден")
 
         permissions = self.permission_service.get_user_permissions(self.db, user_id, use_cache)
-        roles = [
-            role.name
-            for role in (
-                self.db.query(Role)
-                .join(user_roles_table, Role.id == user_roles_table.c.role_id)
-                .filter(user_roles_table.c.user_id == user_id, Role.is_active.is_(True))
-                .all()
-            )
-        ]
-        groups = [
-            group.name
-            for group in (
-                self.db.query(UserGroup)
-                .join(user_groups_table, UserGroup.id == user_groups_table.c.group_id)
-                .filter(
-                    user_groups_table.c.user_id == user_id,
-                    UserGroup.is_active.is_(True),
-                )
-                .all()
-            )
-        ]
+        roles = self.repository.get_user_role_names(user_id)
+        groups = self.repository.get_user_group_names(user_id)
 
         return {
             "user_id": user_id,
@@ -95,24 +68,8 @@ class GroupPermissionsApiService:
                 "description": group.description,
                 "group_type": group.group_type,
                 "is_active": group.is_active,
-                "users_count": (
-                    self.db.query(User)
-                    .join(user_groups_table, User.id == user_groups_table.c.user_id)
-                    .filter(
-                        user_groups_table.c.group_id == group.id,
-                        User.is_active.is_(True),
-                    )
-                    .count()
-                ),
-                "roles_count": (
-                    self.db.query(Role)
-                    .join(group_roles_table, Role.id == group_roles_table.c.role_id)
-                    .filter(
-                        group_roles_table.c.group_id == group.id,
-                        Role.is_active.is_(True),
-                    )
-                    .count()
-                ),
+                "users_count": self.repository.count_group_users(group.id),
+                "roles_count": self.repository.count_group_roles(group.id),
             }
             for group in groups
         ]
