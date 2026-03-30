@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 
@@ -12,8 +13,8 @@ export default function NotificationSystemStatus() {
 
     async function loadStatus() {
         try {
-            const data = await api.get('/notifications/notification-status');
-            setStatus(data);
+            const response = await api.get('/notifications/notification-status');
+            setStatus(response.data ?? response);
         } catch (err) {
             logger.error('Failed to load notification system status', err);
         } finally {
@@ -87,3 +88,14 @@ function StatusCard({ title, configured, details }) {
         </div>
     );
 }
+
+StatusCard.propTypes = {
+    title: PropTypes.string.isRequired,
+    configured: PropTypes.bool,
+    details: PropTypes.arrayOf(
+        PropTypes.shape({
+            label: PropTypes.string.isRequired,
+            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.bool]),
+        })
+    ).isRequired,
+};

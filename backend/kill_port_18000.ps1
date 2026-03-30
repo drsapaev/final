@@ -1,7 +1,7 @@
-# Скрипт для остановки всех процессов на порту 8000
-Write-Host "[*] Поиск процессов на порту 8000..." -ForegroundColor Cyan
+# Скрипт для остановки всех процессов на порту 18000
+Write-Host "[*] Поиск процессов на порту 18000..." -ForegroundColor Cyan
 
-$connections = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
+$connections = Get-NetTCPConnection -LocalPort 18000 -ErrorAction SilentlyContinue
 
 if ($connections) {
     $pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique
@@ -22,8 +22,8 @@ if ($connections) {
 
     Start-Sleep -Seconds 1
     Write-Host ""
-    Write-Host "[OK] Порт 8000 освобожден!" -ForegroundColor Green
+    Write-Host "[OK] Порт 18000 освобожден!" -ForegroundColor Green
 }
 else {
-    Write-Host "[OK] Порт 8000 свободен" -ForegroundColor Green
+    Write-Host "[OK] Порт 18000 свободен" -ForegroundColor Green
 }

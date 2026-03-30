@@ -6,6 +6,11 @@ import * as messagesApi from '../api/messages';
 import { pushNotifications } from '../services/pushNotifications';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import {
+  MESSAGE_EVENT_TYPES,
+  MESSAGING_CONTRACT_VERSION,
+  isSupportedMessagingContractVersion,
+} from '../constants/messagingContract';
 
 const ChatContext = createContext(null);
 
@@ -28,6 +33,9 @@ export const ChatProvider = ({ children }) => {
   const reconnectTimeoutRef = useRef(null);
   const activeConversationRef = useRef(activeConversation);
   const retryCountRef = useRef(0);
+  const readSyncInFlightRef = useRef(new Set());
+  const contractVersionMismatchRef = useRef(false);
+  const initialConversationLoadUserRef = useRef(null);
 
   // Храним актуальные функции в ref
   // Это предотвращает разрыв соединения WebSocket при обновлении функций/стейта
@@ -46,16 +54,36 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Загрузка бесед
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async ({ syncUnread = true } = {}) => {
     if (!user) return;
     try {
       const data = await messagesApi.getConversations();
       setConversations(data.conversations || []);
-      setUnreadCount(data.total_unread || 0);
+      if (syncUnread) {
+        setUnreadCount(data.total_unread || 0);
+      }
     } catch (error) {
       logger.error('Failed to load conversations:', error);
     }
   }, [user]);
+
+  const markMessageAsRead = useCallback(async (messageId) => {
+    if (!messageId) return;
+    if (readSyncInFlightRef.current.has(messageId)) return;
+
+    readSyncInFlightRef.current.add(messageId);
+    try {
+      await messagesApi.markAsRead(messageId);
+      setMessages((prev) => prev.map((msg) => (
+        msg.id === messageId ? { ...msg, is_read: true } : msg
+      )));
+    } catch (error) {
+      logger.warn('[FIX:CHAT] Failed to sync read receipt', { messageId, error });
+    } finally {
+      readSyncInFlightRef.current.delete(messageId);
+      loadConversationsRef.current?.();
+    }
+  }, []);
 
   // Обработка сообщения
   const handleNewMessage = useCallback((message) => {
@@ -66,9 +94,17 @@ export const ChatProvider = ({ children }) => {
     const senderIdStr = String(message.sender_id);
     const recipientIdStr = String(message.recipient_id);
     const currentUserIdStr = user ? String(user.id) : null;
+    const hasFocus = typeof document?.hasFocus === 'function' ? document.hasFocus() : true;
 
     const isIncoming = activeIdStr && senderIdStr === activeIdStr;
     const isOutgoingSync = currentUserIdStr && senderIdStr === currentUserIdStr && activeIdStr && recipientIdStr === activeIdStr;
+    const isIncomingForCurrentUser = currentUserIdStr && recipientIdStr === currentUserIdStr;
+    const isConversationInView = Boolean(
+      isIncomingForCurrentUser &&
+      isIncoming &&
+      isChatOpen &&
+      hasFocus
+    );
 
     if (currentActive && (isIncoming || isOutgoingSync)) {
 
@@ -78,10 +114,15 @@ export const ChatProvider = ({ children }) => {
       });
     }
 
-    loadConversations(); // Всегда обновляем список
+    if (isConversationInView) {
+      // Keep sender receipts and unread badge in sync for active viewed conversation.
+      void markMessageAsRead(message.id);
+    } else {
+      loadConversations({ syncUnread: !isIncomingForCurrentUser });
+    }
 
     // Обновляем счетчик непрочитанных если нужно
-    if (message.recipient_id === user?.id && (!currentActive || String(currentActive) !== String(message.sender_id))) {
+    if (isIncomingForCurrentUser && !isConversationInView) {
       setUnreadCount((prev) => prev + 1);
 
       // Play notification sound ONLY when:
@@ -119,7 +160,7 @@ export const ChatProvider = ({ children }) => {
         message.sender_name || `User ${message.sender_id}`
       );
     }
-  }, [user, loadConversations, isChatOpen]);
+  }, [user, loadConversations, isChatOpen, markMessageAsRead]);
 
   // Обновляем ref при изменении handleNewMessage
   useEffect(() => {
@@ -130,6 +171,45 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     loadConversationsRef.current = loadConversations;
   }, [loadConversations]);
+
+  // Обновить количество непрочитанных
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      const count = await messagesApi.getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      logger.error('Failed to get unread count:', error);
+    }
+  }, []);
+
+  // Load the inbox as soon as auth is available, even before WS finishes connecting.
+  // This keeps the conversation list usable on slower sockets and on first mount.
+  useEffect(() => {
+    const currentUserId = user?.id || null;
+    if (!currentUserId) {
+      initialConversationLoadUserRef.current = null;
+      return;
+    }
+
+    if (initialConversationLoadUserRef.current === currentUserId) {
+      return;
+    }
+
+    initialConversationLoadUserRef.current = currentUserId;
+    void loadConversations();
+    void refreshUnreadCount();
+  }, [user?.id, loadConversations, refreshUnreadCount]);
+
+  // Request online status of specific users
+  const requestOnlineStatus = useCallback((userIds) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && userIds.length > 0) {
+      wsRef.current.send(JSON.stringify({
+        type: MESSAGE_EVENT_TYPES.GET_ONLINE_STATUS,
+        user_ids: userIds,
+        contract_version: MESSAGING_CONTRACT_VERSION,
+      }));
+    }
+  }, []);
 
   // WebSocket подключение (Один раз на приложение!)
   // Зависит ТОЛЬКО от токена. User и функции исключены для стабильности.
@@ -180,38 +260,62 @@ export const ChatProvider = ({ children }) => {
         setIsConnected(true);
         retryCountRef.current = 0;
         logger.info('[FIX:WS] Chat WebSocket connected');
+        loadConversationsRef.current?.();
+        refreshUnreadCount();
+        if (activeConversationRef.current) {
+          requestOnlineStatus([activeConversationRef.current]);
+        }
         // console.log('✅ [Context] WS Connected');
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'new_message') {
+          if (
+            data.contract_version &&
+            !isSupportedMessagingContractVersion(data.contract_version) &&
+            !contractVersionMismatchRef.current
+          ) {
+            contractVersionMismatchRef.current = true;
+            logger.warn('[FIX:WS] Messaging contract version mismatch', {
+              expected: MESSAGING_CONTRACT_VERSION,
+              received: data.contract_version,
+              type: data.type,
+            });
+          }
+          if (data.type === MESSAGE_EVENT_TYPES.NEW_MESSAGE) {
             // Используем ref для вызова актуальной версии функции
             if (handleNewMessageRef.current) {
               handleNewMessageRef.current(data.message);
             }
-          } else if (data.type === 'typing') {
+          } else if (data.type === MESSAGE_EVENT_TYPES.TYPING) {
             setTypingUsers((prev) => ({ ...prev, [data.sender_id]: data.is_typing }));
-          } else if (data.type === 'message_read') {
+          } else if (data.type === MESSAGE_EVENT_TYPES.MESSAGE_READ) {
             setMessages((prev) => prev.map((msg) => msg.id === data.message_id ? { ...msg, is_read: true } : msg));
-          } else if (data.type === 'messages_read') {
+            loadConversationsRef.current?.();
+            refreshUnreadCount();
+          } else if (data.type === MESSAGE_EVENT_TYPES.MESSAGES_READ) {
             const ids = new Set(data.message_ids);
             setMessages((prev) => prev.map((msg) => ids.has(msg.id) ? { ...msg, is_read: true } : msg));
-          } else if (data.type === 'ping') {
-            // Respond to server heartbeat
-            ws.send(JSON.stringify({ type: 'pong' }));
-          } else if (data.type === 'online_status') {
+            loadConversationsRef.current?.();
+            refreshUnreadCount();
+      } else if (data.type === MESSAGE_EVENT_TYPES.PING) {
+        // Respond to server heartbeat
+        ws.send(JSON.stringify({
+          type: MESSAGE_EVENT_TYPES.PONG,
+          contract_version: MESSAGING_CONTRACT_VERSION,
+        }));
+      } else if (data.type === MESSAGE_EVENT_TYPES.ONLINE_STATUS) {
             // Update online status of users
             // Update online status of users
             setOnlineUsers((prev) => ({ ...prev, ...data.users }));
-          } else if (data.type === 'reaction_update') {
+          } else if (data.type === MESSAGE_EVENT_TYPES.REACTION_UPDATE) {
             setMessages((prev) => prev.map((msg) =>
             msg.id === data.message_id ?
             { ...msg, reactions: data.reactions } :
             msg
             ));
-          } else if (data.type === 'message_deleted') {
+          } else if (data.type === MESSAGE_EVENT_TYPES.MESSAGE_DELETED) {
             setMessages((prev) => prev.filter((msg) => msg.id !== data.message_id));
             loadConversationsRef.current?.();
           }
@@ -225,6 +329,8 @@ export const ChatProvider = ({ children }) => {
           wsRef.current = null;
         }
         setIsConnected(false);
+        setTypingUsers({});
+        setOnlineUsers({});
         if (!isMounted) {
           return;
         }
@@ -263,7 +369,7 @@ export const ChatProvider = ({ children }) => {
         }
       }
     };
-  }, [token]); // <-- Ключевое изменение: только token!
+  }, [token, refreshUnreadCount, requestOnlineStatus]);
 
   // Загрузка сообщений (при открытии чата)
   const [hasMore, setHasMore] = useState(false);
@@ -279,6 +385,8 @@ export const ChatProvider = ({ children }) => {
       // Важно: обновляем и ref и state
       activeConversationRef.current = userId;
       setActiveConversation(userId);
+      setTypingUsers({});
+      setOnlineUsers({});
 
       // Сбрасываем непрочитанные
       loadConversations();
@@ -323,6 +431,8 @@ export const ChatProvider = ({ children }) => {
     activeConversationRef.current = null;
     setActiveConversation(null);
     setMessages([]);
+    setTypingUsers({});
+    setOnlineUsers({});
   }, []);
 
   // Поиск пользователей
@@ -339,32 +449,21 @@ export const ChatProvider = ({ children }) => {
   const sendTyping = useCallback((recipientId, isTyping) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
-        type: 'typing',
+        type: MESSAGE_EVENT_TYPES.TYPING,
         recipient_id: recipientId,
-        is_typing: isTyping
+        is_typing: isTyping,
+        contract_version: MESSAGING_CONTRACT_VERSION,
       }));
     }
   }, []);
 
-  // Обновить количество непрочитанных
-  const refreshUnreadCount = useCallback(async () => {
-    try {
-      const count = await messagesApi.getUnreadCount();
-      setUnreadCount(count);
-    } catch (error) {
-      logger.error('Failed to get unread count:', error);
+  useEffect(() => {
+    setTypingUsers({});
+    setOnlineUsers({});
+    if (activeConversation) {
+      requestOnlineStatus([activeConversation]);
     }
-  }, []);
-
-  // Request online status of specific users
-  const requestOnlineStatus = useCallback((userIds) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN && userIds.length > 0) {
-      wsRef.current.send(JSON.stringify({
-        type: 'get_online_status',
-        user_ids: userIds
-      }));
-    }
-  }, []);
+  }, [activeConversation, requestOnlineStatus]);
 
   // Toggle reaction
   const toggleReaction = useCallback(async (messageId, reaction) => {

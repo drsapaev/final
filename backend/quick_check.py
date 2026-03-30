@@ -37,7 +37,7 @@ def main():
 
     # Проверяем доступность сервера
     if not run_command(
-        "curl -s http://127.0.0.1:8000/api/v1/health", "Проверка сервера"
+        "curl -s http://127.0.0.1:18000/api/v1/health", "Проверка сервера"
     ):
         print("ВНИМАНИЕ: Сервер не запущен. Запустите: uvicorn app.main:app --reload")
         sys.exit(1)

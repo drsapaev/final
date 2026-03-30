@@ -9,7 +9,7 @@ import json
 def test_login_endpoint():
     """Тестирование login endpoint"""
     
-    url = "http://127.0.0.1:8000/api/v1/authentication/login"
+url = "http://127.0.0.1:18000/api/v1/authentication/login"
     
     # Тестовые данные
     test_cases = [
@@ -50,7 +50,7 @@ def test_login_endpoint():
                     
         except requests.exceptions.ConnectionError:
             print("❌ Не удается подключиться к серверу")
-            print("Убедитесь, что backend запущен на http://127.0.0.1:8000")
+print("Убедитесь, что backend запущен на http://127.0.0.1:18000")
             break
         except Exception as e:
             print(f"❌ Неожиданная ошибка: {e}")
@@ -59,9 +59,9 @@ def check_server_health():
     """Проверка доступности сервера"""
     
     health_endpoints = [
-        "http://127.0.0.1:8000/health",
-        "http://127.0.0.1:8000/docs",
-        "http://127.0.0.1:8000/api/v1/health"
+"http://127.0.0.1:18000/health",
+"http://127.0.0.1:18000/docs",
+"http://127.0.0.1:18000/api/v1/health"
     ]
     
     print("🏥 Проверка доступности сервера...")

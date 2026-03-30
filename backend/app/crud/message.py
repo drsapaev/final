@@ -27,6 +27,7 @@ class CRUDMessage:
             sender_id=sender_id,
             recipient_id=obj_in.recipient_id,
             content=obj_in.content,
+            patient_id=getattr(obj_in, "patient_id", None),
         )
         db.add(db_obj)
         db.commit()

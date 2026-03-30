@@ -41,6 +41,7 @@ import {
 // API клиент
 import { api as apiClient, getToken } from '../../api/client';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 
 const PaymentWidget = ({
@@ -110,7 +111,7 @@ const PaymentWidget = ({
       }
     } catch (err) {
       logger.error('Ошибка загрузки провайдеров:', err);
-      setError('Не удалось загрузить способы оплаты');
+      setError(getErrorMessage(err, 'Не удалось загрузить способы оплаты. Проверьте соединение и попробуйте снова.'));
     } finally {
       setProvidersLoading(false);
     }
@@ -217,11 +218,16 @@ const PaymentWidget = ({
           setPaymentStatus('redirected');
         }
       } else {
-        throw new Error(response.data?.error_message || 'Ошибка инициализации платежа');
+        throw new Error(
+          getErrorMessage(
+            response.data?.error_message || '',
+            'Не удалось инициализировать платёж. Проверьте соединение и попробуйте снова.'
+          )
+        );
       }
     } catch (err) {
       logger.error('Ошибка инициализации платежа:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обработки платежа';
+      const errorMessage = getErrorMessage(err, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
       setError(errorMessage);
       setPaymentStatus('failed');
 

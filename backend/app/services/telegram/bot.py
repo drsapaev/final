@@ -441,13 +441,16 @@ class ClinicTelegramBot:
 
         await self.send_notification(user_id, message, keyboard)
 
-    async def setup_webhook(self, webhook_url: str):
+    async def setup_webhook(self, webhook_url: str, secret_token: str | None = None):
         """Настройка webhook"""
         if not self.bot:
             return False
 
         try:
-            await self.bot.set_webhook(webhook_url)
+            webhook_kwargs = {}
+            if secret_token:
+                webhook_kwargs["secret_token"] = secret_token
+            await self.bot.set_webhook(webhook_url, **webhook_kwargs)
             logger.info(f"Webhook set to: {webhook_url}")
             return True
         except Exception as e:

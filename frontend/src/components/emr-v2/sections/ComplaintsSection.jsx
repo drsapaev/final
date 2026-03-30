@@ -73,7 +73,11 @@ export function ComplaintsSection({
             return historyItems;
 
         } catch (e) {
-            logger.error('Failed to fetch complaints history:', e);
+            logger.error('[ComplaintsSection] Не удалось получить историю жалоб', {
+                doctorId,
+                specialty,
+                error: e?.message || String(e),
+            });
             return [];
         }
     }, [doctorId, specialty]);

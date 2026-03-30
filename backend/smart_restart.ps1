@@ -10,7 +10,7 @@ Write-Host "Шаг 1: Остановка процессов Python..." -Foregrou
 
 # Шаг 2: Проверка порта
 Write-Host ""
-Write-Host "Шаг 2: Проверка доступности порта 8000..." -ForegroundColor Yellow
+Write-Host "Шаг 2: Проверка доступности порта 18000..." -ForegroundColor Yellow
 
 $maxAttempts = 5
 $attempt = 0
@@ -18,11 +18,11 @@ $portFree = $false
 
 while ($attempt -lt $maxAttempts -and -not $portFree) {
     $attempt++
-    $check = netstat -ano | Select-String ":8000.*LISTENING"
+    $check = netstat -ano | Select-String ":18000.*LISTENING"
     
     if (-not $check) {
         $portFree = $true
-        Write-Host "✅ Порт 8000 свободен!" -ForegroundColor Green
+        Write-Host "✅ Порт 18000 свободен!" -ForegroundColor Green
     }
     else {
         Write-Host "⏳ Попытка $attempt/$maxAttempts - порт все еще занят, ожидание..." -ForegroundColor Yellow
@@ -42,13 +42,13 @@ while ($attempt -lt $maxAttempts -and -not $portFree) {
 # Шаг 3: Выбор порта и запуск
 Write-Host ""
 if ($portFree) {
-    Write-Host "Шаг 3: Запуск сервера на порту 8000..." -ForegroundColor Yellow
+    Write-Host "Шаг 3: Запуск сервера на порту 18000..." -ForegroundColor Yellow
     Write-Host ""
     & "c:\final\.venv\Scripts\python.exe" "$PSScriptRoot\start_server.py"
 }
 else {
     Write-Host "=" * 80 -ForegroundColor Red
-    Write-Host "⚠️ ВНИМАНИЕ: Не удалось освободить порт 8000!" -ForegroundColor Red
+    Write-Host "⚠️ ВНИМАНИЕ: Не удалось освободить порт 18000!" -ForegroundColor Red
     Write-Host "=" * 80 -ForegroundColor Red
     Write-Host ""
     Write-Host "Варианты решения:" -ForegroundColor Yellow

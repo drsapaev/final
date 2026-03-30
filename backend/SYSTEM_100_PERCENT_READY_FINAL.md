@@ -4,7 +4,7 @@
 
 ### ✅ BACKEND - 100% ГОТОВ
 - **FastAPI сервер**: Запущен на http://localhost:18000
-- **База данных**: SQLite с полной схемой
+- **База данных**: PostgreSQL с полной схемой
 - **Аутентификация**: JWT + OAuth2 + 2FA
 - **API эндпоинты**: Все 50+ эндпоинтов работают
 - **Безопасность**: Argon2 хеширование, CORS, валидация
@@ -74,7 +74,7 @@ http://localhost:18000/docs
 ### 1. Backend
 ```bash
 cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 18000 --reload
 ```
 
 ### 2. Frontend

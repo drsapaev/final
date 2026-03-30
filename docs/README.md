@@ -82,6 +82,8 @@
 |----------|-------------|
 | [AI_MCP_QA_CHECKLIST.md](./AI_MCP_QA_CHECKLIST.md) | AI/MCP QA checklist |
 | [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
+| [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Canonical messaging SSOT, delivery, rollout, and security rules |
+| [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Messaging stack QA checklist |
 | [PANEL_QA_CHECKLIST.md](./PANEL_QA_CHECKLIST.md) | SSOT runbook for panel verification with step-by-step progress tracking |
 | [ADM-06_BROWSER_SMOKE.md](./ADM-06_BROWSER_SMOKE.md) | Compact manual smoke for the service-catalog prefix guardrail |
 
@@ -122,4 +124,4 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 
 ---
 
-*Last Updated: 2026-03-26*
+*Last Updated: 2026-03-30*

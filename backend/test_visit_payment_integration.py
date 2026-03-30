@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 
 # Конфигурация
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:18000"
 
 
 def test_visit_payment_integration():

@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
+import { getErrorMessage } from '../utils/errorHandler';
 const useUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,8 +46,12 @@ const useUsers = () => {
       }
     } catch (err) {
       logger.error('Ошибка загрузки пользователей:', err);
-      setError(err);
-      toast.error('Ошибка загрузки пользователей');
+      const errorMessage = getErrorMessage(
+        err,
+        'Не удалось загрузить пользователей. Проверьте соединение и попробуйте снова.'
+      );
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -68,8 +73,11 @@ const useUsers = () => {
       }
     } catch (err) {
       logger.error('Ошибка создания пользователя:', err);
-      setError(err);
-      const errorMessage = err.response?.data?.detail || 'Ошибка создания пользователя';
+      const errorMessage = getErrorMessage(
+        err,
+        'Не удалось создать пользователя. Проверьте соединение и попробуйте снова.'
+      );
+      setError(errorMessage);
       toast.error(errorMessage);
       throw err;
     } finally {
@@ -93,8 +101,11 @@ const useUsers = () => {
       }
     } catch (err) {
       logger.error('Ошибка обновления пользователя:', err);
-      setError(err);
-      const errorMessage = err.response?.data?.detail || 'Ошибка обновления пользователя';
+      const errorMessage = getErrorMessage(
+        err,
+        'Не удалось обновить пользователя. Проверьте соединение и попробуйте снова.'
+      );
+      setError(errorMessage);
       toast.error(errorMessage);
       throw err;
     } finally {
@@ -115,8 +126,11 @@ const useUsers = () => {
       await loadUsers(pagination.page);
     } catch (err) {
       logger.error('Ошибка удаления пользователя:', err);
-      setError(err);
-      const errorMessage = err.response?.data?.detail || 'Ошибка удаления пользователя';
+      const errorMessage = getErrorMessage(
+        err,
+        'Не удалось удалить пользователя. Проверьте соединение и попробуйте снова.'
+      );
+      setError(errorMessage);
       toast.error(errorMessage);
       throw err;
     } finally {

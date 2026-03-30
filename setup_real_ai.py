@@ -106,7 +106,7 @@ def setup_gemini_api():
         
         print("⏳ Запускаем новый сервер...")
         print("   Откройте новый терминал и запустите:")
-        print("   cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000")
+        print("   cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 18000")
         print("\n✅ Готово!")
 
 if __name__ == "__main__":

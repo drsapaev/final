@@ -16,6 +16,7 @@ import { usePayments } from '../hooks/usePayments';
 import { getApiOrigin } from '../api/runtime';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { getErrorMessage } from '../utils/errorHandler';
 import {
   Dialog,
   DialogTitle,
@@ -344,7 +345,8 @@ const CashierPanel = () => {void
   };
 
   const handlePaymentError = (error) => {
-    setPaymentError(error);
+    const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+    setPaymentError(message);
     logger.error('Ошибка платежа:', error);
   };
 
@@ -420,7 +422,7 @@ const CashierPanel = () => {void
         });
 
         if (!result.success) {
-          throw new Error(`Ошибка оплаты визита #${p.visitId}: ${result.error}`);
+          throw new Error(`Не удалось оплатить визит #${p.visitId}: ${result.error}`);
         }
       }
 
@@ -441,8 +443,9 @@ const CashierPanel = () => {void
 
     } catch (error) {
       logger.error('Ошибка обработки платежа:', error);
-      setPaymentError(error.message || 'Ошибка обработки платежа. Попробуйте позже.');
-      alert(`❌ Ошибка обработки платежа: ${error.message || 'Попробуйте позже'}`);
+      const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+      setPaymentError(message);
+      alert(`❌ ${message}`);
     }
   };
 
@@ -457,7 +460,7 @@ const CashierPanel = () => {void
       setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
-      alert(`❌ Ошибка подтверждения платежа: ${err.message}`);
+      alert(`❌ ${getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.')}`);
     }
   };
 
@@ -478,10 +481,10 @@ const CashierPanel = () => {void
         alert('Платёж отменён');
         triggerDataReload();
       } else {
-        alert('Ошибка: ' + result.error);
+        alert(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
       }
     } catch (error) {
-      alert('Ошибка отмены: ' + error.message);
+      alert(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -493,9 +496,14 @@ const CashierPanel = () => {void
       date_to: date_to || undefined
     });
 
-    if (!result.success) {
-      alert('Ошибка экспорта: ' + (result.error || 'Неизвестная ошибка'));
-    }
+      if (!result.success) {
+        alert(
+          getErrorMessage(
+            result.error,
+            'Не удалось экспортировать платежи. Проверьте соединение и попробуйте снова.'
+          )
+        );
+      }
   };
 
   // ✅ УЛУЧШЕНИЕ: Кнопка обновления данных
@@ -538,10 +546,10 @@ const CashierPanel = () => {void
         alert(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
         triggerDataReload();
       } else {
-        alert('Ошибка возврата: ' + result.error);
+        alert(getErrorMessage(result.error, 'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'));
       }
     } catch (error) {
-      alert('Ошибка: ' + error.message);
+      alert(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -549,7 +557,7 @@ const CashierPanel = () => {void
   const handlePrintReceipt = async (paymentId) => {
     const result = await paymentsHook.getReceipt(paymentId);
     if (!result.success) {
-      alert('Ошибка получения чека: ' + result.error);
+      alert(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -564,7 +572,7 @@ const CashierPanel = () => {void
       setHourlyStats(result.data);
       setShowHourlyChart(true);
     } else {
-      alert('Ошибка загрузки статистики: ' + result.error);
+      alert(getErrorMessage(result.error, 'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'));
     }
   };
 

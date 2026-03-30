@@ -80,7 +80,7 @@ hasActiveQueue: deptAppointments.some(a => a.queue_numbers && a.queue_numbers.le
    cd c:\final\backend
    # Остановите текущий процесс (Ctrl+C)
    # Запустите снова:
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
    ```
 
 2. **Обновите фронтенд:**

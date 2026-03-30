@@ -18,7 +18,10 @@ const LinkPreview = ({ url }) => {
                     }
                 }
             } catch (e) {
-                logger.error('Failed to fetch link preview:', e);
+                logger.error('[LinkPreview] Не удалось получить preview ссылки', {
+                    url,
+                    error: e?.message || String(e),
+                });
             } finally {
                 setLoading(false);
             }

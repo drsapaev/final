@@ -31,6 +31,7 @@ import {
 import NotificationPreferences from '../components/settings/NotificationPreferences.jsx';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 
 const SELF_PROFILE_CACHE_MS = 30_000;
@@ -373,7 +374,7 @@ export default function UserProfile() {
 
       logger.error('[FIX:PROFILE] Failed to load self profile', err);
       setError(
-        err?.response?.data?.detail || 'Не удалось загрузить профиль. Проверьте соединение и повторите попытку.'
+        getErrorMessage(err, 'Не удалось загрузить профиль. Проверьте соединение и попробуйте снова.')
       );
     } finally {
       setLoading(false);
@@ -410,7 +411,7 @@ export default function UserProfile() {
     } catch (err) {
       logger.error('[FIX:PROFILE] Failed to save self profile', err);
       setError(
-        err?.response?.data?.detail || 'Не удалось сохранить профиль. Проверьте поля формы и повторите попытку.'
+        getErrorMessage(err, 'Не удалось сохранить профиль. Проверьте поля формы и попробуйте снова.')
       );
     } finally {
       setSaving(false);

@@ -25,8 +25,8 @@ netstat -ano | findstr :5173
 
 ### 3. **Запуск системы** ✅
 ```bash
-# Backend запущен на порту 8000
-cd C:\final\backend && python -m uvicorn app.main:app --reload --port 8000
+# Backend запущен на порту 18000
+cd C:\final\backend && python -m uvicorn app.main:app --reload --port 18000
 
 # Frontend запущен на порту 5173
 cd C:\final\frontend && npm run dev
@@ -56,7 +56,7 @@ cd C:\final\frontend && npm run dev
 - Показывает статус и ссылки
 
 ### **stop_system.bat** - Остановка системы
-- Останавливает все процессы на портах 5173 и 8000
+- Останавливает все процессы на портах 5173 и 18000
 - Очищает систему от конфликтов
 
 ---
@@ -77,7 +77,7 @@ stop_system.bat
 
 # 2. Запустить Backend
 cd C:\final\backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 18000
 
 # 3. Запустить Frontend (в новом окне)
 cd C:\final\frontend

@@ -102,7 +102,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 ### **1. Запуск Backend**
 ```bash
 cd C:\final\backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 18000
 ```
 
 ### **2. Запуск Frontend**

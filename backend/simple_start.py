@@ -7,8 +7,8 @@ if __name__ == "__main__":
     import uvicorn
     
     print("🚀 Запуск сервера...")
-    print("URL: http://127.0.0.1:8000")
-    print("Docs: http://127.0.0.1:8000/docs")
+    print("URL: http://127.0.0.1:18000")
+    print("Docs: http://127.0.0.1:18000/docs")
     print("Нажмите Ctrl+C для остановки")
     print("-" * 50)
     
@@ -16,7 +16,7 @@ if __name__ == "__main__":
         uvicorn.run(
             "app.main:app",
             host="127.0.0.1",
-            port=8000,
+            port=18000,
             reload=False,
             log_level="info"
         )

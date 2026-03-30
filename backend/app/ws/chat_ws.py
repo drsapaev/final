@@ -11,6 +11,12 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.messaging_contract import (
+    CONTRACT_VERSION,
+    MessageEventType,
+    build_ws_event_payload,
+    is_supported_contract_version,
+)
 from app.db.session import SessionLocal
 from app.models.user import User
 
@@ -71,30 +77,64 @@ class ChatConnectionManager:
 
     async def broadcast_typing(self, sender_id: int, recipient_id: int, is_typing: bool):
         """Отправить статус набора текста"""
-        await self.send_to_user(recipient_id, {
-            "type": "typing",
-            "sender_id": sender_id,
-            "is_typing": is_typing
-        })
+        await self.send_to_user(
+            recipient_id,
+            build_ws_event_payload(
+                MessageEventType.TYPING,
+                {
+                    "sender_id": sender_id,
+                    "is_typing": is_typing,
+                },
+            ),
+        )
 
     async def notify_new_message(self, recipient_id: int, message_data: dict):
         """Уведомить о новом сообщении"""
         is_online = recipient_id in self.active_connections
-        logger.info(f"WS: Notifying user {recipient_id} about new message. Online: {is_online}")
+        logger.info(
+            "WS: Notifying user %s about new message. Online: %s",
+            recipient_id,
+            is_online,
+        )
         if is_online:
-            await self.send_to_user(recipient_id, {
-                "type": "new_message",
-                "message": message_data
-            })
+            await self.broadcast_event(
+                [recipient_id],
+                "new_message",
+                {"message": message_data},
+            )
         else:
-            logger.info(f"WS: User {recipient_id} is offline, skipping notification")
+            logger.info("WS: User %s is offline, skipping notification", recipient_id)
 
     async def notify_message_read(self, sender_id: int, message_id: int):
-        """Уведомить о прочтении сообщения"""
-        await self.send_to_user(sender_id, {
-            "type": "message_read",
-            "message_id": message_id
-        })
+        """Уведомить о прочтении сообщения."""
+        await self.broadcast_event(
+            [sender_id],
+            "message_read",
+            {"message_id": message_id},
+        )
+
+    async def notify_messages_read(self, sender_id: int, message_ids: list[int]):
+        """Уведомить отправителя о прочтении нескольких сообщений."""
+        if not message_ids:
+            return
+        await self.broadcast_event(
+            [sender_id],
+            "messages_read",
+            {"message_ids": message_ids},
+        )
+
+    async def broadcast_event(self, user_ids: list[int], event_type: str, data: dict):
+        if not user_ids:
+            return
+
+        payload = build_ws_event_payload(event_type, data)
+
+        for raw_user_id in dict.fromkeys(user_ids):
+            try:
+                user_id = int(raw_user_id)
+            except (TypeError, ValueError):
+                continue
+            await self.send_to_user(user_id, payload)
 
 
 # Глобальный менеджер соединений
@@ -176,6 +216,7 @@ async def chat_websocket_handler(
         return
 
     try:
+        contract_version_mismatch_logged = False
         while True:
             # Получаем сообщение от клиента
             data = await websocket.receive_text()
@@ -183,8 +224,23 @@ async def chat_websocket_handler(
             try:
                 message = json.loads(data)
                 msg_type = message.get("type")
+                incoming_contract_version = message.get("contract_version")
 
-                if msg_type == "typing":
+                if (
+                    incoming_contract_version
+                    and not is_supported_contract_version(incoming_contract_version)
+                    and not contract_version_mismatch_logged
+                ):
+                    contract_version_mismatch_logged = True
+                    logger.warning(
+                        "Chat WebSocket contract version mismatch: expected=%s, received=%s, user_id=%s, type=%s",
+                        CONTRACT_VERSION,
+                        incoming_contract_version,
+                        user.id,
+                        msg_type,
+                    )
+
+                if msg_type == MessageEventType.TYPING.value:
                     recipient_id = message.get("recipient_id")
                     is_typing = message.get("is_typing", False)
                     if recipient_id:
@@ -194,31 +250,39 @@ async def chat_websocket_handler(
                             is_typing=is_typing
                         )
 
-                elif msg_type == "ping":
-                    await websocket.send_json({"type": "pong"})
+                elif msg_type == MessageEventType.PING.value:
+                    await websocket.send_json(
+                        build_ws_event_payload(MessageEventType.PONG)
+                    )
 
-                elif msg_type == "get_online_status":
+                elif msg_type == MessageEventType.GET_ONLINE_STATUS.value:
                     user_ids = message.get("user_ids", [])
                     online_status = {
                         uid: chat_manager.is_online(uid)
                         for uid in user_ids
                     }
-                    await websocket.send_json({
-                        "type": "online_status",
-                        "users": online_status
-                    })
+                    await websocket.send_json(
+                        build_ws_event_payload(
+                            MessageEventType.ONLINE_STATUS,
+                            {"users": online_status},
+                        )
+                    )
+
+                elif msg_type == MessageEventType.PONG.value:
+                    continue
 
                 else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": f"Unknown message type: {msg_type}"
-                    })
+                    await websocket.send_json(
+                        build_ws_event_payload(
+                            "error",
+                            {"message": f"Unknown message type: {msg_type}"},
+                        )
+                    )
 
             except json.JSONDecodeError:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "Invalid JSON"
-                })
+                await websocket.send_json(
+                    build_ws_event_payload("error", {"message": "Invalid JSON"})
+                )
 
     except WebSocketDisconnect:
         chat_manager.disconnect(user.id)

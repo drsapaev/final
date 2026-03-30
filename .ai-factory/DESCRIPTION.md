@@ -55,7 +55,7 @@ System covers patient lifecycle from registration and queue to visit documentati
 - High-level delivery roadmap tracked in `.ai-factory/ROADMAP.md`
 - Current primary runtime is the local host-based staging contour:
   - backend on `:18000`
-  - frontend on `:18080`
+  - frontend on `:5173`
   - dedicated staging Postgres cluster on `:55432`
 - EMR v2 hard-cutover has already been rehearsed successfully on the local staging contour.
 - Current local-first execution checklist is maintained in `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.

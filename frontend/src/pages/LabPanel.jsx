@@ -6,6 +6,7 @@ import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
 import { getApiBaseUrl } from '../api/runtime';
 import { labReportingApi } from '../api/labReporting';
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
@@ -220,7 +221,10 @@ export default function LabPanel() {
       logger.info('[LabPanel] loaded lab queue entries', mergedEntries.length);
     } catch (error) {
       logger.error('[LabPanel] loadLabAppointments failed', error);
-      notify('error', error.message || 'Не удалось загрузить лабораторную очередь.');
+      notify(
+        'error',
+        getErrorMessage(error, 'Не удалось загрузить лабораторную очередь. Проверьте соединение и попробуйте снова.')
+      );
     } finally {
       setAppointmentsLoading(false);
     }
@@ -239,7 +243,10 @@ export default function LabPanel() {
       }
     } catch (error) {
       logger.error('[LabPanel] loadTemplates failed', error);
-      notify('error', error.message || 'Не удалось загрузить шаблоны лаборатории.');
+      notify(
+        'error',
+        getErrorMessage(error, 'Не удалось загрузить шаблоны лаборатории. Проверьте соединение и попробуйте снова.')
+      );
     }
   }, [notify, selectedTemplate?.id]);
 
@@ -253,7 +260,10 @@ export default function LabPanel() {
       setReportHistory(history);
     } catch (error) {
       logger.error('[LabPanel] loadReportHistory failed', error);
-      notify('error', error.message || 'Не удалось загрузить историю лабораторных бланков.');
+      notify(
+        'error',
+        getErrorMessage(error, 'Не удалось загрузить историю лабораторных бланков. Проверьте соединение и попробуйте снова.')
+      );
     }
   }, [notify]);
 
@@ -263,7 +273,10 @@ export default function LabPanel() {
       setRecentReports(instances);
     } catch (error) {
       logger.error('[LabPanel] loadRecentReports failed', error);
-      notify('error', error.message || 'Не удалось загрузить список лабораторных бланков.');
+      notify(
+        'error',
+        getErrorMessage(error, 'Не удалось загрузить список лабораторных бланков. Проверьте соединение и попробуйте снова.')
+      );
     }
   }, [notify]);
 
@@ -291,7 +304,13 @@ export default function LabPanel() {
     } catch (error) {
       logger.error('[LabPanel] loadTemplateResolution failed', error);
       setTemplateResolution(null);
-      notify('error', error.message || 'Не удалось определить доступные бланки для выбранного визита.');
+      notify(
+        'error',
+        getErrorMessage(
+          error,
+          'Не удалось определить доступные бланки для выбранного визита. Проверьте соединение и попробуйте снова.'
+        )
+      );
     } finally {
       setTemplateResolutionLoading(false);
     }
@@ -310,7 +329,10 @@ export default function LabPanel() {
       switchTab('reports');
     } catch (error) {
       logger.error('[LabPanel] loadInstance failed', error);
-      notify('error', error.message || 'Не удалось открыть лабораторный бланк.');
+      notify(
+        'error',
+        getErrorMessage(error, 'Не удалось открыть лабораторный бланк. Проверьте соединение и попробуйте снова.')
+      );
     }
   }, [loadReportHistory, notify, switchTab]);
 
@@ -415,7 +437,7 @@ export default function LabPanel() {
               const template = await labReportingApi.getTemplate(templateId);
               setSelectedTemplate(template);
             } catch (error) {
-              notify('error', error.message);
+              notify('error', getErrorMessage(error, 'Не удалось загрузить шаблон. Проверьте соединение и попробуйте снова.'));
             }
           }}
           onTemplatesChanged={async (preferredTemplateId = null) => {

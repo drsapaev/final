@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 
 /**
@@ -46,7 +47,10 @@ export function useRoles({ includeAll = false } = {}) {
 
             setRoleOptions(response.data.options || []);
         } catch (err) {
-            const errorMessage = err.response?.data?.detail || err.message || 'Failed to load roles';
+            const errorMessage = getErrorMessage(
+                err,
+                'Не удалось загрузить роли. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             logger.error('Error fetching role options:', err);
 
@@ -80,7 +84,10 @@ export function useRoles({ includeAll = false } = {}) {
             const response = await api.get('/roles');
             setRoles(response.data.roles || []);
         } catch (err) {
-            const errorMessage = err.response?.data?.detail || err.message || 'Failed to load roles';
+            const errorMessage = getErrorMessage(
+                err,
+                'Не удалось загрузить роли. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             logger.error('Error fetching roles:', err);
         } finally {
