@@ -8,6 +8,7 @@ import { getRouteForProfile } from '../../constants/routes';
 import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
+import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import { Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert } from '../ui/macos';
 import logger from '../../utils/logger';
 
@@ -79,7 +80,7 @@ const LoginFormStyled = () => {void
       logger.log('🔍 Отправляемые данные:', credentials);
       logger.log('📝 formData:', formData);
 
-      // Используем основной backend на порту 8000
+      // Используем текущий API origin, чтобы login smoke не зависел от старых портов
       const response = await fetch(buildApiUrl('/auth/minimal-login'), {
         method: 'POST',
         headers: {
@@ -89,8 +90,23 @@ const LoginFormStyled = () => {void
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка авторизации');
+        const responseText = await response.text();
+        let errorData = null;
+
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch {
+            errorData = { detail: responseText };
+          }
+        }
+
+        throw new Error(formatLoginErrorMessage({
+          responseStatus: response.status,
+          responseDetail: errorData?.detail,
+          responseMessage: errorData?.message,
+          fallbackMessage: 'Ошибка авторизации',
+        }));
       }
 
       const data = await response.json();
@@ -162,26 +178,29 @@ const LoginFormStyled = () => {void
       }
     } catch (err) {
       // Улучшенная обработка ошибок с нормализацией
-      let errorMessage = 'Ошибка входа';
+      const rawMessage = typeof err?.message === 'string' ? err.message : '';
+      const errorMessage = formatLoginErrorMessage({
+        responseStatus: err?.response?.status,
+        responseDetail: err?.response?.data?.detail,
+        responseMessage: err?.response?.data?.message,
+        rawMessage: err?.normalizedMessage || rawMessage,
+        fallbackMessage: 'Ошибка входа',
+      });
 
-      if (err?.response?.data?.detail) {
-        const detail = err.response.data.detail;
-        if (Array.isArray(detail)) {
-          // Pydantic validation errors
-          errorMessage = detail.map((error) => `${error.loc?.join('.')}: ${error.msg}`).join(', ');
-        } else if (typeof detail === 'string') {
-          errorMessage = detail;
-        }
-      } else if (err?.normalizedMessage) {
-        // Используем нормализованное сообщение об ошибке
-        errorMessage = err.normalizedMessage;
-      } else if (err?.message) {
-        errorMessage = err.message;
+      if (rawMessage && /failed to fetch/i.test(rawMessage)) {
+        logger.warn('[FIX:LOGIN] Network login failure normalized', {
+          username: formData.username,
+          loginType: formData.loginType,
+          rawMessage,
+          normalizedMessage: LOGIN_ERROR_MESSAGES.NETWORK,
+          timestamp: new Date().toISOString(),
+        });
       }
 
       // Логирование ошибки для аналитики
       logger.error('🚨 Login error:', {
         error: errorMessage,
+        rawMessage,
         timestamp: new Date().toISOString(),
         username: formData.username,
         loginType: formData.loginType
@@ -497,7 +516,7 @@ const LoginFormStyled = () => {void
             <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>
             }
 
-            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+            <Button type="button" variant="primary" fullWidth disabled={loading} onClick={handleSubmit}>
               {loading ? 'Вход...' : 'ВОЙТИ →'}
             </Button>
           </form>

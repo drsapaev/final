@@ -6,7 +6,7 @@ import json
 import urllib.parse
 import urllib.request
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:18000"
 
 
 def get_auth_token():

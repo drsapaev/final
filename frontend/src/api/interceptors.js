@@ -186,56 +186,6 @@ export function setupInterceptors() {
         }
       }
 
-      // Обработка 403 ошибок (недостаточно прав)
-      if (error.response?.status === 403) {
-        const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Недостаточно прав для выполнения операции';
-        logger.warn(`❌ 403 Forbidden: ${errorMessage}`, {
-          url: originalRequest?.url,
-          method: originalRequest?.method,
-          role: error.response?.data?.role
-        });
-
-        // Показываем понятное сообщение пользователю
-        if (window.showToast) {
-          window.showToast(errorMessage, 'error');
-        } else {
-          logger.error(`403 Forbidden: ${errorMessage}`);
-        }
-      }
-
-      // Обработка 404 ошибок (ресурс не найден)
-      if (status === 404) {
-        const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Запрашиваемый ресурс не найден';
-        logger.warn(`❌ 404 Not Found: ${errorMessage}`, {
-          url: originalRequest?.url,
-          method: originalRequest?.method
-        });
-
-        if (window.showToast) {
-          window.showToast(errorMessage, 'warning');
-        } else {
-          logger.error(`404 Not Found: ${errorMessage}`);
-        }
-      }
-
-      // Обработка 500 ошибок (серверные ошибки)
-      if (error.response?.status >= 500) {
-        logger.error('Серверная ошибка');
-
-        if (window.showToast) {
-          window.showToast('Серверная ошибка. Попробуйте позже.', 'error');
-        }
-      }
-
-      // Обработка сетевых ошибок
-      if (!error.response) {
-        logger.error('Сетевая ошибка');
-
-        if (window.showToast) {
-          window.showToast('Проблемы с подключением к серверу', 'error');
-        }
-      }
-
       return Promise.reject(error);
     }
   );

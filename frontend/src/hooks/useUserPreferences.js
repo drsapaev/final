@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
@@ -102,7 +103,9 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
             // Используем defaults если ошибка
             const defaultPrefs = { ...DEFAULT_EMR_PREFERENCES };
             setPreferences(defaultPrefs);
-            setError(err.message);
+            setError(
+                getErrorMessage(err, 'Не удалось загрузить настройки пользователя. Проверьте соединение и попробуйте снова.')
+            );
 
             return defaultPrefs;
         } finally {
@@ -133,7 +136,9 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
             return true;
         } catch (err) {
             logger.error('Failed to save preferences:', err);
-            setError(err.message);
+            setError(
+                getErrorMessage(err, 'Не удалось сохранить настройки пользователя. Проверьте соединение и попробуйте снова.')
+            );
             return false;
         }
     }, [preferences, userId]);

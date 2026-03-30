@@ -85,7 +85,7 @@ $ python -c "from app.api.v1.api import api_router; print(f'API router has {len(
 ```
 
 ### ✅ Backend Server Running
-- Server: http://0.0.0.0:8000
+- Server: http://0.0.0.0:18000
 - Process ID: 9348
 - Status: LISTENING
 
@@ -260,7 +260,7 @@ The registrar panel and modern tabs components can now successfully load departm
 ---
 
 **Report Generated**: 2025-11-26
-**Backend Status**: Running on port 8000
+**Backend Status**: Running on port 18000
 **Frontend Status**: Ready to consume departments API
 **Recommendation**: **DEPLOY WITH CONFIDENCE**
 

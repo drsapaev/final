@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.config import settings
 from app.core.rbac import AIPermission, has_permission, require_ai_permission
 from app.models.user import User
@@ -25,6 +26,17 @@ from app.services.ai.chat_service import get_chat_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _build_ai_ws_payload(event_type: str, session_id: int | None = None, **data: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "type": event_type,
+        "contract_version": CONTRACT_VERSION,
+    }
+    if session_id is not None:
+        payload["session_id"] = session_id
+    payload.update(data)
+    return payload
 
 
 # =============================================================================
@@ -349,7 +361,7 @@ async def chat_websocket(
             msg_type = message.get("type", "message")
             
             if msg_type == "ping":
-                await websocket.send_json({"type": "pong"})
+                await websocket.send_json(_build_ai_ws_payload("pong", current_session_id))
                 continue
             
             if msg_type == "message":
@@ -357,8 +369,7 @@ async def chat_websocket(
                 
                 if not content:
                     await websocket.send_json({
-                        "type": "error",
-                        "message": "Empty message"
+                        **_build_ai_ws_payload("error", current_session_id, message="Empty message")
                     })
                     continue
                 
@@ -375,8 +386,7 @@ async def chat_websocket(
                     current_session_id = session_id
                     
                     await websocket.send_json({
-                        "type": "session",
-                        "session_id": session_id
+                        **_build_ai_ws_payload("session", session_id)
                     })
                 
                 # Отправляем сообщение
@@ -396,39 +406,38 @@ async def chat_websocket(
                     for i in range(0, len(full_content), chunk_size):
                         chunk = full_content[i:i + chunk_size]
                         await websocket.send_json({
-                            "type": "chunk",
-                            "content": chunk
+                            **_build_ai_ws_payload("chunk", session_id, content=chunk)
                         })
                         await asyncio.sleep(0.03)  # Небольшая задержка для эффекта typing
                     
                     await websocket.send_json({
-                        "type": "done",
-                        "message_id": response.id,
-                        "provider": response.provider,
-                        "model": response.model,
-                        "tokens": response.tokens_used,
-                        "latency_ms": response.latency_ms,
-                        "cached": response.was_cached
+                        **_build_ai_ws_payload(
+                            "done",
+                            session_id,
+                            message_id=response.id,
+                            provider=response.provider,
+                            model=response.model,
+                            tokens=response.tokens_used,
+                            latency_ms=response.latency_ms,
+                            cached=response.was_cached,
+                        )
                     })
                     
                 except ValueError as e:
                     await websocket.send_json({
-                        "type": "error",
-                        "message": str(e)
+                        **_build_ai_ws_payload("error", session_id, message=str(e))
                     })
                 except Exception as e:
                     logger.exception(f"Chat error: {e}")
                     await websocket.send_json({
-                        "type": "error",
-                        "message": "Internal error occurred"
+                        **_build_ai_ws_payload("error", session_id, message="Internal error occurred")
                     })
             
             elif msg_type == "close_session":
                 if current_session_id:
                     await service.close_session(current_session_id, user.id)
                     await websocket.send_json({
-                        "type": "session_closed",
-                        "session_id": current_session_id
+                        **_build_ai_ws_payload("session_closed", current_session_id)
                     })
                     current_session_id = None
     

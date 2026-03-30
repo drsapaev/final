@@ -230,7 +230,7 @@ Traceback (most recent call last):
    ```bash
    # В отдельном терминале
    cd backend
-   python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000 --log-level debug
    ```
 
 4. **Добавить отладочный print в начало create_cart_appointments**:

@@ -13,6 +13,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
+from app.core.messaging_contract import MessageEventType
 from app.models.file_system import File as FileModel
 from app.models.file_system import FileType
 from app.models.message import Message
@@ -115,17 +116,30 @@ class MessagesApiService:
             current_user=current_user,
         )
 
+        sanitized_content = self.sanitize_content(message_data.content)
+        prepared_message_data = message_data.model_copy(
+            update={"content": sanitized_content}
+        )
+
         new_message = self.repository.create_message(
             sender_id=current_user.id,
-            obj_in=message_data,
+            obj_in=prepared_message_data,
         )
+        if message_data.patient_id is not None:
+            new_message.patient_id = message_data.patient_id
+            self.repository.commit()
+            self.repository.refresh(new_message)
 
         self._audit(
             action="send_message",
             entity_type="message",
             entity_id=new_message.id,
             actor_user_id=current_user.id,
-            payload={"recipient_id": recipient.id, "message_type": new_message.message_type},
+            payload={
+                "recipient_id": recipient.id,
+                "message_type": new_message.message_type,
+                "patient_id": message_data.patient_id,
+            },
         )
 
         from app.ws.chat_ws import chat_manager
@@ -211,7 +225,29 @@ class MessagesApiService:
         return self.repository.get_unread_count(user_id=user_id)
 
     def mark_message_read(self, *, message_id: int, user_id: int):
-        return self.repository.mark_message_as_read(message_id=message_id, user_id=user_id)
+        existing_message = self.repository.get_message_by_id(message_id=message_id)
+        should_notify_sender = bool(
+            existing_message
+            and existing_message.recipient_id == user_id
+            and not existing_message.is_read
+        )
+
+        message = self.repository.mark_message_as_read(message_id=message_id, user_id=user_id)
+
+        if message and should_notify_sender:
+            try:
+                from app.ws.chat_ws import chat_manager
+
+                asyncio.create_task(
+                    chat_manager.notify_message_read(
+                        sender_id=message.sender_id,
+                        message_id=message.id,
+                    )
+                )
+            except Exception:
+                pass
+
+        return message
 
     async def delete_message(self, *, message_id: int, user_id: int) -> dict[str, Any]:
         success = self.repository.delete_message_for_user(message_id=message_id, user_id=user_id)
@@ -232,7 +268,7 @@ class MessagesApiService:
             asyncio.create_task(
                 chat_manager.broadcast_event(
                     user_ids=[user_id],
-                    event_type="message_deleted",
+                    event_type=MessageEventType.MESSAGE_DELETED,
                     data={"message_id": message_id},
                 )
             )
@@ -281,7 +317,7 @@ class MessagesApiService:
             asyncio.create_task(
                 chat_manager.broadcast_event(
                     user_ids=[current_user.id, other_user_id],
-                    event_type="reaction_update",
+                    event_type=MessageEventType.REACTION_UPDATE,
                     data=payload,
                 )
             )
@@ -302,7 +338,9 @@ class MessagesApiService:
         if search:
             search_pattern = f"%{search}%"
             query = query.filter(
-                (User.username.ilike(search_pattern)) | (User.email.ilike(search_pattern))
+                (User.username.ilike(search_pattern))
+                | (User.email.ilike(search_pattern))
+                | (User.full_name.ilike(search_pattern))
             )
         users = query.limit(20).all()
         return [
@@ -428,8 +466,8 @@ class MessagesApiService:
         self.validate_recipient(recipient_id=recipient_id, current_user=current_user)
 
         content = await file.read()
-        filename = file.filename or "file"
-        safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+        original_filename = os.path.basename(file.filename or "file")
+        safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
         upload_dir = "uploads/chat"
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, safe_filename)
@@ -440,14 +478,14 @@ class MessagesApiService:
         message_obj = self.repository.create_message(
             obj_in=MessageCreate(
                 recipient_id=recipient_id,
-                content=filename,
+                content=original_filename,
                 message_type="document"
                 if not (file.content_type or "").startswith("image")
                 else "image",
             ),
             sender_id=current_user.id,
         )
-        message_obj.content = f"/api/v1/messages/download/{safe_filename}?name={filename}"
+        message_obj.content = f"/api/v1/messages/download/{safe_filename}?name={original_filename}"
         message_obj.message_type = (
             "image" if (file.content_type or "").startswith("image") else "file"
         )
@@ -461,7 +499,7 @@ class MessagesApiService:
             asyncio.create_task(
                 chat_manager.broadcast_event(
                     user_ids=[current_user.id, recipient_id],
-                    event_type="new_message",
+                    event_type=MessageEventType.NEW_MESSAGE,
                     data=jsonable_encoder(
                         msg_out.model_dump() if hasattr(msg_out, "model_dump") else msg_out.dict()
                     ),

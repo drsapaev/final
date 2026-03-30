@@ -86,7 +86,7 @@ curl -X POST -d "username=admin&password=admin123&grant_type=password" \
 ### **1. Backend**
 ```bash
 cd C:\final\backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 18000
 ```
 
 ### **2. Frontend**

@@ -3,7 +3,7 @@
 import pytest
 import requests
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:18000"
 
 
 def _ensure_running_server() -> None:

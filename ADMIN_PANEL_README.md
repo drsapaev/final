@@ -11,7 +11,7 @@
 1. Запустите backend сервер:
    ```bash
    cd backend
-   python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 18000
    ```
 
 2. Запустите frontend:
@@ -92,7 +92,7 @@ python test_admin_panel.py
 ### 📊 Мониторинг системы
 
 **Статус компонентов:**
-- База данных (PostgreSQL/SQLite)
+- База данных (PostgreSQL)
 - Redis кэш
 - Веб-сервер
 - Система печати

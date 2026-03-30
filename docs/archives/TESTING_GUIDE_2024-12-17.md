@@ -5,7 +5,7 @@
 ### 1. Запустить Backend
 ```bash
 cd c:\final\backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 ```
 
 ### 2. Запустить Frontend

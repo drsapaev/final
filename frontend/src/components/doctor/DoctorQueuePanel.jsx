@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import { buildApiUrl } from '../../api/runtime';
 import {
 
   Phone,
@@ -140,8 +142,12 @@ const DoctorQueuePanel = ({
       return;
     }
 
+    const doctorInfoUrl = buildApiUrl('/doctor/my-info');
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/v1/doctor/my-info', {
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Loading doctor info from canonical API origin', {
+        url: doctorInfoUrl,
+      });
+      const response = await fetch(doctorInfoUrl, {
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -165,10 +171,15 @@ const DoctorQueuePanel = ({
       return;
     }
 
+    const queueUrl = buildApiUrl(`/doctor/${specialty}/queue/today`);
     try {
       setLoading(true);
 
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/${specialty}/queue/today`, {
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Loading doctor queue from canonical API origin', {
+        specialty,
+        url: queueUrl,
+      });
+      const response = await fetch(queueUrl, {
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
 
@@ -200,7 +211,12 @@ const DoctorQueuePanel = ({
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/call`, {
+      const callUrl = buildApiUrl(`/doctor/queue/${entryId}/call`);
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Calling patient via canonical API origin', {
+        entryId,
+        url: callUrl,
+      });
+      const response = await fetch(callUrl, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
@@ -231,7 +247,12 @@ const DoctorQueuePanel = ({
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/start-visit`, {
+      const startVisitUrl = buildApiUrl(`/doctor/queue/${entryId}/start-visit`);
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Starting visit via canonical API origin', {
+        entryId,
+        url: startVisitUrl,
+      });
+      const response = await fetch(startVisitUrl, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
@@ -263,7 +284,12 @@ const DoctorQueuePanel = ({
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/complete`, {
+      const completeVisitUrl = buildApiUrl(`/doctor/queue/${entryId}/complete`);
+      logger.info('[FIX:DOCTOR_QUEUE_PANEL] Completing visit via canonical API origin', {
+        entryId,
+        url: completeVisitUrl,
+      });
+      const response = await fetch(completeVisitUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
@@ -686,6 +712,12 @@ const DoctorQueuePanel = ({
       }
     </div>);
 
+};
+
+DoctorQueuePanel.propTypes = {
+  specialty: PropTypes.string,
+  onPatientSelect: PropTypes.func,
+  className: PropTypes.string,
 };
 
 export default DoctorQueuePanel;

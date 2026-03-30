@@ -48,7 +48,7 @@ def test_backend():
     except httpx.ConnectError:
         print("❌ Бэкенд недоступен на localhost:18000")
         print(
-            "   Убедитесь, что запущен: uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+            "   Убедитесь, что запущен: uvicorn main:app --reload --host 0.0.0.0 --port 18000"
         )
     except Exception as e:
         print(f"❌ Ошибка при тестировании бэкенда: {e}")

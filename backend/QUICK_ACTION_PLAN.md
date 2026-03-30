@@ -14,8 +14,8 @@
 cd C:\final\backend
 $env:PYTHONPATH="C:\final\backend"
 $env:PYTHONIOENCODING="utf-8"
-$env:DATABASE_URL="sqlite:///C:/final/backend/clinic.db"
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+$env:DATABASE_URL="postgresql://user:password@localhost:5432/clinic"
+python -m uvicorn app.main:app --host 0.0.0.0 --port 18000 --reload
 ```
 
 ### **2. Проверить работоспособность всех компонентов**
@@ -24,7 +24,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 python check_system_integrity.py
 
 # Проверить API endpoints
-curl http://127.0.0.1:8000/api/v1/health
+curl http://127.0.0.1:18000/api/v1/health
 ```
 
 ---

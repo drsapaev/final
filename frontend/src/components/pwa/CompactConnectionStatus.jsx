@@ -1,15 +1,55 @@
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
-import { usePWA } from '../../hooks/usePWA';
 /**
  * Компактный индикатор подключения с PWA статусом
  * ИСПРАВЛЕНО: Убран избыточный импорт React
  */
 const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
-  const pwaState = usePWA();
-  const { isOnline, isServiceWorkerReady } = pwaState;
+  const [isOnline, setIsOnline] = useState(() => (
+    typeof navigator === 'undefined' ? true : navigator.onLine
+  ));
+  const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    navigator.serviceWorker.ready
+      .then(() => {
+        if (!cancelled) {
+          setIsServiceWorkerReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsServiceWorkerReady(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Слушаем сообщения от Service Worker о синхронизации
   useEffect(() => {

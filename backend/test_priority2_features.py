@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime, timedelta
 
 # Конфигурация
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:18000"
 ADMIN_CREDENTIALS = {"username": "admin", "password": "admin123"}
 
 

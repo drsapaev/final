@@ -103,13 +103,13 @@ python load_test.py --endpoint /api/v1/patients/ --users 10 --requests 100
 ### 5.1 Using Uvicorn
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port 18000 --workers 4
 ```
 
 ### 5.2 Using Gunicorn (Recommended for production)
 
 ```bash
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:18000
 ```
 
 ### 5.3 Using Docker

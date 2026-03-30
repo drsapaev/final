@@ -1,7 +1,10 @@
 
 import { useState, useCallback } from 'react';
 import { api } from '../api/client';
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
+
+const formatPaymentError = (err, fallbackMessage) => getErrorMessage(err, fallbackMessage);
 
 export const usePayments = () => {
     const [loading, setLoading] = useState(false);
@@ -41,7 +44,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error fetching pending payments:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error fetching pending payments';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось загрузить список ожидающих оплат. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -86,7 +92,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error fetching payment history:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error fetching payment history';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось загрузить историю платежей. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -116,7 +125,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error creating payment:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error creating payment';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось создать платёж. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -144,7 +156,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error marking visit as paid:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error marking visit as paid';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось отметить визит как оплаченный. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -172,7 +187,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error fetching payment:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error fetching payment';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось загрузить платёж. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -201,7 +219,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error canceling payment:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error canceling payment';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -229,7 +250,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error confirming payment:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error confirming payment';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
             throw errorMessage;
@@ -256,7 +280,10 @@ export const usePayments = () => {
             logger.error('Error fetching stats:', err);
             return {
                 success: false,
-                error: err.response?.data?.detail || err.message || 'Error fetching stats',
+                error: formatPaymentError(
+                    err,
+                    'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'
+                ),
                 data: null
             };
         }
@@ -292,7 +319,10 @@ export const usePayments = () => {
             logger.error('Error exporting payments:', err);
             return {
                 success: false,
-                error: err.response?.data?.detail || err.message || 'Error exporting payments'
+                error: formatPaymentError(
+                    err,
+                    'Не удалось экспортировать платежи. Проверьте соединение и попробуйте снова.'
+                )
             };
         }
     }, []);
@@ -317,7 +347,10 @@ export const usePayments = () => {
             };
         } catch (err) {
             logger.error('Error refunding payment:', err);
-            const errorMessage = err.response?.data?.detail || err.message || 'Error refunding payment';
+            const errorMessage = formatPaymentError(
+                err,
+                'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             setLoading(false);
 
@@ -354,7 +387,10 @@ export const usePayments = () => {
             logger.error('Error getting receipt:', err);
             return {
                 success: false,
-                error: err.response?.data?.detail || err.message || 'Error getting receipt'
+                error: formatPaymentError(
+                    err,
+                    'Не удалось получить чек. Проверьте соединение и попробуйте снова.'
+                )
             };
         }
     }, []);
@@ -378,7 +414,10 @@ export const usePayments = () => {
             logger.error('Error fetching hourly stats:', err);
             return {
                 success: false,
-                error: err.response?.data?.detail || err.message || 'Error fetching hourly stats',
+                error: formatPaymentError(
+                    err,
+                    'Не удалось загрузить почасовую статистику. Проверьте соединение и попробуйте снова.'
+                ),
                 data: []
             };
         }

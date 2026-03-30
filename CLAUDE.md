@@ -26,7 +26,7 @@ This is a **Medical Clinic Management System** built with FastAPI (Python backen
 ```bash
 # Start development server (from backend directory)
 cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python run_server.py
 
 # Run tests
 python test_role_routing.py
@@ -106,7 +106,7 @@ docker compose logs -f frontend
 - `app/services/` - Business logic services
 - `app/ws/` - WebSocket handlers for real-time updates
 
-**Database:** SQLite (`clinic.db`) with SQLAlchemy 2.0+
+**Database:** PostgreSQL + Alembic
 
 **Authentication:**
 - JWT tokens via `python-jose`
@@ -295,7 +295,7 @@ npm run lint:check        # Lint check
 ## Environment Variables
 
 **Backend Key Variables:**
-- `DATABASE_URL` - Database connection (default: SQLite)
+- `DATABASE_URL` - Database connection (default: PostgreSQL via `postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb`)
 - `SECRET_KEY` - JWT secret
 - `API_V1_STR` - API prefix (default: `/api/v1`)
 - `CORS_ORIGINS` - Allowed CORS origins
@@ -316,7 +316,7 @@ npm run lint:check        # Lint check
 
 ### Russian Language Support
 - All user-facing text must support Russian
-- Backend runs from `C:\final\backend` directory with uvicorn
+- Backend runs from `C:\final\backend` directory with `python run_server.py`
 - Maintain backward compatibility with existing APIs
 
 ### Integration Patterns
@@ -342,6 +342,6 @@ GraphQL endpoint available at `/api/graphql` with schema explorer in admin panel
 ## Notes
 
 - Backend server must always run from `C:\final\backend` directory
-- Frontend dev server runs on port 5173, backend on 8000
-- Database file: `backend/clinic.db` (SQLite)
+- Frontend dev server runs on port 5173, backend on 18000
+- Database source of truth: PostgreSQL + Alembic
 - Recent work: macOS UI refactor (current branch: `feat/macos-ui-refactor`)

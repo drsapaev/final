@@ -250,7 +250,7 @@ DATABASE_URL=postgresql://user:pass@localhost/medilab
 ```bash
 # Backend
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 18000
 
 # Frontend  
 cd frontend

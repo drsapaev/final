@@ -12,6 +12,10 @@ import { api } from '../api/client';
 import { buildWsUrl } from '../api/runtime';
 import logger from '../utils/logger';
 import { tokenManager } from '../utils/tokenManager';
+import {
+    MESSAGING_CONTRACT_VERSION,
+    isSupportedMessagingContractVersion,
+} from '../constants/messagingContract';
 
 /**
  * Хук для AI чата
@@ -41,6 +45,13 @@ export const useAIChat = (options = {}) => {
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const handleWebSocketMessageRef = useRef(null);
+    const currentSessionRef = useRef(null);
+    const loadSessionRequestRef = useRef(0);
+    const contractVersionMismatchRef = useRef(false);
+
+    useEffect(() => {
+        currentSessionRef.current = currentSession;
+    }, [currentSession]);
 
     // ==========================================================================
     // REST API Methods
@@ -78,7 +89,10 @@ export const useAIChat = (options = {}) => {
             const session = response.data;
             setSessions(prev => [session, ...prev]);
             setCurrentSession(session);
+            currentSessionRef.current = session;
             setMessages([]);
+            setStreaming(false);
+            setError(null);
 
             return session;
         } catch (err) {
@@ -94,16 +108,29 @@ export const useAIChat = (options = {}) => {
      * Загрузить сессию и её сообщения
      */
     const loadSession = useCallback(async (sessionId) => {
+        const requestId = ++loadSessionRequestRef.current;
         try {
             setLoading(true);
+            setError(null);
+            setStreaming(false);
 
             // Загружаем сессию
             const sessionResponse = await api.get(`/ai/chat/sessions/${sessionId}`);
-            setCurrentSession(sessionResponse.data);
+            if (requestId !== loadSessionRequestRef.current) {
+                return sessionResponse.data;
+            }
 
             // Загружаем сообщения
             const messagesResponse = await api.get(`/ai/chat/sessions/${sessionId}/messages`);
+            if (requestId !== loadSessionRequestRef.current) {
+                return sessionResponse.data;
+            }
+
+            setCurrentSession(sessionResponse.data);
+            currentSessionRef.current = sessionResponse.data;
             setMessages(messagesResponse.data);
+            setStreaming(false);
+            setError(null);
 
             return sessionResponse.data;
         } catch (err) {
@@ -125,7 +152,7 @@ export const useAIChat = (options = {}) => {
         }
 
         // Создаем сессию если нет
-        let sessionId = currentSession?.id;
+        let sessionId = currentSessionRef.current?.id;
         if (!sessionId) {
             const session = await createSession();
             if (!session) return null;
@@ -153,6 +180,10 @@ export const useAIChat = (options = {}) => {
             });
 
             // Обновляем сообщения
+            if (currentSessionRef.current?.id !== sessionId) {
+                setMessages(prev => prev.filter(m => m.id !== userMessage.id));
+                return response.data;
+            }
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== userMessage.id);
                 return [...filtered, { ...userMessage, _pending: false }, response.data];
@@ -169,7 +200,7 @@ export const useAIChat = (options = {}) => {
         } finally {
             setLoading(false);
         }
-    }, [currentSession, createSession]);
+    }, [createSession]);
 
     /**
      * Удалить сессию
@@ -179,9 +210,13 @@ export const useAIChat = (options = {}) => {
             await api.delete(`/ai/chat/sessions/${sessionId}`);
             setSessions(prev => prev.filter(s => s.id !== sessionId));
 
-            if (currentSession?.id === sessionId) {
+            if (currentSessionRef.current?.id === sessionId) {
+                loadSessionRequestRef.current += 1;
                 setCurrentSession(null);
+                currentSessionRef.current = null;
                 setMessages([]);
+                setStreaming(false);
+                setError(null);
             }
 
             return true;
@@ -190,7 +225,7 @@ export const useAIChat = (options = {}) => {
             setError(err.response?.data?.detail || 'Failed to delete session');
             return false;
         }
-    }, [currentSession]);
+    }, []);
 
     /**
      * Отправить feedback на сообщение
@@ -256,6 +291,18 @@ export const useAIChat = (options = {}) => {
             wsRef.current.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+                    if (
+                        data.contract_version &&
+                        !isSupportedMessagingContractVersion(data.contract_version) &&
+                        !contractVersionMismatchRef.current
+                    ) {
+                        contractVersionMismatchRef.current = true;
+                        logger.warn('AI Chat contract version mismatch', {
+                            expected: MESSAGING_CONTRACT_VERSION,
+                            received: data.contract_version,
+                            type: data.type,
+                        });
+                    }
                     handleWebSocketMessageRef.current?.(data);
                 } catch (err) {
                     logger.error('Failed to parse WebSocket message:', err);
@@ -271,10 +318,20 @@ export const useAIChat = (options = {}) => {
      * Обработка WebSocket сообщений
      */
     const handleWebSocketMessage = useCallback((data) => {
+        if (
+            data.session_id &&
+            currentSessionRef.current?.id &&
+            data.session_id !== currentSessionRef.current.id &&
+            data.type !== 'session'
+        ) {
+            return;
+        }
+
         switch (data.type) {
             case 'session':
                 // Новая сессия создана
                 setCurrentSession({ id: data.session_id });
+                currentSessionRef.current = { id: data.session_id };
                 break;
 
             case 'chunk':
@@ -333,6 +390,15 @@ export const useAIChat = (options = {}) => {
                 setError(data.message);
                 break;
 
+            case 'session_closed':
+                if (currentSessionRef.current?.id === data.session_id) {
+                    setCurrentSession(null);
+                    currentSessionRef.current = null;
+                    setMessages([]);
+                    setStreaming(false);
+                }
+                break;
+
             case 'pong':
                 // Keepalive response
                 break;
@@ -369,14 +435,15 @@ export const useAIChat = (options = {}) => {
         // Отправляем
         wsRef.current.send(JSON.stringify({
             type: 'message',
-            session_id: currentSession?.id,
+            session_id: currentSessionRef.current?.id,
             content,
             context_type: contextType,
-            specialty
+            specialty,
+            contract_version: MESSAGING_CONTRACT_VERSION
         }));
 
         return true;
-    }, [currentSession, contextType, specialty]);
+    }, [contextType, specialty]);
 
     /**
      * Отключиться от WebSocket
@@ -415,7 +482,11 @@ export const useAIChat = (options = {}) => {
 
         const interval = setInterval(() => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify({ type: 'ping' }));
+                wsRef.current.send(JSON.stringify({
+                    type: 'ping',
+                    session_id: currentSessionRef.current?.id,
+                    contract_version: MESSAGING_CONTRACT_VERSION
+                }));
             }
         }, 30000);
 

@@ -21,7 +21,7 @@ os.environ.setdefault('WS_DEV_ALLOW', '1')
 from app.db.base import Base
 from app.db.session import engine
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:18000"
 
 
 async def test_payment_webhooks():

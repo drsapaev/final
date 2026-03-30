@@ -10,9 +10,9 @@ from datetime import datetime
 
 import websockets
 
-BASE_URL = "http://127.0.0.1:8000"
-WS_URL = "ws://127.0.0.1:8000/ws/queue"
-WS_NOAUTH_URL = "ws://127.0.0.1:8000/ws/noauth"
+BASE_URL = "http://127.0.0.1:18000"
+WS_URL = "ws://127.0.0.1:18000/ws/queue"
+WS_NOAUTH_URL = "ws://127.0.0.1:18000/ws/noauth"
 
 
 def get_auth_token():
@@ -227,7 +227,7 @@ async def test_websocket_error_handling():
 
     try:
         # Пытаемся подключиться к несуществующему WebSocket
-        invalid_url = "ws://127.0.0.1:8000/invalid_ws"
+        invalid_url = "ws://127.0.0.1:18000/invalid_ws"
 
         try:
             async with websockets.connect(invalid_url):

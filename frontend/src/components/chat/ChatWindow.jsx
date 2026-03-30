@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
+import PropTypes from 'prop-types';
 import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import auth from '../../stores/auth';
@@ -29,6 +30,8 @@ const groupReactions = (reactions) => {
   });
   return groups;
 };
+
+const COMPACT_CHAT_BREAKPOINT = 768;
 
 // === HELPER FUNCTIONS ===
 
@@ -117,6 +120,10 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 0, h: 0 });
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
 
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
@@ -246,7 +253,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
     if (!showNewChat) return;
 
     const search = async () => {
-      if (searchQuery.length < 1) {
+      const normalizedQuery = searchQuery.trim().toLowerCase();
+      if (normalizedQuery.length < 1) {
         setSearchResults([]);
         return;
       }
@@ -254,7 +262,17 @@ const ChatWindow = ({ isOpen, onClose }) => {
       setIsSearching(true);
       try {
         const results = await searchUsers(searchQuery);
-        setSearchResults(results);
+        const serverResults = Array.isArray(results) ? results : [];
+
+        // Keep backend search behavior and augment with local full_name fallback.
+        const existingIds = new Set(serverResults.map((userItem) => userItem.id));
+        const fullNameFallback = allUsers.filter((userItem) => {
+          if (existingIds.has(userItem.id)) return false;
+          const displayName = String(userItem.name || '').toLowerCase();
+          return displayName.includes(normalizedQuery);
+        });
+
+        setSearchResults([...serverResults, ...fullNameFallback]);
       } catch (e) {
         logger.error('Search error:', e);
       } finally {
@@ -264,7 +282,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
     const timeout = setTimeout(search, 300);
     return () => clearTimeout(timeout);
-  }, [searchQuery, showNewChat, searchUsers]);
+  }, [searchQuery, showNewChat, searchUsers, allUsers]);
 
   // Отправка сообщения
   const handleSend = async () => {
@@ -408,6 +426,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
   // Drag Logic
   const handleMouseDown = (e) => {
+    if (isCompactViewport) return;
     if (e.target.closest('.chat-header') && !e.target.closest('button')) {
       setIsDragging(true);
       setDragOffset({
@@ -419,6 +438,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
   // Resize Logic
   const handleResizeStart = (e) => {
+    if (isCompactViewport) return;
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
@@ -529,6 +549,67 @@ const ChatWindow = ({ isOpen, onClose }) => {
     return matchesSearch && matchesFilter;
   });
 
+  const isCompactViewport = viewport.width <= COMPACT_CHAT_BREAKPOINT;
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewport((prev) => {
+        const next = {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        };
+
+        if (prev.width === next.width && prev.height === next.height) {
+          return prev;
+        }
+
+        return next;
+      });
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isCompactViewport) return;
+    setIsDragging(false);
+    setIsResizing(false);
+    setReactionMenuMessageId(null);
+    setContextMenu(null);
+  }, [isCompactViewport]);
+
+  const chatWindowStyle = isCompactViewport ? {
+    position: 'fixed',
+    inset: 0,
+    width: '100vw',
+    height: '100dvh',
+    maxWidth: '100vw',
+    maxHeight: '100dvh',
+    transform: 'none',
+    margin: 0,
+    pointerEvents: 'auto',
+    cursor: 'default',
+    userSelect: 'auto',
+    borderRadius: 0,
+    boxShadow: 'none'
+  } : {
+    position: 'absolute',
+    left: Math.max(0, Math.min(window.innerWidth - size.width, position.x)),
+    top: Math.max(0, Math.min(window.innerHeight - size.height, position.y)),
+    width: size.width,
+    height: size.height,
+    transform: 'none',
+    margin: 0,
+    pointerEvents: 'auto',
+    cursor: isDragging ? 'grabbing' : 'default',
+    userSelect: isDragging || isResizing ? 'none' : 'auto'
+  };
+
 
 
   if (!isOpen) return null;
@@ -539,20 +620,9 @@ const ChatWindow = ({ isOpen, onClose }) => {
   return ReactDOM.createPortal(
     <div className="chat-window-overlay" style={{ pointerEvents: 'none', background: 'transparent' }}>
             <div
-        className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''}`}
-        onPointerDown={handleMouseDown}
-        style={{
-          position: 'absolute',
-          left: Math.max(0, Math.min(window.innerWidth - size.width, position.x)),
-          top: Math.max(0, Math.min(window.innerHeight - size.height, position.y)),
-          width: size.width,
-          height: size.height,
-          transform: 'none',
-          margin: 0,
-          pointerEvents: 'auto',
-          cursor: isDragging ? 'grabbing' : 'default',
-          userSelect: isDragging || isResizing ? 'none' : 'auto'
-        }}>
+        className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''} ${isCompactViewport ? 'compact' : ''}`}
+        onPointerDown={isCompactViewport ? undefined : handleMouseDown}
+        style={chatWindowStyle}>
         
                 {/* Header */}
                 <div className="chat-header">
@@ -721,13 +791,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
             <div className="chat-loading" /> :
             filteredConversations.length > 0 ?
             filteredConversations.map((conv) =>
-            <div
-              key={conv.user_id}
-              className="conversation-item"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => handleActivationKeyDown(event, () => loadMessages(conv.user_id))}
-              onClick={() => loadMessages(conv.user_id)}>
+              <div
+                key={conv.user_id}
+                className="conversation-item"
+                data-user-id={conv.user_id}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => handleActivationKeyDown(event, () => loadMessages(conv.user_id))}
+                onClick={() => loadMessages(conv.user_id)}>
               
                                         <div className="conv-avatar-wrapper">
                                             <div className="conv-avatar">
@@ -771,6 +842,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
               <div
                 key={u.id}
                 className="conversation-item"
+                data-user-id={u.id}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(event) => handleActivationKeyDown(event, () => startConversation(u.id))}
@@ -921,7 +993,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                   style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }} />
                                 
                                                                                 </div> :
-                              item.message_type === 'file' ?
+                              (item.message_type === 'file' || (item.file_id && item.file_url && item.message_type !== 'voice')) ?
                               <div className="message-file">
                                                                                     <a href={item.content} target="_blank" rel="noopener noreferrer" className="file-link">
                                                                                         <Paperclip size={16} />
@@ -1121,11 +1193,18 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 }
 
                 {/* Resize handle */}
-                <div className="chat-resize-handle" onPointerDown={handleResizeStart} />
+                {!isCompactViewport &&
+        <div className="chat-resize-handle" onPointerDown={handleResizeStart} />
+                }
             </div>
         </div>,
     document.body
   );
+};
+
+ChatWindow.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
 };
 
 export default ChatWindow;

@@ -5,7 +5,7 @@ import sys
 
 async def test_endpoint(client, endpoint):
     try:
-        response = await client.get(f"http://127.0.0.1:8000{endpoint}")
+        response = await client.get(f"http://127.0.0.1:18000{endpoint}")
         return response.status_code, float(response.elapsed.total_seconds()) if hasattr(response, 'elapsed') else 0.1
     except Exception as e:
         print(f"❌ Ошибка запроса к {endpoint}: {e}")

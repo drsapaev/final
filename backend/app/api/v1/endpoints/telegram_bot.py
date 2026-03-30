@@ -2,14 +2,16 @@
 Telegram Bot API endpoints
 """
 
-import json
 import logging
+import secrets
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
-from ....api.deps import get_current_user
+from ....api.deps import get_db, require_roles
+from ....crud import telegram_config as crud_telegram
 from ....models.user import User
 from ....services.telegram.bot import telegram_bot
 
@@ -18,8 +20,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _validate_webhook_secret(request: Request, db: Session) -> None:
+    config = crud_telegram.get_telegram_config(db)
+    expected_secret = getattr(config, "webhook_secret", None)
+    if not expected_secret:
+        return
+
+    received_secret = request.headers.get("x-telegram-bot-api-secret-token")
+    if received_secret != expected_secret:
+        logger.warning("Telegram webhook rejected due to invalid secret token")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid Telegram webhook secret",
+        )
+
+
 @router.post("/webhook")
-async def telegram_webhook(request: Request):
+async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
     """Webhook для получения обновлений от Telegram"""
     try:
         if not telegram_bot.bot:
@@ -27,6 +44,8 @@ async def telegram_webhook(request: Request):
 
         # Получаем JSON данные
         update_data = await request.json()
+
+        _validate_webhook_secret(request, db)
 
         # Обрабатываем обновление через aiogram
         from aiogram.types import Update
@@ -38,6 +57,8 @@ async def telegram_webhook(request: Request):
 
         return JSONResponse({"status": "ok"})
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Telegram webhook error: {str(e)}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
@@ -45,16 +66,12 @@ async def telegram_webhook(request: Request):
 
 @router.post("/set-webhook")
 async def set_telegram_webhook(
-    webhook_data: Dict[str, str], current_user: User = Depends(get_current_user)
+    webhook_data: Dict[str, str],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Установка webhook URL для Telegram бота"""
     try:
-        # Проверяем права администратора
-        if current_user.role != "admin":
-            raise HTTPException(
-                status_code=403, detail="Только администратор может настраивать webhook"
-            )
-
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
@@ -62,45 +79,73 @@ async def set_telegram_webhook(
         if not webhook_url:
             raise HTTPException(status_code=400, detail="webhook_url required")
 
-        success = await telegram_bot.setup_webhook(webhook_url)
+        secret_token = secrets.token_urlsafe(32)
+        success = await telegram_bot.setup_webhook(webhook_url, secret_token=secret_token)
 
         if success:
+            config = crud_telegram.get_telegram_config(db)
+            if config:
+                crud_telegram.update_telegram_config(
+                    db,
+                    {
+                        "webhook_url": webhook_url,
+                        "webhook_secret": secret_token,
+                    },
+                )
+            else:
+                crud_telegram.create_telegram_config(
+                    db,
+                    {
+                        "webhook_url": webhook_url,
+                        "webhook_secret": secret_token,
+                    },
+                )
             return {"status": "success", "message": "Webhook установлен"}
         else:
             raise HTTPException(status_code=500, detail="Не удалось установить webhook")
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Set webhook error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/webhook")
-async def remove_telegram_webhook(current_user: User = Depends(get_current_user)):
+async def remove_telegram_webhook(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
     """Удаление webhook для Telegram бота"""
     try:
-        # Проверяем права администратора
-        if current_user.role != "admin":
-            raise HTTPException(
-                status_code=403, detail="Только администратор может управлять webhook"
-            )
-
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
         success = await telegram_bot.remove_webhook()
 
         if success:
+            config = crud_telegram.get_telegram_config(db)
+            if config:
+                crud_telegram.update_telegram_config(
+                    db,
+                    {
+                        "webhook_url": None,
+                        "webhook_secret": None,
+                    },
+                )
             return {"status": "success", "message": "Webhook удален"}
         else:
             raise HTTPException(status_code=500, detail="Не удалось удалить webhook")
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Remove webhook error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/info")
-async def get_bot_info(current_user: User = Depends(get_current_user)):
+async def get_bot_info(current_user: User = Depends(require_roles("Admin"))):
     """Получение информации о боте"""
     try:
         if not telegram_bot.bot:
@@ -134,6 +179,8 @@ async def get_bot_info(current_user: User = Depends(get_current_user)):
             },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Get bot info error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -141,14 +188,11 @@ async def get_bot_info(current_user: User = Depends(get_current_user)):
 
 @router.post("/send-notification")
 async def send_telegram_notification(
-    notification_data: Dict[str, Any], current_user: User = Depends(get_current_user)
+    notification_data: Dict[str, Any],
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Отправка уведомления через Telegram бота"""
     try:
-        # Проверяем права (врач или администратор)
-        if current_user.role not in ["doctor", "admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
@@ -167,6 +211,8 @@ async def send_telegram_notification(
                 status_code=500, detail="Не удалось отправить уведомление"
             )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Send notification error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -174,14 +220,11 @@ async def send_telegram_notification(
 
 @router.post("/send-appointment-reminder")
 async def send_appointment_reminder(
-    reminder_data: Dict[str, Any], current_user: User = Depends(get_current_user)
+    reminder_data: Dict[str, Any],
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
     """Отправка напоминания о визите"""
     try:
-        # Проверяем права
-        if current_user.role not in ["doctor", "registrar", "admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
@@ -197,6 +240,8 @@ async def send_appointment_reminder(
 
         return {"status": "success", "message": "Напоминание отправлено"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Send reminder error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -204,14 +249,11 @@ async def send_appointment_reminder(
 
 @router.post("/send-lab-notification")
 async def send_lab_results_notification(
-    lab_data: Dict[str, Any], current_user: User = Depends(get_current_user)
+    lab_data: Dict[str, Any],
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
     """Уведомление о готовности результатов анализов"""
     try:
-        # Проверяем права
-        if current_user.role not in ["lab", "doctor", "admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-
         if not telegram_bot.bot:
             raise HTTPException(status_code=503, detail="Telegram bot not configured")
 
@@ -227,18 +269,17 @@ async def send_lab_results_notification(
 
         return {"status": "success", "message": "Уведомление о результатах отправлено"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Send lab notification error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats")
-async def get_telegram_stats(current_user: User = Depends(get_current_user)):
+async def get_telegram_stats(current_user: User = Depends(require_roles("Admin"))):
     """Статистика Telegram бота"""
     try:
-        if current_user.role != "admin":
-            raise HTTPException(status_code=403, detail="Только для администратора")
-
         if not telegram_bot.bot:
             return {"status": "disabled", "stats": None}
 
@@ -255,6 +296,8 @@ async def get_telegram_stats(current_user: User = Depends(get_current_user)):
 
         return {"status": "active", "stats": stats}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Get telegram stats error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

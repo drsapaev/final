@@ -8,7 +8,7 @@ echo [1/4] Остановка старых процессов...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173') do (
     taskkill /PID %%a /F >nul 2>&1
 )
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000') do (
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :18000') do (
     taskkill /PID %%a /F >nul 2>&1
 )
 

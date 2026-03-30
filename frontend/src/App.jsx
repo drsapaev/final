@@ -3,8 +3,6 @@ import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react
 import PropTypes from 'prop-types';
 import { ToastContainer } from 'react-toastify';
 import { AppProviders } from './providers/AppProviders';
-import { PWAInstallPrompt } from './components/pwa';
-import { usePWA } from './hooks/usePWA.js';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
@@ -1075,21 +1073,9 @@ function AppShell() {
   );
 }
 
-// Внутренний компонент с PWA логикой
 function AppContent() {
-  // Безопасный вызов PWA хука с fallback
-  let shouldShowInstallPrompt = () => false;
-
-  try {
-    const pwa = usePWA();
-    shouldShowInstallPrompt = pwa.shouldShowInstallPrompt;
-  } catch (error) {
-    logger.warn('PWA hook failed in AppContent, using fallback:', error);
-  }
-
   return (
     <>
-      {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>Загрузка...</div>}>
         <Routes>
           <Route path="/login" element={<LoginFormStyled />} />

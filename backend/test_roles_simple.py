@@ -6,7 +6,7 @@ import sys
 
 import requests
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:18000"
 
 
 def test_user_login(username, password, expected_role):

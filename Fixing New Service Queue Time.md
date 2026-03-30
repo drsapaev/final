@@ -8230,7 +8230,7 @@ Visit confirmation audit — добавить source_ip/user_agent
 ```bash
 # Backend
 cd c:\final\backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 
 # Frontend (в отдельном терминале)
 cd c:\final\frontend
@@ -9015,7 +9015,7 @@ console.log(JSON.stringify(appointments[0].services, null, 2));
 # Остановите текущий backend (Ctrl+C)
 # Запустите снова:
 cd backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 18000
 ```
 
 **2. Создать НОВУЮ запись** (старые записи уже имеют неправильный код в БД):

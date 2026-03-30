@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
+import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
@@ -41,6 +42,8 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
 // Утилиты для работы с датами
 import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
+import { formatNetworkErrorMessage, isNetworkFetchError } from '../utils/networkErrorMessages';
+import { getErrorMessage } from '../utils/errorHandler';
 
 // ⭐ SSOT: Centralized service code resolver
 import { SPECIALTY_TO_CODE, toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
@@ -1001,9 +1004,22 @@ const RegistrarPanel = () => {
         }
       } catch (error) {
         // Подавляем ошибки для демо-режима
-        if (error.message !== 'Failed to fetch') {
-          logger.error(`Error fetching patient ${patientId}:`, error);
+        const rawMessage = error?.message || '';
+        if (isNetworkFetchError(rawMessage)) {
+          logger.warn('[Registrar] Не удалось загрузить пациента из URL: backend недоступен', {
+            patientId,
+            rawMessage,
+          });
+          return null;
         }
+
+        logger.error(`Error fetching patient ${patientId}:`, {
+          error: formatNetworkErrorMessage({
+            rawMessage,
+            fallbackMessage: 'Не удалось загрузить пациента из URL',
+          }),
+          rawMessage,
+        });
       }
       return null;
     }, []);
@@ -1736,7 +1752,7 @@ const RegistrarPanel = () => {
       }
     } catch (error) {
       logger.error('RegistrarPanel: Start visit API error:', error);
-      toast.error('Не удалось вызвать пациента: ' + error.message);
+          toast.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
     }
   }, [loadAppointments]);
 
@@ -2021,7 +2037,7 @@ const RegistrarPanel = () => {
       return updatedAppointment;
     } catch (error) {
       logger.error('RegistrarPanel: Update status error:', error);
-      toast.error('Не удалось обновить статус: ' + error.message);
+      toast.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
       return null;
     }
   }, [loadAppointments]);
@@ -2854,6 +2870,9 @@ const RegistrarPanel = () => {
   });
 
   DataSourceIndicator.displayName = 'DataSourceIndicator';
+  DataSourceIndicator.propTypes = {
+    count: PropTypes.number.isRequired,
+  };
 
   // Функция генерации CSV
   const generateCSV = (data) => {
@@ -4112,9 +4131,9 @@ const RegistrarPanel = () => {
 
             // Если это 404 после всех попыток
             if (error.response?.status === 404) {
-              toast.error(`Ошибка: Запись ${appointmentId} не найдена в базе данных`);
+        toast.error(`Не удалось найти запись ${appointmentId} в базе данных`);
             } else {
-              toast.error('Не удалось обновить статус на сервере: ' + (error.message || 'Unknown error'));
+      toast.error(getErrorMessage(error, 'Не удалось обновить статус на сервере. Проверьте соединение и попробуйте снова.'));
             }
             // Don't return here, still update locally to remove from view or let the user know
           }
@@ -4280,7 +4299,7 @@ const RegistrarPanel = () => {
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
                 logger.error('Ошибка переноса на завтра:', e);
-                toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
+    toast.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
               }
             }}>
                 🌅 {t('tomorrow')}
@@ -4308,7 +4327,7 @@ const RegistrarPanel = () => {
                   loadAppointments({ source: 'reschedule_date' });
                 } catch (e) {
                   logger.error('Ошибка переноса на дату:', e);
-                  toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
+    toast.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
                 }
               }
             }}>

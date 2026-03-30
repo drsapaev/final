@@ -6,6 +6,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Form, File, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.encoders import jsonable_encoder
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import logging
 import asyncio
@@ -14,8 +15,12 @@ import hashlib
 from datetime import datetime
 
 from app.api.deps import get_current_user, get_db
+from app.core.messaging_contract import MessageEventType
+from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
+from app.models.file_system import File as FileModel, FileType
 from app.models.user import User
 from app.crud.message import message as message_crud
+from app.utils.file_validator import FileCategory, validate_upload_file
 from app.schemas.message import (
     MessageCreate, 
     MessageOut, 
@@ -31,10 +36,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Import from centralized config
-from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
-
-
 def sanitize_content(content: str) -> str:
     """
     Sanitize message content to prevent XSS attacks.
@@ -48,6 +49,22 @@ def sanitize_content(content: str) -> str:
         # Fallback: basic HTML entity escaping if bleach not installed
         import html
         return html.escape(content)
+
+
+def _map_chat_file_type(category: FileCategory) -> FileType:
+    if category == FileCategory.IMAGE:
+        return FileType.IMAGE
+    if category == FileCategory.VIDEO:
+        return FileType.VIDEO
+    if category == FileCategory.AUDIO:
+        return FileType.AUDIO
+    if category == FileCategory.ARCHIVE:
+        return FileType.ARCHIVE
+    if category == FileCategory.MEDICAL:
+        return FileType.MEDICAL_RECORD
+    if category in (FileCategory.DOCUMENT, FileCategory.SPREADSHEET):
+        return FileType.DOCUMENT
+    return FileType.OTHER
 
 
 def validate_recipient(
@@ -102,10 +119,12 @@ def enrich_message(msg, db: Session) -> MessageOut:
     sender = db.query(User).filter(User.id == msg.sender_id).first()
     recipient = db.query(User).filter(User.id == msg.recipient_id).first()
     
-    # Для голосовых сообщений - добавить URL файла
+    # Для файловых сообщений - добавить URL файла
     file_url = None
-    if msg.message_type == "voice" and msg.file_id:
+    if msg.file_id and msg.message_type == "voice":
         file_url = f"/api/v1/messages/voice/{msg.id}/stream"
+    elif msg.file_id and msg.content:
+        file_url = msg.content
     
     # Name resolution helper
     def get_name(u):
@@ -155,10 +174,13 @@ async def send_message(
     recipient = validate_recipient(message_data.recipient_id, current_user, db)
     
     # Создаём сообщение
+    sanitized_message_data = message_data.model_copy(
+        update={"content": sanitize_content(message_data.content)}
+    )
     new_message = message_crud.create(
         db, 
         sender_id=current_user.id, 
-        obj_in=message_data
+        obj_in=sanitized_message_data
     )
     
     # Audit Log: track message sending for medical compliance
@@ -331,6 +353,18 @@ async def mark_message_read(
             detail="Сообщение не найдено или нет доступа"
         )
     
+    try:
+        from app.ws.chat_ws import chat_manager
+
+        asyncio.create_task(
+            chat_manager.notify_message_read(
+                sender_id=message.sender_id,
+                message_id=message.id,
+            )
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send WS notification for mark_message_read: {e}")
+
     return enrich_message(message, db)
 
 
@@ -378,7 +412,7 @@ async def delete_message(
         from app.ws.chat_ws import chat_manager
         asyncio.create_task(chat_manager.broadcast_event(
             user_ids=[current_user.id],
-            event_type="message_deleted",
+            event_type=MessageEventType.MESSAGE_DELETED,
             data={"message_id": message_id}
         ))
     except Exception as e:
@@ -437,7 +471,7 @@ async def toggle_message_reaction(
         # Notify both users
         asyncio.create_task(chat_manager.broadcast_event(
             user_ids=[current_user.id, other_user_id],
-            event_type="reaction_update",
+            event_type=MessageEventType.REACTION_UPDATE,
             data=payload
         ))
     except Exception as e:
@@ -470,6 +504,7 @@ async def get_available_users(
         search_pattern = f"%{search}%"
         query = query.filter(
             (User.username.ilike(search_pattern)) | 
+            (User.full_name.ilike(search_pattern)) |
             (User.email.ilike(search_pattern))
         )
     
@@ -524,6 +559,7 @@ async def send_voice_message(
     # Сохраняем файл
     file_hash = hashlib.sha256(content).hexdigest()
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    original_name = os.path.basename(audio_file.filename or f"voice.{format_name}")
     safe_filename = f"voice_{current_user.id}_{timestamp}.{format_name}"
     
     # Создаём директорию если не существует
@@ -539,7 +575,7 @@ async def send_voice_message(
     # Создаём запись в таблице files
     file_record = FileModel(
         filename=safe_filename,
-        original_filename=audio_file.filename,
+        original_filename=original_name,
         file_path=file_path,
         file_size=len(content),
         file_type=FileType.AUDIO,
@@ -681,15 +717,22 @@ async def upload_file_message(
     recipient = validate_recipient(recipient_id, current_user, db)
     
     try:
-        # 1. Read file content
+        # 1. Validate upload against shared file safety rules.
+        is_valid, error_msg, file_info = await validate_upload_file(file)
+        if not is_valid or not file_info:
+            raise HTTPException(status_code=400, detail=error_msg or "Invalid file upload")
+
+        # 2. Read file content after validation reset the file pointer.
         content = await file.read()
         file_size = len(content)
-        
-        # 2. Create hash
+        content_type = file_info["mime"]
+        file_type = _map_chat_file_type(file_info["category"])
+
+        # 3. Create hash
         file_hash = hashlib.sha256(content).hexdigest()
-        filename = file.filename or "file"
+        filename = os.path.basename(file.filename or "file")
         
-        # 3. Save to disk
+        # 4. Save to disk
         upload_dir = "uploads/chat"
         os.makedirs(upload_dir, exist_ok=True)
         safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
@@ -697,40 +740,51 @@ async def upload_file_message(
         
         with open(file_path, "wb") as f:
             f.write(content)
-            
-        # 4. Create File record if needed, but for simplicity we'll just use message type 'file'
-        # Actually, if the model has file_id, we should follow it.
-        # But for chat modernization, let's just make it work.
-        
-        # Create Message
+
+        # 5. Create scoped file record
+        file_record = FileModel(
+            filename=safe_filename,
+            original_filename=filename,
+            file_path=file_path,
+            file_size=file_size,
+            file_type=file_type,
+            mime_type=content_type,
+            file_hash=file_hash,
+            owner_id=current_user.id,
+            status="ready",
+        )
+        db.add(file_record)
+        db.flush()
+
+        # 6. Create Message
         message_obj = message_crud.create(
             db, 
             obj_in=MessageCreate(
                 recipient_id=recipient_id,
-                content=filename, # Store original filename in content
-                message_type="document" if not file.content_type.startswith("image") else "image"
+                content=filename,
+                message_type="image" if file_type == FileType.IMAGE else "file"
             ),
             sender_id=current_user.id
         )
-        
-        # Update with file path (we'll reuse content or add a custom field)
-        # For now, let's store the file path in content or just use a helper
+
+        message_obj.file_id = file_record.id
         message_obj.content = f"/api/v1/messages/download/{safe_filename}?name={filename}"
-        message_obj.message_type = "image" if file.content_type.startswith("image") else "file"
         db.commit()
         db.refresh(message_obj)
         
-        # 5. Notify via WS
+        # 7. Notify via WS
         msg_out = enrich_message(message_obj, db)
         from app.ws.chat_ws import chat_manager
         asyncio.create_task(chat_manager.broadcast_event(
             user_ids=[current_user.id, recipient_id],
-            event_type="new_message",
+            event_type=MessageEventType.NEW_MESSAGE,
             data=jsonable_encoder(msg_out)
         ))
         
         return msg_out
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Chat file upload error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -740,12 +794,32 @@ async def upload_file_message(
 async def download_chat_file(
     filename: str,
     name: str = Query(None),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Скачать файл из чата"""
+    filename = os.path.basename(filename)
     file_path = os.path.join("uploads/chat", filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Файл не найден")
+
+    from app.models.message import Message
+
+    file_record = db.query(FileModel).filter(FileModel.filename == filename).first()
+    if file_record:
+        message = db.query(Message).filter(Message.file_id == file_record.id).first()
+    else:
+        message = db.query(Message).filter(
+            or_(
+                Message.content.contains(f"/download/{filename}"),
+                Message.content.contains(f"name={filename}"),
+            )
+        ).first()
+
+    if not message or (
+        current_user.id != message.sender_id and current_user.id != message.recipient_id
+    ):
+        raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
     
     return FileResponse(
         path=file_path,

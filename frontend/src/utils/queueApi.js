@@ -5,6 +5,7 @@
 import { useState } from 'react';
 
 import { getApiBaseUrl } from '../api/runtime';
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { tokenManager } from '../utils/tokenManager';
 const API_BASE = getApiBaseUrl();
@@ -31,7 +32,7 @@ export const getQueueStatus = async (queueId) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to get queue status: ${response.statusText}`);
+    throw new Error('Не удалось получить статус очереди. Проверьте соединение и попробуйте снова.');
   }
 
   return response.json();
@@ -50,7 +51,7 @@ export const getQueueStatusBySpecialist = async (specialistId, day = null) => {
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to get queue status by specialist: ${response.statusText}`);
+    throw new Error('Не удалось получить очередь специалиста. Проверьте соединение и попробуйте снова.');
   }
 
   return response.json();
@@ -70,7 +71,7 @@ export const moveQueueEntry = async (entryId, newPosition) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to move queue entry: ${response.statusText}`);
+    throw new Error('Не удалось переместить запись в очереди. Проверьте соединение и попробуйте снова.');
   }
 
   return response.json();
@@ -90,7 +91,7 @@ export const reorderQueue = async (queueId, entryOrders) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to reorder queue: ${response.statusText}`);
+    throw new Error('Не удалось изменить порядок очереди. Проверьте соединение и попробуйте снова.');
   }
 
   return response.json();
@@ -138,7 +139,7 @@ export const useQueueManager = (specialistId) => {
       setQueue(formatQueueData(queueData));
     } catch (err) {
       logger.error('Error loading queue:', err);
-      setError(err.message);
+      setError(getErrorMessage(err, 'Не удалось загрузить очередь. Проверьте соединение и попробуйте снова.'));
     } finally {
       setLoading(false);
     }

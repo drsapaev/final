@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { MacOSCard, MacOSButton, MacOSInput } from '../../components/ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 
 /**
@@ -76,7 +77,10 @@ export default function ChangePasswordRequired({ currentPassword }) {
             }, 2000);
 
         } catch (err) {
-            const errorMessage = err.response?.data?.detail || err.message || 'Ошибка смены пароля';
+            const errorMessage = getErrorMessage(
+                err,
+                'Не удалось сменить пароль. Проверьте соединение и попробуйте снова.'
+            );
             setError(errorMessage);
             logger.error('Ошибка смены пароля:', err);
         } finally {
