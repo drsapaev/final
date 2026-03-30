@@ -4,9 +4,14 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, beforeEach, expect, vi } from 'vitest';
+import PropTypes from 'prop-types';
+
+function SnackbarProviderMock({ children }) {
+  return <div>{children}</div>;
+}
 
 vi.mock('notistack', () => ({
-  SnackbarProvider: ({ children }) => <div>{children}</div>,
+  SnackbarProvider: SnackbarProviderMock,
   useSnackbar: () => ({ enqueueSnackbar: vi.fn() })
 }));
 
@@ -28,6 +33,16 @@ import AIAssistant from '../AIAssistant';
 import { mcpAPI } from '../../../api/mcpClient';
 
 const MockWrapper = ({ children }) => <div>{children}</div>;
+
+
+SnackbarProviderMock.propTypes = {
+  children: PropTypes.node
+};
+
+MockWrapper.propTypes = {
+  ...(MockWrapper.propTypes || {}),
+  children: PropTypes.node,
+};
 
 describe('AIAssistant Component', () => {
   beforeEach(() => {

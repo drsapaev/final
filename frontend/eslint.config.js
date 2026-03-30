@@ -3,6 +3,7 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
+import tsParser from '@typescript-eslint/parser';
 
 export default [
   js.configs.recommended,
@@ -65,6 +66,27 @@ export default [
       'jsx-a11y/aria-role': 'warn',
       'jsx-a11y/click-events-have-key-events': 'warn',
       'jsx-a11y/no-static-element-interactions': 'warn',
+    },
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsParser,
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.es2022,
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-unused-vars': 'off',
     },
   },
   {

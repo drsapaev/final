@@ -9,13 +9,13 @@ import {
   persistColorSchemeLocally,
   resolveThemeMode,
 } from '../theme/colorScheme.js';
+import apiClient from '../api/client.js';
 import { mixColors, toRgbaString } from '../theme/colorUtils.js';
 import logger from '../utils/logger';
 
 const ThemeContext = createContext();
 const THEME_PREFERENCE_SAVE_DEBOUNCE_MS = 400;
 const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
-let apiClientPromise = null;
 
 function getAuthTokenSnapshot() {
   if (typeof window === 'undefined') {
@@ -27,25 +27,6 @@ function getAuthTokenSnapshot() {
   } catch {
     return null;
   }
-}
-
-async function getApiClient() {
-  if (!apiClientPromise) {
-    apiClientPromise = import('../api/client.js').then((module) => {
-      const resolvedApiClient =
-        module.api ||
-        module.default?.api ||
-        module.default ||
-        module;
-
-      if (typeof resolvedApiClient?.get !== 'function' || typeof resolvedApiClient?.put !== 'function') {
-        throw new Error('ThemeContext could not resolve API client instance');
-      }
-
-      return resolvedApiClient;
-    });
-  }
-  return apiClientPromise;
 }
 
 export const useTheme = () => {
@@ -285,8 +266,7 @@ export const ThemeProvider = ({ children }) => {
 
     const loadThemePreference = async () => {
       try {
-        const api = await getApiClient();
-        const response = await api.get('/users/me/preferences');
+        const response = await apiClient.get('/users/me/preferences');
         if (cancelled) {
           return;
         }
@@ -346,8 +326,7 @@ export const ThemeProvider = ({ children }) => {
 
     saveTimeoutRef.current = window.setTimeout(async () => {
       try {
-        const api = await getApiClient();
-        await api.put('/users/me/preferences', { theme: colorScheme });
+        await apiClient.put('/users/me/preferences', { theme: colorScheme });
         lastSavedPreferenceRef.current = colorScheme;
         logger.info('[FIX:THEME] Saved color scheme to user preferences', {
           colorScheme,
