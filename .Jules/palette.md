@@ -1,0 +1,3 @@
+## 2026-03-31 - Table Header Accessibility
+**Learning:** When making React custom table headers sortable via keyboard, it's crucial to retain the native `role="columnheader"` instead of overwriting it with `role="button"`. A simple `tabIndex={0}` and handling the 'Enter' and 'Space' keys using `onKeyDown` with `e.preventDefault()` ensures it is keyboard accessible without compromising screen reader functionality. Also, adding `aria-sort={isSorted ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}` provides proper state feedback.
+**Action:** Apply this pattern directly to sortable headers in future table implementations instead of wrapping them in non-semantic buttons.

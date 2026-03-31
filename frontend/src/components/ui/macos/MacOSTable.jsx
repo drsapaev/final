@@ -279,29 +279,45 @@ const MacOSTable = ({
       <table className={className} style={tableStyle}>
         <thead>
           <tr>
-            {columns.map((column, index) => (
-              <th
-                key={column.key || index}
-                style={{
-                  ...headerStyle,
-                  borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
-                }}
-                onClick={() => handleSort(column)}
-                onMouseEnter={(e) => {
-                  if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = currentVariant.headerBackground;
-                  }
-                }}
-              >
-                {column.title}
-                {renderSortIcon(column)}
-              </th>
-            ))}
+            {columns.map((column, index) => {
+              const isSortable = sortable && column.sortable;
+              const isSorted = sortColumn === column.key;
+              const ariaSort = isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none';
+
+              return (
+                <th
+                  key={column.key || index}
+                  style={{
+                    ...headerStyle,
+                    borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)',
+                    cursor: isSortable ? 'pointer' : 'default'
+                  }}
+                  onClick={() => handleSort(column)}
+                  onMouseEnter={(e) => {
+                    if (isSortable) {
+                      e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isSortable) {
+                      e.target.style.backgroundColor = currentVariant.headerBackground;
+                    }
+                  }}
+                  tabIndex={isSortable ? 0 : undefined}
+                  role="columnheader"
+                  aria-sort={isSortable ? ariaSort : undefined}
+                  onKeyDown={(e) => {
+                    if (isSortable && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      handleSort(column);
+                    }
+                  }}
+                >
+                  {column.title}
+                  {renderSortIcon(column)}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
