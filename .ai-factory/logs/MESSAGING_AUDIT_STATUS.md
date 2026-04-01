@@ -1,5 +1,7 @@
 # Messaging Audit Status
 
+> Historical evidence log. Keep for audit trail and implementation history; do not treat this file as the live product contract.
+
 Updated: 2026-03-30
 
 ## Current Tracking

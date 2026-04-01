@@ -1,5 +1,8 @@
 # Messaging Stack Modernization Plan
 
+> Historical plan note: this plan is preserved as implementation history.
+> Current product truth is the current `main` branch plus active runbooks/contracts, not this historical planning artifact.
+
 ## Settings
 - Testing: yes
 - Logging: verbose

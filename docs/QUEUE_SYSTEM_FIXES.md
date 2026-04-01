@@ -1,6 +1,10 @@
 # 🔧 Исправления системы очередей
 
-**Дата**: 2025-10-01  
+> **Historical Fix Report**
+> Этот документ отражает прошлую волну исправлений и не должен использоваться как актуальный queue SSOT.
+> Текущий источник истины: `docs/QUEUE_SYSTEM_ARCHITECTURE.md`, `docs/PANEL_QA_CHECKLIST.md`, `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+
+**Дата**: 2025-10-01
 **Версия**: 1.0
 
 ---

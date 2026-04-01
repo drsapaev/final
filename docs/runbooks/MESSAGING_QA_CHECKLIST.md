@@ -1,5 +1,8 @@
 # Messaging QA Checklist
 
+> Historical evidence note: this checklist is preserved for messaging rollout history.
+> Do not treat it as the primary clinic-wide acceptance runbook; current operator truth is `docs/PANEL_QA_CHECKLIST.md` plus active role runbooks.
+
 ## Purpose
 
 Use this runbook to verify the full messaging stack after backend, frontend, or integration changes.

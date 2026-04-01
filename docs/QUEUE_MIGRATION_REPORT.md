@@ -1,5 +1,9 @@
 # 📊 Отчёт о миграции системы очередей
 
+> **Historical Migration Report**
+> Этот отчёт сохраняется как evidence, но не описывает полный текущий queue runtime на `main`.
+> Для текущей архитектуры и операционного контура используйте `docs/QUEUE_SYSTEM_ARCHITECTURE.md` и `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+
 **Дата**: 2025-10-01  
 **Статус**: ✅ Завершено успешно
 
@@ -251,4 +255,3 @@ for idx, visit_req in enumerate(cart_data.visits):
 **Автор**: AI Agent  
 **Дата создания**: 2025-10-01  
 **Версия**: 1.0
-
