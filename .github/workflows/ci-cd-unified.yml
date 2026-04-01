@@ -406,7 +406,7 @@ jobs:
     
     - name: 📤 Сохранение отчетов
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: code-quality-reports
         path: backend/quality-reports/
@@ -570,7 +570,7 @@ jobs:
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
     
     - name: 📊 Загрузка отчета покрытия
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: coverage-report
@@ -714,7 +714,7 @@ jobs:
 
     - name: 📤 Upload parity artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: frontend-backend-parity-report
         path: |
@@ -807,7 +807,7 @@ jobs:
 
     - name: 📤 Upload security reports
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: security-reports
         path: backend/security-reports/
@@ -1295,7 +1295,7 @@ jobs:
 
     - name: 📤 Upload load artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: load-test-report
         path: |
@@ -1639,7 +1639,7 @@ jobs:
         fi
     
     - name: 📤 Загрузка документации
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: api-docs
         path: backend/openapi.json
