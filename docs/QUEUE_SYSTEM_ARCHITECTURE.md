@@ -1,8 +1,12 @@
 # Архитектура системы очередей - SSOT Guide
 
-**Дата**: 2025-11-24
-**Статус**: ✅ Active
-**Версия**: 2.0
+**Дата**: 2026-04-01
+**Статус**: ✅ Active (reconciled to current `main`)
+**Версия**: 2.1
+
+> Используйте этот документ как текущий queue SSOT только вместе с [docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) и [docs/PANEL_QA_CHECKLIST.md](./PANEL_QA_CHECKLIST.md).
+> Старые документы `ONLINE_QUEUE_SYSTEM_*`, `QUEUE_*_REPORT`, `QUEUE_*_FIX*` и отдельные migration/fix планы считаются historical/deprecated и не должны использоваться как текущий implementation guide.
+> Текущий источник истины в коде: `backend/app/models/online_queue.py`, `backend/app/services/queue_service.py`, канонические панельные маршруты и acceptance runbooks на `main`.
 
 ---
 
