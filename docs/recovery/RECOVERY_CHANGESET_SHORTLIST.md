@@ -1,0 +1,23 @@
+# Recovery Changeset Shortlist
+
+## Rules Used
+- Only items with a concrete gap in current main are listed.
+- No broad feature branch passed the proof threshold here.
+- The shortlist is intentionally limited to the lowest-risk recovery items.
+
+| source branch | commit range or file slice | exact missing value in current main | proof that the gap is real | why not already covered by main | action | regression risk | required tests | priority |
+|---|---|---|---|---|---|---|---|---|
+| `dependabot/github_actions/actions/checkout-6` | `main...dependabot/github_actions/actions/checkout-6` | GitHub Actions `actions/checkout` bumped to v6 | Diff is workflow-only; main still pins the older checkout version. | No equivalent version bump is present in main. | cherry-pick | low | workflow syntax check; CI dry run for affected workflow | P1 |
+| `dependabot/github_actions/actions/setup-node-6` | `main...dependabot/github_actions/actions/setup-node-6` | GitHub Actions `actions/setup-node` bumped to v6 | Diff is workflow-only; main still pins the older setup-node version. | No equivalent version bump is present in main. | cherry-pick | low | workflow syntax check; CI dry run for affected workflow | P1 |
+| `dependabot/github_actions/actions/setup-python-6` | `main...dependabot/github_actions/actions/setup-python-6` | GitHub Actions `actions/setup-python` bumped to v6 | Diff is workflow-only; main still pins the older setup-python version. | No equivalent version bump is present in main. | cherry-pick | low | workflow syntax check; CI dry run for affected workflow | P1 |
+| `origin/dependabot/github_actions/actions/upload-artifact-7` | `main...origin/dependabot/github_actions/actions/upload-artifact-7` | GitHub Actions `actions/upload-artifact` bumped to v7 | Diff is workflow-only; main still pins the older upload-artifact version. | No equivalent version bump is present in main. | cherry-pick | low | workflow syntax check; CI dry run for affected workflow | P1 |
+| `origin/dependabot/github_actions/docker/build-push-action-7` | `main...origin/dependabot/github_actions/docker/build-push-action-7` | GitHub Actions `docker/build-push-action` bumped to v7 | Diff is workflow-only; main still pins the older build-push-action version. | No equivalent version bump is present in main. | cherry-pick | low | workflow syntax check; CI dry run for affected workflow | P1 |
+| `origin/dependabot/pip/backend/alembic-gte-1.13-and-lt-1.19` | `main...origin/dependabot/pip/backend/alembic-gte-1.13-and-lt-1.19` | Backend Alembic requirement widened to the newer safe range | Diff is backend requirements-only; main still has the older constraint. | No equivalent constraints update is present in main. | cherry-pick | low | backend targeted pytest; import/startup smoke | P1 |
+| `origin/dependabot/pip/backend/fastapi-gte-0.121-and-lt-0.136` | `main...origin/dependabot/pip/backend/fastapi-gte-0.121-and-lt-0.136` | Backend FastAPI requirement widened to the newer safe range | Diff is backend requirements-only; main still has the older constraint. | No equivalent constraints update is present in main. | cherry-pick | low | backend targeted pytest; import/startup smoke | P1 |
+| `origin/dependabot/pip/backend/pydantic-gte-2.7-and-lt-2.13` | `main...origin/dependabot/pip/backend/pydantic-gte-2.7-and-lt-2.13` | Backend Pydantic requirement widened to the newer safe range | Diff is backend requirements-only; main still has the older constraint. | No equivalent constraints update is present in main. | cherry-pick | low | backend targeted pytest; import/startup smoke | P1 |
+| `origin/dependabot/pip/backend/uvicorn-standard--gte-0.29-and-lt-0.43` | `main...origin/dependabot/pip/backend/uvicorn-standard--gte-0.29-and-lt-0.43` | Backend Uvicorn requirement widened to the newer safe range | Diff is backend requirements-only; main still has the older constraint. | No equivalent constraints update is present in main. | cherry-pick | low | backend targeted pytest; import/startup smoke | P1 |
+| `origin/dependabot/pip/backend/redis-gte-5.0-and-lt-8.0` | `main...origin/dependabot/pip/backend/redis-gte-5.0-and-lt-8.0` | Backend Redis requirement widened to the newer safe range | Diff is backend requirements-only; main still has the older constraint. | No equivalent constraints update is present in main. | cherry-pick | low | backend targeted pytest; import/startup smoke | P1 |
+
+## Exclusions
+- No feature-branch item is included without a demonstrated gap in current main.
+- That means the w2a, w2c, post-w2c, notification precursor, startup hardening, and wip-jules families stay out of the shortlist.
