@@ -37,16 +37,38 @@
 - outcome: `docs-only reconciliation complete`
 
 ## Stage 2
-- status: `in_progress`
+- status: `completed`
+- actions:
+  - Triaged all 10 dependabot refs one-by-one against current execution branch.
+  - Dropped `actions/checkout@v6`, `actions/setup-node@v6`, and `actions/setup-python@v6` because current `main` already superseded them.
+  - Applied the smallest safe equivalent changes for `docker/build-push-action@v7`, `upload-artifact@v7`, and five backend dependency upper-bound widenings.
+  - Captured the full per-ref outcome in `docs/recovery/RECOVERY_DEPENDABOT_TRIAGE.md`.
+- outcome:
+  - applied_candidates: `7`
+  - dropped_no_op_candidates: `3`
+  - failed_validation_candidates: `0`
 
 ## Stage 3
-- status: `pending`
+- status: `completed`
+- outcome: `NO-OP`
+- note: `RECOVERY_CHANGESET_SHORTLIST.md` contained no proven manual-port items beyond the dependabot shortlist
 
 ## Stage 4
-- status: `pending`
+- status: `completed`
+- outcome: `NO-OP`
+- note: `RECOVERY_CHANGESET_SHORTLIST.md` contained no proven reimplement-from-main items beyond the dependabot shortlist
 
 ## Stage 5
-- status: `pending`
+- status: `completed`
+- actions:
+  - Ran final patch hygiene, workflow YAML integrity, backend import smoke, targeted backend pytest, and forbidden-artifact checks.
+  - Captured the full validation set in `docs/recovery/RECOVERY_VALIDATION_EVIDENCE.md`.
+- outcome: `validation complete with residual CI / clean-env risk documented`
 
 ## Stage 6
-- status: `pending`
+- status: `completed`
+- actions:
+  - Updated the shortlist with final statuses.
+  - Updated `RECOVERY_GO_NO_GO.md` to reflect actual execution outcome.
+  - Added `docs/recovery/RECOVERY_COMPLETION_REPORT.md`.
+- final_verdict: `READY FOR REVIEW`
