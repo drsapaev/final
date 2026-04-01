@@ -370,7 +370,7 @@ jobs:
         
     - name: 📤 Загрузка отчёта
       continue-on-error: true
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: performance-report
         path: performance-report.md

@@ -1,5 +1,9 @@
 # Система онлайн-очередей - Полная документация реализации
 
+> **Deprecated / Historical Reference**
+> Этот документ сохраняется как историческое описание ранней online-queue реализации.
+> Для текущего `main` используйте `docs/QUEUE_SYSTEM_ARCHITECTURE.md`, `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md` и `docs/PANEL_QA_CHECKLIST.md`.
+
 ## 📋 Содержание
 
 1. [Обзор системы](#обзор-системы)

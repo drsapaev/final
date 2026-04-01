@@ -1,5 +1,7 @@
 # Panel QA Checklist v2 Implementation Status
 
+> Historical evidence log. The active operator runbook is `docs/PANEL_QA_CHECKLIST.md`; this file remains as execution history only.
+
 Updated: 2026-03-29
 
 ## Run Metadata
