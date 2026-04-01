@@ -117,6 +117,7 @@ const MCPMonitor = () => {
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Авто-обновление">
               <IconButton 
+                aria-label="Авто-обновление"
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 color={autoRefresh ? 'primary' : 'default'}
               >
@@ -124,7 +125,7 @@ const MCPMonitor = () => {
               </IconButton>
             </Tooltip>
             <Tooltip title="Обновить">
-              <IconButton onClick={fetchMCPStatus} disabled={loading}>
+              <IconButton aria-label="Обновить" onClick={fetchMCPStatus} disabled={loading}>
                 <Refresh />
               </IconButton>
             </Tooltip>

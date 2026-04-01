@@ -301,10 +301,10 @@ const TelegramManager = () => {
                           </Badge>
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton>
+                          <IconButton aria-label="Редактировать">
                             <Edit />
                           </IconButton>
-                          <IconButton>
+                          <IconButton aria-label="Удалить">
                             <Trash2 />
                           </IconButton>
                         </TableCell>
