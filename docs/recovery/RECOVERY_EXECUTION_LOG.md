@@ -25,11 +25,19 @@
 - worktree_state_before_runtime_changes: `clean`
 
 ## Stage 1
-- status: `in_progress`
-- note: `docs reconciliation only; no runtime changes started`
+- status: `completed`
+- actions:
+  - Reconciled queue docs according to the disposition matrix.
+  - Added explicit `historical` / `deprecated` markers to stale notification, queue, messaging, and AI Factory evidence docs.
+  - Updated `docs/README.md` so the documentation index no longer presents deprecated queue or messaging docs as current operator guidance.
+  - Added `docs/recovery/RECOVERY_DOCS_RECONCILIATION.md`.
+- validation:
+  - `git diff --check` passed after reconciliation edits.
+  - `git diff --name-only -- . ":(exclude)docs/*" ":(exclude).ai-factory/*"` returned no runtime changes.
+- outcome: `docs-only reconciliation complete`
 
 ## Stage 2
-- status: `pending`
+- status: `in_progress`
 
 ## Stage 3
 - status: `pending`
