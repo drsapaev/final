@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
+import { printService } from '../../services/print';
 import {
   formatLabStatus,
   formatSeverityLabel,
@@ -115,6 +116,102 @@ function getServiceContextItems(appointment) {
     label: code,
     code
   }));
+}
+
+function normalizeLabSections(sections = []) {
+  return sections.map((section, sectionIndex) => ({
+    key: section.key || section.section_key || section.id || `section-${sectionIndex}`,
+    title: section.title || section.name || section.key || `Раздел ${sectionIndex + 1}`,
+    fields: (section.fields || []).map((field, fieldIndex) => ({
+      field_key: field.field_key || field.key || field.id || `${section.key || `section-${sectionIndex}`}-field-${fieldIndex}`,
+      label: field.label || field.name || field.field_key || `Показатель ${fieldIndex + 1}`,
+      value_numeric: field.value_numeric ?? null,
+      value_text: field.value_text ?? '',
+      reference_text: field.reference_text ?? '',
+      unit: field.unit ?? '',
+      resolved_flag: field.resolved_flag ?? null,
+      resolved_flag_severity: field.resolved_flag_severity ?? null
+    }))
+  }));
+}
+
+function flattenLabResults(sections = []) {
+  return sections.flatMap((section) =>
+    (section.fields || []).map((field) => ({
+      section_key: section.key,
+      section_title: section.title,
+      field_key: field.field_key,
+      label: field.label,
+      value_numeric: field.value_numeric,
+      value_text: field.value_text,
+      reference_text: field.reference_text,
+      unit: field.unit,
+      resolved_flag: field.resolved_flag,
+      resolved_flag_severity: field.resolved_flag_severity
+    }))
+  );
+}
+
+function buildLabPrintPayload(instance, appointment) {
+  const sections = normalizeLabSections(instance?.sections || []);
+  const patientSnapshot = instance?.patient_snapshot || {};
+  const appointmentSnapshot = appointment || {};
+  const clinic = instance?.clinic || appointmentSnapshot?.clinic || {};
+  const templateName = instance?.template?.name || instance?.template_name || 'Лабораторный бланк';
+  const reportDate =
+    instance?.printed_at
+    || instance?.finalized_at
+    || instance?.updated_at
+    || instance?.created_at
+    || new Date().toISOString();
+
+  return {
+    lab_order: {
+      id: instance?.id || null,
+      visit_id: instance?.visit_id || appointmentSnapshot?.visit_id || null,
+      patient_id: instance?.patient_id || appointmentSnapshot?.patient_id || null,
+      template_id: instance?.template_id || null,
+      template_name: templateName,
+      status: instance?.status || 'DRAFT',
+      created_at: instance?.created_at || null,
+      finalized_at: instance?.finalized_at || null,
+      printed_at: instance?.printed_at || null
+    },
+    lab_results: flattenLabResults(sections),
+    patient: {
+      full_name:
+        patientSnapshot.full_name
+        || appointmentSnapshot.patient_fio
+        || appointmentSnapshot.patient_name
+        || `Пациент #${instance?.patient_id || appointmentSnapshot.patient_id || ''}`,
+      birth_date: patientSnapshot.birth_date || appointmentSnapshot.patient_birth_year || '',
+      address: patientSnapshot.address || appointmentSnapshot.address || '',
+      phone: patientSnapshot.phone || appointmentSnapshot.patient_phone || '',
+      sex: patientSnapshot.sex || appointmentSnapshot.sex || ''
+    },
+    clinic: {
+      name: clinic.name || clinic.clinic_name || 'МЕДИЦИНСКАЯ КЛИНИКА',
+      address: clinic.address || '',
+      phone: clinic.phone || '',
+      website: clinic.website || ''
+    },
+    branding: {
+      clinic_name: clinic.name || clinic.clinic_name || 'МЕДИЦИНСКАЯ КЛИНИКА',
+      address: clinic.address || '',
+      phone: clinic.phone || '',
+      document_title: templateName,
+      document_subtitle: instance?.template?.subtitle || ''
+    },
+    signers: instance?.signer_snapshot || {},
+    sections,
+    template_name: templateName,
+    report_date: typeof reportDate === 'string' ? reportDate : new Date(reportDate).toISOString(),
+    footer_notes: instance?.footer_notes || instance?.template?.footer_notes || '',
+    critical_findings: instance?.critical_findings || [],
+    smear_matrix_mode: Boolean(instance?.template?.layout_mode === 'smear_matrix'),
+    oam_docx_mode: Boolean(instance?.template?.layout_mode === 'oam'),
+    docx_three_column_mode: Boolean(instance?.template?.layout_mode === 'docx_three_column')
+  };
 }
 
 export default function LabReportWorkbench({
@@ -436,10 +533,38 @@ export default function LabReportWorkbench({
     setBusyAction('print');
     setPrintFeedback({
       severity: 'info',
-      text: 'Формирую PDF и открываю его в новой вкладке...'
+      text: 'Отправляю лабораторный бланк на печать...'
     });
     try {
-      notify('info', 'Формирую PDF...');
+      notify('info', 'Пытаюсь отправить бланк на принтер...');
+
+      const printResult = await printService.printLabResults(
+        buildLabPrintPayload(activeInstance, selectedAppointment)
+      );
+
+      if (printResult.success) {
+        const printed = await labReportingApi.markPrinted(activeInstance.id);
+        onInstanceChange(printed);
+        await onRefreshHistory(printed.patient_id);
+        await onRefreshRecentReports?.();
+        await onQueueChanged?.();
+        setPrintFeedback({
+          severity: 'success',
+          text: `Лабораторный бланк отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
+        });
+        notify(
+          'success',
+          `Лабораторный бланк отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
+        );
+        return;
+      }
+
+      logger.warn('[LabReportWorkbench] direct lab print failed, falling back to PDF', {
+        instanceId: activeInstance.id,
+        error: printResult.error
+      });
+      notify('warning', 'Прямая печать недоступна, использую PDF-файл как запасной вариант.');
+
       const blob = await labReportingApi.downloadPdf(activeInstance.id);
       const url = URL.createObjectURL(blob);
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
@@ -600,7 +725,7 @@ export default function LabReportWorkbench({
                       </Button>
                       <Button variant="primary" onClick={handlePrint} disabled={saving}>
                         <Icon name="printer" size={16} />
-                        {busyAction === 'print' ? 'Формирую PDF...' : 'Печать PDF'}
+                        {busyAction === 'print' ? 'Отправляю...' : 'Печать результата'}
                       </Button>
                     </>
                   )}

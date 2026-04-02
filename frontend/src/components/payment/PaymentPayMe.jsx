@@ -14,6 +14,7 @@ import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { getApiBaseUrl } from '../../api/runtime';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
+import { openPrintableWindow } from '../../utils/printWindow';
 import notify from '../../services/notify';
 import './PaymentPayMe.css';
 import PropTypes from 'prop-types';
@@ -266,9 +267,8 @@ const PaymentPayMe = ({
 
     `;
 
-    // Открываем окно печати
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    openPrintableWindow({
+      html: `
       <html>
         <head>
           <title>Талон на приём</title>
@@ -281,11 +281,10 @@ const PaymentPayMe = ({
           <div class="ticket">
             <pre>${printContent}</pre>
           </div>
-          <script>window.print(); window.close();</script>
         </body>
       </html>
-    `);
-    printWindow.document.close();
+    `
+    });
   };
 
   const printAllTickets = () => {

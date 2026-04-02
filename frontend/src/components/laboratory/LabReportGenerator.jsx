@@ -33,6 +33,7 @@ import {
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { api } from '../../api/client';
+import { openPrintableWindow } from '../../utils/printWindow';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
@@ -170,7 +171,73 @@ const LabReportGenerator = ({
 
   // Печать отчета
   const printReport = () => {
-    window.print();
+    const grouped = groupResultsByCategory();
+    const rowsHtml = Object.entries(grouped).map(([category, categoryResults]) => `
+      <section style="margin-bottom: 24px;">
+        <h2 style="font-size: 18px; margin: 0 0 12px;">${getCategoryName(category)}</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Исследование</th>
+              <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Результат</th>
+              <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Норма</th>
+              <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${categoryResults
+              .map((result) => `
+                <tr>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${result.test_name || ''}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${result.value || ''} ${result.unit || ''}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${result.reference_min || ''}-${result.reference_max || ''} ${result.unit || ''}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${getStatusText(result.status)}</td>
+                </tr>
+              `)
+              .join('')}
+          </tbody>
+        </table>
+      </section>
+    `).join('');
+
+    openPrintableWindow({
+      features: 'width=900,height=700',
+      html: `
+      <!doctype html>
+      <html lang="ru">
+        <head>
+          <title>Результаты лабораторных исследований</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+            h1 { margin: 0 0 12px; font-size: 24px; text-align: center; }
+            .subhead { text-align: center; color: #6b7280; margin-bottom: 20px; }
+            .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+            .meta div { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; }
+            .warning { margin-top: 20px; padding: 12px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; }
+            table { margin-bottom: 16px; }
+            th { background: #f3f4f6; }
+            th, td { vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <h1>${clinic.name || 'Медицинская клиника'}</h1>
+          <div class="subhead">Результаты лабораторных исследований</div>
+          <div class="meta">
+            <div><strong>Пациент:</strong> ${patient.name || 'Не указан'}</div>
+            <div><strong>Дата рождения:</strong> ${patient.birthDate || 'Не указана'}</div>
+            <div><strong>Телефон:</strong> ${patient.phone || 'Не указан'}</div>
+            <div><strong>Врач:</strong> ${doctor.name || 'Не указан'}</div>
+          </div>
+          ${rowsHtml}
+          ${results.some((r) => r.status === 'abnormal') ? `
+            <div class="warning">
+              <strong>Внимание:</strong> обнаружены отклонения от нормы.
+            </div>
+          ` : ''}
+        </body>
+      </html>
+    `
+    });
   };
 
   // Отправка по email

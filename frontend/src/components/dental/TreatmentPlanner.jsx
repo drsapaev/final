@@ -38,6 +38,7 @@ import CalendarToday from '@mui/icons-material/CalendarToday';
 import Delete from '@mui/icons-material/Delete';
 import LocalHospital from '@mui/icons-material/LocalHospital';
 import Print from '@mui/icons-material/Print';
+import { openPrintableWindow } from '../../utils/printWindow';
 import Schedule from '@mui/icons-material/Schedule';
 import { api } from '../../api/client';
 
@@ -115,6 +116,73 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
     }
   };
 
+  const handlePrint = () => {
+    const stagesHtml = treatmentPlan.stages.length
+      ? treatmentPlan.stages
+          .map(
+            (stage, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${stage.name || ''}</td>
+                <td>${stage.description || ''}</td>
+                <td>${stage.date || 'Не назначено'}</td>
+                <td>${stage.duration || 0}</td>
+                <td>${stage.cost || 0}</td>
+                <td>${PRIORITIES[stage.priority]?.label || stage.priority || ''}</td>
+              </tr>
+            `
+          )
+          .join('')
+      : '<tr><td colspan="7">Этапы лечения не добавлены</td></tr>';
+
+    openPrintableWindow({
+      html: `
+      <!doctype html>
+      <html lang="ru">
+        <head>
+          <title>План лечения</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+            h1 { margin: 0 0 12px; font-size: 24px; }
+            h2 { margin: 24px 0 12px; font-size: 18px; }
+            .meta { margin-bottom: 20px; color: #374151; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f3f4f6; }
+            .summary { display: flex; gap: 24px; margin: 12px 0 20px; }
+            .summary div { min-width: 120px; }
+            .muted { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <h1>${treatmentPlan.name || 'План лечения'}</h1>
+          <div class="meta muted">План лечения для печати из стоматологической панели</div>
+          <div class="summary">
+            <div><strong>Этапов:</strong> ${treatmentPlan.stages.length}</div>
+            <div><strong>Визитов:</strong> ${treatmentPlan.totalDuration}</div>
+            <div><strong>Стоимость:</strong> ${(treatmentPlan.totalCost / 1000).toFixed(0)}k сум</div>
+          </div>
+          <h2>Этапы</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Название</th>
+                <th>Описание</th>
+                <th>Дата</th>
+                <th>Визиты</th>
+                <th>Стоимость</th>
+                <th>Приоритет</th>
+              </tr>
+            </thead>
+            <tbody>${stagesHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `
+    });
+  };
+
   return (
     <Box>
       <Card>
@@ -129,7 +197,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
               <Button size="small" startIcon={<Add />} onClick={() => setStageDialog(true)}>
                 Добавить этап
               </Button>
-              <Button size="small" startIcon={<Print />} onClick={() => window.print()}>
+              <Button size="small" startIcon={<Print />} onClick={handlePrint}>
                 Печать
               </Button>
             </Box>

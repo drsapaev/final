@@ -7,6 +7,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
+import { openPrintableWindow } from '../utils/printWindow';
 import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
 
 // Get user role for role-based UI
@@ -128,7 +129,82 @@ export default function PatientPickupView() {
 
   // Handle print
   const handlePrint = () => {
-    window.print(); // Simple print for now
+    const visitsHtml = visits.length
+      ? visits.map((visit) => `
+        <tr>
+          <td>${formatDate(visit.visit_date || visit.date)}</td>
+          <td>${visit.doctor_name || visit.doctor || '—'}</td>
+          <td>${getVisitStatusBadge(visit.status).label}</td>
+        </tr>
+      `).join('')
+      : '<tr><td colspan="3">Записи не найдены</td></tr>';
+
+    const labHtml = labResults.length
+      ? labResults.map((result) => `
+        <tr>
+          <td>${result.name || result.test_name || '—'}</td>
+          <td>${result.value || '—'}</td>
+          <td>${getStatusBadge(result.status).label}</td>
+        </tr>
+      `).join('')
+      : '<tr><td colspan="3">Результаты не найдены</td></tr>';
+
+    openPrintableWindow({
+      features: 'width=900,height=700',
+      html: `
+      <!doctype html>
+      <html lang="ru">
+        <head>
+          <title>Выдача результатов пациента</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+            h1 { margin: 0 0 12px; font-size: 24px; }
+            h2 { margin: 24px 0 12px; font-size: 18px; }
+            .muted { color: #6b7280; margin-bottom: 16px; }
+            .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+            .meta div { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h1>${getPageTitle()}</h1>
+          <div class="muted">Печатная форма для выдачи данных пациенту</div>
+          <div class="meta">
+            <div><strong>Пациент:</strong> ${patient?.full_name || patient?.name || '—'}</div>
+            <div><strong>ID:</strong> ${patientId || '—'}</div>
+            <div><strong>Дата рождения:</strong> ${formatDate(patient?.birth_date || patient?.birthDate)}</div>
+            <div><strong>Телефон:</strong> ${patient?.phone || '—'}</div>
+          </div>
+
+          <h2>История визитов</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Врач</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>${visitsHtml}</tbody>
+          </table>
+
+          <h2>Лабораторные результаты</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Исследование</th>
+                <th>Результат</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>${labHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `
+    });
   };
 
   // Handle download PDF

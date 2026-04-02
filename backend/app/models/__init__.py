@@ -143,7 +143,7 @@ from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
 # from .webhook import Webhook, WebhookCall, WebhookEvent
 # from .ai_config import AIProvider, AIProviderSettings
 from .display_config import DisplayAnnouncement, DisplayBanner, DisplayBoard, DisplayTheme
-# from .print_config import PrintTemplate, PrintJob
+from .print_config import PrinterConfig, PrintJob, PrintTemplate
 # from .dermatology_photos import DermatologyPhoto
 # from .telegram import TelegramConfig, TelegramUser, TelegramMessage, TelegramTemplate
 # from .notification import NotificationTemplate, NotificationHistory, NotificationSettings
@@ -193,6 +193,9 @@ __all__ = [
     "PaymentProvider",
     "PaymentTransaction",
     "FinanceTransaction",
+    "PrinterConfig",
+    "PrintTemplate",
+    "PrintJob",
     "Appointment",
     # "QueueTicket", # заменен на DailyQueue, QueueEntry, QueueToken
     "ScheduleTemplate",

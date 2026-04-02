@@ -7,6 +7,7 @@ import base64
 import io
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ import qrcode
 from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
+LEGACY_COMMENT_BLOCK_RE = re.compile(r"{% comment %}.*?{% endcomment %}", re.S)
 
 WEASYPRINT_AVAILABLE = False
 _WEASYPRINT_DLL_HANDLES = []
@@ -151,7 +153,7 @@ class PDFService:
 
             # Рендерим HTML шаблон
             template = self.jinja_env.get_template(template_name)
-            html_content = template.render(**data)
+            html_content = LEGACY_COMMENT_BLOCK_RE.sub("", template.render(**data))
 
             # Создаем CSS для размера бумаги
             css_content = self._get_page_css(paper_size)

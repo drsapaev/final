@@ -5,25 +5,37 @@ import { Card, Button, Badge } from './ui/native';
 import { APPOINTMENT_STATUS, canCreatePrescription } from '../constants/appointmentStatus';
 
 import logger from '../utils/logger';
-const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
-  const [prescription, setPrescription] = useState({
-    medications: [], // Список препаратов
-    instructions: '', // Общие инструкции
-    doctorNotes: '', // Заметки врача
-    isDraft: true, // Черновик
-    createdAt: null,
-    printedAt: null
-  });
+const createEmptyPrescription = () => ({
+  medications: [], // Список препаратов
+  instructions: '', // Общие инструкции
+  doctorNotes: '', // Заметки врача
+  isDraft: true, // Черновик
+  createdAt: null,
+  printedAt: null
+});
+
+const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescription, onSave, onPrint }) => {
+  const [prescription, setPrescription] = useState(() => createEmptyPrescription());
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     // Загрузка существующего рецепта
-    if (appointment?.prescription) {
-      setPrescription(appointment.prescription);
+    const sourcePrescription = initialPrescription || appointment?.prescription;
+
+    if (sourcePrescription) {
+      setPrescription({
+        ...createEmptyPrescription(),
+        ...sourcePrescription
+      });
+      setHasUnsavedChanges(false);
+      return;
     }
-  }, [appointment]);
+
+    setPrescription(createEmptyPrescription());
+    setHasUnsavedChanges(false);
+  }, [appointment, initialPrescription]);
 
   const handleMedicationAdd = () => {
     const newMedication = {
@@ -92,6 +104,11 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
 
   const handlePrintPrescription = async () => {
     try {
+      if (typeof onPrint !== 'function') {
+        logger.warn('Prescription: Print skipped because onPrint handler is missing');
+        return;
+      }
+
       await onPrint(prescription);
       setPrescription((prev) => ({
         ...prev,
@@ -384,7 +401,7 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
             <Button
               variant="outline"
               onClick={handlePrintPrescription}
-              disabled={prescription.isDraft}>
+              disabled={prescription.isDraft || typeof onPrint !== 'function'}>
               
               <Printer className="w-4 h-4 mr-2" />
               Печать рецепта
@@ -407,11 +424,19 @@ PrescriptionSystem.propTypes = {
       medications: PropTypes.arrayOf(PropTypes.object),
       instructions: PropTypes.string,
       doctorNotes: PropTypes.string,
-      isDraft: PropTypes.bool
+      isDraft: PropTypes.bool,
+      printedAt: PropTypes.string
     })
   }),
   emr: PropTypes.shape({
     isDraft: PropTypes.bool
+  }),
+  prescription: PropTypes.shape({
+    medications: PropTypes.arrayOf(PropTypes.object),
+    instructions: PropTypes.string,
+    doctorNotes: PropTypes.string,
+    isDraft: PropTypes.bool,
+    printedAt: PropTypes.string
   }),
   onSave: PropTypes.func,
   onPrint: PropTypes.func

@@ -2,6 +2,7 @@
 CRUD операции для системы печати
 """
 
+import logging
 from typing import Any
 
 from sqlalchemy import and_
@@ -14,6 +15,16 @@ from app.schemas.print_config import (
     PrintTemplateCreate,
     PrintTemplateUpdate,
 )
+
+logger = logging.getLogger(__name__)
+
+DOCUMENT_PRINTER_TYPE_MAP: dict[str, str] = {
+    "ticket": "ESC/POS",
+    "receipt": "ESC/POS",
+    "prescription": "A5",
+    "medical_certificate": "A4",
+    "lab_results": "A4",
+}
 
 # ===================== ПРИНТЕРЫ =====================
 
@@ -37,7 +48,12 @@ def get_printer_configs(
     if active_only:
         query = query.filter(PrinterConfig.active == True)
 
-    return query.offset(skip).limit(limit).all()
+    return (
+        query.order_by(PrinterConfig.is_default.desc(), PrinterConfig.id.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 def create_printer_config(
@@ -83,13 +99,33 @@ def get_default_printer_for_type(
     db: Session, document_type: str
 ) -> PrinterConfig | None:
     """Получить принтер по умолчанию для типа документа"""
-    # Пока возвращаем первый активный принтер
-    # В будущем можно добавить логику сопоставления типов документов и принтеров
-    return (
-        db.query(PrinterConfig)
-        .filter(and_(PrinterConfig.active == True, PrinterConfig.is_default == True))
+    preferred_printer_type = DOCUMENT_PRINTER_TYPE_MAP.get((document_type or "").lower())
+    logger.info(
+        "[FIX] Resolving default printer for document_type=%s preferred_printer_type=%s",
+        document_type,
+        preferred_printer_type,
+    )
+
+    query = db.query(PrinterConfig).filter(PrinterConfig.active == True)
+
+    if preferred_printer_type:
+        preferred_printer = (
+            query.filter(PrinterConfig.printer_type == preferred_printer_type)
+            .order_by(PrinterConfig.is_default.desc(), PrinterConfig.id.asc())
+            .first()
+        )
+        if preferred_printer:
+            return preferred_printer
+
+    default_printer = (
+        query.filter(PrinterConfig.is_default == True)
+        .order_by(PrinterConfig.id.asc())
         .first()
     )
+    if default_printer:
+        return default_printer
+
+    return query.order_by(PrinterConfig.id.asc()).first()
 
 
 # ===================== ШАБЛОНЫ =====================

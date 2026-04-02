@@ -182,6 +182,12 @@ class PrintReceiptRequest(BaseModel):
     patient: dict[str, Any] = Field(..., description="Данные пациента")
     services: list[dict[str, Any]] = Field(..., description="Список услуг")
     clinic: dict[str, Any] | None = None
+    clinic_name: str | None = None
+    clinic_phone: str | None = None
+    clinic_address: str | None = None
+    clinic_website: str | None = None
+    doctor: dict[str, Any] | None = None
+    cashier: dict[str, Any] | None = None
     printer_name: str | None = None
 
 

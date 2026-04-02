@@ -4,7 +4,9 @@
 """
 
 import asyncio
+import re
 import os
+import logging
 import socket
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +19,9 @@ from sqlalchemy.orm import Session
 from app.crud import print_config as crud_print
 from app.models.print_config import PrinterConfig, PrintJob, PrintTemplate
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
+LEGACY_COMMENT_BLOCK_RE = re.compile(r"{% comment %}.*?{% endcomment %}", re.S)
 
 
 class PrintService:
@@ -71,6 +76,13 @@ class PrintService:
         Основной метод печати документа
         """
         try:
+            logger.info(
+                "[FIX] print_document start document_type=%s printer_name=%s",
+                document_type,
+                printer_name,
+            )
+            if document_type == "lab_results":
+                document_data = self._normalize_lab_results_data(document_data, user)
             # Находим принтер
             printer = self._get_printer(printer_name, document_type)
             if not printer:
@@ -108,6 +120,12 @@ class PrintService:
 
                 # Обновляем статус задания
                 self._update_print_job(print_job.id, "completed")
+                logger.info(
+                    "[FIX] print_document completed document_type=%s printer=%s job_id=%s",
+                    document_type,
+                    printer.name,
+                    print_job.id,
+                )
 
                 return {
                     "success": True,
@@ -120,9 +138,21 @@ class PrintService:
             except Exception as e:
                 # Обновляем статус задания с ошибкой
                 self._update_print_job(print_job.id, "failed", str(e))
+                logger.error(
+                    "[FIX] print_document failed document_type=%s printer=%s error=%s",
+                    document_type,
+                    printer.name,
+                    e,
+                )
                 raise
 
         except Exception as e:
+            logger.error(
+                "[FIX] print_document error document_type=%s printer_name=%s error=%s",
+                document_type,
+                printer_name,
+                e,
+            )
             return {
                 "success": False,
                 "error": str(e),
@@ -134,10 +164,32 @@ class PrintService:
     ) -> PrinterConfig | None:
         """Найти принтер по имени или типу документа"""
         if printer_name:
-            return crud_print.get_printer_by_name(self.db, printer_name)
-        else:
-            # Находим принтер по умолчанию для типа документа
-            return crud_print.get_default_printer_for_type(self.db, document_type)
+            printer = crud_print.get_printer_by_name(self.db, printer_name)
+            if printer:
+                logger.info(
+                    "[FIX] Using requested printer name=%s type=%s connection=%s",
+                    printer.name,
+                    printer.printer_type,
+                    printer.connection_type,
+                )
+                return printer
+
+            logger.warning(
+                "[FIX] Requested printer name=%s not found, falling back to document_type=%s",
+                printer_name,
+                document_type,
+            )
+
+        printer = crud_print.get_default_printer_for_type(self.db, document_type)
+        if printer:
+            logger.info(
+                "[FIX] Using default printer name=%s type=%s connection=%s for document_type=%s",
+                printer.name,
+                printer.printer_type,
+                printer.connection_type,
+                document_type,
+            )
+        return printer
 
     def _get_template(
         self, template_id: int | None, document_type: str, printer_id: int
@@ -153,10 +205,66 @@ class PrintService:
     def _render_template(self, template: PrintTemplate, data: dict[str, Any]) -> str:
         """Рендерить шаблон с данными"""
         try:
-            jinja_template = self.jinja_env.from_string(template.template_content)
+            template_source = LEGACY_COMMENT_BLOCK_RE.sub("", template.template_content)
+            jinja_template = self.jinja_env.from_string(template_source)
             return jinja_template.render(**data)
         except Exception as e:
             raise Exception(f"Ошибка рендеринга шаблона: {str(e)}")
+
+    def _normalize_lab_results_data(
+        self, lab_data: dict[str, Any], user: User | None = None
+    ) -> dict[str, Any]:
+        """Нормализовать данные для печати лабораторного отчета."""
+        from app.core.config import settings
+
+        normalized = lab_data.copy()
+        clinic_data = normalized.get("clinic") or {}
+        patient_data = normalized.get("patient") or {}
+
+        referring_doctor = normalized.get("referring_doctor")
+        if not isinstance(referring_doctor, dict):
+            referring_doctor = {}
+
+        lab_doctor = normalized.get("lab_doctor")
+        if not isinstance(lab_doctor, dict):
+            lab_doctor = {}
+
+        lab_head = normalized.get("lab_head")
+        if not isinstance(lab_head, dict):
+            lab_head = {}
+
+        normalized["clinic"] = {
+            "name": clinic_data.get("name") or settings.APP_NAME,
+            "license_number": clinic_data.get("license_number") or "",
+            "address": clinic_data.get("address") or "",
+            "phone": clinic_data.get("phone") or "",
+            "email": clinic_data.get("email") or "",
+        }
+        normalized["referring_doctor"] = {
+            "full_name": referring_doctor.get("full_name")
+            or patient_data.get("referring_doctor_name")
+            or normalized.get("referring_doctor_name")
+            or "Не указано",
+            "specialty_name": referring_doctor.get("specialty_name")
+            or normalized.get("referring_specialty")
+            or "",
+        }
+        normalized["lab_doctor"] = {
+            "full_name": lab_doctor.get("full_name")
+            or (user.full_name if user else None)
+            or normalized.get("lab_doctor_name")
+            or "Лаборант",
+            "specialty_name": lab_doctor.get("specialty_name") or "Лаборант",
+            "license_number": lab_doctor.get("license_number") or "",
+        }
+        normalized["lab_head"] = {
+            "full_name": lab_head.get("full_name")
+            or normalized.get("lab_head_name")
+            or "Заведующий лабораторией",
+            "specialty_name": lab_head.get("specialty_name") or "",
+        }
+
+        return normalized
 
     def _create_print_job(
         self,
@@ -202,6 +310,19 @@ class PrintService:
         Печать на ESC/POS принтере (термопринтер)
         """
         try:
+            if printer.connection_type == "mock":
+                encoded_content = content.encode(printer.encoding or "utf-8")
+                logger.info(
+                    "[FIX] Mock ESC/POS print for printer=%s bytes_sent=%s",
+                    printer.name,
+                    len(encoded_content),
+                )
+                return {
+                    "method": "mock",
+                    "printer": printer.display_name,
+                    "bytes_sent": len(encoded_content),
+                }
+
             if printer.connection_type == "network":
                 return await self._print_network_escpos(printer, content)
             elif printer.connection_type == "usb":
@@ -317,6 +438,21 @@ class PrintService:
         Печать PDF документов (A4/A5)
         """
         try:
+            if printer.connection_type == "mock":
+                logger.info(
+                    "[FIX] Mock PDF print for printer=%s paper_size=%s content_chars=%s",
+                    printer.name,
+                    paper_size,
+                    len(content),
+                )
+                return {
+                    "method": "mock",
+                    "paper_size": paper_size,
+                    "printer": printer.display_name,
+                    "status": "queued",
+                    "file_size": len(content.encode("utf-8")),
+                }
+
             import tempfile
 
             from app.services.pdf_service import get_pdf_service
@@ -502,6 +638,9 @@ class PrintService:
         if not printer.active:
             return {"status": "disabled", "message": "Принтер отключен"}
 
+        if printer.connection_type == "mock":
+            return {"status": "online", "message": "Mock printer available"}
+
         # Проверяем доступность принтера
         try:
             if printer.connection_type == "network":
@@ -547,6 +686,7 @@ class PrintService:
         """
         from app.models.payment import Payment
         from app.models.visit import Visit
+        from app.core.config import settings
         from app.services.queue_service import queue_service
 
         # Получаем данные платежа
@@ -579,6 +719,42 @@ class PrintService:
         else:
             receipt_data = {}
 
+        clinic_data = receipt_data.get("clinic") or {}
+        receipt_data.setdefault(
+            "clinic_name",
+            receipt_data.get("clinic_name")
+            or clinic_data.get("name")
+            or settings.APP_NAME,
+        )
+        receipt_data.setdefault(
+            "clinic_phone",
+            receipt_data.get("clinic_phone")
+            or clinic_data.get("phone")
+            or "",
+        )
+        receipt_data.setdefault(
+            "clinic_address",
+            receipt_data.get("clinic_address")
+            or clinic_data.get("address")
+            or "",
+        )
+        receipt_data.setdefault(
+            "clinic_website",
+            receipt_data.get("clinic_website")
+            or clinic_data.get("website")
+            or "",
+        )
+        receipt_data.setdefault(
+            "cashier",
+            receipt_data.get("cashier")
+            or {"full_name": user.full_name if user else "Система"},
+        )
+        receipt_data.setdefault(
+            "doctor",
+            receipt_data.get("doctor")
+            or {"full_name": user.full_name if user else "Врач", "specialty_name": "", "cabinet": ""},
+        )
+
         # Дополняем данными из БД
         if payment:
             receipt_data.update(
@@ -589,8 +765,11 @@ class PrintService:
                     "method": payment.method or "cash",
                     "status": payment.status,
                     "receipt_no": payment.receipt_no or f"RCP-{payment.id}",
-                    "paid_at": payment.paid_at
-                    or queue_service.get_local_timestamp(self.db),
+                    "paid_at": (
+                        payment.paid_at.isoformat()
+                        if payment.paid_at
+                        else queue_service.get_local_timestamp(self.db).isoformat()
+                    ),
                     "note": payment.note,
                 }
             )
@@ -605,8 +784,18 @@ class PrintService:
                 }
             )
 
+        payment_block = receipt_data.setdefault("payment", {})
+        if isinstance(payment_block, dict):
+            payment_block["services"] = payment_block.get("services") or receipt_data.get("services", [])
+            payment_block["method_name"] = payment_block.get("method_name") or "cash"
+            payment_block["total"] = payment_block.get("total", receipt_data.get("amount", 0))
+            payment_block["subtotal"] = payment_block.get("subtotal", payment_block.get("total", 0))
+            payment_block["discount"] = payment_block.get("discount", 0)
+            payment_block["paid_amount"] = payment_block.get("paid_amount", payment_block.get("total", 0))
+            payment_block["change"] = payment_block.get("change", 0)
+
         # Добавляем метаданные
-        now = queue_service.get_local_timestamp(self.db)
+        now = queue_service.get_local_timestamp(self.db).isoformat()
         receipt_data.update(
             {
                 "date": now,
@@ -646,6 +835,7 @@ class PrintService:
         """
         from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
+        from app.core.config import settings
         from app.services.queue_service import queue_service
 
         # Получаем данные из очереди
@@ -674,6 +864,10 @@ class PrintService:
         else:
             ticket_data_final = {}
 
+        ticket_data_final.setdefault("clinic_name", settings.APP_NAME)
+        ticket_data_final.setdefault("clinic_phone", "")
+        ticket_data_final.setdefault("clinic_address", "")
+
         # Дополняем данными из БД
         if queue_entry:
             ticket_data_final.update(
@@ -700,7 +894,7 @@ class PrintService:
             )
 
         # Добавляем метаданные
-        now = queue_service.get_local_timestamp(self.db)
+        now = queue_service.get_local_timestamp(self.db).isoformat()
         ticket_data_final.update(
             {
                 "date": now,
@@ -745,11 +939,11 @@ class PrintService:
         return {
             "id": template.id,
             "name": template.name,
-            "document_type": template.document_type,
+            "document_type": template.template_type,
             "printer_id": template.printer_id,
             "template_content": template.template_content,
             "language": template.language or language,
-            "is_active": template.is_active,
+            "is_active": template.active,
             "created_at": (
                 template.created_at.isoformat() if template.created_at else None
             ),

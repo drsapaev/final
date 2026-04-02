@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Download,
   Calendar,
@@ -21,7 +21,34 @@ import {
   MacOSSelect,
   MacOSCheckbox } from
 '../ui/macos';
+import { api } from '../../api/client';
 import PropTypes from 'prop-types';
+import { toast } from 'react-toastify';
+import logger from '../../utils/logger';
+
+const DEFAULT_REPORT_TYPES = [
+  'patient_report',
+  'appointments_report',
+  'financial_report',
+  'queue_report',
+  'doctor_performance_report'
+];
+
+const REPORT_ENDPOINTS = {
+  patient_report: 'patient',
+  appointments_report: 'appointments',
+  financial_report: 'financial',
+  queue_report: 'queue',
+  doctor_performance_report: 'doctor-performance',
+  patients: 'patient',
+  appointments: 'appointments',
+  financial: 'financial',
+  queue: 'queue',
+  doctors: 'doctor-performance',
+  performance: 'doctor-performance',
+  revenue: 'financial',
+  analytics: 'financial'
+};
 
 const ReportGenerator = ({
   onGenerateReport,
@@ -41,9 +68,108 @@ const ReportGenerator = ({
     appointmentType: ''
   });
 
+  const [availableReportTypes, setAvailableReportTypes] = useState([]);
+  const [internalSelectedReportType, setInternalSelectedReportType] = useState(
+    selectedReportType || ''
+  );
+  const [internalDateRange, setInternalDateRange] = useState(dateRange);
+  const [internalLoading, setInternalLoading] = useState(false);
   const [reportFormat, setReportFormat] = useState('pdf');
   const [includeCharts, setIncludeCharts] = useState(true);
   const [includeDetails, setIncludeDetails] = useState(true);
+
+  const effectiveLoading = loading || internalLoading;
+  const effectiveDateRange = onDateRangeChange ? dateRange : internalDateRange;
+  const effectiveSelectedReportType =
+    selectedReportType || internalSelectedReportType;
+
+  const normalizeReportType = (type) => {
+    if (!type) {
+      return null;
+    }
+
+    if (typeof type === 'string') {
+      return {
+        type,
+        label: getReportTypeLabel(type),
+        description: getReportTypeDescription(type)
+      };
+    }
+
+    const value = type.type || type.id || type.value || '';
+
+    return {
+      type: value,
+      label: type.name || type.label || getReportTypeLabel(value),
+      description:
+        type.description || getReportTypeDescription(value)
+    };
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadReportTypes = async () => {
+      if (reportTypes.length > 0) {
+        const normalized = reportTypes
+          .map(normalizeReportType)
+          .filter(Boolean);
+        if (isMounted) {
+          setAvailableReportTypes(normalized);
+          if (!selectedReportType && normalized.length > 0) {
+            setInternalSelectedReportType(normalized[0].type);
+          }
+        }
+        return;
+      }
+
+      try {
+        const response = await api.get('/reports/available-reports');
+        const normalized = (response.data?.reports || [])
+          .map(normalizeReportType)
+          .filter(Boolean);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (normalized.length > 0) {
+          setAvailableReportTypes(normalized);
+          if (!selectedReportType && !internalSelectedReportType) {
+            setInternalSelectedReportType(normalized[0].type);
+          }
+        } else {
+          const fallback = DEFAULT_REPORT_TYPES
+            .map(normalizeReportType)
+            .filter(Boolean);
+          setAvailableReportTypes(fallback);
+          if (!selectedReportType && !internalSelectedReportType && fallback[0]) {
+            setInternalSelectedReportType(fallback[0].type);
+          }
+        }
+      } catch (error) {
+        logger.warn('Не удалось загрузить доступные отчеты для генератора:', error);
+
+        if (!isMounted) {
+          return;
+        }
+
+        const fallback = DEFAULT_REPORT_TYPES
+          .map(normalizeReportType)
+          .filter(Boolean);
+        setAvailableReportTypes(fallback);
+        if (!selectedReportType && !internalSelectedReportType && fallback[0]) {
+          setInternalSelectedReportType(fallback[0].type);
+        }
+      }
+    };
+
+    loadReportTypes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [reportTypes, selectedReportType, internalSelectedReportType]);
 
   const handleFilterChange = (filterName, value) => {
     setFilters((prev) => ({
@@ -52,57 +178,138 @@ const ReportGenerator = ({
     }));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async (formatOverride = reportFormat) => {
     const reportConfig = {
-      type: selectedReportType,
-      dateRange,
+      type: effectiveSelectedReportType,
+      dateRange: effectiveDateRange,
       filters,
-      format: reportFormat,
+      format: formatOverride,
       includeCharts,
       includeDetails
     };
 
-    onGenerateReport(reportConfig);
+    if (onGenerateReport) {
+      return onGenerateReport(reportConfig);
+    }
+
+    if (!effectiveSelectedReportType) {
+      toast.error('Выберите тип отчета');
+      return null;
+    }
+
+    const endpoint = REPORT_ENDPOINTS[effectiveSelectedReportType];
+    if (!endpoint) {
+      toast.error('Для выбранного отчета нет backend-эндпоинта');
+      return null;
+    }
+
+    setInternalLoading(true);
+    try {
+      const response = await api.post(`/reports/${endpoint}`, {
+        start_date: effectiveDateRange.start || null,
+        end_date: effectiveDateRange.end || null,
+        format: formatOverride,
+        filters,
+        department: filters.department || null,
+        doctor_id: filters.doctor ? Number(filters.doctor) : null
+      });
+
+      const data = response.data;
+      if (data?.success === false) {
+        toast.error(data.error || 'Ошибка генерации отчета');
+        return data;
+      }
+
+      toast.success('Отчет успешно сгенерирован');
+
+      if (formatOverride === 'pdf' && data?.filename) {
+        toast.info(`PDF сформирован: ${data.filename}`);
+      }
+
+      return data;
+    } catch (error) {
+      logger.error('Ошибка генерации отчета:', error);
+      toast.error(error.response?.data?.detail || 'Ошибка генерации отчета');
+      return null;
+    } finally {
+      setInternalLoading(false);
+    }
   };
 
   const getReportTypeIcon = (type) => {
     const iconMap = {
-      'financial': DollarSign,
-      'appointments': Calendar,
-      'patients': Users,
-      'doctors': Users,
-      'analytics': BarChart3,
-      'revenue': TrendingUp,
-      'performance': PieChart
+      financial: DollarSign,
+      financial_report: DollarSign,
+      appointments: Calendar,
+      appointments_report: Calendar,
+      patient_report: Users,
+      patients: Users,
+      queue_report: Clock,
+      doctors: Users,
+      doctor_performance_report: PieChart,
+      performance: PieChart,
+      analytics: BarChart3,
+      revenue: TrendingUp
     };
     return iconMap[type] || FileText;
   };
 
   const getReportTypeLabel = (type) => {
     const labelMap = {
-      'financial': 'Финансовый отчет',
-      'appointments': 'Отчет по записям',
-      'patients': 'Отчет по пациентам',
-      'doctors': 'Отчет по врачам',
-      'analytics': 'Аналитический отчет',
-      'revenue': 'Отчет по доходам',
-      'performance': 'Отчет по эффективности'
+      financial: 'Финансовый отчет',
+      financial_report: 'Финансовый отчет',
+      appointments: 'Отчет по записям',
+      appointments_report: 'Отчет по записям',
+      patients: 'Отчет по пациентам',
+      patient_report: 'Отчет по пациентам',
+      queue_report: 'Отчет по очереди',
+      doctors: 'Отчет по врачам',
+      doctor_performance_report: 'Отчет по эффективности врачей',
+      analytics: 'Аналитический отчет',
+      revenue: 'Отчет по доходам',
+      performance: 'Отчет по эффективности'
     };
     return labelMap[type] || type;
   };
 
   const getReportTypeDescription = (type) => {
     const descMap = {
-      'financial': 'Детальный анализ доходов и расходов клиники',
-      'appointments': 'Статистика записей, загруженности и эффективности',
-      'patients': 'Анализ пациентской базы и демографии',
-      'doctors': 'Производительность и загруженность врачей',
-      'analytics': 'Общая аналитика и ключевые показатели',
-      'revenue': 'Анализ доходов по источникам и периодам',
-      'performance': 'KPI и метрики эффективности работы'
+      financial: 'Детальный анализ доходов и расходов клиники',
+      financial_report: 'Детальный анализ доходов и расходов клиники',
+      appointments: 'Статистика записей, загруженности и эффективности',
+      appointments_report: 'Статистика записей, загруженности и эффективности',
+      patients: 'Анализ пациентской базы и демографии',
+      patient_report: 'Анализ пациентской базы и демографии',
+      queue_report: 'Анализ очередей и времени ожидания',
+      doctors: 'Производительность и загруженность врачей',
+      doctor_performance_report: 'Производительность и загруженность врачей',
+      analytics: 'Общая аналитика и ключевые показатели',
+      revenue: 'Анализ доходов по источникам и периодам',
+      performance: 'KPI и метрики эффективности работы'
     };
     return descMap[type] || 'Отчет по выбранным параметрам';
   };
+
+  const updateSelectedReportType = (type) => {
+    if (onReportTypeChange) {
+      onReportTypeChange(type);
+      return;
+    }
+
+    setInternalSelectedReportType(type);
+  };
+
+  const updateDateRange = (nextRange) => {
+    if (onDateRangeChange) {
+      onDateRangeChange(nextRange);
+      return;
+    }
+
+    setInternalDateRange(nextRange);
+  };
+
+  const currentReportTypes =
+    reportTypes.length > 0 ? reportTypes.map(normalizeReportType).filter(Boolean) : availableReportTypes;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -122,14 +329,19 @@ const ReportGenerator = ({
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '16px'
         }}>
-          {reportTypes.map((type) => {
-            const Icon = getReportTypeIcon(type);
-            const isSelected = selectedReportType === type;
+          {currentReportTypes.length > 0 ? currentReportTypes.map((type) => {
+            const typeValue = type.type || type.value || type.id;
+            if (!typeValue) {
+              return null;
+            }
+
+            const Icon = getReportTypeIcon(typeValue);
+            const isSelected = effectiveSelectedReportType === typeValue;
 
             return (
               <MacOSButton
-                key={type}
-                onClick={() => onReportTypeChange(type)}
+                key={typeValue}
+                onClick={() => updateSelectedReportType(typeValue)}
                 variant={isSelected ? 'primary' : 'outline'}
                 style={{
                   padding: '16px',
@@ -148,20 +360,24 @@ const ReportGenerator = ({
                       color: 'var(--mac-text-primary)',
                       margin: 0
                     }}>
-                      {getReportTypeLabel(type)}
+                      {type.label || getReportTypeLabel(typeValue)}
                     </h4>
                     <p style={{
                       fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-text-secondary)',
                       margin: '4px 0 0 0'
                     }}>
-                      {getReportTypeDescription(type)}
+                      {type.description || getReportTypeDescription(typeValue)}
                     </p>
                   </div>
                 </div>
               </MacOSButton>);
 
-          })}
+          }) : (
+            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+              Загрузка доступных отчетов...
+            </div>
+          )}
         </div>
       </MacOSCard>
 
@@ -193,8 +409,8 @@ const ReportGenerator = ({
             </label>
             <MacOSInput
               type="date"
-              value={dateRange.start}
-              onChange={(e) => onDateRangeChange({ ...dateRange, start: e.target.value })}
+              value={effectiveDateRange.start}
+              onChange={(e) => updateDateRange({ ...effectiveDateRange, start: e.target.value })}
               icon={Calendar}
               iconPosition="left"
               style={{
@@ -224,8 +440,8 @@ const ReportGenerator = ({
             </label>
             <MacOSInput
               type="date"
-              value={dateRange.end}
-              onChange={(e) => onDateRangeChange({ ...dateRange, end: e.target.value })}
+              value={effectiveDateRange.end}
+              onChange={(e) => updateDateRange({ ...effectiveDateRange, end: e.target.value })}
               icon={Calendar}
               iconPosition="left"
               style={{
@@ -270,7 +486,7 @@ const ReportGenerator = ({
               return (
                 <MacOSButton
                   key={label}
-                  onClick={() => onDateRangeChange({
+                  onClick={() => updateDateRange({
                     start: startDate.toISOString().split('T')[0],
                     end: endDate.toISOString().split('T')[0]
                   })}
@@ -512,8 +728,8 @@ const ReportGenerator = ({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <MacOSButton
-            onClick={handleGenerate}
-            disabled={!selectedReportType || loading}
+            onClick={() => handleGenerate(reportFormat)}
+            disabled={!effectiveSelectedReportType || effectiveLoading}
             variant="primary"
             style={{
               display: 'flex',
@@ -523,7 +739,7 @@ const ReportGenerator = ({
               color: 'white'
             }}>
             
-            {loading ?
+            {effectiveLoading ?
             <>
                 <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
                 <span>Генерация...</span>
@@ -538,8 +754,8 @@ const ReportGenerator = ({
           
           <MacOSButton
             variant="outline"
-            onClick={() => window.print()}
-            disabled={loading}
+            onClick={() => handleGenerate('pdf')}
+            disabled={!effectiveSelectedReportType || effectiveLoading}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -555,9 +771,9 @@ const ReportGenerator = ({
           fontSize: 'var(--mac-font-size-sm)',
           color: 'var(--mac-text-secondary)'
         }}>
-          {selectedReportType &&
+          {effectiveSelectedReportType &&
           <span>
-              Будет сгенерирован: <strong>{getReportTypeLabel(selectedReportType)}</strong>
+              Будет сгенерирован: <strong>{getReportTypeLabel(effectiveSelectedReportType)}</strong>
             </span>
           }
         </div>

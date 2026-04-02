@@ -24,17 +24,41 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const PROVIDER_LABELS = {
+  mock: 'Mock (Тестовый)',
+  microsoft: 'Microsoft Universal Print',
+  google: 'Google Cloud Print',
+  local: 'Local Print Gateway'
+};
+
+const getProviderLabel = (provider) => PROVIDER_LABELS[provider] || provider;
+
+const getProviderOptions = (providers = []) =>
+  providers.map((provider) => ({
+    value: provider,
+    label: getProviderLabel(provider)
+  }));
+
+const getPrinterOptions = (printers = [], providerName = '') =>
+  printers
+    .filter((printer) => printer.provider === providerName)
+    .map((printer) => ({
+      value: printer.id,
+      label: `${printer.name} (${getStatusText(printer.status)})`
+    }));
+
 const CloudPrintingManager = () => {
   const [activeTab, setActiveTab] = useState('printers');
   const [printers, setPrinters] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPrinter, setSelectedPrinter] = useState(null);void
-  useState([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(null);
   const [statistics, setStatistics] = useState(null);
 
   // Состояние для печати документа
   const [printForm, setPrintForm] = useState({
-    provider_name: 'mock',
+    provider_name: '',
     printer_id: '',
     title: '',
     content: '',
@@ -46,7 +70,7 @@ const CloudPrintingManager = () => {
 
   // Состояние для медицинского документа
   const [medicalForm, setMedicalForm] = useState({
-    provider_name: 'mock',
+    provider_name: '',
     printer_id: '',
     document_type: 'prescription',
     patient_data: {
@@ -70,33 +94,43 @@ const CloudPrintingManager = () => {
     loadStatistics();
   }, []);
 
+  useEffect(() => {
+    if (providers.length === 0) {
+      return;
+    }
+
+    setPrintForm((prev) => (
+      providers.includes(prev.provider_name)
+        ? prev
+        : { ...prev, provider_name: providers[0] }
+    ));
+
+    setMedicalForm((prev) => (
+      providers.includes(prev.provider_name)
+        ? prev
+        : { ...prev, provider_name: providers[0] }
+    ));
+  }, [providers]);
+
   const loadPrinters = async () => {
     setLoading(true);
     try {
       const response = await api.get('/cloud-printing/printers');
-      setPrinters(response.data?.printers || []);
+      const printersData = response.data?.printers || [];
+      const providersData = response.data?.providers || [];
+
+      setPrinters(printersData);
+      setProviders(
+        providersData.length > 0
+          ? providersData
+          : Array.from(new Set(printersData.map((printer) => printer.provider).filter(Boolean)))
+      );
     } catch (error) {
       logger.error('Ошибка загрузки принтеров:', error);
-      // Fallback данные для демонстрации
-      setPrinters([
-      {
-        id: 'mock-printer-1',
-        name: 'Тестовый принтер',
-        description: 'Mock принтер для тестирования',
-        provider: 'mock',
-        status: 'online',
-        location: 'Кабинет 101'
-      },
-      {
-        id: 'mock-printer-2',
-        name: 'Принтер документов',
-        description: 'Основной принтер для документов',
-        provider: 'mock',
-        status: 'busy',
-        location: 'Регистратура'
-      }]
-      );
-      toast.error('Ошибка загрузки принтеров, показаны тестовые данные');
+      setPrinters([]);
+      setProviders([]);
+      setSelectedPrinter(null);
+      toast.error('Не удалось загрузить облачные принтеры');
     } finally {
       setLoading(false);
     }
@@ -108,13 +142,7 @@ const CloudPrintingManager = () => {
       setStatistics(response.data?.statistics);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
-      // Fallback данные для демонстрации
-      setStatistics({
-        total_printers: 2,
-        online_printers: 1,
-        offline_printers: 0,
-        providers_count: 1
-      });
+      setStatistics(null);
     }
   };
 
@@ -360,11 +388,15 @@ const CloudPrintingManager = () => {
               <MacOSSelect
               id="provider"
               value={printForm.provider_name}
-              onChange={(e) => setPrintForm({ ...printForm, provider_name: e.target.value })}
+              onChange={(e) => setPrintForm({
+                ...printForm,
+                provider_name: e.target.value,
+                printer_id: ''
+              })}
               options={[
-              { value: 'mock', label: 'Mock (Тестовый)' },
-              { value: 'microsoft', label: 'Microsoft Universal Print' }]
-              } />
+                { value: '', label: 'Выберите провайдера' },
+                ...getProviderOptions(providers)
+              ]} />
             
             </div>
 
@@ -382,12 +414,7 @@ const CloudPrintingManager = () => {
               onChange={(e) => setPrintForm({ ...printForm, printer_id: e.target.value })}
               options={[
               { value: '', label: 'Выберите принтер' },
-              ...printers.
-              filter((p) => p.provider === printForm.provider_name).
-              map((printer) => ({
-                value: printer.id,
-                label: `${printer.name} (${getStatusText(printer.status)})`
-              }))]
+              ...getPrinterOptions(printers, printForm.provider_name)]
               } />
             
             </div>
@@ -540,11 +567,15 @@ const CloudPrintingManager = () => {
               <MacOSSelect
               id="med-provider"
               value={medicalForm.provider_name}
-              onChange={(e) => setMedicalForm({ ...medicalForm, provider_name: e.target.value })}>
-              
-                <option value="mock">Mock (Тестовый)</option>
-                <option value="microsoft">Microsoft Universal Print</option>
-              </MacOSSelect>
+              onChange={(e) => setMedicalForm({
+                ...medicalForm,
+                provider_name: e.target.value,
+                printer_id: ''
+              })}
+              options={[
+                { value: '', label: 'Выберите провайдера' },
+                ...getProviderOptions(providers)
+              ]} />
             </div>
 
             <div>
@@ -558,17 +589,11 @@ const CloudPrintingManager = () => {
               <MacOSSelect
               id="med-printer"
               value={medicalForm.printer_id}
-              onChange={(e) => setMedicalForm({ ...medicalForm, printer_id: e.target.value })}>
-              
-                <option value="">Выберите принтер</option>
-                {printers.
-              filter((p) => p.provider === medicalForm.provider_name).
-              map((printer) =>
-              <option key={printer.id} value={printer.id}>
-                      {printer.name} ({getStatusText(printer.status)})
-                    </option>
-              )}
-              </MacOSSelect>
+              onChange={(e) => setMedicalForm({ ...medicalForm, printer_id: e.target.value })}
+              options={[
+                { value: '', label: 'Выберите принтер' },
+                ...getPrinterOptions(printers, medicalForm.provider_name)
+              ]} />
             </div>
 
             <div>

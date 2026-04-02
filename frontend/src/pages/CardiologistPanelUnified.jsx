@@ -28,6 +28,7 @@ import EchoForm from '../components/cardiology/EchoForm';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
+import { printPanelTicket } from '../services/panelPrint';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import { getApiBaseUrl } from '../api/runtime';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
@@ -916,8 +917,14 @@ const MacOSCardiologistPanelUnified = () => {
         notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
         break;
       case 'print':
-        // Печать талона
-        window.print();
+        try {
+          const printResult = await printPanelTicket(row, {
+            specialtyName: 'Кардиология'
+          });
+          notify.success(printResult?.message || `Талон для ${row.patient_fio} отправлен на печать`);
+        } catch (error) {
+          notify.error(getErrorMessage(error, 'Не удалось отправить талон на печать'));
+        }
         break;
       case 'complete':{
           // Завершить приём

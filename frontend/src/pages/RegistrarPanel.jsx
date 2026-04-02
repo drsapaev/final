@@ -24,6 +24,7 @@ const API_BASE = getApiOrigin();
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
+import { printService } from '../services/print';
 
 // Современный мастер
 // ✅ Используется только новый мастер (V2)
@@ -4206,7 +4207,54 @@ const RegistrarPanel = () => {
         documentData={printDialog.data}
         onPrint={async (printerName, docType, docData) => {
           logger.info('Printing:', { printerName, docType, docData });
-          // Здесь можно добавить реальную логику печати
+
+          if (docType !== 'ticket') {
+            throw new Error(`Неподдерживаемый тип документа: ${docType}`);
+          }
+
+          const queueNumbers = Array.isArray(docData?.queue_numbers) ? docData.queue_numbers : [];
+          const primaryQueue = queueNumbers[0] || null;
+          const resolvedQueueNumber =
+            docData?.queue_number ||
+            primaryQueue?.number ||
+            '';
+
+          if (!resolvedQueueNumber) {
+            throw new Error('Не удалось определить номер талона для печати');
+          }
+
+          const ticketPayload = {
+            queue_number: String(resolvedQueueNumber),
+            doctor_name:
+              docData?.doctor_name ||
+              docData?.specialist_name ||
+              primaryQueue?.queue_name ||
+              'Специалист',
+            specialty_name:
+              docData?.specialty_name ||
+              primaryQueue?.queue_name ||
+              docData?.doctor_specialty ||
+              docData?.specialty ||
+              'Прием',
+            cabinet:
+              docData?.cabinet ||
+              docData?.doctor_cabinet ||
+              primaryQueue?.cabinet ||
+              null,
+            patient_name: docData?.patient_fio || docData?.patient_name || null,
+            source: docData?.source || 'desk',
+            time_window:
+              docData?.appointment_time ||
+              primaryQueue?.queue_time ||
+              docData?.queue_time ||
+              null,
+            printer_name: printerName
+          };
+
+          const result = await printService.printTicket(ticketPayload);
+          if (!result.success) {
+            throw new Error(result.error || 'Ошибка печати талона');
+          }
         }} />
 
 
