@@ -1,5 +1,9 @@
 # 📋 Улучшения системы очередей - Отчет
 
+> **Historical Improvement Report**
+> Этот отчёт сохраняется как evidence и не является текущим implementation guide.
+> Для текущего `main` используйте `docs/QUEUE_SYSTEM_ARCHITECTURE.md` и связанные runbooks.
+
 ## 🎯 Реализованные улучшения
 
 ### 1. **Унификация источников данных** ✅

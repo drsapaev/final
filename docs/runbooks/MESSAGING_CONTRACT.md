@@ -1,6 +1,9 @@
 # Messaging Contract
 
-This document is the operational SSOT for the messaging stack.
+> Historical evidence note: this contract captures the messaging modernization lane and remains useful for audit/reference.
+> It is not the current global product SSOT; current truth lives in `main` code, active runbooks, and the recovery packet.
+
+This document is the historical operational contract for the messaging stack.
 
 ## Canonical Truths
 

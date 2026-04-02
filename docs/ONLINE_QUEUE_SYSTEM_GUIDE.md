@@ -1,5 +1,9 @@
 # Система онлайн-очередей — Полная документация v2.0
 
+> **Deprecated / Historical Reference**
+> Этот guide больше не является текущим operational SSOT.
+> Актуальная точка входа: `docs/QUEUE_SYSTEM_ARCHITECTURE.md` + `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+
 ---
 
 ## 🏗️ SSOT Architecture (Single Source of Truth)

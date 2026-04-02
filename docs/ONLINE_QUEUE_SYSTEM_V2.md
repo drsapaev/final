@@ -1,5 +1,9 @@
 # Система онлайн-очередей — Полная документация v2.0
 
+> **Deprecated / Historical Reference**
+> Этот документ сохраняется только как исторический narrative до текущего queue contour на `main`.
+> Актуальная точка входа: `docs/QUEUE_SYSTEM_ARCHITECTURE.md` + `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+
 ---
 
 # ЧАСТЬ 1: КАК ЭТО РАБОТАЕТ (Простым языком)

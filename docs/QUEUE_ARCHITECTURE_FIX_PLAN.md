@@ -1,5 +1,9 @@
 # План исправления архитектуры очередей
 
+> **Historical Fix Plan**
+> План выполнен частично и затем был superseded более поздним queue SSOT на `main`.
+> Не использовать как текущий implementation contract; текущая опора: `docs/QUEUE_SYSTEM_ARCHITECTURE.md` и `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+
 ## ✅ СТАТУС: КРИТИЧЕСКИЕ ФИКСЫ РЕАЛИЗОВАНЫ (2025-12-19)
 
 ### Реализованные фиксы:

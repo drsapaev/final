@@ -19,8 +19,9 @@
 | Document | Description |
 |----------|-------------|
 | [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md) | Role-based access control |
-| [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Queue management system |
-| [ONLINE_QUEUE_SYSTEM_GUIDE.md](./ONLINE_QUEUE_SYSTEM_GUIDE.md) | Online queue guide |
+| [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Current queue SSOT aligned to current `main` |
+| [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) | Current staging contour and role acceptance flow |
+| [ONLINE_QUEUE_SYSTEM_GUIDE.md](./ONLINE_QUEUE_SYSTEM_GUIDE.md) | Historical online queue guide (deprecated; keep for reference only) |
 | [BATCH_UPDATE_ARCHITECTURE.md](./BATCH_UPDATE_ARCHITECTURE.md) | Batch operations |
 
 ### EMR & Autocomplete
@@ -83,8 +84,8 @@
 | [AI_MCP_QA_CHECKLIST.md](./AI_MCP_QA_CHECKLIST.md) | AI/MCP QA checklist |
 | [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
 | [reports/PRINT_PANEL_AUDIT_REPORT.md](./reports/PRINT_PANEL_AUDIT_REPORT.md) | Unified print audit across registrar, specialists, lab, and admin panels |
-| [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Canonical messaging SSOT, delivery, rollout, and security rules |
-| [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Messaging stack QA checklist |
+| [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Historical messaging contract and rollout evidence |
+| [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Historical messaging QA evidence |
 | [PANEL_QA_CHECKLIST.md](./PANEL_QA_CHECKLIST.md) | SSOT runbook for panel verification with step-by-step progress tracking |
 | [ADM-06_BROWSER_SMOKE.md](./ADM-06_BROWSER_SMOKE.md) | Compact manual smoke for the service-catalog prefix guardrail |
 
@@ -101,7 +102,8 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 ### "I need to understand the system"
 1. Start with [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md)
 2. Then [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md)
-3. Then [AUTHENTICATION_SYSTEM_FINAL_GUIDE.md](./AUTHENTICATION_SYSTEM_FINAL_GUIDE.md)
+3. Then [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md)
+4. Then [AUTHENTICATION_SYSTEM_FINAL_GUIDE.md](./AUTHENTICATION_SYSTEM_FINAL_GUIDE.md)
 
 ### "I'm an AI agent making changes"
 1. **READ FIRST:** [AUTHENTICATION_LAWS_FOR_AI.md](./AUTHENTICATION_LAWS_FOR_AI.md)

@@ -64,12 +64,12 @@ requires-python = ">=3.11"
 authors = [{ name = "Clinic Team" }]
 readme = "README.md"
 dependencies = [
-  "fastapi>=0.121,<0.130",
-  "uvicorn[standard]>=0.29,<0.39",
-  "pydantic>=2.7,<2.12",
+  "fastapi>=0.121,<0.136",
+  "uvicorn[standard]>=0.29,<0.43",
+  "pydantic>=2.7,<2.13",
   "SQLAlchemy>=2.0,<2.1",
-  "redis>=5.0,<6.0",
-  "alembic>=1.13,<1.18",
+  "redis>=5.0,<8.0",
+  "alembic>=1.13,<1.19",
   "python-jose[cryptography]>=3.3,<4.0",
   "passlib[bcrypt]>=1.7,<1.8",
   "reportlab>=4.0,<4.5",
