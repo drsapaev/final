@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Printer, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
+import { printService } from '../../services/print';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
@@ -64,38 +65,34 @@ const PrintDialog = ({
     setError('');
 
     try {
-      // Заглушка для принтеров (как в оригинальном коде)
-      const mockPrinters = [
-      {
-        id: 'default',
-        name: 'Принтер по умолчанию',
-        status: 'online',
-        type: 'thermal'
-      },
-      {
-        id: 'hp_laser',
-        name: 'HP LaserJet Pro',
-        status: 'online',
-        type: 'laser'
-      },
-      {
-        id: 'receipt_printer',
-        name: 'Чековый принтер',
-        status: 'offline',
-        type: 'thermal'
-      }];
+      const result = await printService.getPrinters();
+      if (!result.success) {
+        throw new Error(result.error || 'Не удалось загрузить список принтеров');
+      }
 
+      const backendPrinters = Array.isArray(result.data) ? result.data : [];
+      const normalizedPrinters = backendPrinters.map((printer) => ({
+        id: printer.name || String(printer.id),
+        name: printer.display_name || printer.name || 'Принтер',
+        status: printer.status || 'offline',
+        type: printer.printer_type || 'unknown',
+        isDefault: Boolean(printer.is_default)
+      }));
 
-      setPrinters(mockPrinters);
+      setPrinters(normalizedPrinters);
 
-      // Автовыбор первого доступного принтера
-      const onlinePrinter = mockPrinters.find((p) => p.status === 'online');
+      // Автовыбор принтера по умолчанию или первого доступного онлайн
+      const onlinePrinter =
+        normalizedPrinters.find((p) => p.isDefault && p.status === 'online') ||
+        normalizedPrinters.find((p) => p.status === 'online');
       if (onlinePrinter) {
         setSelectedPrinter(onlinePrinter.id);
+      } else {
+        setSelectedPrinter('');
       }
     } catch (error) {
       logger.error('Error loading printers:', error);
-      setError('Не удалось загрузить список принтеров');
+      setError(error.message || 'Не удалось загрузить список принтеров');
     } finally {
       setIsLoading(false);
     }
@@ -116,9 +113,6 @@ const PrintDialog = ({
     setIsPrinting(true);
 
     try {
-      // Имитация печати
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
       if (onPrint) {
         await onPrint(selectedPrinter, documentType, documentData);
       }
@@ -365,7 +359,11 @@ const PrintDialog = ({
                   fontSize: '12px',
                   marginTop: '2px'
                 }}>
-                      {printer.type === 'thermal' ? 'Термопринтер' : 'Лазерный принтер'}
+                      {printer.type === 'thermal' || printer.type === 'ESC/POS' ?
+                    'Термопринтер' :
+                    printer.type === 'A4' || printer.type === 'A5' || printer.type === 'laser' ?
+                    'Лазерный принтер' :
+                    printer.type}
                     </div>
                   </div>
 
@@ -417,7 +415,7 @@ PrintDialog.propTypes = {
   documentType: PropTypes.oneOf(['ticket', 'receipt', 'report']),
   documentData: PropTypes.shape({
     patient_fio: PropTypes.string,
-    services: PropTypes.oneOfType([PropTypes.arrayOf(PropTypes.string), PropTypes.string]),
+    services: PropTypes.oneOfType([PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.object])), PropTypes.string]),
     cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   }),
   onPrint: PropTypes.func

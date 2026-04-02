@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSAlert = ({
   type = 'info',
@@ -199,6 +200,22 @@ const MacOSAlert = ({
       )}
     </div>
   );
+};
+
+
+MacOSAlert.propTypes = {
+  ...(MacOSAlert.propTypes || {}),
+  action: PropTypes.any,
+  children: PropTypes.any,
+  className: PropTypes.any,
+  description: PropTypes.any,
+  dismissible: PropTypes.any,
+  onDismiss: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  title: PropTypes.any,
+  type: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default MacOSAlert;

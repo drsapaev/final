@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff } from
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Мастер настройки Two-Factor Authentication
@@ -545,6 +546,12 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
       </Card>
     </div>);
 
+};
+
+
+TwoFactorSetupWizard.propTypes = {
+  ...(TwoFactorSetupWizard.propTypes || {}),
+  onComplete: PropTypes.any,
 };
 
 export default TwoFactorSetupWizard;

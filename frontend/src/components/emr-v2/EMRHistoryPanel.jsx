@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRHistoryPanel.css';
@@ -229,3 +230,12 @@ export function EMRHistoryPanel({
 }
 
 export default EMRHistoryPanel;
+
+EMRHistoryPanel.propTypes = {
+    visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    currentVersion: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    selectedVersion: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onSelectVersion: PropTypes.func,
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func,
+};

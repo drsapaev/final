@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { Check, AlertCircle } from 'lucide-react';
 import './ExaminationMatrix.css';
 
@@ -210,3 +211,9 @@ const ExaminationMatrix = ({
 };
 
 export default ExaminationMatrix;
+
+ExaminationMatrix.propTypes = {
+  specialty: PropTypes.oneOf(['general', 'cardiology', 'dermatology', 'dentist', 'dentistry']),
+  onGenerateText: PropTypes.func,
+  isEditable: PropTypes.bool,
+};

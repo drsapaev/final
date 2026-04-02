@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import ModernButton from './ModernButton';
 import { useTheme } from '../../contexts/ThemeContext';
 import './FloatingActionButton.css';
+import PropTypes from 'prop-types';
 
 const FloatingActionButton = ({
   icon = Plus,
@@ -105,6 +106,19 @@ const FloatingActionButton = ({
       </div>
     </>);
 
+};
+
+
+FloatingActionButton.propTypes = {
+  ...(FloatingActionButton.propTypes || {}),
+  actions: PropTypes.any,
+  className: PropTypes.any,
+  icon: PropTypes.any,
+  onClick: PropTypes.any,
+  position: PropTypes.any,
+  size: PropTypes.any,
+  tooltip: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default FloatingActionButton;

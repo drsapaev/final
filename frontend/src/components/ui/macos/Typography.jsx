@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 // Minimal macOS-style Typography supporting common MUI variants
 const variantMap = {
   h1: { fontSize: '28px', fontWeight: 700 },
@@ -34,6 +35,17 @@ const Typography = ({ children, variant = 'body1', color, gutterBottom = false, 
   };
   const Tag = variant.startsWith('h') ? 'h' + variant.replace('h', '') : 'p';
   return <Tag style={styles} {...props}>{children}</Tag>;
+};
+
+
+Typography.propTypes = {
+  ...(Typography.propTypes || {}),
+  children: PropTypes.any,
+  color: PropTypes.any,
+  gutterBottom: PropTypes.any,
+  paragraph: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default Typography;

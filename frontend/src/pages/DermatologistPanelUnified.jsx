@@ -32,7 +32,9 @@ import SkinAnalysis from '../components/dermatology/SkinAnalysis';
 import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
+import { printPanelTicket } from '../services/panelPrint';
 import { queueService } from '../services/queue';
+import { printService } from '../services/print';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
@@ -640,7 +642,15 @@ const DermatologistPanelUnified = () => {
         break;
       case 'print':
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
-        window.print();
+        try {
+          const printResult = await printPanelTicket(row, {
+            specialtyName: 'Дерматология'
+          });
+          notify.success(printResult?.message || `Талон для ${row.patient_fio} отправлен на печать`);
+        } catch (error) {
+          logger.error('[Dermatology] Ошибка печати талона:', error);
+          notify.error(error.message || 'Не удалось отправить талон на печать');
+        }
         break;
       case 'complete':
         // Завершить приём
@@ -1075,6 +1085,50 @@ const DermatologistPanelUnified = () => {
     } catch (error) {
       logger.error('DermatologistPanel: Save prescription error:', error);
       notify.error('Ошибка при сохранении рецепта');
+    }
+  };
+
+  const printPrescription = async (prescriptionData) => {
+    const patientFullName =
+      selectedPatient?.patient_name ||
+      currentAppointment?.patient_fio ||
+      currentAppointment?.patient_name ||
+      selectedPatient?.name ||
+      'Пациент';
+
+    const payload = {
+      prescription: {
+        ...prescriptionData,
+        recommendations: prescriptionData.instructions || ''
+      },
+      patient: {
+        id: getSelectedPatientId(),
+        full_name: patientFullName,
+        birth_date: selectedPatient?.birth_date || currentAppointment?.birth_date || '',
+        address: selectedPatient?.address || currentAppointment?.address || '',
+        phone: selectedPatient?.phone || currentAppointment?.patient_phone || currentAppointment?.phone || ''
+      },
+      clinic: {}
+    };
+
+    try {
+      const result = await printService.printPrescription(payload);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Ошибка при печати рецепта');
+      }
+
+      notify.success(result.data?.message || 'Рецепт отправлен в печать');
+      logger.info('[Dermatology] Prescription print success', {
+        patientId: payload.patient.id,
+        visitId: currentAppointment?.visit_id || null,
+        printer: result.data?.printer || null,
+        jobId: result.data?.job_id || null
+      });
+    } catch (error) {
+      logger.error('[Dermatology] Prescription print error:', error);
+      notify.error(error.message || 'Ошибка при печати рецепта');
+      throw error;
     }
   };
 
@@ -1550,7 +1604,8 @@ const DermatologistPanelUnified = () => {
                   appointment={currentAppointment}
                   emr={emr}
                   prescription={prescription}
-                  onSave={savePrescription} />
+                  onSave={savePrescription}
+                  onPrint={printPrescription} />
 
                   </div>
               }

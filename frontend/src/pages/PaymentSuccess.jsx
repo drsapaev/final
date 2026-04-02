@@ -23,6 +23,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import { api as apiClient } from '../api/client';
 
 import logger from '../utils/logger';
+import { openPrintableWindow } from '../utils/printWindow';
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -120,23 +121,29 @@ const PaymentSuccess = () => {
 
   const printReceipt = () => {
     const receiptContent = generateSimpleReceipt();
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    openPrintableWindow({
+      html: `
       <html>
         <head>
           <title>Квитанция ${paymentId}</title>
           <style>
-            body { font-family: monospace; margin: 20px; }
-            pre { white-space: pre-wrap; }
+            body { font-family: monospace; margin: 24px; color: #111827; }
+            h1 { font-size: 20px; margin-bottom: 12px; }
+            .meta { margin-bottom: 16px; line-height: 1.6; }
+            pre { white-space: pre-wrap; font-family: inherit; padding: 16px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; }
           </style>
         </head>
         <body>
+          <h1>Квитанция об оплате</h1>
+          <div class="meta">
+            <div><strong>Платеж:</strong> ${paymentId}</div>
+            <div><strong>Статус:</strong> ${getStatusText(paymentData.status)}</div>
+          </div>
           <pre>${receiptContent}</pre>
         </body>
       </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    `
+    });
   };
 
   const shareReceipt = async () => {

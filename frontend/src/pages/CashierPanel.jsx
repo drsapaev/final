@@ -14,6 +14,7 @@ import Input from '../components/ui/macos/Input';
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
 import { getApiOrigin } from '../api/runtime';
+import { printService } from '../services/print';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -64,6 +65,134 @@ const useDebounce = (value, delay) => {
   }, [value, delay]);
 
   return debouncedValue;
+};
+
+const PAYMENT_METHOD_LABELS = {
+  cash: 'Наличные',
+  card: 'Карта',
+  payme: 'PayMe',
+  click: 'Click'
+};
+
+const resolvePaymentId = (paymentRowOrId) => {
+  if (typeof paymentRowOrId === 'number' || typeof paymentRowOrId === 'string') {
+    return paymentRowOrId;
+  }
+
+  return (
+    paymentRowOrId?.id ||
+    paymentRowOrId?.payment_id ||
+    paymentRowOrId?.grouped_payments?.[0] ||
+    null
+  );
+};
+
+const resolvePaymentMethodCode = (method) => {
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+
+  if (!normalizedMethod) return 'cash';
+  if (normalizedMethod === 'наличные') return 'cash';
+  if (normalizedMethod === 'карта') return 'card';
+
+  return normalizedMethod;
+};
+
+const resolvePaymentMethodLabel = (method) => {
+  const methodCode = resolvePaymentMethodCode(method);
+  return PAYMENT_METHOD_LABELS[methodCode] || String(method || 'Наличные');
+};
+
+const extractReceiptDateTime = (paymentRow) => {
+  const sourceTimestamp = paymentRow?.paid_at || paymentRow?.created_at || null;
+  const parsedDate = sourceTimestamp ? new Date(sourceTimestamp) : null;
+  const hasValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
+
+  return {
+    date: paymentRow?.date || (hasValidDate ? parsedDate.toLocaleDateString('ru-RU') : ''),
+    time: paymentRow?.time || (
+      hasValidDate
+        ? parsedDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        : ''
+    )
+  };
+};
+
+const buildReceiptServices = (paymentRow, totalAmount) => {
+  const currency = String(paymentRow?.currency || 'UZS');
+  const namedServices = Array.isArray(paymentRow?.services_names) ? paymentRow.services_names : [];
+
+  if (namedServices.length > 0) {
+    return namedServices.map((serviceName) => ({
+      name: serviceName || 'Услуга',
+      quantity: 1,
+      price: totalAmount,
+      total: totalAmount,
+      currency
+    }));
+  }
+
+  if (Array.isArray(paymentRow?.services) && paymentRow.services.length > 0) {
+    return paymentRow.services.map((serviceItem) => {
+      if (typeof serviceItem === 'object' && serviceItem !== null) {
+        const quantity = Number(serviceItem.quantity || 1);
+        const price = Number(serviceItem.price || totalAmount);
+        return {
+          name: serviceItem.name || serviceItem.code || 'Услуга',
+          quantity,
+          price,
+          total: Number(serviceItem.total || price * quantity),
+          currency: serviceItem.currency || currency
+        };
+      }
+
+      return {
+        name: String(serviceItem || 'Услуга'),
+        quantity: 1,
+        price: totalAmount,
+        total: totalAmount,
+        currency
+      };
+    });
+  }
+
+  return [{
+    name: paymentRow?.service || 'Услуга',
+    quantity: 1,
+    price: totalAmount,
+    total: totalAmount,
+    currency
+  }];
+};
+
+const buildReceiptPrintPayload = (paymentRow) => {
+  const paymentId = resolvePaymentId(paymentRow);
+  const totalAmount = Number(paymentRow?.total_amount || paymentRow?.amount || 0);
+  const services = buildReceiptServices(paymentRow, totalAmount);
+  const { date, time } = extractReceiptDateTime(paymentRow);
+  const methodCode = resolvePaymentMethodCode(paymentRow?.method);
+
+  return {
+    payment: {
+      number: paymentRow?.receipt_no || `PAY-${paymentId}`,
+      date,
+      time,
+      services,
+      subtotal: totalAmount,
+      discount: 0,
+      total: totalAmount,
+      method: methodCode,
+      method_name: resolvePaymentMethodLabel(paymentRow?.method),
+      status: paymentRow?.status || 'paid',
+      paid_amount: totalAmount,
+      change: 0
+    },
+    patient: {
+      full_name: paymentRow?.patient || paymentRow?.patient_name || 'Пациент',
+      phone: paymentRow?.patient_phone || null
+    },
+    services,
+    clinic: null
+  };
 };
 
 const CashierPanel = () => {void
@@ -555,11 +684,38 @@ const CashierPanel = () => {void
   };
 
   // ✅ v2.0: Обработчик печати чека
-  const handlePrintReceipt = async (paymentId) => {
+  const handlePrintReceipt = async (paymentRowOrId) => {
+    const paymentId = resolvePaymentId(paymentRowOrId);
+
+    if (!paymentId) {
+      notify.error('Не удалось определить платеж для печати чека.');
+      return;
+    }
+
+    if (paymentRowOrId && typeof paymentRowOrId === 'object') {
+      try {
+        const printResult = await printService.printReceipt(buildReceiptPrintPayload(paymentRowOrId));
+        if (printResult.success) {
+          notify.success(`Чек отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`);
+          return;
+        }
+
+        logger.warn('[Cashier] Direct receipt print failed, falling back to PDF', {
+          paymentId,
+          error: printResult.error
+        });
+      } catch (error) {
+        logger.error('[Cashier] Unexpected direct receipt print error:', error);
+      }
+    }
+
     const result = await paymentsHook.getReceipt(paymentId);
     if (!result.success) {
       notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
+      return;
     }
+
+    notify.warning('Прямая печать чека недоступна, поэтому был загружен PDF-чек.');
   };
 
   // ✅ v2.0: Состояние для почасовой статистики
@@ -690,21 +846,36 @@ const CashierPanel = () => {void
         // Создаём новую группу
         grouped[groupKey] = {
           ...payment,
-          services: [], // Services info might need to be fetched or assumed from note/structure
-          services_names: [],
+          services: Array.isArray(payment.services) ? [...payment.services] : [],
+          services_names: Array.isArray(payment.services_names) ? [...payment.services_names] : [],
           grouped_payments: [payment.id],
           total_amount: payment.amount,
           date: dateKey, // Display helpers
           time: timeKey,
-          patient: payment.patient_name
+          patient: payment.patient_name,
+          service: payment.service || null
         };
       } else {
         grouped[groupKey].grouped_payments.push(payment.id);
         grouped[groupKey].total_amount += Number(payment.amount);
+        if (payment.service && !grouped[groupKey].service) {
+          grouped[groupKey].service = payment.service;
+        }
+        if (Array.isArray(payment.services)) {
+          grouped[groupKey].services.push(...payment.services);
+        }
+        if (Array.isArray(payment.services_names)) {
+          grouped[groupKey].services_names.push(...payment.services_names);
+        }
       }
     });
 
-    return Object.values(grouped);
+    return Object.values(grouped).map((group) => ({
+      ...group,
+      services: Array.from(new Set(group.services.filter(Boolean))),
+      services_names: Array.from(new Set(group.services_names.filter(Boolean))),
+      service: group.service || group.services_names[0] || group.services[0] || 'Услуга'
+    }));
   };
 
   // Group payments for display (already filtered by server)
@@ -1206,7 +1377,7 @@ const CashierPanel = () => {void
                                 <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handlePrintReceipt(row.id)}
+                          onClick={() => handlePrintReceipt(row)}
                           title="Печать чека">
 
                                   🧾 Чек

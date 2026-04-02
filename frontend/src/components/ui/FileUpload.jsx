@@ -4,6 +4,7 @@ import heic2any from 'heic2any';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
 import '../../styles/animations.css';
+import PropTypes from 'prop-types';
 
 const FileUpload = ({
   onFilesSelected,
@@ -321,6 +322,20 @@ const FileUpload = ({
       }
         </div>);
 
+};
+
+
+FileUpload.propTypes = {
+  ...(FileUpload.propTypes || {}),
+  accept: PropTypes.any,
+  className: PropTypes.any,
+  clearOnSelect: PropTypes.any,
+  disabled: PropTypes.any,
+  maxSize: PropTypes.any,
+  multiple: PropTypes.any,
+  onFilesSelected: PropTypes.any,
+  showPreviews: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default FileUpload;

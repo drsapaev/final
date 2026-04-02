@@ -1,6 +1,7 @@
 import { Card } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
+import PropTypes from 'prop-types';
 
 /**
  * Пример интерактивной карточки с эффектами наведения
@@ -77,6 +78,15 @@ const InteractiveCard = ({
       )}
     </Card>
   );
+};
+
+
+InteractiveCard.propTypes = {
+  ...(InteractiveCard.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  onClick: PropTypes.any,
+  style: PropTypes.any,
 };
 
 /**
@@ -183,6 +193,15 @@ export const InteractiveListItem = ({
       {itemContent}
     </div>
   );
+};
+
+
+InteractiveListItem.propTypes = {
+  ...(InteractiveListItem.propTypes || {}),
+  icon: PropTypes.any,
+  onClick: PropTypes.any,
+  subtitle: PropTypes.any,
+  title: PropTypes.any,
 };
 
 export default InteractiveCard;

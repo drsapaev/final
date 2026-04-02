@@ -348,6 +348,12 @@ export function FormField({
 
 }
 
+
+FormField.propTypes = {
+  ...(FormField.propTypes || {}),
+  id: PropTypes.any,
+};
+
 /**
  * Компонент текстовой области
  */
@@ -470,6 +476,12 @@ export function FormTextArea({
 
 }
 
+
+FormTextArea.propTypes = {
+  ...(FormTextArea.propTypes || {}),
+  id: PropTypes.any,
+};
+
 /**
  * Компонент селекта
  */
@@ -584,6 +596,12 @@ export function FormSelect({
     </div>);
 
 }
+
+
+FormSelect.propTypes = {
+  ...(FormSelect.propTypes || {}),
+  id: PropTypes.any,
+};
 
 /**
  * Компонент кнопки отправки

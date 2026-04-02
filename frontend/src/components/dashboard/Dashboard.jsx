@@ -49,6 +49,7 @@ import {
 
 'lucide-react';
 import tokenManager from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 // import AdvancedCharts from './AdvancedCharts';
 
 const Dashboard = ({ user }) => {
@@ -427,6 +428,14 @@ const Dashboard = ({ user }) => {
       </Grid>
     </div>);
 
+};
+
+
+Dashboard.propTypes = {
+  ...(Dashboard.propTypes || {}),
+  full_name: PropTypes.any,
+  user: PropTypes.any,
+  username: PropTypes.any,
 };
 
 export default Dashboard;

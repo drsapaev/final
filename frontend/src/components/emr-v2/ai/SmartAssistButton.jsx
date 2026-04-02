@@ -5,7 +5,9 @@
  * - Shows when field has content
  * - Click to get AI suggestions
  * - Positioned near the field
- */import './SmartAssistButton.css';
+ */
+import PropTypes from 'prop-types';
+import './SmartAssistButton.css';
 
 /**
  * SmartAssistButton Component
@@ -47,3 +49,11 @@ export function SmartAssistButton({
 }
 
 export default SmartAssistButton;
+
+SmartAssistButton.propTypes = {
+    onClick: PropTypes.func,
+    isLoading: PropTypes.bool,
+    hasSuggestions: PropTypes.bool,
+    disabled: PropTypes.bool,
+    size: PropTypes.oneOf(['small', 'medium']),
+};

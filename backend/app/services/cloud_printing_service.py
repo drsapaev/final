@@ -5,6 +5,7 @@
 
 import asyncio
 import base64
+import itertools
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -353,6 +354,9 @@ class GoogleCloudPrintProvider(BasePrintProvider):
 class MockPrintProvider(BasePrintProvider):
     """Мок-провайдер для тестирования"""
 
+    _job_counter = itertools.count(1)
+    _jobs: dict[str, PrintJob] = {}
+
     def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         self.printers = [
@@ -371,7 +375,12 @@ class MockPrintProvider(BasePrintProvider):
                 location="Другая локация",
             ),
         ]
-        self.jobs = {}
+
+    @classmethod
+    def reset_mock_state(cls) -> None:
+        """Сбросить состояние мок-провайдера между тестами."""
+        cls._job_counter = itertools.count(1)
+        cls._jobs = {}
 
     async def get_printers(self) -> list[Printer]:
         return self.printers
@@ -383,8 +392,9 @@ class MockPrintProvider(BasePrintProvider):
         return PrinterStatus.ERROR
 
     async def submit_print_job(self, job: PrintJob) -> str:
-        job_id = f"mock-job-{len(self.jobs) + 1}"
-        self.jobs[job_id] = job
+        job_id = f"mock-job-{next(self._job_counter)}"
+        job.id = job_id
+        self._jobs[job_id] = job
         job.status = PrintJobStatus.PENDING
 
         # Симуляция обработки задания
@@ -398,12 +408,13 @@ class MockPrintProvider(BasePrintProvider):
         return job_id
 
     async def get_job_status(self, job_id: str) -> PrintJobStatus:
-        job = self.jobs.get(job_id)
+        job = self._jobs.get(job_id)
         return job.status if job else PrintJobStatus.FAILED
 
     async def cancel_job(self, job_id: str) -> bool:
-        if job_id in self.jobs:
-            self.jobs[job_id].status = PrintJobStatus.CANCELLED
+        job = self._jobs.get(job_id)
+        if job:
+            job.status = PrintJobStatus.CANCELLED
             return True
         return False
 
@@ -418,6 +429,8 @@ class CloudPrintingService:
 
     def _initialize_providers(self):
         """Инициализация провайдеров"""
+        env = (getattr(settings, "ENV", "dev") or "dev").lower()
+
         # Microsoft Universal Print
         if hasattr(settings, 'MICROSOFT_PRINT_TENANT_ID'):
             microsoft_config = {
@@ -430,8 +443,15 @@ class CloudPrintingService:
                     microsoft_config
                 )
 
-        # Mock провайдер для тестирования
-        self.providers["mock"] = MockPrintProvider({})
+        # Mock провайдер для тестирования и локальной разработки.
+        # В production он не должен маскировать отсутствие реальных провайдеров.
+        if env not in {"prod", "production"}:
+            self.providers["mock"] = MockPrintProvider({})
+        elif not self.providers:
+            logger.warning(
+                "Cloud printing started without configured providers in production env=%s",
+                env,
+            )
 
         logger.info(
             f"Инициализированы провайдеры печати: {list(self.providers.keys())}"

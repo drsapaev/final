@@ -14,6 +14,7 @@ import { toast } from 'react-toastify';
 
 import { getApiBaseUrl } from '../../api/runtime';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const API_BASE = getApiBaseUrl();
 
 /**
@@ -585,6 +586,18 @@ const PriceOverrideManager = ({
       </div>
     </div>);
 
+};
+
+
+PriceOverrideManager.propTypes = {
+  ...(PriceOverrideManager.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onPriceOverrideCreated: PropTypes.any,
+  originalPrice: PropTypes.any,
+  serviceId: PropTypes.any,
+  serviceName: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default PriceOverrideManager;

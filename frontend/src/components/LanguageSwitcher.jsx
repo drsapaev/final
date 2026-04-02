@@ -5,6 +5,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from '../hooks/useTranslation';
 import { Button, Icon } from './ui/macos';
+import PropTypes from 'prop-types';
 
 const LanguageSwitcher = ({ compact = false }) => {
     const { language, setLanguage, availableLanguages, t } = useTranslation();
@@ -105,6 +106,12 @@ const LanguageSwitcher = ({ compact = false }) => {
             )}
         </div>
     );
+};
+
+
+LanguageSwitcher.propTypes = {
+  ...(LanguageSwitcher.propTypes || {}),
+  compact: PropTypes.any,
 };
 
 export default LanguageSwitcher;

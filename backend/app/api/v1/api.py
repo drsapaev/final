@@ -132,9 +132,6 @@ from app.api.v1.endpoints import (
     health as health_ep,
 )
 from app.api.v1.endpoints import (
-    print as print_ep,
-)
-from app.api.v1.endpoints import (
     reports as reports_ep,
 )
 from app.api.v1.endpoints.migration_management import (
@@ -275,7 +272,6 @@ api_router.include_router(
 api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
-api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
 api_router.include_router(reports_ep.router, tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])

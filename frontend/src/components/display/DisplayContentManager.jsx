@@ -17,6 +17,7 @@ import { Card, Button, Badge } from '../ui/native';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 /**
  * Управление контентом для табло
  * Основа: passport.md стр. 2571-3324
@@ -387,6 +388,13 @@ const DisplayContentManager = ({
       }
     </div>);
 
+};
+
+
+DisplayContentManager.propTypes = {
+  ...(DisplayContentManager.propTypes || {}),
+  boardId: PropTypes.any,
+  className: PropTypes.any,
 };
 
 export default DisplayContentManager;

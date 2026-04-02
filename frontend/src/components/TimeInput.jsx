@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 /**
  * TimeInput — контрол ввода времени HH:MM с простейшей валидацией.
  * Props:
@@ -47,5 +48,14 @@ export default function TimeInput({ value = '09:00', onChange = () => {}, disabl
     />
   );
 }
+
+
+TimeInput.propTypes = {
+  ...(TimeInput.propTypes || {}),
+  disabled: PropTypes.any,
+  onChange: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+};
 
 

@@ -40,8 +40,8 @@
    - Нет матриц для `dermatology` и `dentist`
 
 4. **Дублирование логики**
-   - Старый EMRSystem и новый EMRContainerV2 существуют параллельно
-   - Специализированные панели используют старый EMRSystem
+   - Legacy EMR удалён
+   - EMRContainerV2 и v2 sections теперь являются основным путём
 
 ---
 
@@ -240,7 +240,7 @@ export function useSpecialtyData(specialty, specialtyData, onChange) {
 ### 3. Расширить ExaminationMatrix
 
 ```javascript
-// components/emr/ExaminationMatrix.jsx
+// components/emr-v2/sections/ExaminationMatrix.jsx
 const MATRICES = {
     // ... существующие
     dermatology: { /* ... */ },
@@ -295,7 +295,7 @@ const DentistrySection = React.lazy(() => import('./sections/DentistrySection'))
 ### Этап 5: Интеграция (1-2 дня)
 - [ ] Обновить EMRContainerV2 для условного рендеринга
 - [ ] Мигрировать специализированные панели на EMRContainerV2
-- [ ] Удалить старый EMRSystem (после полной миграции)
+- [x] Удалить старый EMRSystem / legacy EMR после полной миграции
 
 ---
 
@@ -384,7 +384,7 @@ const DentistrySection = React.lazy(() => import('./sections/DentistrySection'))
 - `frontend/src/components/emr-v2/sections/` - Базовые секции
 - `frontend/src/components/cardiology/ECGViewer.jsx` - Компонент ЭКГ
 - `frontend/src/components/dental/TeethChart.jsx` - Зубная карта
-- `frontend/src/components/emr/ExaminationMatrix.jsx` - Матрица осмотра
+- `frontend/src/components/emr-v2/sections/ExaminationMatrix.jsx` - Матрица осмотра
 - `backend/app/schemas/emr_v2.py` - Схема данных (specialty_data)
 
 ---

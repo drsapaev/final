@@ -83,6 +83,7 @@
 |----------|-------------|
 | [AI_MCP_QA_CHECKLIST.md](./AI_MCP_QA_CHECKLIST.md) | AI/MCP QA checklist |
 | [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
+| [reports/PRINT_PANEL_AUDIT_REPORT.md](./reports/PRINT_PANEL_AUDIT_REPORT.md) | Unified print audit across registrar, specialists, lab, and admin panels |
 | [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Historical messaging contract and rollout evidence |
 | [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Historical messaging QA evidence |
 | [PANEL_QA_CHECKLIST.md](./PANEL_QA_CHECKLIST.md) | SSOT runbook for panel verification with step-by-step progress tracking |
@@ -126,4 +127,4 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 
 ---
 
-*Last Updated: 2026-03-30*
+*Last Updated: 2026-04-02*

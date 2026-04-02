@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 
 import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
@@ -88,3 +89,11 @@ export function RecommendationsSection({
 }
 
 export default RecommendationsSection;
+
+RecommendationsSection.propTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func,
+  disabled: PropTypes.bool,
+  defaultOpen: PropTypes.bool,
+  icd10Code: PropTypes.string,
+};

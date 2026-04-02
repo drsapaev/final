@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client.js';
+import PropTypes from 'prop-types';
 
 /**
  * Универсальный выбор услуги (одиночный или множественный).
@@ -118,6 +119,16 @@ export default function ServicePicker({
     </div>
   );
 }
+
+
+ServicePicker.propTypes = {
+  ...(ServicePicker.propTypes || {}),
+  multi: PropTypes.any,
+  onChange: PropTypes.any,
+  placeholder: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+};
 
 const inp = { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 8 };
 const listBox = { display: 'grid', gap: 6, maxHeight: 280, overflow: 'auto', border: '1px solid #eee', borderRadius: 10, padding: 6, background: '#fff' };

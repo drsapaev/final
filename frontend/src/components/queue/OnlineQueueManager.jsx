@@ -40,6 +40,7 @@ import StopIcon from '@mui/icons-material/Stop';
 import TimeIcon from '@mui/icons-material/Schedule';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQueueManager } from '../../hooks/useQueueManager';
+import { openPrintableWindow } from '../../utils/printWindow';
 
 const OnlineQueueManager = () => {
   // Используем кастомный хук вместо прямых API вызовов
@@ -122,6 +123,41 @@ const OnlineQueueManager = () => {
     };
     
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+  };
+
+  const handlePrintQR = () => {
+    if (!qrData) return;
+
+    const svg = document.querySelector('#qr-code-svg');
+    const svgMarkup = svg?.outerHTML || '';
+
+    openPrintableWindow({
+      features: 'width=900,height=700',
+      html: `
+      <!doctype html>
+      <html lang="ru">
+        <head>
+          <title>QR код для очереди</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; text-align: center; }
+            h1 { margin-bottom: 12px; font-size: 24px; }
+            .meta { color: #4b5563; margin-top: 16px; line-height: 1.6; }
+            .qr { display: inline-block; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>QR код для записи в очередь</h1>
+          <div class="qr">${svgMarkup}</div>
+          <div class="meta">
+            <div><strong>Специалист:</strong> ${qrData.specialist_name || ''}</div>
+            <div><strong>Дата:</strong> ${new Date(qrData.day).toLocaleDateString('ru-RU')}</div>
+            <div><strong>Действует до:</strong> ${formatTime(qrData.expires_at)}</div>
+            <div><strong>Ссылка:</strong> ${window.location.origin}/queue/join?token=${qrData.token}</div>
+          </div>
+        </body>
+      </html>
+    `
+    });
   };
 
   const formatTime = (dateString) => {
@@ -560,7 +596,7 @@ const OnlineQueueManager = () => {
                   <Button
                     variant="outlined"
                     startIcon={<PrintIcon />}
-                    onClick={() => window.print()}
+                    onClick={handlePrintQR}
                   >
                     Печать
                   </Button>

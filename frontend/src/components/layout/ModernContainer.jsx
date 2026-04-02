@@ -1,5 +1,6 @@
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernContainer.css';
+import PropTypes from 'prop-types';
 
 const ModernContainer = ({
   children,
@@ -52,6 +53,18 @@ const ModernContainer = ({
       {children}
     </div>);
 
+};
+
+
+ModernContainer.propTypes = {
+  ...(ModernContainer.propTypes || {}),
+  centered: PropTypes.any,
+  children: PropTypes.any,
+  className: PropTypes.any,
+  fluid: PropTypes.any,
+  margin: PropTypes.any,
+  maxWidth: PropTypes.any,
+  padding: PropTypes.any,
 };
 
 export default ModernContainer;

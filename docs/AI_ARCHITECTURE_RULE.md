@@ -88,10 +88,10 @@ const ICD10Autocomplete = ({
 ### 2. Parent Component (с useEMRAI)
 
 ```jsx
-// SingleSheetEMR.jsx
+// EMRContainerV2.jsx
 import { useEMRAI } from '../../hooks/useEMRAI';
 
-const SingleSheetEMR = () => {
+const EMRContainerV2 = () => {
   // AI через hook
   const { icd10Suggestions, loading, getICD10Suggestions } = useEMRAI(true, 'deepseek');
 
@@ -139,7 +139,7 @@ const mcpResult = await mcpAPI.suggestICD10(data);
 | `mcpClient.js` | API Client | HTTP вызовы к MCP backend |
 | `ICD10Autocomplete.jsx` | UI-only | Отображение, клавиатура |
 | `AISuggestions.jsx` | UI-only | Отображение подсказок |
-| `EMRSmartField.jsx` | UI-only | Ghost text, modes |
+| `EMRSmartFieldV2.jsx` | UI-only | Ghost text, modes |
 
 ---
 

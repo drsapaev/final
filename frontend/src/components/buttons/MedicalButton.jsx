@@ -14,6 +14,7 @@ import {
   Zap
 } from 'lucide-react';
 import './MedicalButton.css';
+import PropTypes from 'prop-types';
 
 /**
  * MedicalButton - специализированная кнопка для медицинских задач
@@ -129,6 +130,18 @@ const MedicalButton = ({
       {children}
     </ModernButton>
   );
+};
+
+
+MedicalButton.propTypes = {
+  ...(MedicalButton.propTypes || {}),
+  action: PropTypes.any,
+  children: PropTypes.any,
+  className: PropTypes.any,
+  department: PropTypes.any,
+  icon: PropTypes.any,
+  priority: PropTypes.any,
+  status: PropTypes.any,
 };
 
 /**

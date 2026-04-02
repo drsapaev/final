@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import { X } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const ResponsiveModal = ({
   isOpen,
@@ -189,6 +190,18 @@ const ResponsiveModal = ({
       </div>
     </div>);
 
+};
+
+
+ResponsiveModal.propTypes = {
+  ...(ResponsiveModal.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  title: PropTypes.any,
 };
 
 export default ResponsiveModal;

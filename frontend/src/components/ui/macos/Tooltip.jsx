@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * macOS-style Tooltip Component
@@ -316,6 +317,19 @@ const Tooltip = ({
       )}
     </>);
 
+};
+
+
+Tooltip.propTypes = {
+  ...(Tooltip.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  content: PropTypes.any,
+  delay: PropTypes.any,
+  disabled: PropTypes.any,
+  followCursor: PropTypes.any,
+  position: PropTypes.any,
+  style: PropTypes.any,
 };
 
 Tooltip.displayName = 'macOS Tooltip';

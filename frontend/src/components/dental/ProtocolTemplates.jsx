@@ -21,6 +21,7 @@ import {
   Star } from
 
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Шаблоны протоколов для стоматологической ЭМК
@@ -601,6 +602,13 @@ const ProtocolTemplates = ({
       </div>
     </div>);
 
+};
+
+
+ProtocolTemplates.propTypes = {
+  ...(ProtocolTemplates.propTypes || {}),
+  onClose: PropTypes.any,
+  onSelectTemplate: PropTypes.any,
 };
 
 export default ProtocolTemplates;

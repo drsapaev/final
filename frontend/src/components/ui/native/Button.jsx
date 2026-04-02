@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 const Button = React.forwardRef(({
   children,
@@ -177,6 +178,18 @@ const Button = React.forwardRef(({
     </button>);
 
 });
+
+
+Button.propTypes = {
+  ...(Button.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  disabled: PropTypes.any,
+  loading: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Button.displayName = 'Button';
 

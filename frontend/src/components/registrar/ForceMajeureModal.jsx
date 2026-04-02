@@ -20,6 +20,7 @@ import {
 
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 
 const ForceMajeureModal = ({
   isOpen,
@@ -514,6 +515,16 @@ const ForceMajeureModal = ({
             </div>
         </div>);
 
+};
+
+
+ForceMajeureModal.propTypes = {
+  ...(ForceMajeureModal.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onSuccess: PropTypes.any,
+  specialistId: PropTypes.any,
+  specialistName: PropTypes.any,
 };
 
 export default ForceMajeureModal;

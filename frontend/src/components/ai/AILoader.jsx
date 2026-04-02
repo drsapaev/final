@@ -1,5 +1,6 @@
 import { Box, Typography, Progress, CircularProgress } from '../../components/ui/macos';
 import { Brain, Sparkles } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const AILoader = ({ 
   variant = 'circular',
@@ -86,6 +87,18 @@ const AILoader = ({
       {content}
     </Box>
   );
+};
+
+
+AILoader.propTypes = {
+  ...(AILoader.propTypes || {}),
+  fullScreen: PropTypes.any,
+  progress: PropTypes.any,
+  showIcon: PropTypes.any,
+  size: PropTypes.any,
+  subtext: PropTypes.any,
+  text: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default AILoader;

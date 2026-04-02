@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import PropTypes from 'prop-types';
 
 const Input = React.forwardRef(({ 
   className = '', 
@@ -38,6 +39,16 @@ const Input = React.forwardRef(({
     />
   );
 });
+
+
+Input.propTypes = {
+  ...(Input.propTypes || {}),
+  className: PropTypes.any,
+  error: PropTypes.any,
+  size: PropTypes.any,
+  type: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Input.displayName = 'Input';
 

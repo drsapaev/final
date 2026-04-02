@@ -43,6 +43,7 @@ import {
 
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const ProcedureTemplates = ({ onSelectProcedure }) => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -603,6 +604,12 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
       </Dialog>
     </Box>);
 
+};
+
+
+ProcedureTemplates.propTypes = {
+  ...(ProcedureTemplates.propTypes || {}),
+  onSelectProcedure: PropTypes.any,
 };
 
 export default ProcedureTemplates;

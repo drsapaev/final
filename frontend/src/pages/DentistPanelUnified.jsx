@@ -44,6 +44,7 @@ import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
+import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
@@ -770,7 +771,15 @@ const DentistPanelUnified = () => {
         break;
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);
-        window.print();
+        try {
+          const printResult = await printPanelTicket(row, {
+            specialtyName: 'Стоматология'
+          });
+          notify.success(printResult?.message || `Талон для ${row.patient_fio} отправлен на печать`);
+        } catch (error) {
+          logger.error('[Dentist] Ошибка печати талона:', error);
+          notify.error(error.message || 'Не удалось отправить талон на печать');
+        }
         break;
       case 'complete':
         // Завершить приём

@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 const Label = React.forwardRef(({ 
   children,
@@ -52,6 +53,17 @@ const Label = React.forwardRef(({
     </label>
   );
 });
+
+
+Label.propTypes = {
+  ...(Label.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  required: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Label.displayName = 'Label';
 

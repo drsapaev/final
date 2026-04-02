@@ -1,5 +1,6 @@
 // Утилиты для проверки и исправления темы
 import { useTheme } from '../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * Проверяет использование хардкодированных цветов в стилях
@@ -269,6 +270,17 @@ export function ThemeIssuesDisplay({ issues, onFix }) {
     </div>);
 
 }
+
+
+ThemeIssuesDisplay.propTypes = {
+  ...(ThemeIssuesDisplay.propTypes || {}),
+  colors: PropTypes.any,
+  cssVariables: PropTypes.any,
+  issues: PropTypes.any,
+  onFix: PropTypes.any,
+  sizes: PropTypes.any,
+  total: PropTypes.any,
+};
 
 /**
  * Утилита для автоматического исправления стилей

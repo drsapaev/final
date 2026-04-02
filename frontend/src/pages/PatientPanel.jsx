@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Button, Badge, Icon } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText } from 'lucide-react';
-import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+import PropTypes from 'prop-types';
 
 // Simple Skeleton component
 const Skeleton = ({ className = '' }) =>
@@ -15,6 +15,12 @@ const Skeleton = ({ className = '' }) =>
     borderRadius: '8px',
     minHeight: '96px'
   }} />;
+
+
+  Skeleton.propTypes = {
+    ...(Skeleton.propTypes || {}),
+    className: PropTypes.any,
+  };
 
 
 const PatientPanel = () => {void
@@ -42,7 +48,7 @@ const PatientPanel = () => {void
   }, []);
 
   return (
-      <div style={{
+    <div style={{
       padding: '0px', // Убираем padding, так как он уже есть в main контейнере
       background: 'var(--mac-gradient-window)',
       minHeight: '100vh',
@@ -155,8 +161,6 @@ const PatientPanel = () => {void
           </Card>
         </div>
       </div>
-
-      <RoleNotificationCenter role="patient" />
     </div>);
 
 };

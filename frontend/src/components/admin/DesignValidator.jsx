@@ -4,6 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { validateComponentDesign } from '../../utils/designValidator';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Компонент для валидации дизайна панелей
  */
@@ -280,6 +281,12 @@ const DesignValidator = ({ onValidationComplete }) => {
       }
     </Card>);
 
+};
+
+
+DesignValidator.propTypes = {
+  ...(DesignValidator.propTypes || {}),
+  onValidationComplete: PropTypes.any,
 };
 
 export default DesignValidator;
