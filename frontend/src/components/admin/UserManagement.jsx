@@ -267,6 +267,8 @@ const UserManagement = () => {
     render: (_, user) =>
     <div onClickCapture={(e) => e.stopPropagation()}>
           <IconButton
+        aria-label="Действия пользователя"
+        aria-haspopup="true"
         onClick={(e) => {
           setAnchorEl(e.currentTarget);
           setSelectedUser(user);
