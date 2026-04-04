@@ -30,10 +30,24 @@ function getBrowserOrigin() {
 
 function buildRuntimeSnapshot() {
   const currentOrigin = getBrowserOrigin();
-  const apiOrigin = currentOrigin || trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
+  const rawApiOrigin = currentOrigin || trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
+
+  // Provide a safe fallback if apiOrigin cannot be parsed
+  let apiOrigin = rawApiOrigin;
+  let wsProtocol = 'ws:';
+  let wsHost = 'localhost:18000';
+
+  try {
+    const url = new URL(apiOrigin);
+    wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsHost = url.host;
+  } catch (_err) {
+    // If URL parsing fails, fallback to default structure
+    apiOrigin = DEFAULT_API_BASE_URL;
+  }
+
   const apiBaseUrl = `${apiOrigin}/api/v1`;
-  const wsProtocol = new URL(apiOrigin).protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsOrigin = `${wsProtocol}//${new URL(apiOrigin).host}`;
+  const wsOrigin = `${wsProtocol}//${wsHost}`;
 
   return {
     currentOrigin,

@@ -559,7 +559,8 @@ export default function LabReportWorkbench({
         return;
       }
 
-      logger.warn('[LabReportWorkbench] direct lab print failed, falling back to PDF', {
+      // eslint-disable-next-line no-console
+      console.warn('[LabReportWorkbench] direct lab print failed, falling back to PDF', {
         instanceId: activeInstance.id,
         error: printResult.error
       });

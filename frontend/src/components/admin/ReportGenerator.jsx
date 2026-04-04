@@ -8,6 +8,7 @@ import {
   Users,
   DollarSign,
   FileText,
+  Clock,
 
   RefreshCw,
 
@@ -169,7 +170,7 @@ const ReportGenerator = ({
     return () => {
       isMounted = false;
     };
-  }, [reportTypes, selectedReportType, internalSelectedReportType]);
+  }, [reportTypes, selectedReportType, internalSelectedReportType, normalizeReportType]);
 
   const handleFilterChange = (filterName, value) => {
     setFilters((prev) => ({

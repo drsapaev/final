@@ -40,12 +40,22 @@ const getProviderOptions = (providers = []) =>
     label: getProviderLabel(provider)
   }));
 
+const getStatusTextStatic = (status) => {
+  switch (status) {
+    case 'online': return 'В сети';
+    case 'offline': return 'Не в сети';
+    case 'error': return 'Ошибка';
+    case 'printing': return 'Печатает';
+    default: return 'Неизвестно';
+  }
+};
+
 const getPrinterOptions = (printers = [], providerName = '') =>
   printers
     .filter((printer) => printer.provider === providerName)
     .map((printer) => ({
       value: printer.id,
-      label: `${printer.name} (${getStatusText(printer.status)})`
+      label: `${printer.name} (${getStatusTextStatic(printer.status)})`
     }));
 
 const CloudPrintingManager = () => {
