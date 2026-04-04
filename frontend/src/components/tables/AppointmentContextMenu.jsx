@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   User,
@@ -25,6 +25,8 @@ const AppointmentContextMenu = ({
   const [isVisible, setIsVisible] = useState(false);
 
   const isDark = theme === 'dark';
+  const status = (row.status || '').toLowerCase();
+  const paymentStatus = (row.payment_status || '').toLowerCase();
   const colors = {
     bg: isDark ? '#1f2937' : '#ffffff',
     border: isDark ? '#4b5563' : '#e5e7eb',
@@ -82,21 +84,21 @@ const AppointmentContextMenu = ({
     label: 'В кабинет',
     icon: User,
     color: colors.accent,
-    visible: row.status === 'confirmed' || row.status === 'queued'
+    visible: status === 'confirmed' || status === 'queued'
   },
   {
     id: 'call',
     label: 'Вызвать',
     icon: Clock,
     color: colors.success,
-    visible: row.status === 'queued'
+    visible: status === 'queued'
   },
   {
     id: 'complete',
     label: 'Завершить',
     icon: CheckCircle,
     color: colors.success,
-    visible: row.status === 'in_cabinet'
+    visible: status === 'in_cabinet'
   },
   { type: 'divider' },
   {
@@ -105,9 +107,7 @@ const AppointmentContextMenu = ({
     icon: CreditCard,
     color: colors.success,
     visible: (() => {
-      const s = (row.status || '').toLowerCase();
-      const ps = (row.payment_status || '').toLowerCase();
-      return s !== 'paid' && ps !== 'paid' && (s === 'paid_pending' || !ps);
+      return status !== 'paid' && paymentStatus !== 'paid' && (status === 'paid_pending' || !paymentStatus);
     })()
   },
   {
@@ -115,7 +115,7 @@ const AppointmentContextMenu = ({
     label: 'Печать талона',
     icon: Printer,
     color: colors.accent,
-    visible: row.payment_status === 'paid' || row.status === 'queued'
+    visible: paymentStatus === 'paid' || status === 'queued'
   },
   { type: 'divider' },
   {
@@ -123,14 +123,14 @@ const AppointmentContextMenu = ({
     label: 'Перенести',
     icon: Calendar,
     color: colors.warning,
-    visible: row.status !== 'done' && row.status !== 'in_cabinet'
+    visible: status !== 'done' && status !== 'in_cabinet'
   },
   {
     id: 'cancel',
     label: 'Отменить',
     icon: X,
     color: colors.error,
-    visible: row.status !== 'canceled' && row.status !== 'done'
+    visible: status !== 'canceled' && status !== 'cancelled' && status !== 'done'
   },
   { type: 'divider' },
   {
@@ -172,8 +172,8 @@ const AppointmentContextMenu = ({
   const adjustedPosition = getAdjustedPosition();
 
   const handleItemClick = (itemId) => {
-    onAction(itemId, row);
-    onClose();
+    onAction?.(itemId, row);
+    onClose?.();
   };
 
   return (

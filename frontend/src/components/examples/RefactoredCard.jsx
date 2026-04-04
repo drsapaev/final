@@ -246,6 +246,8 @@ export default RefactoredCard;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function CardExamples() {
+  const [lastClickedCard, setLastClickedCard] = useState('');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
       {/* Example 1: Simple card with title */}
@@ -270,11 +272,17 @@ export function CardExamples() {
       <RefactoredCard
         variant="outlined"
         clickable
-        onClick={() => {}}
+        onClick={() => setLastClickedCard('Clickable Card')}
         title="Clickable Card"
       >
         <p>This card is clickable. Click to trigger an action.</p>
       </RefactoredCard>
+
+      {lastClickedCard && (
+        <p style={{ color: colors.semantic.text.secondary, fontSize: typography.sizes.sm }}>
+          Last clicked: {lastClickedCard}
+        </p>
+      )}
 
       {/* Example 4: Status card (Success) */}
       <RefactoredCard

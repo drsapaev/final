@@ -1162,7 +1162,6 @@ const AdminPanel = () => {
     { to: '/admin/users', label: 'Пользователи', icon: Users },
     { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
     { to: '/admin/services', label: 'Услуги', icon: Package },
-    { to: '/admin/departments', label: 'Отделения', icon: FolderTree },
     { to: '/admin/queue-cabinet-management', label: 'Кабинеты очередей', icon: Building2 },
     { to: '/admin/patients', label: 'Пациенты', icon: Users },
     { to: '/admin/appointments', label: 'Записи', icon: Calendar },
@@ -2650,7 +2649,6 @@ const AdminPanel = () => {
               }}>
                 {tabs.find((tab) => tab.id === current)?.label || 'Неизвестный раздел'}
               </h2>
-              <p style={{ color: 'var(--mac-text-secondary)' }}>Этот раздел находится в разработке</p>
             </div>
           </MacOSCard>);
 

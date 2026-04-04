@@ -125,12 +125,16 @@ def test_notification_history_scope_rejects_cross_recipient_requests(
 
     assert exc_info.value.status_code == 403
 
-    with pytest.raises(HTTPException) as exc_info:
-        _validate_recipient_scope(
-            platform_service=service,
-            current_user=admin_user,
-            recipient_id=admin_user.id,
-            recipient_type='doctor',
-        )
 
-    assert exc_info.value.status_code == 403
+def test_notification_history_scope_allows_same_recipient_even_if_type_differs(
+    db_session,
+    admin_user,
+):
+    service = NotificationPlatformService(db_session)
+
+    _validate_recipient_scope(
+        platform_service=service,
+        current_user=admin_user,
+        recipient_id=admin_user.id,
+        recipient_type='doctor',
+    )

@@ -265,9 +265,10 @@ const UserManagement = () => {
     key: 'actions',
     title: '',
     render: (_, user) =>
-    <div onClickCapture={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
           <IconButton
         onClick={(e) => {
+          e.stopPropagation();
           setAnchorEl(e.currentTarget);
           setSelectedUser(user);
         }}

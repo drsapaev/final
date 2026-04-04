@@ -1,8 +1,8 @@
-import React, { startTransition, useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../hooks/useTranslation';
-import { MacOSButton, MacOSCard, MacOSModal } from '../components/ui/macos';
+import { MacOSButton, MacOSCard } from '../components/ui/macos';
 import {
   Activity,
   ArrowRight,
@@ -24,7 +24,6 @@ import {
   User,
   Users
 } from 'lucide-react';
-import AppActivation from '../components/activation/AppActivation';
 import { LANDING_COPY, buildGlassStyle } from './landingContent';
 import './Landing.css';
 import PropTypes from 'prop-types';
@@ -210,8 +209,6 @@ export default function Landing() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const { availableLanguages, language, setLanguage, t } = useTranslation();
-  const [showActivation, setShowActivation] = useState(false);
-
   const copy = LANDING_COPY[language] || LANDING_COPY.ru;
   const cardStyle = useMemo(() => buildGlassStyle(isDark), [isDark]);
   const heroCardStyle = useMemo(() => buildGlassStyle(isDark, 'hero'), [isDark]);
@@ -576,7 +573,7 @@ export default function Landing() {
                 <MacOSButton
                   variant={plan.featured ? 'primary' : 'outline'}
                   size="lg"
-                  onClick={() => setShowActivation(true)}
+                  onClick={() => navigate('/login')}
                   className="landing-plan-button"
                 >
                   {plan.cta}
@@ -626,7 +623,7 @@ export default function Landing() {
                 <User size={18} />
                 {copy.finalCta.primaryCta}
               </MacOSButton>
-              <MacOSButton variant="outline" size="lg" onClick={() => setShowActivation(true)}>
+              <MacOSButton variant="outline" size="lg" onClick={() => navigate('/login')}>
                 <Key size={18} />
                 {copy.finalCta.secondaryCta}
               </MacOSButton>
@@ -678,10 +675,6 @@ export default function Landing() {
           </div>
         </footer>
       </main>
-
-      <MacOSModal isOpen={showActivation} onClose={() => setShowActivation(false)} title={copy.activationTitle} size="md">
-        <AppActivation onClose={() => setShowActivation(false)} />
-      </MacOSModal>
     </div>
   );
 }

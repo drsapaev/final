@@ -135,9 +135,7 @@ class ActivateResult:
     machine_hash: str | None = None
     expiry_date: str | None = None
     status: str | None = None
-
-
-def activate_key(db: Session, *, key: str) -> ActivateResult:
+def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
     key = (key or "").strip()
     if not key:
         return ActivateResult(ok=False, reason="EMPTY_KEY")
@@ -163,6 +161,8 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
     if row.expiry_date and datetime.utcnow() > row.expiry_date:
         row.status = ActivationStatus.EXPIRED
         db.flush()
+        if commit:
+            db.commit()
         return ActivateResult(ok=False, reason="EXPIRED", key=key)
 
     # Привязываем к текущей машине при необходимости
@@ -175,7 +175,8 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
         changed = True
     if changed:
         db.flush()
-        db.commit()
+        if commit:
+            db.commit()
 
     # Генерируем оффлайн-токен (JWT)
     claims = {
@@ -196,6 +197,10 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
         expiry_date=exp_dt.strftime("%Y-%m-%d"),
         status=row.status,
     )
+
+
+def activate_key(db: Session, *, key: str, commit: bool = True) -> ActivateResult:
+    return _activate_key(db, key=key, commit=commit)
 
 
 @dataclass

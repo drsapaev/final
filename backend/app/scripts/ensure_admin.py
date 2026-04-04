@@ -16,6 +16,7 @@ if BACKEND_ROOT not in sys.path:
 
 from app.db.session import SessionLocal  # noqa: E402
 from app.models.user import User  # type: ignore[attr-defined]  # noqa: E402
+from app.services.setup_service import SetupService  # noqa: E402
 
 
 def _hash_or_plain(pw: str) -> str:
@@ -34,8 +35,22 @@ def ensure_admin() -> dict:
     password = os.getenv("ADMIN_PASSWORD", "admin")  # ⚠️ DEV ONLY: используйте сильный пароль в продакшене!
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
+    allow_initialized = os.getenv("ENSURE_ADMIN_ALLOW_INITIALIZED", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
     with SessionLocal() as db:  # type: ignore # type: Session
+        if SetupService(db).is_initialized() and not allow_initialized:
+            return {
+                "skipped": True,
+                "reason": (
+                    "initialized_instance_requires_explicit_ops_override; "
+                    "set ENSURE_ADMIN_ALLOW_INITIALIZED=1 for controlled recovery"
+                ),
+            }
+
         # Check by username first
         row = (
             db.execute(select(User).where(User.username == username)).scalars().first()

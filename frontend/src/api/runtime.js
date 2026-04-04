@@ -16,12 +16,57 @@ function isAbsoluteWsUrl(value = '') {
   return /^wss?:\/\//i.test(value);
 }
 
+function getBrowserOrigin() {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return '';
+  }
+
+  if (!isAbsoluteHttpUrl(window.location.origin)) {
+    return '';
+  }
+
+  return trimTrailingSlash(window.location.origin);
+}
+
+function buildRuntimeSnapshot() {
+  const currentOrigin = getBrowserOrigin();
+  const apiOrigin = currentOrigin || trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
+  const apiBaseUrl = `${apiOrigin}/api/v1`;
+  const wsProtocol = new URL(apiOrigin).protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsOrigin = `${wsProtocol}//${new URL(apiOrigin).host}`;
+
+  return {
+    currentOrigin,
+    apiOrigin,
+    apiBaseUrl,
+    wsOrigin,
+  };
+}
+
+function syncRuntimeProbeState(snapshot) {
+  if (typeof window === 'undefined') {
+    return snapshot;
+  }
+
+  window.__CLINIC_RUNTIME__ = {
+    currentOrigin: snapshot.currentOrigin,
+    apiOrigin: snapshot.apiOrigin,
+    apiBaseUrl: snapshot.apiBaseUrl,
+    wsOrigin: snapshot.wsOrigin,
+  };
+  return snapshot;
+}
+
+export function getRuntimeResolution() {
+  return syncRuntimeProbeState(buildRuntimeSnapshot());
+}
+
 export function getApiOrigin() {
-  return trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
+  return getRuntimeResolution().apiOrigin;
 }
 
 export function getApiBaseUrl() {
-  return `${getApiOrigin()}/api/v1`;
+  return getRuntimeResolution().apiBaseUrl;
 }
 
 export function buildApiUrl(path = '') {
@@ -42,9 +87,7 @@ export function buildApiUrl(path = '') {
 }
 
 export function getWsBaseUrl() {
-  const apiOrigin = new URL(getApiOrigin());
-  const wsProtocol = apiOrigin.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${wsProtocol}//${apiOrigin.host}`;
+  return getRuntimeResolution().wsOrigin;
 }
 
 export function buildWsUrl(path = '') {

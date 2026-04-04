@@ -1995,6 +1995,10 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           onActionClick?.('payment', row, e);
                         }}
                         style={{
@@ -2018,6 +2022,10 @@ const EnhancedAppointmentsTable = ({
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('call', row, e);
@@ -2045,6 +2053,10 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           onActionClick?.('print', row, e);
                         }}
                         style={{
@@ -2067,6 +2079,10 @@ const EnhancedAppointmentsTable = ({
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('complete', row, e);
@@ -2111,17 +2127,11 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
-                          if (onActionClick) {
-                            onActionClick('view', row, e);
-                          }
                         }}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          // Дублируем обработчик для надежности
-                          if (onActionClick) {
-                            onActionClick('view', row, e);
-                          }
+                          onActionClick?.('view', row, e);
                         }}
                         style={{
                           padding: '4px',
@@ -2146,17 +2156,11 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
-                          if (onActionClick) {
-                            onActionClick('edit', row, e);
-                          }
                         }}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          // Дублируем обработчик для надежности
-                          if (onActionClick) {
-                            onActionClick('edit', row, e);
-                          }
+                          onActionClick?.('edit', row, e);
                         }}
                         style={{
                           padding: '4px',
@@ -2177,9 +2181,13 @@ const EnhancedAppointmentsTable = ({
                         {/* Просмотр EMR (только для завершённых записей) */}
                         {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
                       row.status === 'in_visit' && row.payment_status === 'paid') &&
-                      <button
+                        <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('view_emr', row, e);
@@ -2200,9 +2208,13 @@ const EnhancedAppointmentsTable = ({
                       }
 
                         {/* Еще */}
-                        <button
+                      <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('more', row, e);
@@ -2226,6 +2238,10 @@ const EnhancedAppointmentsTable = ({
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('schedule_next', row, e);

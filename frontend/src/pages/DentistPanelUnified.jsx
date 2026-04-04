@@ -201,7 +201,7 @@ const DentistPanelUnified = () => {
     () => loadStoredDentistDocuments().visitProtocols
   );
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  useState(null);
+  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState(null);
 
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
@@ -1197,6 +1197,92 @@ const DentistPanelUnified = () => {
     setShowProtocolTemplates(true);
   };
 
+  const buildVisitProtocolDraftFromTemplate = useCallback((template) => {
+    if (!template) {
+      return null;
+    }
+
+    const mapPhotoList = (type) => (
+      Array.isArray(template.photos)
+        ? template.photos.filter((photo) => photo?.type === type).map((photo, index) => ({
+          id: `${type}-${index}-${Date.now()}`,
+          url: '',
+          filename: photo.description || `${type} photo ${index + 1}`,
+          size: 0,
+          type,
+          uploadedAt: new Date().toISOString(),
+          description: photo.description || '',
+        }))
+        : []
+    );
+
+    return {
+      chiefComplaint: template.description || template.name || '',
+      historyOfPresentIllness: template.description || '',
+      procedures: Array.isArray(template.steps)
+        ? template.steps.map((step, index) => ({
+          name: typeof step === 'string' ? step : step?.name || `Шаг ${index + 1}`,
+          teeth: '',
+          notes: '',
+          duration: typeof step === 'object' && step !== null ? step.duration || 0 : 0,
+        }))
+        : [],
+      materials: Array.isArray(template.materials)
+        ? template.materials.map((material) => ({
+          name: material?.name || '',
+          quantity: material?.quantity || '',
+          notes: material?.required ? 'Обязательный материал' : '',
+        }))
+        : [],
+      anesthesia: Array.isArray(template.anesthesia)
+        ? template.anesthesia.map((anesthesia) => ({
+          drug: anesthesia?.drug || '',
+          dose: anesthesia?.dose || '',
+          method: anesthesia?.method || '',
+          required: Boolean(anesthesia?.required),
+        }))
+        : [],
+      photos: {
+        before: mapPhotoList('before'),
+        during: mapPhotoList('during'),
+        after: mapPhotoList('after'),
+      },
+      radiographs: [],
+      prescriptions: Array.isArray(template.prescriptions)
+        ? template.prescriptions.map((prescription) => ({
+          medication: prescription?.medication || '',
+          dosage: prescription?.dosage || '',
+          instructions: prescription?.instructions || '',
+          required: Boolean(prescription?.required),
+        }))
+        : [],
+      recommendations: template.aftercare || '',
+      nextVisit: { date: '', time: '', purpose: '' },
+    };
+  }, []);
+
+  const handleProtocolTemplateSelect = useCallback((template) => {
+    const templateName = template?.name || 'Шаблон протокола';
+    const currentPatientName = resolvePatientName(selectedPatient);
+    const draft = {
+      patient_id: selectedPatient?.patient_id || selectedPatient?.id || null,
+      patient_name: currentPatientName || `Шаблон: ${templateName}`,
+      patient_fio: currentPatientName || `Шаблон: ${templateName}`,
+      visit_id: selectedPatient?.visit_id || null,
+      source: 'protocol-template',
+      visitData: buildVisitProtocolDraftFromTemplate(template),
+    };
+
+    logger.info('[Dentist] Использую шаблон протокола', {
+      template: templateName,
+      patient: draft.patient_name,
+    });
+
+    setProtocolTemplateDraft(draft);
+    setShowProtocolTemplates(false);
+    setShowVisitProtocol(true);
+  }, [buildVisitProtocolDraftFromTemplate, resolvePatientName, selectedPatient]);
+
   const handleReports = () => {
     setShowReports(true);
   };
@@ -1598,18 +1684,6 @@ const DentistPanelUnified = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-primary)'
         }}>Быстрые действия</h3>
-          <Button
-          variant="text"
-          size="sm"
-          onClick={() => {}}
-          style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-accent-blue)'
-          }}>
-
-            Показать все
-          </Button>
         </div>
         <div style={{
         display: 'grid',
@@ -1717,18 +1791,6 @@ const DentistPanelUnified = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-primary)'
         }}>Последние записи</h3>
-          <Button
-          variant="text"
-          size="sm"
-          onClick={() => {}}
-          style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-accent-blue)'
-          }}>
-
-            Показать все
-          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {appointmentsTableData.slice(0, 5).map((appointment) =>
@@ -2086,7 +2148,6 @@ const DentistPanelUnified = () => {
         outerBorder={false}
         services={services}
         showCheckboxes={false}
-        onRowSelect={() => {}}
         onRowClick={handleAppointmentRowClick}
         onActionClick={handleAppointmentActionClick} />
 
@@ -2548,7 +2609,7 @@ const DentistPanelUnified = () => {
               Стандартный протокол лечения кариеса с анестезией и пломбированием
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="sm" style={{ flex: 1 }}>
+              <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
@@ -2603,7 +2664,7 @@ const DentistPanelUnified = () => {
               Протокол лечения корневых каналов с инструментальной обработкой
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="sm" style={{ flex: 1 }}>
+              <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
@@ -2658,7 +2719,7 @@ const DentistPanelUnified = () => {
               Протокол профессиональной гигиены полости рта
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="sm" style={{ flex: 1 }}>
+              <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
@@ -3393,18 +3454,22 @@ const DentistPanelUnified = () => {
 
       }
 
-      {showVisitProtocol && selectedPatient &&
+      {showVisitProtocol && (selectedPatient || protocolTemplateDraft) &&
       <VisitProtocol
-        patientId={selectedPatientId}
-        patientName={selectedPatientDisplayName}
-        visitId={selectedPatient.visit_id}
-        initialData={selectedPatient.visitData}
+        patientId={(selectedPatient || protocolTemplateDraft)?.patient_id || selectedPatientId}
+        patientName={(selectedPatient || protocolTemplateDraft)?.patient_name || selectedPatientDisplayName}
+        visitId={(selectedPatient || protocolTemplateDraft)?.visit_id || selectedPatient?.visit_id}
+        initialData={(selectedPatient || protocolTemplateDraft)?.visitData || selectedPatient?.visitData}
         onSave={async (visitData) => {
           logger.info('Сохранение протокола визита:', visitData);
-          await persistVisitProtocol(selectedPatient, visitData);
+          await persistVisitProtocol(selectedPatient || protocolTemplateDraft, visitData);
           setShowVisitProtocol(false);
+          setProtocolTemplateDraft(null);
         }}
-        onClose={() => setShowVisitProtocol(false)} />
+        onClose={() => {
+          setShowVisitProtocol(false);
+          setProtocolTemplateDraft(null);
+        }} />
 
       }
 
@@ -3423,10 +3488,7 @@ const DentistPanelUnified = () => {
 
       {showProtocolTemplates &&
       <ProtocolTemplates
-        onSelectTemplate={(template) => {
-          logger.info('Выбран шаблон:', template);
-          // Здесь можно открыть протокол визита с выбранным шаблоном
-        }}
+        onSelectTemplate={handleProtocolTemplateSelect}
         onClose={() => setShowProtocolTemplates(false)} />
 
       }

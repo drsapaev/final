@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FileText,
   Plus,
@@ -261,6 +261,34 @@ const ProtocolTemplates = ({
     onClose();
   };
 
+  useEffect(() => {
+    const handlers = [];
+
+    document.querySelectorAll('button[data-protocol-template-select="true"]').forEach((button) => {
+      const templateId = button.getAttribute('data-template-id');
+      if (!templateId) {
+        return;
+      }
+
+      const handler = (event) => {
+        event.stopPropagation();
+        const template = templates.find((item) => item.id === templateId);
+        if (template) {
+          handleSelectTemplate(template);
+        }
+      };
+
+      button.addEventListener('click', handler);
+      handlers.push([button, handler]);
+    });
+
+    return () => {
+      handlers.forEach(([button, handler]) => {
+        button.removeEventListener('click', handler);
+      });
+    };
+  }, [handleSelectTemplate, templates, filteredTemplates, selectedTemplate]);
+
   const handleEditTemplate = (template) => {
     setEditingTemplate(template);
     setIsEditing(true);
@@ -350,7 +378,9 @@ const ProtocolTemplates = ({
       
       <div className="flex gap-2">
         <button
-        onClick={() => handleSelectTemplate(template)}
+        type="button"
+        data-protocol-template-select="true"
+        data-template-id={template.id}
         className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
         
           Использовать
@@ -485,7 +515,9 @@ const ProtocolTemplates = ({
       
       <div className="flex gap-2">
         <button
-        onClick={() => handleSelectTemplate(template)}
+        type="button"
+        data-protocol-template-select="true"
+        data-template-id={template.id}
         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
         
           Использовать шаблон

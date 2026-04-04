@@ -220,6 +220,24 @@ class TestRateLimiting:
             response = client.get("/api/v1/activation/status")
             assert response.status_code == 200
 
+    def test_api_rate_limit_uses_dev_override(self, monkeypatch):
+        """Тест: в dev/local API bucket поднимается для длинного smoke."""
+        monkeypatch.delenv("SECURITY_API_RATE_LIMIT_REQUESTS", raising=False)
+        monkeypatch.setenv("ENV", "dev")
+
+        middleware = SecurityMiddleware(None)
+
+        assert middleware.rate_limits["api"]["requests"] == 50000
+
+    def test_api_rate_limit_can_be_overridden_explicitly(self, monkeypatch):
+        """Тест: явный env override для API bucket имеет приоритет."""
+        monkeypatch.setenv("SECURITY_API_RATE_LIMIT_REQUESTS", "1234")
+        monkeypatch.setenv("ENV", "prod")
+
+        middleware = SecurityMiddleware(None)
+
+        assert middleware.rate_limits["api"]["requests"] == 1234
+
 
 class TestBruteForceProtection:
     """Тесты для brute force protection"""
