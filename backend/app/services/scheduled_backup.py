@@ -5,7 +5,7 @@ Scheduled Backup Service
 """
 import asyncio
 import logging
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -47,7 +47,7 @@ class ScheduledBackupService:
 
                     # If backup time has passed today, schedule for tomorrow
                     if next_backup < now:
-                        next_backup += asyncio.timedelta(days=1)
+                        next_backup += timedelta(days=1)
 
                     wait_seconds = (next_backup - now).total_seconds()
                     logger.info(f"⏰ Next backup scheduled for: {next_backup} (in {wait_seconds/3600:.1f} hours)")

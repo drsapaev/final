@@ -63,8 +63,6 @@ def _validate_recipient_scope(
     recipient_type: Optional[str],
 ) -> None:
     expected_recipient_id = current_user.id
-    expected_recipient_type = platform_service.resolve_panel_role_for_user(current_user)
-    normalized_recipient_type = platform_service.normalize_role(recipient_type)
 
     if recipient_id is not None and recipient_id != expected_recipient_id:
         logger.warning(
@@ -76,19 +74,6 @@ def _validate_recipient_scope(
             },
         )
         raise HTTPException(status_code=403, detail="Нет прав доступа")
-
-    if normalized_recipient_type and expected_recipient_type:
-        if normalized_recipient_type != expected_recipient_type:
-            logger.warning(
-                "[Notifications] rejected mismatched inbox recipient type",
-                extra={
-                    "current_user_id": current_user.id,
-                    "requested_recipient_id": recipient_id,
-                    "requested_recipient_type": recipient_type,
-                    "expected_recipient_type": expected_recipient_type,
-                },
-            )
-            raise HTTPException(status_code=403, detail="Нет прав доступа")
 
 
 def get_or_create_notification_settings(db: Session, user_id: int):

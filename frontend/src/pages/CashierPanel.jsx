@@ -1134,11 +1134,6 @@ const CashierPanel = () => {void
                 id: 'refunds',
                 label: 'Возвраты',
                 icon: RefreshCw
-              },
-              {
-                id: 'deposits',
-                label: 'Депозиты',
-                icon: User
               }]
               }
               activeTab={activeTab}
@@ -1443,14 +1438,6 @@ const CashierPanel = () => {void
               </div>
             }
 
-            {/* Вкладка Депозиты */}
-            {activeTab === 'deposits' &&
-            <div style={{ marginTop: '24px', padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-                <User size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                <h3>Управление депозитами</h3>
-                <p>Раздел находится в разработке</p>
-              </div>
-            }
           </Card>
 
           {/* ✅ УЛУЧШЕНИЕ: Диалог подтверждения отмены платежа */}

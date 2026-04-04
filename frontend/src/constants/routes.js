@@ -31,6 +31,10 @@ export function roleToRoute(role) {
  * @returns {string[]} массив ролей, которые могут получить доступ к маршруту
  */
 export function routeToRoles(route) {
+  if (route === '/admin' || route.startsWith('/admin/')) {
+    return ['Admin'];
+  }
+
   const routeMap = {
     '/admin': ['Admin'],
     '/admin/analytics': ['Admin'],

@@ -1405,7 +1405,6 @@ const DermatologistPanelUnified = () => {
                 services={services}
                 showCheckboxes={false}
                 view="doctor"
-                onRowSelect={() => {}}
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick} />
 

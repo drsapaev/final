@@ -1544,7 +1544,6 @@ const MacOSCardiologistPanelUnified = () => {
                 services={services}
                 showCheckboxes={false}
                 view="doctor"
-                onRowSelect={() => {}}
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick} />
 
@@ -2162,7 +2161,6 @@ const MacOSCardiologistPanelUnified = () => {
               <DoctorServiceSelector
               specialty="cardiology"
               selectedServices={[]}
-              onServicesChange={() => {}}
               canEditPrices={false} />
 
             </div>

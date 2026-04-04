@@ -251,7 +251,7 @@ const QueueTable = ({
                                     <Button
                                         size="sm"
                                         variant="primary"
-                                        onClick={onCallPatient}
+                                        onClick={() => onCallPatient(entry)}
                                         disabled={loading}
                                     >
                                         <Icon name="bell.fill" size="small" style={{ marginRight: '4px' }} />

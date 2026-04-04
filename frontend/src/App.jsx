@@ -58,6 +58,9 @@ const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
 
 // Стилизованные компоненты
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
+import Setup from './pages/Setup.jsx';
+import { useSetupStatus } from './hooks/useSetupStatus.js';
+import { shouldRedirectFromSetup, shouldRedirectToSetup } from './utils/setupRouting.js';
 
 // Скрытые компоненты для интеграции
 import TelegramManager from './components/TelegramManager.jsx';
@@ -182,6 +185,9 @@ function getPageTitle(path) {
     '/settings': 'Settings',
     '/analytics': 'Analytics'
   };
+  if (path === '/admin' || path.startsWith('/admin/')) {
+    return 'Admin Panel';
+  }
   return titles[path] || 'Медицинская система';
 }
 
@@ -1074,10 +1080,28 @@ function AppShell() {
 }
 
 function AppContent() {
+  const location = useLocation();
+  const setupStatus = useSetupStatus();
+
+  if (setupStatus.isLoading && location.pathname !== '/health') {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>Загрузка...</div>;
+  }
+
+  if (!setupStatus.error) {
+    if (shouldRedirectFromSetup(location.pathname, setupStatus.initialized)) {
+      return <Navigate to="/login" replace />;
+    }
+
+    if (shouldRedirectToSetup(location.pathname, setupStatus.initialized)) {
+      return <Navigate to="/setup" replace />;
+    }
+  }
+
   return (
     <>
       <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>Загрузка...</div>}>
         <Routes>
+          <Route path="/setup" element={<Setup />} />
           <Route path="/login" element={<LoginFormStyled />} />
           <Route path="/old-login" element={<Login />} />
           <Route path="/change-password-required" element={<ChangePasswordRequired />} />
@@ -1126,6 +1150,7 @@ function AppContent() {
               <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/*" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
               <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar']}><RegistrarPanel /></RequireAuth>} />
               <Route path="doctor-panel" element={<RequireAuth roles={['Admin', 'Doctor']}><DoctorPanel /></RequireAuth>} />
               <Route path="cardiologist" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio']}><CardiologistPanelUnified /></RequireAuth>} />

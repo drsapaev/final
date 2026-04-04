@@ -68,6 +68,111 @@ frontend/
 - Cross-domain flow: services call explicit service APIs from neighboring modules, not internal repository internals.
 - Migration flow: schema changes through Alembic revisions only; no manual drift scripts as default path.
 
+## Deployment Topology
+
+- Proposed target model: **single-tenant per clinic deployment**
+- This is treated as the target architecture and is aligned to current repo behavior where possible, not assumed blindly as a universal runtime fact.
+- Each clinic deployment should run in isolation with:
+  - its own runtime
+  - its own PostgreSQL database
+  - its own branding/config context
+  - its own first admin account
+- Isolation may be delivered through VPS hosting or an on-prem clinic host.
+- First-run setup belongs inside the deployed application at `/setup`.
+- `/setup` must orchestrate existing SSOT entities and services rather than introducing a second source of truth.
+
+## Packaging And Configuration Boundaries
+
+- The application must ship as one universal package for all clinics.
+- The package contains shared code and assets only:
+  - backend code
+  - frontend code
+  - migrations
+  - lifecycle helpers and runbooks
+  - sample env files
+  - `/setup`
+- Per-clinic differences must not be baked into the package at build time.
+
+Install-time per-clinic technical configuration belongs outside the package:
+- `DATABASE_URL`
+- `RESTORE_DATABASE_URL`
+- `APP_HOST`
+- `PUBLIC_URL`
+- `BACKEND_URL`
+- `SECRET_KEY`
+- `AUTH_SECRET`
+- database credentials
+- clinic-specific paths for backups, logs, uploads, and similar runtime state
+
+First-run `/setup` owns clinic business identity only:
+- clinic name
+- first branch name
+- first admin full name
+- first admin email
+- first admin username
+- first admin password
+- activation or license key when required
+
+Shared operational defaults may remain package-level when they are intentionally global:
+- timezone defaults
+- queue start hour
+- backup schedule defaults
+- branch code fallback such as `main`
+
+The frontend should prefer runtime or current-origin API resolution over hardcoded per-clinic build-time URLs. Rebuilding the frontend per clinic is a fallback transport, not the preferred steady-state model.
+
+## Access And Installation Roles
+
+- **Host machine** is the clinic server or main machine where backend, PostgreSQL, storage, backup, and update tooling run.
+- **Admin user** is the person who manages the system through RBAC inside the application.
+- **Workstation user** is the person who signs in from another machine with their own account.
+
+These roles must stay separate:
+- machine role is selected by deployment/install mode
+- user authority is selected by RBAC
+- the system must not infer admin authority from the machine being used
+
+Default workstation model:
+- browser/LAN access first
+- no separate backend on workstations
+- no separate PostgreSQL on workstations
+- any thin launcher is optional convenience only
+
+## Release Artifact Policy
+
+- Clinic updates must be delivered as an **approved release artifact**.
+- The same approved artifact may be delivered:
+  - from GitHub Releases or another approved online release source
+  - as an offline package copied to the clinic host
+- The clinic host is the only machine that imports or deploys approved release artifacts.
+- The approved artifact must stay compatible with the existing backup, migration, smoke, and rollback path.
+
+## Local-Only External Services Policy
+
+- Local-only clinics must be able to install, initialize, and run core workflows without mandatory internet services.
+- External integrations are disabled by default for local-only clinics:
+  - AI/cloud providers
+  - Telegram
+  - SMS gateways
+  - FCM/push providers
+  - external payment webhooks
+- `/setup` must support a configure-later path for these integrations.
+- Unsupported-until-configured external features must not block core clinical workflows.
+
+## Verified Current Semantics
+
+- `clinic_settings` stores deployment-level clinic identity/config.
+- `branches` model branch/facility data inside one deployment.
+- `tenant_scope` is currently a feature-flagged write guard on scoped routes and must not be treated as proven multi-clinic tenancy.
+- Activation is server-bound via machine fingerprint and is not tied to a receptionist/admin workstation.
+- `ensure_admin.py` is now restricted from mutating an already initialized deployment unless an explicit ops override flag is provided.
+
+## DRIFT And Migration Notes
+
+- Current repo still contains public landing/login routes in the same frontend bundle as the clinic app.
+- Current setup detection is inferred from SSOT entities (`clinic_settings`, `branches`, active admin users) rather than a dedicated setup-state table by design.
+- This avoids a second source of truth, but future refactors must preserve that constraint when expanding provisioning or installer workflows.
+
 ## Domain Context Matrix
 
 | Context | Primary ownership |

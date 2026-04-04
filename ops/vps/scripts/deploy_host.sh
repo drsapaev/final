@@ -37,7 +37,10 @@ pushd "${BACKEND_DIR}" >/dev/null
 set -a
 source "${BACKEND_ENV_FILE}"
 set +a
-"${BACKEND_DIR}/.venv/bin/alembic" upgrade head
+if [[ "${SKIP_MIGRATIONS:-0}" != "1" ]]; then
+  "${BACKEND_DIR}/.venv/bin/alembic" upgrade head
+  "${BACKEND_DIR}/.venv/bin/alembic" current
+fi
 popd >/dev/null
 
 pushd "${FRONTEND_DIR}" >/dev/null

@@ -21,6 +21,24 @@
 | [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md) | Role-based access control |
 | [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Current queue SSOT aligned to current `main` |
 | [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) | Current staging contour and role acceptance flow |
+| [runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](./runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md) | Clinic-host/on-prem install skeleton and fresh-run smoke pack |
+| [runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md](./runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md) | Approved release artifact format, import, and online/offline delivery policy |
+| [runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md](./runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md) | Local-only policy for optional external integrations and configure-later behavior |
+| [runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md](./runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md) | Single execution checklist for local-only clinic package, pilot, and safe updates |
+| [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md) | Safe update rehearsal for initialized clinic deployments |
+| [runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md) | Backup and restore proof for a clinic deployment |
+| [runbooks/CLINIC_STATE_SEPARATION_AUDIT.md](./runbooks/CLINIC_STATE_SEPARATION_AUDIT.md) | Separation checklist for release, DB, files, logs, and backups |
+| [runbooks/CLINIC_OPERATOR_CHECKLIST.md](./runbooks/CLINIC_OPERATOR_CHECKLIST.md) | One-page operator checklist for fresh install, update, backup, restore, and rollback |
+| [runbooks/CLINIC_EVIDENCE_PACK_TEMPLATE.md](./runbooks/CLINIC_EVIDENCE_PACK_TEMPLATE.md) | Evidence pack template for rehearsal and rollout logs |
+| [runbooks/CONTROLLED_PILOT_GATE_CHECKLIST.md](./runbooks/CONTROLLED_PILOT_GATE_CHECKLIST.md) | One-screen gate checklist for the last three proofs before controlled pilot |
+| [runbooks/CONTROLLED_PILOT_GATE_QUICK.md](./runbooks/CONTROLLED_PILOT_GATE_QUICK.md) | Compact copy-paste gate checklist for operators |
+| [runbooks/CONTROLLED_PILOT_GATE_RESULT.md](./runbooks/CONTROLLED_PILOT_GATE_RESULT.md) | Final controlled pilot gate result and evidence summary |
+| [runbooks/PILOT_LAUNCH_PACK.md](./runbooks/PILOT_LAUNCH_PACK.md) | One-page pilot scope, incident, and go/no-go pack for the first clinic live cycle |
+| [runbooks/PILOT_START_CHECKLIST.md](./runbooks/PILOT_START_CHECKLIST.md) | First-day pilot start checklist for opening the clinic to real users |
+| [runbooks/PILOT_INCIDENT_NOTE_TEMPLATE.md](./runbooks/PILOT_INCIDENT_NOTE_TEMPLATE.md) | One-screen template for recording pilot incidents and stop conditions |
+| [runbooks/PILOT_7_DAY_EVIDENCE_PACK.md](./runbooks/PILOT_7_DAY_EVIDENCE_PACK.md) | Seven-day live pilot evidence pack |
+| [runbooks/OPERATIONAL_PROOF_PACKET.md](./runbooks/OPERATIONAL_PROOF_PACKET.md) | Minimal execution packet for the Linux/VPS, release delta, and clinic-like data proofs |
+| [runbooks/CLINIC_PILOT_CONTOUR_TEMPLATE.md](./runbooks/CLINIC_PILOT_CONTOUR_TEMPLATE.md) | Template for naming one real clinic pilot contour before the first live cycle |
 | [ONLINE_QUEUE_SYSTEM_GUIDE.md](./ONLINE_QUEUE_SYSTEM_GUIDE.md) | Historical online queue guide (deprecated; keep for reference only) |
 | [BATCH_UPDATE_ARCHITECTURE.md](./BATCH_UPDATE_ARCHITECTURE.md) | Batch operations |
 
@@ -114,6 +132,9 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 1. [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 2. [DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md](./DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md)
 3. [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md)
+4. [runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](./runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md)
+5. [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md)
+6. [runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md)
 
 ### "I need local onboarding"
 1. [runbooks/LOCAL_DEV_ONBOARDING.md](./runbooks/LOCAL_DEV_ONBOARDING.md)
