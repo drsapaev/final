@@ -282,11 +282,24 @@ const MacOSTable = ({
             {columns.map((column, index) => (
               <th
                 key={column.key || index}
+                role="columnheader"
+                tabIndex={sortable && column.sortable !== false ? 0 : undefined}
+                aria-sort={
+                  sortColumn === column.key
+                    ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                    : 'none'
+                }
                 style={{
                   ...headerStyle,
                   borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
                 }}
                 onClick={() => handleSort(column)}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && sortable && column.sortable !== false) {
+                    e.preventDefault();
+                    handleSort(column);
+                  }
+                }}
                 onMouseEnter={(e) => {
                   if (sortable && column.sortable) {
                     e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
