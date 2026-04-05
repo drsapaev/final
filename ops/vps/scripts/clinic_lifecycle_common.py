@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,38 @@ def backend_python() -> Path:
 
 def backend_alembic_cmd() -> list[str]:
     return [str(backend_python()), "-m", "alembic"]
+
+
+def postgres_tool(tool_name: str) -> str:
+    stem = Path(tool_name).stem.upper()
+    explicit = os.environ.get(f"{stem}_EXE")
+    if explicit and Path(explicit).exists():
+        return explicit
+
+    candidates: list[Path] = []
+    postgres_bin_dir = os.environ.get("POSTGRES_BIN_DIR")
+    names = [tool_name]
+    if Path(tool_name).suffix.lower() != ".exe":
+        names.append(f"{tool_name}.exe")
+
+    if postgres_bin_dir:
+        bin_dir = Path(postgres_bin_dir)
+        for name in names:
+            candidates.append(bin_dir / name)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    for name in names:
+        resolved = shutil.which(name)
+        if resolved:
+            return resolved
+
+    fail(
+        "Missing required PostgreSQL executable: "
+        f"{tool_name}. Set POSTGRES_BIN_DIR or {stem}_EXE."
+    )
 
 
 def public_url() -> str:

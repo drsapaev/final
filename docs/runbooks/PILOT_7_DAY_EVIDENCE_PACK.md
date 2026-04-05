@@ -3,13 +3,27 @@
 Use one row per pilot day for the first seven live days.
 
 ## Pilot Header
-- Clinic:
-- Host machine:
-- Contour:
-- Pilot start date:
-- Pilot end date:
-- Pilot owner:
-- Escalation owner:
+- Clinic: Doktor KosMed clinic
+- Host machine: `DESKTOP-SNC8G9T` (Windows pilot host)
+- Contour: [Clinic Pilot Contour: Windows Host](CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md)
+- Pilot start date: `2026-04-05` (planned opening)
+- Pilot end date: after day 7 live evidence is complete
+- Pilot owner: Dr. Sapaev
+- Escalation owner: Dr. Sapaev
+
+## Pre-Open Readiness
+- Approved artifact: `clinic-release-923010c00bf3.zip`
+- Imported release ref: `refs/clinic-releases/clinic-release-923010c00bf3`
+- Update rehearsal result: PASS
+- Restore rehearsal result: PASS
+- Live browser URL: `http://192.168.1.5:18080`
+- Live backend URL: `http://127.0.0.1:18000`
+- Live backup baseline: `C:\clinic\output\backups\clinicdb_20260405_165644.dump`
+- Restore rehearsal backup: `C:\clinic\output\backups\clinicdb_20260405_181100.dump`
+- Live runtime proof:
+  - `CURRENT_ORIGIN=http://192.168.1.5:18080`
+  - `RESOLVED_API_ORIGIN=http://192.168.1.5:18080`
+  - `RESOLVED_WS_ORIGIN=ws://192.168.1.5:18080`
 
 ## Daily Fields
 - Day

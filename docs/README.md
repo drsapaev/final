@@ -22,7 +22,12 @@
 | [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Current queue SSOT aligned to current `main` |
 | [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) | Current staging contour and role acceptance flow |
 | [runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](./runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md) | Clinic-host/on-prem install skeleton and fresh-run smoke pack |
+| [runbooks/CLINIC_WINDOWS_PILOT_HOST_RUNBOOK.md](./runbooks/CLINIC_WINDOWS_PILOT_HOST_RUNBOOK.md) | Windows-native pilot host lifecycle and safe update flow |
+| [runbooks/CLINIC_WINDOWS_OPERATOR_CARD.md](./runbooks/CLINIC_WINDOWS_OPERATOR_CARD.md) | Short operator card for day-1 Windows clinic opening |
 | [runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md](./runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md) | Approved release artifact format, import, and online/offline delivery policy |
+| [runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md](./runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md) | Pre-release proof for the real Windows pilot host artifact import, update, and post-update smoke |
+| [runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md](./runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md) | Release candidate pinned to the tested artifact `clinic-release-923010c00bf3.zip` |
+| [runbooks/CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md](./runbooks/CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md) | Named limited-pilot contour for the real Windows clinic host |
 | [runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md](./runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md) | Local-only policy for optional external integrations and configure-later behavior |
 | [runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md](./runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md) | Single execution checklist for local-only clinic package, pilot, and safe updates |
 | [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md) | Safe update rehearsal for initialized clinic deployments |
@@ -35,6 +40,7 @@
 | [runbooks/CONTROLLED_PILOT_GATE_RESULT.md](./runbooks/CONTROLLED_PILOT_GATE_RESULT.md) | Final controlled pilot gate result and evidence summary |
 | [runbooks/PILOT_LAUNCH_PACK.md](./runbooks/PILOT_LAUNCH_PACK.md) | One-page pilot scope, incident, and go/no-go pack for the first clinic live cycle |
 | [runbooks/PILOT_START_CHECKLIST.md](./runbooks/PILOT_START_CHECKLIST.md) | First-day pilot start checklist for opening the clinic to real users |
+| [runbooks/PILOT_DAY1_GO_NO_GO_WINDOWS_HOST.md](./runbooks/PILOT_DAY1_GO_NO_GO_WINDOWS_HOST.md) | Filled day-1 go/no-go result for the real Windows pilot host |
 | [runbooks/PILOT_INCIDENT_NOTE_TEMPLATE.md](./runbooks/PILOT_INCIDENT_NOTE_TEMPLATE.md) | One-screen template for recording pilot incidents and stop conditions |
 | [runbooks/PILOT_7_DAY_EVIDENCE_PACK.md](./runbooks/PILOT_7_DAY_EVIDENCE_PACK.md) | Seven-day live pilot evidence pack |
 | [runbooks/OPERATIONAL_PROOF_PACKET.md](./runbooks/OPERATIONAL_PROOF_PACKET.md) | Minimal execution packet for the Linux/VPS, release delta, and clinic-like data proofs |
@@ -133,8 +139,15 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 2. [DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md](./DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md)
 3. [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md)
 4. [runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](./runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md)
-5. [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md)
-6. [runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md)
+5. [runbooks/CLINIC_WINDOWS_PILOT_HOST_RUNBOOK.md](./runbooks/CLINIC_WINDOWS_PILOT_HOST_RUNBOOK.md)
+6. [runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md](./runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md)
+7. [runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md](./runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md)
+8. [runbooks/CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md](./runbooks/CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md)
+9. [runbooks/CLINIC_WINDOWS_OPERATOR_CARD.md](./runbooks/CLINIC_WINDOWS_OPERATOR_CARD.md)
+10. [runbooks/PILOT_START_CHECKLIST.md](./runbooks/PILOT_START_CHECKLIST.md)
+11. [runbooks/PILOT_DAY1_GO_NO_GO_WINDOWS_HOST.md](./runbooks/PILOT_DAY1_GO_NO_GO_WINDOWS_HOST.md)
+12. [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md)
+13. [runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md)
 
 ### "I need local onboarding"
 1. [runbooks/LOCAL_DEV_ONBOARDING.md](./runbooks/LOCAL_DEV_ONBOARDING.md)
@@ -148,4 +161,4 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 
 ---
 
-*Last Updated: 2026-04-02*
+*Last Updated: 2026-04-05*

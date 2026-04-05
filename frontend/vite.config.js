@@ -1,6 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const apiProxyTarget = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || "http://localhost:18000";
+const wsProxyTarget =
+  process.env.VITE_WS_PROXY_TARGET ||
+  apiProxyTarget.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -14,15 +19,15 @@ export default defineConfig({
     },
     allowedHosts: ['localhost', '127.0.0.1'],
     proxy: {
-      // HTTP API -> http://localhost:18000
+      // HTTP API -> target backend (overridable for isolated restore rehearsal)
       "/api": {
-        target: "http://localhost:18000",
+        target: apiProxyTarget,
         changeOrigin: true,
         secure: false,
       },
-      // WebSocket -> ws://localhost:18000
+      // WebSocket -> target backend (overridable for isolated restore rehearsal)
       "/ws": {
-        target: "ws://localhost:18000",
+        target: wsProxyTarget,
         ws: true,
         changeOrigin: true,
         secure: false,

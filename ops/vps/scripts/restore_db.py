@@ -14,6 +14,7 @@ from clinic_lifecycle_common import (
     load_clinic_env,
     parse_database_url,
     pass_message,
+    postgres_tool,
     run_command,
 )
 
@@ -56,7 +57,7 @@ def main() -> int:
         suffix = "".join(backup_file.suffixes)
         if suffix.endswith(".sql") or suffix.endswith(".sql.gz"):
             cmd = [
-                "psql",
+                postgres_tool("psql"),
                 "-h",
                 target.host,
                 "-p",
@@ -70,7 +71,7 @@ def main() -> int:
             ]
         else:
             cmd = [
-                "pg_restore",
+                postgres_tool("pg_restore"),
                 "-h",
                 target.host,
                 "-p",

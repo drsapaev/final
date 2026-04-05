@@ -13,6 +13,15 @@ function envFlag(name, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
 }
 
+function envInt(name, fallback) {
+  const value = process.env[name];
+  if (value == null) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function resolveExpectedWsOrigin(origin) {
   const parsed = new URL(origin);
   parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -29,6 +38,8 @@ const expectedApiOrigin = process.env.EXPECTED_FRONTEND_API_ORIGIN || expectedCu
 const expectedWsOrigin = process.env.EXPECTED_FRONTEND_WS_ORIGIN || resolveExpectedWsOrigin(expectedApiOrigin);
 const allowSplitOrigin = envFlag('FRONTEND_EXPECT_SPLIT_ORIGIN', false);
 const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined;
+const gotoTimeoutMs = envInt('FRONTEND_RUNTIME_PROBE_GOTO_TIMEOUT_MS', 30000);
+const readyTimeoutMs = envInt('FRONTEND_RUNTIME_PROBE_READY_TIMEOUT_MS', 15000);
 
 let browser;
 
@@ -47,10 +58,10 @@ try {
 
 try {
   const page = await browser.newPage();
-  await page.goto(publicUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(publicUrl, { waitUntil: 'domcontentloaded', timeout: gotoTimeoutMs });
   await page.waitForFunction(
     () => Boolean(window.__CLINIC_RUNTIME__?.apiOrigin && window.__CLINIC_RUNTIME__?.wsOrigin),
-    { timeout: 15000 }
+    { timeout: readyTimeoutMs }
   );
 
   const resolved = await page.evaluate(() => ({
