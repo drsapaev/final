@@ -54,14 +54,37 @@ Backup result: PASS (`C:\clinic\output\backups\clinicdb_20260405_191852.dump`)
 Update result: N/A
 Restore result: N/A
 Health result: PASS
-Smoke result: PASS
+Smoke result: FAIL
 Current origin: http://192.168.1.5:18080
 Resolved API origin: http://192.168.1.5:18080
 Resolved WS origin: ws://192.168.1.5:18080
-Incident count: 0
-Stop signal: None
-Notes: live browser open verified on the named Windows host; no setup reappearance
+Incident count: 1
+Stop signal: queue board crash on /queue-board
+Notes: login, registrar, and cashier routes opened successfully; queue board crashed with wsRef.current.close is not a function
 ```
+
+### Incident Note
+- Date and time: 2026-04-06, first live-hour smoke
+- Host / env: DESKTOP-SNC8G9T / Windows pilot host
+- Clinic contour: named live Windows pilot contour
+- Reported by: Codex smoke run
+- Severity: stop condition
+- Classification: product
+- Expected behavior: queue board should render the current live queue state without a React error boundary crash
+- Actual behavior: /queue-board crashed in `DisplayBoardUnified` with `wsRef.current.close is not a function`
+- First failing command or screen: `http://192.168.1.5:18080/queue-board`
+- What stopped: queue board smoke and broader first-hour pilot confidence
+- What still works: admin login, registrar panel, cashier panel, live host health
+- Any data loss: none observed
+- Any rollback ambiguity: none observed
+- Stop condition triggered: yes
+- Action taken: paused further pilot smoke and documented the failure
+- Backup or ref involved: `C:\clinic\output\backups\clinicdb_20260405_191852.dump`
+- Rollback result: not needed for this read-only failure
+- Fix owner: unresolved
+- Follow-up command or rehearsal: inspect `DisplayBoardUnified.jsx` and the queue/board API contract before resuming queue smoke
+- Evidence link: [PILOT_7_DAY_EVIDENCE_PACK.md](PILOT_7_DAY_EVIDENCE_PACK.md)
+- Recheck time: after fix is applied and verified
 
 ## Day 1 Recorded
 

@@ -16,6 +16,7 @@
 - Fresh live baseline backup taken: PASS (`C:\clinic\output\backups\clinicdb_20260405_191852.dump`)
 - Live browser verification: PASS (`http://192.168.1.5:18080`)
 - Pilot user list is limited: PASS
+- Post-open smoke later hit a stop condition on `/queue-board`; see [PILOT_7_DAY_EVIDENCE_PACK.md](PILOT_7_DAY_EVIDENCE_PACK.md)
 
 ## Opening Scope
 - admin
