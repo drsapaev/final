@@ -54,9 +54,11 @@
 
 ## Readiness Notes
 - Latest update-path backup completed: `C:\clinic\output\backups\clinicdb_20260405_165644.dump`
+- Fresh live baseline backup completed: `C:\clinic\output\backups\clinicdb_20260405_191852.dump`
 - Latest restore rehearsal backup completed: `C:\clinic\output\backups\clinicdb_20260405_181100.dump`
 - Update rehearsal completed: PASS on `2026-04-05`
 - Restore rehearsal completed: PASS on `2026-04-05`
+- Live pilot opening confirmed: PASS on `2026-04-06`
 - Post-update runtime proof:
   - `CURRENT_ORIGIN=http://192.168.1.5:18080`
   - `RESOLVED_API_ORIGIN=http://192.168.1.5:18080`

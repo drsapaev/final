@@ -385,7 +385,7 @@ function Start-Backend {
 }
 
 function Start-Frontend {
-    Start-FrontendInstance -Port $DefaultFrontendPort -PidFile $FrontendPidFile -StdoutLog $FrontendOutLog -StderrLog $FrontendErrLog
+    Start-FrontendInstance -Port $DefaultFrontendPort -PidFile $FrontendPidFile -StdoutLog $FrontendOutLog -StderrLog $FrontendErrLog -HostAddress '0.0.0.0'
 }
 
 function Start-BackendInstance {
@@ -427,6 +427,7 @@ function Start-FrontendInstance {
         [Parameter(Mandatory = $true)][string]$PidFile,
         [Parameter(Mandatory = $true)][string]$StdoutLog,
         [Parameter(Mandatory = $true)][string]$StderrLog,
+        [string]$HostAddress = '0.0.0.0',
         [hashtable]$EnvOverrides = @{}
     )
 
@@ -438,7 +439,7 @@ function Start-FrontendInstance {
     Invoke-WithEnvOverrides -Overrides $EnvOverrides -ScriptBlock {
         $process = Start-Process `
             -FilePath $npm `
-            -ArgumentList @('run', 'dev', '--', '--host', '127.0.0.1', '--port', $Port.ToString(), '--strictPort') `
+            -ArgumentList @('run', 'dev', '--', '--host', $HostAddress, '--port', $Port.ToString(), '--strictPort') `
             -WorkingDirectory $FrontendDir `
             -RedirectStandardOutput $StdoutLog `
             -RedirectStandardError $StderrLog `
@@ -652,6 +653,7 @@ function Start-RestoreHost {
         -PidFile $RestoreFrontendPidFile `
         -StdoutLog $RestoreFrontendOutLog `
         -StderrLog $RestoreFrontendErrLog `
+        -HostAddress '127.0.0.1' `
         -EnvOverrides @{
             VITE_API_BASE_URL = $restorePublicUrl
             VITE_PROXY_TARGET = $restoreBackendUrl

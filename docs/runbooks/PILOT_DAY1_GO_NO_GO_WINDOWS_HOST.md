@@ -3,7 +3,7 @@
 [← Previous Page](PILOT_START_CHECKLIST.md) · [Back to README](../README.md)
 
 ## Status
-- `GO` for limited pilot opening on `2026-04-05`
+- `GO` for limited pilot opening on `2026-04-06`
 
 ## Checklist Result
 - Named real contour: PASS
@@ -13,6 +13,8 @@
 - Latest backup completed successfully: PASS (`C:\clinic\output\backups\clinicdb_20260405_165644.dump`)
 - Last update rehearsal passed: PASS
 - Last restore rehearsal passed: PASS (`C:\clinic\output\backups\clinicdb_20260405_181100.dump`)
+- Fresh live baseline backup taken: PASS (`C:\clinic\output\backups\clinicdb_20260405_191852.dump`)
+- Live browser verification: PASS (`http://192.168.1.5:18080`)
 - Pilot user list is limited: PASS
 
 ## Opening Scope

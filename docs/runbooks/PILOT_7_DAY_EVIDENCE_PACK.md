@@ -6,7 +6,7 @@ Use one row per pilot day for the first seven live days.
 - Clinic: Doktor KosMed clinic
 - Host machine: `DESKTOP-SNC8G9T` (Windows pilot host)
 - Contour: [Clinic Pilot Contour: Windows Host](CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md)
-- Pilot start date: `2026-04-05` (planned opening)
+- Pilot start date: `2026-04-06` (live opening)
 - Pilot end date: after day 7 live evidence is complete
 - Pilot owner: Dr. Sapaev
 - Escalation owner: Dr. Sapaev
@@ -19,6 +19,7 @@ Use one row per pilot day for the first seven live days.
 - Live browser URL: `http://192.168.1.5:18080`
 - Live backend URL: `http://127.0.0.1:18000`
 - Live backup baseline: `C:\clinic\output\backups\clinicdb_20260405_165644.dump`
+- Fresh live baseline backup: `C:\clinic\output\backups\clinicdb_20260405_191852.dump`
 - Restore rehearsal backup: `C:\clinic\output\backups\clinicdb_20260405_181100.dump`
 - Live runtime proof:
   - `CURRENT_ORIGIN=http://192.168.1.5:18080`
@@ -46,20 +47,20 @@ Use one row per pilot day for the first seven live days.
 
 ```text
 Day: 1
-Date: 2026-04-04
+Date: 2026-04-06
 Users active: admin, registrar, doctor, cashier
-Scope used: login, registrar, queue, doctor, cashier, patient lookup/update
-Backup result: PASS
+Scope used: login, queue, registrar, cashier, patient lookup/update
+Backup result: PASS (`C:\clinic\output\backups\clinicdb_20260405_191852.dump`)
 Update result: N/A
 Restore result: N/A
 Health result: PASS
 Smoke result: PASS
-Current origin: https://clinic.example.com
-Resolved API origin: https://clinic.example.com
-Resolved WS origin: wss://clinic.example.com
+Current origin: http://192.168.1.5:18080
+Resolved API origin: http://192.168.1.5:18080
+Resolved WS origin: ws://192.168.1.5:18080
 Incident count: 0
 Stop signal: None
-Notes: first live day, no setup reappearance
+Notes: live browser open verified on the named Windows host; no setup reappearance
 ```
 
 ## Evidence Rules
