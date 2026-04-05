@@ -24,6 +24,15 @@ describe('api runtime resolution', () => {
     expect(buildApiUrl('/patients')).toBe('https://clinic.example.com/api/v1/patients');
   });
 
+  it('falls back to the canonical backend origin for localhost browser origins', () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://staging.example.com');
+    vi.stubGlobal('window', { location: { origin: 'http://localhost:3000' } });
+
+    expect(getApiOrigin()).toBe('https://staging.example.com');
+    expect(getApiBaseUrl()).toBe('https://staging.example.com/api/v1');
+    expect(buildWsUrl('/ws/chat')).toBe('wss://staging.example.com/ws/chat');
+  });
+
   it('derives websocket base from current browser origin', () => {
     vi.stubGlobal('window', { location: { origin: 'https://clinic.example.com' } });
 

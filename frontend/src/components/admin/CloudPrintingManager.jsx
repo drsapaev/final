@@ -34,6 +34,16 @@ const PROVIDER_LABELS = {
 
 const getProviderLabel = (provider) => PROVIDER_LABELS[provider] || provider;
 
+const getStatusText = (status) => {
+  switch (status) {
+    case 'online': return 'В сети';
+    case 'busy': return 'Занят';
+    case 'offline': return 'Не в сети';
+    case 'error': return 'Ошибка';
+    default: return status;
+  }
+};
+
 const getProviderOptions = (providers = []) =>
   providers.map((provider) => ({
     value: provider,
@@ -210,16 +220,6 @@ const CloudPrintingManager = () => {
       case 'offline':return 'secondary';
       case 'error':return 'destructive';
       default:return 'secondary';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'online':return 'В сети';
-      case 'busy':return 'Занят';
-      case 'offline':return 'Не в сети';
-      case 'error':return 'Ошибка';
-      default:return status;
     }
   };
 

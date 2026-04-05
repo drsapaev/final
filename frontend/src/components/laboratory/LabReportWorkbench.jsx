@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 import { printService } from '../../services/print';
+import logger from '../../utils/logger';
 import {
   formatLabStatus,
   formatSeverityLabel,
