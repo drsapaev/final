@@ -63,6 +63,37 @@ Stop signal: None
 Notes: live browser open verified on the named Windows host; no setup reappearance
 ```
 
+## Day 1 Recorded
+
+### Checklist Walkthrough
+- Clinic contour is the named real contour: PASS
+- Host machine is the intended clinic host: PASS
+- Database is the intended live clinic database: PASS
+- Official clinic URL is the LAN URL, not `localhost`: PASS
+- Latest backup completed successfully: PASS
+- Last update rehearsal passed: PASS
+- Last restore rehearsal passed: PASS
+- Pilot user list is limited to the approved group: PASS
+
+### Live Opening Entry
+```text
+Day: 1
+Date: 2026-04-06
+Users active: admin, registrar, doctor, cashier
+Scope used: login, queue, registrar, cashier, patient lookup/update
+Backup result: PASS (`C:\clinic\output\backups\clinicdb_20260405_191852.dump`)
+Update result: N/A
+Restore result: N/A
+Health result: PASS
+Smoke result: PASS
+Current origin: http://192.168.1.5:18080
+Resolved API origin: http://192.168.1.5:18080
+Resolved WS origin: ws://192.168.1.5:18080
+Incident count: 0
+Stop signal: None
+Notes: live browser open verified on the named Windows host; no setup reappearance
+```
+
 ## Evidence Rules
 - Record one row for each pilot day.
 - Copy the exact PASS/FAIL line for any failing action.
