@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
 import auth from '../stores/auth';
@@ -15,9 +16,11 @@ import {
 const ChatContext = createContext(null);
 
 export const ChatProvider = ({ children }) => {
+  const location = useLocation();
   const [authState, setAuthState] = useState(auth.getState());
   const user = authState.profile;
   const token = authState.token;
+  const isBoardRoute = location.pathname.startsWith('/queue-board') || location.pathname.startsWith('/display-board');
 
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -47,6 +50,18 @@ export const ChatProvider = ({ children }) => {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
 
+  const resetChatState = useCallback(() => {
+    setConversations([]);
+    setMessages([]);
+    setActiveConversation(null);
+    setUnreadCount(0);
+    setIsConnected(false);
+    setIsLoading(false);
+    setTypingUsers({});
+    setOnlineUsers({});
+    setIsChatOpen(false);
+  }, []);
+
   // Подписка на auth
   useEffect(() => {
     const unsubscribe = auth.subscribe(setAuthState);
@@ -55,7 +70,7 @@ export const ChatProvider = ({ children }) => {
 
   // Загрузка бесед
   const loadConversations = useCallback(async ({ syncUnread = true } = {}) => {
-    if (!user) return;
+    if (!user || isBoardRoute) return;
     try {
       const data = await messagesApi.getConversations();
       setConversations(data.conversations || []);
@@ -65,7 +80,7 @@ export const ChatProvider = ({ children }) => {
     } catch (error) {
       logger.error('Failed to load conversations:', error);
     }
-  }, [user]);
+  }, [isBoardRoute, user]);
 
   const markMessageAsRead = useCallback(async (messageId) => {
     if (!messageId) return;
@@ -87,6 +102,9 @@ export const ChatProvider = ({ children }) => {
 
   // Обработка сообщения
   const handleNewMessage = useCallback((message) => {
+    if (isBoardRoute) {
+      return;
+    }
 
 
     const currentActive = activeConversationRef.current;
@@ -160,7 +178,7 @@ export const ChatProvider = ({ children }) => {
         message.sender_name || `User ${message.sender_id}`
       );
     }
-  }, [user, loadConversations, isChatOpen, markMessageAsRead]);
+  }, [isBoardRoute, user, loadConversations, isChatOpen, markMessageAsRead]);
 
   // Обновляем ref при изменении handleNewMessage
   useEffect(() => {
@@ -174,17 +192,37 @@ export const ChatProvider = ({ children }) => {
 
   // Обновить количество непрочитанных
   const refreshUnreadCount = useCallback(async () => {
+    if (isBoardRoute) return;
     try {
       const count = await messagesApi.getUnreadCount();
       setUnreadCount(count);
     } catch (error) {
       logger.error('Failed to get unread count:', error);
     }
-  }, []);
+  }, [isBoardRoute]);
 
   // Load the inbox as soon as auth is available, even before WS finishes connecting.
   // This keeps the conversation list usable on slower sockets and on first mount.
   useEffect(() => {
+    if (isBoardRoute) {
+      logger.info('[FIX:CHAT] Chat disabled on board route', { path: location.pathname });
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      if (wsRef.current) {
+        try {
+          wsRef.current.close(1000, 'Chat disabled on board route');
+        } catch (error) {
+          logger.warn('[FIX:CHAT] Failed to close chat websocket on board route', error);
+        }
+        wsRef.current = null;
+      }
+      resetChatState();
+      initialConversationLoadUserRef.current = null;
+      return () => {};
+    }
+
     const currentUserId = user?.id || null;
     if (!currentUserId) {
       initialConversationLoadUserRef.current = null;
@@ -198,10 +236,11 @@ export const ChatProvider = ({ children }) => {
     initialConversationLoadUserRef.current = currentUserId;
     void loadConversations();
     void refreshUnreadCount();
-  }, [user?.id, loadConversations, refreshUnreadCount]);
+  }, [isBoardRoute, location.pathname, resetChatState, user?.id, loadConversations, refreshUnreadCount]);
 
   // Request online status of specific users
   const requestOnlineStatus = useCallback((userIds) => {
+    if (isBoardRoute) return;
     if (wsRef.current?.readyState === WebSocket.OPEN && userIds.length > 0) {
       wsRef.current.send(JSON.stringify({
         type: MESSAGE_EVENT_TYPES.GET_ONLINE_STATUS,
@@ -209,11 +248,15 @@ export const ChatProvider = ({ children }) => {
         contract_version: MESSAGING_CONTRACT_VERSION,
       }));
     }
-  }, []);
+  }, [isBoardRoute]);
 
   // WebSocket подключение (Один раз на приложение!)
   // Зависит ТОЛЬКО от токена. User и функции исключены для стабильности.
   useEffect(() => {
+    if (isBoardRoute) {
+      return undefined;
+    }
+
     const initialToken = tokenManager.getAccessToken() || token;
     if (!initialToken) return;
 
@@ -369,7 +412,7 @@ export const ChatProvider = ({ children }) => {
         }
       }
     };
-  }, [token, refreshUnreadCount, requestOnlineStatus]);
+  }, [isBoardRoute, token, refreshUnreadCount, requestOnlineStatus]);
 
   // Загрузка сообщений (при открытии чата)
   const [hasMore, setHasMore] = useState(false);

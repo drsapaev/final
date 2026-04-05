@@ -116,6 +116,7 @@ export default function DisplayBoardUnified({
 
   // Получаем board_id из URL или используем переданный
   const currentBoardId = new URLSearchParams(window.location.search).get('board') || boardId;
+  const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
 
   // Загрузка статистики (старое)
   async function loadStats() {
@@ -392,15 +393,15 @@ export default function DisplayBoardUnified({
     loadWindowsRef.current();
     connectWebSocketRef.current();
 
-    const t = setInterval(() => loadStatsRef.current(), Math.max(5000, Number(refreshMs || 0)));
-    const tb = setInterval(() => loadBoardStateRef.current(), Math.max(15000, Number(refreshMs || 0)));
-    const tw = setInterval(() => loadWindowsRef.current(), Math.max(5000, Number(refreshMs || 0)));
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
+    const t = isBoardView ? null : setInterval(() => loadStatsRef.current(), Math.max(5000, Number(refreshMs || 0)));
+    const tb = isBoardView ? null : setInterval(() => loadBoardStateRef.current(), Math.max(15000, Number(refreshMs || 0)));
+    const tw = isBoardView ? null : setInterval(() => loadWindowsRef.current(), Math.max(5000, Number(refreshMs || 0)));
 
     return () => {
-      clearInterval(t);
-      clearInterval(tb);
-      clearInterval(tw);
+      if (t) clearInterval(t);
+      if (tb) clearInterval(tb);
+      if (tw) clearInterval(tw);
       clearInterval(clock);
       if (wsRef.current) {
         const closeWS = wsRef.current;
@@ -413,7 +414,7 @@ export default function DisplayBoardUnified({
         }
       }
     };
-  }, [qs.department, qs.d, refreshMs, currentBoardId]);
+  }, [isBoardView, qs.department, qs.d, refreshMs, currentBoardId]);
 
   // Online/offline (старое)
   useEffect(() => {
