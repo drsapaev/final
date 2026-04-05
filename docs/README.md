@@ -23,6 +23,9 @@
 | [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) | Current staging contour and role acceptance flow |
 | [runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](./runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md) | Clinic-host/on-prem install skeleton and fresh-run smoke pack |
 | [runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md](./runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md) | Approved release artifact format, import, and online/offline delivery policy |
+| [runbooks/CLINIC_PRE_RELEASE_CHECKLIST.md](./runbooks/CLINIC_PRE_RELEASE_CHECKLIST.md) | Final pre-release gate for approved artifacts, backups, smoke, and rollback readiness |
+| [runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md](./runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md) | Release candidate summary with artifact, commit SHA, and verification status |
+| [runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md](./runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md) | Filled evidence pack for the current clinic release candidate |
 | [runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md](./runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md) | Local-only policy for optional external integrations and configure-later behavior |
 | [runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md](./runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md) | Single execution checklist for local-only clinic package, pilot, and safe updates |
 | [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md) | Safe update rehearsal for initialized clinic deployments |
@@ -133,8 +136,9 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 2. [DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md](./DOCTOR_AUTOCOMPLETE_DEPLOYMENT.md)
 3. [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md)
 4. [runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](./runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md)
-5. [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md)
-6. [runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md)
+5. [runbooks/CLINIC_PRE_RELEASE_CHECKLIST.md](./runbooks/CLINIC_PRE_RELEASE_CHECKLIST.md)
+6. [runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_UPDATE_REHEARSAL_RUNBOOK.md)
+7. [runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](./runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md)
 
 ### "I need local onboarding"
 1. [runbooks/LOCAL_DEV_ONBOARDING.md](./runbooks/LOCAL_DEV_ONBOARDING.md)

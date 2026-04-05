@@ -99,6 +99,9 @@ For a clinic-owned host or on-prem Linux install, use the same isolated-deployme
 
 - [docs/runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md](/C:/final/docs/runbooks/CLINIC_HOST_INSTALL_RUNBOOK.md)
 - [docs/runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md](/C:/final/docs/runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md)
+- [docs/runbooks/CLINIC_PRE_RELEASE_CHECKLIST.md](/C:/final/docs/runbooks/CLINIC_PRE_RELEASE_CHECKLIST.md)
+- [docs/runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md](/C:/final/docs/runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md)
+- [docs/runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md](/C:/final/docs/runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md)
 - [docs/runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md](/C:/final/docs/runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md)
 - [docs/runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md](/C:/final/docs/runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md)
 - [docs/runbooks/CONTROLLED_PILOT_GATE_RESULT.md](/C:/final/docs/runbooks/CONTROLLED_PILOT_GATE_RESULT.md)
