@@ -105,8 +105,8 @@ export default function DisplayBoardUnified({
   });
 
   // Рефы
-  const wsRef = useRef(null);void
-  useRef(null);
+  const wsRef = useRef(null);
+  const legacyWindowsLookupWarnedRef = useRef(false);
   const loadStatsRef = useRef(() => {});
   const loadBoardStateRef = useRef(() => {});
   const loadWindowsRef = useRef(() => {});
@@ -121,7 +121,7 @@ export default function DisplayBoardUnified({
   async function loadStats() {
     setErr('');
     try {
-      const s = await api.get('/queues/stats', { query: qs });
+      const s = (await api.get('/queues/stats', { params: qs })).data;
       setStats(s || { last_ticket: 0, waiting: 0, serving: 0, done: 0 });
       setLastUpdatedAt(timeNow());
       try {
@@ -148,7 +148,7 @@ export default function DisplayBoardUnified({
 
         // Игнорируем ошибки localStorage
       }}} // Загрузка состояния табло (старое)
-  async function loadBoardState() {try {const st = await api.get('/board/state');if (st && typeof st === 'object') {
+  async function loadBoardState() {try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data;if (st && typeof st === 'object') {
         setBoard({
           brand: st.brand || st.title || 'Clinic',
           logo: st.logo || st.logo_url || '',
@@ -207,19 +207,14 @@ export default function DisplayBoardUnified({
 
         // Игнорируем ошибки localStorage
       }}} // Загрузка окон/кабинетов (старое)
-  async function loadWindows() {try {const st = await api.get('/queue/queue/status');let arr = [];
-      if (Array.isArray(st?.windows)) arr = st.windows;else
-      if (Array.isArray(st)) arr = st;else
-      if (st && typeof st === 'object' && Array.isArray(st.items)) arr = st.items;
-      const norm = arr.map((x) => ({
-        window: x.window || x.win || x.cabinet || x.room || '',
-        ticket: x.ticket || x.number || x.last_ticket || 0,
-        label: x.label || ''
-      })).filter((x) => x.window);
-      setWindows(norm);
-    } catch {
-      setWindows([]);
+  async function loadWindows() {
+    // Legacy windows endpoint no longer exists in the current backend contract.
+    // Keep the section empty instead of hammering a dead route every refresh tick.
+    if (!legacyWindowsLookupWarnedRef.current) {
+      logger.info('[DisplayBoardUnified] Legacy windows lookup disabled; backend no longer exposes queue/queue/status');
+      legacyWindowsLookupWarnedRef.current = true;
     }
+    setWindows([]);
   }
 
   // WebSocket подключение (новое)
@@ -408,7 +403,14 @@ export default function DisplayBoardUnified({
       clearInterval(tw);
       clearInterval(clock);
       if (wsRef.current) {
-        wsRef.current.close();
+        const closeWS = wsRef.current;
+        wsRef.current = null;
+        try {
+          closeWS();
+          logger.info('[DisplayBoardUnified] WebSocket cleanup completed');
+        } catch (error) {
+          logger.warn('[DisplayBoardUnified] WebSocket cleanup failed', error);
+        }
       }
     };
   }, [qs.department, qs.d, refreshMs, currentBoardId]);
