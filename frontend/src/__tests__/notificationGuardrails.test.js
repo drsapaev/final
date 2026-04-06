@@ -14,6 +14,7 @@ const NOTIFICATION_FILES = [
 
 const PANEL_FILES = [
   'pages/AdminPanel.jsx',
+  'pages/RegistrarPanel.jsx',
   'pages/CardiologistPanelUnified.jsx',
   'pages/DentistPanelUnified.jsx',
   'pages/DermatologistPanelUnified.jsx',
@@ -41,5 +42,9 @@ describe('notification guardrails', () => {
       expect(content).toContain('RoleNotificationCenter');
       expect(content).not.toMatch(/react-toastify/);
     }
+
+    const registrar = read('pages/RegistrarPanel.jsx');
+    expect(registrar).toContain('loadAppointmentsInFlightRef');
+    expect(registrar).toContain('autoRefreshCooldownUntilRef');
   });
 });
