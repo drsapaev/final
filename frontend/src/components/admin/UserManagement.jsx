@@ -265,8 +265,9 @@ const UserManagement = () => {
     key: 'actions',
     title: '',
     render: (_, user) =>
-    <div onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()} role="presentation">
           <IconButton
+        aria-label="User actions"
         onClick={(e) => {
           e.stopPropagation();
           setAnchorEl(e.currentTarget);
