@@ -269,11 +269,36 @@ function isUnread(item) {
 }
 
 function getUnreadSnapshotFromResponse(payload) {
+  const total =
+    payload?.total ??
+    payload?.unread_count ??
+    payload?.unreadCount ??
+    0;
+
   return {
-    total: Number(payload?.total ?? 0),
+    total: Number(total),
     by_role: payload?.by_role || {},
     by_channel: payload?.by_channel || {},
     by_severity: payload?.by_severity || {}
+  };
+}
+
+export function applyUnreadSnapshot(currentSnapshot = EMPTY_UNREAD_SNAPSHOT, payload = {}, replace = false) {
+  const normalized = getUnreadSnapshotFromResponse(payload);
+  const hasExplicitTotal =
+    payload?.total !== undefined ||
+    payload?.unread_count !== undefined ||
+    payload?.unreadCount !== undefined;
+
+  if (replace) {
+    return normalized;
+  }
+
+  return {
+    total: hasExplicitTotal ? normalized.total : currentSnapshot.total,
+    by_role: payload?.by_role === undefined ? currentSnapshot.by_role : normalized.by_role,
+    by_channel: payload?.by_channel === undefined ? currentSnapshot.by_channel : normalized.by_channel,
+    by_severity: payload?.by_severity === undefined ? currentSnapshot.by_severity : normalized.by_severity
   };
 }
 
@@ -291,12 +316,16 @@ export function NotificationCenterProvider({ children }) {
     const normalized = items.map((item) => normalizeNotification(item, meta.source || 'api'));
     setInbox((current) => mergeInboxItems(current, normalized));
     if (meta.unreadSnapshot) {
-      setUnreadSnapshot(meta.unreadSnapshot);
+      setUnreadSnapshot((current) => applyUnreadSnapshot(current, meta.unreadSnapshot, true));
     }
     if (meta.lastSyncAt) {
       setLastSyncAt(meta.lastSyncAt);
     }
     return normalized;
+  }, []);
+
+  const updateUnreadSnapshot = useCallback((snapshot, options = {}) => {
+    setUnreadSnapshot((current) => applyUnreadSnapshot(current, snapshot, options.replace === true));
   }, []);
 
   const refreshUnreadCounts = useCallback(
@@ -318,7 +347,7 @@ export function NotificationCenterProvider({ children }) {
         try {
           const payload = await notificationsService.getUnreadCount(params);
           const snapshot = getUnreadSnapshotFromResponse(payload);
-          setUnreadSnapshot(snapshot);
+          setUnreadSnapshot((current) => applyUnreadSnapshot(current, snapshot, true));
           unreadCooldownUntilRef.current = 0;
           return snapshot;
         } catch (error) {
@@ -405,8 +434,7 @@ export function NotificationCenterProvider({ children }) {
         });
 
         if (inboxPayload?.unread_count !== undefined && unreadPayload?.total === undefined) {
-          setUnreadSnapshot((current) => ({
-            ...current,
+          setUnreadSnapshot((current) => applyUnreadSnapshot(current, {
             total: Number(inboxPayload.unread_count || 0)
           }));
         }
@@ -627,6 +655,7 @@ export function NotificationCenterProvider({ children }) {
     lastSyncAt,
     isLoading,
     replaceNotifications,
+    updateUnreadSnapshot,
     appendNotification,
     loadNotifications,
     syncNotifications,
@@ -643,6 +672,7 @@ export function NotificationCenterProvider({ children }) {
     lastSyncAt,
     isLoading,
     replaceNotifications,
+    updateUnreadSnapshot,
     appendNotification,
     loadNotifications,
     syncNotifications,
