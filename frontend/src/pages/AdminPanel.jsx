@@ -1,6 +1,7 @@
 // AdminPanel.jsx - macOS UI/UX Compliant - Updated: 2025-01-26
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getAdminNavSections, isInternalDemoEnabled } from '../routing/routeSelectors.js';
 import {
 
 
@@ -35,7 +36,6 @@ import {
   Brain,
   Globe,
   FileText,
-  Server,
   Printer,
   Stethoscope,
   Package,
@@ -61,6 +61,7 @@ import {
   Download,
 
   Key,
+  Lock,
   CheckCircle,
   Activity,
   Eye,
@@ -1141,46 +1142,39 @@ const AdminPanel = () => {
     return methodMap[method] || method;
   };
 
-  // Новая структура навигации
-  const navigationSections = [
-  {
-    title: 'Обзор',
-    items: [
-    { to: '/admin', label: 'Дашборд', icon: BarChart3 },
-    { to: '/admin/analytics', label: 'Аналитика', icon: TrendingUp },
-    { to: '/admin/webhooks', label: 'Webhook\'и', icon: Globe },
-    { to: '/admin/reports', label: 'Отчеты', icon: FileText },
-    { to: '/admin/system', label: 'Система', icon: Server },
-    { to: '/admin/cloud-printing', label: 'Облачная печать', icon: Printer },
-    { to: '/admin/medical-equipment', label: 'Медицинское оборудование', icon: Stethoscope },
-    { to: '/admin/graphql-explorer', label: 'GraphQL API', icon: Database }]
+  const iconMap = {
+    'chart.bar': BarChart3,
+    globe: Globe,
+    'file-text': FileText,
+    gear: Settings,
+    printer: Printer,
+    stethoscope: Stethoscope,
+    database: Database,
+    users: Users,
+    'user-plus': UserPlus,
+    list: Package,
+    building: Building2,
+    calendar: Calendar,
+    'exclamationmark.triangle': AlertTriangle,
+    brain: Brain,
+    bell: Bell,
+    phone: Phone,
+    key: Key,
+    'dollarsign.circle': DollarSign,
+    lock: Lock,
+    'doc.text': FileText,
+    paperplane: Bot,
+  };
 
-  },
-  {
-    title: 'Управление',
-    items: [
-    { to: '/admin/users', label: 'Пользователи', icon: Users },
-    { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
-    { to: '/admin/services', label: 'Услуги', icon: Package },
-    { to: '/admin/queue-cabinet-management', label: 'Кабинеты очередей', icon: Building2 },
-    { to: '/admin/patients', label: 'Пациенты', icon: Users },
-    { to: '/admin/appointments', label: 'Записи', icon: Calendar },
-    { to: '/admin/all-free', label: 'Заявки All Free', icon: AlertTriangle }]
-
-  },
-  {
-    title: 'Система',
-    items: [
-    { to: '/admin/clinic-management', label: 'Управление клиникой', icon: Building2 },
-    { to: '/admin/ai-imaging', label: 'AI Инструменты', icon: Brain },
-    { to: '/admin/telegram-bot', label: 'Telegram', icon: Bot },
-    { to: '/admin/fcm-notifications', label: 'Уведомления', icon: Bell },
-    { to: '/admin/phone-verification', label: 'Верификация телефонов', icon: Phone },
-    { to: '/admin/activation', label: 'Система активации', icon: Key },
-    { to: '/admin/finance', label: 'Финансы', icon: CreditCard },
-    { to: '/admin/settings', label: 'Настройки', icon: Settings }]
-
-  }];
+  const navigationSections = getAdminNavSections({ role: 'Admin' }, {
+    internalDemoEnabled: isInternalDemoEnabled(),
+  }).map((section) => ({
+    ...section,
+    items: section.items.map((item) => ({
+      ...item,
+      icon: iconMap[item.icon] || Activity,
+    })),
+  }));
 
 
   // Получаем все табы для совместимости

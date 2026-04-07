@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import tokenManager from '../utils/tokenManager';
+import { roleToRoute } from '../constants/routes';
 
 export default function UserSelect() {
   const [items, setItems] = useState([]);
@@ -42,7 +43,7 @@ export default function UserSelect() {
                 <div className="legacy-muted" style={{ fontSize: 12 }}>{u.role || '—'} · {u.email || '—'}</div>
               </div>
               <div>
-                <button className="legacy-button" onClick={() => navigate(routeForRole(u.role))}>Перейти</button>
+                <button className="legacy-button" onClick={() => navigate(roleToRoute(u.role))}>Перейти</button>
               </div>
             </div>
           ))}
@@ -51,17 +52,4 @@ export default function UserSelect() {
       )}
     </div>
   );
-}
-
-function routeForRole(role) {
-  const r = String(role || '').toLowerCase();
-  if (r === 'admin') return '/admin';
-  if (r === 'registrar') return '/registrar-panel';
-  if (r === 'lab') return '/lab-panel';
-  if (r === 'doctor') return '/doctor-panel';
-  if (r === 'cashier') return '/cashier-panel';
-  if (r === 'cardio') return '/cardiologist';
-  if (r === 'derma') return '/dermatologist';
-  if (r === 'dentist') return '/dentist';
-  return '/';
 }

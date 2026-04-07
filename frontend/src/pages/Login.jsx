@@ -4,6 +4,7 @@ import { login, me, setToken } from '../api/client';
 import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
+import { getEffectiveRouteByPath } from '../routing/routeSelectors.js';
 import { A11Y_COLORS } from '../constants/a11yTokens';
 import ForgotPassword from '../components/auth/ForgotPassword';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
@@ -181,11 +182,8 @@ export default function Login() {
   }
 
   function isProtectedPanelPath(pathname) {
-    const prefixes = [
-      '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
-      '/cardiologist', '/dermatologist', '/dentist'
-    ];
-    return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
+    const route = getEffectiveRouteByPath(pathname);
+    return Boolean(route && (route.group === 'clinical' || route.group === 'admin'));
   }
 
   async function onLoginClick(e) {

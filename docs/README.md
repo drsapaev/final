@@ -27,6 +27,7 @@
 | [runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md](./runbooks/CLINIC_RELEASE_ARTIFACT_POLICY.md) | Approved release artifact format, import, and online/offline delivery policy |
 | [runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md](./runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md) | Pre-release proof for the real Windows pilot host artifact import, update, and post-update smoke |
 | [runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md](./runbooks/CLINIC_RELEASE_CANDIDATE_SUMMARY.md) | Release candidate pinned to the tested artifact `clinic-release-923010c00bf3.zip` |
+| [runbooks/CLINIC_ROUTING_PROOF_PHASE.md](./runbooks/CLINIC_ROUTING_PROOF_PHASE.md) | Live-router proof for canonical routes, legacy redirects, role-home behavior, and visible navigation parity |
 | [runbooks/CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md](./runbooks/CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md) | Named limited-pilot contour for the real Windows clinic host |
 | [runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md](./runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md) | Local-only policy for optional external integrations and configure-later behavior |
 | [runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md](./runbooks/LOCAL_ONLY_CLINIC_MASTER_CHECKLIST.md) | Single execution checklist for local-only clinic package, pilot, and safe updates |

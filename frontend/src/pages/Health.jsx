@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
-import RoleGate from '../components/RoleGate.jsx';
 import { getApiBase } from '../api/client.js';
 import { getHealth, getActivationStatus } from '../api/index.js';
+import auth from '../stores/auth.js';
 
 export default function Health() {
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState(null);
   const [act, setAct] = useState(null);
   const [err, setErr] = useState('');
+  const [authState, setAuthState] = useState(() => auth.getState());
+
+  useEffect(() => auth.subscribe(setAuthState), []);
+  const isAdmin = Boolean(authState?.token) && String(authState?.profile?.role || '').toLowerCase() === 'admin';
 
   useEffect(() => {
     let mounted = true;
@@ -15,7 +19,9 @@ export default function Health() {
       setErr('');
       setLoading(true);
       try {
-        const [h, a] = await Promise.all([getHealth(), getActivationStatus()]);
+        const [h, a = null] = await Promise.all(
+          isAdmin ? [getHealth(), getActivationStatus()] : [getHealth()]
+        );
         if (!mounted) return;
         setHealth(h);
         setAct(a);
@@ -28,7 +34,7 @@ export default function Health() {
     }
     load();
     return () => { mounted = false; };
-  }, []);
+  }, [isAdmin]);
 
   return (
     <div>
@@ -59,7 +65,7 @@ export default function Health() {
           )}
         </section>
 
-        <RoleGate roles={['Admin']}>
+        {isAdmin && (
           <section>
             <h2 className="text-lg font-medium mb-2">Статус активации</h2>
             {loading ? (
@@ -74,7 +80,7 @@ export default function Health() {
               </div>
             )}
           </section>
-        </RoleGate>
+        )}
       </main>
     </div>
   );

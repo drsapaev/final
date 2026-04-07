@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import PublicApp from './PublicApp.jsx';
+import App from './App.jsx';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
@@ -31,7 +31,7 @@ if (!rootEl) {
           v7_relativeSplatPath: true
         }}
       >
-        <PublicApp />
+        <App />
       </BrowserRouter>
     </React.StrictMode>
   );
@@ -44,7 +44,7 @@ if (!rootEl) {
           v7_relativeSplatPath: true
         }}
       >
-        <PublicApp />
+        <App />
       </BrowserRouter>
     </React.StrictMode>
   );

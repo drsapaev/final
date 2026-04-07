@@ -18,7 +18,8 @@ export default function Audit() {
     setErr('');
     try {
       const res = await api.get('/audit', { params: { limit } });
-      const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+      const payload = res?.data;
+      const items = Array.isArray(payload) ? payload : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
       setErr(e?.data?.detail || e?.message || 'Ошибка загрузки аудита');
@@ -33,9 +34,9 @@ export default function Audit() {
     if (!q) return rows;
     const qq = q.toLowerCase();
     return rows.filter((a) =>
-    String(a.user || a.username || '').toLowerCase().includes(qq) ||
+    String(a.user || a.username || a.actor_user_id || '').toLowerCase().includes(qq) ||
     String(a.action || '').toLowerCase().includes(qq) ||
-    String(a.entity || '').toLowerCase().includes(qq) ||
+    String(a.entity || a.table || a.entity_type || '').toLowerCase().includes(qq) ||
     String(a.id || '').toLowerCase().includes(qq)
     );
   }, [q, rows]);
@@ -72,10 +73,10 @@ export default function Audit() {
                 {filtered.map((a, i) =>
                 <tr key={a.id || i}>
                     <td>{a.created_at || a.time || '—'}</td>
-                    <td>{a.user || a.username || '—'}</td>
+                    <td>{a.user || a.username || a.actor_user_id || '—'}</td>
                     <td>{a.action || '—'}</td>
-                    <td>{a.entity || a.table || '—'}</td>
-                    <td><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : '—'}</code></td>
+                    <td>{a.entity || a.table || a.entity_type || '—'}</td>
+                    <td><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : a.payload ? JSON.stringify(a.payload) : '—'}</code></td>
                   </tr>
                 )}
                 {filtered.length === 0 &&

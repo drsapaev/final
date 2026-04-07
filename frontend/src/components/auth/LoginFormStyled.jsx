@@ -5,6 +5,7 @@ import { api, buildApiUrl, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
+import { getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
 import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
@@ -51,11 +52,8 @@ const LoginFormStyled = () => {void
 
   // Функция для проверки защищенных панелей
   const isProtectedPanelPath = (pathname) => {
-    const prefixes = [
-    '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
-    '/cardiologist', '/dermatologist', '/dentist'];
-
-    return prefixes.some((p) => pathname === p || pathname.startsWith(p + '/'));
+    const route = getEffectiveRouteByPath(pathname);
+    return Boolean(route && (route.group === 'clinical' || route.group === 'admin'));
   };
 
   const handleSubmit = async (e) => {
