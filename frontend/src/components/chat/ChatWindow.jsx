@@ -631,7 +631,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
             title={isConnected ? 'Онлайн' : 'Подключение...'} />
 
                         {(activeConversation || showNewChat) &&
-            <button onClick={handleBack} className="chat-btn-icon" title="Назад">
+            <button onClick={handleBack} className="chat-btn-icon" title="Назад" aria-label="Назад">
                                 <ChevronLeft size={20} />
                             </button>
             }
@@ -661,7 +661,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 if (showMsgSearch) setMsgSearchQuery('');
               }}
               className={`chat-btn-icon ${showMsgSearch ? 'active' : ''}`}
-              title="Поиск в переписке">
+              title="Поиск в переписке" aria-label="Поиск в переписке">
               
                                 <Search size={18} />
                             </button>
@@ -669,13 +669,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
                         <button
               onClick={() => setShowNewChat(true)}
               className="chat-btn-icon"
-              title="Новый чат"
+              title="Новый чат" aria-label="Новый чат"
               style={{ opacity: activeConversation || showNewChat ? 0.5 : 1 }}
               disabled={activeConversation || showNewChat}>
               
                             <Plus size={18} />
                         </button>
-                        <button onClick={onClose} className="chat-btn-icon" title="Закрыть">
+                        <button onClick={onClose} className="chat-btn-icon" title="Закрыть" aria-label="Закрыть">
                             <X size={18} />
                         </button>
                     </div>
