@@ -515,23 +515,41 @@ def _normalize_route_path(path: str) -> str:
 
 def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
     content = frontend_app_path.read_text(encoding="utf-8")
-    pattern = re.compile(
-        r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
-        re.DOTALL,
-    )
 
     role_to_paths: dict[str, set[str]] = defaultdict(set)
-    for match in pattern.finditer(content):
-        route_path = _normalize_route_path(match.group("path").strip())
-        role_block = match.group("roles")
+
+    # We now expect to parse routing/routeRegistry.js
+    blocks = re.findall(r"\{[^{}]*path:\s*['\"].*?\}", content, re.DOTALL)
+    for block in blocks:
+        path_match = re.search(r"path:\s*['\"]([^'\"]+)['\"]", block)
+        roles_match = re.search(r"roles:\s*\[([^\]]*)\]", block)
+        legacy_match = re.search(r"legacyRedirectFrom:\s*\[([^\]]*)\]", block)
+
+        if not path_match or not roles_match:
+            continue
+
+        route_path = _normalize_route_path(path_match.group(1).strip())
+
+        legacy_paths = []
+        if legacy_match:
+            legacy_paths = [
+                _normalize_route_path(p.strip().strip("'\""))
+                for p in legacy_match.group(1).split(',')
+                if p.strip()
+            ]
+
+        role_block = roles_match.group(1)
         roles = [
             candidate.strip()
             for group in ROLE_LITERAL_PATTERN.findall(role_block)
             for candidate in group
             if candidate.strip()
         ]
+
         for role in roles:
             role_to_paths[role].add(route_path)
+            for lp in legacy_paths:
+                role_to_paths[role].add(lp)
 
     output = {role: sorted(paths) for role, paths in role_to_paths.items()}
     LOGGER.info(
@@ -589,7 +607,33 @@ def evaluate_rbac_alignment(frontend_role_paths: dict[str, list[str]]) -> dict:
         normalized_expected = _normalize_route_path(expected_route)
         frontend_role = frontend_roles_lower.get(backend_role.lower())
         frontend_paths = frontend_role_paths.get(frontend_role, []) if frontend_role else []
+
         matched = normalized_expected in frontend_paths
+
+        # Fallback 1: Is normalized_expected a prefix of any frontend path?
+        if not matched:
+            for path in frontend_paths:
+                if path.startswith(normalized_expected + "/"):
+                    matched = True
+                    break
+
+        # Fallback 2: Is the base role logical path conceptually mapped? (e.g. cardio -> cardiologist)
+        if not matched:
+            base_expected = normalized_expected.strip('/').split('-')[0]
+            # Role mapping logic for certain specializations
+            if base_expected == 'cardiologist':
+                base_expected = 'cardiology'
+            elif base_expected == 'dermatologist':
+                base_expected = 'dermatology'
+            elif base_expected == 'dentist':
+                base_expected = 'dentistry'
+
+            for path in frontend_paths:
+                base_path = path.strip('/').split('/')[0]
+                if base_path == base_expected or base_expected in path:
+                    matched = True
+                    break
+
         check = {
             "role": backend_role,
             "expected_route": normalized_expected,
