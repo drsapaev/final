@@ -1,15 +1,15 @@
 # Frontend-Backend Parity Report
 
-Generated at: 2026-04-07T19:25:48.106423+00:00
+Generated at: 2026-02-25T07:03:34.547174+00:00
 
 ## Summary
 
 - Backend operations total: **1111**
 - Frontend calls total: **222**
 - Implemented matches: **128**
-- Partial (unresolved frontend calls): **9**
+- Partial (unresolved frontend calls): **6**
 - Missing in frontend: **989**
-- Frontend orphan calls: **85**
+- Frontend orphan calls: **88**
 - Coverage: **11.52%**
 
 ## Critical Missing (auth/queue/billing/emr)
@@ -37,9 +37,6 @@ Generated at: 2026-04-07T19:25:48.106423+00:00
 
 ## Partial Preview (first 40)
 
-- `GET` ``${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`` (frontend/src/api/services.js:600) reason=`unresolved_constant_ref`
-- `GET` `API_ENDPOINTS.NOTIFICATIONS.GET(id)` (frontend/src/api/services.js:607) reason=`unresolved_constant_ref`
-- `GET` `API_ENDPOINTS.NOTIFICATIONS.TYPES` (frontend/src/api/services.js:637) reason=`unresolved_constant_ref`
 - `GET` `cleanUrl` (frontend/src/hooks/useAdminData.js:45) reason=`unresolved_expression`
 - `GET` `endpoint` (frontend/src/hooks/useApi.js:79) reason=`unresolved_expression`
 - `POST` `endpoint` (frontend/src/hooks/useApi.js:217) reason=`unresolved_expression`
