@@ -14,6 +14,7 @@ from clinic_lifecycle_common import (
     load_clinic_env,
     parse_database_url,
     pass_message,
+    postgres_tool,
     require_env,
     run_command,
 )
@@ -41,7 +42,7 @@ def main() -> int:
         backup_file = backup_dir / f"{target.name}_{timestamp}.dump"
 
     cmd = [
-        "pg_dump",
+        postgres_tool("pg_dump"),
         "-h",
         target.host,
         "-p",

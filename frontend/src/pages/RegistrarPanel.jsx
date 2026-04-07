@@ -1109,6 +1109,27 @@ const RegistrarPanel = () => {
   const loadAppointments = useCallback(async (options = {}) => {
     // console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
     const { silent = false } = options || {};
+    const callSource = String(options?.source || 'unknown');
+    const isAutoRefreshCall = callSource === 'auto_refresh';
+    if (isAutoRefreshCall) {
+      const cooldownUntil = autoRefreshCooldownUntilRef.current;
+      if (Date.now() < cooldownUntil) {
+        if (!autoRefreshCooldownLoggedRef.current) {
+          logger.info('⏳ Автообновление приостановлено после rate limit', {
+            cooldownUntil: new Date(cooldownUntil).toISOString()
+          });
+          autoRefreshCooldownLoggedRef.current = true;
+        }
+        return;
+      }
+
+      if (loadAppointmentsInFlightRef.current) {
+        logger.info('⏭️ Автообновление пропущено: предыдущий запрос еще выполняется');
+        return;
+      }
+    }
+
+    loadAppointmentsInFlightRef.current = true;
     try {
       if (!silent) {
         setAppointmentsLoading(true);
@@ -1316,6 +1337,16 @@ const RegistrarPanel = () => {
         });
       }
     } catch (error) {
+      if (error?.response?.status === 429) {
+        autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
+        autoRefreshCooldownLoggedRef.current = false;
+        logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
+          source: callSource,
+          dateParam: showCalendar && historyDate ? historyDate : getLocalDateString()
+        });
+        return;
+      }
+
       // Handle axios errors
       if (error.response?.status === 401) {
         // Токен недействителен
@@ -1350,6 +1381,7 @@ const RegistrarPanel = () => {
         }
       }
     } finally {
+      loadAppointmentsInFlightRef.current = false;
       if (!silent) setAppointmentsLoading(false);
     }
   }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab, demoAppointments, appointmentsCount]);
@@ -1392,6 +1424,9 @@ const RegistrarPanel = () => {
 
   // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
   const initialLoadRef = useRef(false);
+  const loadAppointmentsInFlightRef = useRef(false);
+  const autoRefreshCooldownUntilRef = useRef(0);
+  const autoRefreshCooldownLoggedRef = useRef(false);
   useEffect(() => {
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
@@ -1703,8 +1738,12 @@ const RegistrarPanel = () => {
     // Во время мастера записи или модальных окон автообновление отключаем, чтобы не было мерцаний
     if (showWizard || paymentDialog.open || printDialog.open || cancelDialog.open) return;
     if (!autoRefresh) return;
+    if (Date.now() < autoRefreshCooldownUntilRef.current) return;
 
     const id = setInterval(() => {
+      if (Date.now() < autoRefreshCooldownUntilRef.current || loadAppointmentsInFlightRef.current) {
+        return;
+      }
       // Загружаем только записи тихо, без смены индикаторов
       logger.info('⏰ Автообновление: вызов loadAppointments');
       loadAppointments({ silent: true, source: 'auto_refresh' });

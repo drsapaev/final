@@ -36,7 +36,7 @@ export function NotificationWebSocketProvider({ children }) {
   const connectRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const shouldReconnect = useRef(true);
-  const { appendNotification, replaceNotifications, refreshUnreadCounts } = useNotificationCenter();
+  const { appendNotification, replaceNotifications, updateUnreadSnapshot } = useNotificationCenter();
 
   const scheduleReconnect = useCallback(() => {
     if (!shouldReconnect.current) {
@@ -53,10 +53,24 @@ export function NotificationWebSocketProvider({ children }) {
   }, []);
 
   const applyUnreadSnapshot = useCallback((data) => {
-    if (typeof data?.unread_count === 'number') {
-      void refreshUnreadCounts();
+    if (
+      typeof data?.unread_count === 'number' ||
+      typeof data?.unreadCount === 'number' ||
+      data?.by_role ||
+      data?.by_channel ||
+      data?.by_severity
+    ) {
+      updateUnreadSnapshot(
+        {
+          total: Number(data?.unread_count ?? data?.unreadCount ?? 0),
+          by_role: data?.by_role,
+          by_channel: data?.by_channel,
+          by_severity: data?.by_severity
+        },
+        { replace: false }
+      );
     }
-  }, [refreshUnreadCounts]);
+  }, [updateUnreadSnapshot]);
 
   const handleMessage = useCallback(
     (data) => {

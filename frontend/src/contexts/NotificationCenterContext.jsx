@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { notificationsService } from '../api/services';
 import logger from '../utils/logger';
@@ -269,11 +269,36 @@ function isUnread(item) {
 }
 
 function getUnreadSnapshotFromResponse(payload) {
+  const total =
+    payload?.total ??
+    payload?.unread_count ??
+    payload?.unreadCount ??
+    0;
+
   return {
-    total: Number(payload?.total ?? 0),
+    total: Number(total),
     by_role: payload?.by_role || {},
     by_channel: payload?.by_channel || {},
     by_severity: payload?.by_severity || {}
+  };
+}
+
+export function applyUnreadSnapshot(currentSnapshot = EMPTY_UNREAD_SNAPSHOT, payload = {}, replace = false) {
+  const normalized = getUnreadSnapshotFromResponse(payload);
+  const hasExplicitTotal =
+    payload?.total !== undefined ||
+    payload?.unread_count !== undefined ||
+    payload?.unreadCount !== undefined;
+
+  if (replace) {
+    return normalized;
+  }
+
+  return {
+    total: hasExplicitTotal ? normalized.total : currentSnapshot.total,
+    by_role: payload?.by_role === undefined ? currentSnapshot.by_role : normalized.by_role,
+    by_channel: payload?.by_channel === undefined ? currentSnapshot.by_channel : normalized.by_channel,
+    by_severity: payload?.by_severity === undefined ? currentSnapshot.by_severity : normalized.by_severity
   };
 }
 
@@ -282,12 +307,16 @@ export function NotificationCenterProvider({ children }) {
   const [unreadSnapshot, setUnreadSnapshot] = useState(EMPTY_UNREAD_SNAPSHOT);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const unreadRefreshPromiseRef = useRef(null);
+  const inboxSyncPromiseRef = useRef(null);
+  const unreadCooldownUntilRef = useRef(0);
+  const inboxCooldownUntilRef = useRef(0);
 
   const replaceNotifications = useCallback((items, meta = {}) => {
     const normalized = items.map((item) => normalizeNotification(item, meta.source || 'api'));
     setInbox((current) => mergeInboxItems(current, normalized));
     if (meta.unreadSnapshot) {
-      setUnreadSnapshot(meta.unreadSnapshot);
+      setUnreadSnapshot((current) => applyUnreadSnapshot(current, meta.unreadSnapshot, true));
     }
     if (meta.lastSyncAt) {
       setLastSyncAt(meta.lastSyncAt);
@@ -295,29 +324,93 @@ export function NotificationCenterProvider({ children }) {
     return normalized;
   }, []);
 
+  const updateUnreadSnapshot = useCallback((snapshot, options = {}) => {
+    setUnreadSnapshot((current) => applyUnreadSnapshot(current, snapshot, options.replace === true));
+  }, []);
+
   const refreshUnreadCounts = useCallback(
     async (params = {}) => {
-      try {
-        const payload = await notificationsService.getUnreadCount(params);
-        const snapshot = getUnreadSnapshotFromResponse(payload);
-        setUnreadSnapshot(snapshot);
-        return snapshot;
-      } catch (error) {
-        logger.warn('[NotificationCenter] refreshUnreadCounts failed', error);
+      const now = Date.now();
+      if (now < unreadCooldownUntilRef.current) {
+        logger.info('[NotificationCenter] unread refresh skipped during cooldown', {
+          cooldownUntil: unreadCooldownUntilRef.current,
+          params
+        });
         return unreadSnapshot;
       }
+
+      if (unreadRefreshPromiseRef.current) {
+        return unreadRefreshPromiseRef.current;
+      }
+
+      unreadRefreshPromiseRef.current = (async () => {
+        try {
+          const payload = await notificationsService.getUnreadCount(params);
+          const snapshot = getUnreadSnapshotFromResponse(payload);
+          setUnreadSnapshot((current) => applyUnreadSnapshot(current, snapshot, true));
+          unreadCooldownUntilRef.current = 0;
+          return snapshot;
+        } catch (error) {
+          const status = error?.response?.status;
+          if (status === 429) {
+            unreadCooldownUntilRef.current = Date.now() + 60_000;
+            logger.warn('[NotificationCenter] refreshUnreadCounts rate limited, cooling down', {
+              cooldownMs: 60_000,
+              params
+            });
+          } else {
+            logger.warn('[NotificationCenter] refreshUnreadCounts failed', error);
+          }
+          return unreadSnapshot;
+        } finally {
+          unreadRefreshPromiseRef.current = null;
+        }
+      })();
+
+      return unreadRefreshPromiseRef.current;
     },
     [unreadSnapshot]
   );
 
   const syncNotifications = useCallback(
     async (params = {}) => {
+      const now = Date.now();
+      if (now < inboxCooldownUntilRef.current) {
+        logger.info('[NotificationCenter] inbox sync skipped during cooldown', {
+          cooldownUntil: inboxCooldownUntilRef.current,
+          params
+        });
+        return inbox;
+      }
+
+      if (inboxSyncPromiseRef.current) {
+        return inboxSyncPromiseRef.current;
+      }
+
+      inboxSyncPromiseRef.current = (async () => {
       setIsLoading(true);
       try {
-        const [inboxPayload, unreadPayload] = await Promise.all([
+        const [inboxResult, unreadResult] = await Promise.allSettled([
           notificationsService.getInbox(params),
           refreshUnreadCounts(params)
         ]);
+
+        const inboxPayload = inboxResult.status === 'fulfilled' ? inboxResult.value : null;
+        const unreadPayload = unreadResult.status === 'fulfilled' ? unreadResult.value : null;
+
+        if (inboxResult.status === 'rejected') {
+          const inboxError = inboxResult.reason;
+          if (inboxError?.response?.status === 429) {
+            inboxCooldownUntilRef.current = Date.now() + 60_000;
+            unreadCooldownUntilRef.current = Date.now() + 60_000;
+            logger.warn('[NotificationCenter] inbox sync rate limited, cooling down', {
+              cooldownMs: 60_000,
+              params
+            });
+            return inbox;
+          }
+          throw inboxError;
+        }
 
         const items = extractItems(inboxPayload);
         const normalized = items.map((item) => normalizeNotification(item, 'api'));
@@ -341,22 +434,43 @@ export function NotificationCenterProvider({ children }) {
         });
 
         if (inboxPayload?.unread_count !== undefined && unreadPayload?.total === undefined) {
-          setUnreadSnapshot((current) => ({
-            ...current,
+          setUnreadSnapshot((current) => applyUnreadSnapshot(current, {
             total: Number(inboxPayload.unread_count || 0)
           }));
+        }
+
+        if (unreadResult.status === 'rejected' && unreadResult.reason?.response?.status === 429) {
+          unreadCooldownUntilRef.current = Date.now() + 60_000;
+          logger.warn('[NotificationCenter] unread snapshot refresh rate limited, cooling down', {
+            cooldownMs: 60_000,
+            params
+          });
         }
 
         setLastSyncAt(new Date().toISOString());
         return normalized;
       } catch (error) {
+        const status = error?.response?.status;
+        if (status === 429) {
+          inboxCooldownUntilRef.current = Date.now() + 60_000;
+          unreadCooldownUntilRef.current = Date.now() + 60_000;
+          logger.warn('[NotificationCenter] syncNotifications rate limited, cooling down', {
+            cooldownMs: 60_000,
+            params
+          });
+          return inbox;
+        }
         logger.error('[NotificationCenter] syncNotifications failed', error);
         throw error;
       } finally {
         setIsLoading(false);
+        inboxSyncPromiseRef.current = null;
       }
+      })();
+
+      return inboxSyncPromiseRef.current;
     },
-    [refreshUnreadCounts]
+    [inbox, refreshUnreadCounts]
   );
 
   const loadNotifications = useCallback(
@@ -541,6 +655,7 @@ export function NotificationCenterProvider({ children }) {
     lastSyncAt,
     isLoading,
     replaceNotifications,
+    updateUnreadSnapshot,
     appendNotification,
     loadNotifications,
     syncNotifications,
@@ -557,6 +672,7 @@ export function NotificationCenterProvider({ children }) {
     lastSyncAt,
     isLoading,
     replaceNotifications,
+    updateUnreadSnapshot,
     appendNotification,
     loadNotifications,
     syncNotifications,

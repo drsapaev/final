@@ -1,39 +1,73 @@
 # Clinic Pre-Release Evidence Pack
 
-[← Previous Page](CLINIC_RELEASE_CANDIDATE_SUMMARY.md) · [Back to README](../README.md) · [Next Page →](LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md)
+[← Previous Page](CLINIC_RELEASE_ARTIFACT_POLICY.md) · [Back to README](../README.md) · [Next Page →](CLINIC_RELEASE_CANDIDATE_SUMMARY.md)
 
-## Purpose
-- Capture the evidence that supports the current clinic release candidate.
-- Use this pack alongside the pre-release checklist and the release candidate summary.
-- Keep the release candidate traceable to concrete build and proof artifacts.
+## Scope
+- Pre-release evidence for the real Windows pilot host rehearsal on this machine.
+- This page records the exact approved artifact that was imported, updated, and smoke-validated before pilot execution.
 
-## Release Candidate
-- Release ref: `main`
-- Commit SHA: `923010c00bf307fdf8bdc7cacc4e593a01d1f60f`
-- Approved release artifact: `output/release-artifacts/clinic-release-923010c00bf3.zip`
+## Candidate
+| Item | Value |
+|---|---|
+| Artifact | `clinic-release-923010c00bf3.zip` |
+| Imported ref | `refs/clinic-releases/clinic-release-923010c00bf3` |
+| Host OS | Windows |
+| Pilot browser URL | `http://192.168.1.5:18080` |
+| Backend URL | `http://127.0.0.1:18000` |
+| Database URL | `postgresql+psycopg://clinic:clinicpwd@127.0.0.1:5432/clinicdb` |
+| Backup dir | `C:\clinic\output\backups` |
+| Latest successful pre-update backup | `C:\clinic\output\backups\clinicdb_20260405_165644.dump` |
+| Latest successful restore rehearsal backup | `C:\clinic\output\backups\clinicdb_20260405_181100.dump` |
 
-## Evidence Rows
+## Verified Rehearsal
+- `import-release -ArtifactFile C:\final\output\release-artifacts\clinic-release-923010c00bf3.zip`
+- `update -ArtifactFile C:\final\output\release-artifacts\clinic-release-923010c00bf3.zip`
+- `smoke-post-update`
+- `restore-rehearsal`
 
-| Date | Host / env | Release artifact / ref | Command | Outcome | Backup artifact | Migration result | Health result | Smoke result | Current origin | Resolved API origin | Resolved WS origin | Rollback result | Notes |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-04-05 | `c:\final` / local release-prep host | `output/release-artifacts/clinic-release-923010c00bf3.zip` / `HEAD` | `python ops/vps/scripts/build_release_artifact.py --ref HEAD --output-dir output/release-artifacts` | PASS | `output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_BACKUP_RESTORE_LINUX.md` | PASS | PASS | PASS | `http://127.0.0.1:18080` | `http://127.0.0.1:18080` | PASS | Release candidate summary and pilot evidence are linked below. |
+## Post-Update Runtime Proof
+- `PASS: health_check completed successfully`
+- `PASS: smoke_post_update completed successfully`
+- `CURRENT_ORIGIN=http://192.168.1.5:18080`
+- `RESOLVED_API_ORIGIN=http://192.168.1.5:18080`
+- `RESOLVED_WS_ORIGIN=ws://192.168.1.5:18080`
 
-## Linked Proofs
-- [Controlled Pilot Gate Result](CONTROLLED_PILOT_GATE_RESULT.md)
-- [Release Candidate Summary](CLINIC_RELEASE_CANDIDATE_SUMMARY.md)
-- [Fresh Install Evidence](../../output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_FRESH_INSTALL_LINUX.md)
-- [Backup/Restore Evidence](../../output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_BACKUP_RESTORE_LINUX.md)
-- [Update Rehearsal Evidence](../../output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_UPDATE_REHEARSAL_LINUX.md)
+## Restore Rehearsal Proof
+- `PASS: restore_rehearsal completed successfully`
+- Restore target database: `postgresql+psycopg://clinic:clinicpwd@127.0.0.1:55433/clinicdb_restore`
+- Restore backend URL: `http://127.0.0.1:18001`
+- Restore public URL: `http://127.0.0.1:18081`
+- Restore smoke result: `PASS: smoke_post_update completed successfully`
+- Restore runtime proof:
+  - `CURRENT_ORIGIN=http://127.0.0.1:18081`
+  - `RESOLVED_API_ORIGIN=http://127.0.0.1:18081`
+  - `RESOLVED_WS_ORIGIN=ws://127.0.0.1:18081`
+- Restore login smoke: PASS using isolated restore admin seed on the restore-only database
 
-## Evidence Rules
-- Record the exact command that was run.
-- Record the exact approved release artifact or imported release ref that was deployed.
-- Copy the exact PASS/FAIL line from the script output.
-- Save backup filenames as emitted by `BACKUP_FILE=...`.
-- Save `CURRENT_ORIGIN=...`, `RESOLVED_API_ORIGIN=...`, and `RESOLVED_WS_ORIGIN=...` exactly as emitted by the smoke output.
-- If a rehearsal fails, include the first `FAIL:` line that stopped it.
+## Host State After Rehearsal
+- Backend is listening on `18000`
+- Frontend is listening on `18080`
+- `ops/windows/clinic_host.ps1 status` passes on the initialized host
+- Same-origin frontend runtime was preserved on the pilot contour
+
+## Pilot-Specific Compatibility Notes
+- Windows PostgreSQL executable support is treated as host-install compatibility only
+- Compatibility stays inside ops/lifecycle tooling, not business logic
+- Relevant host-compat paths:
+  - `ops/windows/clinic_host.ps1`
+  - `ops/vps/scripts/clinic_lifecycle_common.py`
+  - `ops/vps/scripts/backup_db.py`
+  - `ops/vps/scripts/restore_db.py`
+
+## Go/No-Go Readiness
+- Approved artifact imported successfully
+- Safe update path executed successfully on the real Windows pilot host
+- Backup/restore path executed successfully to an isolated restore target on the same Windows host
+- Post-update smoke passed on the initialized host
+- Pilot can proceed to the day-1 checklist on the named Windows contour unless scope or contour changes
 
 ## See Also
-- [Clinic Pre-Release Checklist](CLINIC_PRE_RELEASE_CHECKLIST.md)
 - [Clinic Release Candidate Summary](CLINIC_RELEASE_CANDIDATE_SUMMARY.md)
-- [Clinic Release Artifact Policy](CLINIC_RELEASE_ARTIFACT_POLICY.md)
+- [Clinic Pilot Contour: Windows Host](CLINIC_PILOT_CONTOUR_WINDOWS_HOST.md)
+- [Clinic Windows Pilot Host Runbook](CLINIC_WINDOWS_PILOT_HOST_RUNBOOK.md)
+- [Pilot Start Checklist](PILOT_START_CHECKLIST.md)

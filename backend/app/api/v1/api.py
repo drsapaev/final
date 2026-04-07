@@ -36,6 +36,7 @@ from app.api.v1.endpoints import (
     appointments,
     auth,
     authentication,
+    audit,
     billing,
     cardio,
     cashier,
@@ -238,6 +239,7 @@ api_router.include_router(
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
+api_router.include_router(audit.router, tags=["audit"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
 api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
 api_router.include_router(registrar_integration.router, tags=["registrar"])
