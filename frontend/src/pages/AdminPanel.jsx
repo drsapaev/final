@@ -2766,7 +2766,7 @@ const AdminPanel = () => {
           } /> :
 
 
-        <table style={{ width: '100%' }} role="table" aria-label="Таблица врачей">
+        <table style={{ width: '100%' }} aria-label="Таблица врачей">
               <thead>
                 <tr style={{
               backgroundColor: 'var(--mac-bg-tertiary)',
@@ -3904,7 +3904,7 @@ const AdminPanel = () => {
               } /> :
 
 
-            <table style={{ width: '100%' }} role="table" aria-label="Таблица транзакций">
+            <table style={{ width: '100%' }} aria-label="Таблица транзакций">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--mac-separator)' }}>
                     <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Тип</th>
