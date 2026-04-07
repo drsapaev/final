@@ -2909,6 +2909,7 @@ const AdminPanel = () => {
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button
+                    type="button"
                     onClick={() => handleEditDoctor(doctor)}
                     style={{
                       padding: '4px',
@@ -2921,11 +2922,13 @@ const AdminPanel = () => {
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    aria-label="Редактировать врача"
                     title="Редактировать">
 
                           <Edit style={{ width: '16px', height: '16px' }} />
                         </button>
                         <button
+                    type="button"
                     onClick={() => handleDeleteDoctor(doctor)}
                     style={{
                       padding: '4px',
@@ -2938,6 +2941,7 @@ const AdminPanel = () => {
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    aria-label="Деактивировать врача"
                     title="Деактивировать">
 
                           <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -3216,6 +3220,7 @@ const AdminPanel = () => {
             actions:
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <MacOSButton
+                type="button"
                 variant="outline"
                 onClick={() => handleEditPatient(patient)}
                 style={{
@@ -3227,11 +3232,13 @@ const AdminPanel = () => {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
+                aria-label="Редактировать пациента"
                 title="Редактировать">
 
                       <Edit style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                     <MacOSButton
+                type="button"
                 variant="outline"
                 onClick={() => handleDeletePatient(patient)}
                 style={{
@@ -3245,6 +3252,7 @@ const AdminPanel = () => {
                   color: 'var(--mac-error)',
                   borderColor: 'var(--mac-error)'
                 }}
+                aria-label="Удалить пациента"
                 title="Удалить">
 
                       <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -3578,6 +3586,7 @@ const AdminPanel = () => {
                 actions:
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <MacOSButton
+                    type="button"
                     variant="outline"
                     onClick={() => handleEditAppointment(appointment)}
                     style={{
@@ -3589,11 +3598,13 @@ const AdminPanel = () => {
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
+                    aria-label="Редактировать запись"
                     title="Редактировать">
 
                         <Edit style={{ width: '16px', height: '16px' }} />
                       </MacOSButton>
                       <MacOSButton
+                    type="button"
                     variant="outline"
                     onClick={() => handleDeleteAppointment(appointment)}
                     style={{
@@ -3607,6 +3618,7 @@ const AdminPanel = () => {
                       color: 'var(--mac-error)',
                       borderColor: 'var(--mac-error)'
                     }}
+                    aria-label="Удалить запись"
                     title="Удалить">
 
                         <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -3969,19 +3981,23 @@ const AdminPanel = () => {
                       <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                           <button
+                        type="button"
                         onClick={() => handleEditTransaction(transaction)}
                         style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-text-secondary)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        aria-label="Редактировать транзакцию"
                         title="Редактировать">
 
                             <Edit style={{ width: '16px', height: '16px' }} />
                           </button>
                           <button
+                        type="button"
                         onClick={() => handleDeleteTransaction(transaction)}
                         style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-danger)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        aria-label="Удалить транзакцию"
                         title="Удалить">
 
                             <Trash2 style={{ width: '16px', height: '16px' }} />
