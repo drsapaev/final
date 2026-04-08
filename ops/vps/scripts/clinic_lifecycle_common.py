@@ -6,6 +6,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import socket
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -161,6 +162,36 @@ def backend_alembic_cmd() -> list[str]:
     return [str(backend_python()), "-m", "alembic"]
 
 
+def _detect_lan_ip() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("1.1.1.1", 80))
+            ip = sock.getsockname()[0]
+            if ip and ip != "127.0.0.1":
+                return ip
+    except OSError:
+        pass
+
+    host = os.environ.get("APP_HOST")
+    if host and host != "127.0.0.1":
+        return host
+
+    return "127.0.0.1"
+
+
+def _public_url_port() -> int:
+    for candidate in (os.environ.get("PUBLIC_URL"), os.environ.get("APP_HOST")):
+        if not candidate:
+            continue
+        try:
+            parsed = urlparse(candidate if "://" in candidate else f"http://{candidate}")
+        except Exception:
+            continue
+        if parsed.port:
+            return parsed.port
+    return int(os.environ.get("PUBLIC_PORT", "18080"))
+
+
 def postgres_tool(tool_name: str) -> str:
     stem = Path(tool_name).stem.upper()
     explicit = os.environ.get(f"{stem}_EXE")
@@ -194,10 +225,12 @@ def postgres_tool(tool_name: str) -> str:
 
 
 def public_url() -> str:
+    if env_bool("CLINIC_AUTO_DETECT_PUBLIC_URL", True):
+        return f"http://{_detect_lan_ip()}:{_public_url_port()}"
     if os.environ.get("PUBLIC_URL"):
         return os.environ["PUBLIC_URL"].rstrip("/")
     if os.environ.get("APP_HOST"):
-        return f"http://{os.environ['APP_HOST'].rstrip('/')}"
+        return f"http://{os.environ['APP_HOST'].rstrip('/')}:{_public_url_port()}"
     return "http://127.0.0.1:18080"
 
 

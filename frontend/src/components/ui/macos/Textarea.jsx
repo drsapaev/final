@@ -20,6 +20,7 @@ const Textarea = React.forwardRef(({
   autoResize = true,
   className = '',
   style = {},
+  textareaStyle = {},
   id,
   ...props
 }, ref) => {
@@ -162,7 +163,8 @@ const Textarea = React.forwardRef(({
         style={{
           ...textareaStyles,
           ...focusStyles,
-          ...errorStyles
+          ...errorStyles,
+          ...textareaStyle
         }}
         {...props}
       />
@@ -226,6 +228,7 @@ Textarea.propTypes = {
   autoResize: PropTypes.bool,
   className: PropTypes.string,
   style: PropTypes.object,
+  textareaStyle: PropTypes.object,
   id: PropTypes.string
 };
 

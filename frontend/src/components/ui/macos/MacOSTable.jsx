@@ -44,18 +44,18 @@ const MacOSTable = ({
   const variantStyles = {
     default: {
       border: '1px solid var(--mac-border)',
-      background: 'var(--mac-bg-primary)',
-      headerBackground: 'var(--mac-bg-tertiary)'
+      background: 'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-gradient-sidebar, var(--mac-main-shell-bg)) 16%)',
+      headerBackground: 'var(--mac-table-header-bg)'
     },
     filled: {
       border: 'none',
-      background: 'var(--mac-bg-secondary)',
-      headerBackground: 'var(--mac-bg-primary)'
+      background: 'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), var(--mac-gradient-sidebar, var(--mac-main-shell-bg)) 16%)',
+      headerBackground: 'var(--mac-table-header-bg)'
     },
     minimal: {
       border: 'none',
       background: 'transparent',
-      headerBackground: 'var(--mac-bg-tertiary)'
+      headerBackground: 'var(--mac-table-header-bg)'
     }
   };
 
@@ -74,7 +74,7 @@ const MacOSTable = ({
   const headerStyle = {
     background: currentVariant.headerBackground,
     fontWeight: 'var(--mac-font-weight-semibold)',
-    color: 'var(--mac-text-primary)',
+    color: 'var(--mac-table-header-text)',
     fontSize: currentSize.fontSize,
     padding: currentSize.headerPadding,
     textAlign: 'left',
@@ -96,7 +96,7 @@ const MacOSTable = ({
   });
 
   const rowStyle = (index, isSelected = false) => ({
-    background: isSelected ? 'var(--mac-bg-blue)' : (striped && index % 2 === 1 ? 'var(--mac-bg-secondary)' : 'transparent'),
+    background: isSelected ? 'var(--mac-bg-blue)' : (striped && index % 2 === 1 ? 'var(--mac-table-row-alt-bg)' : 'transparent'),
     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
     cursor: hoverable ? 'pointer' : 'default'
   });
@@ -121,7 +121,7 @@ const MacOSTable = ({
 
   const handleMouseEnter = (e, isSelected) => {
     if (hoverable) {
-      e.currentTarget.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'var(--mac-bg-secondary)';
+      e.currentTarget.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'var(--mac-table-row-hover-bg)';
     }
   };
 
@@ -289,7 +289,7 @@ const MacOSTable = ({
                 onClick={() => handleSort(column)}
                 onMouseEnter={(e) => {
                   if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                    e.target.style.backgroundColor = 'var(--mac-table-header-hover-bg)';
                   }
                 }}
                 onMouseLeave={(e) => {

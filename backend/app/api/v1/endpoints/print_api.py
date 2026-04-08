@@ -4,6 +4,7 @@ API endpoints для печати документов
 """
 
 from datetime import datetime
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -226,7 +227,22 @@ def get_printers(
     Получить список доступных принтеров
     """
     try:
+        # Сначала синхронизируем локальные системные принтеры, чтобы UI видел
+        # реальные установленные устройства, а не только seed/mock записи.
+        synced_printers = asyncio.run(print_service.sync_system_printers())
         printers = crud_print.get_printer_configs(db, active_only=True)
+        local_printer_types = {
+            printer.printer_type
+            for printer in printers
+            if printer.connection_type != "mock"
+        }
+        if local_printer_types:
+            printers = [
+                printer
+                for printer in printers
+                if printer.connection_type != "mock"
+                or printer.printer_type not in local_printer_types
+            ]
         printer_items = []
 
         for printer in printers:
@@ -243,7 +259,11 @@ def get_printers(
                 }
             )
 
-        logger.info("[FIX] Loaded %s printers from database", len(printer_items))
+        logger.info(
+            "[FIX] Loaded %s printers from database (%s synced local printers)",
+            len(printer_items),
+            len(synced_printers),
+        )
         return {"printers": printer_items, "total": len(printer_items)}
 
     except Exception as e:

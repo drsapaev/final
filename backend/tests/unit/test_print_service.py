@@ -159,7 +159,9 @@ def test_print_service_selects_document_type_printers_and_uses_mock_paths(db_ses
     assert prescription_result["result"]["method"] == "mock"
 
 
-def test_print_printers_endpoint_returns_database_printers(client, auth_headers, db_session):
+def test_print_printers_endpoint_returns_database_printers(
+    client, auth_headers, db_session, monkeypatch
+):
     _create_printer(
         db_session,
         name="ticket_printer",
@@ -174,6 +176,13 @@ def test_print_printers_endpoint_returns_database_printers(client, auth_headers,
         printer_type="A4",
     )
 
+    async def fake_discover_system_printers(self):
+        return []
+
+    monkeypatch.setattr(
+        PrintService, "discover_system_printers", fake_discover_system_printers
+    )
+
     client.app.dependency_overrides[print_api_module.get_print_service] = (
         lambda: PrintService(db_session)
     )
@@ -186,6 +195,124 @@ def test_print_printers_endpoint_returns_database_printers(client, auth_headers,
         printer_names = {item["name"] for item in payload["printers"]}
         assert printer_names == {"ticket_printer", "lab_printer"}
         assert any(item["status"] == "online" for item in payload["printers"])
+    finally:
+        client.app.dependency_overrides.pop(print_api_module.get_print_service, None)
+
+
+def test_print_service_prefers_discovered_system_printers_over_mock(
+    db_session, monkeypatch
+):
+    _create_printer(
+        db_session,
+        name="ticket_printer",
+        display_name="Термопринтер кассы",
+        printer_type="ESC/POS",
+        is_default=True,
+    )
+
+    service = PrintService(db_session)
+
+    async def fake_discover_system_printers(self):
+        return [
+            {
+                "name": "Canon MF3010",
+                "display_name": "Canon MF3010",
+                "printer_type": "A4",
+                "connection_type": "local",
+                "device_path": "Canon MF3010",
+                "paper_width": 210,
+                "paper_height": 297,
+                "margins": None,
+                "encoding": "utf-8",
+                "active": True,
+                "is_default": True,
+                "status": "online",
+                "driver_name": "Canon MF3010",
+                "location": "",
+            }
+        ]
+
+    monkeypatch.setattr(
+        PrintService, "discover_system_printers", fake_discover_system_printers
+    )
+
+    synced = asyncio.run(service.sync_system_printers())
+    assert synced
+    assert synced[0].name == "Canon MF3010"
+    assert synced[0].connection_type == "local"
+
+    default_printer = crud_print.get_default_printer_for_type(db_session, "lab_results")
+    assert default_printer is not None
+    assert default_printer.name == "Canon MF3010"
+    assert default_printer.connection_type == "local"
+
+
+def test_print_printers_endpoint_uses_discovered_system_printers(
+    client, auth_headers, db_session, monkeypatch
+):
+    _create_printer(
+        db_session,
+        name="ticket_printer",
+        display_name="Термопринтер кассы",
+        printer_type="ESC/POS",
+        is_default=True,
+    )
+
+    service = PrintService(db_session)
+
+    async def fake_discover_system_printers(self):
+        return [
+            {
+                "name": "Canon MF3010",
+                "display_name": "Canon MF3010",
+                "printer_type": "A4",
+                "connection_type": "local",
+                "device_path": "Canon MF3010",
+                "paper_width": 210,
+                "paper_height": 297,
+                "margins": None,
+                "encoding": "utf-8",
+                "active": True,
+                "is_default": True,
+                "status": "online",
+                "driver_name": "Canon MF3010",
+                "location": "",
+            },
+            {
+                "name": "Thermal XPrinter",
+                "display_name": "Thermal XPrinter",
+                "printer_type": "ESC/POS",
+                "connection_type": "local",
+                "device_path": "Thermal XPrinter",
+                "paper_width": 58,
+                "paper_height": None,
+                "margins": None,
+                "encoding": "utf-8",
+                "active": True,
+                "is_default": False,
+                "status": "online",
+                "driver_name": "XPrinter",
+                "location": "",
+            },
+        ]
+
+    monkeypatch.setattr(
+        PrintService, "discover_system_printers", fake_discover_system_printers
+    )
+
+    client.app.dependency_overrides[print_api_module.get_print_service] = (
+        lambda: service
+    )
+    try:
+        response = client.get("/api/v1/print/printers", headers=auth_headers)
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["total"] == 2
+
+        printer_names = {item["name"] for item in payload["printers"]}
+        assert printer_names == {"Canon MF3010", "Thermal XPrinter"}
+        assert all(item["connection_type"] == "local" for item in payload["printers"])
     finally:
         client.app.dependency_overrides.pop(print_api_module.get_print_service, None)
 

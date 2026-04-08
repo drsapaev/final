@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
-import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import KPIMetrics from '../components/analytics/KPIMetrics';
 import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
+import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
 import logger from '../utils/logger';
 import {
   Calendar,
@@ -17,32 +17,308 @@ import {
 
   RefreshCw,
   BarChart3,
-  Target } from
+  Target,
+  Building2,
+  Wallet,
+  ArrowUpRight,
+  Clock3 } from
 'lucide-react';
 
-function buildKpiData(metrics) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const TAB_DEFINITIONS = [
+  { id: 'overview', label: 'Обзор', description: 'Сводка ключевых показателей за выбранный период', icon: Activity },
+  { id: 'appointments', label: 'Записи', description: 'Воронка записи, оплат и завершения', icon: Calendar },
+  { id: 'revenue', label: 'Доходы', description: 'Динамика выручки и структура оплат', icon: DollarSign },
+  { id: 'providers', label: 'Провайдеры', description: 'Сравнение платёжных провайдеров', icon: Wallet },
+  { id: 'visualization', label: 'Графики', description: 'Расширенные интерактивные графики', icon: BarChart3 },
+  { id: 'kpi', label: 'KPI', description: 'Операционные метрики и эффективность', icon: Target },
+  { id: 'predictive', label: 'Прогнозы', description: 'Тренды, сценарии и прогнозы', icon: TrendingUp }
+];
+
+const DEPARTMENT_OPTIONS = [
+{ value: '', label: 'Все отделения' },
+{ value: 'General', label: 'Общее' },
+{ value: 'Cardiology', label: 'Кардиология' },
+{ value: 'Dermatology', label: 'Дерматология' },
+{ value: 'Dentistry', label: 'Стоматология' }];
+
+function buildRelativeDateRange(days) {
+  const end = new Date();
+  const start = new Date(Date.now() - (days - 1) * DAY_MS);
   return {
-    metrics: Object.fromEntries(
-      metrics.map((metric, index) => [
-        metric.label || `metric_${index}`,
-        {
-          ...metric,
-          format: metric.format === 'visits' ? 'count' : metric.format || 'count'
-        }
-      ])
-    )
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
   };
+}
+
+function formatMetricValue(value, format = 'count') {
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
+  switch (format) {
+    case 'revenue':
+      return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'UZS',
+        maximumFractionDigits: 0
+      }).format(safeValue);
+    case 'percentage':
+      return `${safeValue.toFixed(1)}%`;
+    default:
+      return new Intl.NumberFormat('ru-RU', {
+        maximumFractionDigits: 0
+      }).format(safeValue);
+  }
+}
+
+function getActivePreset(start, end) {
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  const diff = Math.round((endDate - startDate) / DAY_MS) + 1;
+  if ([7, 30, 90].includes(diff)) {
+    return diff;
+  }
+  return null;
+}
+
+function normalizePairs(source, formatter) {
+  return Object.entries(source || {}).map(([key, value]) => formatter(key, value)).filter(Boolean);
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+const analyticsSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 68%) 0%, color-mix(in srgb, var(--mac-card-bg), white 60%) 100%)';
+const analyticsSurfaceStrong = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 74%) 0%, color-mix(in srgb, var(--mac-card-bg), white 66%) 100%)';
+const analyticsBorder = '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)';
+const analyticsInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 78%)';
+const analyticsTextPrimary = 'color-mix(in srgb, var(--mac-text-primary), black 72%)';
+const analyticsTextSecondary = 'color-mix(in srgb, var(--mac-text-secondary), black 48%)';
+
+function AnalyticsSectionCard({ title, subtitle, children, action, compact = false }) {
+  return (
+    <section style={{
+      background: analyticsSurface,
+      border: analyticsBorder,
+      borderRadius: '18px',
+      padding: compact ? '16px' : '20px',
+      boxShadow: 'var(--mac-shadow-sm)'
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '16px',
+        marginBottom: '18px'
+      }}>
+        <div>
+          <h3 style={{
+            margin: 0,
+            fontSize: compact ? '16px' : '18px',
+            fontWeight: 700,
+            color: analyticsTextPrimary
+          }}>
+            {title}
+          </h3>
+          {subtitle ?
+          <p style={{
+            margin: '6px 0 0 0',
+            fontSize: compact ? '12px' : '13px',
+            color: analyticsTextSecondary,
+            lineHeight: 1.5
+          }}>
+              {subtitle}
+            </p> :
+          null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>);
+}
+
+function AnalyticsStatCard({ icon, label, value, helper, accent = '#2563eb', format = 'count', compact = false }) {
+  return (
+    <article style={{
+      background: analyticsSurfaceStrong,
+      border: analyticsBorder,
+      borderRadius: '18px',
+      padding: compact ? '14px' : '18px',
+      minHeight: compact ? '108px' : '126px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      boxShadow: 'var(--mac-shadow-sm)'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px'
+      }}>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: compact ? '38px' : '42px',
+          height: compact ? '38px' : '42px',
+          borderRadius: '14px',
+          background: `${accent}14`,
+          color: accent
+        }}>
+          {icon}
+        </span>
+        {helper ?
+        <span style={{
+          fontSize: '12px',
+          fontWeight: 600,
+          color: accent,
+          background: `${accent}12`,
+          padding: '6px 10px',
+          borderRadius: '999px'
+        }}>
+            {helper}
+          </span> :
+        null}
+      </div>
+
+      <div>
+        <div style={{
+          fontSize: compact ? '12px' : '13px',
+          color: analyticsTextSecondary,
+          marginBottom: '8px'
+        }}>
+          {label}
+        </div>
+        <div style={{
+          fontSize: compact ? '24px' : '28px',
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          color: analyticsTextPrimary,
+          lineHeight: 1.1
+        }}>
+          {formatMetricValue(value, format)}
+        </div>
+      </div>
+    </article>);
+}
+
+function AnalyticsComparisonList({ items, format = 'count', accent = '#2563eb' }) {
+  if (!items.length) {
+    return <div style={{ color: analyticsTextSecondary }}>Данных пока недостаточно для сравнения.</div>;
+  }
+
+  const maxValue = Math.max(...items.map((item) => Number(item.value) || 0), 1);
+
+  return (
+    <div style={{ display: 'grid', gap: '14px' }}>
+      {items.map((item) =>
+      <div key={item.label} style={{ display: 'grid', gap: '8px' }}>
+          <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: '12px'
+        }}>
+            <span style={{ fontSize: '14px', color: analyticsTextPrimary, fontWeight: 600 }}>
+              {item.label}
+            </span>
+            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>
+              {formatMetricValue(item.value, format)}
+            </span>
+          </div>
+          <div style={{
+          height: '10px',
+          borderRadius: '999px',
+          background: 'color-mix(in srgb, var(--mac-card-border), transparent 38%)',
+          overflow: 'hidden'
+        }}>
+            <div style={{
+            width: `${clamp(Number(item.value) / maxValue * 100, 6, 100)}%`,
+            height: '100%',
+            borderRadius: '999px',
+            background: `linear-gradient(90deg, ${accent}, ${accent}bb)`
+          }}></div>
+          </div>
+        </div>
+      )}
+    </div>);
+}
+
+function AnalyticsLineTrend({ items, format = 'count', accent = '#2563eb', compact = false }) {
+  if (!items.length) {
+    return <div style={{ color: analyticsTextSecondary }}>История для графика пока пуста.</div>;
+  }
+
+  const values = items.map((item) => Number(item.value) || 0);
+  const maxValue = Math.max(...values, 1);
+  const minValue = Math.min(...values, 0);
+  const range = Math.max(maxValue - minValue, 1);
+  const points = items.map((item, index) => {
+    const x = items.length === 1 ? 0 : index / (items.length - 1) * 100;
+    const y = 100 - (Number(item.value) - minValue) / range * 100;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div style={{ display: 'grid', gap: '14px' }}>
+      <div style={{
+        height: compact ? '180px' : '210px',
+        borderRadius: '16px',
+        background: 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 6%) 0%, color-mix(in srgb, var(--mac-main-shell-bg), white 12%) 100%)',
+        border: analyticsBorder,
+        padding: '16px'
+      }}>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
+          <defs>
+            <linearGradient id="analyticsLineFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.22" />
+              <stop offset="100%" stopColor={accent} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          <polyline fill="none" stroke={accent} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={points} />
+          <polygon fill="url(#analyticsLineFill)" points={`0,100 ${points} 100,100`} />
+        </svg>
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: compact ? 'repeat(auto-fit, minmax(84px, 1fr))' : `repeat(${Math.min(items.length, 6)}, minmax(0, 1fr))`,
+        gap: '10px'
+      }}>
+        {items.slice(0, 6).map((item) =>
+        <div key={item.label} style={{ background: analyticsInsetSurface, border: analyticsBorder, borderRadius: '12px', padding: '10px 12px' }}>
+            <div style={{ fontSize: '12px', color: analyticsTextSecondary, marginBottom: '4px' }}>{item.label}</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: analyticsTextPrimary }}>
+              {formatMetricValue(item.value, format)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>);
+}
+
+function AnalyticsEmptyState({ title, description }) {
+  return (
+    <div style={{
+      background: analyticsSurface,
+      border: '1px dashed color-mix(in srgb, var(--mac-card-border), white 8%)',
+      borderRadius: '18px',
+      padding: '36px',
+      textAlign: 'center',
+      color: analyticsTextSecondary
+    }}>
+      <div style={{ fontSize: '16px', fontWeight: 700, color: analyticsTextPrimary, marginBottom: '8px' }}>{title}</div>
+      <div style={{ fontSize: '14px', lineHeight: 1.6 }}>{description}</div>
+    </div>);
 }
 
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
-  });
+  const [dateRange, setDateRange] = useState(buildRelativeDateRange(30));
   const [department, setDepartment] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [isCompactLayout, setIsCompactLayout] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 900 : false);
   const [data, setData] = useState({
     overview: null,
     appointments: null,
@@ -52,6 +328,18 @@ export default function AnalyticsPage() {
     kpi: null,
     predictive: null
   });
+  const activeTabMeta = TAB_DEFINITIONS.find((tab) => tab.id === activeTab) || TAB_DEFINITIONS[0];
+  const activePreset = getActivePreset(dateRange.start, dateRange.end);
+
+  useEffect(() => {
+    const updateLayoutMode = () => {
+      setIsCompactLayout(window.innerWidth < 900);
+    };
+
+    updateLayoutMode();
+    window.addEventListener('resize', updateLayoutMode);
+    return () => window.removeEventListener('resize', updateLayoutMode);
+  }, []);
 
   const loadAnalytics = useCallback(async (tab = activeTab) => {
     setLoading(true);
@@ -145,8 +433,34 @@ export default function AnalyticsPage() {
     }
   };
 
+  const setQuickRange = (days) => {
+    setDateRange(buildRelativeDateRange(days));
+  };
+
+  const renderMetricsRow = (metrics) =>
+  <div style={{
+    display: 'grid',
+    gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '16px'
+  }}>
+      {metrics.map((metric) =>
+    <AnalyticsStatCard
+      key={metric.label}
+      icon={metric.icon}
+      label={metric.label}
+      value={metric.value}
+      helper={metric.helper}
+      accent={metric.accent}
+      format={metric.format}
+      compact={isCompactLayout}
+    />
+    )}
+    </div>;
+
   const renderOverviewTab = () => {
-    if (!data.overview) return <div>Загрузка...</div>;
+    if (!data.overview) {
+      return <AnalyticsEmptyState title="Нет обзорных данных" description="Попробуй обновить диапазон или перезагрузить аналитический срез." />;
+    }
 
     const { today = {}, month = {} } = data.overview || {};
 
@@ -154,65 +468,74 @@ export default function AnalyticsPage() {
     {
       label: 'Визиты сегодня',
       value: today?.visits?.total_visits || 0,
-      type: 'visits',
-      icon: <Calendar size={16} />
+      helper: 'Сегодня',
+      accent: '#2563eb',
+      icon: <Calendar size={18} />
     },
     {
       label: 'Доходы сегодня',
       value: today?.revenue?.total_revenue || 0,
-      type: 'revenue',
+      helper: 'Касса',
+      accent: '#059669',
       format: 'revenue',
-      icon: <DollarSign size={16} />
+      icon: <DollarSign size={18} />
     },
     {
-      label: 'Пациенты за месяц',
+      label: 'Пациенты за период',
       value: month?.patients?.total_patients || 0,
-      type: 'patients',
-      icon: <Users size={16} />
+      helper: 'База',
+      accent: '#7c3aed',
+      icon: <Users size={18} />
     },
     {
-      label: 'Конверсия',
+      label: 'Конверсия завершения',
       value: month?.visits?.completion_rate || 0,
-      type: 'conversion',
+      helper: 'Эффективность',
+      accent: '#ea580c',
       format: 'percentage',
-      icon: <TrendingUp size={16} />
+      icon: <TrendingUp size={18} />
     }];
 
+    const visitTrend = normalizePairs(month?.visits?.day_stats, (day, count) => ({
+      label: day,
+      value: count
+    }));
+    const departmentRevenue = normalizePairs(month?.revenue?.department_stats, (departmentName, stats) => ({
+      label: departmentName,
+      value: stats?.total_revenue || 0
+    }));
 
     return (
-      <div>
-        <KPIMetrics data={buildKpiData(metrics)} />
-        
+      <div style={{ display: 'grid', gap: '18px' }}>
+        {renderMetricsRow(metrics)}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '24px'
+          gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '18px'
         }}>
-          <AnalyticsDashboard
-            title="Визиты по дням недели"
-            data={Object.entries(month.visits?.day_stats || {}).map(([day, count]) => ({
-              label: day,
-              value: count
-            }))}
-            type="bar"
-            color="#3b82f6" />
-          
-          
-          <AnalyticsDashboard
-            title="Доходы по отделениям"
-            data={Object.entries(month.revenue?.department_stats || {}).map(([dept, stats]) => ({
-              label: dept,
-              value: stats.total_revenue || 0
-            }))}
-            type="pie" />
-          
+          <AnalyticsSectionCard
+            title="Ритм визитов"
+            subtitle="Быстрый обзор нагрузки по дням недели."
+            compact={isCompactLayout}
+          >
+            <AnalyticsLineTrend items={visitTrend} accent="#2563eb" compact={isCompactLayout} />
+          </AnalyticsSectionCard>
+          <AnalyticsSectionCard
+            title="Доход по отделениям"
+            subtitle="Сразу видно, какие отделения тянут выручку."
+            compact={isCompactLayout}
+          >
+            <AnalyticsComparisonList items={departmentRevenue} format="revenue" accent="#059669" />
+          </AnalyticsSectionCard>
         </div>
       </div>);
 
   };
 
   const renderAppointmentsTab = () => {
-    if (!data.appointments) return <div>Загрузка...</div>;
+    if (!data.appointments) {
+      return <AnalyticsEmptyState title="Нет данных по записям" description="Этот блок появится, когда backend вернёт воронку записи и статусы." />;
+    }
 
     const {
       summary = {},
@@ -224,65 +547,74 @@ export default function AnalyticsPage() {
     {
       label: 'Всего записей',
       value: summary.total_appointments || 0,
-      type: 'visits',
-      icon: <Calendar size={16} />
+      helper: 'Поток',
+      accent: '#2563eb',
+      icon: <Calendar size={18} />
     },
     {
       label: 'Оплачено',
       value: summary.paid_appointments || 0,
-      type: 'visits',
-      icon: <DollarSign size={16} />
+      helper: 'Оплата',
+      accent: '#059669',
+      icon: <DollarSign size={18} />
     },
     {
       label: 'Завершено',
       value: summary.completed_appointments || 0,
-      type: 'visits',
-      icon: <Activity size={16} />
+      helper: 'Финал',
+      accent: '#7c3aed',
+      icon: <Activity size={18} />
     },
     {
-      label: 'Конверсия',
+      label: 'Общая конверсия',
       value: conversion_rates.overall_conversion || 0,
-      type: 'conversion',
+      helper: 'Воронка',
+      accent: '#ea580c',
       format: 'percentage',
-      icon: <TrendingUp size={16} />
+      icon: <TrendingUp size={18} />
     }];
+
+    const statuses = normalizePairs(status_distribution, (status, count) => ({
+      label: status,
+      value: count
+    }));
+    const funnel = [
+    { label: 'Запись -> Оплата', value: conversion_rates.pending_to_paid || 0 },
+    { label: 'Оплата -> Завершение', value: conversion_rates.paid_to_completed || 0 },
+    { label: 'Итоговая конверсия', value: conversion_rates.overall_conversion || 0 }];
 
 
     return (
-      <div>
-        <KPIMetrics data={buildKpiData(metrics)} />
-        
+      <div style={{ display: 'grid', gap: '18px' }}>
+        {renderMetricsRow(metrics)}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '24px'
+          gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '18px'
         }}>
-          <AnalyticsDashboard
-            title="Распределение по статусам"
-            data={Object.entries(status_distribution).map(([status, count]) => ({
-              label: status,
-              value: count
-            }))}
-            type="pie" />
-          
-          
-          <AnalyticsDashboard
-            title="Конверсия по воронке"
-            data={[
-            { label: 'Запись → Оплата', value: conversion_rates.pending_to_paid },
-            { label: 'Оплата → Завершение', value: conversion_rates.paid_to_completed },
-            { label: 'Общая конверсия', value: conversion_rates.overall_conversion }]
-            }
-            type="bar"
-            color="#10b981" />
-          
+          <AnalyticsSectionCard
+            title="Статусы записей"
+            subtitle="Что происходит с записями в текущем окне."
+            compact={isCompactLayout}
+          >
+            <AnalyticsComparisonList items={statuses} accent="#2563eb" />
+          </AnalyticsSectionCard>
+          <AnalyticsSectionCard
+            title="Качество воронки"
+            subtitle="Где путь пациента сужается сильнее всего."
+            compact={isCompactLayout}
+          >
+            <AnalyticsComparisonList items={funnel} format="percentage" accent="#ea580c" />
+          </AnalyticsSectionCard>
         </div>
       </div>);
 
   };
 
   const renderRevenueTab = () => {
-    if (!data.revenue) return <div>Загрузка...</div>;
+    if (!data.revenue) {
+      return <AnalyticsEmptyState title="Нет данных по доходам" description="Попробуй другой диапазон или обновление среза." />;
+    }
 
     const {
       total_revenue = 0,
@@ -296,327 +628,455 @@ export default function AnalyticsPage() {
     {
       label: 'Общий доход',
       value: total_revenue,
-      type: 'revenue',
+      helper: 'Сумма',
+      accent: '#059669',
       format: 'revenue',
-      icon: <DollarSign size={16} />
+      icon: <DollarSign size={18} />
     },
     {
       label: 'Транзакций',
       value: total_transactions,
-      type: 'visits',
-      icon: <Activity size={16} />
+      helper: 'Платежи',
+      accent: '#2563eb',
+      icon: <Activity size={18} />
     },
     {
       label: 'Средний чек',
       value: average_transaction,
-      type: 'revenue',
+      helper: 'Среднее',
+      accent: '#7c3aed',
       format: 'revenue',
-      icon: <TrendingUp size={16} />
+      icon: <ArrowUpRight size={18} />
     }];
+
+    const dailyTrend = (daily_revenue || []).map((item) => ({
+      label: new Date(item.date).toLocaleDateString('ru-RU', {
+        month: 'short',
+        day: 'numeric'
+      }),
+      value: item.amount
+    }));
+    const providerRevenue = normalizePairs(provider_breakdown, (providerName, stats) => ({
+      label: providerName,
+      value: stats?.total_amount || 0
+    }));
 
 
     return (
-      <div>
-        <KPIMetrics data={buildKpiData(metrics)} />
-        
+      <div style={{ display: 'grid', gap: '18px' }}>
+        {renderMetricsRow(metrics)}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '24px'
+          gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '18px'
         }}>
-          <AnalyticsDashboard
-            title="Доходы по дням"
-            data={daily_revenue.map((item) => ({
-              label: new Date(item.date).toLocaleDateString('ru-RU', {
-                month: 'short',
-                day: 'numeric'
-              }),
-              value: item.amount
-            }))}
-            type="line"
-            color="#10b981" />
-          
-          
-          <AnalyticsDashboard
-            title="Доходы по провайдерам"
-            data={Object.entries(provider_breakdown).map(([provider, stats]) => ({
-              label: provider,
-              value: stats.total_amount
-            }))}
-            type="bar"
-            color="#8b5cf6" />
-          
+          <AnalyticsSectionCard
+            title="Доход по дням"
+            subtitle="Насколько ровно идёт денежный поток."
+            compact={isCompactLayout}
+          >
+            <AnalyticsLineTrend items={dailyTrend} format="revenue" accent="#059669" compact={isCompactLayout} />
+          </AnalyticsSectionCard>
+          <AnalyticsSectionCard
+            title="Доход по провайдерам"
+            subtitle="Какие платёжные каналы приносят больше."
+            compact={isCompactLayout}
+          >
+            <AnalyticsComparisonList items={providerRevenue} format="revenue" accent="#7c3aed" />
+          </AnalyticsSectionCard>
         </div>
       </div>);
 
   };
 
   const renderProvidersTab = () => {
-    if (!data.providers) return <div>Загрузка...</div>;
+    if (!data.providers) {
+      return <AnalyticsEmptyState title="Нет данных по провайдерам" description="Провайдеры появятся здесь после успешной загрузки аналитики платежей." />;
+    }
 
     const { summary = {}, providers = {} } = data.providers || {};
 
     const metrics = [
     {
       label: 'Активных провайдеров',
-      value: summary.active_providers,
-      type: 'visits',
-      icon: <Activity size={16} />
+      value: summary.active_providers || 0,
+      helper: 'Каналы',
+      accent: '#2563eb',
+      icon: <Building2 size={18} />
     },
     {
       label: 'Всего транзакций',
-      value: summary.total_transactions,
-      type: 'visits',
-      icon: <TrendingUp size={16} />
+      value: summary.total_transactions || 0,
+      helper: 'Операции',
+      accent: '#059669',
+      icon: <Activity size={18} />
     },
     {
       label: 'Общий доход',
-      value: summary.total_revenue,
-      type: 'revenue',
+      value: summary.total_revenue || 0,
+      helper: 'Выручка',
+      accent: '#7c3aed',
       format: 'revenue',
-      icon: <DollarSign size={16} />
+      icon: <DollarSign size={18} />
     },
     {
       label: 'Комиссия',
-      value: summary.total_commission,
-      type: 'revenue',
+      value: summary.total_commission || 0,
+      helper: 'Издержки',
+      accent: '#ea580c',
       format: 'revenue',
-      icon: <DollarSign size={16} />
+      icon: <Wallet size={18} />
     }];
+
+    const providerAmount = normalizePairs(providers, (_, stats) => ({
+      label: stats?.name || 'Без названия',
+      value: stats?.total_amount || 0
+    }));
+    const providerSuccess = normalizePairs(providers, (_, stats) => ({
+      label: stats?.name || 'Без названия',
+      value: stats?.success_rate || 0
+    }));
 
 
     return (
-      <div>
-        <KPIMetrics data={buildKpiData(metrics)} />
-        
+      <div style={{ display: 'grid', gap: '18px' }}>
+        {renderMetricsRow(metrics)}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '24px'
+          gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '18px'
         }}>
-          <AnalyticsDashboard
-            title="Доходы по провайдерам"
-            data={Object.entries(providers).map(([, stats]) => ({
-              label: stats.name,
-              value: stats.total_amount
-            }))}
-            type="pie" />
-          
-          
-          <AnalyticsDashboard
-            title="Успешность провайдеров"
-            data={Object.entries(providers).map(([, stats]) => ({
-              label: stats.name,
-              value: stats.success_rate
-            }))}
-            type="bar"
-            color="#10b981" />
-          
+          <AnalyticsSectionCard
+            title="Доходность провайдеров"
+            subtitle="Сравнение по выручке без визуального шума."
+            compact={isCompactLayout}
+          >
+            <AnalyticsComparisonList items={providerAmount} format="revenue" accent="#2563eb" />
+          </AnalyticsSectionCard>
+          <AnalyticsSectionCard
+            title="Успешность операций"
+            subtitle="Где меньше отказов и стабильнее обработка."
+            compact={isCompactLayout}
+          >
+            <AnalyticsComparisonList items={providerSuccess} format="percentage" accent="#059669" />
+          </AnalyticsSectionCard>
         </div>
       </div>);
 
   };
 
+  const renderCurrentTab = () => {
+    switch (activeTab) {
+      case 'overview':
+        return renderOverviewTab();
+      case 'appointments':
+        return renderAppointmentsTab();
+      case 'revenue':
+        return renderRevenueTab();
+      case 'providers':
+        return renderProvidersTab();
+      case 'visualization':
+        return (
+          <AnalyticsSectionCard title="Глубокая визуализация" subtitle="Расширенные интерактивные графики для детального разбора." compact={isCompactLayout}>
+            <AdvancedCharts
+              data={data.visualization}
+              loading={loading}
+              onRefresh={() => loadAnalytics('visualization')}
+              onExport={() => exportData('json')}
+              title="Интерактивные графики аналитики" />
+          </AnalyticsSectionCard>);
+      case 'kpi':
+        return (
+          <AnalyticsSectionCard title="KPI-панель" subtitle="Управленческие метрики и сравнения без смешения с обзорным экраном." compact={isCompactLayout}>
+            <KPIMetrics
+              data={data.kpi}
+              loading={loading}
+              onRefresh={() => loadAnalytics('kpi')}
+              onExport={() => exportData('json')} />
+          </AnalyticsSectionCard>);
+      case 'predictive':
+        return (
+          <AnalyticsSectionCard title="Прогнозная аналитика" subtitle="Будущие тренды и сценарии на основе текущих данных." compact={isCompactLayout}>
+            <PredictiveAnalytics
+              data={data.predictive}
+              loading={loading}
+              onRefresh={() => loadAnalytics('predictive')}
+              onExport={() => exportData('json')} />
+          </AnalyticsSectionCard>);
+      default:
+        return renderOverviewTab();
+    }
+  };
+
   return (
-    <div style={{ padding: getSpacing('lg') }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: getSpacing('lg')
+    <div style={{ padding: isCompactLayout ? getSpacing('md') : getSpacing('lg'), display: 'grid', gap: getSpacing('lg') }}>
+      <section style={{
+        background: analyticsSurface,
+        border: analyticsBorder,
+        borderRadius: '22px',
+        padding: isCompactLayout ? '18px' : '24px',
+        boxShadow: 'var(--mac-shadow-sm)'
       }}>
-        <h1 style={{
-          fontSize: '24px',
-          fontWeight: '700',
-          color: getColor('primary', 900),
-          margin: 0
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: isCompactLayout ? 'stretch' : 'flex-start',
+          gap: '18px',
+          flexWrap: 'wrap',
+          flexDirection: isCompactLayout ? 'column' : 'row'
         }}>
-          Аналитика и отчёты
-        </h1>
-        
-        <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center' }}>
+          <div style={{ maxWidth: '760px' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 12px',
+              borderRadius: '999px',
+              background: analyticsInsetSurface,
+              color: getColor('primary', 800),
+              fontSize: '12px',
+              fontWeight: 700,
+              marginBottom: '14px',
+              width: isCompactLayout ? 'fit-content' : 'auto'
+            }}>
+              <BarChart3 size={14} />
+              Админ / аналитика
+            </div>
+            <h1 style={{
+              fontSize: isCompactLayout ? '26px' : '32px',
+              lineHeight: 1.1,
+              fontWeight: 800,
+              color: getColor('primary', 900),
+              margin: 0
+            }}>
+              Аналитика
+            </h1>
+            <p style={{ margin: '10px 0 0 0', fontSize: isCompactLayout ? '14px' : '15px', lineHeight: 1.65, color: analyticsTextSecondary }}>
+              Быстрый обзор вынесен отдельно, а здесь собраны подробные разрезы по записям, выручке, провайдерам и прогнозам.
+            </p>
+          </div>
           <button
             onClick={() => exportData('json')}
             style={{
-              padding: '8px 16px',
-              background: 'var(--accent-color)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '10px',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '12px 18px',
+              background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 700,
+              boxShadow: '0 10px 24px rgba(37, 99, 235, 0.22)',
+              width: isCompactLayout ? '100%' : 'auto',
+              justifyContent: 'center'
             }}>
-            
             <Download size={16} />
-            Экспорт
+            Экспорт JSON
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Фильтры */}
-      <div style={{
-        background: 'var(--bg-primary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        padding: getSpacing('lg'),
-        marginBottom: getSpacing('lg'),
-        display: 'flex',
-        gap: getSpacing('md'),
-        alignItems: 'center',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar size={16} color="var(--text-secondary)" />
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-            style={{
-              padding: '8px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '6px',
-              background: 'var(--bg-primary)',
-              color: 'var(--text-primary)'
-            }} />
-          
-          <span style={{ color: 'var(--text-secondary)' }}>—</span>
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-            style={{
-              padding: '8px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '6px',
-              background: 'var(--bg-primary)',
-              color: 'var(--text-primary)'
-            }} />
-          
-        </div>
-        
-        <select
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          style={{
-            padding: '8px',
-            border: '1px solid var(--border-color)',
-            borderRadius: '6px',
-            background: 'var(--bg-primary)',
-            color: 'var(--text-primary)'
-          }}>
-          
-          <option value="">Все отделения</option>
-          <option value="General">Общее</option>
-          <option value="Cardiology">Кардиология</option>
-          <option value="Dermatology">Дерматология</option>
-          <option value="Dentistry">Стоматология</option>
-        </select>
-        
-        <button
-          onClick={() => loadAnalytics()}
-          disabled={loading}
-          style={{
-            padding: '8px 16px',
-            background: loading ? 'var(--bg-secondary)' : 'var(--accent-color)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-          
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Обновить
-        </button>
-      </div>
+      <AdminRouteSwitcher current="analytics" />
 
-      {/* Вкладки */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: getSpacing('lg'),
-        borderBottom: '1px solid var(--border-color)'
+      <section style={{
+        background: analyticsSurface,
+        border: analyticsBorder,
+        borderRadius: '20px',
+        padding: isCompactLayout ? '16px' : '20px',
+        display: 'grid',
+        gap: '18px',
+        boxShadow: 'var(--mac-shadow-sm)'
       }}>
-        {[
-        { id: 'overview', label: 'Обзор', icon: <Activity size={16} /> },
-        { id: 'appointments', label: 'Записи', icon: <Calendar size={16} /> },
-        { id: 'revenue', label: 'Доходы', icon: <DollarSign size={16} /> },
-        { id: 'providers', label: 'Провайдеры', icon: <TrendingUp size={16} /> },
-        { id: 'visualization', label: 'Графики', icon: <BarChart3 size={16} /> },
-        { id: 'kpi', label: 'KPI', icon: <Target size={16} /> },
-        { id: 'predictive', label: 'Прогнозы', icon: <TrendingUp size={16} /> }].
-        map((tab) =>
-        <button
-          key={tab.id}
-          onClick={() => handleTabChange(tab.id)}
-          style={{
-            padding: '12px 20px',
-            background: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
-            color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
-            border: 'none',
-            borderRadius: '8px 8px 0 0',
-            cursor: 'pointer',
-            display: 'flex',
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: isCompactLayout ? 'stretch' : 'center',
+          gap: '16px',
+          flexWrap: 'wrap',
+          flexDirection: isCompactLayout ? 'column' : 'row'
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: analyticsTextSecondary, marginBottom: '6px' }}>
+              Период и разрез
+            </div>
+            <div style={{ fontSize: isCompactLayout ? '15px' : '16px', fontWeight: 700, color: analyticsTextPrimary }}>
+              {activeTabMeta.label}: {activeTabMeta.description}
+            </div>
+          </div>
+          <div style={{
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease'
+            padding: '8px 12px',
+            borderRadius: '999px',
+            background: analyticsInsetSurface,
+            border: analyticsBorder,
+            color: analyticsTextSecondary,
+            fontSize: '13px',
+            width: isCompactLayout ? '100%' : 'auto',
+            justifyContent: 'center'
           }}>
-          
-            {tab.icon}
-            {tab.label}
+            <Clock3 size={14} />
+            {dateRange.start} {' -> '} {dateRange.end}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {[7, 30, 90].map((days) =>
+          <button
+            key={days}
+            onClick={() => setQuickRange(days)}
+            style={{
+              border: '1px solid',
+              borderColor: activePreset === days ? '#2563eb' : 'color-mix(in srgb, var(--mac-card-border), white 8%)',
+              background: activePreset === days ? 'rgba(37, 99, 235, 0.1)' : analyticsInsetSurface,
+              color: activePreset === days ? '#2563eb' : analyticsTextPrimary,
+              padding: '9px 14px',
+              borderRadius: '999px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              flex: isCompactLayout ? '1 1 92px' : '0 0 auto'
+            }}>
+              {days} дней
+            </button>
+          )}
+        </div>
+
+        <div style={{
+          display: 'flex',
+          gap: '14px',
+          alignItems: 'end',
+          flexWrap: 'wrap',
+          flexDirection: isCompactLayout ? 'column' : 'row'
+        }}>
+          <label style={{ display: 'grid', gap: '8px', flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
+            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Начало периода</span>
+            <input
+              type="date"
+              value={dateRange.start}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+              style={{
+                padding: '11px 12px',
+                border: analyticsBorder,
+                borderRadius: '12px',
+                background: analyticsInsetSurface,
+                color: analyticsTextPrimary
+              }} />
+          </label>
+
+          <label style={{ display: 'grid', gap: '8px', flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
+            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Конец периода</span>
+            <input
+              type="date"
+              value={dateRange.end}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+              style={{
+                padding: '11px 12px',
+                border: analyticsBorder,
+                borderRadius: '12px',
+                background: analyticsInsetSurface,
+                color: analyticsTextPrimary
+              }} />
+          </label>
+
+          <label style={{ display: 'grid', gap: '8px', flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
+            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Отделение</span>
+            <select
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              style={{
+                padding: '11px 12px',
+                border: analyticsBorder,
+                borderRadius: '12px',
+                background: analyticsInsetSurface,
+                color: analyticsTextPrimary
+              }}>
+              {DEPARTMENT_OPTIONS.map((option) =>
+              <option key={option.value || 'all'} value={option.value}>
+                  {option.label}
+                </option>
+              )}
+            </select>
+          </label>
+
+          <button
+            onClick={() => loadAnalytics()}
+            disabled={loading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '12px 18px',
+              border: 'none',
+              borderRadius: '14px',
+              background: loading ? 'rgba(148, 163, 184, 0.45)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              color: '#fff',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: 700,
+              minWidth: '156px',
+              flex: isCompactLayout ? '1 1 100%' : '0 0 auto',
+              width: isCompactLayout ? '100%' : 'auto'
+            }}>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Обновляем...' : 'Обновить'}
           </button>
-        )}
-      </div>
+        </div>
+      </section>
 
-      {/* Контент */}
-      {loading ?
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '200px',
-        color: 'var(--text-secondary)'
+      <section style={{
+        background: analyticsSurface,
+        border: analyticsBorder,
+        borderRadius: '20px',
+        padding: isCompactLayout ? '10px' : '12px',
+        boxShadow: 'var(--mac-shadow-sm)'
       }}>
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          flexWrap: isCompactLayout ? 'nowrap' : 'wrap',
+          overflowX: isCompactLayout ? 'auto' : 'visible',
+          paddingBottom: isCompactLayout ? '4px' : 0,
+          scrollbarWidth: 'none'
+        }}>
+          {TAB_DEFINITIONS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '9px',
+                  border: isActive ? 'none' : analyticsBorder,
+                  borderRadius: '14px',
+                  padding: isCompactLayout ? '11px 14px' : '12px 16px',
+                  background: isActive ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : analyticsInsetSurface,
+                  color: isActive ? '#fff' : analyticsTextPrimary,
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  boxShadow: isActive ? '0 10px 20px rgba(37, 99, 235, 0.18)' : 'var(--mac-shadow-sm)',
+                  whiteSpace: 'nowrap',
+                  flex: isCompactLayout ? '0 0 auto' : 'none'
+                }}>
+                <Icon size={16} />
+                {tab.label}
+              </button>);
+          })}
+        </div>
+      </section>
+
+      {loading ?
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: isCompactLayout ? '160px' : '200px', color: analyticsTextSecondary }}>
           <RefreshCw size={24} className="animate-spin" />
-          <span style={{ marginLeft: '12px' }}>Загрузка данных...</span>
+          <span style={{ marginLeft: '12px' }}>Подготавливаем аналитический срез...</span>
         </div> :
-
-      <>
-          {activeTab === 'overview' && renderOverviewTab()}
-          {activeTab === 'appointments' && renderAppointmentsTab()}
-          {activeTab === 'revenue' && renderRevenueTab()}
-          {activeTab === 'providers' && renderProvidersTab()}
-          {activeTab === 'visualization' &&
-        <AdvancedCharts
-          data={data.visualization}
-          loading={loading}
-          onRefresh={() => loadAnalytics('visualization')}
-          onExport={() => exportData('json')}
-          title="Интерактивные графики аналитики" />
-
-        }
-          {activeTab === 'kpi' &&
-        <KPIMetrics
-          data={data.kpi}
-          loading={loading}
-          onRefresh={() => loadAnalytics('kpi')}
-          onExport={() => exportData('json')} />
-
-        }
-          {activeTab === 'predictive' &&
-        <PredictiveAnalytics
-          data={data.predictive}
-          loading={loading}
-          onRefresh={() => loadAnalytics('predictive')}
-          onExport={() => exportData('json')} />
-
-        }
-        </>
+      renderCurrentTab()
       }
     </div>);
 

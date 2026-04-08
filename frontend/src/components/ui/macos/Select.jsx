@@ -100,14 +100,16 @@ const Select = React.forwardRef(({
     fontSize: `${s.fs}px`,
     padding: s.pad,
     borderRadius: '8px',
-    border: '1px solid var(--mac-border)',
-    background: disabled ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-elev-1)',
+    border: '1px solid var(--mac-card-border, var(--mac-border))',
+    background: disabled ?
+    'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-tertiary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 38%)' :
+    'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 24%)',
     color: 'var(--mac-text-primary)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '8px',
-    boxShadow: 'var(--mac-shadow-1)',
+    boxShadow: 'var(--mac-shadow-sm)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all 160ms cubic-bezier(0.2,0.8,0.2,1)'
   };
@@ -120,8 +122,8 @@ const Select = React.forwardRef(({
     maxHeight: `${dropdownRect.height}px`,
     zIndex: 2147483000,
     borderRadius: '10px',
-    border: '1px solid var(--mac-border)',
-    background: 'var(--mac-bg-primary)',
+    border: '1px solid var(--mac-card-border, var(--mac-border))',
+    background: 'var(--mac-card-bg, var(--mac-bg-primary))',
     boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
     overflow: 'visible',
     padding: '4px 0',
@@ -133,8 +135,8 @@ const Select = React.forwardRef(({
     minWidth: '160px',
     zIndex: 2147483000,
     borderRadius: '10px',
-    border: '1px solid var(--mac-border)',
-    background: 'var(--mac-bg-primary)',
+    border: '1px solid var(--mac-card-border, var(--mac-border))',
+    background: 'var(--mac-card-bg, var(--mac-bg-primary))',
     boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
     overflow: 'visible',
     padding: '4px 0',
@@ -237,4 +239,3 @@ Select.propTypes = {
 };
 
 export default Select;
-

@@ -1,4 +1,5 @@
 import calendar
+import statistics
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -17,6 +18,52 @@ class AnalyticsService:
     """Сервис для аналитики и статистики клиники"""
 
     @staticmethod
+    def _stringify_dimension(value: Any, fallback: str) -> str:
+        """Normalize analytics labels so JSON responses always have string keys."""
+        if value is None:
+            return fallback
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or fallback
+        if isinstance(value, dict):
+            for candidate_key in ("name", "title", "label", "code", "id"):
+                candidate = value.get(candidate_key)
+                if candidate not in (None, ""):
+                    return str(candidate)
+            return fallback
+
+        for attr_name in ("name", "title", "label", "code", "id"):
+            candidate = getattr(value, attr_name, None)
+            if candidate not in (None, ""):
+                return str(candidate)
+
+        return str(value)
+
+    @staticmethod
+    def _visit_activity_date(visit: Visit) -> datetime.date:
+        """Resolve the most reliable visit date for analytics."""
+        if getattr(visit, "visit_date", None):
+            return visit.visit_date
+        if getattr(visit, "created_at", None):
+            return visit.created_at.date()
+        return datetime.utcnow().date()
+
+    @staticmethod
+    def _visit_activity_hour(visit: Visit) -> int:
+        """Resolve the most reliable visit hour for analytics."""
+        visit_time = getattr(visit, "visit_time", None)
+        if visit_time:
+            for fmt in ("%H:%M:%S", "%H:%M"):
+                try:
+                    return datetime.strptime(visit_time, fmt).hour
+                except ValueError:
+                    continue
+        created_at = getattr(visit, "created_at", None)
+        if created_at:
+            return created_at.hour
+        return 0
+
+    @staticmethod
     def get_visit_statistics(
         db: Session,
         start_date: datetime,
@@ -24,8 +71,9 @@ class AnalyticsService:
         department: str | None = None,
     ) -> dict[str, Any]:
         """Получение статистики визитов"""
+        visit_date_expr = func.coalesce(Visit.visit_date, func.date(Visit.created_at))
         query = db.query(Visit).filter(
-            and_(Visit.date >= start_date, Visit.date <= end_date)
+            and_(visit_date_expr >= start_date.date(), visit_date_expr <= end_date.date())
         )
 
         if department:
@@ -42,13 +90,13 @@ class AnalyticsService:
         # Статистика по дням недели
         day_stats = {}
         for visit in visits:
-            day_name = calendar.day_name[visit.date.weekday()]
+            day_name = calendar.day_name[AnalyticsService._visit_activity_date(visit).weekday()]
             day_stats[day_name] = day_stats.get(day_name, 0) + 1
 
         # Статистика по часам
         hour_stats = {}
         for visit in visits:
-            hour = visit.date.hour
+            hour = AnalyticsService._visit_activity_hour(visit)
             hour_stats[hour] = hour_stats.get(hour, 0) + 1
 
         return {
@@ -84,7 +132,14 @@ class AnalyticsService:
         # Активные пациенты (с визитами за период)
         active_patients = (
             db.query(Visit.patient_id)
-            .filter(and_(Visit.date >= start_date, Visit.date <= end_date))
+            .filter(
+                and_(
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    >= start_date.date(),
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    <= end_date.date(),
+                )
+            )
             .distinct()
             .count()
         )
@@ -92,7 +147,14 @@ class AnalyticsService:
         # Возвращающиеся пациенты
         returning_patients = (
             db.query(Visit.patient_id)
-            .filter(and_(Visit.date >= start_date, Visit.date <= end_date))
+            .filter(
+                and_(
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    >= start_date.date(),
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    <= end_date.date(),
+                )
+            )
             .group_by(Visit.patient_id)
             .having(func.count(Visit.id) > 1)
             .count()
@@ -258,7 +320,14 @@ class AnalyticsService:
             # Подсчитываем количество визитов с этой услугой
             visit_count = (
                 db.query(Visit)
-                .filter(and_(Visit.date >= start_date, Visit.date <= end_date))
+                .filter(
+                    and_(
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        >= start_date.date(),
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        <= end_date.date(),
+                    )
+                )
                 .join(Visit.services)
                 .filter(Service.id == service.id)
                 .count()
@@ -298,38 +367,68 @@ class AnalyticsService:
     ) -> dict[str, Any]:
         """Получение статистики очередей"""
         # Импортируем здесь, чтобы избежать циклических импортов
+        from app.models.clinic import Doctor
         from app.models.online_queue import DailyQueue
 
         # Получаем статистику очередей
         queue_query = db.query(DailyQueue).filter(
-            and_(
-                DailyQueue.date >= start_date.date(), DailyQueue.date <= end_date.date()
-            )
+            and_(DailyQueue.day >= start_date.date(), DailyQueue.day <= end_date.date())
         )
 
         if department:
-            queue_query = queue_query.filter(DailyQueue.department == department)
+            queue_query = queue_query.join(DailyQueue.specialist).filter(
+                Doctor.specialty == department
+            )
 
         queues = queue_query.all()
 
         total_queues = len(queues)
-        total_entries = sum(q.total_entries for q in queues)
-        total_served = sum(q.served for q in queues)
-        total_waiting = sum(q.waiting for q in queues)
+        total_entries = sum(len(q.entries) for q in queues)
+        total_served = sum(
+            sum(1 for entry in q.entries if entry.status == "served") for q in queues
+        )
+        total_waiting = sum(
+            sum(
+                1
+                for entry in q.entries
+                if entry.status in {"waiting", "called", "in_service", "diagnostics"}
+            )
+            for q in queues
+        )
 
-        # Среднее время ожидания (примерно)
-        avg_wait_time = "15-30 минут"  # TODO: реализовать точный расчёт
+        wait_times: list[float] = []
+        for queue in queues:
+            for entry in queue.entries:
+                reference_time = entry.called_at or entry.created_at
+                if entry.queue_time and reference_time:
+                    wait_times.append(
+                        (reference_time - entry.queue_time).total_seconds() / 60
+                    )
+
+        avg_wait_time_minutes = round(statistics.mean(wait_times), 2) if wait_times else 0.0
+        avg_wait_time = f"{avg_wait_time_minutes:.0f} минут" if avg_wait_time_minutes else "0 минут"
 
         # Статистика по отделениям
         department_stats = {}
         for queue in queues:
-            dept = queue.department
+            dept = (
+                queue.specialist.specialty
+                if getattr(queue, "specialist", None)
+                and getattr(queue.specialist, "specialty", None)
+                else queue.queue_tag or "Общее"
+            )
             if dept not in department_stats:
                 department_stats[dept] = {"total_entries": 0, "served": 0, "waiting": 0}
 
-            department_stats[dept]["total_entries"] += queue.total_entries
-            department_stats[dept]["served"] += queue.served
-            department_stats[dept]["waiting"] += queue.waiting
+            department_stats[dept]["total_entries"] += len(queue.entries)
+            department_stats[dept]["served"] += sum(
+                1 for entry in queue.entries if entry.status == "served"
+            )
+            department_stats[dept]["waiting"] += sum(
+                1
+                for entry in queue.entries
+                if entry.status in {"waiting", "called", "in_service", "diagnostics"}
+            )
 
         return {
             "period": {
@@ -343,6 +442,7 @@ class AnalyticsService:
             "service_rate": (
                 (total_served / total_entries * 100) if total_entries > 0 else 0
             ),
+            "average_wait_time_minutes": avg_wait_time_minutes,
             "average_wait_time": avg_wait_time,
             "by_department": department_stats,
         }
@@ -396,7 +496,14 @@ class AnalyticsService:
 
             visit_count = (
                 db.query(Visit)
-                .filter(and_(Visit.date >= date, Visit.date < next_date))
+                .filter(
+                    and_(
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        >= date.date(),
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        < next_date.date(),
+                    )
+                )
                 .count()
             )
 
@@ -554,7 +661,9 @@ class AnalyticsService:
         # Статистика по статусам
         status_stats = {}
         for appointment in appointments:
-            status = appointment.status
+            status = AnalyticsService._stringify_dimension(
+                getattr(appointment, "status", None), "scheduled"
+            )
             if status not in status_stats:
                 status_stats[status] = 0
             status_stats[status] += 1
@@ -562,7 +671,9 @@ class AnalyticsService:
         # Статистика по отделениям
         department_stats = {}
         for appointment in appointments:
-            dept = appointment.department or "Не указано"
+            dept = AnalyticsService._stringify_dimension(
+                getattr(appointment, "department", None), "Не указано"
+            )
             if dept not in department_stats:
                 department_stats[dept] = {"total": 0, "paid": 0, "completed": 0}
             department_stats[dept]["total"] += 1

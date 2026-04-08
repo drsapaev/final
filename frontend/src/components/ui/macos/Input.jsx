@@ -35,8 +35,10 @@ const Input = React.forwardRef(({
       fontSize: '13px',
       fontWeight: '400',
       borderRadius: '6px',
-      border: `1px solid ${error ? '#ff3b30' : isFocused ? '#007aff' : 'var(--mac-border)'}`,
-      backgroundColor: disabled ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)',
+      border: `1px solid ${error ? '#ff3b30' : isFocused ? '#007aff' : 'var(--mac-card-border, var(--mac-border))'}`,
+      backgroundColor: disabled ?
+      'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-tertiary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 38%)' :
+      'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 24%)',
       color: 'var(--mac-text-primary)',
       padding: '8px 12px',
       transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -44,7 +46,7 @@ const Input = React.forwardRef(({
       WebkitAppearance: 'none',
       MozAppearance: 'none',
       appearance: 'none',
-      backdropFilter: 'blur(10px)',
+      backdropFilter: 'var(--mac-blur-light)',
       position: 'relative'
     };
 
