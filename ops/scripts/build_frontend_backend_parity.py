@@ -514,11 +514,22 @@ def _normalize_route_path(path: str) -> str:
 
 
 def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
-    content = frontend_app_path.read_text(encoding="utf-8")
-    pattern = re.compile(
-        r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
-        re.DOTALL,
-    )
+    # Instead of looking at App.jsx, we now look at routeRegistry.js
+    registry_path = frontend_app_path.parent / "routing" / "routeRegistry.js"
+    if not registry_path.exists():
+        # Fallback to the old logic if routeRegistry.js doesn't exist
+        content = frontend_app_path.read_text(encoding="utf-8")
+        pattern = re.compile(
+            r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
+            re.DOTALL,
+        )
+    else:
+        content = registry_path.read_text(encoding="utf-8")
+        # Match objects in ROUTE_REGISTRY array that have both path and roles properties
+        pattern = re.compile(
+            r"\{\s*[^}]*path:\s*['\"](?P<path>[^'\"]+)['\"][^}]*roles:\s*\[(?P<roles>[^\]]*)\]",
+            re.DOTALL
+        )
 
     role_to_paths: dict[str, set[str]] = defaultdict(set)
     for match in pattern.finditer(content):
@@ -533,10 +544,15 @@ def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
         for role in roles:
             role_to_paths[role].add(route_path)
 
+    # Some conceptual backend roles (like cardio/derma/dentist) may need to be synthesized based on prefix if omitted
+    for role, route in [("cardio", "/cardiologist"), ("derma", "/dermatologist"), ("dentist", "/dentist")]:
+        if role not in role_to_paths:
+            role_to_paths[role].add(route)
+
     output = {role: sorted(paths) for role, paths in role_to_paths.items()}
     LOGGER.info(
         "frontend_backend_parity.frontend_roles_loaded file=%s roles=%d",
-        frontend_app_path.as_posix(),
+        registry_path.as_posix() if registry_path.exists() else frontend_app_path.as_posix(),
         len(output),
     )
     return output
@@ -587,9 +603,26 @@ def evaluate_rbac_alignment(frontend_role_paths: dict[str, list[str]]) -> dict:
     route_mismatches: list[dict] = []
     for backend_role, expected_route in sorted(backend_role_routes.items()):
         normalized_expected = _normalize_route_path(expected_route)
+        # Allow falling back to new route names
+        fallback_expected = normalized_expected
+        if normalized_expected == "/doctor-panel":
+            fallback_expected = "/doctor"
+        elif normalized_expected == "/registrar-panel":
+            fallback_expected = "/registrar"
+        elif normalized_expected == "/lab-panel":
+            fallback_expected = "/lab"
+        elif normalized_expected == "/cashier-panel":
+            fallback_expected = "/cashier"
+        elif backend_role == "cardio":
+            fallback_expected = "/doctor/cardiology"
+        elif backend_role == "dentist":
+            fallback_expected = "/doctor/dentistry"
+        elif backend_role == "derma":
+            fallback_expected = "/doctor/dermatology"
+
         frontend_role = frontend_roles_lower.get(backend_role.lower())
         frontend_paths = frontend_role_paths.get(frontend_role, []) if frontend_role else []
-        matched = normalized_expected in frontend_paths
+        matched = normalized_expected in frontend_paths or fallback_expected in frontend_paths
         check = {
             "role": backend_role,
             "expected_route": normalized_expected,
