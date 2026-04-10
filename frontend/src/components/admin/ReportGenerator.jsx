@@ -85,29 +85,45 @@ const ReportGenerator = ({
     selectedReportType || internalSelectedReportType;
 
   const getReportTypeLabel = useCallback((type) => {
-    const labels = {
+    const labelMap = {
       financial: 'Финансовый отчет',
+      financial_report: 'Финансовый отчет',
+      appointments: 'Отчет по записям',
+      appointments_report: 'Отчет по записям',
       patients: 'Отчет по пациентам',
-      appointments: 'Отчет по приемам',
-      services: 'Отчет по услугам',
+      patient_report: 'Отчет по пациентам',
+      queue_report: 'Отчет по очереди',
       doctors: 'Отчет по врачам',
+      doctor_performance_report: 'Отчет по эффективности врачей',
+      analytics: 'Аналитический отчет',
+      revenue: 'Отчет по доходам',
+      performance: 'Отчет по эффективности',
+      services: 'Отчет по услугам',
       inventory: 'Отчет по складу',
       marketing: 'Маркетинговый отчет'
     };
-    return labels[type] || type;
+    return labelMap[type] || type;
   }, []);
 
   const getReportTypeDescription = useCallback((type) => {
-    const descriptions = {
-      financial: 'Доходы, расходы, прибыль и финансовые показатели',
-      patients: 'Статистика новых пациентов, демография и активность',
-      appointments: 'Загруженность клиники, отмены и статистика приемов',
+    const descMap = {
+      financial: 'Детальный анализ доходов и расходов клиники',
+      financial_report: 'Детальный анализ доходов и расходов клиники',
+      appointments: 'Статистика записей, загруженности и эффективности',
+      appointments_report: 'Статистика записей, загруженности и эффективности',
+      patients: 'Анализ пациентской базы и демографии',
+      patient_report: 'Анализ пациентской базы и демографии',
+      queue_report: 'Анализ очередей и времени ожидания',
+      doctors: 'Производительность и загруженность врачей',
+      doctor_performance_report: 'Производительность и загруженность врачей',
+      analytics: 'Общая аналитика и ключевые показатели',
+      revenue: 'Анализ доходов по источникам и периодам',
+      performance: 'KPI и метрики эффективности работы',
       services: 'Популярные услуги и их доходность',
-      doctors: 'Выработка врачей, количество приемов и отзывы',
       inventory: 'Остатки материалов, расход и закупки',
       marketing: 'Эффективность рекламных каналов и акций'
     };
-    return descriptions[type] || 'Детальный отчет';
+    return descMap[type] || 'Отчет по выбранным параметрам';
   }, []);
 
   const normalizeReportType = useCallback((type) => {
@@ -281,41 +297,6 @@ const ReportGenerator = ({
     return iconMap[type] || FileText;
   };
 
-  const getReportTypeLabel = (type) => {
-    const labelMap = {
-      financial: 'Финансовый отчет',
-      financial_report: 'Финансовый отчет',
-      appointments: 'Отчет по записям',
-      appointments_report: 'Отчет по записям',
-      patients: 'Отчет по пациентам',
-      patient_report: 'Отчет по пациентам',
-      queue_report: 'Отчет по очереди',
-      doctors: 'Отчет по врачам',
-      doctor_performance_report: 'Отчет по эффективности врачей',
-      analytics: 'Аналитический отчет',
-      revenue: 'Отчет по доходам',
-      performance: 'Отчет по эффективности'
-    };
-    return labelMap[type] || type;
-  };
-
-  const getReportTypeDescription = (type) => {
-    const descMap = {
-      financial: 'Детальный анализ доходов и расходов клиники',
-      financial_report: 'Детальный анализ доходов и расходов клиники',
-      appointments: 'Статистика записей, загруженности и эффективности',
-      appointments_report: 'Статистика записей, загруженности и эффективности',
-      patients: 'Анализ пациентской базы и демографии',
-      patient_report: 'Анализ пациентской базы и демографии',
-      queue_report: 'Анализ очередей и времени ожидания',
-      doctors: 'Производительность и загруженность врачей',
-      doctor_performance_report: 'Производительность и загруженность врачей',
-      analytics: 'Общая аналитика и ключевые показатели',
-      revenue: 'Анализ доходов по источникам и периодам',
-      performance: 'KPI и метрики эффективности работы'
-    };
-    return descMap[type] || 'Отчет по выбранным параметрам';
-  };
 
   const updateSelectedReportType = (type) => {
     if (onReportTypeChange) {
