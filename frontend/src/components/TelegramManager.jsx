@@ -61,6 +61,13 @@ const TelegramManager = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    message_type: 'text',
+    content: '',
+    is_active: true
+  });
 
   useEffect(() => {
     loadTelegramData();
