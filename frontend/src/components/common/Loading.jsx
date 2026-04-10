@@ -154,7 +154,7 @@ export function ButtonLoading({ loading, children, style = {}, disabled = false,
   };
 
   return (
-    <button {...props} style={buttonStyle} disabled={loading || disabled}>
+    <button {...props} style={buttonStyle} disabled={loading || disabled} aria-busy={loading}>
       {loading && <div style={spinnerStyle} />}
       {children}
     </button>);
