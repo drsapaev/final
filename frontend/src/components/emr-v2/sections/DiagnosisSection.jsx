@@ -15,6 +15,25 @@ import EMRTextField from './EMRTextField';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import './DiagnosisSection.css';
 
+function normalizeTextValue(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (value && typeof value === 'object') {
+        return (
+            value.main ||
+            value.primary ||
+            value.text ||
+            value.value ||
+            value.description ||
+            ''
+        );
+    }
+
+    return '';
+}
+
 /**
  * DiagnosisSection Component
  * 
@@ -46,12 +65,15 @@ export function DiagnosisSection({
     experimentalGhostMode = false,
     onTelemetry,
 }) {
+    const diagnosisText = normalizeTextValue(diagnosis);
+    const icd10Text = normalizeTextValue(icd10Code);
+
     // 🧠 Connect Doctor History (Personal Learning)
     const { suggestions: doctorSuggestions, loading: historyLoading } = useDoctorPhrases({
         doctorId,
         field: 'diagnosis',
         specialty,
-        currentText: diagnosis,
+        currentText: diagnosisText,
         config: { minQueryLength: 2 }
     });
 
@@ -79,7 +101,7 @@ export function DiagnosisSection({
             <div className="diagnosis-section">
                 {/* Main diagnosis text */}
                 <EMRSmartFieldV2
-                    value={diagnosis}
+                    value={diagnosisText}
                     onChange={onDiagnosisChange}
                     placeholder="Основной диагноз..."
                     multiline
@@ -102,14 +124,14 @@ export function DiagnosisSection({
                 <div className="diagnosis-section__icd10">
                     {ICD10Component ? (
                         <ICD10Component
-                            value={icd10Code}
+                            value={icd10Text}
                             onChange={onIcd10Change}
                             placeholder="Код МКБ-10"
                             disabled={disabled}
                         />
                     ) : (
                         <EMRTextField
-                            value={icd10Code}
+                            value={icd10Text}
                             onChange={onIcd10Change}
                             placeholder="например, J06.9"
                             disabled={disabled}
@@ -124,8 +146,28 @@ export function DiagnosisSection({
 }
 
 DiagnosisSection.propTypes = {
-    diagnosis: PropTypes.string,
-    icd10Code: PropTypes.string,
+    diagnosis: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.shape({
+            main: PropTypes.string,
+            primary: PropTypes.string,
+            text: PropTypes.string,
+            value: PropTypes.string,
+            description: PropTypes.string,
+            icd10_code: PropTypes.string,
+        }),
+    ]),
+    icd10Code: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.shape({
+            main: PropTypes.string,
+            primary: PropTypes.string,
+            text: PropTypes.string,
+            value: PropTypes.string,
+            description: PropTypes.string,
+            icd10_code: PropTypes.string,
+        }),
+    ]),
     onDiagnosisChange: PropTypes.func,
     onIcd10Change: PropTypes.func,
     disabled: PropTypes.bool,

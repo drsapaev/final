@@ -90,6 +90,33 @@ class UserManagementService:
             ],
         }
 
+    def _count_other_active_admins(self, db: Session, exclude_user_id: int) -> int:
+        return (
+            db.query(User)
+            .filter(
+                and_(
+                    User.role == "Admin",
+                    User.is_active == True,
+                    User.id != exclude_user_id,
+                )
+            )
+            .count()
+        )
+
+    def _count_other_active_superadmins(self, db: Session, exclude_user_id: int) -> int:
+        return (
+            db.query(User)
+            .filter(
+                and_(
+                    User.role == "Admin",
+                    User.is_active == True,
+                    User.is_superuser == True,
+                    User.id != exclude_user_id,
+                )
+            )
+            .count()
+        )
+
     def ensure_user_support_records(
         self, db: Session, user_or_id: User | int
     ) -> tuple[UserProfile, UserPreferences, UserNotificationSettings]:
@@ -257,7 +284,60 @@ class UserManagementService:
                 return False, "Пользователь не найден"
 
             # Обновляем основные поля
-            update_data = user_data.dict(exclude_unset=True)
+            update_data = user_data.model_dump(exclude_unset=True)
+
+            target_is_active = update_data.get("is_active", user.is_active)
+            target_role = update_data.get("role", user.role)
+            target_is_superuser = update_data.get("is_superuser", user.is_superuser)
+
+            if updated_by == user_id and user.is_active and target_is_active is False:
+                return (
+                    False,
+                    "Нельзя деактивировать текущую учётную запись из активной сессии. "
+                    "Войдите под другим администратором и выполните это действие оттуда.",
+                )
+
+            if updated_by == user_id and user.role == "Admin" and target_role != "Admin":
+                return (
+                    False,
+                    "Нельзя снять у текущей учётной записи роль администратора из активной сессии. "
+                    "Сначала войдите под другим администратором.",
+                )
+
+            if updated_by == user_id and user.is_superuser and target_is_superuser is False:
+                return (
+                    False,
+                    "Нельзя снять права суперпользователя у текущей учётной записи из активной сессии. "
+                    "Сначала войдите под другим администратором.",
+                )
+
+            superadmin_privileges_removed = (
+                user.role == "Admin"
+                and user.is_superuser
+                and user.is_active
+                and (
+                    target_is_active is False
+                    or target_role != "Admin"
+                    or target_is_superuser is False
+                )
+            )
+            if (
+                superadmin_privileges_removed
+                and self._count_other_active_superadmins(db, user_id) == 0
+            ):
+                return (
+                    False,
+                    "Нельзя деактивировать или понизить последнего активного суперпользователя"
+                )
+
+            admin_privileges_removed = (
+                user.role == "Admin"
+                and user.is_active
+                and (target_is_active is False or target_role != "Admin")
+            )
+            if admin_privileges_removed and self._count_other_active_admins(db, user_id) == 0:
+                return False, "Нельзя деактивировать или понизить последнего активного администратора"
+
             for field, value in update_data.items():
                 if hasattr(user, field):
                     setattr(user, field, value)
@@ -300,21 +380,27 @@ class UserManagementService:
             if not user:
                 return False, "Пользователь не найден"
 
-            # Проверяем, что не удаляем последнего администратора
-            if user.role == "Admin" and user.is_superuser:
-                admin_count = (
-                    db.query(User)
-                    .filter(
-                        and_(
-                            User.role == "Admin",
-                            User.is_superuser == True,
-                            User.id != user_id,
-                        )
-                    )
-                    .count()
+            if deleted_by == user_id:
+                return (
+                    False,
+                    "Нельзя удалить текущую учётную запись из активной сессии. "
+                    "Войдите под другим администратором и выполните это действие оттуда.",
                 )
-                if admin_count == 0:
-                    return False, "Нельзя удалить последнего администратора"
+
+            if (
+                user.role == "Admin"
+                and user.is_superuser
+                and user.is_active
+                and self._count_other_active_superadmins(db, user_id) == 0
+            ):
+                return False, "Нельзя удалить последнего активного суперпользователя"
+
+            if (
+                user.role == "Admin"
+                and user.is_active
+                and self._count_other_active_admins(db, user_id) == 0
+            ):
+                return False, "Нельзя удалить последнего активного администратора"
 
             # Если указан пользователь для передачи данных
             if transfer_to:

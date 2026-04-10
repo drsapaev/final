@@ -331,6 +331,7 @@ async def get_files(
             appointment_id=appointment_id,
             visit_id=visit_id,
             emr_id=emr_id,
+            emr_record_id=None,
             folder_id=folder_id,
         )
         pages = (total + size - 1) // size

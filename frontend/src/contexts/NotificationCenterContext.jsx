@@ -307,10 +307,15 @@ export function NotificationCenterProvider({ children }) {
   const [unreadSnapshot, setUnreadSnapshot] = useState(EMPTY_UNREAD_SNAPSHOT);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const inboxRef = useRef(inbox);
+  const unreadSnapshotRef = useRef(unreadSnapshot);
   const unreadRefreshPromiseRef = useRef(null);
   const inboxSyncPromiseRef = useRef(null);
   const unreadCooldownUntilRef = useRef(0);
   const inboxCooldownUntilRef = useRef(0);
+
+  inboxRef.current = inbox;
+  unreadSnapshotRef.current = unreadSnapshot;
 
   const replaceNotifications = useCallback((items, meta = {}) => {
     const normalized = items.map((item) => normalizeNotification(item, meta.source || 'api'));
@@ -336,7 +341,7 @@ export function NotificationCenterProvider({ children }) {
           cooldownUntil: unreadCooldownUntilRef.current,
           params
         });
-        return unreadSnapshot;
+        return unreadSnapshotRef.current;
       }
 
       if (unreadRefreshPromiseRef.current) {
@@ -361,7 +366,7 @@ export function NotificationCenterProvider({ children }) {
           } else {
             logger.warn('[NotificationCenter] refreshUnreadCounts failed', error);
           }
-          return unreadSnapshot;
+          return unreadSnapshotRef.current;
         } finally {
           unreadRefreshPromiseRef.current = null;
         }
@@ -369,7 +374,7 @@ export function NotificationCenterProvider({ children }) {
 
       return unreadRefreshPromiseRef.current;
     },
-    [unreadSnapshot]
+    []
   );
 
   const syncNotifications = useCallback(
@@ -380,7 +385,7 @@ export function NotificationCenterProvider({ children }) {
           cooldownUntil: inboxCooldownUntilRef.current,
           params
         });
-        return inbox;
+        return inboxRef.current;
       }
 
       if (inboxSyncPromiseRef.current) {
@@ -407,7 +412,7 @@ export function NotificationCenterProvider({ children }) {
               cooldownMs: 60_000,
               params
             });
-            return inbox;
+            return inboxRef.current;
           }
           throw inboxError;
         }
@@ -458,7 +463,7 @@ export function NotificationCenterProvider({ children }) {
             cooldownMs: 60_000,
             params
           });
-          return inbox;
+          return inboxRef.current;
         }
         logger.error('[NotificationCenter] syncNotifications failed', error);
         throw error;
@@ -470,7 +475,7 @@ export function NotificationCenterProvider({ children }) {
 
       return inboxSyncPromiseRef.current;
     },
-    [inbox, refreshUnreadCounts]
+    [refreshUnreadCounts]
   );
 
   const loadNotifications = useCallback(

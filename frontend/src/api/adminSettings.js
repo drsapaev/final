@@ -32,6 +32,16 @@ export async function saveClinicSettings(payload) {
   return response.data;
 }
 
+export async function fetchTicketPrintSettings() {
+  const response = await api.get('/admin/clinic/ticket-print-settings');
+  return response.data;
+}
+
+export async function saveTicketPrintSettings(payload) {
+  const response = await api.put('/admin/clinic/ticket-print-settings', payload);
+  return response.data;
+}
+
 export async function fetchPaymentProviderSettings() {
   const response = await api.get('/admin/payment-provider-settings');
   return response.data;

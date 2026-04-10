@@ -52,13 +52,22 @@ const PrintDialog = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [error, setError] = useState('');
+  const usesBrowserPrint = documentType === 'ticket';
 
   // Загрузка списка принтеров
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !usesBrowserPrint) {
       loadPrinters();
+      return;
     }
-  }, [isOpen]);
+
+    if (isOpen && usesBrowserPrint) {
+      setPrinters([]);
+      setSelectedPrinter('');
+      setError('');
+      setIsLoading(false);
+    }
+  }, [isOpen, usesBrowserPrint]);
 
   const loadPrinters = async () => {
     setIsLoading(true);
@@ -99,13 +108,13 @@ const PrintDialog = ({
   };
 
   const handlePrint = async () => {
-    if (!selectedPrinter) {
+    if (!usesBrowserPrint && !selectedPrinter) {
       toast.error('Выберите принтер');
       return;
     }
 
     const printer = printers.find((p) => p.id === selectedPrinter);
-    if (printer?.status !== 'online') {
+    if (!usesBrowserPrint && printer?.status !== 'online') {
       toast.error('Выбранный принтер недоступен');
       return;
     }
@@ -114,10 +123,10 @@ const PrintDialog = ({
 
     try {
       if (onPrint) {
-        await onPrint(selectedPrinter, documentType, documentData);
+        await onPrint(usesBrowserPrint ? null : selectedPrinter, documentType, documentData);
       }
 
-      toast.success('Документ отправлен на печать');
+      toast.success(usesBrowserPrint ? 'Открыт диалог печати этого компьютера' : 'Документ отправлен на печать');
       onClose();
     } catch (error) {
       logger.error('Print error:', error);
@@ -157,7 +166,7 @@ const PrintDialog = ({
     variant: 'primary',
     icon: isPrinting ? null : <Printer size={16} />,
     onClick: handlePrint,
-    disabled: isPrinting || !selectedPrinter || isLoading
+    disabled: isPrinting || isLoading || (!usesBrowserPrint && !selectedPrinter)
   }];
 
 
@@ -222,6 +231,26 @@ const PrintDialog = ({
           }
         </div>
 
+        {usesBrowserPrint ?
+        <div style={{
+          padding: '16px',
+          borderRadius: '8px',
+          backgroundColor: theme === 'dark' ? '#1f2937' : '#eff6ff',
+          border: `1px solid ${theme === 'dark' ? '#374151' : '#bfdbfe'}`,
+          color: 'var(--color-text-primary)'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <Printer size={20} />
+              <strong>Печать через браузер</strong>
+            </div>
+            <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+              Будет открыт системный диалог печати на текущем компьютере.
+            </p>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+              Список принтеров покажет устройства именно этого ПК, а не сервера.
+            </p>
+          </div> :
+        <>
         {/* Выбор принтера */}
         <div>
           <label style={{
@@ -404,6 +433,7 @@ const PrintDialog = ({
             </div>
           }
         </div>
+        </>}
       </div>
     </ModernDialog>);
 

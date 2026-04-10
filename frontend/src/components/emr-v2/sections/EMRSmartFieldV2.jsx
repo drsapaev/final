@@ -257,7 +257,16 @@ const suggestionShape = PropTypes.shape({
 });
 
 EMRSmartFieldV2.propTypes = {
-    value: PropTypes.string,
+    value: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.shape({
+            main: PropTypes.string,
+            primary: PropTypes.string,
+            text: PropTypes.string,
+            value: PropTypes.string,
+            description: PropTypes.string,
+        }),
+    ]),
     onChange: PropTypes.func,
     placeholder: PropTypes.string,
     multiline: PropTypes.bool,

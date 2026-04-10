@@ -14,7 +14,7 @@ import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { getApiBaseUrl } from '../../api/runtime';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
-import { openPrintableWindow } from '../../utils/printWindow';
+import { printPanelTicketInBrowser } from '../../services/panelPrint';
 import notify from '../../services/notify';
 import './PaymentPayMe.css';
 import PropTypes from 'prop-types';
@@ -245,46 +245,16 @@ const PaymentPayMe = ({
   };
 
   const printTicket = (ticket) => {
-    // В реальной реализации здесь будет вызов принтера
-    const printContent = `
-      ТАЛОН НА ПРИЁМ
-
-      Пациент: ${ticket.patient_name}
-
-      Врач: ${ticket.doctor_name}
-
-      Отделение: ${ticket.department}
-
-      Дата: ${ticket.visit_date}
-
-      Время: ${ticket.visit_time || 'По очереди'}
-
-      Номер в очереди: ${ticket.queue_number}
-
-      ────────────────────────────
-
-      Время печати: ${new Date().toLocaleString()}
-
-    `;
-
-    openPrintableWindow({
-      html: `
-      <html>
-        <head>
-          <title>Талон на приём</title>
-          <style>
-            body { font-family: monospace; font-size: 12px; margin: 20px; }
-            .ticket { border: 1px dashed #000; padding: 15px; width: 300px; }
-          </style>
-        </head>
-        <body>
-          <div class="ticket">
-            <pre>${printContent}</pre>
-          </div>
-        </body>
-      </html>
-    `
+    const opened = printPanelTicketInBrowser({
+      ...ticket,
+      specialty_name: ticket.department || ticket.specialty || ticket.queue_name || 'Очередь',
+      source: 'payment',
     });
+
+    if (!opened) {
+      logger.warn('Browser popup blocked for payment ticket print', ticket);
+    }
+    return opened;
   };
 
   const printAllTickets = () => {

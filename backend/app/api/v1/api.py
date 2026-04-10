@@ -276,7 +276,7 @@ api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
 api_router.include_router(board_ep.router, tags=["board"])
-api_router.include_router(reports_ep.router, tags=["reports"])
+api_router.include_router(reports_ep.router, prefix="/reports", tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])

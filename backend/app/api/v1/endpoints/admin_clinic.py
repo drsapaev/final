@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_current_active_user, get_db, require_roles
 from app.crud import clinic as crud_clinic
 from app.models.user import User
 from app.schemas.clinic import (
@@ -18,6 +18,8 @@ from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsOut,
     ClinicSettingsUpdate,
+    TicketPrintSettingsOut,
+    TicketPrintSettingsUpdate,
     QueueSettingsUpdate,
     QueueTestRequest,
     ServiceCategoryCreate,
@@ -34,9 +36,14 @@ router = APIRouter()
 def get_clinic_settings(
     category: str = "clinic",
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Получить настройки клиники по категории"""
+    """Получить настройки клиники по категории.
+
+    Read access is allowed for any active authenticated staff member so shared
+    workstations can resolve clinic branding and other non-sensitive settings.
+    Write access remains admin-only on the corresponding PUT/POST endpoints.
+    """
     try:
         settings = crud_clinic.get_settings_by_category(db, category)
         return settings
@@ -123,6 +130,46 @@ def create_clinic_setting(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания настройки: {str(e)}",
+        )
+
+
+@router.get("/clinic/ticket-print-settings", response_model=TicketPrintSettingsOut)
+def get_ticket_print_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Получить настройки печати талонов.
+
+    Read access is allowed for any active authenticated staff member because the
+    shared browser ticket renderer needs these flags on registrar/doctor/cashier
+    workstations too. Writes remain admin-only.
+    """
+    try:
+        return crud_clinic.get_ticket_print_settings(db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения настроек печати талонов: {str(e)}",
+        )
+
+
+@router.put("/clinic/ticket-print-settings", response_model=TicketPrintSettingsOut)
+def update_ticket_print_settings(
+    settings: TicketPrintSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Обновить настройки печати талонов."""
+    try:
+        return crud_clinic.update_ticket_print_settings(
+            db,
+            settings.model_dump(exclude_unset=True),
+            current_user.id,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка обновления настроек печати талонов: {str(e)}",
         )
 
 

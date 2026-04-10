@@ -3,6 +3,71 @@
 
 import { apiRequest, api } from './client.js';
 import { API_ENDPOINTS, QUERY_PARAMS, buildQueryString } from './endpoints.js';
+import logger from '../utils/logger';
+
+const NOTIFICATION_QUERY_CACHE_MS = 15_000;
+const notificationQueryResultCache = new Map();
+const notificationQueryPromiseCache = new Map();
+
+function buildNotificationQueryKey(endpoint, params = {}) {
+  const queryString = buildQueryString(params);
+  return queryString ? `${endpoint}?${queryString}` : endpoint;
+}
+
+function getNotificationQueryCacheEntry(key) {
+  const entry = notificationQueryResultCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  if (Date.now() - entry.cachedAt > NOTIFICATION_QUERY_CACHE_MS) {
+    notificationQueryResultCache.delete(key);
+    return null;
+  }
+
+  logger.info('[FIX:NOTIFICATIONS] cache hit for notification query', { key });
+  return entry.data;
+}
+
+function setNotificationQueryCacheEntry(key, data) {
+  notificationQueryResultCache.set(key, {
+    cachedAt: Date.now(),
+    data
+  });
+}
+
+export function clearNotificationQueryCache() {
+  notificationQueryResultCache.clear();
+  notificationQueryPromiseCache.clear();
+  logger.info('[FIX:NOTIFICATIONS] notification query cache cleared');
+}
+
+async function fetchNotificationQuery(endpoint, params = {}) {
+  const cacheKey = buildNotificationQueryKey(endpoint, params);
+
+  const cached = getNotificationQueryCacheEntry(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const inFlight = notificationQueryPromiseCache.get(cacheKey);
+  if (inFlight) {
+    logger.info('[FIX:NOTIFICATIONS] reusing in-flight notification query', { key: cacheKey });
+    return inFlight;
+  }
+
+  const requestPromise = apiRequest('GET', cacheKey)
+    .then((data) => {
+      setNotificationQueryCacheEntry(cacheKey, data);
+      return data;
+    })
+    .finally(() => {
+      notificationQueryPromiseCache.delete(cacheKey);
+    });
+
+  notificationQueryPromiseCache.set(cacheKey, requestPromise);
+  return requestPromise;
+}
 
 /**
  * Сервис аутентификации
@@ -601,63 +666,71 @@ export const notificationsService = {
    * Persistent inbox
    */
   async getInbox(params = {}) {
-    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.INBOX, params));
+    return fetchNotificationQuery(API_ENDPOINTS.NOTIFICATIONS.INBOX, params);
   },
 
   /**
    * Cursor-based inbox sync
    */
   async getSync(params = {}) {
-    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.SYNC, params));
+    return fetchNotificationQuery(API_ENDPOINTS.NOTIFICATIONS.SYNC, params);
   },
 
   /**
    * Legacy compatibility alias
    */
   async getHistory(params = {}) {
-    return notificationsService.getInbox(params);
+    return fetchNotificationQuery(API_ENDPOINTS.NOTIFICATIONS.INBOX, params);
   },
 
   /**
    * Backward compatibility for older callers
    */
   async getNotifications(params = {}) {
-    return notificationsService.getInbox(params);
+    return fetchNotificationQuery(API_ENDPOINTS.NOTIFICATIONS.INBOX, params);
   },
 
   /**
    * Server-authoritative unread counts
    */
   async getUnreadCount(params = {}) {
-    return apiRequest('GET', appendQuery(API_ENDPOINTS.NOTIFICATIONS.UNREAD_COUNT, params));
+    return fetchNotificationQuery(API_ENDPOINTS.NOTIFICATIONS.UNREAD_COUNT, params);
   },
 
   /**
    * Mark a notification as seen
    */
   async markSeen(id) {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_SEEN(id));
+  const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_SEEN(id));
+  clearNotificationQueryCache();
+  return response;
   },
 
   /**
    * Mark a notification as read
    */
   async markAsRead(id) {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
+  const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
+  clearNotificationQueryCache();
+  return response;
   },
 
   /**
    * Archive a notification
    */
   async archiveNotification(id) {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.ARCHIVE(id));
+  const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.ARCHIVE(id));
+  clearNotificationQueryCache();
+  return response;
   },
 
   /**
    * Mark all notifications as read
    */
   async markAllAsRead(params = {}) {
-    return apiRequest('POST', appendQuery(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ, params));
+  const response = await apiRequest('POST', appendQuery(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ, params));
+  clearNotificationQueryCache();
+  return response;
   },
 
   /**
@@ -674,9 +747,11 @@ export const notificationsService = {
    * Отправка уведомления
    */
   async sendNotification(notificationData) {
-    return apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.SEND, {
+  const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.SEND, {
       data: notificationData
     });
+    clearNotificationQueryCache();
+    return response;
   },
 
   /**

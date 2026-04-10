@@ -47,4 +47,20 @@ describe('notification guardrails', () => {
     expect(registrar).toContain('loadAppointmentsInFlightRef');
     expect(registrar).toContain('autoRefreshCooldownUntilRef');
   });
+
+  it('keeps notification center loaders stable to avoid fetch loops', () => {
+    const context = read('contexts/NotificationCenterContext.jsx');
+    const roleCenter = read('components/notifications/RoleNotificationCenter.jsx');
+
+    expect(context).toContain('const inboxRef = useRef(inbox);');
+    expect(context).toContain('const unreadSnapshotRef = useRef(unreadSnapshot);');
+    expect(context).toContain('return unreadSnapshotRef.current;');
+    expect(context).toContain('return inboxRef.current;');
+    expect(context).toContain('[refreshUnreadCounts]');
+    expect(context).not.toContain('[inbox, refreshUnreadCounts]');
+    expect(context).not.toContain('[unreadSnapshot]');
+
+    expect(roleCenter).toContain('useEffect(() => {');
+    expect(roleCenter).toContain('[refreshNotifications, role]');
+  });
 });

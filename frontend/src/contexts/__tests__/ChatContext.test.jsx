@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { MemoryRouter } from 'react-router-dom';
 import { ChatProvider, useChat } from '../ChatContext.jsx';
 import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract.js';
 
@@ -179,9 +180,11 @@ ChatHarness.propTypes = {
 
 function renderChat(openChat = true) {
   return render(
-    <ChatProvider>
-      <ChatHarness openChat={openChat} />
-    </ChatProvider>,
+    <MemoryRouter initialEntries={['/admin']}>
+      <ChatProvider>
+        <ChatHarness openChat={openChat} />
+      </ChatProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -215,6 +218,38 @@ describe('ChatContext', () => {
       expect(messagesApiMock.getConversations).toHaveBeenCalled();
       expect(messagesApiMock.getUnreadCount).toHaveBeenCalled();
     });
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerOpen();
+    });
+
+    await waitFor(() => {
+      expect(messagesApiMock.getConversations).toHaveBeenCalledTimes(1);
+      expect(messagesApiMock.getUnreadCount).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not load chat data on public routes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <ChatProvider>
+          <ChatHarness openChat />
+        </ChatProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-count')).toHaveTextContent('0');
+      expect(screen.getByTestId('unread-count')).toHaveTextContent('0');
+    });
+
+    expect(messagesApiMock.getConversations).not.toHaveBeenCalled();
+    expect(messagesApiMock.getUnreadCount).not.toHaveBeenCalled();
   });
 
   it('auto-marks incoming messages as read when the active conversation is open and focused', async () => {

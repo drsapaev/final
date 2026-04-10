@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, useTheme } from '../ThemeContext.jsx';
 import { getColorSchemeDefinition } from '../../theme/colorScheme.js';
 
@@ -36,9 +37,11 @@ function ThemeHarness() {
 
 function renderWithProvider() {
   return render(
-    <ThemeProvider>
-      <ThemeHarness />
-    </ThemeProvider>);
+    <MemoryRouter initialEntries={['/admin']}>
+      <ThemeProvider>
+        <ThemeHarness />
+      </ThemeProvider>
+    </MemoryRouter>);
 
 }
 
@@ -100,6 +103,22 @@ describe('ThemeContext', () => {
     await waitFor(() => {
       expect(apiMock.put).toHaveBeenCalledWith('/users/me/preferences', { theme: 'vibrant' });
     }, { timeout: 2000 });
+  });
+
+  it('does not load remote preferences on public routes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <ThemeProvider>
+          <ThemeHarness />
+        </ThemeProvider>
+      </MemoryRouter>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('theme')).toHaveTextContent('light');
+    });
+
+    expect(apiMock.get).not.toHaveBeenCalledWith('/users/me/preferences');
+    expect(apiMock.put).not.toHaveBeenCalled();
   });
 
   it('keeps vibrant and gradient as visually distinct custom schemes', () => {

@@ -42,6 +42,40 @@ class ClinicSettingsBatch(BaseModel):
     settings: dict[str, Any] = Field(..., description="Словарь настроек {key: value}")
 
 
+class TicketPrintSettingsBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    show_clinic_name: bool = True
+    show_logo: bool = False
+    show_patient_name: bool = False
+    show_service_name: bool = True
+    show_queue_number: bool = True
+    show_doctor_name: bool = False
+    show_cabinet: bool = True
+    show_price: bool = False
+    show_qr_code: bool = False
+    show_printed_at: bool = True
+
+
+class TicketPrintSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    show_clinic_name: bool | None = None
+    show_logo: bool | None = None
+    show_patient_name: bool | None = None
+    show_service_name: bool | None = None
+    show_queue_number: bool | None = None
+    show_doctor_name: bool | None = None
+    show_cabinet: bool | None = None
+    show_price: bool | None = None
+    show_qr_code: bool | None = None
+    show_printed_at: bool | None = None
+
+
+class TicketPrintSettingsOut(TicketPrintSettingsBase):
+    pass
+
+
 # ===================== ВРАЧИ =====================
 
 

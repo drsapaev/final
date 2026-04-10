@@ -35,7 +35,9 @@ const Input = React.forwardRef(({
       fontSize: '13px',
       fontWeight: '400',
       borderRadius: '6px',
-      border: `1px solid ${error ? '#ff3b30' : isFocused ? '#007aff' : 'var(--mac-card-border, var(--mac-border))'}`,
+      borderWidth: '1px',
+      borderStyle: 'solid',
+      borderColor: error ? '#ff3b30' : isFocused ? '#007aff' : 'var(--mac-card-border, var(--mac-border))',
       backgroundColor: disabled ?
       'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-tertiary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 38%)' :
       'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 24%)',
@@ -55,8 +57,8 @@ const Input = React.forwardRef(({
       baseStyles.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
     }
 
-    // Error state
-    if (error) {
+      // Error state
+      if (error) {
       baseStyles.borderColor = '#ff3b30';
       baseStyles.boxShadow = '0 0 0 3px rgba(255, 59, 48, 0.1)';
     }

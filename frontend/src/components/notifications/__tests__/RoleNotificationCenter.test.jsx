@@ -57,7 +57,7 @@ describe('RoleNotificationCenter', () => {
     getProfileMock.mockResolvedValueOnce({ id: 77, role: 'lab' });
 
     // eslint-disable-next-line jsx-a11y/aria-role
-    render(<RoleNotificationCenter role="lab" />);
+    const { rerender } = render(<RoleNotificationCenter role="lab" />);
 
     await waitFor(() => {
       expect(loadNotifications).toHaveBeenCalledWith(
@@ -70,6 +70,11 @@ describe('RoleNotificationCenter', () => {
         })
       );
     });
+
+    rerender(<RoleNotificationCenter role="lab" />);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(loadNotifications).toHaveBeenCalledTimes(1);
   });
 
   it('skips history load when the auth profile is unavailable', async () => {

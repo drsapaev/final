@@ -21,6 +21,21 @@ from app.schemas.clinic import (
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
+TICKET_PRINT_SETTINGS_CATEGORY = "print"
+TICKET_PRINT_SETTINGS_PREFIX = "ticket_print_"
+TICKET_PRINT_SETTINGS_DEFAULTS: dict[str, bool] = {
+    "show_clinic_name": True,
+    "show_logo": False,
+    "show_patient_name": False,
+    "show_service_name": True,
+    "show_queue_number": True,
+    "show_doctor_name": False,
+    "show_cabinet": True,
+    "show_price": False,
+    "show_qr_code": False,
+    "show_printed_at": True,
+}
+
 
 def get_settings_by_category(db: Session, category: str) -> list[ClinicSettings]:
     """Получить настройки по категории"""
@@ -88,6 +103,65 @@ def update_settings_batch(
         db.refresh(setting)
 
     return updated_settings
+
+
+def _ticket_print_storage_key(field_name: str) -> str:
+    return f"{TICKET_PRINT_SETTINGS_PREFIX}{field_name}"
+
+
+def _coerce_ticket_print_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return bool(value)
+
+
+def get_ticket_print_settings(db: Session) -> dict[str, bool]:
+    """Получить настройки печати талонов с подстановкой значений по умолчанию."""
+    result = dict(TICKET_PRINT_SETTINGS_DEFAULTS)
+    settings = get_settings_by_category(db, TICKET_PRINT_SETTINGS_CATEGORY)
+
+    for setting in settings:
+        storage_key = setting.key or ""
+        if storage_key.startswith(TICKET_PRINT_SETTINGS_PREFIX):
+            field_name = storage_key.removeprefix(TICKET_PRINT_SETTINGS_PREFIX)
+        else:
+            field_name = storage_key
+
+        if field_name not in result:
+            continue
+
+        result[field_name] = _coerce_ticket_print_bool(setting.value, result[field_name])
+
+    return result
+
+
+def update_ticket_print_settings(
+    db: Session, settings: dict[str, Any], user_id: int
+) -> dict[str, bool]:
+    """Обновить настройки печати талонов."""
+    updates: dict[str, Any] = {}
+
+    for field_name in TICKET_PRINT_SETTINGS_DEFAULTS:
+        if field_name not in settings:
+            continue
+        updates[_ticket_print_storage_key(field_name)] = _coerce_ticket_print_bool(
+            settings[field_name], TICKET_PRINT_SETTINGS_DEFAULTS[field_name]
+        )
+
+    if updates:
+        update_settings_batch(db, TICKET_PRINT_SETTINGS_CATEGORY, updates, user_id)
+
+    return get_ticket_print_settings(db)
 
 
 # ===================== ВРАЧИ =====================
