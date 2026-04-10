@@ -62,7 +62,7 @@ def test_build_parity_resolves_api_endpoints_function_reference():
 def test_rbac_alignment_matches_backend_surface():
     module = _load_module()
     root = Path(__file__).resolve().parents[3]
-    frontend_role_paths = module.parse_frontend_route_roles(root / "frontend" / "src" / "App.jsx")
+    frontend_role_paths = module.parse_frontend_route_roles(root / "frontend" / "src" / "routing" / "routeRegistry.js")
     rbac = module.evaluate_rbac_alignment(frontend_role_paths)
 
     assert rbac["status"] == "pass"

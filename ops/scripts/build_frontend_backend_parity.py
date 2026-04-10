@@ -515,8 +515,12 @@ def _normalize_route_path(path: str) -> str:
 
 def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
     content = frontend_app_path.read_text(encoding="utf-8")
+    # match patterns in frontend/src/routing/routeRegistry.js
+    # example:
+    # path: '/admin',
+    # roles: ['Admin'],
     pattern = re.compile(
-        r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
+        r"path:\s*['\"](?P<path>[^'\"]+)['\"][^}]+roles:\s*\[(?P<roles>[^\]]*)\]",
         re.DOTALL,
     )
 

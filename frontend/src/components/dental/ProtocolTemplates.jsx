@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   FileText,
   Plus,
@@ -254,12 +254,12 @@ const ProtocolTemplates = ({
 
 
   // Обработчики
-  const handleSelectTemplate = (template) => {
+  const handleSelectTemplate = useCallback((template) => {
     if (onSelectTemplate) {
       onSelectTemplate(template);
     }
     onClose();
-  };
+  }, [onSelectTemplate, onClose]);
 
   useEffect(() => {
     const handlers = [];

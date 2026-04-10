@@ -61,13 +61,6 @@ const TelegramManager = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [templateForm, setTemplateForm] = useState({
-    name: '',
-    message_type: 'text',
-    content: '',
-    is_active: true
-  });
 
   useEffect(() => {
     loadTelegramData();
@@ -112,15 +105,6 @@ const TelegramManager = () => {
 
   const handleCreateTemplate = async () => {
     setError('В этой сборке доступен просмотр Telegram шаблонов. Создание шаблонов через UI пока не опубликовано в backend contract.');
-  };
-
-  const resetForm = () => {
-    setTemplateForm({
-      name: '',
-      message_type: 'text',
-      content: '',
-      is_active: true
-    });
   };
 
   if (loading) {

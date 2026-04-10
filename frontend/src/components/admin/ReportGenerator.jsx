@@ -84,7 +84,33 @@ const ReportGenerator = ({
   const effectiveSelectedReportType =
     selectedReportType || internalSelectedReportType;
 
-  const normalizeReportType = (type) => {
+  const getReportTypeLabel = useCallback((type) => {
+    const labels = {
+      financial: 'Финансовый отчет',
+      patients: 'Отчет по пациентам',
+      appointments: 'Отчет по приемам',
+      services: 'Отчет по услугам',
+      doctors: 'Отчет по врачам',
+      inventory: 'Отчет по складу',
+      marketing: 'Маркетинговый отчет'
+    };
+    return labels[type] || type;
+  }, []);
+
+  const getReportTypeDescription = useCallback((type) => {
+    const descriptions = {
+      financial: 'Доходы, расходы, прибыль и финансовые показатели',
+      patients: 'Статистика новых пациентов, демография и активность',
+      appointments: 'Загруженность клиники, отмены и статистика приемов',
+      services: 'Популярные услуги и их доходность',
+      doctors: 'Выработка врачей, количество приемов и отзывы',
+      inventory: 'Остатки материалов, расход и закупки',
+      marketing: 'Эффективность рекламных каналов и акций'
+    };
+    return descriptions[type] || 'Детальный отчет';
+  }, []);
+
+  const normalizeReportType = useCallback((type) => {
     if (!type) {
       return null;
     }
@@ -105,7 +131,7 @@ const ReportGenerator = ({
       description:
         type.description || getReportTypeDescription(value)
     };
-  };
+  }, [getReportTypeLabel, getReportTypeDescription]);
 
   useEffect(() => {
     let isMounted = true;
@@ -170,7 +196,7 @@ const ReportGenerator = ({
     return () => {
       isMounted = false;
     };
-  }, [reportTypes, selectedReportType, internalSelectedReportType]);
+  }, [reportTypes, selectedReportType, internalSelectedReportType, normalizeReportType]);
 
   const handleFilterChange = (filterName, value) => {
     setFilters((prev) => ({
