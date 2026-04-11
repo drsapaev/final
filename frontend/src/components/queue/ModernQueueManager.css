@@ -185,11 +185,29 @@
 }
 
 /* QR Modal */
+.mqm-qr-dialog .modern-dialog-header {
+    padding-bottom: 8px;
+}
+
+.mqm-qr-dialog .modern-dialog-title {
+    font-size: 18px;
+    letter-spacing: -0.01em;
+}
+
+.mqm-qr-dialog .modern-dialog-close {
+    margin-top: -1px;
+}
+
+.mqm-qr-dialog .modern-dialog-content {
+    padding-top: 16px;
+}
+
 .mqm-qr-modal-content {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    padding: 8px;
+    gap: 16px;
+    min-height: 0;
+    padding: 2px 0 4px;
 }
 
 .mqm-qr-badge-container {
@@ -207,12 +225,14 @@
 }
 
 .mqm-qr-info-card {
-    background: var(--mac-bg-tertiary);
+    background: linear-gradient(180deg, var(--mac-bg-secondary), var(--mac-bg-tertiary));
+    border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-md);
     padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .mqm-qr-info-row {
@@ -244,10 +264,12 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 24px;
-    background: white;
+    padding: 20px;
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-lg);
-    min-height: 280px;
+    min-height: 260px;
+    box-shadow: var(--mac-shadow-sm);
 }
 
 .mqm-qr-image,
@@ -255,6 +277,9 @@
     max-width: 100%;
     height: auto;
     border-radius: var(--mac-radius-sm);
+    background: #ffffff;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .mqm-qr-loading {
@@ -283,6 +308,7 @@
 .mqm-qr-footer-info {
     text-align: center;
     color: var(--mac-text-secondary);
+    padding: 0 4px;
 }
 
 .mqm-qr-instruction {
@@ -304,7 +330,8 @@
 .mqm-qr-actions {
     display: flex;
     gap: 12px;
-    justify-content: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 .mqm-qr-action-btn {
@@ -355,9 +382,24 @@
     }
 }
 
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-    .mqm-qr-code-container {
-        background: rgba(255, 255, 255, 0.95);
+@media (max-width: 640px) {
+    .mqm-qr-modal-content {
+        gap: 14px;
     }
+
+    .mqm-qr-code-container {
+        min-height: 220px;
+        padding: 16px;
+    }
+
+    .mqm-qr-image,
+    .mqm-qr-svg {
+        padding: 12px;
+    }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .mqm-qr-image,
+[data-theme="dark"] .mqm-qr-svg {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }

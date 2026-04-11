@@ -61,6 +61,7 @@ export function useEMRAutosave({
         if (isSaving) return false;           // Already saving
         if (isSigned) return false;           // EMR is signed (readonly)
         if (status === 'conflict') return false; // Active conflict
+        if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) return false; // Paused after repeated errors
         if (!enabled) return false;           // Autosave disabled
 
         return true;
@@ -96,8 +97,6 @@ export function useEMRAutosave({
 
         // Stop if too many consecutive errors
         if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
-            // eslint-disable-next-line no-console
-            console.warn('[Autosave] Paused due to repeated errors. Manual save required.');
             pendingSaveRef.current = false;
             return;
         }
@@ -108,6 +107,20 @@ export function useEMRAutosave({
             onAutosaveStart?.();
 
             const result = await saveEMR({ isDraft: true });
+
+            if (result?.accessDenied) {
+                errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
+                pendingSaveRef.current = false;
+                clearTimers();
+                // eslint-disable-next-line no-console
+                console.warn('[Autosave] Paused because EMR access is denied.');
+                onAutosaveError?.({
+                    type: 'accessDenied',
+                    error: result,
+                    retryCount: errorCountRef.current
+                });
+                return;
+            }
 
             lastSaveTimeRef.current = Date.now();
             errorCountRef.current = 0; // Reset on success
@@ -120,6 +133,21 @@ export function useEMRAutosave({
             }
         } catch (error) {
             errorCountRef.current += 1;
+
+            const isAccessDenied = error?.response?.status === 401 || error?.response?.status === 403;
+            if (isAccessDenied) {
+                errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
+                pendingSaveRef.current = false;
+                clearTimers();
+                // eslint-disable-next-line no-console
+                console.warn('[Autosave] Paused because EMR access is denied.');
+                onAutosaveError?.({
+                    type: 'accessDenied',
+                    error,
+                    retryCount: errorCountRef.current
+                });
+                return;
+            }
 
             // Only log once, not spam
             if (errorCountRef.current === 1) {

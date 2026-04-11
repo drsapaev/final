@@ -11,8 +11,10 @@ vi.mock('../client', () => ({
 import { api } from '../client';
 import {
   fetchClinicSettings,
+  fetchTicketPrintSettings,
   fetchWizardSettings,
   saveClinicSettings,
+  saveTicketPrintSettings,
   testPaymentProviderConfig,
 } from '../adminSettings';
 
@@ -46,6 +48,23 @@ describe('adminSettings API', () => {
 
     expect(api.put).toHaveBeenCalledWith('/admin/clinic/settings', payload);
     expect(data).toEqual({ ok: true });
+  });
+
+  it('fetches ticket print settings via dedicated endpoint', async () => {
+    api.get.mockResolvedValueOnce({ data: { show_logo: true } });
+    const data = await fetchTicketPrintSettings();
+
+    expect(api.get).toHaveBeenCalledWith('/admin/clinic/ticket-print-settings');
+    expect(data).toEqual({ show_logo: true });
+  });
+
+  it('saves ticket print settings via dedicated endpoint', async () => {
+    const payload = { show_logo: true, show_patient_name: false };
+    api.put.mockResolvedValueOnce({ data: { show_logo: true } });
+    const data = await saveTicketPrintSettings(payload);
+
+    expect(api.put).toHaveBeenCalledWith('/admin/clinic/ticket-print-settings', payload);
+    expect(data).toEqual({ show_logo: true });
   });
 
   it('tests payment provider config via dedicated endpoint', async () => {

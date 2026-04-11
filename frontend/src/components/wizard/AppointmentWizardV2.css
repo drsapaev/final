@@ -1,4 +1,4 @@
-/* Мастер регистрации V2 - Windows 11 дизайн */
+/* Мастер регистрации V2 - macOS-friendly style */
 
 .appointment-wizard-v2 {
   --wizard-surface: var(--mac-card-bg);
@@ -20,7 +20,8 @@
 .appointment-wizard-v2 .modern-dialog-container {
   max-height: 95vh;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--mac-border);
   box-shadow: var(--mac-shadow-lg);
   backdrop-filter: blur(16px);
 }
@@ -28,9 +29,8 @@
 .wizard-container-v2 {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  height: 65vh;
-  /* Fixed height to force scrolling */
+  gap: 16px;
+  height: 66vh;
   padding: 0;
   overflow: hidden;
 }
@@ -42,18 +42,18 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 24px 32px 16px;
-  background: linear-gradient(135deg, var(--wizard-surface-strong) 0%, var(--wizard-surface-muted) 100%);
+  padding: 20px 24px 14px;
+  background: var(--wizard-surface-strong);
   border-bottom: 1px solid var(--wizard-border);
-  border-radius: 12px 12px 0 0;
+  border-radius: 16px 16px 0 0;
 }
 
 .wizard-step-v2 {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 11px 15px;
+  border-radius: 12px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   position: relative;
@@ -68,14 +68,14 @@
 }
 
 .wizard-step-v2.active {
-  background: linear-gradient(135deg, var(--wizard-accent) 0%, var(--wizard-accent-strong) 100%);
+  background: color-mix(in srgb, var(--wizard-accent), transparent 84%);
   color: var(--mac-text-on-accent);
   border: 1px solid var(--wizard-accent);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--wizard-accent), transparent 70%);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--wizard-accent), transparent 82%);
 }
 
 .wizard-step-v2.completed {
-  background: linear-gradient(135deg, var(--wizard-success) 0%, var(--wizard-success-strong) 100%);
+  background: color-mix(in srgb, var(--wizard-success), transparent 84%);
   color: var(--mac-text-on-accent);
   border: 1px solid var(--wizard-success);
 }
@@ -128,8 +128,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* Let children handle scrolling */
-  padding: 0 32px 24px;
+  padding: 0 24px 20px;
   min-height: 0;
 }
 
@@ -198,9 +197,9 @@
 .form-field input,
 .form-field select,
 .form-field textarea {
-  padding: 12px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--wizard-border);
-  border-radius: 6px;
+  border-radius: 12px;
   font-size: 14px;
   transition: all 0.2s ease;
   background: var(--wizard-surface);
@@ -251,7 +250,7 @@
   background: var(--wizard-surface);
   border: 1px solid var(--wizard-border);
   border-top: none;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 12px 12px;
   box-shadow: var(--mac-shadow-md);
   z-index: 1000;
   max-height: 200px;
@@ -298,7 +297,7 @@
 
 .services-panel {
   border: 1px solid var(--wizard-border);
-  border-radius: 8px;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--wizard-surface);
 }
@@ -324,7 +323,7 @@
   background: var(--wizard-accent);
   color: var(--mac-text-on-accent);
   border: none;
-  border-radius: 4px;
+  border-radius: 999px;
   font-size: 12px;
   cursor: pointer;
   transition: background-color 0.2s ease;
@@ -405,7 +404,7 @@
   height: 32px;
   border: 1px solid var(--wizard-border);
   background: var(--wizard-surface);
-  border-radius: 6px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -424,7 +423,7 @@
 
 .cart-panel {
   border: 1px solid var(--wizard-border);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--wizard-surface);
   display: flex;
   flex-direction: column;
@@ -524,7 +523,7 @@
   height: 28px;
   border: 1px solid var(--wizard-border);
   background: var(--wizard-surface);
-  border-radius: 4px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -547,7 +546,7 @@
 .doctor-select {
   padding: 8px 12px;
   border: 1px solid var(--wizard-border);
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 13px;
   background: var(--wizard-surface);
   color: var(--wizard-text);
@@ -594,7 +593,7 @@
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--wizard-border);
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   background: var(--wizard-surface);
@@ -622,7 +621,7 @@
   padding: 8px 12px;
   background: color-mix(in srgb, var(--wizard-warning), transparent 84%);
   border: 1px solid color-mix(in srgb, var(--wizard-warning), transparent 48%);
-  border-radius: 4px;
+  border-radius: 10px;
   color: var(--wizard-text);
   font-size: 12px;
   margin-top: 8px;
@@ -690,7 +689,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s;
   min-height: 40px;

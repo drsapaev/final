@@ -14,7 +14,7 @@ import Input from '../components/ui/macos/Input';
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
 import { getApiOrigin } from '../api/runtime';
-import { printService } from '../services/print';
+import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -694,18 +694,17 @@ const CashierPanel = () => {void
 
     if (paymentRowOrId && typeof paymentRowOrId === 'object') {
       try {
-        const printResult = await printService.printReceipt(buildReceiptPrintPayload(paymentRowOrId));
-        if (printResult.success) {
-          notify.success(`Чек отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`);
+        const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
+        if (opened) {
+          notify.success('Открыт диалог печати этого компьютера.');
           return;
         }
 
-        logger.warn('[Cashier] Direct receipt print failed, falling back to PDF', {
-          paymentId,
-          error: printResult.error
+        logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+          paymentId
         });
       } catch (error) {
-        logger.error('[Cashier] Unexpected direct receipt print error:', error);
+        logger.error('[Cashier] Unexpected browser receipt print error:', error);
       }
     }
 
@@ -715,7 +714,7 @@ const CashierPanel = () => {void
       return;
     }
 
-    notify.warning('Прямая печать чека недоступна, поэтому был загружен PDF-чек.');
+    notify.warning('Диалог печати не открылся, поэтому был загружен PDF-чек.');
   };
 
   // ✅ v2.0: Состояние для почасовой статистики
@@ -849,7 +848,7 @@ const CashierPanel = () => {void
           services: Array.isArray(payment.services) ? [...payment.services] : [],
           services_names: Array.isArray(payment.services_names) ? [...payment.services_names] : [],
           grouped_payments: [payment.id],
-          total_amount: payment.amount,
+          total_amount: Number(payment.amount || 0),
           date: dateKey, // Display helpers
           time: timeKey,
           patient: payment.patient_name,

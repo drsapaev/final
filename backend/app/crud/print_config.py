@@ -110,6 +110,17 @@ def get_default_printer_for_type(
 
     if preferred_printer_type:
         preferred_printer = (
+            query.filter(
+                PrinterConfig.printer_type == preferred_printer_type,
+                PrinterConfig.connection_type != "mock",
+            )
+            .order_by(PrinterConfig.is_default.desc(), PrinterConfig.id.asc())
+            .first()
+        )
+        if preferred_printer:
+            return preferred_printer
+
+        preferred_printer = (
             query.filter(PrinterConfig.printer_type == preferred_printer_type)
             .order_by(PrinterConfig.is_default.desc(), PrinterConfig.id.asc())
             .first()
@@ -118,12 +129,31 @@ def get_default_printer_for_type(
             return preferred_printer
 
     default_printer = (
+        query.filter(
+            PrinterConfig.is_default == True,
+            PrinterConfig.connection_type != "mock",
+        )
+        .order_by(PrinterConfig.id.asc())
+        .first()
+    )
+    if default_printer:
+        return default_printer
+
+    default_printer = (
         query.filter(PrinterConfig.is_default == True)
         .order_by(PrinterConfig.id.asc())
         .first()
     )
     if default_printer:
         return default_printer
+
+    non_mock_printer = (
+        query.filter(PrinterConfig.connection_type != "mock")
+        .order_by(PrinterConfig.id.asc())
+        .first()
+    )
+    if non_mock_printer:
+        return non_mock_printer
 
     return query.order_by(PrinterConfig.id.asc()).first()
 

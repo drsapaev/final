@@ -19,10 +19,11 @@ function setupQueueApiMock({
   specialists = [
     { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
   ],
+  availableSpecialists = specialists,
   clinicWide = false,
 } = {}) {
   queueApiMocks.fetchPublicQueueProfiles.mockResolvedValue({ specialists });
-  queueApiMocks.fetchAvailableSpecialists.mockResolvedValue(specialists);
+  queueApiMocks.fetchAvailableSpecialists.mockResolvedValue(availableSpecialists);
   queueApiMocks.fetchQrTokenInfo.mockResolvedValue({
     queue_active: true,
     allowed: true,
@@ -116,11 +117,42 @@ describe('QueueJoin Accessibility & UX', () => {
   });
 
   it('shows meaningful empty state when no specialists are available for clinic-wide QR', async () => {
-    setupQueueApiMock({ specialists: [], clinicWide: true });
+    setupQueueApiMock({ specialists: [], availableSpecialists: [], clinicWide: true });
     renderQueueJoin('clinic-wide-token');
 
     expect(await screen.findByText(/ҳозирча qr орқали танлаш учун мутахассислар мавжуд эмас/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /янгилаш/i })).toBeInTheDocument();
+  });
+
+  it('submits real doctor ids for clinic-wide QR instead of queue profile ids', async () => {
+    setupQueueApiMock({
+      specialists: [
+        { id: 101, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
+      ],
+      availableSpecialists: [
+        { id: 6, specialty: 'cardio', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
+      ],
+      clinicWide: true,
+    });
+    renderQueueJoin('clinic-wide-real-id-token');
+
+    fireEvent.click(await screen.findByLabelText(/кардиолог/i));
+    fireEvent.click(screen.getByRole('button', { name: /давом этиш/i }));
+
+    fireEvent.change(await screen.findByLabelText(/фио/i), {
+      target: { value: 'Тест Пациент' },
+    });
+    fireEvent.change(screen.getByLabelText(/телефон рақами/i), {
+      target: { value: '+998 (90) 123-45-67' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /қўшилиш/i }));
+
+    await screen.findByText(/сиз навбатда!/i);
+    expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specialist_ids: [6],
+      })
+    );
   });
 
   it('provides retry action from error state and recovers to info step', async () => {

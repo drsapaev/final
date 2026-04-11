@@ -24,7 +24,8 @@ const API_BASE = getApiOrigin();
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
-import { printService } from '../services/print';
+import ModernDialog from '../components/dialogs/ModernDialog';
+import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 
 // Современный мастер
 // ✅ Используется только новый мастер (V2)
@@ -66,6 +67,19 @@ const RegistrarPanel = () => {
   // Основные состояния
   const [activeTab, setActiveTab] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentView = useMemo(() => {
+    const explicitView = searchParams.get('view');
+    if (explicitView === 'welcome' || explicitView === 'queue') {
+      return explicitView;
+    }
+
+    const legacyTab = searchParams.get('tab');
+    if (legacyTab === 'welcome' || legacyTab === 'queue') {
+      return legacyTab;
+    }
+
+    return explicitView;
+  }, [searchParams]);
   const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
   const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
   const todayStr = getLocalDateString();
@@ -668,7 +682,8 @@ const RegistrarPanel = () => {
           }
         }, 100);
       }*/}, [appointments]); // Убираем дублирование - filteredAppointments уже определена ниже в коде
-  const [showSlotsModal, setShowSlotsModal] = useState(false);const [showQRModal, setShowQRModal] = useState(false);const autoRefresh = true; // Новые состояния для интеграции с админ панелью
+  const [showSlotsModal, setShowSlotsModal] = useState(false);
+  const autoRefresh = true; // Новые состояния для интеграции с админ панелью
   const resolveRescheduleVisitId = useCallback((appointmentRow) => {
     return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || appointmentRow?.appointment_id || appointmentRow?.appointment_ids?.[0] || appointmentRow?.id || null;
   }, []);
@@ -2174,13 +2189,12 @@ const RegistrarPanel = () => {
       } else if (e.key === 'Escape') {
         if (showWizard) setShowWizard(false);
         if (showSlotsModal) setShowSlotsModal(false);
-        if (showQRModal) setShowQRModal(false);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, showQRModal, appointments, handleBulkAction, appointmentsSelected]);
+  }, [showWizard, showSlotsModal, appointments, handleBulkAction, appointmentsSelected]);
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
@@ -3033,7 +3047,7 @@ const RegistrarPanel = () => {
       </a>
 
       {/* Современные вкладки */}
-      {(!searchParams.get('view') || searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue') &&
+      {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
       <div style={{
         margin: `0 ${'1rem'}`,
         maxWidth: 'none',
@@ -3056,7 +3070,7 @@ const RegistrarPanel = () => {
       {/* Основной контент без отступа сверху */}
       <div style={{ overflow: 'hidden' }}>
         {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
-        {searchParams.get('view') === 'welcome' &&
+        {currentView === 'welcome' &&
         <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{
             margin: `0 ${'1rem'} ${'2rem'} ${'1rem'}`,
@@ -3720,7 +3734,7 @@ const RegistrarPanel = () => {
         }
 
         {/* Онлайн-очередь по параметру view=queue */}
-        {searchParams.get('view') === 'queue' &&
+        {currentView === 'queue' &&
         <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
               <CardHeader>
@@ -3778,7 +3792,7 @@ const RegistrarPanel = () => {
         }
 
         {/* Основная панель с записями */}
-        {(!searchParams.get('view') || searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue') &&
+        {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
         <div
           id="main-content"
           role="tabpanel"
@@ -4251,49 +4265,16 @@ const RegistrarPanel = () => {
             throw new Error(`Неподдерживаемый тип документа: ${docType}`);
           }
 
-          const queueNumbers = Array.isArray(docData?.queue_numbers) ? docData.queue_numbers : [];
-          const primaryQueue = queueNumbers[0] || null;
-          const resolvedQueueNumber =
-            docData?.queue_number ||
-            primaryQueue?.number ||
-            '';
-
-          if (!resolvedQueueNumber) {
-            throw new Error('Не удалось определить номер талона для печати');
+          const result = await printPanelTicketInBrowserAsync(docData);
+          if (result?.opened && result?.success) {
+            return;
           }
 
-          const ticketPayload = {
-            queue_number: String(resolvedQueueNumber),
-            doctor_name:
-              docData?.doctor_name ||
-              docData?.specialist_name ||
-              primaryQueue?.queue_name ||
-              'Специалист',
-            specialty_name:
-              docData?.specialty_name ||
-              primaryQueue?.queue_name ||
-              docData?.doctor_specialty ||
-              docData?.specialty ||
-              'Прием',
-            cabinet:
-              docData?.cabinet ||
-              docData?.doctor_cabinet ||
-              primaryQueue?.cabinet ||
-              null,
-            patient_name: docData?.patient_fio || docData?.patient_name || null,
-            source: docData?.source || 'desk',
-            time_window:
-              docData?.appointment_time ||
-              primaryQueue?.queue_time ||
-              docData?.queue_time ||
-              null,
-            printer_name: printerName
-          };
-
-          const result = await printService.printTicket(ticketPayload);
-          if (!result.success) {
-            throw new Error(result.error || 'Ошибка печати талона');
+          if (!result?.opened) {
+            throw new Error('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите печать.');
           }
+
+          throw result?.error || new Error('Не удалось подготовить талон к печати. Проверьте данные записи и повторите попытку.');
         }} />
 
 
@@ -4349,33 +4330,21 @@ const RegistrarPanel = () => {
       {/* Встроенный мастер удален - используется AppointmentWizard компонент */}
 
       {/* Модальное окно слотов */}
-      {showSlotsModal &&
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }} role="dialog" aria-modal="true">
-          <div style={{
-          background: cardBg,
-          padding: '24px',
-          borderRadius: '12px',
-          maxWidth: '500px',
-          width: '90%'
-        }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0 }}>📅 {t('available_slots')}</h3>
-              <button onClick={() => setShowSlotsModal(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-            </div>
-            <div style={{ display: 'grid', gap: '8px' }}>
-              <button style={buttonStyle} onClick={async () => {
+      <ModernDialog
+        isOpen={showSlotsModal}
+        onClose={() => setShowSlotsModal(false)}
+        title={`📅 ${t('available_slots')}`}
+        maxWidth="32rem"
+        dialogStyle={{
+          backgroundColor: 'var(--mac-bg-primary)'
+        }}
+        actions={[
+          {
+            label: '🌅 ' + t('tomorrow'),
+            variant: 'primary',
+            onClick: async () => {
               if (!rescheduleData) return;
+
               try {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
@@ -4387,105 +4356,90 @@ const RegistrarPanel = () => {
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
                 logger.error('Ошибка переноса на завтра:', e);
-    notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+                notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
               }
-            }}>
-                🌅 {t('tomorrow')}
-              </button>
-              <button style={buttonSecondaryStyle} onClick={async () => {
+            }
+          },
+          {
+            label: `📅 ${t('select_date')}`,
+            variant: 'secondary',
+            onClick: async () => {
               if (!rescheduleData) return;
-              const currentVal = getLocalDateString(rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date());
+
+              const currentVal = getLocalDateString(
+                rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date()
+              );
               const dateStr = prompt('Введите дату переноса (YYYY-MM-DD):', currentVal);
 
-              if (dateStr) {
-                // Simple validation YYYY-MM-DD
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                  notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
-                  return;
-                }
+              if (!dateStr) return;
 
-                try {
-                  setShowSlotsModal(false);
-                  const targetVisitId = resolveRescheduleVisitId(rescheduleData);
-                  logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
-                  await rescheduleVisit(targetVisitId, dateStr);
-                  notify.success(`Визит перенесен на ${dateStr}`);
-                  removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
-                  setRescheduleData(null);
-                  loadAppointments({ source: 'reschedule_date' });
-                } catch (e) {
-                  logger.error('Ошибка переноса на дату:', e);
-    notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
-                }
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                return;
               }
-            }}>
-                📅 {t('select_date')}
-              </button>
-            </div>
-          </div>
-        </div>
-      }
 
-      {/* Модальное окно QR */}
-      {showQRModal &&
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }} role="dialog" aria-modal="true">
+              try {
+                setShowSlotsModal(false);
+                const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
+                await rescheduleVisit(targetVisitId, dateStr);
+                notify.success(`Визит перенесен на ${dateStr}`);
+                removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
+                setRescheduleData(null);
+                loadAppointments({ source: 'reschedule_date' });
+              } catch (e) {
+                logger.error('Ошибка переноса на дату:', e);
+                notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+              }
+            }
+          }
+        ]}>
+        <div style={{ display: 'grid', gap: '16px' }}>
           <div style={{
-          background: cardBg,
-          padding: '24px',
-          borderRadius: '12px',
-          maxWidth: '400px',
-          width: '90%',
-          textAlign: 'center'
-        }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>📱 QR-код для пациента</h3>
-            <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            margin: '16px 0',
-            display: 'inline-block'
+            padding: '16px',
+            borderRadius: '14px',
+            border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.14)'}`,
+            backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)'
           }}>
-              {/* Здесь будет QR-код */}
-              <div style={{
-              width: '200px',
-              height: '200px',
-              background: '#f0f0f0',
+            <div style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '14px',
-              color: '#666'
+              alignItems: 'flex-start',
+              gap: '12px'
             }}>
-                QR-код
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)',
+                color: '#3b82f6',
+                flexShrink: 0
+              }}>
+                📅
+              </div>
+              <div>
+                <div style={{
+                  color: getColor('textPrimary'),
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  marginBottom: '4px'
+                }}>
+                  Перенос записи
+                </div>
+                <div style={{
+                  color: getColor('textSecondary'),
+                  fontSize: '13px',
+                  lineHeight: 1.5
+                }}>
+                  Выберите быстрый перенос на завтра или укажите другую дату.
+                </div>
               </div>
             </div>
-            <button
-            onClick={() => setShowQRModal(false)}
-            style={{
-              padding: '8px 16px',
-              background: accentColor,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}>
-
-              Закрыть
-            </button>
           </div>
         </div>
-      }
+      </ModernDialog>
 
       {/* Контекстное меню */}
       {contextMenu.open &&

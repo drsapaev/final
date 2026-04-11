@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isCanceledApiError,
   isExpectedApiErrorStatus,
+  shouldClearAuthOnUnauthorized,
   shouldSuppressApiError,
 } from '../interceptors';
 
@@ -54,6 +55,40 @@ describe('shouldSuppressApiError', () => {
         config: { silent: false, expectedErrorStatuses: [409] },
         response: { status: 404 },
       })
+    ).toBe(false);
+  });
+});
+
+describe('shouldClearAuthOnUnauthorized', () => {
+  it('clears auth on 401 responses from protected endpoints when a token exists', () => {
+    expect(
+      shouldClearAuthOnUnauthorized({
+        config: { url: '/users/me/preferences' },
+        response: { status: 401 },
+      }, true)
+    ).toBe(true);
+
+    expect(
+      shouldClearAuthOnUnauthorized({
+        config: { url: '/messages/unread' },
+        response: { status: 401 },
+      }, true)
+    ).toBe(true);
+  });
+
+  it('does not clear auth for auth endpoints or when no token exists', () => {
+    expect(
+      shouldClearAuthOnUnauthorized({
+        config: { url: '/auth/refresh' },
+        response: { status: 401 },
+      }, true)
+    ).toBe(false);
+
+    expect(
+      shouldClearAuthOnUnauthorized({
+        config: { url: '/users/me/preferences' },
+        response: { status: 401 },
+      }, false)
     ).toBe(false);
   });
 });

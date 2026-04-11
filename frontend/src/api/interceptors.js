@@ -4,6 +4,7 @@
  */
 import { api } from './client';
 import { tokenManager } from '../utils/tokenManager';
+import { clearToken as clearAuthState } from '../stores/auth.js';
 import logger from '../utils/logger';
 
 export function isExpectedApiErrorStatus(originalRequest, status) {
@@ -32,6 +33,25 @@ export function shouldSuppressApiError(error) {
   }
 
   return originalRequest?.silent === true && status === 404;
+}
+
+export function shouldClearAuthOnUnauthorized(error, hasToken = tokenManager.hasToken()) {
+  if (!hasToken || error?.response?.status !== 401) {
+    return false;
+  }
+
+  const requestUrl = String(error?.config?.url || '');
+  if (
+    requestUrl.includes('/auth/login') ||
+    requestUrl.includes('/auth/refresh') ||
+    requestUrl.includes('/auth/csrf-token') ||
+    requestUrl.includes('/authentication/login') ||
+    requestUrl.includes('/authentication/refresh')
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -133,22 +153,11 @@ export function setupInterceptors() {
           logger.error('Ошибка обновления токена:', refreshError);
         }
 
-        // Проверяем, есть ли токен ДО удаления
         const hadToken = tokenManager.hasToken();
-
-        // Перенаправляем на страницу входа только если запрос не помечен как некритичный
-        // или если это не некритичный эндпоинт (например, /clinic/stats, /clinic/health)
         const requestUrl = originalRequest?.url || originalRequest?.baseURL + originalRequest?.url || '';
         const isNonCriticalEndpoint = requestUrl.includes('/clinic/stats') ||
         requestUrl.includes('/clinic/health') ||
         originalRequest?.skipAuthRedirect;
-
-        // Проверяем, не происходит ли это при начальной загрузке страницы
-        // Если мы на защищенной странице и токен есть, не редиректим сразу
-        const isProtectedRoute = !['/login', '/', '/health'].includes(window.location.pathname);
-        // Проверяем, является ли это начальной загрузкой (нет referrer или referrer совпадает с текущим URL)
-        const isInitialLoad = !document.referrer || document.referrer === window.location.href ||
-        performance.navigation && performance.navigation.type === 0;
 
         // Логируем для отладки
         if (process.env.NODE_ENV === 'development') {
@@ -156,33 +165,18 @@ export function setupInterceptors() {
             url: requestUrl,
             isNonCritical: isNonCriticalEndpoint,
             hadToken,
-            isProtectedRoute,
-            isInitialLoad,
+            shouldClearAuth: shouldClearAuthOnUnauthorized(error, hadToken),
             currentPath: window.location.pathname,
-            willRedirect: !isNonCriticalEndpoint && hadToken && !isInitialLoad && window.location.pathname !== '/login'
+            willRedirect: !isNonCriticalEndpoint && hadToken && window.location.pathname !== '/login'
           });
         }
 
-        // Не очищаем токен при начальной загрузке (после логина), чтобы не терять только что выданный токен
-        if (!isInitialLoad) {
-          tokenManager.clearAll();
-          delete api.defaults.headers.common['Authorization'];
-        }
-
-        // Перенаправляем только если:
-        // 1. Это не некритичный эндпоинт
-        // 2. Был токен (значит пользователь был авторизован, но токен истек)
-        // 3. Мы не на странице логина
-        // 4. Это не начальная загрузка страницы (чтобы дать RequireAuth время проверить токен)
-        // НЕ перенаправляем для некритичных эндпоинтов или если токена не было (значит пользователь не был авторизован)
-        if (!isNonCriticalEndpoint && hadToken && window.location.pathname !== '/login' && !isInitialLoad) {
-          // Используем небольшую задержку, чтобы дать RequireAuth время проверить токен
-          setTimeout(() => {
-            // Проверяем еще раз, не был ли токен восстановлен
-            if (!tokenManager.hasToken()) {
-              window.location.href = '/login';
-            }
-          }, 100);
+        if (shouldClearAuthOnUnauthorized(error, hadToken)) {
+          logger.warn('[FIX:AUTH] Clearing invalid session after 401', {
+            url: requestUrl,
+            message: error.response?.data?.message || error.response?.data?.detail || 'Unauthorized'
+          });
+          clearAuthState();
         }
       }
 

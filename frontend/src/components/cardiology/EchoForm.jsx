@@ -30,59 +30,96 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+
+const DEFAULT_ECHO_DATA = {
+  // Левый желудочек
+  leftVentricle: {
+    edd: '', // КДР
+    esd: '', // КСР
+    ef: '', // ФВ
+    fs: '', // ФС
+    ivs: '', // МЖП
+    pw: '' // ЗС
+  },
+  // Правый желудочек
+  rightVentricle: {
+    rvdd: '', // КДР ПЖ
+    rvot: '' // ВТ ПЖ
+  },
+  // Предсердия
+  atria: {
+    la: '', // ЛП
+    ra: '' // ПП
+  },
+  // Клапаны
+  valves: {
+    mitral: {
+      e: '',
+      a: '',
+      e_a: '',
+      decel_time: ''
+    },
+    tricuspid: {
+      e: '',
+      a: '',
+      e_a: ''
+    },
+    aortic: {
+      peak_velocity: '',
+      mean_gradient: '',
+      ava: ''
+    },
+    pulmonary: {
+      peak_velocity: '',
+      mean_gradient: ''
+    }
+  },
+  // Дополнительные параметры
+  additional: {
+    pericardium: '',
+    aorta: '',
+    comments: ''
+  },
+  // Заключение
+  conclusion: ''
+};
+
+function deepMerge(base, incoming) {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    return base;
+  }
+
+  const result = Array.isArray(base) ? [...base] : { ...base };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && base?.[key] && typeof base[key] === 'object') {
+      result[key] = deepMerge(base[key], value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function getNestedValue(source, path) {
+  if (!source || !path) return '';
+  return String(path).split('.').reduce((acc, key) => acc?.[key], source) ?? '';
+}
+
+function setNestedValue(source, path, value) {
+  const keys = String(path).split('.');
+  const result = { ...source };
+  let current = result;
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    const key = keys[i];
+    current[key] = current[key] && typeof current[key] === 'object' ? { ...current[key] } : {};
+    current = current[key];
+  }
+  current[keys[keys.length - 1]] = value;
+  return result;
+}
+
 const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
-  const [echoData, setEchoData] = useState({
-    // Левый желудочек
-    leftVentricle: {
-      edd: '', // КДР
-      esd: '', // КСР
-      ef: '', // ФВ
-      fs: '', // ФС
-      ivs: '', // МЖП
-      pw: '' // ЗС
-    },
-    // Правый желудочек
-    rightVentricle: {
-      rvdd: '', // КДР ПЖ
-      rvot: '' // ВТ ПЖ
-    },
-    // Предсердия
-    atria: {
-      la: '', // ЛП
-      ra: '' // ПП
-    },
-    // Клапаны
-    valves: {
-      mitral: {
-        e: '',
-        a: '',
-        e_a: '',
-        decel_time: ''
-      },
-      tricuspid: {
-        e: '',
-        a: '',
-        e_a: ''
-      },
-      aortic: {
-        peak_velocity: '',
-        mean_gradient: '',
-        ava: ''
-      },
-      pulmonary: {
-        peak_velocity: '',
-        mean_gradient: ''
-      }
-    },
-    // Дополнительные параметры
-    additional: {
-      pericardium: '',
-      aorta: '',
-      comments: ''
-    },
-    // Заключение
-    conclusion: ''
-  });
+  const [echoData, setEchoData] = useState(DEFAULT_ECHO_DATA);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -97,17 +134,19 @@ const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
 
   useEffect(() => {
     if (initialData) {
-      setEchoData(initialData);
+      setEchoData(deepMerge(DEFAULT_ECHO_DATA, initialData));
     }
   }, [initialData]);
 
   const handleChange = (section, field, value) => {
     setEchoData((prev) => ({
       ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value
-      }
+      [section]: field.includes('.')
+        ? setNestedValue(prev[section] || {}, field, value)
+        : {
+          ...(prev[section] || {}),
+          [field]: value
+        }
     }));
   };
 
@@ -181,7 +220,7 @@ const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
         <div key={field.key}>
                 <Input
             label={field.label}
-            value={echoData[section][field.key]}
+            value={getNestedValue(echoData[section], field.key)}
             onChange={(e) => handleChange(section, field.key, e.target.value)}
             placeholder={field.placeholder} />
           

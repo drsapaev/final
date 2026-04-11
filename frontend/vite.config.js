@@ -10,14 +10,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: '127.0.0.1',
+    host: '0.0.0.0',
     strictPort: false,
     hmr: false,
     watch: {
       usePolling: true,
       interval: 1000
     },
-    allowedHosts: ['localhost', '127.0.0.1'],
+    allowedHosts: true,
     proxy: {
       // HTTP API -> target backend (overridable for isolated restore rehearsal)
       "/api": {

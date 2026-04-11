@@ -119,6 +119,85 @@ function Import-EnvFile {
     }
 }
 
+function Get-CurrentLanAddress {
+    $preferred = @()
+
+    try {
+        $configs = Get-NetIPConfiguration -ErrorAction Stop | Where-Object {
+            $_.NetAdapter -and $_.NetAdapter.Status -eq 'Up' -and $_.IPv4Address
+        }
+
+        foreach ($config in $configs) {
+            $hasGateway = [bool]$config.IPv4DefaultGateway
+            $metric = if ($null -ne $config.InterfaceMetric) { [int]$config.InterfaceMetric } else { 9999 }
+
+            foreach ($address in @($config.IPv4Address)) {
+                $ip = $address.IPAddress
+                if (-not $ip) {
+                    continue
+                }
+
+                if ($ip -eq '127.0.0.1' -or $ip -like '169.254*') {
+                    continue
+                }
+
+                $preferred += [pscustomobject]@{
+                    Ip = $ip
+                    HasGateway = $hasGateway
+                    Metric = $metric
+                }
+            }
+        }
+    } catch {
+        # Fall through to socket-based detection.
+    }
+
+    if ($preferred.Count -gt 0) {
+        $best = $preferred | Sort-Object @{ Expression = 'HasGateway'; Descending = $true }, @{ Expression = 'Metric'; Ascending = $true } | Select-Object -First 1
+        if ($best -and $best.Ip) {
+            return $best.Ip
+        }
+    }
+
+    try {
+        $socket = [System.Net.Sockets.Socket]::new(
+            [System.Net.Sockets.AddressFamily]::InterNetwork,
+            [System.Net.Sockets.SocketType]::Dgram,
+            [System.Net.Sockets.ProtocolType]::Udp
+        )
+        try {
+            $socket.Connect('1.1.1.1', 80)
+            $endpoint = $socket.LocalEndPoint
+            if ($endpoint -and $endpoint.Address) {
+                $ip = $endpoint.Address.IPAddressToString
+                if ($ip -and $ip -ne '127.0.0.1') {
+                    return $ip
+                }
+            }
+        } finally {
+            $socket.Close()
+        }
+    } catch {
+        # No-op; final fallback below.
+    }
+
+    return '127.0.0.1'
+}
+
+function Set-DynamicRuntimeOrigins {
+    $lanAddress = Get-CurrentLanAddress
+    $publicUrl = "http://${lanAddress}:$DefaultFrontendPort"
+    $corsOrigins = @(
+        $publicUrl,
+        "http://$($env:COMPUTERNAME):$DefaultFrontendPort"
+    ) -join ','
+
+    [System.Environment]::SetEnvironmentVariable('APP_HOST', $lanAddress, 'Process')
+    [System.Environment]::SetEnvironmentVariable('PUBLIC_URL', $publicUrl, 'Process')
+    [System.Environment]::SetEnvironmentVariable('CORS_ORIGINS', $corsOrigins, 'Process')
+    [System.Environment]::SetEnvironmentVariable('CLINIC_AUTO_DETECT_PUBLIC_URL', '1', 'Process')
+}
+
 function Initialize-ClinicEnv {
     [System.Environment]::SetEnvironmentVariable('APP_ROOT', $RepoRoot, 'Process')
     [System.Environment]::SetEnvironmentVariable('LIFECYCLE_ENV_FILE', $LifecycleEnv, 'Process')
@@ -127,6 +206,7 @@ function Initialize-ClinicEnv {
     Import-EnvFile -Path $LifecycleEnv -Override
     Import-EnvFile -Path $BackendEnv -Override
     Import-EnvFile -Path $FrontendEnv -Override
+    Set-DynamicRuntimeOrigins
     [System.Environment]::SetEnvironmentVariable('APP_ROOT', $RepoRoot, 'Process')
 }
 
@@ -737,6 +817,7 @@ function Invoke-RestoreRehearsal {
             -EnvOverrides @{
                 BACKEND_URL = $restoreBackendUrl
                 PUBLIC_URL = $restorePublicUrl
+                CLINIC_AUTO_DETECT_PUBLIC_URL = '0'
                 EXPECTED_SETUP_INITIALIZED = '1'
             }
 
@@ -745,6 +826,7 @@ function Invoke-RestoreRehearsal {
             -EnvOverrides @{
                 BACKEND_URL = $restoreBackendUrl
                 PUBLIC_URL = $restorePublicUrl
+                CLINIC_AUTO_DETECT_PUBLIC_URL = '0'
                 EXPECTED_SETUP_INITIALIZED = '1'
                 SMOKE_REQUIRE_LOGIN = '1'
                 SMOKE_LOGIN_USERNAME = $smokeLoginUsername

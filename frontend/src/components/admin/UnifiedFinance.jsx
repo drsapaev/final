@@ -8,24 +8,14 @@ import { useTheme } from '../../contexts/ThemeContext';
 
 // Простой компонент вкладок для админки
 const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
-  const { isDark } = useTheme();
-  const colors = {
-    bg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.98)',
-    border: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-    text: isDark ? '#f8fafc' : '#0f172a',
-    textSecondary: isDark ? '#cbd5e1' : '#64748b',
-    active: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
-    activeText: '#3b82f6'
-  };
-
   return (
     <div style={{
       display: 'flex',
       gap: '4px',
       padding: '8px',
-      background: colors.bg,
+      background: 'var(--mac-card-bg)',
       borderRadius: '8px',
-      border: `1px solid ${colors.border}`,
+      border: '1px solid var(--mac-card-border)',
       marginBottom: '20px'
     }}>
       {tabs.map((tab) =>
@@ -36,8 +26,8 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
           padding: '8px 16px',
           border: 'none',
           borderRadius: '6px',
-          background: activeTab === tab.id ? colors.active : 'transparent',
-          color: activeTab === tab.id ? colors.activeText : colors.text,
+          background: activeTab === tab.id ? 'color-mix(in srgb, var(--mac-accent-blue), transparent 88%)' : 'transparent',
+          color: activeTab === tab.id ? 'var(--mac-accent-blue)' : 'var(--mac-text-primary)',
           fontSize: '14px',
           fontWeight: activeTab === tab.id ? '600' : '400',
           cursor: 'pointer',

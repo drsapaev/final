@@ -6,12 +6,12 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from app.crud import online_queue as crud_queue
 from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.services.queue_service import queue_service
 
 
 class VisitConfirmationRepository:
@@ -53,7 +53,12 @@ class VisitConfirmationRepository:
         )
 
     def get_or_create_daily_queue(self, day: date, specialist_id: int, queue_tag: str):
-        return crud_queue.get_or_create_daily_queue(self.db, day, specialist_id, queue_tag)
+        return queue_service.get_or_create_daily_queue(
+            self.db,
+            day=day,
+            specialist_id=specialist_id,
+            queue_tag=queue_tag,
+        )
 
     def commit(self) -> None:
         self.db.commit()

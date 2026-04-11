@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRef } from 'react';
 import PropTypes from 'prop-types';
 import NotificationBell from './NotificationBell';
 import NotificationInbox from './NotificationInbox';
@@ -10,6 +11,46 @@ export default function RoleNotificationCenter({ role }) {
   const [open, setOpen] = useState(false);
   const [recipientScope, setRecipientScope] = useState(null);
   const { loadNotifications, getUnreadCount } = useNotificationCenter();
+  const lastLoadKeyRef = useRef(null);
+  const lastLoadAtRef = useRef(0);
+
+  const shouldSkipLoad = useCallback((scope, source) => {
+    if (!scope?.recipientId) {
+      return true;
+    }
+
+    const loadKey = `${role}:${scope.recipientId}:${scope.recipientType || 'unknown'}`;
+    const now = Date.now();
+    const withinCooldown = lastLoadKeyRef.current === loadKey && (now - lastLoadAtRef.current) < 15_000;
+
+    if (withinCooldown) {
+      logger.info('[FIX:NOTIFICATIONS] skipping duplicate role notification load', {
+        role,
+        source,
+        loadKey,
+        ageMs: now - lastLoadAtRef.current
+      });
+      return true;
+    }
+
+    lastLoadKeyRef.current = loadKey;
+    lastLoadAtRef.current = now;
+    return false;
+  }, [role]);
+
+  const runLoadNotifications = useCallback((source) => {
+    if (shouldSkipLoad(recipientScope, source)) {
+      return Promise.resolve([]);
+    }
+
+    return loadNotifications({
+      role,
+      recipient_id: recipientScope.recipientId,
+      recipient_type: recipientScope.recipientType,
+      status: 'all',
+      limit: 50
+    });
+  }, [loadNotifications, recipientScope, role, shouldSkipLoad]);
 
   useEffect(() => {
     let isActive = true;
@@ -47,34 +88,24 @@ export default function RoleNotificationCenter({ role }) {
   }, [role]);
 
   const refreshNotifications = useCallback(() => {
-    if (!recipientScope?.recipientId) {
-      return Promise.resolve([]);
-    }
-
-    return loadNotifications({
-      role,
-      recipient_id: recipientScope.recipientId,
-      recipient_type: recipientScope.recipientType,
-      status: 'all',
-      limit: 50
-    });
-  }, [loadNotifications, recipientScope, role]);
+    return runLoadNotifications('manual');
+  }, [runLoadNotifications]);
 
   useEffect(() => {
-    refreshNotifications().catch((error) => {
+    runLoadNotifications('initial').catch((error) => {
       logger.warn(`[NotificationCenter] initial load failed for role=${role}`, error);
     });
-  }, [refreshNotifications, role]);
+  }, [runLoadNotifications, role]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    refreshNotifications().catch((error) => {
+    runLoadNotifications('open').catch((error) => {
       logger.warn(`[NotificationCenter] refresh load failed for role=${role}`, error);
     });
-  }, [open, refreshNotifications, role]);
+  }, [open, runLoadNotifications, role]);
 
   return (
     <div style={{ position: 'fixed', top: 80, right: 24, zIndex: 1200 }}>

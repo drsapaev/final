@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowRight, AtSign, Eye, EyeOff, LogIn, CircleHelp, Phone, UserPlus, UserRound } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api, buildApiUrl, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
@@ -33,6 +34,39 @@ const LoginFormStyled = () => {void
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+  const authControlStyles = {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    color: '#0f172a',
+    WebkitTextFillColor: '#0f172a',
+    caretColor: '#0f172a',
+    borderColor: 'rgba(148, 163, 184, 0.62)',
+    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.05)',
+  };
+  const authButtonBaseStyles = {
+    borderRadius: '10px',
+    fontWeight: '600',
+    letterSpacing: '0.01em',
+    boxShadow: 'none',
+    WebkitBackdropFilter: 'none',
+    backdropFilter: 'none',
+  };
+  const authSecondaryButtonStyles = {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    color: '#0f172a',
+    borderColor: 'rgba(148, 163, 184, 0.85)',
+  };
+  const authGhostButtonStyles = {
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    color: '#0f172a',
+    borderColor: 'rgba(148, 163, 184, 0.58)',
+    boxShadow: '0 6px 14px rgba(15, 23, 42, 0.06)',
+  };
+  const authPrimaryButtonStyles = {
+    background: 'linear-gradient(135deg, #0a84ff 0%, #007aff 55%, #0060df 100%)',
+    borderColor: '#007aff',
+    color: 'white',
+    boxShadow: '0 12px 24px rgba(0, 122, 255, 0.28)',
+  };
 
   const [formData, setFormData] = useState({
     username: '',
@@ -410,20 +444,21 @@ const LoginFormStyled = () => {void
       position: 'relative'
     }}>
 
-      <Card style={{
+      <Card className="login-form-auth" style={{
         width: '100%',
-        maxWidth: '420px',
-        // macOS-стиль карточки: полупрозрачная с размытием
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
+      maxWidth: '400px',
+      // macOS-стиль карточки: полупрозрачная с размытием
+      background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(248, 250, 252, 0.74) 100%)',
+        backdropFilter: 'blur(26px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(26px) saturate(140%)',
+        border: '1px solid rgba(255, 255, 255, 0.42)',
         boxShadow: `
-          0 8px 32px rgba(0, 0, 0, 0.1),
-          0 0 0 1px rgba(255, 255, 255, 0.05),
-          inset 0 1px 0 rgba(255, 255, 255, 0.1)
+          0 18px 48px rgba(15, 23, 42, 0.18),
+          0 2px 8px rgba(15, 23, 42, 0.06),
+          inset 0 1px 0 rgba(255, 255, 255, 0.55)
         `,
-        borderRadius: '20px',
+        borderRadius: '24px',
+        overflow: 'hidden',
         position: 'relative',
         zIndex: 1
       }}>
@@ -453,23 +488,23 @@ const LoginFormStyled = () => {void
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent style={{ paddingTop: 12, paddingBottom: 14 }}>
           <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>Тип входа</label>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#1d1d1f', fontWeight: 500 }}>Тип входа</label>
               <Select
                 value={formData.loginType}
                 onChange={(val) => setFormData((prev) => ({ ...prev, loginType: val }))}
                 options={[
-                { value: 'username', label: 'Имя пользователя' },
-                { value: 'email', label: 'Email' },
-                { value: 'phone', label: 'Телефон' }]
+                { value: 'username', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><UserRound size={14} />Имя пользователя</span> },
+                { value: 'email', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><AtSign size={14} />Email</span> },
+                { value: 'phone', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Phone size={14} />Телефон</span> }]
                 } />
 
             </div>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#1d1d1f', fontWeight: 500 }}>
                 {formData.loginType === 'username' ? 'Имя пользователя' : formData.loginType === 'email' ? 'Email' : 'Телефон'} *
               </label>
               <Input
@@ -479,12 +514,13 @@ const LoginFormStyled = () => {void
                 onChange={handleInputChange}
                 required
                 autoComplete={formData.loginType === 'email' ? 'email' : 'username'}
-                placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : formData.loginType === 'email' ? 'email' : 'телефон'}`} />
+                placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : formData.loginType === 'email' ? 'email' : 'телефон'}`}
+                style={authControlStyles} />
 
             </div>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>Пароль *</label>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#1d1d1f', fontWeight: 500 }}>Пароль *</label>
               <div style={{ position: 'relative' }}>
                 <Input
                   type={showPassword ? 'text' : 'password'}
@@ -493,20 +529,27 @@ const LoginFormStyled = () => {void
                   onChange={handleInputChange}
                   required
                   autoComplete="current-password"
-                  placeholder="Введите пароль" />
+                  placeholder="Введите пароль"
+                  style={authControlStyles} />
 
-                <Button type="button" variant="ghost" size="small" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 4, top: 4 }}>
-                  {showPassword ? 'Скрыть' : 'Показать'}
+                <Button type="button" variant="ghost" size="small" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 4, top: 4, ...authGhostButtonStyles, ...authButtonBaseStyles }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showPassword ? 'Скрыть' : 'Показать'}
+                  </span>
                 </Button>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Checkbox checked={rememberMe} onChange={(checked) => setRememberMe(checked)} /> Запомнить меня
               </label>
-              <Button type="button" variant="ghost" onClick={() => setShowForgotPassword(true)}>
-                Забыли пароль?
+              <Button type="button" variant="ghost" size="small" onClick={() => setShowForgotPassword(true)} style={{ ...authGhostButtonStyles, ...authButtonBaseStyles }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <CircleHelp size={14} />
+                  Забыли пароль?
+                </span>
               </Button>
             </div>
 
@@ -514,16 +557,93 @@ const LoginFormStyled = () => {void
             <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>
             }
 
-            <Button type="button" variant="primary" fullWidth disabled={loading} onClick={handleSubmit}>
-              {loading ? 'Вход...' : 'ВОЙТИ →'}
+            <Button type="button" variant="primary" fullWidth disabled={loading} onClick={handleSubmit} size="large" style={{ ...authPrimaryButtonStyles, ...authButtonBaseStyles }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <LogIn size={16} />
+                {loading ? 'Вход...' : 'ВОЙТИ'}
+                {!loading && <ArrowRight size={16} />}
+              </span>
             </Button>
           </form>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <Button type="button" variant="outline" fullWidth onClick={() => navigate('/register')}>Регистрация</Button>
-            <Button type="button" variant="outline" fullWidth onClick={() => navigate('/')}>Гость</Button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate('/register')} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <UserPlus size={16} />
+                Регистрация
+              </span>
+            </Button>
+            <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate('/')} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <UserRound size={16} />
+                Гость
+              </span>
+            </Button>
           </div>
         </CardContent>
+        <style>{`
+          .login-form-auth .mac-input,
+          .login-form-auth .mac-input-label,
+          .login-form-auth .mac-input-hint,
+          .login-form-auth .mac-input-error {
+            color: #0f172a !important;
+          }
+
+          .login-form-auth .mac-input::placeholder {
+            color: #64748b !important;
+            opacity: 1 !important;
+          }
+
+          .login-form-auth .mac-select-trigger {
+            background: rgba(255, 255, 255, 0.96) !important;
+            color: #0f172a !important;
+            border-color: rgba(148, 163, 184, 0.7) !important;
+          }
+
+          .login-form-auth .mac-select-trigger span,
+          .login-form-auth .mac-select-trigger svg {
+            color: inherit !important;
+          }
+
+          .login-form-auth .mac-select-list {
+            background: rgba(255, 255, 255, 0.98) !important;
+            color: #0f172a !important;
+            border-color: rgba(148, 163, 184, 0.7) !important;
+          }
+
+          .login-form-auth .mac-select-item {
+            color: #0f172a !important;
+          }
+
+          .login-form-auth .mac-select-item:hover {
+            color: #0f172a !important;
+          }
+
+          .login-form-auth .mac-button {
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+          }
+
+          .login-form-auth .mac-button span {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+          }
+
+          .login-form-auth .mac-button:hover {
+            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08) !important;
+            transform: translateY(-1px);
+          }
+
+          .login-form-auth .mac-button:active {
+            transform: translateY(0) scale(0.99);
+          }
+
+          .login-form-auth .mac-button[disabled] {
+            opacity: 0.7 !important;
+            cursor: not-allowed !important;
+          }
+        `}</style>
       </Card>
     </div>);
 

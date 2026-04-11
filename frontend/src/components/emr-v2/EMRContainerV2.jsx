@@ -74,6 +74,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
         isSaving,
         isSigned,
         isAmended,
+        accessDenied,
         version,
         canUndo,
         canRedo,
@@ -101,7 +102,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
         saveEMR,
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
-        enabled: !isSigned,
+        enabled: !isSigned && !accessDenied,
     });
 
     // Navigation guard
@@ -676,20 +677,25 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
 
                 {/* Actions */}
                 <div className="emr-v2-actions">
+                    {accessDenied && (
+                        <div className="emr-v2-signed-badge" style={{ marginBottom: 8 }}>
+                            ⛔ Нет прав на сохранение этой EMR
+                        </div>
+                    )}
                     {!isSigned ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveEMR({ isDraft: false })}
-                                disabled={isSaving || !isDirty}
-                            >
-                                {isSaving ? '💾 Сохранение...' : '💾 Сохранить'}
-                            </button>
+                            disabled={isSaving || !isDirty || accessDenied}
+                        >
+                            {isSaving ? '💾 Сохранение...' : '💾 Сохранить'}
+                        </button>
                             <button
                                 className="emr-v2-btn emr-v2-btn--success"
                                 onClick={handleSign}
-                                disabled={isSaving || isDirty}
-                                title={isDirty ? 'Сначала сохраните' : 'Подписать'}
+                                disabled={isSaving || isDirty || accessDenied}
+                                title={accessDenied ? 'Нет прав на изменение EMR' : (isDirty ? 'Сначала сохраните' : 'Подписать')}
                             >
                                 ✅ Подписать
                             </button>

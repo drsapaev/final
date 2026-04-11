@@ -217,8 +217,8 @@ const ReportsManager = () => {
       {/* Форма генерации отчета */}
       <Card style={{
       padding: '24px',
-      background: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border-primary)',
+      background: 'var(--mac-card-bg)',
+      border: '1px solid var(--mac-card-border)',
       borderRadius: '12px'
     }}>
         <h3 style={{
@@ -344,8 +344,8 @@ const ReportsManager = () => {
       {/* Быстрые отчеты */}
       <Card style={{
       padding: '24px',
-      background: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border-primary)',
+      background: 'var(--mac-card-bg)',
+      border: '1px solid var(--mac-card-border)',
       borderRadius: '12px'
     }}>
         <h3 style={{
@@ -455,8 +455,8 @@ const ReportsManager = () => {
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <Card style={{
       padding: '24px',
-      background: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border-primary)',
+      background: 'var(--mac-card-bg)',
+      border: '1px solid var(--mac-card-border)',
       borderRadius: '12px',
       minHeight: '400px' // Ensure card has some height even when empty
     }}>
@@ -564,8 +564,8 @@ const ReportsManager = () => {
       {/* Автоматические отчеты */}
       <Card style={{
       padding: '24px',
-      background: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border-primary)',
+      background: 'var(--mac-card-bg)',
+      border: '1px solid var(--mac-card-border)',
       borderRadius: '12px'
     }}>
         <div style={{
@@ -643,7 +643,7 @@ const ReportsManager = () => {
             fontWeight: '500',
             color: 'var(--mac-text-primary)',
             border: '1px solid var(--mac-border-primary)',
-            background: 'var(--mac-bg-secondary)'
+            background: 'var(--mac-card-bg)'
           }}>
 
             <Activity style={{ width: '18px', height: '18px' }} />
@@ -655,8 +655,8 @@ const ReportsManager = () => {
       {/* Хранение и очистка */}
       <Card style={{
       padding: '24px',
-      background: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border-primary)',
+      background: 'var(--mac-card-bg)',
+      border: '1px solid var(--mac-card-border)',
       borderRadius: '12px'
     }}>
         <div style={{
@@ -735,7 +735,7 @@ const ReportsManager = () => {
             fontWeight: '500',
             color: 'var(--mac-text-primary)',
             border: '1px solid var(--mac-border-primary)',
-            background: 'var(--mac-bg-secondary)'
+            background: 'var(--mac-card-bg)'
           }}>
 
             <Download style={{ width: '18px', height: '18px' }} />
@@ -747,8 +747,8 @@ const ReportsManager = () => {
       {/* Статистика хранения */}
       <Card style={{
       padding: '24px',
-      background: 'var(--mac-bg-primary)',
-      border: '1px solid var(--mac-border-primary)',
+      background: 'var(--mac-card-bg)',
+      border: '1px solid var(--mac-card-border)',
       borderRadius: '12px'
     }}>
         <h3 style={{

@@ -399,6 +399,30 @@ const GraphQLExplorer = () => {
     return JSON.stringify(obj, null, 2);
   };
 
+  const shellStyle = {
+    padding: 'clamp(16px, 2vw, 24px)',
+    borderRadius: '28px',
+    border: '1px solid color-mix(in srgb, var(--mac-card-border), white 12%)',
+    background: 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 7%) 0%, color-mix(in srgb, var(--mac-main-shell-bg), transparent 6%) 100%)',
+    boxShadow: 'var(--mac-shadow-sm)'
+  };
+
+  const sectionCardStyle = {
+    padding: '24px',
+    boxShadow: 'var(--mac-shadow-sm)'
+  };
+
+  const softSurfaceStyle = {
+    background: 'color-mix(in srgb, var(--mac-card-bg), white 5%)',
+    border: '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)'
+  };
+
+  const textareaStyle = {
+    background: 'color-mix(in srgb, var(--mac-card-bg), white 4%)',
+    border: '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)',
+    boxShadow: 'none'
+  };
+
   const renderExplorerTab = () =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Отображение ошибок */}
@@ -412,7 +436,7 @@ const GraphQLExplorer = () => {
     }
 
       {/* Примеры запросов */}
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={sectionCardStyle}>
         <h3 style={{
         margin: '0 0 16px 0',
         color: 'var(--mac-text-primary)',
@@ -444,13 +468,15 @@ const GraphQLExplorer = () => {
       </MacOSCard>
 
       {/* Редактор запроса */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        <MacOSCard style={{ padding: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+        <MacOSCard style={sectionCardStyle}>
           <div style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '16px'
+          marginBottom: '16px',
+          gap: '12px'
         }}>
             <h3 style={{
             margin: 0,
@@ -501,9 +527,11 @@ const GraphQLExplorer = () => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Введите GraphQL запрос..."
+          minRows={10}
+          maxRows={18}
+          textareaStyle={textareaStyle}
           style={{
             width: '100%',
-            height: '300px',
             fontFamily: 'Monaco, Consolas, "Courier New", monospace',
             fontSize: 'var(--mac-font-size-sm)',
             lineHeight: '1.5',
@@ -523,9 +551,11 @@ const GraphQLExplorer = () => {
             value={variables}
             onChange={(e) => setVariables(e.target.value)}
             placeholder='{"key": "value"}'
+            minRows={5}
+            maxRows={10}
+            textareaStyle={textareaStyle}
             style={{
               width: '100%',
-              height: '100px',
               fontFamily: 'Monaco, Consolas, "Courier New", monospace',
               fontSize: 'var(--mac-font-size-sm)',
               lineHeight: '1.5',
@@ -535,12 +565,14 @@ const GraphQLExplorer = () => {
           </div>
         </MacOSCard>
 
-        <MacOSCard style={{ padding: '24px' }}>
+        <MacOSCard style={sectionCardStyle}>
           <div style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '16px'
+          marginBottom: '16px',
+          gap: '12px'
         }}>
             <h3 style={{
             margin: 0,
@@ -575,8 +607,7 @@ const GraphQLExplorer = () => {
           <div style={{
           height: '400px',
           padding: '16px',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          border: '1px solid var(--mac-border)',
+          ...softSurfaceStyle,
           borderRadius: 'var(--mac-radius-md)',
           overflow: 'auto',
           fontFamily: 'Monaco, Consolas, "Courier New", monospace',
@@ -616,7 +647,7 @@ const GraphQLExplorer = () => {
 
   const renderSchemaTab = () =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '24px' }}>
+      <MacOSCard style={sectionCardStyle}>
         <h3 style={{
         margin: '0 0 16px 0',
         color: 'var(--mac-text-primary)',
@@ -639,9 +670,8 @@ const GraphQLExplorer = () => {
           key={index}
           style={{
             padding: '16px',
-            border: '1px solid var(--mac-border)',
+            ...softSurfaceStyle,
             borderRadius: 'var(--mac-radius-md)',
-            backgroundColor: 'var(--mac-bg-secondary)'
           }}>
           
                   <h4 style={{
@@ -669,7 +699,7 @@ const GraphQLExplorer = () => {
                 display: 'flex',
                 justifyContent: 'space-between',
                 padding: '4px 8px',
-                backgroundColor: 'var(--mac-bg-primary)',
+                background: 'color-mix(in srgb, var(--mac-card-bg), white 9%)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)'
               }}>
@@ -713,9 +743,10 @@ const GraphQLExplorer = () => {
 
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={shellStyle}>
       <div style={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: '16px',
         marginBottom: '24px'
@@ -734,7 +765,12 @@ const GraphQLExplorer = () => {
       {/* Вкладки */}
       <div style={{
         display: 'flex',
-        borderBottom: '1px solid var(--mac-border)',
+        flexWrap: 'wrap',
+        gap: '8px',
+        padding: '8px',
+        border: '1px solid color-mix(in srgb, var(--mac-card-border), white 10%)',
+        background: 'color-mix(in srgb, var(--mac-card-bg), transparent 8%)',
+        borderRadius: '18px',
         marginBottom: '24px'
       }}>
         {tabs.map((tab) => {
@@ -744,14 +780,16 @@ const GraphQLExplorer = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '16px 24px',
-                border: 'none',
-                background: 'none',
+                padding: '12px 18px',
+                border: '1px solid transparent',
+                background: activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                borderBottom: activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
+                borderRadius: '14px',
+                boxShadow: activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none',
+                borderColor: activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent',
                 color: activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                 fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
                 fontSize: 'var(--mac-font-size-sm)',

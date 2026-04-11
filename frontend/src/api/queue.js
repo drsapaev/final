@@ -93,23 +93,11 @@ export async function callNextQueuePatient({ specialistId, targetDate }) {
 }
 
 /**
- * Получить user_id по doctor_id
- * @param {number} doctorId - ID врача (doctor_id)
- * @returns {Promise<number>} user_id
- */
-export async function getDoctorUserId(doctorId) {
-  const response = await api.get(
-    `/registrar-integration/doctors/${Number(doctorId)}/user-id`
-  );
-  return response.data.user_id;
-}
-
-/**
  * Массовое создание записей в очереди (при добавлении новых услуг)
  * @param {Object} params - Параметры для создания очередей
  * @param {number} params.patientId - ID пациента
  * @param {string} params.source - Источник регистрации: 'online', 'desk', 'morning_assignment'
- * @param {Array<{specialist_id: number, service_id: number, quantity: number}>} params.services - Список услуг
+ * @param {Array<{specialist_id: number, service_id: number, quantity: number}>} params.services - Список услуг, где specialist_id = Doctor.id
  * @returns {Promise<{success: boolean, entries: Array, message: string}>}
  */
 export async function createQueueEntriesBatch({ patientId, source, services }) {

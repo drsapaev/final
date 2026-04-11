@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
-import { printService } from '../../services/print';
+import { buildPanelTicketPayload, printPanelTicketInBrowserAsync } from '../../services/panelPrint';
 import logger from '../../utils/logger';
-import { openPrintableWindow } from '../../utils/printWindow';
 import PropTypes from 'prop-types';
 
 const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
@@ -11,78 +10,21 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
   const [currentPrinting, setCurrentPrinting] = useState(null);
   const [countdown, setCountdown] = useState(0);
 
-  const buildTicketPayload = (ticket) => ({
-    queue_number: String(ticket.queue_number || ''),
-    doctor_name: ticket.doctor_name || 'Без врача',
-    specialty: ticket.department || ticket.specialty || ticket.queue_name || 'Очередь',
-    patient_name: ticket.patient_name || 'Не указан',
-    cabinet: ticket.cabinet || ticket.room || null,
-    source: ticket.source || 'payment'
-  });
-
-  const printFallbackTicket = (ticket) => {
-    const printContent = `
-      ═══════════════════════════════════
-           ТАЛОН НА ПРИЁМ
-      ═══════════════════════════════════
-      
-      Пациент: ${ticket.patient_name || 'Не указан'}
-      
-      Очередь: ${ticket.queue_name}
-      Номер: ${ticket.queue_number}
-      
-      ${ticket.doctor_name !== 'Без врача' ? `Врач: ${ticket.doctor_name}` : ''}
-      
-      Дата: ${new Date(ticket.visit_date).toLocaleDateString('ru-RU')}
-      Время: ${ticket.visit_time || 'Не указано'}
-      
-      ═══════════════════════════════════
-      Сохраните талон до приёма
-      ═══════════════════════════════════
-    `;
-
-    return openPrintableWindow({
-      features: 'width=400,height=600',
-      html: `
-      <html>
-        <head>
-          <title>Талон ${ticket.queue_name} №${ticket.queue_number}</title>
-          <style>
-            body {
-              font-family: 'Courier New', monospace;
-              font-size: 12px;
-              line-height: 1.4;
-              margin: 20px;
-              white-space: pre-line;
-            }
-            @media print {
-              body { margin: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `
-    });
-  };
-
   // Функция печати одного талона
   const printSingleTicket = async (ticket) => {
     setCurrentPrinting(ticket.queue_id);
 
     try {
-      const result = await printService.quickQueueTicket(buildTicketPayload(ticket));
-      if (!result?.success) {
-        logger.warn('Backend quick print ticket failed, falling back to popup', result?.error);
-        return printFallbackTicket(ticket);
+      const result = await printPanelTicketInBrowserAsync(buildPanelTicketPayload(ticket));
+      if (!result?.opened) {
+        logger.warn('Browser popup blocked for ticket print', ticket);
+      } else if (!result?.success) {
+        logger.warn('Browser ticket preview failed', ticket);
       }
-
-      return true;
+      return Boolean(result?.opened && result?.success);
     } catch (error) {
-      logger.warn('Backend quick print ticket errored, falling back to popup', error);
-      return printFallbackTicket(ticket);
+      logger.error('Browser ticket print failed', error);
+      return false;
     } finally {
       setCurrentPrinting(null);
     }

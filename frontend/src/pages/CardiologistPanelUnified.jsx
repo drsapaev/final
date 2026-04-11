@@ -35,6 +35,7 @@ import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
+import logger from '../utils/logger';
 import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
@@ -129,6 +130,7 @@ const MacOSCardiologistPanelUnified = () => {
   const [patientFiles, setPatientFiles] = useState([]);
   const [historyFilter, setHistoryFilter] = useState('all');
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
+  const filesAccessDeniedRef = useRef(false);
 
   const getSelectedPatientContext = useCallback(() => {
     const patientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || null;
@@ -207,6 +209,11 @@ const MacOSCardiologistPanelUnified = () => {
         fileEndpoints.push(`${API_V1_BASE}/files?visit_id=${visitId}&page=1&size=50`);
       }
 
+      if (filesAccessDeniedRef.current) {
+        setPatientFiles([]);
+        return;
+      }
+
       const mergedFiles = new Map();
       for (const endpoint of fileEndpoints) {
         const fileResponse = await fetch(endpoint, {
@@ -214,6 +221,15 @@ const MacOSCardiologistPanelUnified = () => {
         });
 
         if (!fileResponse.ok) {
+          if (fileResponse.status === 403) {
+            filesAccessDeniedRef.current = true;
+            logger.info('[FIX:FILES] Skipping file fetches after permission denied', {
+              patientId,
+              visitId,
+              endpoint
+            });
+            break;
+          }
           continue;
         }
 
@@ -368,6 +384,10 @@ const MacOSCardiologistPanelUnified = () => {
   useEffect(() => {
     hydratePatientFromUrl();
   }, [hydratePatientFromUrl, authRefreshTick]);
+
+  const patientIdFromUrl = getPatientIdFromUrl();
+  const visitIdFromUrl = getVisitIdFromUrl();
+  const shouldHydrateAppointmentContext = Boolean(patientIdFromUrl || visitIdFromUrl);
 
   // Смена вкладки с синхронизацией URL
   const goToTab = (tabId) => {
@@ -666,7 +686,7 @@ const MacOSCardiologistPanelUnified = () => {
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
-    if (activeTab === 'appointments') {
+    if (activeTab === 'appointments' || shouldHydrateAppointmentContext) {
       loadMacOSCardiologyAppointments();
     }
 
@@ -676,13 +696,13 @@ const MacOSCardiologistPanelUnified = () => {
 
       // Автоматически обновляем список appointments после завершения приёма
       if (action === 'visitCompleted' || action === 'nextPatientCalled') {
-        if (activeTab === 'appointments') {
+        if (activeTab === 'appointments' || shouldHydrateAppointmentContext) {
           loadMacOSCardiologyAppointments();
         }
       }
 
       // Обновляем при любых изменениях, если открыта вкладка appointments
-      if (activeTab === 'appointments') {
+      if (activeTab === 'appointments' || shouldHydrateAppointmentContext) {
         // Небольшая задержка, чтобы дать бэкенду время обновить статусы
         setTimeout(() => {
           loadMacOSCardiologyAppointments();
@@ -694,7 +714,7 @@ const MacOSCardiologistPanelUnified = () => {
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
-  }, [activeTab, loadMacOSCardiologyAppointments]);
+  }, [activeTab, loadMacOSCardiologyAppointments, shouldHydrateAppointmentContext]);
 
   // Функция для получения данных пациента по ID
   const fetchPatientData = useCallback(async (patientId) => {

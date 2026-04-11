@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import { fetchClinicSettings, saveClinicSettings } from '../../api/adminSettings';
+import {
+  fetchTicketPrintSettings,
+  saveTicketPrintSettings,
+  TICKET_PRINT_SETTINGS_DEFINITIONS,
+  TICKET_PRINT_SETTINGS_DEFAULTS,
+} from '../../api/ticketPrintSettings';
 import logger from '../../utils/logger';
 import {
   Building2,
@@ -9,6 +15,7 @@ import {
   Mail,
   Clock,
   Globe,
+  Printer,
   Upload,
   Save,
   RefreshCw,
@@ -21,7 +28,8 @@ import {
   MacOSButton,
   MacOSInput,
   MacOSSelect,
-  MacOSTextarea
+  MacOSTextarea,
+  MacOSCheckbox
 } from '../ui/macos';
 
 const ClinicSettings = () => {
@@ -38,6 +46,10 @@ const ClinicSettings = () => {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [ticketPrintSettings, setTicketPrintSettings] = useState({ ...TICKET_PRINT_SETTINGS_DEFAULTS });
+  const [ticketPrintLoading, setTicketPrintLoading] = useState(true);
+  const [ticketPrintSaving, setTicketPrintSaving] = useState(false);
+  const [ticketPrintMessage, setTicketPrintMessage] = useState({ type: '', text: '' });
 
   // Список часовых поясов
   const timezones = [
@@ -50,6 +62,7 @@ const ClinicSettings = () => {
 
   useEffect(() => {
     loadSettings();
+    loadTicketPrintSettings();
   }, []);
 
   const loadSettings = async () => {
@@ -75,6 +88,24 @@ const ClinicSettings = () => {
 
   const handleInputChange = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const loadTicketPrintSettings = async () => {
+    try {
+      setTicketPrintLoading(true);
+      const data = await fetchTicketPrintSettings();
+      setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...data });
+    } catch (error) {
+      logger.error('Ошибка загрузки настроек печати талонов:', error);
+      setTicketPrintMessage({ type: 'error', text: 'Ошибка загрузки настроек печати талонов' });
+      setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS });
+    } finally {
+      setTicketPrintLoading(false);
+    }
+  };
+
+  const handleTicketPrintChange = (key, value) => {
+    setTicketPrintSettings(prev => ({ ...prev, [key]: value }));
   };
 
   const handleLogoSelect = (event) => {
@@ -157,6 +188,21 @@ const ClinicSettings = () => {
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveTicketPrintSettingsHandler = async () => {
+    try {
+      setTicketPrintSaving(true);
+      setTicketPrintMessage({ type: '', text: '' });
+      const savedSettings = await saveTicketPrintSettings(ticketPrintSettings);
+      setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...savedSettings });
+      setTicketPrintMessage({ type: 'success', text: 'Настройки печати талонов сохранены' });
+    } catch (error) {
+      logger.error('Ошибка сохранения настроек печати талонов:', error);
+      setTicketPrintMessage({ type: 'error', text: 'Ошибка сохранения настроек печати талонов' });
+    } finally {
+      setTicketPrintSaving(false);
     }
   };
 
@@ -553,6 +599,158 @@ const ClinicSettings = () => {
             </div>
           </MacOSCard>
         </div>
+
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            marginBottom: '20px',
+            paddingBottom: '20px',
+            borderBottom: '1px solid var(--mac-border)'
+          }}>
+            <div>
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                margin: '0 0 8px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Printer style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+                Печать талонов
+              </h3>
+              <p style={{
+                color: 'var(--mac-text-secondary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                margin: 0,
+                maxWidth: '720px'
+              }}>
+                Настройте, какие поля будут видны на печатном талоне. Эти параметры применяются и к регистратуре, и к панелям специалистов.
+              </p>
+              <p style={{
+                color: 'var(--mac-text-tertiary)',
+                fontSize: 'var(--mac-font-size-xs)',
+                margin: '8px 0 0 0',
+                maxWidth: '720px'
+              }}>
+                Поле «Кабинет» управляет только видимостью. Само значение берётся из связанного врача и сегодняшней очереди, а не задаётся в настройках печати.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <MacOSButton
+                variant="outline"
+                onClick={loadTicketPrintSettings}
+                disabled={ticketPrintLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px'
+                }}
+              >
+                <RefreshCw style={{ width: '16px', height: '16px' }} />
+                Обновить
+              </MacOSButton>
+              <MacOSButton
+                onClick={saveTicketPrintSettingsHandler}
+                disabled={ticketPrintSaving || ticketPrintLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  border: 'none',
+                  padding: '8px 16px'
+                }}
+              >
+                {ticketPrintSaving ? (
+                  <RefreshCw style={{
+                    width: '16px',
+                    height: '16px',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                ) : (
+                  <Save style={{ width: '16px', height: '16px' }} />
+                )}
+                Сохранить
+              </MacOSButton>
+            </div>
+          </div>
+
+          {ticketPrintMessage.text && (
+            <MacOSCard style={{
+              padding: '16px',
+              marginBottom: '20px',
+              backgroundColor: ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+              border: ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {ticketPrintMessage.type === 'success' ? (
+                  <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+                ) : (
+                  <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+                )}
+                <span style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: ticketPrintMessage.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
+                  fontWeight: 'var(--mac-font-weight-medium)'
+                }}>
+                  {ticketPrintMessage.text}
+                </span>
+              </div>
+            </MacOSCard>
+          )}
+
+          {ticketPrintLoading ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              padding: '24px 0',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              <RefreshCw style={{
+                width: '24px',
+                height: '24px',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <span>Загрузка настроек печати талонов...</span>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '12px'
+            }}>
+              {TICKET_PRINT_SETTINGS_DEFINITIONS.map((item) => (
+                <div
+                  key={item.key}
+                  style={{
+                    padding: '14px',
+                    borderRadius: 'var(--mac-radius-md)',
+                    border: '1px solid var(--mac-border)',
+                    backgroundColor: 'var(--mac-bg-secondary)'
+                  }}
+                >
+                  <MacOSCheckbox
+                    checked={Boolean(ticketPrintSettings[item.key])}
+                    onChange={(checked) => handleTicketPrintChange(item.key, checked)}
+                    label={item.label}
+                    description={item.description}
+                    disabled={ticketPrintSaving}
+                    size="md"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </MacOSCard>
       </MacOSCard>
     </div>
   );

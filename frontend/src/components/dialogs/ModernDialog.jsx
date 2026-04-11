@@ -12,15 +12,17 @@ const ModernDialog = ({
   customHeader,
   actions,
   maxWidth = '28rem',
+  maxHeight = 'calc(100dvh - 2rem)',
   showCloseButton = true,
   closeOnBackdrop = true,
   closeOnEscape = true,
   className = '',
+  dialogClassName = '',
+  dialogStyle = {},
   ...props
 }) => {
   const { theme, getColor } = useTheme();
-  const dialogRef = useRef(null);void
-  useRef(null);
+  const dialogRef = useRef(null);
 
   // Фокус-ловушка и управление клавишами
   useEffect(() => {
@@ -84,6 +86,27 @@ const ModernDialog = ({
     background: 'transparent'
   };
 
+  const dialogStyles = {
+    backgroundColor: getColor('cardBg'),
+    maxWidth,
+    maxHeight,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    zIndex: 1,
+    boxShadow: theme === 'dark' ?
+    '0 25px 50px -12px rgba(0, 0, 0, 0.8)' :
+    '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    ...dialogStyle
+  };
+
+  const dialogLabelProps = customHeader && title ? {
+    'aria-label': typeof title === 'string' ? title : undefined
+  } : {
+    'aria-labelledby': title ? 'dialog-title' : undefined
+  };
+
   return (
     <div
       className={`modern-dialog-backdrop ${className}`}
@@ -105,19 +128,11 @@ const ModernDialog = ({
       
       <div
         ref={dialogRef}
-        className="modern-dialog-container"
+        className={`modern-dialog-container ${dialogClassName}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={title ? 'dialog-title' : undefined}
-        style={{
-          backgroundColor: getColor('cardBg'),
-          maxWidth,
-          position: 'relative',
-          zIndex: 1,
-          boxShadow: theme === 'dark' ?
-          '0 25px 50px -12px rgba(0, 0, 0, 0.8)' :
-          '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-        }}>
+        {...dialogLabelProps}
+        style={dialogStyles}>
         
         {/* Заголовок */}
         {(customHeader || title || showCloseButton) &&
@@ -142,8 +157,7 @@ const ModernDialog = ({
               onClick={onClose}
               aria-label="Закрыть диалог"
               style={{
-                color: getColor('textSecondary'),
-                backgroundColor: 'transparent'
+                color: getColor('textSecondary')
               }}>
               
                     <X size={20} />
@@ -208,10 +222,13 @@ ModernDialog.propTypes = {
     })
   ),
   maxWidth: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  maxHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   showCloseButton: PropTypes.bool,
   closeOnBackdrop: PropTypes.bool,
   closeOnEscape: PropTypes.bool,
-  className: PropTypes.string
+  className: PropTypes.string,
+  dialogClassName: PropTypes.string,
+  dialogStyle: PropTypes.object
 };
 
 export default ModernDialog;

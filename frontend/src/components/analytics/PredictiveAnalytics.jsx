@@ -51,6 +51,10 @@ const PredictiveAnalytics = ({
     return metric ? <metric.icon className="w-5 h-5" /> : <Activity className="w-5 h-5" />;
   };
 
+  const visibleForecasts = (data?.forecasts || []).filter((forecast) =>
+    !forecast.metric || forecast.metric === selectedMetric
+  );
+
 
 
 
@@ -61,13 +65,15 @@ const PredictiveAnalytics = ({
     const trend = forecast.trend || 0;
     const isPositive = trend > 0;
     const isHighConfidence = confidence > 0.8;
+    const metricId = forecast.metric || selectedMetric;
+    const metricLabel = forecast.metric_label || metricOptions.find((m) => m.id === metricId)?.label || 'Прогноз';
 
     return (
       <Card key={forecast.period} className="relative overflow-hidden">
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              {getMetricIcon(selectedMetric)}
+              {getMetricIcon(metricId)}
               <h4 className="font-semibold">{forecast.period}</h4>
             </div>
             <div className="flex items-center space-x-2">
@@ -93,6 +99,7 @@ const PredictiveAnalytics = ({
                 {forecast.unit || ''}
               </span>
             </div>
+            <div className="text-xs text-gray-500">{metricLabel}</div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -334,7 +341,7 @@ const PredictiveAnalytics = ({
       <div>
           <h3 className="text-lg font-semibold mb-4">Прогнозы на {forecastPeriod}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.forecasts.map((forecast) => renderForecastCard(forecast))}
+            {visibleForecasts.map((forecast) => renderForecastCard(forecast))}
           </div>
         </div>
       }

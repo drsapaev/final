@@ -58,8 +58,16 @@ export const QueueActionButtons = ({
     }
   } = styles;
 
-  const entryId = entry.queue_entry_id || entry.id;
+  const entryId = entry?.queue_entry_id ?? null;
   const status = entry.status || entry.queue_status || 'waiting';
+
+  if (!entryId) {
+    logger.warn('[QueueActionButtons] Missing queue_entry_id, skipping queue action controls', {
+      entry,
+      status
+    });
+    return null;
+  }
 
   const handleAction = async (action, payload = {}) => {
     if (loading) return;
@@ -85,9 +93,7 @@ export const QueueActionButtons = ({
           response = await api.post(`/queue/entry/${entryId}/incomplete`, payload);
           break;
         case 'complete':
-          response = await api.post(`/queue/entry/${entryId}/status`, null, {
-            params: { status: 'served' }
-          });
+          response = await api.post(`/doctor/queue/${entryId}/complete`);
           break;
         default:
           throw new Error(`Unknown action: ${action}`);

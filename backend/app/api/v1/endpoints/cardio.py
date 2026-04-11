@@ -16,7 +16,7 @@ from app.schemas.cardio import CardioBloodTestCreate, CardioBloodTestOut
 router = APIRouter(prefix="/cardio", tags=["cardio"])
 logger = logging.getLogger(__name__)
 
-CARDIO_ROLES = ("Admin", "Doctor", "cardio", "cardiology")
+CARDIO_ROLES = ("Admin", "Doctor", "cardio", "cardiology", "cardiologist", "Cardiologist")
 
 
 @router.get("/ecg", summary="ЭКГ исследования")

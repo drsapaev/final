@@ -1,15 +1,5 @@
-export const openPrintableWindow = ({
-  html,
-  features = 'width=900,height=700',
-  logger,
-  onOpenFailure
-}) => {
-  const printWindow = window.open('', '_blank', features);
-
+export const finalizePrintableWindow = (printWindow, html, logger) => {
   if (!printWindow) {
-    if (onOpenFailure) {
-      onOpenFailure();
-    }
     return false;
   }
 
@@ -44,4 +34,22 @@ export const openPrintableWindow = ({
   }
 
   return true;
+};
+
+export const openPrintableWindow = ({
+  html,
+  features = 'width=900,height=700',
+  logger,
+  onOpenFailure
+}) => {
+  const printWindow = window.open('', '_blank', features);
+
+  if (!printWindow) {
+    if (onOpenFailure) {
+      onOpenFailure();
+    }
+    return false;
+  }
+
+  return finalizePrintableWindow(printWindow, html, logger);
 };

@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.models.online_queue import DailyQueue
+from app.models.service import Service
+from app.models.visit import VisitService
 from app.services.visit_confirmation_service import (
     VisitConfirmationDomainError,
     VisitConfirmationService,
@@ -68,3 +71,43 @@ class TestVisitConfirmationService:
         assert result["success"] is True
         assert result["visit_id"] == test_visit.id
         assert test_visit.status in {"confirmed", "open"}
+
+    def test_assign_queue_numbers_uses_doctor_id_for_daily_queue(self, db_session, test_visit, test_doctor):
+        service = Service(
+            code="CARDIO_CONFIRM",
+            name="Подтвержденная консультация",
+            price=100000,
+            duration_minutes=30,
+            is_active=True,
+            queue_tag="cardiology_common",
+        )
+        db_session.add(service)
+        db_session.commit()
+        db_session.refresh(service)
+
+        visit_service = VisitService(
+            visit_id=test_visit.id,
+            service_id=service.id,
+            code=service.code,
+            name=service.name,
+            qty=1,
+            price=service.price,
+        )
+        db_session.add(visit_service)
+        db_session.commit()
+
+        confirmation_service = VisitConfirmationService(db_session)
+        queue_numbers, print_tickets = confirmation_service._assign_queue_numbers_on_confirmation(test_visit)
+        db_session.flush()
+
+        assert len(queue_numbers) == 1
+        assert len(print_tickets) == 1
+
+        daily_queue = (
+            db_session.query(DailyQueue)
+            .filter(DailyQueue.id == queue_numbers[0]["queue_id"])
+            .first()
+        )
+        assert daily_queue is not None
+        assert daily_queue.specialist_id == test_doctor.id
+        assert print_tickets[0]["doctor_cabinet"] == test_doctor.cabinet

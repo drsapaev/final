@@ -14,6 +14,12 @@ import {
 } from '../constants/messagingContract';
 
 const ChatContext = createContext(null);
+const PUBLIC_PATH_PREFIXES = ['/login', '/health', '/setup', '/forbidden', '/unauthorized', '/not-found'];
+
+function isPublicPath(pathname) {
+  const normalizedPath = String(pathname || '/').toLowerCase();
+  return normalizedPath === '/' || PUBLIC_PATH_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
+}
 
 export const ChatProvider = ({ children }) => {
   const location = useLocation();
@@ -21,6 +27,7 @@ export const ChatProvider = ({ children }) => {
   const user = authState.profile;
   const token = authState.token;
   const isBoardRoute = location.pathname.startsWith('/queue-board') || location.pathname.startsWith('/display-board');
+  const isPublicRoute = isPublicPath(location.pathname);
 
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -44,6 +51,7 @@ export const ChatProvider = ({ children }) => {
   // Это предотвращает разрыв соединения WebSocket при обновлении функций/стейта
   const handleNewMessageRef = useRef(null);
   const loadConversationsRef = useRef(null);
+  const chatSnapshotSyncUserRef = useRef(null);
 
   // Синхронизация ref activeConversation
   useEffect(() => {
@@ -68,9 +76,38 @@ export const ChatProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
+  const markConversationLocallyRead = useCallback((userId) => {
+    if (!userId) return;
+
+    setConversations((prev) => {
+      let clearedUnread = 0;
+      const next = prev.map((conversation) => {
+        if (conversation.user_id !== userId) {
+          return conversation;
+        }
+
+        clearedUnread = Number(conversation.unread_count || 0);
+        if (!clearedUnread) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          unread_count: 0,
+        };
+      });
+
+      if (clearedUnread > 0) {
+        setUnreadCount((prevUnread) => Math.max(0, prevUnread - clearedUnread));
+      }
+
+      return next;
+    });
+  }, []);
+
   // Загрузка бесед
   const loadConversations = useCallback(async ({ syncUnread = true } = {}) => {
-    if (!user || isBoardRoute) return;
+    if (!user || isBoardRoute || isPublicRoute) return;
     try {
       const data = await messagesApi.getConversations();
       setConversations(data.conversations || []);
@@ -78,9 +115,17 @@ export const ChatProvider = ({ children }) => {
         setUnreadCount(data.total_unread || 0);
       }
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        logger.info('[FIX:CHAT] Skipping conversations load due to auth state', {
+          status,
+          path: location.pathname,
+        });
+        return;
+      }
       logger.error('Failed to load conversations:', error);
     }
-  }, [isBoardRoute, user]);
+  }, [isBoardRoute, isPublicRoute, location.pathname, user]);
 
   const markMessageAsRead = useCallback(async (messageId) => {
     if (!messageId) return;
@@ -96,13 +141,31 @@ export const ChatProvider = ({ children }) => {
       logger.warn('[FIX:CHAT] Failed to sync read receipt', { messageId, error });
     } finally {
       readSyncInFlightRef.current.delete(messageId);
-      loadConversationsRef.current?.();
     }
   }, []);
 
+  // Обновить количество непрочитанных
+  const refreshUnreadCount = useCallback(async () => {
+    if (isBoardRoute || isPublicRoute) return;
+    try {
+      const count = await messagesApi.getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        logger.info('[FIX:CHAT] Skipping unread count refresh due to auth state', {
+          status,
+          path: location.pathname,
+        });
+        return;
+      }
+      logger.error('Failed to get unread count:', error);
+    }
+  }, [isBoardRoute, isPublicRoute, location.pathname]);
+
   // Обработка сообщения
   const handleNewMessage = useCallback((message) => {
-    if (isBoardRoute) {
+    if (isBoardRoute || isPublicRoute) {
       return;
     }
 
@@ -178,7 +241,7 @@ export const ChatProvider = ({ children }) => {
         message.sender_name || `User ${message.sender_id}`
       );
     }
-  }, [isBoardRoute, user, loadConversations, isChatOpen, markMessageAsRead]);
+  }, [isBoardRoute, isPublicRoute, user, loadConversations, isChatOpen, markMessageAsRead]);
 
   // Обновляем ref при изменении handleNewMessage
   useEffect(() => {
@@ -190,21 +253,32 @@ export const ChatProvider = ({ children }) => {
     loadConversationsRef.current = loadConversations;
   }, [loadConversations]);
 
-  // Обновить количество непрочитанных
-  const refreshUnreadCount = useCallback(async () => {
-    if (isBoardRoute) return;
-    try {
-      const count = await messagesApi.getUnreadCount();
-      setUnreadCount(count);
-    } catch (error) {
-      logger.error('Failed to get unread count:', error);
+  const syncChatSnapshot = useCallback(async () => {
+    if (!user || isBoardRoute || isPublicRoute) {
+      return false;
     }
-  }, [isBoardRoute]);
+
+    const currentUserId = user.id || null;
+    if (!currentUserId) {
+      return false;
+    }
+
+    if (chatSnapshotSyncUserRef.current === currentUserId) {
+      return false;
+    }
+
+    chatSnapshotSyncUserRef.current = currentUserId;
+    await Promise.all([
+      loadConversations(),
+      refreshUnreadCount(),
+    ]);
+    return true;
+  }, [isBoardRoute, isPublicRoute, loadConversations, refreshUnreadCount, user]);
 
   // Load the inbox as soon as auth is available, even before WS finishes connecting.
   // This keeps the conversation list usable on slower sockets and on first mount.
   useEffect(() => {
-    if (isBoardRoute) {
+    if (isBoardRoute || isPublicRoute) {
       logger.info('[FIX:CHAT] Chat disabled on board route', { path: location.pathname });
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
@@ -219,28 +293,22 @@ export const ChatProvider = ({ children }) => {
         wsRef.current = null;
       }
       resetChatState();
-      initialConversationLoadUserRef.current = null;
+      chatSnapshotSyncUserRef.current = null;
       return () => {};
     }
 
     const currentUserId = user?.id || null;
     if (!currentUserId) {
-      initialConversationLoadUserRef.current = null;
+      chatSnapshotSyncUserRef.current = null;
       return;
     }
 
-    if (initialConversationLoadUserRef.current === currentUserId) {
-      return;
-    }
-
-    initialConversationLoadUserRef.current = currentUserId;
-    void loadConversations();
-    void refreshUnreadCount();
-  }, [isBoardRoute, location.pathname, resetChatState, user?.id, loadConversations, refreshUnreadCount]);
+    void syncChatSnapshot();
+  }, [isBoardRoute, isPublicRoute, location.pathname, resetChatState, syncChatSnapshot, user?.id]);
 
   // Request online status of specific users
   const requestOnlineStatus = useCallback((userIds) => {
-    if (isBoardRoute) return;
+    if (isBoardRoute || isPublicRoute) return;
     if (wsRef.current?.readyState === WebSocket.OPEN && userIds.length > 0) {
       wsRef.current.send(JSON.stringify({
         type: MESSAGE_EVENT_TYPES.GET_ONLINE_STATUS,
@@ -248,12 +316,12 @@ export const ChatProvider = ({ children }) => {
         contract_version: MESSAGING_CONTRACT_VERSION,
       }));
     }
-  }, [isBoardRoute]);
+  }, [isBoardRoute, isPublicRoute]);
 
   // WebSocket подключение (Один раз на приложение!)
   // Зависит ТОЛЬКО от токена. User и функции исключены для стабильности.
   useEffect(() => {
-    if (isBoardRoute) {
+    if (isBoardRoute || isPublicRoute) {
       return undefined;
     }
 
@@ -303,8 +371,7 @@ export const ChatProvider = ({ children }) => {
         setIsConnected(true);
         retryCountRef.current = 0;
         logger.info('[FIX:WS] Chat WebSocket connected');
-        loadConversationsRef.current?.();
-        refreshUnreadCount();
+        void syncChatSnapshot();
         if (activeConversationRef.current) {
           requestOnlineStatus([activeConversationRef.current]);
         }
@@ -412,7 +479,7 @@ export const ChatProvider = ({ children }) => {
         }
       }
     };
-  }, [isBoardRoute, token, refreshUnreadCount, requestOnlineStatus]);
+  }, [isBoardRoute, isPublicRoute, token, refreshUnreadCount, requestOnlineStatus]);
 
   // Загрузка сообщений (при открытии чата)
   const [hasMore, setHasMore] = useState(false);
@@ -431,14 +498,15 @@ export const ChatProvider = ({ children }) => {
       setTypingUsers({});
       setOnlineUsers({});
 
-      // Сбрасываем непрочитанные
-      loadConversations();
+      // getConversation() already marks the thread as read on the backend.
+      // Mirror that locally so opening a chat does not force a full conversations refetch.
+      markConversationLocallyRead(userId);
     } catch (e) {
       logger.error('Failed to load messages:', e);
     } finally {
       setIsLoading(false);
     }
-  }, [user, loadConversations]);
+  }, [user, markConversationLocallyRead]);
 
   const loadMoreMessages = useCallback(async () => {
     const userId = activeConversationRef.current;
@@ -490,7 +558,7 @@ export const ChatProvider = ({ children }) => {
 
   // Отправка статуса набора текста
   const sendTyping = useCallback((recipientId, isTyping) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    if (!isBoardRoute && !isPublicRoute && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: MESSAGE_EVENT_TYPES.TYPING,
         recipient_id: recipientId,
@@ -498,7 +566,7 @@ export const ChatProvider = ({ children }) => {
         contract_version: MESSAGING_CONTRACT_VERSION,
       }));
     }
-  }, []);
+  }, [isBoardRoute, isPublicRoute]);
 
   useEffect(() => {
     setTypingUsers({});

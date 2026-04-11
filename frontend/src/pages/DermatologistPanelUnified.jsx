@@ -965,6 +965,35 @@ const DermatologistPanelUnified = () => {
           }
         }
 
+        if (visitIdFromUrl || patientIdFromUrl) {
+          const fallbackPatientId = normalizeNumericId(patientIdFromUrl || null);
+          const fallbackLabel = fallbackPatientId
+            ? `Пациент #${fallbackPatientId}`
+            : `Визит #${visitIdFromUrl}`;
+          const fallbackPatient = {
+            id: fallbackPatientId || visitIdFromUrl,
+            appointment_id: null,
+            visit_id: visitIdFromUrl || null,
+            patient_id: fallbackPatientId,
+            patient_name: fallbackLabel,
+            patient_fio: fallbackLabel,
+            phone: '',
+            specialty: 'dermatology',
+            source: 'url',
+            status: 'open',
+          };
+
+          setSelectedPatient(fallbackPatient);
+          setCurrentAppointment(fallbackPatient);
+          setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
+          urlResolutionRef.current.notified = false;
+          logger.info('[Dermatology] Пациент из URL не найден в очереди, использую безопасный URL-fallback', {
+            visitId: visitIdFromUrl,
+            patientId: fallbackPatientId,
+          });
+          return;
+        }
+
         if (!urlResolutionRef.current.notified) {
           urlResolutionRef.current.notified = true;
           setSelectedPatient(null);
@@ -986,7 +1015,9 @@ const DermatologistPanelUnified = () => {
   }, [location.search, getPatientIdFromUrl, getVisitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments]);
 
   useEffect(() => {
-    const appointmentId = currentAppointment?.appointment_id || currentAppointment?.id;
+    const appointmentId =
+      currentAppointment?.appointment_id ||
+      (currentAppointment?.source !== 'url' ? currentAppointment?.id : null);
     if (!appointmentId) {
       setEmr(null);
       setPrescription(null);
@@ -997,7 +1028,7 @@ const DermatologistPanelUnified = () => {
 
     const loadCanonicalStatus = async () => {
       try {
-        const response = await fetch(`${API_V1_BASE}/appointments/${appointmentId}/status`, {
+        const response = await fetch(`/api/v1/appointments/${appointmentId}/status`, {
           headers: {
             Authorization: `Bearer ${tokenManager.getAccessToken()}`
           }
