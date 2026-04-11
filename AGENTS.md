@@ -1,102 +1,177 @@
 # AGENTS.md
 
-> Project map for AI agents. Keep this file aligned with the tracked project structure.
+Primary repo-level operating rules for Codex, Cursor agents, Claude Code style agents, and other repo-aware executors.
 
-## Project Overview
-Clinic Management System: a full-stack EMR and clinic operations platform for admin, registrar, doctor, cashier, lab, queue, and billing workflows.
+`AGENTS.md` is the short operational layer. `CLAUDE.md`, `.cursor/rules/*`, `.ai-factory/*`, and docs remain compatible secondary context. If instructions conflict, prefer the narrower, safer, more canonical rule.
 
-## Tech Stack
-- Backend: Python 3.11, FastAPI, SQLAlchemy, Pydantic v2
-- Frontend: JavaScript/JSX, React 18, Vite, React Router
-- Database: PostgreSQL
-- Migrations: Alembic
-- Testing: Pytest, Vitest, Playwright, k6
-- Realtime/Infra: Redis pub/sub and WebSocket broadcast
+## Project Anchors
 
-## Project Structure
-```text
-backend/
-  app/
-    api/v1/endpoints/   # FastAPI route handlers by domain
-    services/           # business logic
-    repositories/       # persistence layer
-    models/             # SQLAlchemy models
-    schemas/            # Pydantic contracts
-    core/               # config, security, shared infra
-    db/                 # session/engine setup
-    ws/                  # websocket channels
-  alembic/versions/     # database migrations
-  tests/                # backend unit and integration tests
-  run_server.py         # local backend entry point (:18000)
-frontend/
-  src/
-    pages/              # route-level screens
-    components/         # reusable UI by domain
-    api/                # HTTP clients
-    hooks/              # shared React hooks
-    utils/              # helper modules
-  e2e/                  # Playwright end-to-end tests
-  vite.config.js        # dev server/proxy config (:5173 -> :18000)
-docs/
-  architecture/
-  runbooks/
-  archives/
-.ai-factory/
-  DESCRIPTION.md
-  ARCHITECTURE.md
-  RULES.md
-  ROADMAP.md
-  patches/
-  evolutions/
-  skill-context/
-.codex/skills/
-.github/workflows/
-ops/
-scripts/
-output/                 # generated evidence/artifacts
-test-results/            # generated test output
-storage/                # runtime files/data
+- Product: clinic EMR and operations platform for admin, registrar, doctor, cashier, lab, queue, billing, and rollout workflows.
+- Backend: Python 3.11, FastAPI, SQLAlchemy, Pydantic v2, PostgreSQL, Alembic, Redis/WebSocket.
+- Frontend: React 18, Vite, React Router, JavaScript/JSX.
+- Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
+- Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.
+- Dev-brain tools live outside runtime in `ai/llamaindex` and `ai/langgraph`.
+
+## Default Task Mode
+
+Before acting, classify the request as one mode:
+
+`analysis`, `locate`, `impact`, `canonical`, `plan`, `dossier`, `handoff`, or `execute`.
+
+- Use `locate` to find implementation/docs locations.
+- Use `impact` to understand touched files, tests, docs, and risks.
+- Use `canonical` to separate SSOT from legacy/adapters.
+- Use `plan` for a patch checklist.
+- Use `dossier` for curated engineering context.
+- Use `handoff` for a strict execution brief for another agent.
+- Use `execute` only after canonical anchors, first-touch files, references, and validation targets are clear.
+
+## Canonical First
+
+- Identify canonical/SSOT sources before proposing or changing code.
+- Prefer executable source, contract tests, route registries, service layers, migrations, and runbooks over broad overview docs.
+- Explicitly distinguish canonical files from legacy, adapters, compatibility paths, redirects, and stale docs when ambiguity exists.
+- Stop instead of guessing if canonical vs legacy ownership is unclear.
+
+## Safe Patch Slice
+
+Before the first edit, name:
+
+- Canonical anchors.
+- Files to read as reference only.
+- First-touch files allowed for the first iteration.
+- Narrow validation target.
+
+For code changes:
+
+- Start with the smallest safe patch slice.
+- Touch only first-touch files first.
+- Do not do opportunistic cleanup.
+- Do not expand scope without a concrete reason and user-visible report.
+
+## Automatic Pre-Execute Gate
+
+Before any `execute` task, run the local gate yourself:
+
+```powershell
+cd C:\final\ai\langgraph
+python scripts\agent_gate.py "<user task>"
 ```
 
-## Key Entry Points
-| File | Purpose |
-|---|---|
-| `backend/app/main.py` | FastAPI app composition and router wiring |
-| `backend/run_server.py` | Local backend launcher on port 18000 |
-| `frontend/src/main.jsx` | React bootstrap |
-| `frontend/src/App.jsx` | Root frontend composition |
-| `frontend/vite.config.js` | Vite dev server and API/WebSocket proxy |
-| `package.json` | root scripts and workspace entry |
-| `.ai-factory/DESCRIPTION.md` | project context and runtime defaults |
-| `.ai-factory/ARCHITECTURE.md` | architecture decisions and boundaries |
+- If the gate says handoff is required, read the generated `Ready-to-send execution prompt` before editing.
+- Execute only inside the prompt's `First-touch files`.
+- Treat the prompt's `Stop conditions` as hard stops.
+- Do not broaden scope without returning a report to the user.
+- If the gate fails or cannot run, stop and report instead of editing.
 
-## Documentation
-| Document | Path | Purpose |
-|---|---|---|
-| README | `README.md` | project landing page |
-| Claude guide | `CLAUDE.md` | agent workflow and runtime notes |
-| AI/MCP quickstart | `QUICKSTART_AI_MCP.md` | local AI/MCP startup guide |
-| Agent setup | `AI_AGENT_SETUP.md` | auth-focused agent setup |
-| Docs landing | `docs/README.md` | documentation index |
-| Local staging runbook | `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md` | acceptance flow for the current contour |
-| Postgres guide | `docs/POSTGRESQL_PRODUCTION_GUIDE.md` | database operations |
-| Plan checklist | `docs/PLAN_CHECKLIST.md` | milestone tracker |
+## LightRAG Readiness Evidence
 
-## AI Context Files
-| File | Purpose |
-|---|---|
-| `AGENTS.md` | structural map for AI agents |
-| `.ai-factory/DESCRIPTION.md` | project specification and runtime context |
-| `.ai-factory/ARCHITECTURE.md` | architecture rules and boundaries |
-| `.ai-factory/RULES.md` | project rules and conventions |
-| `.ai-factory/ROADMAP.md` | strategic roadmap |
-| `.mcp.json` | project MCP server configuration |
-| `CLAUDE.md` | editor/agent guidance for this repo |
+For every real risky change-task executed through `agent_gate` or handoff, append one factual evidence entry to:
 
-## Agent Rules
-- Treat `.ai-factory/DESCRIPTION.md` and `.ai-factory/ARCHITECTURE.md` as the source of truth for project context.
-- Verify runtime ports against `backend/run_server.py` and `frontend/vite.config.js` before changing docs or setup files.
-- Keep PostgreSQL + Alembic as the database source of truth.
-- Avoid reintroducing SQLite-first defaults in docs or setup templates.
-- Leave generated evidence in `output/`, `test-results/`, and `storage/` alone unless the task is explicitly about artifacts.
-- Use project-level MCP settings from `.mcp.json`; do not edit `.claude/settings.local.json` for shared project config.
+```text
+C:\final\ai\langgraph\EVIDENCE_LIGHTRAG_READINESS.md
+```
+
+- Create the file if it does not exist.
+- Record what the handoff solved well, missing relationship mapping, manual reconstruction needed, and whether multi-hop gap, ownership ambiguity, or manual graph reconstruction occurred.
+- Do not inflate the signal: write `none` when no gap was observed and mark LightRAG as helpful only when the task produced a concrete observed gap.
+- After 5 to 10 risky task entries, add a short evidence-based mini-review with counts and a recommendation.
+- Do not change `backend/`, `frontend/`, or `ops/` only for this evidence log.
+
+## Strict Mode Triggers
+
+Automatically move to `plan`, `dossier`, or `handoff` before `execute` when a task touches:
+
+- Routing canonicalization or route aliases.
+- Queue fairness, specialist/profile/doctor mapping, or `queue_time`.
+- Frontend/backend contract alignment.
+- Telegram integration.
+- EMR, lab, rollout, evidence packs, go/no-go, or production-sensitive behavior.
+- Any canonical vs legacy ambiguity.
+
+For risky multi-file work, prefer `handoff` before implementation.
+
+## Stop Conditions
+
+Stop and report instead of continuing silently if:
+
+- Canonical vs legacy conflict is unclear.
+- Required edits leave the first safe patch slice.
+- Frontend/backend ownership is not obvious.
+- No clear verification target exists.
+- Scope begins to spread across unrelated areas.
+- Contract ambiguity appears.
+- A policy, product, rollout, or runtime behavior decision is needed.
+
+## Validation Discipline
+
+- After changes, run the narrowest relevant validation first.
+- Prefer targeted tests, contract checks, smoke checks, and runbook proof over broad unrelated suites.
+- Do not run heavy checks without a reason.
+- Report exactly what ran, what passed or failed, and what was not checked.
+
+## Execute Response Format
+
+For completed `execute` tasks, answer with:
+
+- `Changed`
+- `Why`
+- `Validation run`
+- `Result`
+- `Scope check`
+- `Stop conditions hit`
+- `Next smallest step`
+
+For risky tasks that should not execute yet, output `plan`, `dossier`, or `handoff` instead.
+
+## Domain Guardrails
+
+Routing:
+
+- Start from routing SSOT files such as `frontend/src/routing/routeRegistry.js`.
+- Verify route contract/snapshot tests before broad cleanup.
+- Do not mass-edit unrelated routes in the first slice.
+
+Queue:
+
+- Protect fairness invariants and `queue_time`.
+- Inspect queue-related tests first.
+- Avoid SSOT drift between profile, specialist, doctor, queue, and online queue mapping layers.
+
+Telegram:
+
+- Consider both frontend manager files and backend Telegram endpoint/service contracts.
+- Do not infer integration behavior from frontend text alone.
+- Keep the first patch slice narrow even for mixed frontend/backend changes.
+
+EMR, Lab, Rollout-sensitive areas:
+
+- Prefer canonical runbooks, contract docs, migrations, and evidence docs.
+- Do not infer production-critical behavior from random overview docs.
+- Stop on ambiguity rather than improvising.
+
+## Repo Hygiene
+
+- Do not introduce unrelated edits.
+- Do not rewrite architecture opportunistically.
+- Do not touch generated evidence in `output/`, `test-results/`, or `storage/` unless the task is explicitly about artifacts.
+- Do not reintroduce SQLite-first defaults. PostgreSQL + Alembic are the database source of truth.
+- Do not edit shared MCP or agent settings unless the task explicitly asks for it.
+- Preserve user changes in a dirty worktree. Never revert unrelated work.
+
+## Local Dev-Brain Commands
+
+From `C:\final\ai\langgraph`:
+
+```powershell
+python scripts\agent_gate.py "<task>"
+python scripts\dev_brain.py plan "<task>"
+python scripts\dev_brain.py dossier "<task>"
+python scripts\dev_brain.py handoff "<task>"
+python scripts\planner_smoke.py
+python scripts\dossier_smoke.py
+python scripts\handoff_smoke.py
+```
+
+Use handoff as the default input contract for the next agent when a real code change is risky or multi-file.

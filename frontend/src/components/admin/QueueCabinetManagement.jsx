@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Building2,
   CalendarDays,
-  Edit,
   MapPin,
   RefreshCw,
-  Save,
   Search,
   Sparkles,
   Users,
@@ -81,14 +79,7 @@ const QueueCabinetManagement = () => {
   const [queues, setQueues] = useState([]);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [savingQueueId, setSavingQueueId] = useState(null);
   const [syncing, setSyncing] = useState(false);
-  const [editingQueueId, setEditingQueueId] = useState(null);
-  const [editValues, setEditValues] = useState({
-    cabinet_number: '',
-    cabinet_floor: '',
-    cabinet_building: '',
-  });
 
   const loadData = useCallback(async (filterSnapshot = INITIAL_FILTERS) => {
     setLoading(true);
@@ -144,56 +135,6 @@ const QueueCabinetManagement = () => {
     [queues, statistics]
   );
 
-  const startEditing = useCallback((queue) => {
-    setEditingQueueId(queue.id);
-    setEditValues({
-      cabinet_number: queue.cabinet_number ?? '',
-      cabinet_floor: queue.cabinet_floor ?? '',
-      cabinet_building: queue.cabinet_building ?? '',
-    });
-  }, []);
-
-  const cancelEditing = useCallback(() => {
-    setEditingQueueId(null);
-    setEditValues({
-      cabinet_number: '',
-      cabinet_floor: '',
-      cabinet_building: '',
-    });
-  }, []);
-
-  const saveQueue = useCallback(async (queueId) => {
-    setSavingQueueId(queueId);
-    try {
-      const floorValue =
-        editValues.cabinet_floor === '' || editValues.cabinet_floor === null
-          ? null
-          : Number(editValues.cabinet_floor);
-
-      if (floorValue !== null && Number.isNaN(floorValue)) {
-        toast.error('Этаж должен быть числом');
-        return;
-      }
-
-      await apiRequest('PUT', `/admin/queues/${queueId}/cabinet-info`, {
-        data: {
-          cabinet_number: toOptionalString(editValues.cabinet_number),
-          cabinet_floor: floorValue,
-          cabinet_building: toOptionalString(editValues.cabinet_building),
-        },
-      });
-
-      toast.success('Информация о кабинете обновлена');
-      cancelEditing();
-      await loadData(appliedFilters);
-    } catch (error) {
-      logger.error('Ошибка обновления кабинета очереди:', error);
-      toast.error(error?.message || 'Ошибка обновления кабинета');
-    } finally {
-      setSavingQueueId(null);
-    }
-  }, [appliedFilters, cancelEditing, editValues, loadData]);
-
   const applyFilters = async () => {
     const nextFilters = {
       day: filters.day,
@@ -207,7 +148,6 @@ const QueueCabinetManagement = () => {
   const resetFilters = async () => {
     setFilters(INITIAL_FILTERS);
     setAppliedFilters(INITIAL_FILTERS);
-    cancelEditing();
     await loadData(INITIAL_FILTERS);
   };
 
@@ -235,8 +175,6 @@ const QueueCabinetManagement = () => {
   const tableRows = useMemo(
     () =>
       queues.map((queue) => {
-        const isEditing = editingQueueId === queue.id;
-
         return {
           day: (
             <span style={{ color: 'var(--mac-text-primary)', fontSize: 'var(--mac-font-size-sm)' }}>
@@ -272,55 +210,22 @@ const QueueCabinetManagement = () => {
               {queue.queue_tag || '—'}
             </span>
           ),
-          cabinet_number: isEditing ? (
-            <MacOSInput
-              value={editValues.cabinet_number}
-              onChange={(event) =>
-                setEditValues((current) => ({
-                  ...current,
-                  cabinet_number: event.target.value,
-                }))
-              }
-              placeholder="101"
-              style={{ minWidth: '90px' }}
-            />
-          ) : (
-            <span style={{ color: 'var(--mac-text-primary)' }}>
-              {queue.cabinet_number || 'Не указан'}
-            </span>
+          cabinet_number: (
+            <div>
+              <div style={{ color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                {queue.effective_cabinet || 'Не указан'}
+              </div>
+              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                Очередь: {queue.cabinet_number || '—'} · Врач: {queue.doctor_cabinet || '—'}
+              </div>
+            </div>
           ),
-          cabinet_floor: isEditing ? (
-            <MacOSInput
-              type="number"
-              min="0"
-              value={editValues.cabinet_floor}
-              onChange={(event) =>
-                setEditValues((current) => ({
-                  ...current,
-                  cabinet_floor: event.target.value,
-                }))
-              }
-              placeholder="2"
-              style={{ minWidth: '80px' }}
-            />
-          ) : (
+          cabinet_floor: (
             <span style={{ color: 'var(--mac-text-primary)' }}>
               {queue.cabinet_floor ?? '—'}
             </span>
           ),
-          cabinet_building: isEditing ? (
-            <MacOSInput
-              value={editValues.cabinet_building}
-              onChange={(event) =>
-                setEditValues((current) => ({
-                  ...current,
-                  cabinet_building: event.target.value,
-                }))
-              }
-              placeholder="A"
-              style={{ minWidth: '90px' }}
-            />
-          ) : (
+          cabinet_building: (
             <span style={{ color: 'var(--mac-text-primary)' }}>
               {queue.cabinet_building || '—'}
             </span>
@@ -340,50 +245,35 @@ const QueueCabinetManagement = () => {
               {queue.active ? 'Активна' : 'Неактивна'}
             </MacOSBadge>
           ),
-          actions: isEditing ? (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <MacOSButton
-                onClick={() => saveQueue(queue.id)}
-                disabled={savingQueueId === queue.id}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: 'var(--mac-success)',
-                  border: 'none',
-                }}>
-                <Save style={{ width: '16px', height: '16px' }} />
-                {savingQueueId === queue.id ? 'Сохранение...' : 'Сохранить'}
-              </MacOSButton>
-              <MacOSButton
-                onClick={cancelEditing}
-                disabled={savingQueueId === queue.id}
-                variant="outline"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}>
-                <X style={{ width: '16px', height: '16px' }} />
-                Отмена
-              </MacOSButton>
+          sync_state: (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <MacOSBadge
+                variant={
+                  queue.sync_status === 'synced'
+                    ? 'success'
+                    : queue.sync_status === 'stale'
+                      ? 'warning'
+                      : 'secondary'
+                }
+              >
+                {queue.sync_status === 'synced'
+                  ? 'Синхронизировано'
+                  : queue.sync_status === 'stale'
+                    ? 'Очередь устарела'
+                    : queue.sync_status === 'missing_doctor'
+                      ? 'Нет врача'
+                      : 'Нет кабинета врача'}
+              </MacOSBadge>
+              {Array.isArray(queue.integrity_warnings) && queue.integrity_warnings.length > 0 ? (
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                  {queue.integrity_warnings.join(', ')}
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <MacOSButton
-              onClick={() => startEditing(queue)}
-              variant="outline"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
-              <Edit style={{ width: '16px', height: '16px' }} />
-              Изменить
-            </MacOSButton>
           ),
         };
       }),
-    [cancelEditing, editValues, editingQueueId, queues, saveQueue, savingQueueId, startEditing]
+    [queues]
   );
 
   return (
@@ -619,7 +509,7 @@ const QueueCabinetManagement = () => {
                 { key: 'cabinet_building', title: 'Корпус', sortable: false },
                 { key: 'entries_count', title: 'Записи', sortable: false },
                 { key: 'active', title: 'Статус', sortable: false },
-                { key: 'actions', title: 'Действия', sortable: false },
+                { key: 'sync_state', title: 'Синхронизация', sortable: false },
               ]}
               data={tableRows}
               loading={loading}

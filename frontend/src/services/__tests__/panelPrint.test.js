@@ -17,7 +17,7 @@ import {
   fetchTicketPrintSettings,
   TICKET_PRINT_SETTINGS_DEFAULTS,
 } from '../../api/ticketPrintSettings';
-import { buildPanelTicketPrintableHtml } from '../panelPrint';
+import { buildPanelTicketPrintableHtml, resolvePanelTicketPayloads } from '../panelPrint';
 
 describe('panelPrint ticket renderer', () => {
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe('panelPrint ticket renderer', () => {
     });
 
     expect(html).toContain('City Clinic');
-    expect(html).toContain('ТАЛОН НА ПРИЁМ');
+    expect(html).not.toContain('ТАЛОН НА ПРИЁМ');
     expect(html).toContain('№A12');
     expect(html).not.toContain('Пациент:');
     expect(html).not.toContain('Dr. Smirnova');
@@ -86,5 +86,89 @@ describe('panelPrint ticket renderer', () => {
     expect(html).toContain('Цена:');
     expect(html).toMatch(/42[\u00a0 ]000 UZS/);
     expect(html).toContain('<svg');
+  });
+
+  it('resolves queue number from nested queue_numbers shapes without failing', async () => {
+    fetchTicketPrintSettings.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
+    fetchClinicSettings.mockResolvedValueOnce([]);
+
+    const html = await buildPanelTicketPrintableHtml({
+      queue_numbers: {
+        cardiology: {
+          queue_number: 'C14',
+          specialty_name: 'Кардиология',
+        },
+      },
+      patient_name: 'Ivan Petrov',
+      doctor_name: 'Dr. Smirnova',
+    });
+
+    expect(html).toContain('№C14');
+    expect(html).not.toContain('ТАЛОН НА ПРИЁМ');
+  });
+
+  it('builds a multi-ticket document from aggregated queue_numbers in a single printable html', async () => {
+    fetchTicketPrintSettings.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
+    fetchClinicSettings.mockResolvedValueOnce([
+      { key: 'clinic_name', value: 'City Clinic' },
+    ]);
+
+    const row = {
+      patient_fio: 'Бабаджанова Мавлуда',
+      queue_numbers: [
+        {
+          number: 2,
+          queue_tag: 'dermatology',
+          specialty: 'dermatology',
+          cabinet_number: '101',
+          queue_time: '2026-04-10T14:19:23+05:00',
+        },
+        {
+          number: 13,
+          queue_tag: 'cardiology',
+          specialty: 'cardiology',
+          cabinet_number: '202',
+          queue_time: '2026-04-10T14:20:23+05:00',
+        },
+        {
+          number: 3,
+          queue_tag: 'laboratory',
+          specialty: 'laboratory',
+          cabinet_number: 'Lab-1',
+          queue_time: '2026-04-10T14:21:23+05:00',
+        },
+      ],
+    };
+
+    const payloads = resolvePanelTicketPayloads(row);
+    expect(payloads).toHaveLength(3);
+    expect(payloads.map((payload) => payload.queue_number)).toEqual(['2', '13', '3']);
+    expect(payloads.map((payload) => payload.cabinet)).toEqual(['101', '202', 'Lab-1']);
+
+    const html = await buildPanelTicketPrintableHtml(row);
+
+    expect(html).toContain('Очередь №2');
+    expect(html).toContain('Очередь №13');
+    expect(html).toContain('Очередь №3');
+    expect(html).toContain('Кабинет:</span> 101');
+    expect(html).toContain('Кабинет:</span> 202');
+    expect(html).toContain('Кабинет:</span> Lab-1');
+    expect(html).toContain('Дерматология');
+    expect(html).toContain('Кардиология');
+    expect(html).toContain('Лаборатория');
+    expect((html.match(/class="ticket-page"/g) || [])).toHaveLength(3);
+  });
+
+  it('prefers queue/daily effective cabinet over linked doctor cabinet in ticket payload', () => {
+    const [payload] = resolvePanelTicketPayloads({
+      queue_number: 'Q5',
+      specialty_name: 'Кардиология',
+      doctor_cabinet: '201',
+      effective_cabinet: '204',
+      queue_cabinet: '204',
+      patient_name: 'Ivan Petrov',
+    });
+
+    expect(payload.cabinet).toBe('204');
   });
 });

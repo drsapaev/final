@@ -20,6 +20,8 @@ import {
 
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
+import ModernDialog from '../dialogs/ModernDialog';
+import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 
 const ForceMajeureModal = ({
@@ -29,6 +31,7 @@ const ForceMajeureModal = ({
   specialistName = 'Специалист',
   onSuccess
 }) => {
+  const { theme, getColor } = useTheme();
   const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' | 'cancel'
   const [reason, setReason] = useState('');
   const [refundType, setRefundType] = useState('deposit'); // 'deposit' | 'bank_transfer'
@@ -182,338 +185,348 @@ const ForceMajeureModal = ({
 
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
+  const primaryActionLabel = loading ? 'Обработка...' : activeTab === 'transfer' ? 'Перенести' : 'Отменить и вернуть';
+  const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
+  const dialogSurfaceStyle = {
+    backgroundColor: 'var(--mac-bg-primary)'
+  };
 
-  return (
+  const header = (
     <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10000,
-      backdropFilter: 'blur(4px)'
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: '16px',
+      width: '100%'
     }}>
-            <div style={{
-        background: 'white',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '560px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-      }}>
-                {/* Header */}
-                <div style={{
-          padding: '20px 24px',
-          borderBottom: '1px solid #e5e7eb',
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0 }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '14px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          background: '#fef3c7'
+          justifyContent: 'center',
+          flexShrink: 0,
+          background: theme === 'dark'
+            ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.2))'
+            : 'linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.16))',
+          border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.18)'}`,
+          color: '#d97706',
+          boxShadow: '0 10px 24px rgba(245, 158, 11, 0.12)'
         }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <AlertTriangle size={24} color="#d97706" />
-                        <div>
-                            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#92400e' }}>
-                                Форс-мажор
-                            </h2>
-                            <p style={{ margin: 0, fontSize: '13px', color: '#b45309' }}>
-                                {specialistName}
-                            </p>
-                        </div>
-                    </div>
-                    <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px'
-            }}>
-            
-                        <XCircle size={24} color="#9ca3af" />
-                    </button>
-                </div>
-
-                {/* Tabs */}
-                <div style={{
+          <AlertTriangle size={20} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: '18px',
+            fontWeight: 600,
+            color: getColor('textPrimary'),
+            lineHeight: 1.2
+          }}>
+            Форс-мажор
+          </h2>
+          <p style={{
+            margin: '4px 0 0',
+            fontSize: '13px',
+            color: getColor('textSecondary'),
+            lineHeight: 1.4
+          }}>
+            {specialistName}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onClose}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '999px',
+          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'var(--mac-border)'}`,
+          background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'var(--mac-bg-secondary)',
+          color: getColor('textSecondary'),
           display: 'flex',
-          borderBottom: '1px solid #e5e7eb'
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 'var(--mac-shadow-sm)',
+          cursor: 'pointer',
+          flexShrink: 0
+        }}
+        aria-label="Закрыть диалог">
+        <XCircle size={18} />
+      </button>
+    </div>
+  );
+
+  const actions = [
+    {
+      label: 'Отмена',
+      variant: 'secondary',
+      onClick: onClose,
+      disabled: loading
+    },
+    {
+      label: primaryActionLabel,
+      variant: activeTab === 'transfer' ? 'primary' : 'danger',
+      icon: primaryActionIcon,
+      onClick: activeTab === 'transfer' ? handleTransfer : handleCancel,
+      disabled: loading || !isConfirmValid || !isReasonValid || Boolean(success)
+    }
+  ];
+
+  return (
+    <ModernDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Форс-мажор"
+      customHeader={header}
+      actions={actions}
+      maxWidth="40rem"
+      maxHeight="calc(100dvh - 2rem)"
+      closeOnBackdrop={!loading}
+      closeOnEscape={!loading}
+      showCloseButton={false}
+      dialogStyle={dialogSurfaceStyle}>
+      <div style={{ display: 'grid', gap: '16px' }}>
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '6px',
+          borderRadius: '14px',
+          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(148, 163, 184, 0.12)',
+          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(148, 163, 184, 0.16)'}`
         }}>
-                    <button
+          <button
+            type="button"
             onClick={() => setActiveTab('transfer')}
             style={{
               flex: 1,
-              padding: '12px',
+              padding: '10px 12px',
               border: 'none',
-              background: activeTab === 'transfer' ? '#f0f9ff' : 'white',
-              borderBottom: activeTab === 'transfer' ? '2px solid #3b82f6' : '2px solid transparent',
+              borderRadius: '10px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              color: activeTab === 'transfer' ? '#1d4ed8' : '#6b7280'
+              fontSize: '14px',
+              fontWeight: 600,
+              color: activeTab === 'transfer' ? '#1d4ed8' : getColor('textSecondary'),
+              background: activeTab === 'transfer'
+                ? (theme === 'dark' ? 'rgba(59, 130, 246, 0.16)' : 'white')
+                : 'transparent',
+              boxShadow: activeTab === 'transfer' && theme !== 'dark' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
             }}>
-            
-                        <Calendar size={18} />
-                        Перенести на завтра
-                    </button>
-                    <button
+            <Calendar size={18} />
+            Перенести на завтра
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('cancel')}
             style={{
               flex: 1,
-              padding: '12px',
+              padding: '10px 12px',
               border: 'none',
-              background: activeTab === 'cancel' ? '#fef2f2' : 'white',
-              borderBottom: activeTab === 'cancel' ? '2px solid #ef4444' : '2px solid transparent',
+              borderRadius: '10px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              color: activeTab === 'cancel' ? '#dc2626' : '#6b7280'
+              fontSize: '14px',
+              fontWeight: 600,
+              color: activeTab === 'cancel' ? '#dc2626' : getColor('textSecondary'),
+              background: activeTab === 'cancel'
+                ? (theme === 'dark' ? 'rgba(239, 68, 68, 0.14)' : 'white')
+                : 'transparent',
+              boxShadow: activeTab === 'cancel' && theme !== 'dark' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
             }}>
-            
-                        <DollarSign size={18} />
-                        Отменить с возвратом
-                    </button>
-                </div>
+            <DollarSign size={18} />
+            Отменить с возвратом
+          </button>
+        </div>
 
-                {/* Content */}
-                <div style={{ padding: '24px' }}>
-                    {/* Dry Run Info */}
-                    {dryRunResult &&
-          <div style={{
-            background: '#f3f4f6',
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px'
-          }}>
-                            <Users size={32} color="#6b7280" />
-                            <div>
-                                <p style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-                                    {dryRunResult.count} записей
-                                </p>
-                                <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
-                                    будут {activeTab === 'transfer' ? 'перенесены' : 'отменены'}
-                                    {dryRunResult.totalAmount > 0 && ` • ${dryRunResult.totalAmount.toLocaleString()} сум`}
-                                </p>
-                            </div>
-                            <button
-              onClick={loadPendingEntries}
-              style={{
-                marginLeft: 'auto',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '8px'
-              }}>
-              
-                                <RefreshCw size={18} color="#6b7280" />
-                            </button>
-                        </div>
-          }
+        {dryRunResult &&
+        <div style={{
+          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'var(--mac-bg-secondary)',
+          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+          borderRadius: '14px',
+          padding: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <Users size={32} color={theme === 'dark' ? '#9ca3af' : '#6b7280'} />
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: getColor('textPrimary') }}>
+              {dryRunResult.count} записей
+            </p>
+            <p style={{ margin: 0, fontSize: '13px', color: getColor('textSecondary') }}>
+              будут {activeTab === 'transfer' ? 'перенесены' : 'отменены'}
+              {dryRunResult.totalAmount > 0 && ` • ${dryRunResult.totalAmount.toLocaleString()} сум`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadPendingEntries}
+            style={{
+              marginLeft: 'auto',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              color: getColor('textSecondary')
+            }}
+            aria-label="Обновить список">
+            <RefreshCw size={18} />
+          </button>
+        </div>
+        }
 
-                    {/* Reason */}
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500, color: '#374151' }}>
-                            Причина *
-                        </label>
-                        <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Опишите причину форс-мажора..."
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                minHeight: '80px',
-                resize: 'vertical'
-              }} />
-            
-                        {!isReasonValid && reason.length > 0 &&
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#ef4444' }}>
-                                Минимум 5 символов
-                            </p>
-            }
-                    </div>
-
-                    {/* Refund Type (only for cancel) */}
-                    {activeTab === 'cancel' &&
-          <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500, color: '#374151' }}>
-                                Тип возврата
-                            </label>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <label style={{
-                flex: 1,
-                padding: '12px',
-                border: refundType === 'deposit' ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                background: refundType === 'deposit' ? '#eff6ff' : 'white'
-              }}>
-                                    <input
-                  type="radio"
-                  name="refundType"
-                  value="deposit"
-                  checked={refundType === 'deposit'}
-                  onChange={(e) => setRefundType(e.target.value)}
-                  style={{ display: 'none' }} />
-                
-                                    <div style={{ fontWeight: 500, color: '#111827' }}>На депозит</div>
-                                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Мгновенно на баланс</div>
-                                </label>
-                                <label style={{
-                flex: 1,
-                padding: '12px',
-                border: refundType === 'bank_transfer' ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                background: refundType === 'bank_transfer' ? '#eff6ff' : 'white'
-              }}>
-                                    <input
-                  type="radio"
-                  name="refundType"
-                  value="bank_transfer"
-                  checked={refundType === 'bank_transfer'}
-                  onChange={(e) => setRefundType(e.target.value)}
-                  style={{ display: 'none' }} />
-                
-                                    <div style={{ fontWeight: 500, color: '#111827' }}>На карту</div>
-                                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Заявка на возврат</div>
-                                </label>
-                            </div>
-                        </div>
-          }
-
-                    {/* Safety Confirmation */}
-                    <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '20px'
-          }}>
-                        <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#991b1b', fontWeight: 500 }}>
-                            ⚠️ Это действие нельзя отменить!
-                        </p>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#7f1d1d' }}>
-                            Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
-                        </label>
-                        <input
-              type="text"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
-              placeholder="ПОДТВЕРЖДАЮ"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `2px solid ${isConfirmValid ? '#22c55e' : '#fca5a5'}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: 600,
-                textAlign: 'center',
-                letterSpacing: '2px'
-              }} />
-            
-                    </div>
-
-                    {/* Error / Success Messages */}
-                    {error &&
-          <div style={{
-            background: '#fef2f2',
-            color: '#dc2626',
-            padding: '12px',
-            borderRadius: '8px',
-            marginBottom: '16px',
+        <div>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            fontWeight: 500,
+            color: getColor('textPrimary'),
             fontSize: '14px'
           }}>
-                            {error}
-                        </div>
+            Причина *
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Опишите причину форс-мажора..."
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              border: `1px solid ${error ? '#ef4444' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'var(--mac-border)'}`,
+              borderRadius: '12px',
+              fontSize: '14px',
+              minHeight: '96px',
+              resize: 'vertical',
+              color: getColor('textPrimary'),
+              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+              fontFamily: 'inherit',
+              outline: 'none'
+            }} />
+          {!isReasonValid && reason.length > 0 &&
+          <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#ef4444' }}>
+            Минимум 5 символов
+          </p>
           }
+        </div>
 
-                    {success &&
-          <div style={{
-            background: '#f0fdf4',
-            color: '#16a34a',
-            padding: '12px',
-            borderRadius: '8px',
-            marginBottom: '16px',
+        {activeTab === 'cancel' &&
+        <div style={{ display: 'grid', gap: '10px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '2px',
+            fontWeight: 500,
+            color: getColor('textPrimary'),
             fontSize: '14px'
           }}>
-                            ✅ {success}
-                        </div>
-          }
+            Тип возврата
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+            <label style={{
+              padding: '12px',
+              border: refundType === 'deposit' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+              borderRadius: '12px',
+              cursor: 'pointer',
+              background: refundType === 'deposit' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : '#eff6ff') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+            }}>
+              <input
+                type="radio"
+                name="refundType"
+                value="deposit"
+                checked={refundType === 'deposit'}
+                onChange={(e) => setRefundType(e.target.value)}
+                style={{ display: 'none' }} />
+              <div style={{ fontWeight: 600, color: getColor('textPrimary'), fontSize: '14px' }}>На депозит</div>
+              <div style={{ fontSize: '12px', color: getColor('textSecondary'), marginTop: '4px' }}>Мгновенно на баланс</div>
+            </label>
+            <label style={{
+              padding: '12px',
+              border: refundType === 'bank_transfer' ? '1px solid #3b82f6' : `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+              borderRadius: '12px',
+              cursor: 'pointer',
+              background: refundType === 'bank_transfer' ? (theme === 'dark' ? 'rgba(59,130,246,0.14)' : '#eff6ff') : (theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white')
+            }}>
+              <input
+                type="radio"
+                name="refundType"
+                value="bank_transfer"
+                checked={refundType === 'bank_transfer'}
+                onChange={(e) => setRefundType(e.target.value)}
+                style={{ display: 'none' }} />
+              <div style={{ fontWeight: 600, color: getColor('textPrimary'), fontSize: '14px' }}>На карту</div>
+              <div style={{ fontSize: '12px', color: getColor('textSecondary'), marginTop: '4px' }}>Заявка на возврат</div>
+            </label>
+          </div>
+        </div>
+        }
 
-                    {/* Actions */}
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <button
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                background: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 500
-              }}>
-              
-                            Отмена
-                        </button>
-                        <button
-              onClick={activeTab === 'transfer' ? handleTransfer : handleCancel}
-              disabled={loading || !isConfirmValid || !isReasonValid || success}
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: 'none',
-                borderRadius: '8px',
-                background: activeTab === 'transfer' ? '#3b82f6' : '#ef4444',
-                color: 'white',
-                cursor: loading || !isConfirmValid || !isReasonValid || success ? 'not-allowed' : 'pointer',
-                opacity: loading || !isConfirmValid || !isReasonValid || success ? 0.5 : 1,
-                fontSize: '14px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}>
-              
-                            {loading ?
-              <>
-                                    <Loader2 size={18} className="animate-spin" />
-                                    Обработка...
-                                </> :
-              activeTab === 'transfer' ?
-              <>
-                                    <ArrowRight size={18} />
-                                    Перенести
-                                </> :
+        <div style={{
+          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
+          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : '#fecaca'}`,
+          borderRadius: '14px',
+          padding: '16px'
+        }}>
+          <p style={{ margin: '0 0 10px', fontSize: '14px', color: '#991b1b', fontWeight: 600 }}>
+            ⚠️ Это действие нельзя отменить!
+          </p>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: theme === 'dark' ? '#fca5a5' : '#7f1d1d' }}>
+            Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+            placeholder="ПОДТВЕРЖДАЮ"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: `1px solid ${isConfirmValid ? '#22c55e' : theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#fca5a5'}`,
+              borderRadius: '12px',
+              fontSize: '14px',
+              fontWeight: 600,
+              textAlign: 'center',
+              letterSpacing: '2px',
+              color: getColor('textPrimary'),
+              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'white',
+              outline: 'none'
+            }} />
+        </div>
 
-              <>
-                                    <XCircle size={18} />
-                                    Отменить и вернуть
-                                </>
-              }
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>);
+        {error &&
+        <div style={{
+          background: theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
+          color: '#dc2626',
+          padding: '12px 14px',
+          borderRadius: '12px',
+          fontSize: '14px',
+          border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.28)' : '#fecaca'}`
+        }}>
+          {error}
+        </div>
+        }
+
+        {success &&
+        <div style={{
+          background: theme === 'dark' ? 'rgba(16, 185, 129, 0.10)' : '#f0fdf4',
+          color: '#16a34a',
+          padding: '12px 14px',
+          borderRadius: '12px',
+          fontSize: '14px',
+          border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.24)' : '#bbf7d0'}`
+        }}>
+          ✅ {success}
+        </div>
+        }
+      </div>
+    </ModernDialog>);
 
 };
 

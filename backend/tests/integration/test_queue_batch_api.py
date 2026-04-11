@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
@@ -91,7 +92,6 @@ def test_specialists(db_session):
         is_active=True
     )
     db_session.add(cardio)
-    specialists.append(cardio)
 
     # Специалист 2: Лаборант
     lab = User(
@@ -103,11 +103,29 @@ def test_specialists(db_session):
         is_active=True
     )
     db_session.add(lab)
-    specialists.append(lab)
 
     db_session.commit()
-    for specialist in specialists:
-        db_session.refresh(specialist)
+    db_session.refresh(cardio)
+    db_session.refresh(lab)
+
+    cardio_doctor = Doctor(
+        user_id=cardio.id,
+        specialty="cardiology",
+        cabinet="201",
+        active=True,
+    )
+    lab_doctor = Doctor(
+        user_id=lab.id,
+        specialty="lab",
+        cabinet="301",
+        active=True,
+    )
+    db_session.add_all([cardio_doctor, lab_doctor])
+    db_session.commit()
+    db_session.refresh(cardio_doctor)
+    db_session.refresh(lab_doctor)
+
+    specialists.extend([cardio_doctor, lab_doctor])
 
     return specialists
 
@@ -252,7 +270,7 @@ class TestQueueBatchAPI:
                 "services": [
                     {
                         "specialist_id": test_specialists[0].id,
-                        "service_id": test_services[1].id,  # Другая услуга, но тот же специалист
+                        "service_id": test_services[0].id,  # Та же очередь того же специалиста
                         "quantity": 1
                     }
                 ]
@@ -585,7 +603,7 @@ class TestQueueBatchAPI:
                 "services": [
                     {
                         "specialist_id": test_specialists[0].id,
-                        "service_id": test_services[1].id,
+                        "service_id": test_services[0].id,
                         "quantity": 1
                     }
                 ]

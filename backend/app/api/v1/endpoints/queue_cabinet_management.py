@@ -42,10 +42,16 @@ class QueueCabinetResponse(BaseModel):
     specialist_name: str
     queue_tag: Optional[str]
     cabinet_number: Optional[str]
+    doctor_cabinet: Optional[str]
+    effective_cabinet: Optional[str]
     cabinet_floor: Optional[int]
     cabinet_building: Optional[str]
     entries_count: int
     active: bool
+    linked_doctor_found: bool
+    doctor_has_cabinet: bool
+    sync_status: str
+    integrity_warnings: List[str]
 
 
 class BulkCabinetUpdateRequest(BaseModel):

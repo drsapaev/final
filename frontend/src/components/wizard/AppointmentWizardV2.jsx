@@ -31,7 +31,7 @@ import {
   isValidUzbekPhone,
   normalizeUzbekPhoneForApi
 } from '../../utils/phoneUtils';
-import { createQueueEntriesBatch, getDoctorUserId, updateOnlineQueueEntry } from '../../api/queue';
+import { createQueueEntriesBatch, updateOnlineQueueEntry } from '../../api/queue';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -1761,11 +1761,9 @@ const AppointmentWizardV2 = ({
 
             if (isNewService) {
               // Новая услуга - нужно добавить через batch endpoint
-              // ⚠️ ВАЖНО: batch endpoint требует specialist_id (user_id), а не doctor_id
-              // Для услуг с врачом используем visit.doctor_id и конвертируем в user_id
+              // specialist_id в batch endpoint канонически использует Doctor.id
               // Для услуг без врача (лаборатория) пропускаем batch endpoint
               if (visit.doctor_id) {
-                // Сохраняем для последующей конвертации
                 logger.log(`  ✅ Новая услуга с врачом: "${service.name}", doctor_id=${visit.doctor_id}`);
                 newServicesWithDoctorId.push({
                   doctor_id: visit.doctor_id,
@@ -1788,53 +1786,16 @@ const AppointmentWizardV2 = ({
           }
         }
 
-        // ✅ Конвертируем все doctor_id в user_id параллельно
+        // ✅ Готовим batch payload в каноническом формате Doctor.id
         const newServices = [];
         if (newServicesWithDoctorId.length > 0) {
-          logger.log(`🔄 Конвертация ${newServicesWithDoctorId.length} doctor_id в user_id...`);
-          const conversionPromises = newServicesWithDoctorId.map(async (item) => {
-            try {
-              const user_id = await getDoctorUserId(item.doctor_id);
-              logger.log(`✅ Конвертация успешна: doctor_id=${item.doctor_id} -> user_id=${user_id} для услуги "${item.service_name}"`);
-              return {
-                success: true,
-                service: {
-                  specialist_id: user_id,
-                  service_id: item.service_id,
-                  quantity: item.quantity
-                },
-                failedItem: null
-              };
-            } catch (error) {
-              logger.error(`❌ Ошибка конвертации doctor_id=${item.doctor_id} в user_id:`, error);
-              logger.warn(`⚠️ Услуга "${item.service_name}" будет обработана через cart endpoint из-за ошибки конвертации`);
-              // ✅ ИСПРАВЛЕНО Bug 1: Возвращаем информацию об ошибке для fallback в cart endpoint
-              return {
-                success: false,
-                service: null,
-                failedItem: {
-                  service_id: item.service_id,
-                  quantity: item.quantity
-                }
-              };
-            }
-          });
-
-          const conversionResults = await Promise.all(conversionPromises);
-
-          // Добавляем успешно конвертированные услуги
-          conversionResults.forEach((result) => {
-            if (result.success && result.service) {
-              newServices.push(result.service);
-            }
-          });
-
-          // ✅ ИСПРАВЛЕНО Bug 1: Добавляем услуги с ошибкой конвертации в newServicesWithoutDoctor для fallback
-          conversionResults.forEach((result) => {
-            if (!result.success && result.failedItem) {
-              newServicesWithoutDoctor.push(result.failedItem);
-              logger.log(`📋 Услуга service_id=${result.failedItem.service_id} добавлена в fallback для cart endpoint`);
-            }
+          logger.log(`🔄 Подготовка ${newServicesWithDoctorId.length} новых услуг для batch endpoint через Doctor.id...`);
+          newServicesWithDoctorId.forEach((item) => {
+            newServices.push({
+              specialist_id: item.doctor_id,
+              service_id: item.service_id,
+              quantity: item.quantity
+            });
           });
         }
 
@@ -2326,53 +2287,111 @@ const AppointmentWizardV2 = ({
     }
   };
 
-  // Кастомный заголовок для Шага 1
-  const Step1Header =
-  <div style={{
+  const wizardHeaderShellStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    padding: '4px 32px 12px 32px',
-    borderBottom: '1px solid var(--mac-border)'
-  }}>
-      {/* Заголовок */}
-      <h3 style={{
-      fontSize: '17px',
-      fontWeight: '600',
-      color: 'var(--mac-text-primary)',
-      margin: 0,
-      letterSpacing: '-0.02em'
-    }}>
-        Регистрация пациента
-      </h3>
+    gap: '16px',
+    padding: '10px 20px 12px',
+    borderBottom: '1px solid var(--mac-border)',
+    background: 'var(--mac-bg-primary)'
+  };
 
-      {/* Кнопка закрытия */}
+  const wizardHeaderTitleStyle = {
+    fontSize: '17px',
+    fontWeight: '600',
+    color: 'var(--mac-text-primary)',
+    margin: 0,
+    letterSpacing: '-0.02em',
+    lineHeight: 1.2
+  };
+
+  const wizardHeaderSubtitleStyle = {
+    margin: '4px 0 0',
+    fontSize: '13px',
+    color: 'var(--mac-text-secondary)',
+    lineHeight: 1.4
+  };
+
+  const wizardHeaderIconStyle = {
+    width: '36px',
+    height: '36px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    background: 'var(--mac-bg-secondary)',
+    color: 'var(--mac-primary)',
+    border: '1px solid var(--mac-border)',
+    boxShadow: 'var(--mac-shadow-sm)'
+  };
+
+  const wizardHeaderCloseStyle = {
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid var(--mac-border)',
+    background: 'var(--mac-bg-secondary)',
+    color: 'var(--mac-text-secondary)',
+    borderRadius: '999px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: 'var(--mac-shadow-sm)',
+    flexShrink: 0
+  };
+
+  const wizardSegmentButtonBase = {
+    minHeight: '34px',
+    padding: '7px 14px',
+    borderRadius: '999px',
+    border: '1px solid var(--mac-border)',
+    background: 'var(--mac-bg-secondary)',
+    color: 'var(--mac-text-primary)',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    boxShadow: 'var(--mac-shadow-sm)'
+  };
+
+  // Кастомный заголовок для Шага 1
+  const Step1Header =
+  <div style={wizardHeaderShellStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+        <div style={wizardHeaderIconStyle}>
+          <Check size={18} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <h3 style={wizardHeaderTitleStyle}>
+            Регистрация пациента
+          </h3>
+          <p style={wizardHeaderSubtitleStyle}>
+            Шаг 1 из 2 · данные пациента и карточка записи
+          </p>
+        </div>
+      </div>
+
       <button
       onClick={onClose}
       title="Закрыть"
-      style={{
-        width: '32px',
-        height: '32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: 'none',
-        background: 'transparent',
-        color: 'var(--mac-text-secondary)',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        transition: 'all 0.2s'
-      }}
+      aria-label="Закрыть"
+      style={wizardHeaderCloseStyle}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = 'var(--mac-danger)';
-        e.currentTarget.style.color = 'white';
+        e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
+        e.currentTarget.style.borderColor = 'var(--mac-border-secondary)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 'transparent';
-        e.currentTarget.style.color = 'var(--mac-text-secondary)';
+        e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
+        e.currentTarget.style.borderColor = 'var(--mac-border)';
       }}>
-
         <X size={18} />
       </button>
     </div>;
@@ -2380,16 +2399,9 @@ const AppointmentWizardV2 = ({
 
   // Улучшенный заголовок для Шага 2
   const Step2Header =
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
-    gap: '20px',
-    padding: '8px 32px 12px 32px',
-    borderBottom: '1px solid var(--mac-border)'
-  }}>
+  <div style={wizardHeaderShellStyle}>
       {/* 1. Поиск (Слева) */}
-      <div style={{ flex: '0 0 280px' }}>
+      <div style={{ flex: '0 0 300px', minWidth: 0 }}>
         <MacOSInput
         placeholder="Поиск услуги (название или код)..."
         value={serviceSearchQuery}
@@ -2399,7 +2411,7 @@ const AppointmentWizardV2 = ({
         onClear={() => setServiceSearchQuery('')}
         autoFocus
         size="sm"
-        style={{ height: '36px', fontSize: '13px' }} />
+        style={{ height: '38px', fontSize: '13px' }} />
 
       </div>
 
@@ -2408,50 +2420,37 @@ const AppointmentWizardV2 = ({
       flex: 1,
       display: 'flex',
       justifyContent: 'center',
-      gap: '12px',
-      padding: '0 12px'
+      gap: '8px',
+      padding: '0 8px',
+      flexWrap: 'wrap'
     }}>
         {categories.map((cat) =>
       <button
         key={cat.id}
         onClick={() => setActiveServiceCategory(cat.id)}
         style={{
-          padding: '7px 16px',
-          borderRadius: 'var(--mac-radius-full)',
-          border: activeServiceCategory === cat.id ?
-          '1px solid var(--mac-accent)' :
-          '1px solid transparent',
+          ...wizardSegmentButtonBase,
+          borderColor: activeServiceCategory === cat.id ? 'var(--mac-accent)' : 'var(--mac-border)',
           background: activeServiceCategory === cat.id ?
-          'linear-gradient(135deg, var(--mac-accent) 0%, color-mix(in srgb, var(--mac-accent), black 18%) 100%)' :
+          'color-mix(in srgb, var(--mac-accent), transparent 90%)' :
           'var(--mac-bg-secondary)',
-          color: activeServiceCategory === cat.id ?
-          'var(--mac-text-on-accent)' :
-          'var(--mac-text-primary)',
-          cursor: 'pointer',
-          fontSize: '13px',
+          color: activeServiceCategory === cat.id ? 'var(--mac-primary)' : 'var(--mac-text-primary)',
           fontWeight: activeServiceCategory === cat.id ? '600' : '500',
-          whiteSpace: 'nowrap',
-          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          boxShadow: activeServiceCategory === cat.id ?
-          '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%), 0 2px 4px color-mix(in srgb, var(--mac-accent), transparent 78%)' :
-          '0 1px 2px color-mix(in srgb, var(--mac-text-primary), transparent 94%)',
-          transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)'
+          transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)',
+          boxShadow: activeServiceCategory === cat.id ? '0 6px 14px rgba(59, 130, 246, 0.08)' : 'var(--mac-shadow-sm)'
         }}
         onMouseEnter={(e) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
             e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 2px 6px color-mix(in srgb, var(--mac-text-primary), transparent 90%)';
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
           }
         }}
         onMouseLeave={(e) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 1px 2px color-mix(in srgb, var(--mac-text-primary), transparent 94%)';
+            e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
           }
         }}>
 
@@ -2465,7 +2464,7 @@ const AppointmentWizardV2 = ({
       <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '10px',
+      gap: '8px',
       flex: '0 0 auto'
     }}>
         {/* Кнопка обновления */}
@@ -2474,17 +2473,18 @@ const AppointmentWizardV2 = ({
         disabled={isReloadingServices}
         title="Обновить список услуг"
         style={{
-          width: '36px',
-          height: '36px',
+          width: '34px',
+          height: '34px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: '1px solid var(--mac-border)',
-          background: 'var(--mac-bg-primary)',
+          background: 'var(--mac-bg-secondary)',
           color: 'var(--mac-text-secondary)',
-          borderRadius: '8px',
+          borderRadius: '999px',
           cursor: isReloadingServices ? 'wait' : 'pointer',
-          transition: 'all 0.2s'
+          transition: 'all 0.2s',
+          boxShadow: 'var(--mac-shadow-sm)'
         }}
         onMouseEnter={(e) => {
           if (!isReloadingServices) {
@@ -2494,7 +2494,7 @@ const AppointmentWizardV2 = ({
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
+          e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
           e.currentTarget.style.borderColor = 'var(--mac-border)';
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
         }}>
@@ -2507,25 +2507,26 @@ const AppointmentWizardV2 = ({
         onClick={onClose}
         title="Закрыть"
         style={{
-          width: '36px',
-          height: '36px',
+          width: '34px',
+          height: '34px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: '1px solid var(--mac-border)',
-          background: 'var(--mac-bg-primary)',
+          background: 'var(--mac-bg-secondary)',
           color: 'var(--mac-text-secondary)',
-          borderRadius: '8px',
+          borderRadius: '999px',
           cursor: 'pointer',
-          transition: 'all 0.2s'
+          transition: 'all 0.2s',
+          boxShadow: 'var(--mac-shadow-sm)'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--mac-danger)';
-          e.currentTarget.style.borderColor = 'var(--mac-danger)';
-          e.currentTarget.style.color = 'white';
+          e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
+          e.currentTarget.style.borderColor = 'var(--mac-border-secondary)';
+          e.currentTarget.style.color = 'var(--mac-text-primary)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
+          e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
           e.currentTarget.style.borderColor = 'var(--mac-border)';
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
         }}>
@@ -2595,7 +2596,10 @@ const AppointmentWizardV2 = ({
         maxWidth="70rem"
         closeOnBackdrop={false}
         closeOnEscape={false}
-        className="appointment-wizard-v2">
+        className="appointment-wizard-v2"
+        dialogStyle={{
+          backgroundColor: 'var(--mac-bg-primary)'
+        }}>
 
         <div className="wizard-container-v2">
           {/* Контент шагов */}

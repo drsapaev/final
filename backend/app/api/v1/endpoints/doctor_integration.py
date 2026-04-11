@@ -153,6 +153,7 @@ def get_doctor_queue_today(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -207,11 +208,11 @@ def get_doctor_queue_today(
 
         today = date.today()
 
-        candidate_specialist_ids = {current_user.id}
-        if doctor:
-            candidate_specialist_ids.add(doctor.id)
-            if doctor.user_id:
-                candidate_specialist_ids.add(doctor.user_id)
+        candidate_specialist_ids = (
+            {doctor.id}
+            if doctor
+            else ({current_user.id} if normalized_specialty == "general" else set())
+        )
 
         daily_queue_query = db.query(DailyQueue).filter(
             and_(
@@ -356,6 +357,7 @@ def call_patient(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -468,6 +470,7 @@ def start_patient_visit(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -488,6 +491,24 @@ def start_patient_visit(
                 detail="Запись в очереди не найдена",
             )
 
+        daily_queue = queue_entry.queue
+        doctor = daily_queue.specialist if daily_queue else None
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Врач не найден для этой очереди",
+            )
+
+        if (
+            current_user.role != "Admin"
+            and doctor.user_id
+            and doctor.user_id != current_user.id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет прав для работы с этой очередью",
+            )
+
         # Обновляем статус
         queue_entry.status = "in_progress"
 
@@ -495,7 +516,7 @@ def start_patient_visit(
         visit = crud_visit.find_or_create_today_visit(
             db=db,
             patient_id=queue_entry.patient_id,
-            doctor_id=current_user.id,
+            doctor_id=doctor.id,
             department=(
                 queue_entry.queue.department
                 if hasattr(queue_entry, 'queue')
@@ -539,6 +560,7 @@ def complete_patient_visit(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -716,7 +738,7 @@ def complete_patient_visit(
                 visit = crud_visit.find_or_create_today_visit(
                     db=db,
                     patient_id=queue_entry.patient_id,
-                    doctor_id=current_user.id,
+                    doctor_id=doctor.id if doctor else None,
                     department=(
                         daily_queue.department
                         if daily_queue and hasattr(daily_queue, 'department')
@@ -883,6 +905,7 @@ def get_doctor_services(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -1133,8 +1156,7 @@ def get_doctor_stats(
             db.query(DailyQueue)
             .filter(
                 and_(
-                    DailyQueue.specialist_id
-                    == doctor.user_id,  # ⭐ user_id, а не doctor.id
+                    DailyQueue.specialist_id == doctor.id,
                     DailyQueue.day >= start_date,
                 )
             )

@@ -10,47 +10,200 @@ import {
 import logger from '../utils/logger';
 import { finalizePrintableWindow, openPrintableWindow } from '../utils/printWindow';
 
-function formatTicketTimeWindow(row) {
-  const combinedVisitTime = row?.visit_date && row?.visit_time
-    ? `${row.visit_date} ${row.visit_time}`
-    : null;
-  const rawValue =
-    row?.appointment_time ||
-    row?.queue_time ||
-    combinedVisitTime ||
-    row?.visit_time ||
-    row?.visit_date ||
-    row?.created_at ||
-    null;
-  if (!rawValue) {
+function normalizePrintableDateString(value) {
+  if (value === null || value === undefined || value === '') {
     return null;
   }
 
-  const parsedDate = new Date(rawValue);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return String(rawValue);
+  return String(value)
+    .trim()
+    .replace(/(\+\d{2}:\d{2})Z$/, '$1')
+    .replace(/(\.\d{3})\d+(?=(Z|[+-]\d{2}:\d{2})?$)/, '$1');
+}
+
+function tryParsePrintableDate(value) {
+  const normalized = normalizePrintableDateString(value);
+  if (!normalized) {
+    return null;
   }
 
-  return parsedDate.toLocaleString('ru-RU', {
+  const candidates = [normalized];
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+    candidates.unshift(normalized.replace(' ', 'T'));
+  }
+
+  for (const candidate of candidates) {
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function formatPrintableDate(date) {
+  return date.toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+  });
+}
+
+function formatPrintableTime(date) {
+  return date.toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit'
   });
 }
 
+function formatPrintableDateTime(date) {
+  return `${formatPrintableDate(date)} ${formatPrintableTime(date)}`;
+}
+
+function normalizeDateOnly(value) {
+  const normalized = normalizePrintableDateString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const directMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (directMatch) {
+    return `${directMatch[3]}.${directMatch[2]}.${directMatch[1]}`;
+  }
+
+  const parsed = tryParsePrintableDate(normalized);
+  return parsed ? formatPrintableDate(parsed) : null;
+}
+
+function normalizeTimeOnly(value) {
+  const normalized = normalizePrintableDateString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const directMatch = normalized.match(/(?:T|\s)?(\d{2}:\d{2})(?::\d{2})?/);
+  if (directMatch) {
+    return directMatch[1];
+  }
+
+  const parsed = tryParsePrintableDate(normalized);
+  return parsed ? formatPrintableTime(parsed) : null;
+}
+
+function formatTicketTimeWindow(row) {
+  const fullDateTimeCandidate = getFirstDefined(
+    row?.appointment_time,
+    row?.queue_time,
+    row?.visit_datetime,
+    row?.created_at
+  );
+  const parsedFullDateTime = tryParsePrintableDate(fullDateTimeCandidate);
+  if (parsedFullDateTime) {
+    return formatPrintableDateTime(parsedFullDateTime);
+  }
+
+  const visitDate = normalizeDateOnly(row?.visit_date);
+  const visitTime = normalizeTimeOnly(row?.visit_time);
+  if (visitDate && visitTime) {
+    return `${visitDate} ${visitTime}`;
+  }
+
+  if (visitDate) {
+    return visitDate;
+  }
+
+  const parsedVisitTime = tryParsePrintableDate(row?.visit_time);
+  if (parsedVisitTime) {
+    return formatPrintableDateTime(parsedVisitTime);
+  }
+
+  const parsedVisitDate = tryParsePrintableDate(row?.visit_date);
+  if (parsedVisitDate) {
+    return formatPrintableDate(parsedVisitDate);
+  }
+
+  return null;
+}
+
+function extractQueueNumberCandidate(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const candidate = extractQueueNumberCandidate(item);
+      if (candidate !== null && candidate !== undefined && candidate !== '') {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    const direct = getFirstDefined(
+      value.queue_number,
+      value.number,
+      value.ticket_number,
+      value.queue_position,
+      value.queue_no,
+      value.display_number,
+      value.id
+    );
+
+    if (direct !== null && direct !== undefined && direct !== '') {
+      return direct;
+    }
+
+    for (const nestedValue of Object.values(value)) {
+      const nestedCandidate = extractQueueNumberCandidate(nestedValue);
+      if (nestedCandidate !== null && nestedCandidate !== undefined && nestedCandidate !== '') {
+        return nestedCandidate;
+      }
+    }
+
+    return null;
+  }
+
+  return value;
+}
+
 function resolveQueueNumber(row) {
-  if (row?.queue_number) {
-    return row.queue_number;
-  }
+  const directCandidates = [
+    row?.queue_number,
+    row?.number,
+    row?.ticket_number,
+    row?.queue_position,
+    row?.queue_no,
+    row?.display_number,
+    row?.queue_entry?.queue_number,
+    row?.queue_entry?.number,
+    row?.queue_entry?.ticket_number,
+    row?.queue_entry?.queue_position,
+    row?.queue_entry?.queue_no,
+    row?.queue_entry?.display_number,
+    row?.queue_ticket?.queue_number,
+    row?.queue_ticket?.number,
+    row?.queue_ticket?.ticket_number,
+    row?.queue_ticket?.queue_position,
+    row?.queue_ticket?.queue_no,
+    row?.queue_ticket?.display_number,
+  ];
 
-  if (row?.number) {
-    return row.number;
-  }
+  const nestedQueueNumber = extractQueueNumberCandidate(row?.queue_numbers);
+  const nestedQueueEntry = extractQueueNumberCandidate(row?.queue_entry);
+  const nestedQueueTicket = extractQueueNumberCandidate(row?.queue_ticket);
 
-  if (Array.isArray(row?.queue_numbers) && row.queue_numbers.length > 0) {
-    return row.queue_numbers[0]?.number || row.queue_numbers[0]?.queue_number || null;
+  const resolved = getFirstDefined(
+    ...directCandidates,
+    nestedQueueNumber,
+    nestedQueueEntry,
+    nestedQueueTicket
+  );
+
+  if (resolved !== null && resolved !== undefined && resolved !== '') {
+    return resolved;
   }
 
   return null;
@@ -137,9 +290,263 @@ function resolveServicePrice(row, overrides = {}) {
   );
 }
 
+const QUEUE_DISPLAY_NAMES = {
+  cardiology: 'Кардиология',
+  cardiology_common: 'Кардиология',
+  dermatology: 'Дерматология',
+  stomatology: 'Стоматология',
+  dentistry: 'Стоматология',
+  echokg: 'ЭхоКГ',
+  ecg: 'ЭКГ',
+  laboratory: 'Лаборатория',
+  lab: 'Лаборатория',
+  general: 'Общая очередь',
+  cosmetology: 'Косметология',
+};
+
+function normalizeDisplayLabel(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) {
+    return null;
+  }
+
+  const mapped = QUEUE_DISPLAY_NAMES[raw.toLowerCase()];
+  if (mapped) {
+    return mapped;
+  }
+
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function normalizeTicketSources(row, overrides = {}) {
+  const explicitSources = Array.isArray(overrides.printTickets)
+    ? overrides.printTickets.filter(Boolean)
+    : null;
+  if (explicitSources && explicitSources.length > 0) {
+    return explicitSources;
+  }
+
+  if (Array.isArray(row?.print_tickets) && row.print_tickets.length > 0) {
+    return row.print_tickets.filter(Boolean);
+  }
+
+  if (Array.isArray(row?.queue_numbers) && row.queue_numbers.length > 0) {
+    return row.queue_numbers.filter(Boolean);
+  }
+
+  return [];
+}
+
+function resolveServicePriceForTicket(row, source, overrides = {}) {
+  const directPrice = getFirstDefined(
+    overrides.servicePrice,
+    source?.service_price,
+    source?.price,
+    source?.service_cost,
+    source?.amount
+  );
+  if (directPrice !== null && directPrice !== undefined && directPrice !== '') {
+    return directPrice;
+  }
+
+  const normalizedCandidates = [
+    source?.service_name,
+    source?.queue_name,
+    normalizeDisplayLabel(source?.queue_tag),
+    normalizeDisplayLabel(source?.specialty),
+    normalizeDisplayLabel(source?.department),
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase());
+
+  if (normalizedCandidates.length === 0) {
+    return null;
+  }
+
+  const services = Array.isArray(row?.services) ? row.services : [];
+  for (const service of services) {
+    if (!service || typeof service !== 'object') {
+      continue;
+    }
+
+    const serviceLabels = [
+      service?.name,
+      service?.display_name,
+      service?.title,
+      service?.service_name,
+      service?.code,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim().toLowerCase());
+
+    if (serviceLabels.some((label) => normalizedCandidates.includes(label))) {
+      return getFirstDefined(
+        service?.price,
+        service?.service_price,
+        service?.amount,
+        service?.cost
+      );
+    }
+  }
+
+  return null;
+}
+
+function resolveTicketCabinet(row, source = null, overrides = {}) {
+  return getFirstDefined(
+    overrides.cabinet,
+    source?.cabinet,
+    source?.cabinet_number,
+    source?.effective_cabinet,
+    source?.queue_cabinet,
+    source?.room,
+    source?.doctor_cabinet,
+    row?.effective_cabinet,
+    row?.queue_cabinet,
+    row?.cabinet_number,
+    row?.cabinet,
+    row?.doctor_cabinet
+  );
+}
+
+function buildPanelTicketPayloadForSource(row, source, overrides = {}) {
+  const mergedRow = {
+    ...row,
+    ...(source && typeof source === 'object' ? source : {}),
+    patient_fio: getFirstDefined(
+      source?.patient_name,
+      source?.patient_fio,
+      row?.patient_fio,
+      row?.patient_name,
+      row?.name
+    ),
+    doctor_name: getFirstDefined(
+      source?.doctor_name,
+      source?.doctor,
+      row?.doctor_name,
+      row?.doctor,
+      row?.specialist_name
+    ),
+    specialty_name: getFirstDefined(
+      source?.queue_name,
+      source?.service_name,
+      source?.specialty_name,
+      normalizeDisplayLabel(source?.queue_tag),
+      normalizeDisplayLabel(source?.specialty),
+      normalizeDisplayLabel(source?.department),
+      row?.specialty_name,
+      row?.queue_name,
+      row?.service_name
+    ),
+    queue_name: getFirstDefined(
+      source?.queue_name,
+      source?.service_name,
+      normalizeDisplayLabel(source?.queue_tag),
+      normalizeDisplayLabel(source?.specialty),
+      normalizeDisplayLabel(source?.department),
+      row?.queue_name
+    ),
+    specialty: getFirstDefined(
+      source?.specialty,
+      source?.queue_tag,
+      source?.department,
+      row?.specialty
+    ),
+    department: getFirstDefined(
+      source?.department,
+      source?.specialty,
+      source?.queue_tag,
+      row?.department
+    ),
+    cabinet: resolveTicketCabinet(row, source, overrides),
+    doctor_cabinet: getFirstDefined(
+      source?.doctor_cabinet,
+      source?.effective_cabinet,
+      source?.cabinet,
+      source?.cabinet_number,
+      row?.doctor_cabinet,
+      row?.cabinet
+    ),
+    visit_date: getFirstDefined(
+      source?.visit_date,
+      source?.appointment_date,
+      row?.visit_date,
+      row?.appointment_date,
+      row?.date
+    ),
+    visit_time: getFirstDefined(
+      source?.visit_time,
+      row?.visit_time
+    ),
+    queue_time: getFirstDefined(
+      source?.queue_time,
+      row?.queue_time
+    ),
+    appointment_time: getFirstDefined(
+      source?.appointment_time,
+      row?.appointment_time
+    ),
+    queue_number: getFirstDefined(
+      source?.queue_number,
+      source?.number,
+      source?.ticket_number,
+      source?.queue_position,
+      row?.queue_number
+    ),
+    queue_numbers: source ? [source] : row?.queue_numbers,
+    service_price: resolveServicePriceForTicket(row, source, overrides),
+    price: resolveServicePriceForTicket(row, source, overrides),
+    cost: resolveServicePriceForTicket(row, source, overrides),
+  };
+
+  return buildPanelTicketPayload(mergedRow, overrides);
+}
+
+export function resolvePanelTicketPayloads(row, overrides = {}) {
+  const ticketSources = normalizeTicketSources(row, overrides);
+  if (ticketSources.length === 0) {
+    return [buildPanelTicketPayload(row, overrides)];
+  }
+
+  const seenKeys = new Set();
+  const payloads = [];
+
+  for (const source of ticketSources) {
+    const payload = buildPanelTicketPayloadForSource(row, source, overrides);
+    const dedupeKey = [
+      payload.queue_number,
+      payload.specialty_name,
+      payload.cabinet || '',
+      source?.visit_id || '',
+      source?.queue_id || '',
+      source?.queue_tag || '',
+    ].join('::');
+
+    if (!seenKeys.has(dedupeKey)) {
+      seenKeys.add(dedupeKey);
+      payloads.push(payload);
+    }
+  }
+
+  return payloads.length > 0 ? payloads : [buildPanelTicketPayload(row, overrides)];
+}
+
 export function buildPanelTicketPayload(row, overrides = {}) {
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
+    logger.warn('[PanelPrint] Queue number missing in row payload', {
+      rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
+      appointmentId: row?.appointment_id || row?.id || null,
+      visitId: row?.visit_id || null,
+      specialty: row?.specialty_name || row?.specialty || row?.department || null,
+    });
     throw new Error('Не удалось определить номер талона для печати');
   }
 
@@ -161,10 +568,7 @@ export function buildPanelTicketPayload(row, overrides = {}) {
       row?.service_name ||
       'Прием',
     cabinet:
-      overrides.cabinet ||
-      row?.cabinet ||
-      row?.doctor_cabinet ||
-      null,
+      resolveTicketCabinet(row, null, overrides) || null,
     patient_name:
       row?.patient_fio ||
       row?.patient_name ||
@@ -174,8 +578,7 @@ export function buildPanelTicketPayload(row, overrides = {}) {
     logo_url: getFirstDefined(overrides.logoUrl, row?.logo_url, row?.clinic_logo_url),
     service_price: resolveServicePrice(row, overrides),
     qr_payload: resolveQrPayload(row, overrides),
-    source: row?.source || 'desk',
-    time_window: row?.time_window || formatTicketTimeWindow(row),
+    time_window: formatTicketTimeWindow(row),
     printer_name: overrides.printerName || null
   };
 }
@@ -227,8 +630,7 @@ function renderTicketQrMarkup(qrPayload, visible) {
   return `<div class="qr-wrap">${qrSvg}</div>`;
 }
 
-function renderPanelTicketHtml(payload, settings, branding) {
-  const issuedAt = new Date().toLocaleString('ru-RU');
+function renderPanelTicketMarkup(payload, settings, branding, issuedAt) {
   const clinicName = resolveClinicName(payload, {}, branding);
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
@@ -237,21 +639,71 @@ function renderPanelTicketHtml(payload, settings, branding) {
   const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
 
   return `
+    <div class="ticket">
+      ${settings.show_clinic_name || settings.show_logo ? `
+        <div class="clinic-brand">
+          ${settings.show_logo && logoUrl ? `<img class="clinic-logo" src="${escapeHtml(logoUrl)}" alt="Логотип клиники" />` : ''}
+          ${settings.show_clinic_name ? `<div class="clinic-name">${escapeHtml(clinicName)}</div>` : ''}
+        </div>
+      ` : ''}
+      ${settings.show_service_name ? `<div class="center service-name">${escapeHtml(payload.specialty_name)}</div>` : ''}
+      <div class="line"></div>
+      ${settings.show_queue_number ? `<div class="center queue-number">Очередь №${escapeHtml(payload.queue_number)}</div>` : ''}
+      <div class="line"></div>
+      ${renderTicketMetadata('Пациент', payload.patient_name, settings.show_patient_name)}
+      ${renderTicketMetadata('Врач', payload.doctor_name, settings.show_doctor_name)}
+      ${renderTicketMetadata('Кабинет', payload.cabinet || 'Не указан', settings.show_cabinet)}
+      ${renderTicketMetadata('Цена', priceValue, settings.show_price)}
+      ${renderTicketMetadata('Дата и время', payload.time_window, Boolean(payload.time_window))}
+      ${renderTicketQrMarkup(qrPayload, settings.show_qr_code)}
+      <div class="line"></div>
+      ${settings.show_printed_at ? `
+        <div class="center footnote">
+          Выдан: ${escapeHtml(issuedAt)}<br/>
+          Сохраните талон до завершения приёма
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderPanelTicketHtml(payloads, settings, branding) {
+  const issuedAt = new Date().toLocaleString('ru-RU');
+  const safePayloads = Array.isArray(payloads) && payloads.length > 0 ? payloads : [];
+  const documentTitle = safePayloads.length > 1
+    ? `Талоны (${safePayloads.length})`
+    : `Талон №${escapeHtml(safePayloads[0]?.queue_number || '')}`;
+
+  return `
     <html>
       <head>
-        <title>Талон №${escapeHtml(payload.queue_number)}</title>
+        <title>${documentTitle}</title>
         <style>
-          @page { size: 80mm auto; margin: 6mm; }
+          @page { size: 58mm auto; margin: 2mm 1mm 2mm 2mm; }
           body {
-            font-family: "Courier New", monospace;
+            font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
             margin: 0;
+            font-size: 16px;
+            line-height: 1.35;
             color: #111827;
             background: #ffffff;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .ticket {
-            width: 72mm;
-            margin: 0 auto;
-            padding: 8px 0;
+            width: 55mm;
+            margin: 0;
+            padding: 4px 0;
+            box-sizing: border-box;
+          }
+          .ticket-page {
+            break-after: page;
+            page-break-after: always;
+          }
+          .ticket-page:last-child {
+            break-after: auto;
+            page-break-after: auto;
           }
           .clinic-brand {
             display: flex;
@@ -261,43 +713,57 @@ function renderPanelTicketHtml(payload, settings, branding) {
             margin-bottom: 8px;
           }
           .clinic-logo {
-            max-width: 52mm;
-            max-height: 18mm;
+            max-width: 40mm;
+            max-height: 14mm;
             object-fit: contain;
           }
           .clinic-name {
-            font-size: 15px;
+            font-size: 17px;
             font-weight: 700;
             text-align: center;
+            line-height: 1.2;
           }
           .center { text-align: center; }
           .title {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 700;
             margin-bottom: 8px;
+            line-height: 1.15;
+            letter-spacing: 0.3px;
+          }
+          .service-name {
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.25;
           }
           .queue-number {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 700;
             margin: 10px 0;
-            letter-spacing: 1px;
+            letter-spacing: 0.4px;
+            line-height: 1;
+            white-space: nowrap;
           }
           .line {
-            border-top: 1px dashed #374151;
+            border-top: 2px solid #111827;
             margin: 10px 0;
           }
           .meta {
-            font-size: 13px;
-            line-height: 1.5;
+            font-size: 14px;
+            line-height: 1.35;
             white-space: pre-line;
+            font-weight: 700;
+            margin-bottom: 3px;
           }
           .label {
             font-weight: 700;
           }
           .footnote {
-            margin-top: 12px;
-            font-size: 11px;
-            color: #4b5563;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #111827;
+            font-weight: 700;
+            line-height: 1.3;
           }
           .qr-wrap {
             display: flex;
@@ -306,38 +772,70 @@ function renderPanelTicketHtml(payload, settings, branding) {
           }
           .qr-wrap svg,
           .qr-image {
-            width: 32mm;
-            height: 32mm;
+            width: 24mm;
+            height: 24mm;
           }
         </style>
       </head>
       <body>
-        <div class="ticket">
-          ${settings.show_clinic_name || settings.show_logo ? `
-            <div class="clinic-brand">
-              ${settings.show_logo && logoUrl ? `<img class="clinic-logo" src="${escapeHtml(logoUrl)}" alt="Логотип клиники" />` : ''}
-              ${settings.show_clinic_name ? `<div class="clinic-name">${escapeHtml(clinicName)}</div>` : ''}
-            </div>
-          ` : ''}
-          <div class="center title">ТАЛОН НА ПРИЁМ</div>
-          ${settings.show_service_name ? `<div class="center">${escapeHtml(payload.specialty_name)}</div>` : ''}
-          <div class="line"></div>
-          ${settings.show_queue_number ? `<div class="center queue-number">${escapeHtml(payload.queue_number)}</div>` : ''}
-          <div class="line"></div>
-          ${renderTicketMetadata('Пациент', payload.patient_name, settings.show_patient_name)}
-          ${renderTicketMetadata('Врач', payload.doctor_name, settings.show_doctor_name)}
-          ${renderTicketMetadata('Кабинет', payload.cabinet || 'Не указан', settings.show_cabinet)}
-          ${renderTicketMetadata('Цена', priceValue, settings.show_price)}
-          ${renderTicketMetadata('Время', payload.time_window || 'По очереди', true)}
-          ${renderTicketMetadata('Источник', payload.source || 'desk', true)}
-          ${renderTicketQrMarkup(qrPayload, settings.show_qr_code)}
-          <div class="line"></div>
-          ${settings.show_printed_at ? `
-            <div class="center footnote">
-              Выдан: ${escapeHtml(issuedAt)}<br/>
-              Сохраните талон до завершения приёма
-            </div>
-          ` : ''}
+        ${safePayloads.map((payload) => `
+          <div class="ticket-page">
+            ${renderPanelTicketMarkup(payload, settings, branding, issuedAt)}
+          </div>
+        `).join('')}
+      </body>
+    </html>
+  `;
+}
+
+function renderPanelTicketErrorHtml(message, details = '') {
+  const safeMessage = escapeHtml(message || 'Не удалось подготовить талон к печати');
+  const safeDetails = details ? escapeHtml(details) : '';
+
+  return `
+    <html>
+      <head>
+        <title>Ошибка печати</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            padding: 24px;
+            background: #ffffff;
+            color: #111827;
+          }
+          .card {
+            max-width: 420px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            background: #f9fafb;
+          }
+          .title {
+            margin: 0 0 12px 0;
+            font-size: 18px;
+            font-weight: 700;
+          }
+          .message {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-line;
+          }
+          .details {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #6b7280;
+            white-space: pre-wrap;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="title">Не удалось подготовить талон к печати</div>
+          <p class="message">${safeMessage}</p>
+          ${safeDetails ? `<div class="details">${safeDetails}</div>` : ''}
         </div>
       </body>
     </html>
@@ -345,7 +843,7 @@ function renderPanelTicketHtml(payload, settings, branding) {
 }
 
 async function loadPanelTicketRenderContext(row, overrides = {}) {
-  const payload = buildPanelTicketPayload(row, overrides);
+  const payloads = resolvePanelTicketPayloads(row, overrides);
 
   const [ticketSettingsResult, clinicSettingsResult] = await Promise.allSettled([
     fetchTicketPrintSettings(),
@@ -362,55 +860,87 @@ async function loadPanelTicketRenderContext(row, overrides = {}) {
       ? normalizeClinicBrandingSettings(clinicSettingsResult.value)
       : normalizeClinicBrandingSettings([]);
 
-  return { payload, settings, branding };
+  return { payloads, settings, branding };
 }
 
 export async function buildPanelTicketPrintableHtml(row, overrides = {}) {
-  const { payload, settings, branding } = await loadPanelTicketRenderContext(row, overrides);
-  return renderPanelTicketHtml(payload, settings, branding);
+  const { payloads, settings, branding } = await loadPanelTicketRenderContext(row, overrides);
+  return renderPanelTicketHtml(payloads, settings, branding);
 }
 
-export function printPanelTicketInBrowser(row, overrides = {}) {
+async function buildAndFinalizePanelTicketWindow(printWindow, row, overrides = {}) {
+  const html = await buildPanelTicketPrintableHtml(row, overrides);
+  finalizePrintableWindow(printWindow, html, logger);
+  return { success: true };
+}
+
+function renderPrintableErrorWindow(printWindow, error, row) {
+  const details = [
+    row?.appointment_id ? `appointment_id: ${row.appointment_id}` : null,
+    row?.visit_id ? `visit_id: ${row.visit_id}` : null,
+    row?.id ? `id: ${row.id}` : null,
+  ].filter(Boolean).join('\n');
+
+  try {
+    const errorHtml = renderPanelTicketErrorHtml(
+      error?.message || 'Не удалось подготовить талон к печати',
+      details
+    );
+    printWindow.document.open();
+    printWindow.document.write(errorHtml);
+    printWindow.document.close();
+  } catch (_renderError) {
+    try {
+      printWindow.close();
+    } catch (_closeError) {
+      // ignore
+    }
+  }
+}
+
+export async function printPanelTicketInBrowserAsync(row, overrides = {}) {
   const printWindow = window.open('', '_blank', 'width=420,height=720');
 
   if (!printWindow) {
-    return false;
+    return { opened: false, success: false };
   }
 
-  void (async () => {
-    try {
-      const html = await buildPanelTicketPrintableHtml(row, overrides);
-      finalizePrintableWindow(printWindow, html, logger);
-    } catch (error) {
-      logger.error('[PanelPrint] Failed to build ticket preview', error);
-      try {
-        printWindow.close();
-      } catch (_closeError) {
-        // ignore
-      }
-    }
-  })();
+  try {
+    await buildAndFinalizePanelTicketWindow(printWindow, row, overrides);
+    return { opened: true, success: true };
+  } catch (error) {
+    logger.error('[PanelPrint] Failed to build ticket preview', error);
+    renderPrintableErrorWindow(printWindow, error, row);
+    return { opened: true, success: false, error };
+  }
+}
 
+export function printPanelTicketInBrowser(row, overrides = {}) {
+  void printPanelTicketInBrowserAsync(row, overrides);
   return true;
 }
 
 export async function printPanelTicket(row, overrides = {}) {
-  const opened = printPanelTicketInBrowser(row, overrides);
-  if (!opened) {
+  const result = await printPanelTicketInBrowserAsync(row, overrides);
+  if (!result?.opened) {
     throw new Error('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите печать.');
   }
+  if (!result?.success) {
+    throw result?.error || new Error('Не удалось подготовить талон к печати');
+  }
 
-  const payload = buildPanelTicketPayload(row, overrides);
+  const payloads = resolvePanelTicketPayloads(row, overrides);
   logger.info('[PanelPrint] Ticket print dialog opened', {
-    queueNumber: payload.queue_number,
-    patientName: payload.patient_name,
-    specialty: payload.specialty_name,
+    ticketCount: payloads.length,
+    queueNumbers: payloads.map((payload) => payload.queue_number),
+    patientName: payloads[0]?.patient_name || null,
+    specialties: payloads.map((payload) => payload.specialty_name),
   });
 
   return {
     success: true,
     message: 'Открыт системный диалог печати текущего компьютера',
-    data: payload,
+    data: payloads.length === 1 ? payloads[0] : payloads,
   };
 }
 

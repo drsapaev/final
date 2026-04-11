@@ -631,6 +631,14 @@ const ClinicSettings = () => {
               }}>
                 Настройте, какие поля будут видны на печатном талоне. Эти параметры применяются и к регистратуре, и к панелям специалистов.
               </p>
+              <p style={{
+                color: 'var(--mac-text-tertiary)',
+                fontSize: 'var(--mac-font-size-xs)',
+                margin: '8px 0 0 0',
+                maxWidth: '720px'
+              }}>
+                Поле «Кабинет» управляет только видимостью. Само значение берётся из связанного врача и сегодняшней очереди, а не задаётся в настройках печати.
+              </p>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>

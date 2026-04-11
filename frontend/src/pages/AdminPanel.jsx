@@ -317,6 +317,8 @@ const AdminPanel = () => {
   // Хук для управления врачами
   const {
     doctors,
+    allDoctors,
+    availableUsers,
     loading: doctorsLoading,
     error: doctorsError,
     searchTerm: doctorsSearchTerm,
@@ -329,7 +331,8 @@ const AdminPanel = () => {
     setFilterStatus: setDoctorsFilterStatus,
     createDoctor,
     updateDoctor,
-    deleteDoctor
+    deleteDoctor,
+    refreshAvailableUsers
   } = useDoctors();
 
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном врачей
@@ -413,7 +416,7 @@ const AdminPanel = () => {
     getStatusStats,
     getTodayAppointments,
     getTomorrowAppointments
-  } = useAppointments();
+  } = useAppointments(allDoctors);
 
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном записей
   const appointmentModal = useModal();
@@ -858,10 +861,12 @@ const AdminPanel = () => {
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для врачей с универсальным хуком
   const handleCreateDoctor = () => {
+    void refreshAvailableUsers();
     doctorModal.openModal(null);
   };
 
   const handleEditDoctor = (doctor) => {
+    void refreshAvailableUsers(doctor?.id);
     doctorModal.openModal(doctor);
   };
 
@@ -2993,6 +2998,7 @@ const AdminPanel = () => {
       onClose={handleCloseDoctorModal}
       doctor={doctorModal.selectedItem}
       onSave={handleSaveDoctor}
+      availableUsers={availableUsers}
       loading={doctorModal.loading} />
 
     </div>;
@@ -3520,9 +3526,11 @@ const AdminPanel = () => {
               columns={[
               { key: 'patient', title: 'Пациент', width: '25%' },
               { key: 'doctor', title: 'Врач', width: '20%' },
-              { key: 'datetime', title: 'Дата и время', width: '20%' },
-              { key: 'status', title: 'Статус', width: '15%' },
-              { key: 'reason', title: 'Причина', width: '15%' },
+              { key: 'cabinet', title: 'Кабинет', width: '12%' },
+              { key: 'datetime', title: 'Дата и время', width: '18%' },
+              { key: 'status', title: 'Статус', width: '12%' },
+              { key: 'integrity', title: 'Связность', width: '12%' },
+              { key: 'reason', title: 'Причина', width: '16%' },
               { key: 'actions', title: 'Действия', width: '5%' }]
               }
               data={appointments.map((appointment) => ({
@@ -3579,6 +3587,24 @@ const AdminPanel = () => {
                   }}>{getAppointmentDoctorSpecialization(appointment) || '—'}</p>
                     </div>,
 
+                cabinet:
+                <div>
+                      <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    margin: 0
+                  }}>
+                        {appointment.effectiveCabinet || '—'}
+                      </p>
+                      <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-secondary)',
+                    margin: '4px 0 0 0'
+                  }}>
+                        {appointment.queueCabinet ? `Очередь: ${appointment.queueCabinet}` : appointment.doctorCabinet ? `Врач: ${appointment.doctorCabinet}` : 'Нет связанного кабинета'}
+                      </p>
+                    </div>,
+
                 datetime:
                 <div>
                       <p style={{
@@ -3600,6 +3626,24 @@ const AdminPanel = () => {
                 status:
                 <MacOSBadge variant={getAppointmentStatusVariant(appointment.status)}>
                       {getAppointmentStatusLabel(appointment.status)}
+                    </MacOSBadge>,
+
+                integrity:
+                appointment.hasIntegrityWarnings ?
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <MacOSBadge variant="warning">
+                        Требует проверки
+                      </MacOSBadge>
+                      <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                        {appointment.integrityWarnings.join(', ')}
+                      </p>
+                    </div> :
+                <MacOSBadge variant="success">
+                      Связано
                     </MacOSBadge>,
 
                 reason:

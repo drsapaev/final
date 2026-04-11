@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
-import { buildPanelTicketPayload, printPanelTicketInBrowser } from '../../services/panelPrint';
+import { buildPanelTicketPayload, printPanelTicketInBrowserAsync } from '../../services/panelPrint';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 
@@ -15,11 +15,13 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
     setCurrentPrinting(ticket.queue_id);
 
     try {
-      const opened = printPanelTicketInBrowser(buildPanelTicketPayload(ticket));
-      if (!opened) {
+      const result = await printPanelTicketInBrowserAsync(buildPanelTicketPayload(ticket));
+      if (!result?.opened) {
         logger.warn('Browser popup blocked for ticket print', ticket);
+      } else if (!result?.success) {
+        logger.warn('Browser ticket preview failed', ticket);
       }
-      return opened;
+      return Boolean(result?.opened && result?.success);
     } catch (error) {
       logger.error('Browser ticket print failed', error);
       return false;

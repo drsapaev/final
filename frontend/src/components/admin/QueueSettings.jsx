@@ -164,7 +164,7 @@ const QueueSettings = () => {
 
       // ⭐ SSOT: Находим врача по специальности из загруженных данных
       const doctor = doctors.find((d) => d.specialty === specialty);
-      const doctorId = doctor?.id || doctor?.user_id;
+      const doctorId = doctor?.id;
 
       if (!doctorId) {
         setMessage({ type: 'error', text: `Врач для специальности "${specialty}" не найден` });

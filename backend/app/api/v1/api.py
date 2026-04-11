@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
 )
 from app.api.v1.endpoints import (
     admin_ai,
+    admin_appointments,
     admin_clinic,
     admin_finance,
     admin_departments,
@@ -280,6 +281,7 @@ api_router.include_router(reports_ep.router, prefix="/reports", tags=["reports"]
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_appointments.router, tags=["admin-appointments"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
 api_router.include_router(
     clinic_management.router, prefix="/clinic", tags=["clinic-management"]

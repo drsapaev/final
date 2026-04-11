@@ -549,7 +549,12 @@ const ModernQueueManager = ({
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
         title={qrData?.is_clinic_wide ? 'Общий QR код клиники' : 'QR код для записи'}
-        maxWidth="32rem">
+        maxWidth="32rem"
+        maxHeight="calc(100dvh - 2rem)"
+        dialogClassName="mqm-qr-dialog"
+        dialogStyle={{
+          backgroundColor: 'var(--mac-bg-primary)'
+        }}>
 
         <div className="mqm-qr-modal-content">
           {/* Badge для типа QR */}

@@ -121,6 +121,17 @@ class DoctorOut(DoctorBase):
     schedules: list["ScheduleOut"] = []
 
 
+class DoctorUserOption(BaseModel):
+    id: int
+    username: str
+    full_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    role: str
+    is_active: bool
+    linked_doctor_id: int | None = None
+
+
 # ===================== РАСПИСАНИЯ =====================
 
 

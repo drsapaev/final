@@ -3053,13 +3053,10 @@ class BatchServiceItem(BaseModel):
     """Услуга для массового создания очередей"""
 
     specialist_id: int = Field(
-        ..., description="ID специалиста (user_id, не doctor_id)"
+        ..., description="ID специалиста (Doctor.id)"
     )
     service_id: int = Field(..., description="ID услуги")
     quantity: int = Field(default=1, ge=1, description="Количество")
-
-    # ⚠️ ВАЖНО: specialist_id должен быть user_id (ForeignKey на users.id), а не doctor_id!
-    # Если передается doctor_id, нужно конвертировать его в user_id на backend
 
 
 class BatchQueueEntriesRequest(BaseModel):
@@ -3141,8 +3138,7 @@ def create_queue_entries_batch(
         today = date.today()
         current_time = datetime.now(timezone)
 
-        # Группируем услуги по specialist_id (один специалист = одна запись в очереди)
-        # ⚠️ ВАЖНО: Конвертируем doctor_id → user_id если нужно
+        # Группируем услуги по specialist_id (один врач = одна запись в очереди)
         services_by_specialist: Dict[int, List[BatchServiceItem]] = {}
         for service_item in request.services:
             service = db.query(Service).filter(Service.id == service_item.service_id).first()
@@ -3154,27 +3150,14 @@ def create_queue_entries_batch(
 
             specialist_id = service_item.specialist_id
 
-            # Проверяем, является ли specialist_id user_id или doctor_id
-            # Если это doctor_id, конвертируем в user_id
             from app.models.clinic import Doctor
 
             doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-            if doctor and doctor.user_id:
-                # Это был doctor_id, конвертируем в user_id
-                specialist_id = doctor.user_id
-                logger.info(
-                    f"[create_queue_entries_batch] Конвертация: doctor_id={service_item.specialist_id} → user_id={specialist_id}"
+            if not doctor:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Врач с ID {specialist_id} не найден",
                 )
-            else:
-                # Проверяем, что specialist_id существует в users
-                from app.models.user import User
-
-                user = db.query(User).filter(User.id == specialist_id).first()
-                if not user:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Специалист с ID {specialist_id} не найден (ни в doctors, ни в users)",
-                    )
 
             if specialist_id not in services_by_specialist:
                 services_by_specialist[specialist_id] = []
@@ -3189,27 +3172,28 @@ def create_queue_entries_batch(
         reused_entries_count = 0
 
         for specialist_id, services_list in services_by_specialist.items():
-            # Проверяем, есть ли очередь у специалиста на сегодня
-            daily_queue = (
-                db.query(DailyQueue)
-                .filter(
-                    DailyQueue.specialist_id == specialist_id, DailyQueue.day == today
+            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+            if not doctor:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Врач с ID {specialist_id} не найден",
                 )
-                .first()
-            )
 
-            # Автосоздание DailyQueue (legacy-совместимый путь по specialist_id=user.id)
-            if not daily_queue:
-                daily_queue = DailyQueue(
-                    day=today,
-                    specialist_id=specialist_id,
-                    active=True,
-                    queue_tag=None,
-                    online_start_time="07:00",
-                    online_end_time="09:00",
-                )
-                db.add(daily_queue)
-                db.flush()
+            queue_tag = None
+            if services_list:
+                first_service = db.query(Service).filter(Service.id == services_list[0].service_id).first()
+                queue_tag = getattr(first_service, "queue_tag", None) or doctor.specialty
+
+            daily_queue = queue_service.get_or_create_daily_queue(
+                db,
+                day=today,
+                specialist_id=doctor.id,
+                queue_tag=queue_tag,
+                defaults={
+                    "max_online_entries": doctor.max_online_per_day,
+                    "cabinet_number": doctor.cabinet,
+                },
+            )
 
             # Проверяем дубликаты (для любых source)
             if daily_queue:
@@ -3359,10 +3343,10 @@ def get_doctor_user_id(
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
-    Получить user_id по doctor_id
+    DEPRECATED: получить user_id по doctor_id.
 
-    Используется для конвертации doctor_id в user_id при создании записей в очереди,
-    так как DailyQueue.specialist_id требует user_id, а не doctor_id.
+    Operational queue flows канонически используют Doctor.id.
+    Endpoint оставлен только для временной обратной совместимости.
 
     Args:
         doctor_id: ID врача из таблицы doctors

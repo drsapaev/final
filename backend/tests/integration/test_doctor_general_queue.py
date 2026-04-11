@@ -8,6 +8,8 @@ from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.visit import Visit
+from app.core.security import get_password_hash
+from app.models.user import User
 
 
 @pytest.mark.integration
@@ -181,3 +183,127 @@ class TestDoctorGeneralQueue:
         db_session.refresh(unrelated_visit)
         assert entry.status == "served"
         assert unrelated_visit.status == "open"
+
+    def test_cardiologist_role_can_complete_queue_entry(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        cardiologist_user = User(
+            username="test_cardiologist",
+            email="cardiologist@test.com",
+            full_name="Test Cardiologist",
+            hashed_password=get_password_hash("cardiologist123"),
+            role="Cardiologist",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(cardiologist_user)
+        db_session.commit()
+        db_session.refresh(cardiologist_user)
+
+        doctor = Doctor(
+            user_id=cardiologist_user.id,
+            specialty="cardiology",
+            active=True,
+            cabinet="202",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="cardiology",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=11,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="waiting",
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+
+        login_response = client.post(
+            "/api/v1/auth/minimal-login",
+            json={"username": cardiologist_user.username, "password": "cardiologist123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/complete",
+            json={"notes": "done"},
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["entry_id"] == entry.id
+        assert payload["status"] == "completed"
+
+    def test_doctor_stats_reads_daily_queue_by_doctor_id(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=5,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="served",
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.get("/api/v1/doctor/stats", headers=headers)
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["doctor"]["cabinet"] == "101"
+        assert payload["stats"]["total_patients"] >= 1
