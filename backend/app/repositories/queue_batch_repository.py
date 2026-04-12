@@ -11,7 +11,6 @@ from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.user import User
 
 
 class QueueBatchRepository:
@@ -35,17 +34,6 @@ class QueueBatchRepository:
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if doctor:
             return doctor.id, False
-
-        legacy_doctor = self.db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
-        if legacy_doctor:
-            return legacy_doctor.id, True
-
-        user = self.db.query(User).filter(User.id == specialist_id).first()
-        if user:
-            linked_doctor = self.db.query(Doctor).filter(Doctor.user_id == user.id).first()
-            if linked_doctor:
-                return linked_doctor.id, True
-            return None, False
 
         return None, False
 

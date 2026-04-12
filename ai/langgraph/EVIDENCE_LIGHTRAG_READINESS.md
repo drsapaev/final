@@ -807,10 +807,10 @@ Do not fix the clinic app bug yet. Instead, fix the dev-brain safety path so `ag
 - manual graph reconstruction: recurring across UI -> endpoint -> persistence chains
 
 ## Count summary
-- tasks reviewed: 40
-- tasks with multi-hop gap: 40
-- tasks with ownership ambiguity: 40
-- tasks with manual reconstruction: 40
+- tasks reviewed: 41
+- tasks with multi-hop gap: 41
+- tasks with ownership ambiguity: 41
+- tasks with manual reconstruction: 41
 
 ## Recommendation
 - LightRAG relevance:
@@ -1368,3 +1368,38 @@ next step is to add or temporarily seed a second active doctor in one specialty 
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - The code path was already correct, but the live proof still required reconstructing the temporary seed data and browser refresh step by hand. That repeated the same multi-hop verification pattern seen in earlier queue and registrar tasks.
+
+## Task 41 - QueueBatchRepository legacy user-id bridge removal
+
+### User task
+давай, но сначала коммит и пуш
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/repositories/queue_batch_repository.py
+
+### What handoff solved well
+- The gate narrowed the work to the batch queue repository and kept the change from spilling into the broader queue stack.
+- The override prompt made the first-touch file explicit, which was enough to safely apply the smallest identity-resolution fix.
+
+### Missing relationship mapping
+- The stack did not surface that the repository still contained two legacy bridges after earlier queue canonicalization work: `Doctor.user_id` and `User.id -> linked_doctor`.
+- It also did not distinguish the batch resolver from the already-fixed queue-open and queue-service paths, so the remaining bridge had to be found by manual search.
+
+### Manual reconstruction needed
+- Manually removed the fallback branches from `resolve_specialist_user_id()` so it now accepts only canonical `Doctor.id`.
+- Manually verified the repository and its service counterpart compile cleanly after the change.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- This was another small but real identity-bridge cleanup: the file was found, but the relationship between batch queue resolution and the earlier queue canonicalization work still had to be reconstructed manually. The gate also misrouted before the narrow override was used.
