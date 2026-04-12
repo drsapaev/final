@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _preserve_cashier_visit_status(raw_status: str | None) -> str:
+    """Payment belongs to Payment/discount_mode; legacy visit.status='paid' becomes operational waiting."""
+    if not raw_status or raw_status == "paid":
+        return "waiting"
+    return raw_status
+
+
 # ===================== МОДЕЛИ ДЛЯ КАССИРА =====================
 
 class PendingPaymentItem(BaseModel):
@@ -882,13 +889,15 @@ async def cancel_payment(
         if hasattr(payment, 'note') and cancel_data.reason:
             payment.note = f"Отменён: {cancel_data.reason}"
 
-        # Возвращаем статус визита в 'pending', чтобы он появился в списке
+        # Возвращаем платежный маркер, не ломая operational статус визита.
         if payment.visit_id:
             visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-            if visit and visit.status == 'paid':
-                 visit.status = 'pending'
-                 visit.discount_mode = 'none'
-                 db.add(visit)
+            if visit and (
+                visit.status == 'paid' or visit.discount_mode == 'paid'
+            ):
+                visit.status = _preserve_cashier_visit_status(visit.status)
+                visit.discount_mode = 'none'
+                db.add(visit)
         
         db.commit()
         
@@ -948,8 +957,8 @@ async def mark_visit_as_paid(
             )
             db.add(new_payment)
         
-        # Обновляем статус визита и discount_mode (SSOT)
-        visit.status = "paid"  # Используем "paid" вместо "closed" для правильной фильтрации
+        # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита.
+        visit.status = _preserve_cashier_visit_status(visit.status)
         visit.discount_mode = "paid"  # SSOT признак оплаты
         
         db.commit()
@@ -958,6 +967,8 @@ async def mark_visit_as_paid(
             "success": True,
             "message": "Визит отмечен как оплаченный",
             "visit_id": visit_id,
+            "status": visit.status,
+            "payment_status": "paid",
             "amount": float(total_amount)
         }
         
@@ -998,13 +1009,13 @@ async def confirm_payment(
         from datetime import datetime
         payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
     
-    # Обновляем статус визита
+    # Обновляем платежный маркер визита, сохраняя operational статус.
     if payment.visit_id:
          visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
          if visit:
-             visit.status = 'paid'
-             visit.discount_mode = 'paid'
-             db.add(visit)
+              visit.status = _preserve_cashier_visit_status(visit.status)
+              visit.discount_mode = 'paid'
+              db.add(visit)
     
     db.commit()
     return {"success": True, "status": "paid"}
@@ -1056,13 +1067,15 @@ async def refund_payment(
         if new_refunded_amount >= payment.amount:
             payment.status = "refunded"
             
-            # Возвращаем статус визита в 'pending' при полном возврате
+            # Возвращаем платежный маркер при полном возврате, не ломая operational статус.
             if payment.visit_id:
                 visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-                if visit and visit.status == 'paid':
-                     visit.status = 'pending'
-                     visit.discount_mode = 'none'
-                     db.add(visit)
+                if visit and (
+                    visit.status == 'paid' or visit.discount_mode == 'paid'
+                ):
+                    visit.status = _preserve_cashier_visit_status(visit.status)
+                    visit.discount_mode = 'none'
+                    db.add(visit)
         else:
             # Частичный возврат — оставляем "paid" но с пометкой
             pass

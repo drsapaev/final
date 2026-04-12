@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _normalize_queue_status_for_registrar(raw_status: str | None) -> str:
+    """Keep payment state out of the operational queue status shown to registrars."""
+    if not raw_status or raw_status == "paid":
+        return "waiting"
+    return raw_status
+
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
 
 
@@ -552,7 +559,6 @@ def get_registrar_services(
         categories = crud_clinic.get_service_categories(
             db, specialty=specialty, active_only=active_only
         )
-        category_specialty_by_id = {cat.id: cat.specialty for cat in categories}
 
         # Получаем услуги из основной таблицы
         query = db.query(Service)
@@ -601,7 +607,7 @@ def get_registrar_services(
             service_data = {
                 "id": service.id,
                 "name": service.name,
-                "code": service.code,
+                "code": service.service_code or get_service_code(service.id, db),
                 "price": float(service.price) if service.price else 0,
                 "currency": service.currency or "UZS",
                 "duration_minutes": service.duration_minutes or 30,
@@ -625,112 +631,24 @@ def get_registrar_services(
                 "group": None,  # Добавим группу для frontend
             }
 
-            # [OK] НОВАЯ ЛОГИКА: определяем группу по category_code
-            category_code = getattr(service, 'category_code', None)
-            category_specialty = category_specialty_by_id.get(service.category_id)
+            # [OK] НОВАЯ ЛОГИКА: определяем группу только по явному routing truth
             resolved_queue_group = resolve_queue_group_key(
-                service_code=service_data["service_code"] or service_data["code"],
+                service_code=service_data["service_code"],
                 queue_tag=service_data["queue_tag"],
                 department_key=service_data["department_key"],
-                category_specialty=category_specialty,
-                category_code=category_code,
             )
 
             if resolved_queue_group:
                 registrar_group = queue_group_to_registrar_group.get(
                     resolved_queue_group, "procedures"
                 )
-                fallback_code_group = resolve_queue_group_key(
-                    service_code=service_data["service_code"] or service_data["code"],
-                    category_code=category_code,
-                )
-                if (
-                    any(
-                        [
-                            service_data["queue_tag"],
-                            service_data["department_key"],
-                            category_specialty,
-                        ]
-                    )
-                    and fallback_code_group
-                    and fallback_code_group != resolved_queue_group
-                ):
-                    logger.info(
-                        "[FIX:ADM-06] registrar service grouping overridden by explicit routing: "
-                        "service_id=%s queue_tag=%s department_key=%s category_specialty=%s "
-                        "fallback_group=%s resolved_group=%s",
-                        service.id,
-                        service_data["queue_tag"],
-                        service_data["department_key"],
-                        category_specialty,
-                        fallback_code_group,
-                        resolved_queue_group,
-                    )
-
                 service_data["group"] = registrar_group
                 grouped_services[registrar_group].append(service_data)
                 continue
 
-            if category_code:
-                # Используем новую систему кодов
-                if category_code == 'L':
-                    service_data["group"] = "laboratory"
-                    grouped_services["laboratory"].append(service_data)
-                elif category_code == 'D':
-                    service_data["group"] = "dermatology"
-                    grouped_services["dermatology"].append(service_data)
-                elif category_code == 'C':
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-                elif category_code == 'K':
-                    service_data["group"] = "cardiology"
-                    grouped_services["cardiology"].append(service_data)
-                elif category_code == 'S':
-                    service_data["group"] = "stomatology"
-                    grouped_services["stomatology"].append(service_data)
-                elif category_code == 'O':
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-                else:
-                    # Неизвестный код - в прочие
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-            else:
-                # Fallback: если нет category_code, пытаемся определить по названию
-                name_lower = service.name.lower()
-                if any(
-                    word in name_lower
-                    for word in ["анализ", "кровь", "моча", "биохим", "гормон"]
-                ):
-                    service_data["group"] = "laboratory"
-                    grouped_services["laboratory"].append(service_data)
-                elif any(
-                    word in name_lower
-                    for word in ["дерматолог", "кожа", "псориаз", "акне"]
-                ):
-                    service_data["group"] = "dermatology"
-                    grouped_services["dermatology"].append(service_data)
-                elif any(
-                    word in name_lower
-                    for word in ["косметолог", "пилинг", "чистка", "ботокс"]
-                ):
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-                elif any(
-                    word in name_lower
-                    for word in ["кардиолог", "экг", "эхокг", "холтер"]
-                ):
-                    service_data["group"] = "cardiology"
-                    grouped_services["cardiology"].append(service_data)
-                elif any(
-                    word in name_lower for word in ["стоматолог", "зуб", "кариес"]
-                ):
-                    service_data["group"] = "stomatology"
-                    grouped_services["stomatology"].append(service_data)
-                else:
-                    # По умолчанию в прочие процедуры
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
+            # Без явного routing truth держим нейтральную группу, а не угадываем по category/name.
+            service_data["group"] = "procedures"
+            grouped_services["procedures"].append(service_data)
 
         return {
             "services_by_group": grouped_services,
@@ -1124,7 +1042,7 @@ def open_reception(
     Из detail.md стр. 253: Кнопка «Открыть приём сейчас»
     """
     try:
-        result = crud_queue.open_daily_queue(db, day, specialist_id, current_user.id)
+        result = crud_queue.open_daily_queue(db, day, specialist_id)
 
         return {
             "success": True,
@@ -1191,39 +1109,12 @@ def start_queue_visit(
                     or payment.paid_at
                 ):
                     visit.discount_mode = "paid"
-                elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # [OK] ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при начале приема (visit {visit.id})",
-                        )
-                        logger.info(
-                            "start_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
-                    visit.discount_mode = "paid"
+                else:
+                    logger.info(
+                        "[FIX:PAYMENT_STATUS] start_queue_visit preserves payment state for visit %d; operational status is %s",
+                        visit.id,
+                        visit.status,
+                    )
 
             db.commit()
             db.refresh(visit)
@@ -1244,41 +1135,11 @@ def start_queue_visit(
             # Обновляем статус appointment
             appointment.status = "in_progress"
 
-            # [OK] Сохраняем visit_type: если appointment был оплачен, сохраняем visit_type='paid'
-            # Appointment не имеет discount_mode, используем visit_type
-            if not appointment.visit_type or appointment.visit_type not in (
-                "paid",
-                "repeat",
-                "benefit",
-                "all_free",
-            ):
-                from app.models.payment import Payment
-
-                payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == appointment.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    appointment.visit_type = "paid"
-                elif (
-                    hasattr(appointment, 'payment_amount')
-                    and appointment.payment_amount
-                    and appointment.payment_amount > 0
-                ):
-                    appointment.visit_type = "paid"
-                elif appointment.status in (
-                    "paid",
-                    "in_visit",
-                    "in_progress",
-                    "completed",
-                ):
-                    appointment.visit_type = "paid"
+            logger.info(
+                "[FIX:PAYMENT_STATUS] start_queue_visit preserves appointment visit_type for appointment %d; operational status is %s",
+                appointment.id,
+                appointment.status,
+            )
 
             db.commit()
             db.refresh(appointment)
@@ -1459,12 +1320,9 @@ def get_today_queues(
                 service_code_val = (
                     get_service_code(
                         {
-                            'code': service.code,
                             'service_code': getattr(service, 'service_code', None),
-                            'category_code': getattr(service, 'category_code', None),
                         }
                     )
-                    or service.code
                     or 'N/A'
                 )
                 queue_tag_val = service.queue_tag or 'N/A'
@@ -1499,8 +1357,8 @@ def get_today_queues(
                                 service_name,
                                 service_code_val,
                             )
-                    elif service.code:
-                        service_code_upper = str(service.code).upper()
+                    elif service.service_code:
+                        service_code_upper = str(service.service_code).upper()
                         if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
                             is_ecg_service = True
                             logger.debug(
@@ -1817,26 +1675,24 @@ def get_today_queues(
             if not daily_queue:
                 continue
 
-            # ✅ ИСПРАВЛЕНО: daily_queue.specialist_id может хранить как doctor.id, так и user_id
-            # Проверяем оба варианта для совместимости с существующими данными
-            doctor = (
-                db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
-            )
-            # Если не нашли по doctor.id, пробуем по user_id (для совместимости со старыми данными)
+            # ✅ CANONICAL: DailyQueue.specialist_id должен указывать на Doctor.id.
+            # Старые записи с user_id больше не auto-link'им: вместо этого оставляем
+            # запись видимой и помечаем её как требующую deterministic repair.
+            doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
+            integrity_warnings: list[str] = []
             if not doctor:
-                doctor = (
-                    db.query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
+                integrity_warnings.append("linked_doctor_missing")
+                logger.warning(
+                    "get_today_queues: DailyQueue %d specialist_id=%s does not resolve to Doctor.id",
+                    daily_queue.id,
+                    daily_queue.specialist_id,
                 )
-            if not doctor:
-                continue
 
-            # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.specialty
+            # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.department
             # queue_tag - это точное указание очереди, созданное при регистрации
             specialty = None
             if daily_queue.queue_tag:
                 specialty = daily_queue.queue_tag.lower()
-            elif doctor.specialty:
-                specialty = doctor.specialty.lower()
             elif doctor.department:
                 specialty = doctor.department.lower()
             else:
@@ -1857,16 +1713,32 @@ def get_today_queues(
             }
             specialty = specialty_mapping.get(specialty, specialty)
 
+            if doctor and not doctor.user_id:
+                integrity_warnings.append("doctor_without_user")
+            if doctor and doctor.user and not doctor.user.is_active:
+                integrity_warnings.append("doctor_user_inactive")
+            if doctor and not doctor.active:
+                integrity_warnings.append("doctor_inactive")
+            if doctor and not doctor.cabinet:
+                integrity_warnings.append("doctor_cabinet_missing")
+
             if specialty not in queues_by_specialty:
                 queues_by_specialty[specialty] = {
                     "entries": [],
                     "doctor": doctor,
-                    "doctor_id": doctor.id,  # ✅ ИСПРАВЛЕНО: Используем doctor.id вместо user_id
+                    "doctor_id": doctor.id if doctor else daily_queue.specialist_id,
+                    "integrity_warnings": list(dict.fromkeys(integrity_warnings)),
                 }
             else:
                 # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
                 # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
                 # Это важно, когда для одной специальности есть записи от разных врачей
+                bucket = queues_by_specialty[specialty]
+                bucket.setdefault("integrity_warnings", [])
+                for warning in integrity_warnings:
+                    if warning not in bucket["integrity_warnings"]:
+                        bucket["integrity_warnings"].append(warning)
+
                 if doctor and doctor.id:
                     # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
                     # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
@@ -2351,19 +2223,11 @@ def get_today_queues(
                             if svc:
                                 service_code_to_use = get_service_code(
                                     {
-                                        'code': svc.code,
                                         'service_code': getattr(
                                             svc, 'service_code', None
                                         ),
-                                        'category_code': getattr(
-                                            svc, 'category_code', None
-                                        ),
                                     }
                                 )
-
-                        # Если не нашли через service_id, используем vs.code как fallback
-                        if not service_code_to_use and vs.code:
-                            service_code_to_use = vs.code
 
                         # Если всё ещё нет кода, используем название (нежелательно)
                         if service_code_to_use:
@@ -2630,8 +2494,8 @@ def get_today_queues(
                             except Exception:
                                 pass
 
-                    # ✅ ИСПРАВЛЕНО: Определяем service_name для отображения в таблице и мастере
-                    # Приоритет: 1. Имя из первой услуги 2. Fallback на специальность
+                    # ✅ ИСПРАВЛЕНО: Определяем service_name только из явной service truth
+                    # Приоритет: 1. Имя из первой услуги 2. SSOT lookup по specialty
                     service_name = None
                     if services and len(services) > 0:
                         first = services[0]
@@ -2652,9 +2516,6 @@ def get_today_queues(
                             # ✅ ВАЖНО: Добавляем service_id для правильной работы визарда
                             entry_wrapper["service_id"] = default_service["id"]
                             entry_wrapper["service_code"] = default_service["service_code"]
-                        else:
-                            # Fallback если услуга не найдена в БД
-                            service_name = f"Консультация ({specialty})"
 
                     entry_wrapper["service_name"] = service_name
                     # Добавляем также в data для надежности (frontend может читать из data)
@@ -2939,7 +2800,9 @@ def get_today_queues(
                             "paid" if discount_mode == "paid" else "pending"
                         ),
                         "source": source,
-                        "status": entry_status,
+                        "status": _normalize_queue_status_for_registrar(
+                            entry_status
+                        ),
                         "created_at": (
                             entry_wrapper["created_at"].isoformat() + "Z"
                             if entry_wrapper["created_at"]
@@ -2962,13 +2825,17 @@ def get_today_queues(
                 "queue_id": queue_number,
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
-                # Поэтому в ответе API specialist_id должен быть doctor.id, а не user_id
-                "specialist_id": data["doctor_id"],  # Это уже doctor.id из queues_by_specialty
+                # Если doctor не найден, оставляем raw specialist_id видимым для repair.
+                "specialist_id": data["doctor_id"],
                 "specialist_name": (
-                    doctor.user.full_name if doctor and doctor.user else f"Врач"
+                    doctor.user.full_name
+                    if doctor and doctor.user
+                    else f"Специалист #{data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "cabinet": doctor.cabinet if doctor else "N/A",
+                "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
+                "has_integrity_warnings": bool(data.get("integrity_warnings")),
                 "opened_at": datetime.now().isoformat(),
                 "entries": entries,
                 "stats": {
@@ -3182,7 +3049,7 @@ def create_queue_entries_batch(
             queue_tag = None
             if services_list:
                 first_service = db.query(Service).filter(Service.id == services_list[0].service_id).first()
-                queue_tag = getattr(first_service, "queue_tag", None) or doctor.specialty
+                queue_tag = getattr(first_service, "queue_tag", None)
 
             daily_queue = queue_service.get_or_create_daily_queue(
                 db,
@@ -3343,10 +3210,10 @@ def get_doctor_user_id(
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
-    DEPRECATED: получить user_id по doctor_id.
+    DEPRECATED: legacy compatibility bridge for doctor -> user lookup.
 
-    Operational queue flows канонически используют Doctor.id.
-    Endpoint оставлен только для временной обратной совместимости.
+    Operational queue flows canonically use Doctor.id. This endpoint remains
+    only as a transitional bridge and should not be treated as the source of truth.
 
     Args:
         doctor_id: ID врача из таблицы doctors
@@ -3376,8 +3243,11 @@ def get_doctor_user_id(
 
         return {
             "doctor_id": doctor_id,
+            "canonical_specialist_id": doctor.id,
             "user_id": doctor.user_id,
             "doctor_name": doctor.user.full_name if doctor.user else None,
+            "deprecated": True,
+            "note": "Use doctor_id as the canonical specialist identifier in queue flows.",
         }
 
     except HTTPException:

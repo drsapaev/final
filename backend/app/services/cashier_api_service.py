@@ -26,6 +26,13 @@ class CashierApiService:
         self.repository = repository or CashierApiRepository(db)
 
     @staticmethod
+    def _preserve_visit_status(raw_status: str | None) -> str:
+        """Payment belongs to Payment/discount_mode; legacy visit.status='paid' becomes operational waiting."""
+        if not raw_status or raw_status == "paid":
+            return "waiting"
+        return raw_status
+
+    @staticmethod
     def _get_patient_name(patient: Optional[Patient], patient_id: int) -> str:
         if patient:
             if hasattr(patient, "short_name") and callable(patient.short_name):
@@ -687,11 +694,13 @@ class CashierApiService:
             if hasattr(payment, 'note') and cancel_data.reason:
                 payment.note = f"Отменён: {cancel_data.reason}"
         
-            # Возвращаем статус визита в 'pending', чтобы он появился в списке
+            # Возвращаем платежный маркер, не ломая operational статус визита.
             if payment.visit_id:
                 visit = self.repository.get_visit_by_id(payment.visit_id)
-                if visit and visit.status == 'paid':
-                     visit.status = 'pending'
+                if visit and (
+                    visit.status == 'paid' or visit.discount_mode == 'paid'
+                ):
+                     visit.status = self._preserve_visit_status(visit.status)
                      visit.discount_mode = 'none'
                      self.repository.add(visit)
         
@@ -746,8 +755,8 @@ class CashierApiService:
                 )
                 self.repository.add(new_payment)
         
-            # Обновляем статус визита и discount_mode (SSOT)
-            visit.status = "paid"  # Используем "paid" вместо "closed" для правильной фильтрации
+            # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита.
+            visit.status = self._preserve_visit_status(visit.status)
             visit.discount_mode = "paid"  # SSOT признак оплаты
         
             self.repository.commit()
@@ -756,6 +765,8 @@ class CashierApiService:
                 "success": True,
                 "message": "Визит отмечен как оплаченный",
                 "visit_id": visit_id,
+                "status": visit.status,
+                "payment_status": "paid",
                 "amount": float(total_amount)
             }
         
@@ -787,11 +798,11 @@ class CashierApiService:
             from datetime import datetime
             payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
         
-        # Обновляем статус визита
+        # Обновляем платежный маркер визита, сохраняя operational статус.
         if payment.visit_id:
              visit = self.repository.get_visit_by_id(payment.visit_id)
              if visit:
-                 visit.status = 'paid'
+                 visit.status = self._preserve_visit_status(visit.status)
                  visit.discount_mode = 'paid'
                  self.repository.add(visit)
         
@@ -837,11 +848,13 @@ class CashierApiService:
             if new_refunded_amount >= payment.amount:
                 payment.status = "refunded"
         
-                # Возвращаем статус визита в 'pending' при полном возврате
+                # Возвращаем платежный маркер при полном возврате, не ломая operational статус.
                 if payment.visit_id:
                     visit = self.repository.get_visit_by_id(payment.visit_id)
-                    if visit and visit.status == 'paid':
-                         visit.status = 'pending'
+                    if visit and (
+                        visit.status == 'paid' or visit.discount_mode == 'paid'
+                    ):
+                         visit.status = self._preserve_visit_status(visit.status)
                          visit.discount_mode = 'none'
                          self.repository.add(visit)
             else:

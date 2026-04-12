@@ -30,6 +30,24 @@ DOCTOR_ROLE_VALUES = {
 }
 
 
+def _validate_doctor_user(db: Session, user_id: int) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Пользователь с ID {user_id} не найден",
+        )
+
+    user_role = str(user.role.value) if hasattr(user.role, "value") else str(user.role)
+    if user_role not in DOCTOR_ROLE_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Выбранный пользователь не имеет doctor-роль",
+        )
+
+    return user
+
+
 def _serialize_doctor_user(
     user: User | None,
     *,
@@ -167,6 +185,7 @@ def create_doctor(
     """Создать врача."""
     try:
         if doctor.user_id:
+            _validate_doctor_user(db, doctor.user_id)
             existing_doctor = crud_clinic.get_doctor_by_user_id(db, doctor.user_id)
             if existing_doctor:
                 raise HTTPException(
@@ -202,6 +221,7 @@ def update_doctor(
             )
 
         if doctor.user_id and doctor.user_id != existing_doctor.user_id:
+            _validate_doctor_user(db, doctor.user_id)
             other_doctor = crud_clinic.get_doctor_by_user_id(db, doctor.user_id)
             if other_doctor and other_doctor.id != doctor_id:
                 raise HTTPException(

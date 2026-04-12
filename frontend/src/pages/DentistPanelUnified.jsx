@@ -3323,7 +3323,7 @@ const DentistPanelUnified = () => {
       case 'queue':
         return (
           <QueueIntegration
-            specialist="Стоматолог"
+            specialistId={user?.doctor_id || user?.specialist_id || ''}
             onPatientSelect={handlePatientSelect}
             onStartVisit={(appointment) => {
               setSelectedPatient(appointment);

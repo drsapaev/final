@@ -589,56 +589,22 @@ def complete_patient_visit(
             # Обновляем статус визита
             visit.status = "completed"
 
-            # ✅ ИСПРАВЛЕНО: Сохраняем discount_mode и создаем платеж через SSOT
-            # Проверяем через Payment или по существующему discount_mode
+            # ✅ ИСПРАВЛЕНО: payment state должен приходить из Payment/discount_mode,
+            # а не из факта завершения приема.
             from app.models.payment import Payment
 
-            if not visit.discount_mode or visit.discount_mode == "none":
-                payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == visit.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    visit.discount_mode = "paid"
-                elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # ✅ ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при завершении приема (visit {visit.id})",
-                        )
-                        logger.info(
-                            "complete_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
-                    visit.discount_mode = "paid"
+            payment = (
+                db.query(Payment)
+                .filter(Payment.visit_id == visit.id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment and (
+                payment.status
+                and payment.status.lower() == 'paid'
+                or payment.paid_at
+            ):
+                visit.discount_mode = "paid"
 
             db.commit()
             db.refresh(visit)
@@ -666,41 +632,21 @@ def complete_patient_visit(
             # Обновляем статус appointment
             appointment.status = "completed"
 
-            # ✅ Сохраняем информацию об оплате: если appointment был оплачен, сохраняем visit_type='paid'
-            # Appointment не имеет discount_mode, используем visit_type
-            if not appointment.visit_type or appointment.visit_type not in (
-                "paid",
-                "repeat",
-                "benefit",
-                "all_free",
-            ):
-                from app.models.payment import Payment
+            # ✅ Сохраняем payment state только из реального Payment.
+            from app.models.payment import Payment
 
-                payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == appointment.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    appointment.visit_type = "paid"
-                elif (
-                    hasattr(appointment, 'payment_amount')
-                    and appointment.payment_amount
-                    and appointment.payment_amount > 0
-                ):
-                    appointment.visit_type = "paid"
-                elif appointment.status in (
-                    "paid",
-                    "in_visit",
-                    "in_progress",
-                    "completed",
-                ):
-                    appointment.visit_type = "paid"
+            payment = (
+                db.query(Payment)
+                .filter(Payment.visit_id == appointment.id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment and (
+                payment.status
+                and payment.status.lower() == 'paid'
+                or payment.paid_at
+            ):
+                appointment.discount_mode = "paid"
 
             db.commit()
             db.refresh(appointment)
@@ -772,38 +718,8 @@ def complete_patient_visit(
                         visit.payment_processed_at = (
                             payment.paid_at or datetime.utcnow()
                         )
-                elif not visit.discount_mode or visit.discount_mode == "none":
-                    # ✅ ИСПРАВЛЕНО: Если нет информации об оплате, но был вызван в кабинет - считаем что оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при завершении приема из очереди (visit {visit.id})",
-                        )
-                        logger.info(
-                            "complete_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
+                elif payment:
+                    # Если платеж уже существует, отражаем его в discount_mode.
                     visit.discount_mode = "paid"
                     if (
                         hasattr(visit, 'payment_processed_at')
@@ -811,8 +727,6 @@ def complete_patient_visit(
                     ):
                         visit.payment_processed_at = (
                             payment.paid_at or datetime.utcnow()
-                            if payment
-                            else datetime.utcnow()
                         )
 
                 # ✅ Также обновляем соответствующий Appointment, если он существует
@@ -842,12 +756,6 @@ def complete_patient_visit(
                         or appointment.discount_mode == "none"
                     ):
                         if visit.discount_mode == "paid":
-                            appointment.discount_mode = "paid"
-                        elif (
-                            hasattr(appointment, 'payment_amount')
-                            and appointment.payment_amount
-                            and appointment.payment_amount > 0
-                        ):
                             appointment.discount_mode = "paid"
 
                 if visit_data:
@@ -935,7 +843,7 @@ def get_doctor_services(
                 {
                     "id": service.id,
                     "name": service.name,
-                    "code": service.code,
+                    "code": service.service_code or get_service_code(service.id, db),
                     "price": float(service.price) if service.price else 0,
                     "currency": service.currency or "UZS",
                     "duration_minutes": service.duration_minutes or 30,
@@ -1347,7 +1255,7 @@ async def schedule_next_visit(
                 service_id=service.id,
                 name=service.name,
                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                code=get_service_code(service.id, db) or service.code,
+                code=service.service_code or get_service_code(service.id, db),
                 qty=service_req.quantity,
                 price=service_price,
                 currency="UZS",
@@ -1533,7 +1441,7 @@ def get_visit_details(
                 "id": vs.id,
                 "service_id": vs.service_id,
                 "service_name": service.name if service else f"Услуга #{vs.service_id}",
-                "service_code": service.code if service else None,
+                "service_code": (service.service_code or get_service_code(service.id, db)) if service else None,
                 "quantity": vs.quantity,
                 "price": vs.price,
                 "custom_price": vs.custom_price,

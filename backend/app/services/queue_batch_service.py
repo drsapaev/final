@@ -77,10 +77,10 @@ class QueueBatchService:
                         detail=f"Услуга с ID {service_item.service_id} не найдена",
                     )
 
-                specialist_user_id, converted = self.repository.resolve_specialist_user_id(
+                specialist_id, converted = self.repository.resolve_specialist_user_id(
                     service_item.specialist_id
                 )
-                if specialist_user_id is None:
+                if specialist_id is None:
                     raise QueueBatchDomainError(
                         status_code=404,
                         detail=f"Специалист с ID {service_item.specialist_id} не найден",
@@ -88,12 +88,12 @@ class QueueBatchService:
 
                 if converted:
                     logger.info(
-                        "[QueueBatchService] Converted doctor_id=%s to user_id=%s",
+                        "[QueueBatchService] Canonicalized legacy specialist_id=%s to doctor_id=%s",
                         service_item.specialist_id,
-                        specialist_user_id,
+                        specialist_id,
                     )
 
-                services_by_specialist.setdefault(specialist_user_id, []).append(
+                services_by_specialist.setdefault(specialist_id, []).append(
                     service_item
                 )
 
@@ -197,4 +197,3 @@ class QueueBatchService:
                 status_code=500,
                 detail=f"Ошибка массового создания записей в очереди: {exc}",
             ) from exc
-

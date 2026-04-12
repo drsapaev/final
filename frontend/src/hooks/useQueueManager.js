@@ -24,16 +24,12 @@ const toError = (err, fallback) => {
   return new Error(fallback);
 };
 
-const normalizeSpecialty = (value) =>
-  value ? value.toString().toLowerCase().trim() : '';
-
 const pickQueueForDoctor = (payload, specialistId, doctor) => {
   if (!payload?.queues) {
     logger.warn('[useQueueManager] pickQueueForDoctor: payload.queues отсутствует');
     return null;
   }
 
-  const normalizedSpecialty = normalizeSpecialty(doctor?.specialty);
   const doctorId = Number(specialistId);
 
   // ✅ ОТЛАДКА: Логируем входные данные
@@ -41,9 +37,6 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
     specialistId,
     doctorId,
     doctorIdFromDoctor: doctor?.id,
-    doctorUserId: doctor?.user_id,
-    doctorSpecialty: doctor?.specialty,
-    normalizedSpecialty,
     availableQueues: payload.queues.map(q => ({
       specialist_id: q.specialist_id,
       specialty: q.specialty,
@@ -51,34 +44,18 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
     }))
   });
 
-  // ✅ ИСПРАВЛЕНО: Сначала проверяем по specialist_id (точное совпадение),
-  // затем по specialty (для случаев, когда несколько врачей одной специальности)
+  // ✅ ИСПРАВЛЕНО: Проверяем только по specialist_id (точное совпадение)
   // Это гарантирует, что для врача с ID=1,2,3 будет найдена именно его очередь
   const foundQueue = payload.queues.find((queue) => {
     // Приоритет 1: Точное совпадение по specialist_id
     if (queue.specialist_id !== undefined && queue.specialist_id !== null) {
       const queueSpecialistId = Number(queue.specialist_id);
-      // ✅ ИСПРАВЛЕНО: Проверяем оба варианта - может быть как doctor.id, так и doctor.user_id
-      if (queueSpecialistId === doctorId || 
-          (doctor?.id && queueSpecialistId === Number(doctor.id)) ||
-          (doctor?.user_id && queueSpecialistId === Number(doctor.user_id))) {
+      if (queueSpecialistId === doctorId || (doctor?.id && queueSpecialistId === Number(doctor.id))) {
         logger.log('[useQueueManager] ✅ Найдена очередь по specialist_id:', {
           queueSpecialistId,
           doctorId,
           doctorIdFromDoctor: doctor?.id,
-          doctorUserId: doctor?.user_id,
           specialty: queue.specialty
-        });
-        return true;
-      }
-    }
-    // Приоритет 2: Совпадение по specialty (fallback для групповых очередей)
-    if (queue.specialty && normalizedSpecialty) {
-      if (normalizeSpecialty(queue.specialty) === normalizedSpecialty) {
-        logger.log('[useQueueManager] ✅ Найдена очередь по specialty:', {
-          queueSpecialty: queue.specialty,
-          normalizedSpecialty,
-          specialist_id: queue.specialist_id
         });
         return true;
       }
@@ -91,8 +68,6 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
       specialistId,
       doctorId,
       doctorIdFromDoctor: doctor?.id,
-      doctorUserId: doctor?.user_id,
-      doctorSpecialty: doctor?.specialty,
       availableQueues: payload.queues.map(q => ({
         specialist_id: q.specialist_id,
         specialty: q.specialty

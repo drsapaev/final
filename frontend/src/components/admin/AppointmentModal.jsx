@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Save, Calendar, Clock, User, Stethoscope, AlertCircle, Phone, Mail } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
 
   MacOSButton,
+  MacOSBadge,
   MacOSInput,
   MacOSSelect,
   MacOSTextarea,
@@ -34,6 +35,10 @@ const AppointmentModal = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const selectedDoctor = useMemo(
+    () => doctors.find((doctor) => doctor.id === parseInt(formData.doctorId, 10)) || null,
+    [doctors, formData.doctorId]
+  );
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -254,7 +259,7 @@ const AppointmentModal = ({
                 { value: '', label: 'Выберите врача' },
                 ...doctors.map((doctor) => ({
                   value: doctor.id,
-                  label: `${getDoctorDisplayName(doctor)} - ${doctor.specialty || doctor.specialization || '—'}`
+                  label: `${getDoctorDisplayName(doctor)} - ${doctor.specialty || doctor.specialization || '—'}${doctor.active === false ? ' • неактивен' : ''}${doctor.user?.is_active === false ? ' • аккаунт неактивен' : ''}${doctor.cabinet ? ` • кабинет ${doctor.cabinet}` : ''}`
                 }))]
                 }
                 error={errors.doctorId}
@@ -551,6 +556,24 @@ const AppointmentModal = ({
             }}>
                     <strong style={{ color: 'var(--mac-text-primary)' }}>Врач:</strong> {getDoctorName(formData.doctorId)}
                   </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                    <MacOSBadge
+                      variant={
+                        selectedDoctor?.active === false || selectedDoctor?.user?.is_active === false
+                          ? 'warning'
+                          : 'success'
+                      }
+                    >
+                      {selectedDoctor?.active === false
+                        ? 'Врач неактивен'
+                        : selectedDoctor?.user?.is_active === false
+                          ? 'Аккаунт врача неактивен'
+                          : 'Связь активна'}
+                    </MacOSBadge>
+                    <MacOSBadge variant={selectedDoctor?.cabinet ? 'info' : 'warning'}>
+                      {selectedDoctor?.cabinet ? `Кабинет ${selectedDoctor.cabinet}` : 'Кабинет не задан'}
+                    </MacOSBadge>
+                  </div>
                   <p style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',

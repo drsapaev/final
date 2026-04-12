@@ -45,7 +45,7 @@ class QueueLimitsApiService:
             for doctor in spec_data["doctors"]:
                 daily_queue = self.repository.get_daily_queue(
                     day=today,
-                    specialist_id=doctor.user_id,
+                    specialist_id=doctor.id,
                 )
                 if daily_queue:
                     total_usage += self.repository.count_entries(queue_id=daily_queue.id)
@@ -102,7 +102,7 @@ class QueueLimitsApiService:
         for doctor in doctors:
             daily_queue = self.repository.get_daily_queue(
                 day=day,
-                specialist_id=doctor.user_id,
+                specialist_id=doctor.id,
             )
 
             current_entries = 0

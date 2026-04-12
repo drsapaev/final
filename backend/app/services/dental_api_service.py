@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.user import User
 from app.repositories.dental_api_repository import DentalApiRepository
+from app.services.service_mapping import get_service_code
 from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ class DentalApiService:
             "Изменение цены стоматологом\n\n"
             f"Врач: {doctor_name}\n"
             f"{patient_info}\n"
-            f"Услуга: {service.name} ({service.code})\n"
+            f"Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.repository.db)})\n"
             f"Цена: {price_override.original_price} -> {price_override.new_price} UZS\n"
             f"Причина: {price_override.reason}\n"
             f"{details_line}"
@@ -279,7 +280,12 @@ class DentalApiService:
                     "service": {
                         "id": service.id if service else None,
                         "name": service.name if service else f"Услуга #{override.service_id}",
-                        "code": service.code if service else None,
+                        "code": (
+                            service.service_code
+                            or get_service_code(service.id, self.repository.db)
+                            if service
+                            else None
+                        ),
                     },
                     "original_price": float(override.original_price),
                     "new_price": float(override.new_price),

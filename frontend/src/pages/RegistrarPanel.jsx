@@ -49,7 +49,7 @@ import { formatNetworkErrorMessage, isNetworkFetchError } from '../utils/network
 import { getErrorMessage } from '../utils/errorHandler';
 
 // ⭐ SSOT: Centralized service code resolver
-import { SPECIALTY_TO_CODE, toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
+import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
 
 // API client
 import { api } from '../api/client';
@@ -718,8 +718,7 @@ const RegistrarPanel = () => {
       return !candidateIds.some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
     }));
   }, []);
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [selectedDoctor, setSelectedDoctor] = useState(null);const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Инициализация selectedDoctor первым доступным врачом
-  useEffect(() => {if (!selectedDoctor && doctors.length > 0) {setSelectedDoctor(doctors[0]);}}, [doctors, selectedDoctor]); // Переводы
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   const translations = { ru: { // Основные
       welcome: 'Добро пожаловать', start_work: 'Начать работу', quick_start: 'Быстрый старт', loading: 'Загрузка', error: 'Ошибка', success: 'Успешно', warning: 'Предупреждение', // Вкладки
       tabs_welcome: 'Главная', tabs_appointments: 'Все записи', tabs_cardio: 'Кардиолог', tabs_echokg: 'ЭКГ', tabs_derma: 'Дерматолог', tabs_dental: 'Стоматолог', tabs_lab: 'Лаборатория', tabs_procedures: 'Процедуры', tabs_queue: 'Онлайн-очередь', // Действия
@@ -825,55 +824,11 @@ const RegistrarPanel = () => {
   const loadIntegratedData = useCallback(async () => {
     logger.info('🔧 loadIntegratedData called at:', new Date().toISOString());
     try {
-      // УБИРАЕМ setAppointmentsLoading(true) - это не должно влиять на загрузку записей
-      // setAppointmentsLoading(true);
-
-      // Сначала устанавливаем fallback данные для врачей и услуг
-      // logger.info('Setting fallback doctors and services data');
-      setDoctors([
-      { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
-      { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
-      { id: 3, specialty: 'stomatology', user: { full_name: 'Доктор Стоматолог' }, cabinet: '103', price_default: 60000 }]
-      );
-
-      setServices({
-        laboratory: [
-        { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
-        { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
-        { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-        { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }],
-
-        cardiology: [
-        { id: 13, name: 'Консультация кардиолога', price: 50000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 14, name: 'ЭКГ', price: 20000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 15, name: 'ЭхоКГ', price: 35000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 16, name: 'ЭКГ с консультацией кардиолога', price: 70000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 17, name: 'ЭхоКГ с консультацией кардиолога', price: 85000, specialty: 'cardiology', group: 'cardiology' }],
-
-        dermatology: [
-        { id: 5, name: 'Консультация дерматолога-косметолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
-        { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
-        { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
-        { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }],
-
-        stomatology: [
-        { id: 18, name: 'Консультация стоматолога', price: 30000, specialty: 'stomatology', group: 'stomatology' },
-        { id: 19, name: 'Лечение кариеса', price: 80000, specialty: 'stomatology', group: 'stomatology' },
-        { id: 20, name: 'Удаление зуба', price: 50000, specialty: 'stomatology', group: 'stomatology' },
-        { id: 21, name: 'Чистка зубов', price: 40000, specialty: 'stomatology', group: 'stomatology' }],
-
-        cosmetology: [
-        { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
-        { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
-        { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
-        { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }],
-
-        procedures: [
-        { id: 22, name: 'Физиотерапия', price: 25000, specialty: 'procedures', group: 'procedures' },
-        { id: 23, name: 'Массаж', price: 30000, specialty: 'procedures', group: 'procedures' },
-        { id: 24, name: 'Ингаляция', price: 15000, specialty: 'procedures', group: 'procedures' }]
-
-      });
+      // Сбрасываем устаревшие значения перед загрузкой truth из API.
+      // Если backend недоступен, лучше показать пустое состояние, чем локальные моки.
+      setDoctors([]);
+      setServices({});
+      setDynamicDepartments([]);
 
       // Загружаем врачей, услуги и настройки очередей из админ панели
       try {
@@ -946,7 +901,7 @@ const RegistrarPanel = () => {
             logger.warn('Ошибка обработки данных врачей:', error.message);
           }
         } else {
-          logger.warn('❌ API врачей недоступен, используем демо-данные');
+          logger.warn('❌ API врачей недоступен, оставляем пустое состояние');
         }
 
         // Обработка отделений
@@ -972,7 +927,7 @@ const RegistrarPanel = () => {
             logger.warn('Ошибка обработки данных услуг:', error.message);
           }
         } else {
-          logger.warn('❌ API услуг недоступен, используем демо-данные');
+          logger.warn('❌ API услуг недоступен, оставляем пустое состояние');
         }
 
         if (queueRes && queueRes.data) {
@@ -982,13 +937,13 @@ const RegistrarPanel = () => {
             logger.warn('Ошибка обработки данных настроек очереди:', error.message);
           }
         } else {
-          logger.warn('❌ API настроек очереди недоступен, используем демо-данные');
+          logger.warn('❌ API настроек очереди недоступен, оставляем пустое состояние');
         }
 
         logger.info('🎯 Загрузка интегрированных данных завершена');
       } catch (fetchError) {
-        // Backend недоступен - используем демо-данные (уже установлены выше)
-        logger.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+        // Backend недоступен - оставляем пустое состояние без локальных моков.
+        logger.warn('Backend недоступен для загрузки интегрированных данных, оставляем пустое состояние:', fetchError.message);
       }
 
     } catch (error) {
@@ -2425,37 +2380,13 @@ const RegistrarPanel = () => {
   // ⭐ ИСПРАВЛЕНО: Для QR-записей с несколькими специалистами используем queue_numbers
   const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
     // ⭐ SSOT: Используем централизованную функцию toServiceCode
-    // Расширяем её для обратной совместимости с fuzzy matching
+    // Используем только канонический резолв из SSOT
     const toServiceCode = (value) => {
       if (!value) return null;
 
       // Сначала пробуем SSOT резолвер
       const ssotResult = ssotToServiceCode(value);
       if (ssotResult) return ssotResult;
-
-      // Fallback для fuzzy matching (legacy support)
-      const normalized = String(value).toLowerCase().trim();
-      for (const [key, code] of Object.entries(SPECIALTY_TO_CODE)) {
-        if (normalized.includes(key) || key.includes(normalized)) {
-          return code;
-        }
-      }
-
-      // Ultimate fallback: первая буква + 01
-      // ⚠️ ТОЛЬКО для известных категорий, не для произвольных кириллических букв
-      const firstLetter = normalized.charAt(0).toUpperCase();
-      if (/[A-Z]/i.test(firstLetter)) {
-        // Только латинские буквы для кодов (K, D, S, L, P, C)
-        return `${firstLetter}01`;
-      }
-      // Кириллические буквы: конвертируем известные, игнорируем остальные
-      const ruToEn = { 'К': 'K', 'Д': 'D', 'С': 'S', 'Л': 'L', 'П': 'P' };
-      const mappedLetter = ruToEn[firstLetter];
-      if (mappedLetter) {
-        return `${mappedLetter}01`;
-      }
-      // ⛔ Не генерируем коды из неизвестных кириллических букв (О, Е, А и т.д.)
-      // Это предотвращает генерацию невалидных кодов вроде "О01"
 
       return null;
     };
@@ -2481,14 +2412,6 @@ const RegistrarPanel = () => {
           if (serviceNameCode && !seenCodes.has(serviceNameCode)) {
             allCodes.push(serviceNameCode);
             seenCodes.add(serviceNameCode);
-            return;
-          }
-
-          // Приоритет 2: specialty
-          const specialtyCode = toServiceCode(qn.specialty || qn.queue_tag);
-          if (specialtyCode && !seenCodes.has(specialtyCode)) {
-            allCodes.push(specialtyCode);
-            seenCodes.add(specialtyCode);
           }
         });
 
@@ -2536,34 +2459,8 @@ const RegistrarPanel = () => {
         }
       }
 
-      // Fallback: если в services нет подходящих кодов, генерируем из queue_numbers (для старых записей)
-      const tabToSpecialtyMap = {
-        'cardio': ['cardiology', 'cardio', 'cardiolog'],
-        'echokg': ['echokg', 'ecg', 'echo'],
-        'derma': ['dermatology', 'derma', 'dermatolog'],
-        'dental': ['stomatology', 'dentist', 'dental', 'stom'],
-        'lab': ['laboratory', 'lab'],
-        'procedures': ['procedures', 'procedure', 'cosmetology', 'physio']
-      };
-
-      const possibleSpecialties = tabToSpecialtyMap[departmentKey] || [departmentKey];
-
-      const matchingQueue = appointment.queue_numbers.find((qn) => {
-        const qnSpecialty = (qn.specialty || qn.queue_tag || '').toLowerCase().trim();
-        return possibleSpecialties.some((spec) => qnSpecialty.includes(spec) || spec.includes(qnSpecialty));
-      });
-
-      if (matchingQueue) {
-        const serviceNameCode = toServiceCode(matchingQueue.service_name);
-        if (serviceNameCode) {
-          return [serviceNameCode];
-        }
-
-        const specialtyCode = toServiceCode(matchingQueue.specialty || matchingQueue.queue_tag);
-        if (specialtyCode) {
-          return [specialtyCode];
-        }
-      }
+      // Если services не дали подходящих кодов, не подменяем их specialty-эвристикой.
+      return [];
     }
 
     // ⭐ Для обычных записей без queue_numbers
@@ -3767,7 +3664,7 @@ const RegistrarPanel = () => {
               <CardContent>
                 <ModernQueueManager
                 selectedDate={searchParams.get('date') || getLocalDateString()}
-                selectedDoctor={searchParams.get('doctor') || selectedDoctor?.id?.toString() || ''}
+                selectedDoctor={searchParams.get('doctor') || ''}
                 searchQuery={searchParams.get('q') || ''}
                 onQueueUpdate={loadAppointments}
                 onDateChange={(newDate) => {

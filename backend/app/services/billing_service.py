@@ -1408,15 +1408,17 @@ def is_appointment_paid(db: Session, appointment) -> bool:
     if getattr(appointment, 'payment_processed_at', None):
         return True
 
-    # Проверяем visit_type
+    # [FIX:BILLING_PAYMENT_STATUS] visit_type='paid' means a paid service type, not completed payment.
     visit_type = getattr(appointment, 'visit_type', None) or ''
     if visit_type.lower() == 'paid':
-        return True
+        logger.debug(
+            "[FIX:BILLING_PAYMENT_STATUS] Ignoring appointment.visit_type='paid' as payment proof: appointment_id=%s",
+            getattr(appointment, 'id', None),
+        )
 
-    # Проверяем статус
-    status = getattr(appointment, 'status', None) or ''
-    paid_statuses = ['paid', 'completed', 'done']
-    if status.lower() in paid_statuses:
+    # Проверяем явный payment_status, если он есть в будущих/адаптерных моделях.
+    explicit_payment_status = getattr(appointment, 'payment_status', None) or ''
+    if str(explicit_payment_status).lower() == 'paid':
         return True
 
     # Проверяем наличие платежей
@@ -1450,8 +1452,12 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
     """
     is_paid = is_appointment_paid(db, appointment)
 
-    if is_paid and getattr(appointment, 'visit_type', None) != 'paid':
-        appointment.visit_type = 'paid'
+    if is_paid and not getattr(appointment, 'payment_processed_at', None):
+        appointment.payment_processed_at = datetime.utcnow()
+        logger.info(
+            "[FIX:BILLING_PAYMENT_STATUS] Appointment payment marker updated without changing visit_type: appointment_id=%s",
+            getattr(appointment, 'id', None),
+        )
         try:
             db.commit()
             db.refresh(appointment)
@@ -1459,7 +1465,7 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
         except Exception as e:
             db.rollback()
             raise ValueError(
-                f"Не удалось сохранить visit_type для Appointment {appointment.id}: {e}"
+                f"Не удалось сохранить payment_processed_at для Appointment {appointment.id}: {e}"
             )
 
     return False
