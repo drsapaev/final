@@ -718,8 +718,7 @@ const RegistrarPanel = () => {
       return !candidateIds.some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
     }));
   }, []);
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [selectedDoctor, setSelectedDoctor] = useState(null);const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Инициализация selectedDoctor первым доступным врачом
-  useEffect(() => {if (!selectedDoctor && doctors.length > 0) {setSelectedDoctor(doctors[0]);}}, [doctors, selectedDoctor]); // Переводы
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   const translations = { ru: { // Основные
       welcome: 'Добро пожаловать', start_work: 'Начать работу', quick_start: 'Быстрый старт', loading: 'Загрузка', error: 'Ошибка', success: 'Успешно', warning: 'Предупреждение', // Вкладки
       tabs_welcome: 'Главная', tabs_appointments: 'Все записи', tabs_cardio: 'Кардиолог', tabs_echokg: 'ЭКГ', tabs_derma: 'Дерматолог', tabs_dental: 'Стоматолог', tabs_lab: 'Лаборатория', tabs_procedures: 'Процедуры', tabs_queue: 'Онлайн-очередь', // Действия
@@ -3767,7 +3766,7 @@ const RegistrarPanel = () => {
               <CardContent>
                 <ModernQueueManager
                 selectedDate={searchParams.get('date') || getLocalDateString()}
-                selectedDoctor={searchParams.get('doctor') || selectedDoctor?.id?.toString() || ''}
+                selectedDoctor={searchParams.get('doctor') || ''}
                 searchQuery={searchParams.get('q') || ''}
                 onQueueUpdate={loadAppointments}
                 onDateChange={(newDate) => {

@@ -54,6 +54,45 @@ const getNumberSetting = (collection, key, fallback) => (
   normalizeNumber(collection?.[key], fallback)
 );
 
+const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+const getDoctorDisplayName = (doctor) => (
+  doctor?.user?.full_name || doctor?.user?.username || `Врач #${doctor?.id || '—'}`
+);
+
+const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
+  const specialty = normalizeText(specialtyKey);
+  const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
+    .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
+    .sort((left, right) => {
+      const leftScore = [
+        left?.active === false ? 1 : 0,
+        left?.user ? 0 : 1,
+        left?.cabinet ? 0 : 1,
+        normalizeNumber(left?.id, Number.MAX_SAFE_INTEGER),
+      ];
+      const rightScore = [
+        right?.active === false ? 1 : 0,
+        right?.user ? 0 : 1,
+        right?.cabinet ? 0 : 1,
+        normalizeNumber(right?.id, Number.MAX_SAFE_INTEGER),
+      ];
+
+      for (let index = 0; index < leftScore.length; index += 1) {
+        if (leftScore[index] !== rightScore[index]) {
+          return leftScore[index] - rightScore[index];
+        }
+      }
+
+      return 0;
+    });
+
+  return {
+    doctor: candidates[0] || null,
+    candidates,
+  };
+};
+
 const QueueSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -162,8 +201,8 @@ const QueueSettings = () => {
       setTesting(true);
       setTestResult(null);
 
-      // ⭐ SSOT: Находим врача по специальности из загруженных данных
-      const doctor = doctors.find((d) => d.specialty === specialty);
+      // ⭐ SSOT: Выбираем врача детерминированно среди докторов этой специальности.
+      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty);
       const doctorId = doctor?.id;
 
       if (!doctorId) {
@@ -177,8 +216,20 @@ const QueueSettings = () => {
         date: new Date().toISOString().split('T')[0]
       });
 
-      setTestResult(response.data.test_data);
-      setMessage({ type: 'success', text: 'Тест очереди выполнен успешно' });
+      setTestResult({
+        ...(response.data.test_data || {}),
+        selected_doctor_id: doctor.id,
+        selected_doctor_name: getDoctorDisplayName(doctor),
+        selected_doctor_cabinet: doctor.cabinet || 'Не указан',
+        matched_doctors_count: candidates.length,
+      });
+      setMessage({
+        type: 'success',
+        text:
+          candidates.length > 1
+            ? `Тест выполнен: использован врач "${getDoctorDisplayName(doctor)}" из ${candidates.length} кандидатов`
+            : 'Тест очереди выполнен успешно',
+      });
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
       setMessage({ type: 'error', text: 'Ошибка тестирования очереди' });
@@ -590,10 +641,14 @@ const QueueSettings = () => {
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)'
                     }}>{testResult.token?.slice(0, 8)}...</code></div>
+                    <div><strong>Врач:</strong> {testResult.selected_doctor_name || '—'}</div>
                     <div><strong>Специальность:</strong> {testResult.doctor_specialty}</div>
+                    <div><strong>Врач ID:</strong> {testResult.selected_doctor_id || testResult.doctor_id}</div>
                     <div><strong>Кабинет:</strong> {testResult.doctor_cabinet}</div>
+                    <div><strong>Выбранный кабинет:</strong> {testResult.selected_doctor_cabinet || '—'}</div>
                     <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
                     <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
+                    <div><strong>Кандидатов:</strong> {testResult.matched_doctors_count ?? 0}</div>
                     <div><strong>QR URL:</strong> <code style={{
                       backgroundColor: 'var(--mac-success-bg)',
                       padding: '2px 4px',

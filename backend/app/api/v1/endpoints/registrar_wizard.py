@@ -1865,43 +1865,42 @@ def get_all_appointments(
                         # Если service_id не число, возможно это уже название
                         service_names.append(str(service_id))
 
-            # Определяем payment_status для Appointment
+            # Определяем payment_status для Appointment.
+            # [FIX:PAYMENT_STATUS] visit_type='paid' is a service type, not completed payment.
+            try:
+                from sqlalchemy import and_
+
+                related_visit = (
+                    db.query(Visit)
+                    .filter(
+                        and_(
+                            Visit.patient_id == apt.patient_id,
+                            Visit.visit_date == apt.appointment_date,
+                            Visit.doctor_id == apt.doctor_id,
+                        )
+                    )
+                    .first()
+                )
+            except Exception:
+                related_visit = None
+
+            visit_type = getattr(apt, 'visit_type', None) or 'paid'
             payment_status = 'pending'
             is_paid = False
-            visit_type = getattr(apt, 'visit_type', None)
-            if visit_type == 'paid':
+            if getattr(apt, 'payment_processed_at', None):
                 payment_status = 'paid'
                 is_paid = True
-            elif apt.status and apt.status.lower() in (
-                'paid',
-                'in_visit',
-                'completed',
-                'done',
+            elif related_visit and (
+                related_visit.discount_mode == 'paid'
+                or getattr(related_visit, 'payment_processed_at', None)
             ):
-                payment_status = 'paid'
-                is_paid = True
-            elif getattr(apt, 'payment_processed_at', None):
                 payment_status = 'paid'
                 is_paid = True
             else:
                 # Проверяем Payment table
                 try:
-                    from sqlalchemy import and_
-
                     from app.models.payment import Payment
 
-                    # Ищем связанный Visit
-                    related_visit = (
-                        db.query(Visit)
-                        .filter(
-                            and_(
-                                Visit.patient_id == apt.patient_id,
-                                Visit.visit_date == apt.appointment_date,
-                                Visit.doctor_id == apt.doctor_id,
-                            )
-                        )
-                        .first()
-                    )
                     if related_visit:
                         payment_row = (
                             db.query(Payment)
@@ -1918,15 +1917,6 @@ def get_all_appointments(
                 except Exception:
                     pass
 
-            # [OK] ВАЖНО: Сохраняем visit_type в БД для существующих записей
-            if is_paid and apt.visit_type != 'paid':
-                apt.visit_type = 'paid'
-                try:
-                    db.commit()
-                    db.refresh(apt)
-                except Exception:
-                    db.rollback()
-
             result.append(
                 {
                     'id': apt.id,
@@ -1938,7 +1928,7 @@ def get_all_appointments(
                     'department': apt.department,
                     'appointment_date': apt.appointment_date,
                     'appointment_time': apt.appointment_time,
-                    'status': apt.status,
+                    'status': _preserve_operational_status_on_payment(apt.status),
                     'services': service_names,  # Преобразованные названия услуг
                     'service_codes': service_codes,  # Коды услуг для фильтрации
                     'total_amount': total_amount,  # Общая сумма услуг
@@ -2099,11 +2089,9 @@ def get_all_appointments(
             payment_status = 'pending'
             is_paid = False
             try:
-                v_status = (getattr(visit, 'status', None) or '').lower()
-                if v_status in ("paid", "in_visit", "in progress", "completed", "done"):
-                    payment_status = 'paid'
-                    is_paid = True
-                elif getattr(visit, 'payment_processed_at', None):
+                if visit.discount_mode == 'paid' or getattr(
+                    visit, 'payment_processed_at', None
+                ):
                     payment_status = 'paid'
                     is_paid = True
                 else:
@@ -2118,20 +2106,6 @@ def get_all_appointments(
                     )
                     if payment_row and (
                         str(payment_row.status).lower() == 'paid' or payment_row.paid_at
-                    ):
-                        payment_status = 'paid'
-                        is_paid = True
-                    elif visit.discount_mode == 'paid' and v_status in (
-                        "paid",
-                        "in_visit",
-                        "in progress",
-                        "completed",
-                        "done",
-                    ):
-                        payment_status = 'paid'
-                        is_paid = True
-                    elif visit.discount_mode == 'paid' and getattr(
-                        visit, 'payment_processed_at', None
                     ):
                         payment_status = 'paid'
                         is_paid = True
@@ -2176,7 +2150,7 @@ def get_all_appointments(
                     'department': visit.department,
                     'appointment_date': visit.visit_date,
                     'appointment_time': visit.visit_time,
-                    'status': visit.status,
+                    'status': _preserve_operational_status_on_payment(visit.status),
                     'services': service_names,  # Реальные названия услуг
                     'service_codes': service_codes,  # Коды услуг для фильтрации
                     'total_amount': total_amount,  # Общая сумма услуг
@@ -2217,6 +2191,13 @@ def get_all_appointments(
 
 
 # ===================== ЭНДПОИНТ ДЛЯ ОТМЕТКИ ЗАПИСЕЙ ИЗ VISITS КАК ОПЛАЧЕННЫХ =====================
+
+
+def _preserve_operational_status_on_payment(raw_status: str | None) -> str:
+    """Payment is stored separately; old status='paid' data stays in the queue as waiting."""
+    if not raw_status or raw_status == "paid":
+        return "waiting"
+    return raw_status
 
 
 @router.post("/registrar/visits/{visit_id}/mark-paid")
@@ -2319,15 +2300,21 @@ def mark_visit_as_paid(
                 existing_payment.id,
             )
 
-        # Обновляем статус и discount_mode
-        visit.status = "paid"
+        # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
+        visit.status = _preserve_operational_status_on_payment(visit.status)
         visit.discount_mode = "paid"  # [OK] ВАЖНО: устанавливаем discount_mode для корректного отображения payment_status
+        logger.info(
+            "[FIX:PAYMENT_STATUS] Visit marked paid without changing operational status: visit_id=%d, status=%s",
+            visit.id,
+            visit.status,
+        )
         db.commit()
         db.refresh(visit)
 
         return {
             "id": visit.id,
             "status": visit.status,
+            "payment_status": "paid",
             "message": "Запись отмечена как оплаченная",
         }
 
@@ -2404,19 +2391,25 @@ def mark_queue_entry_as_paid(
                 logger.info(f"mark_queue_entry_as_paid: Найден Visit {visit.id} через patient_id и дату")
 
         if not visit:
-            # Если Visit не найден, обновляем только статус записи в очереди
+            # Если Visit не найден, обновляем только платежные поля записи в очереди
             logger.warning(
                 f"mark_queue_entry_as_paid: Visit не найден для entry {entry_id}. "
-                f"Обновляем только статус очереди."
+                f"Обновляем только платежный статус."
             )
-            entry.status = "paid"
+            entry.status = _preserve_operational_status_on_payment(entry.status)
             entry.discount_mode = "paid"
+            logger.info(
+                "[FIX:PAYMENT_STATUS] Queue entry marked paid without Visit: entry_id=%d, status=%s",
+                entry.id,
+                entry.status,
+            )
             db.commit()
             db.refresh(entry)
             
             return {
                 "id": entry.id,
                 "status": entry.status,
+                "payment_status": "paid",
                 "message": "Запись в очереди отмечена как оплаченная (Visit не найден)",
             }
 
@@ -2486,13 +2479,20 @@ def mark_queue_entry_as_paid(
                 existing_payment.id,
             )
 
-        # Обновляем статус визита
-        visit.status = "paid"
+        # [FIX:PAYMENT_STATUS] Payment state belongs to discount_mode/payments, not queue status.
+        visit.status = _preserve_operational_status_on_payment(visit.status)
         visit.discount_mode = "paid"
         
-        # Обновляем статус записи в очереди
-        entry.status = "paid"
+        # Обновляем платежные поля записи в очереди, сохраняя operational status.
+        entry.status = _preserve_operational_status_on_payment(entry.status)
         entry.discount_mode = "paid"
+        logger.info(
+            "[FIX:PAYMENT_STATUS] Queue entry marked paid without changing operational status: entry_id=%d, visit_id=%d, entry_status=%s, visit_status=%s",
+            entry.id,
+            visit.id,
+            entry.status,
+            visit.status,
+        )
         
         db.commit()
         db.refresh(visit)
@@ -2502,6 +2502,7 @@ def mark_queue_entry_as_paid(
             "id": entry.id,
             "visit_id": visit.id,
             "status": visit.status,
+            "payment_status": "paid",
             "message": "Запись отмечена как оплаченная",
         }
 

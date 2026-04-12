@@ -1076,7 +1076,7 @@ def open_reception(
     Из detail.md стр. 253: Кнопка «Открыть приём сейчас»
     """
     try:
-        result = crud_queue.open_daily_queue(db, day, specialist_id, current_user.id)
+        result = crud_queue.open_daily_queue(db, day, specialist_id)
 
         return {
             "success": True,
@@ -1768,18 +1768,20 @@ def get_today_queues(
             if not daily_queue:
                 continue
 
-            # ✅ ИСПРАВЛЕНО: daily_queue.specialist_id может хранить как doctor.id, так и user_id
-            # Проверяем оба варианта для совместимости с существующими данными
+            # ✅ CANONICAL: DailyQueue.specialist_id должен указывать на Doctor.id.
+            # Старые записи с user_id больше не auto-link'им: вместо этого оставляем
+            # запись видимой и помечаем её как требующую deterministic repair.
             doctor = (
                 _repo(db).query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
             )
-            # Если не нашли по doctor.id, пробуем по user_id (для совместимости со старыми данными)
+            integrity_warnings: list[str] = []
             if not doctor:
-                doctor = (
-                    _repo(db).query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
+                integrity_warnings.append("linked_doctor_missing")
+                logger.warning(
+                    "get_today_queues: DailyQueue %d specialist_id=%s does not resolve to Doctor.id",
+                    daily_queue.id,
+                    daily_queue.specialist_id,
                 )
-            if not doctor:
-                continue
 
             # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.specialty
             # queue_tag - это точное указание очереди, созданное при регистрации
@@ -1808,16 +1810,32 @@ def get_today_queues(
             }
             specialty = specialty_mapping.get(specialty, specialty)
 
+            if doctor and not doctor.user_id:
+                integrity_warnings.append("doctor_without_user")
+            if doctor and doctor.user and not doctor.user.is_active:
+                integrity_warnings.append("doctor_user_inactive")
+            if doctor and not doctor.active:
+                integrity_warnings.append("doctor_inactive")
+            if doctor and not doctor.cabinet:
+                integrity_warnings.append("doctor_cabinet_missing")
+
             if specialty not in queues_by_specialty:
                 queues_by_specialty[specialty] = {
                     "entries": [],
                     "doctor": doctor,
-                    "doctor_id": doctor.id,  # ✅ ИСПРАВЛЕНО: Используем doctor.id вместо user_id
+                    "doctor_id": doctor.id if doctor else daily_queue.specialist_id,
+                    "integrity_warnings": list(dict.fromkeys(integrity_warnings)),
                 }
             else:
                 # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
                 # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
                 # Это важно, когда для одной специальности есть записи от разных врачей
+                bucket = queues_by_specialty[specialty]
+                bucket.setdefault("integrity_warnings", [])
+                for warning in integrity_warnings:
+                    if warning not in bucket["integrity_warnings"]:
+                        bucket["integrity_warnings"].append(warning)
+
                 if doctor and doctor.id:
                     # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
                     # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
@@ -2889,13 +2907,17 @@ def get_today_queues(
                 "queue_id": queue_number,
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
-                # Поэтому в ответе API specialist_id должен быть doctor.id, а не user_id
-                "specialist_id": data["doctor_id"],  # Это уже doctor.id из queues_by_specialty
+                # Если doctor не найден, оставляем raw specialist_id видимым для repair.
+                "specialist_id": data["doctor_id"],
                 "specialist_name": (
-                    doctor.user.full_name if doctor and doctor.user else "Врач"
+                    doctor.user.full_name
+                    if doctor and doctor.user
+                    else f"Специалист #{data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "cabinet": doctor.cabinet if doctor else "N/A",
+                "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
+                "has_integrity_warnings": bool(data.get("integrity_warnings")),
                 "opened_at": datetime.now().isoformat(),
                 "entries": entries,
                 "stats": {
@@ -2980,13 +3002,13 @@ class BatchServiceItem(BaseModel):
     """Услуга для массового создания очередей"""
 
     specialist_id: int = Field(
-        ..., description="ID специалиста (user_id, не doctor_id)"
+        ..., description="ID специалиста (doctor_id; legacy user_id нормализуется на backend)"
     )
     service_id: int = Field(..., description="ID услуги")
     quantity: int = Field(default=1, ge=1, description="Количество")
 
-    # ⚠️ ВАЖНО: specialist_id должен быть user_id (ForeignKey на users.id), а не doctor_id!
-    # Если передается doctor_id, нужно конвертировать его в user_id на backend
+    # ⚠️ ВАЖНО: specialist_id должен быть canonical doctor_id.
+    # Legacy user_id, если встретится, нормализуется на backend.
 
 
 class BatchQueueEntriesRequest(BaseModel):
@@ -3087,10 +3109,10 @@ def get_doctor_user_id(
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
-    Получить user_id по doctor_id
+    Legacy compatibility bridge for doctor -> user lookup.
 
-    Используется для конвертации doctor_id в user_id при создании записей в очереди,
-    так как DailyQueue.specialist_id требует user_id, а не doctor_id.
+    Canonical queue flows use Doctor.id. This helper is retained only for
+    transitional compatibility and should not be used as the source of truth.
 
     Args:
         doctor_id: ID врача из таблицы doctors
@@ -3120,8 +3142,11 @@ def get_doctor_user_id(
 
         return {
             "doctor_id": doctor_id,
+            "canonical_specialist_id": doctor.id,
             "user_id": doctor.user_id,
             "doctor_name": doctor.user.full_name if doctor.user else None,
+            "deprecated": True,
+            "note": "Use doctor_id as the canonical specialist identifier in queue flows.",
         }
 
     except HTTPException:

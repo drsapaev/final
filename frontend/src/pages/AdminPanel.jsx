@@ -2908,6 +2908,20 @@ const AdminPanel = () => {
                       margin: '2px 0 0 0'
                     }}>{doctor.user.phone}</p>
                     }
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                            <MacOSBadge
+                              variant={doctor.user?.is_active === false ? 'warning' : 'success'}
+                              style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                            >
+                              {doctor.user?.is_active === false ? 'Аккаунт неактивен' : 'Аккаунт активен'}
+                            </MacOSBadge>
+                            <MacOSBadge
+                              variant={doctor.cabinet ? 'info' : 'warning'}
+                              style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                            >
+                              {doctor.cabinet ? `Кабинет ${doctor.cabinet}` : 'Кабинет не задан'}
+                            </MacOSBadge>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -3483,7 +3497,7 @@ const AdminPanel = () => {
               { value: '', label: 'Все врачи' },
               ...doctors.map((doctor) => ({
                 value: doctor.id,
-                label: doctor.user?.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`
+                label: `${doctor.user?.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`}${doctor.active === false ? ' • неактивен' : ''}${doctor.user?.is_active === false ? ' • аккаунт неактивен' : ''}${doctor.cabinet ? ` • каб. ${doctor.cabinet}` : ''}`
               }))]
               }
               style={{ minWidth: '140px' }} />
@@ -3585,6 +3599,22 @@ const AdminPanel = () => {
                     color: 'var(--mac-text-secondary)',
                     margin: '4px 0 0 0'
                   }}>{getAppointmentDoctorSpecialization(appointment) || '—'}</p>
+                      <div style={{ marginTop: '4px' }}>
+                        <MacOSBadge
+                          variant={
+                            appointment.doctor?.active === false || appointment.doctor?.user_active === false
+                              ? 'warning'
+                              : 'success'
+                          }
+                          style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                        >
+                          {appointment.doctor?.active === false
+                            ? 'Врач неактивен'
+                            : appointment.doctor?.user_active === false
+                              ? 'Аккаунт врача неактивен'
+                              : 'Связь активна'}
+                        </MacOSBadge>
+                      </div>
                     </div>,
 
                 cabinet:
@@ -3602,6 +3632,17 @@ const AdminPanel = () => {
                     margin: '4px 0 0 0'
                   }}>
                         {appointment.queueCabinet ? `Очередь: ${appointment.queueCabinet}` : appointment.doctorCabinet ? `Врач: ${appointment.doctorCabinet}` : 'Нет связанного кабинета'}
+                      </p>
+                      <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
+                    margin: '2px 0 0 0'
+                  }}>
+                        Источник: {appointment.queueCabinet
+                          ? 'очередь'
+                          : appointment.doctorCabinet
+                            ? 'карточка врача'
+                            : 'нет данных'}
                       </p>
                     </div>,
 

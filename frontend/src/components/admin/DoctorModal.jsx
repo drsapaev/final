@@ -5,6 +5,7 @@ import {
   MacOSAlert,
   MacOSButton,
   MacOSCheckbox,
+  MacOSBadge,
   MacOSInput,
   MacOSModal,
   MacOSSelect,
@@ -65,6 +66,17 @@ const DoctorModal = ({
     );
     return fromList || fallbackUser;
   }, [availableUsers, doctor?.user, formData.userId]);
+
+  const selectedUserStatus = useMemo(() => {
+    if (!selectedUser) return { variant: 'warning', label: 'Пользователь не выбран' };
+    if (selectedUser.is_active === false) {
+      return { variant: 'warning', label: 'Аккаунт пользователя неактивен' };
+    }
+    if (selectedUser.linked_doctor_id && String(selectedUser.linked_doctor_id) !== String(doctor?.id || '')) {
+      return { variant: 'warning', label: `Уже связан с врачом #${selectedUser.linked_doctor_id}` };
+    }
+    return { variant: 'success', label: 'Связь активна' };
+  }, [doctor?.id, selectedUser]);
 
   const userOptions = useMemo(
     () => [
@@ -200,6 +212,15 @@ const DoctorModal = ({
             <Label style={{ display: 'block', marginBottom: '8px' }}>Роль</Label>
             <MacOSInput value={selectedUser?.role || ''} readOnly />
           </div>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <MacOSBadge variant={selectedUserStatus.variant}>
+            {selectedUserStatus.label}
+          </MacOSBadge>
+          <MacOSBadge variant={formData.cabinet ? 'info' : 'warning'}>
+            {formData.cabinet ? `Кабинет ${formData.cabinet}` : 'Кабинет не задан'}
+          </MacOSBadge>
         </div>
 
         <div

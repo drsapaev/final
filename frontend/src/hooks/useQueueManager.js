@@ -41,7 +41,6 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
     specialistId,
     doctorId,
     doctorIdFromDoctor: doctor?.id,
-    doctorUserId: doctor?.user_id,
     doctorSpecialty: doctor?.specialty,
     normalizedSpecialty,
     availableQueues: payload.queues.map(q => ({
@@ -58,15 +57,11 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
     // Приоритет 1: Точное совпадение по specialist_id
     if (queue.specialist_id !== undefined && queue.specialist_id !== null) {
       const queueSpecialistId = Number(queue.specialist_id);
-      // ✅ ИСПРАВЛЕНО: Проверяем оба варианта - может быть как doctor.id, так и doctor.user_id
-      if (queueSpecialistId === doctorId || 
-          (doctor?.id && queueSpecialistId === Number(doctor.id)) ||
-          (doctor?.user_id && queueSpecialistId === Number(doctor.user_id))) {
+      if (queueSpecialistId === doctorId || (doctor?.id && queueSpecialistId === Number(doctor.id))) {
         logger.log('[useQueueManager] ✅ Найдена очередь по specialist_id:', {
           queueSpecialistId,
           doctorId,
           doctorIdFromDoctor: doctor?.id,
-          doctorUserId: doctor?.user_id,
           specialty: queue.specialty
         });
         return true;
@@ -91,7 +86,6 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
       specialistId,
       doctorId,
       doctorIdFromDoctor: doctor?.id,
-      doctorUserId: doctor?.user_id,
       doctorSpecialty: doctor?.specialty,
       availableQueues: payload.queues.map(q => ({
         specialist_id: q.specialist_id,

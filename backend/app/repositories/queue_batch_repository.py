@@ -31,14 +31,21 @@ class QueueBatchRepository:
         )
 
     def resolve_specialist_user_id(self, specialist_id: int) -> tuple[int | None, bool]:
-        """Returns (user_id, converted_from_doctor_id)."""
+        """Returns (doctor_id, converted_from_legacy_user_id)."""
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        if doctor and doctor.user_id:
-            return doctor.user_id, True
+        if doctor:
+            return doctor.id, False
+
+        legacy_doctor = self.db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
+        if legacy_doctor:
+            return legacy_doctor.id, True
 
         user = self.db.query(User).filter(User.id == specialist_id).first()
         if user:
-            return user.id, False
+            linked_doctor = self.db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            if linked_doctor:
+                return linked_doctor.id, True
+            return None, False
 
         return None, False
 
@@ -74,4 +81,3 @@ class QueueBatchRepository:
 
     def rollback(self) -> None:
         self.db.rollback()
-

@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _normalize_queue_status_for_registrar(raw_status: str | None) -> str:
+    """Keep payment state out of the operational queue status shown to registrars."""
+    if not raw_status or raw_status == "paid":
+        return "waiting"
+    return raw_status
+
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
 
 
@@ -1124,7 +1131,7 @@ def open_reception(
     Из detail.md стр. 253: Кнопка «Открыть приём сейчас»
     """
     try:
-        result = crud_queue.open_daily_queue(db, day, specialist_id, current_user.id)
+        result = crud_queue.open_daily_queue(db, day, specialist_id)
 
         return {
             "success": True,
@@ -1191,39 +1198,12 @@ def start_queue_visit(
                     or payment.paid_at
                 ):
                     visit.discount_mode = "paid"
-                elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # [OK] ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при начале приема (visit {visit.id})",
-                        )
-                        logger.info(
-                            "start_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
-                    visit.discount_mode = "paid"
+                else:
+                    logger.info(
+                        "[FIX:PAYMENT_STATUS] start_queue_visit preserves payment state for visit %d; operational status is %s",
+                        visit.id,
+                        visit.status,
+                    )
 
             db.commit()
             db.refresh(visit)
@@ -1244,41 +1224,11 @@ def start_queue_visit(
             # Обновляем статус appointment
             appointment.status = "in_progress"
 
-            # [OK] Сохраняем visit_type: если appointment был оплачен, сохраняем visit_type='paid'
-            # Appointment не имеет discount_mode, используем visit_type
-            if not appointment.visit_type or appointment.visit_type not in (
-                "paid",
-                "repeat",
-                "benefit",
-                "all_free",
-            ):
-                from app.models.payment import Payment
-
-                payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == appointment.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    appointment.visit_type = "paid"
-                elif (
-                    hasattr(appointment, 'payment_amount')
-                    and appointment.payment_amount
-                    and appointment.payment_amount > 0
-                ):
-                    appointment.visit_type = "paid"
-                elif appointment.status in (
-                    "paid",
-                    "in_visit",
-                    "in_progress",
-                    "completed",
-                ):
-                    appointment.visit_type = "paid"
+            logger.info(
+                "[FIX:PAYMENT_STATUS] start_queue_visit preserves appointment visit_type for appointment %d; operational status is %s",
+                appointment.id,
+                appointment.status,
+            )
 
             db.commit()
             db.refresh(appointment)
@@ -1817,18 +1767,18 @@ def get_today_queues(
             if not daily_queue:
                 continue
 
-            # ✅ ИСПРАВЛЕНО: daily_queue.specialist_id может хранить как doctor.id, так и user_id
-            # Проверяем оба варианта для совместимости с существующими данными
-            doctor = (
-                db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
-            )
-            # Если не нашли по doctor.id, пробуем по user_id (для совместимости со старыми данными)
+            # ✅ CANONICAL: DailyQueue.specialist_id должен указывать на Doctor.id.
+            # Старые записи с user_id больше не auto-link'им: вместо этого оставляем
+            # запись видимой и помечаем её как требующую deterministic repair.
+            doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
+            integrity_warnings: list[str] = []
             if not doctor:
-                doctor = (
-                    db.query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
+                integrity_warnings.append("linked_doctor_missing")
+                logger.warning(
+                    "get_today_queues: DailyQueue %d specialist_id=%s does not resolve to Doctor.id",
+                    daily_queue.id,
+                    daily_queue.specialist_id,
                 )
-            if not doctor:
-                continue
 
             # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.specialty
             # queue_tag - это точное указание очереди, созданное при регистрации
@@ -1857,16 +1807,32 @@ def get_today_queues(
             }
             specialty = specialty_mapping.get(specialty, specialty)
 
+            if doctor and not doctor.user_id:
+                integrity_warnings.append("doctor_without_user")
+            if doctor and doctor.user and not doctor.user.is_active:
+                integrity_warnings.append("doctor_user_inactive")
+            if doctor and not doctor.active:
+                integrity_warnings.append("doctor_inactive")
+            if doctor and not doctor.cabinet:
+                integrity_warnings.append("doctor_cabinet_missing")
+
             if specialty not in queues_by_specialty:
                 queues_by_specialty[specialty] = {
                     "entries": [],
                     "doctor": doctor,
-                    "doctor_id": doctor.id,  # ✅ ИСПРАВЛЕНО: Используем doctor.id вместо user_id
+                    "doctor_id": doctor.id if doctor else daily_queue.specialist_id,
+                    "integrity_warnings": list(dict.fromkeys(integrity_warnings)),
                 }
             else:
                 # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
                 # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
                 # Это важно, когда для одной специальности есть записи от разных врачей
+                bucket = queues_by_specialty[specialty]
+                bucket.setdefault("integrity_warnings", [])
+                for warning in integrity_warnings:
+                    if warning not in bucket["integrity_warnings"]:
+                        bucket["integrity_warnings"].append(warning)
+
                 if doctor and doctor.id:
                     # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
                     # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
@@ -2939,7 +2905,9 @@ def get_today_queues(
                             "paid" if discount_mode == "paid" else "pending"
                         ),
                         "source": source,
-                        "status": entry_status,
+                        "status": _normalize_queue_status_for_registrar(
+                            entry_status
+                        ),
                         "created_at": (
                             entry_wrapper["created_at"].isoformat() + "Z"
                             if entry_wrapper["created_at"]
@@ -2962,13 +2930,17 @@ def get_today_queues(
                 "queue_id": queue_number,
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
-                # Поэтому в ответе API specialist_id должен быть doctor.id, а не user_id
-                "specialist_id": data["doctor_id"],  # Это уже doctor.id из queues_by_specialty
+                # Если doctor не найден, оставляем raw specialist_id видимым для repair.
+                "specialist_id": data["doctor_id"],
                 "specialist_name": (
-                    doctor.user.full_name if doctor and doctor.user else f"Врач"
+                    doctor.user.full_name
+                    if doctor and doctor.user
+                    else f"Специалист #{data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "cabinet": doctor.cabinet if doctor else "N/A",
+                "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
+                "has_integrity_warnings": bool(data.get("integrity_warnings")),
                 "opened_at": datetime.now().isoformat(),
                 "entries": entries,
                 "stats": {
@@ -3343,10 +3315,10 @@ def get_doctor_user_id(
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
-    DEPRECATED: получить user_id по doctor_id.
+    DEPRECATED: legacy compatibility bridge for doctor -> user lookup.
 
-    Operational queue flows канонически используют Doctor.id.
-    Endpoint оставлен только для временной обратной совместимости.
+    Operational queue flows canonically use Doctor.id. This endpoint remains
+    only as a transitional bridge and should not be treated as the source of truth.
 
     Args:
         doctor_id: ID врача из таблицы doctors
@@ -3376,8 +3348,11 @@ def get_doctor_user_id(
 
         return {
             "doctor_id": doctor_id,
+            "canonical_specialist_id": doctor.id,
             "user_id": doctor.user_id,
             "doctor_name": doctor.user.full_name if doctor.user else None,
+            "deprecated": True,
+            "note": "Use doctor_id as the canonical specialist identifier in queue flows.",
         }
 
     except HTTPException:

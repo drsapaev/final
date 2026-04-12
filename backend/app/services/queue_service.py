@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session
 from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
-from app.models.user import User
 from app.services.queue_session import (
     get_or_create_session_id,
 )
@@ -372,28 +371,17 @@ class QueueBusinessService:
         defaults = defaults or {}
 
         # ✅ SECURITY: Проверяем существование врача перед созданием очереди
-        # ✅ ИСПРАВЛЕНО: Используем правильный импорт Doctor из app.models.clinic
-        # ✅ ИСПРАВЛЕНО: Проверяем как по doctor.id, так и по doctor.user_id (для совместимости)
-        doctor = (
-            db.query(Doctor)
-            .filter(
-                or_(
-                    Doctor.id == specialist_id,
-                    Doctor.user_id == specialist_id,
-                )
-            )
-            .first()
-        )
+        # SSOT: DailyQueue.specialist_id ссылается на Doctor.id
+        doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if not doctor:
             logger.error(
-                f"Cannot create DailyQueue: Doctor with ID or user_id={specialist_id} does not exist"
+                f"Cannot create DailyQueue: Doctor with ID={specialist_id} does not exist"
             )
             raise ValueError(
                 f"Врач с ID {specialist_id} не найден. Невозможно создать очередь."
             )
-
         # ✅ ИСПРАВЛЕНО: Используем doctor.id для specialist_id (ForeignKey на doctors.id)
-        # DailyQueue.specialist_id должен быть doctor.id, а не doctor.user_id
+        # DailyQueue.specialist_id должен быть doctor.id
         actual_specialist_id = doctor.id
 
         # ⭐ SSOT FIX: Сначала ищем очередь по (day, queue_tag), игнорируя specialist_id
@@ -549,7 +537,6 @@ class QueueBusinessService:
                 .filter(
                     or_(
                         Doctor.id == specialist_id,
-                        Doctor.user_id == specialist_id,
                     ),
                     Doctor.active.is_(True),
                 )
@@ -614,10 +601,6 @@ class QueueBusinessService:
         specialist_name = None
         if doctor and doctor.user:
             specialist_name = doctor.user.full_name or doctor.user.username
-        elif doctor and doctor.user_id:
-            user_obj = db.query(User).filter(User.id == doctor.user_id).first()
-            if user_obj:
-                specialist_name = user_obj.full_name or user_obj.username
 
         metadata = {
             "day": day,
@@ -807,7 +790,6 @@ class QueueBusinessService:
                         Doctor.active.is_(True),
                         or_(
                             Doctor.id == specialist_id_override,
-                            Doctor.user_id == specialist_id_override,
                         ),
                     )
                     .first()

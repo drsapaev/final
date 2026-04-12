@@ -374,8 +374,7 @@ def get_available_specialists(db: Session = Depends(get_db)):
             'lab': {'name': 'Лаборатория', 'icon': '🔬', 'color': '#34C759'},
         }
 
-        # Группируем по специальностям и выбираем первого врача из каждой группы
-        specialists_by_specialty = {}
+        specialists_list = []
         for doctor in doctors:
             specialty_key = doctor.specialty.lower() if doctor.specialty else None
             if not specialty_key:
@@ -397,9 +396,8 @@ def get_available_specialists(db: Session = Depends(get_db)):
                     'color': '#8E8E93',
                 }
 
-            # Берем первого врача из каждой специальности
-            if normalized_specialty not in specialists_by_specialty:
-                specialists_by_specialty[normalized_specialty] = {
+            specialists_list.append(
+                {
                     'id': doctor.id,
                     'specialty': normalized_specialty,
                     'specialty_display': specialty_mapping[normalized_specialty][
@@ -412,9 +410,7 @@ def get_available_specialists(db: Session = Depends(get_db)):
                     ),
                     'cabinet': doctor.cabinet,
                 }
-
-        # Преобразуем в список
-        specialists_list = list(specialists_by_specialty.values())
+            )
 
         # Сортируем по порядку: кардиолог, дерматолог, стоматолог, лаборатория
         sort_order = [
@@ -431,7 +427,9 @@ def get_available_specialists(db: Session = Depends(get_db)):
             key=lambda x: (
                 sort_order.index(x['specialty'])
                 if x['specialty'] in sort_order
-                else 999
+                else 999,
+                x['doctor_name'] or '',
+                x['id'],
             )
         )
 

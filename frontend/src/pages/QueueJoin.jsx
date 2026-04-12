@@ -75,6 +75,25 @@ const mergeVisibleSpecialists = (profilesPayload, specialistsPayload) => {
   return merged;
 };
 
+const formatSpecialistLabel = (specialist) => {
+  const doctorName =
+    specialist?.doctor_name ||
+    specialist?.full_name ||
+    specialist?.name ||
+    specialist?.specialty_display ||
+    specialist?.specialty ||
+    'Мутахассис';
+  const specialtyLabel =
+    specialist?.specialty_display ||
+    specialist?.specialty ||
+    '';
+  const cabinetLabel = specialist?.cabinet ? `Каб. ${specialist.cabinet}` : '';
+
+  return [doctorName, specialtyLabel, cabinetLabel]
+    .filter(Boolean)
+    .join(' • ');
+};
+
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
@@ -1238,7 +1257,7 @@ const QueueJoin = () => {
                         fontWeight: '600',
                         color: isSelected ? specialist.color : 'var(--mac-text-primary)'
                       }}>
-                        {specialist.specialty_display || specialist.name}
+                        {formatSpecialistLabel(specialist)}
                       </span>
                     </label>
                   );

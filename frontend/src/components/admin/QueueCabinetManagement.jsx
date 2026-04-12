@@ -264,6 +264,24 @@ const QueueCabinetManagement = () => {
                       ? 'Нет врача'
                       : 'Нет кабинета врача'}
               </MacOSBadge>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <MacOSBadge
+                  variant={queue.linked_doctor_found ? 'success' : 'warning'}
+                  style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                >
+                  {queue.linked_doctor_found ? 'Врач найден' : 'Врач не найден'}
+                </MacOSBadge>
+                <MacOSBadge
+                  variant={queue.doctor_has_cabinet ? 'success' : 'warning'}
+                  style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                >
+                  {queue.doctor_has_cabinet ? 'Кабинет врача задан' : 'Кабинет врача пуст'}
+                </MacOSBadge>
+              </div>
+              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
+                Канонический кабинет берётся из карточки врача. Здесь можно только проверить и
+                синхронизировать очередь.
+              </div>
               {Array.isArray(queue.integrity_warnings) && queue.integrity_warnings.length > 0 ? (
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                   {queue.integrity_warnings.join(', ')}

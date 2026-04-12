@@ -50,13 +50,51 @@ For code changes:
 - Do not do opportunistic cleanup.
 - Do not expand scope without a concrete reason and user-visible report.
 
+## Execution Mode Selection
+
+Before any execution task, first choose exactly one mode:
+
+- `direct_execute`: local narrow task, root cause known, likely one file or very small slice, no risky domain, no ownership ambiguity, no canonical/legacy ambiguity, no expected scope creep. Do not run `agent_gate.py`.
+- `gate`: risky task, unclear root cause, likely multi-file impact, frontend/backend ownership ambiguity, canonical/legacy ambiguity, scope-creep risk, or handoff-style brief needed.
+- `gate_known_root_cause`: risky task with a confirmed root-cause file; use the gate but anchor it with `--known-root-cause`.
+- `narrow_override`: only after `agent_gate.py` misroutes, one retry still misses the confirmed root-cause file, and there is explicit human or repo-approved basis for a narrow bypass.
+
+Always start execution work with this pre-work block:
+
+```text
+Execution mode
+selected mode:
+reason:
+risky domain: yes/no
+root cause known: yes/no
+scope expectation: single-file / narrow / multi-file
+command:
+actual command to run
+or not needed for direct execute
+
+Initial boundaries
+canonical anchor:
+first-touch files:
+validation target:
+stop condition to watch first:
+```
+
+For `direct_execute`, still name the canonical anchor, first-touch file(s), narrow validation target, and first stop condition before editing.
+
 ## Automatic Pre-Execute Gate
 
-Before any `execute` task, run the local gate yourself:
+Run the local gate only when the selected mode is `gate` or `gate_known_root_cause`:
 
 ```powershell
 cd C:\final\ai\langgraph
 python scripts\agent_gate.py "<user task>"
+```
+
+- For `gate_known_root_cause`, run:
+
+```powershell
+cd C:\final\ai\langgraph
+python scripts\agent_gate.py "<user task>" --known-root-cause "<relative/path.py>"
 ```
 
 - If the gate says handoff is required, read the generated `Ready-to-send execution prompt` before editing.
@@ -64,6 +102,10 @@ python scripts\agent_gate.py "<user task>"
 - Treat the prompt's `Stop conditions` as hard stops.
 - Do not broaden scope without returning a report to the user.
 - If the gate fails or cannot run, stop and report instead of editing.
+- If the gate returns a misroute or misses the confirmed root-cause file, retry at most once with `--known-root-cause`.
+- If the retry still misses the confirmed file, switch to `narrow_override`: edit only the approved narrow file set, preserve stop conditions, do not expand scope, and record evidence.
+- Record `gate_misroute`, `override_used`, and `known_root_cause_file` in the LightRAG evidence entry for that risky task when applicable.
+- Do not use `agent_gate.py` as a ritual for every small safe task.
 
 ## LightRAG Readiness Evidence
 

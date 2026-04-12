@@ -584,7 +584,7 @@ def join_online_queue_multiple(
 
 
 def open_daily_queue(
-    db: Session, day: date, specialist_id: int, user_id: int | None = None
+    db: Session, day: date, specialist_id: int
 ) -> dict[str, Any]:
     """
     Открытие приема и закрытие онлайн-набора
@@ -838,12 +838,7 @@ def get_or_create_daily_queue(
 
     ⭐ ВАЖНО: specialist_id канонически хранит Doctor.id (ForeignKey на doctors.id).
     """
-    # Transitional normalization: принимаем legacy user_id, но всегда приводим к Doctor.id.
-    doctor_exists = (
-        db.query(Doctor)
-        .filter(or_(Doctor.id == specialist_id, Doctor.user_id == specialist_id))
-        .first()
-    )
+    doctor_exists = db.query(Doctor).filter(Doctor.id == specialist_id).first()
     if not doctor_exists:
         raise ValueError(f"Doctor with id {specialist_id} does not exist in doctors table")
 
