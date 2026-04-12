@@ -692,16 +692,6 @@ const AppointmentWizardV2 = ({
       });
 
       if (foundService?.name) return foundService.name;
-
-      // ✅ УЛУЧШЕНО: Поиск по частичному совпадению названия
-      const foundByNamePartial = servicesData.find((s) => {
-        if (!s.name) return false;
-        const serviceNameLower = s.name.toLowerCase();
-        const searchNameLower = String(searchName).toLowerCase();
-        return serviceNameLower.includes(searchNameLower) || searchNameLower.includes(serviceNameLower);
-      });
-
-      if (foundByNamePartial?.name) return foundByNamePartial.name;
     }
 
     // Fallback: возвращаем service_name (если это название) или код
@@ -799,31 +789,10 @@ const AppointmentWizardV2 = ({
             // ✅ ВАЖНО: Сохраняем doctor_id при резолвинге
             doctor_id: item.doctor_id || null
           };
-        } else {
-          // ✅ УЛУЧШЕНО: Пробуем найти по частичному совпадению названия
-          const foundByName = servicesData.find((s) => {
-            if (!s.name) return false;
-            const serviceNameLower = s.name.toLowerCase();
-            const searchNameLower = String(searchName).toLowerCase();
-            return serviceNameLower.includes(searchNameLower) || searchNameLower.includes(serviceNameLower);
-          });
-
-          if (foundByName) {
-            logger.log(`✅ Service found by name match: "${searchName}" -> ID ${foundByName.id} (${foundByName.name})`);
-            return {
-              ...item,
-              service_id: foundByName.id,
-              service_name: foundByName.name,
-              service_price: foundByName.price || 0,
-              _temp_name: searchName,
-              // ✅ ВАЖНО: Сохраняем doctor_id при резолвинге
-              doctor_id: item.doctor_id || null
-            };
-          }
-
-          logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`,
-          servicesData.slice(0, 20).map((s) => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter((s) => s !== 'N/A: N/A'));
         }
+
+        logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`,
+        servicesData.slice(0, 20).map((s) => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter((s) => s !== 'N/A: N/A'));
 
         return item;
       });

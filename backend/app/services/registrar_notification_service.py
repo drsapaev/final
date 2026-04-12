@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.doctor_info_service import get_doctor_info_service
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
+from app.services.service_mapping import get_service_code
 from app.services.telegram.bot import TelegramBotService
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,9 @@ class RegistrarNotificationService:
             if services:
                 services_list = []
                 for service in services:
-                    services_list.append(f"• {service.name} ({service.code})")
+                    services_list.append(
+                        f"• {service.name} ({service.service_code or get_service_code(service.id, self.db)})"
+                    )
                     total_amount += float(service.price) if service.price else 0
                 services_text = "\n".join(services_list)
             elif isinstance(appointment, Visit):
@@ -207,7 +210,7 @@ class RegistrarNotificationService:
 👨‍⚕️ Врач: {doctor_name}
 🏥 Отделение: {department_name}
 👤 Пациент: {patient_info}
-🔧 Услуга: {service.name} ({service.code})
+🔧 Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.db)})
 💰 Цена: {price_override.original_price} → {price_override.new_price} сум
 📝 Причина: {price_override.reason}
 {f"📋 Детали: {price_override.details}" if price_override.details else ""}

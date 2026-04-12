@@ -739,7 +739,7 @@ def get_doctor_services(
                 {
                     "id": service.id,
                     "name": service.name,
-                    "code": service.code,
+                    "code": service.service_code or get_service_code(service.id, db),
                     "price": float(service.price) if service.price else 0,
                     "currency": service.currency or "UZS",
                     "duration_minutes": service.duration_minutes or 30,
@@ -1152,7 +1152,7 @@ async def schedule_next_visit(
                 service_id=service.id,
                 name=service.name,
                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                code=get_service_code(service.id, db) or service.code,
+                code=service.service_code or get_service_code(service.id, db),
                 qty=service_req.quantity,
                 price=service_price,
                 currency="UZS",
@@ -1338,7 +1338,7 @@ def get_visit_details(
                 "id": vs.id,
                 "service_id": vs.service_id,
                 "service_name": service.name if service else f"Услуга #{vs.service_id}",
-                "service_code": service.code if service else None,
+                "service_code": (service.service_code or get_service_code(service.id, db)) if service else None,
                 "quantity": vs.quantity,
                 "price": vs.price,
                 "custom_price": vs.custom_price,

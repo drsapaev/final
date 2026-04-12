@@ -1712,13 +1712,22 @@ def full_update_online_entry(
                         services=json.dumps([{
                             "service_id": new_service.id,
                             "name": new_service.name,
-                            "code": new_service.code or "UNKNOWN",
+                            "code": new_service.service_code
+                            or get_service_code(new_service.id, db)
+                            or "UNKNOWN",
                             "quantity": quantity,
                             "price": int(item_price),
                             "queue_time": current_queue_time.isoformat(),
                             "cancelled": False,
                         }], ensure_ascii=False),
-                        service_codes=json.dumps([new_service.code or "UNKNOWN"], ensure_ascii=False),
+                        service_codes=json.dumps(
+                            [
+                                new_service.service_code
+                                or get_service_code(new_service.id, db)
+                                or "UNKNOWN"
+                            ],
+                            ensure_ascii=False,
+                        ),
                         total_amount=int(item_price),
                     )
                     db.add(new_entry)
@@ -1889,13 +1898,22 @@ def full_update_online_entry(
                         services=json.dumps([{
                             "service_id": new_service.id,
                             "name": new_service.name,
-                            "code": new_service.code or "UNKNOWN",
+                            "code": new_service.service_code
+                            or get_service_code(new_service.id, db)
+                            or "UNKNOWN",
                             "quantity": quantity,
                             "price": int(item_price),
                             "queue_time": current_queue_time.isoformat(),
                             "cancelled": False,
                         }], ensure_ascii=False),
-                        service_codes=json.dumps([new_service.code or "UNKNOWN"], ensure_ascii=False),
+                        service_codes=json.dumps(
+                            [
+                                new_service.service_code
+                                or get_service_code(new_service.id, db)
+                                or "UNKNOWN"
+                            ],
+                            ensure_ascii=False,
+                        ),
                         total_amount=int(item_price),
                     )
                     db.add(new_entry)
@@ -1969,7 +1987,9 @@ def full_update_online_entry(
                     service_obj = {
                         "service_id": service.id,
                         "name": service.name,
-                        "code": service.code or "UNKNOWN",
+                        "code": service.service_code
+                        or get_service_code(service.id, db)
+                        or "UNKNOWN",
                         "quantity": service_item.get('quantity', 1),
                         "price": int(item_price),
                         "queue_time": service_queue_time,  # ⭐ FIX: Используем правильное время
@@ -1979,7 +1999,11 @@ def full_update_online_entry(
                         "was_paid_before_cancel": False,
                     }
                     services_list.append(service_obj)
-                    service_codes_list.append(service.code or "UNKNOWN")
+                    service_codes_list.append(
+                        service.service_code
+                        or get_service_code(service.id, db)
+                        or "UNKNOWN"
+                    )
                 else:
                     # Новая услуга
                     if is_initial_registration or is_first_fill_qr:
@@ -1993,7 +2017,9 @@ def full_update_online_entry(
                         service_obj = {
                             "service_id": service.id,
                             "name": service.name,
-                            "code": service.code or "UNKNOWN",
+                            "code": service.service_code
+                            or get_service_code(service.id, db)
+                            or "UNKNOWN",
                             "quantity": service_item.get('quantity', 1),
                             "price": int(item_price),
                             "queue_time": service_queue_time,  # ⭐ FIX: Используем правильное время
@@ -2003,7 +2029,11 @@ def full_update_online_entry(
                             "was_paid_before_cancel": False,
                         }
                         services_list.append(service_obj)
-                        service_codes_list.append(service.code or "UNKNOWN")
+                        service_codes_list.append(
+                            service.service_code
+                            or get_service_code(service.id, db)
+                            or "UNKNOWN"
+                        )
                     else:
                         # ⭐ PHASE 2.2 FIX: Повторное редактирование — Пропускаем добавление в entry.services!
                         # Новые услуги будут созданы как отдельные entries.
@@ -2086,8 +2116,8 @@ def full_update_online_entry(
                         # ✅ SSOT: Используем service_mapping.get_service_category() вместо дублирующей логики
                         from app.services.service_mapping import get_service_category
 
-                        service_code = (
-                            get_service_code(service.id, db) or service.code or ''
+                        service_code = service.service_code or get_service_code(
+                            service.id, db
                         )
                         category, _ = get_service_category(service_code)
                         if category and category.value == 'K':
@@ -2327,7 +2357,9 @@ def full_update_online_entry(
                     if not existing_service:
                         # ⭐ ИСПРАВЛЕНИЕ #2: Добавляем новую услугу (работает и для оплаченных, и для неоплаченных)
                         # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                        service_code = get_service_code(service.id, db) or service.code
+                        service_code = service.service_code or get_service_code(
+                            service.id, db
+                        )
                         visit_service = VisitService(
                             visit_id=visit.id,
                             service_id=service.id,
@@ -2526,7 +2558,9 @@ def full_update_online_entry(
                     continue
                 
                 # Получаем код услуги (⭐ FIX: используем service_code, не code)
-                service_code = service.service_code or service.code or ""
+                service_code = service.service_code or get_service_code(
+                    service.id, db
+                )
 
                 # ⭐ SSOT FIX: Использовать РЕАЛЬНЫЙ queue_tag из Service модели
                 # Вместо hardcoded маппинга категорий!
@@ -2593,8 +2627,49 @@ def full_update_online_entry(
                 current_queue = (
                     db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
                 )
-                specialist_id_for_queue = (
-                    current_queue.specialist_id if current_queue else None
+                from app.models.clinic import Doctor
+                from app.services.service_mapping import normalize_specialty
+
+                def _resolve_specialist_id_for_queue_tag(
+                    queue_tag_value: str | None,
+                    preferred_specialist_id: int | None,
+                ) -> int | None:
+                    normalized_queue_tag = normalize_specialty(queue_tag_value)
+
+                    if preferred_specialist_id:
+                        preferred = (
+                            db.query(Doctor)
+                            .filter(
+                                Doctor.id == preferred_specialist_id,
+                                Doctor.active == True,
+                            )
+                            .first()
+                        )
+                        if (
+                            preferred
+                            and normalize_specialty(preferred.specialty)
+                            == normalized_queue_tag
+                        ):
+                            return preferred_specialist_id
+
+                    if normalized_queue_tag:
+                        resolved = (
+                            db.query(Doctor)
+                            .filter(
+                                Doctor.active == True,
+                                Doctor.specialty == normalized_queue_tag,
+                            )
+                            .order_by(Doctor.id.asc())
+                            .first()
+                        )
+                        if resolved:
+                            return resolved.id
+
+                    return preferred_specialist_id
+
+                specialist_id_for_queue = _resolve_specialist_id_for_queue_tag(
+                    queue_tag,
+                    current_queue.specialist_id if current_queue else None,
                 )
 
                 daily_queue = (
@@ -2606,13 +2681,8 @@ def full_update_online_entry(
                 if not daily_queue:
                     # Создаем новую очередь
                     if not specialist_id_for_queue:
-                        from app.models.user import User
-
-                        fallback_user = (
-                            db.query(User).filter(User.is_active == True).first()
-                        )
-                        specialist_id_for_queue = (
-                            fallback_user.id if fallback_user else 1
+                        raise ValueError(
+                            f"Не удалось определить специалиста для новой очереди {queue_tag}"
                         )
 
                     daily_queue = DailyQueue(
@@ -2648,7 +2718,8 @@ def full_update_online_entry(
                     service_obj = {
                         'service_id': svc_data['service_id'],
                         'name': service.name,
-                        'code': service.service_code or service.code,
+                        'code': service.service_code
+                        or get_service_code(service.id, db),
                         'quantity': svc_quantity,
                         'price': int(svc_price),
                         'queue_time': current_time.isoformat(),  # ⭐ ТЕКУЩЕЕ ВРЕМЯ

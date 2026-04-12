@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CreditCard, Calendar, Search, CheckCircle, DollarSign, User, RefreshCw } from 'lucide-react';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
 import { Card, Badge, Button } from '../components/ui/macos';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
@@ -122,22 +122,28 @@ const buildReceiptServices = (paymentRow, totalAmount) => {
   const namedServices = Array.isArray(paymentRow?.services_names) ? paymentRow.services_names : [];
 
   if (namedServices.length > 0) {
-    return namedServices.map((serviceName) => ({
-      name: serviceName || 'Услуга',
+    return namedServices
+      .filter(Boolean)
+      .map((serviceName) => ({
+      name: serviceName,
       quantity: 1,
       price: totalAmount,
       total: totalAmount,
       currency
-    }));
+      }));
   }
 
   if (Array.isArray(paymentRow?.services) && paymentRow.services.length > 0) {
-    return paymentRow.services.map((serviceItem) => {
+    return paymentRow.services.flatMap((serviceItem) => {
       if (typeof serviceItem === 'object' && serviceItem !== null) {
+        const displayName = serviceItem.name || serviceItem.code || null;
+        if (!displayName) {
+          return [];
+        }
         const quantity = Number(serviceItem.quantity || 1);
         const price = Number(serviceItem.price || totalAmount);
         return {
-          name: serviceItem.name || serviceItem.code || 'Услуга',
+          name: displayName,
           quantity,
           price,
           total: Number(serviceItem.total || price * quantity),
@@ -145,8 +151,12 @@ const buildReceiptServices = (paymentRow, totalAmount) => {
         };
       }
 
+      if (!serviceItem) {
+        return [];
+      }
+
       return {
-        name: String(serviceItem || 'Услуга'),
+        name: String(serviceItem),
         quantity: 1,
         price: totalAmount,
         total: totalAmount,
@@ -155,13 +165,7 @@ const buildReceiptServices = (paymentRow, totalAmount) => {
     });
   }
 
-  return [{
-    name: paymentRow?.service || 'Услуга',
-    quantity: 1,
-    price: totalAmount,
-    total: totalAmount,
-    currency
-  }];
+  return [];
 };
 
 const buildReceiptPrintPayload = (paymentRow) => {
@@ -873,7 +877,7 @@ const CashierPanel = () => {void
       ...group,
       services: Array.from(new Set(group.services.filter(Boolean))),
       services_names: Array.from(new Set(group.services_names.filter(Boolean))),
-      service: group.service || group.services_names[0] || group.services[0] || 'Услуга'
+      service: group.service || group.services_names[0] || group.services[0] || null
     }));
   };
 
@@ -1323,7 +1327,7 @@ const CashierPanel = () => {void
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {/* TODO: Render services info properly if available in history item */}
-                                {row.service || 'Услуга'}
+                                 {row.service || '—'}
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {row.method}

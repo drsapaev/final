@@ -598,7 +598,7 @@ def get_registrar_services(
             service_data = {
                 "id": service.id,
                 "name": service.name,
-                "code": service.code,
+                "code": service.service_code or get_service_code(service.id, db),
                 "price": float(service.price) if service.price else 0,
                 "currency": service.currency or "UZS",
                 "duration_minutes": service.duration_minutes or 30,
@@ -1411,12 +1411,12 @@ def get_today_queues(
                 service_code_val = (
                     get_service_code(
                         {
-                            'code': service.code,
                             'service_code': getattr(service, 'service_code', None),
                             'category_code': getattr(service, 'category_code', None),
+                            'code': getattr(service, 'code', None),
                         }
                     )
-                    or service.code
+                    or service.service_code
                     or 'N/A'
                 )
                 queue_tag_val = service.queue_tag or 'N/A'
@@ -1451,8 +1451,8 @@ def get_today_queues(
                                 service_name,
                                 service_code_val,
                             )
-                    elif service.code:
-                        service_code_upper = str(service.code).upper()
+                    elif service.service_code:
+                        service_code_upper = str(service.service_code).upper()
                         if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
                             is_ecg_service = True
                             logger.debug(

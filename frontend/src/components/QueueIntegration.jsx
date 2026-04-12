@@ -2,48 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import ModernQueueManager from './queue/ModernQueueManager';
 import { fetchAvailableSpecialists } from '../api/queue';
+import auth from '../stores/auth.js';
 import logger from '../utils/logger';
-
-const normalizeSpecialty = (value) =>
-  String(value || '').toLowerCase().trim();
-
-const getSpecialtyCandidates = (value) => {
-  const normalized = normalizeSpecialty(value);
-  if (!normalized) {
-    return [];
-  }
-
-  const aliases = {
-    cardio: ['cardiology'],
-    cardiology: ['cardio'],
-    derma: ['dermatology'],
-    dermatology: ['derma'],
-    dentist: ['dentistry', 'stomatology'],
-    dentistry: ['dentist', 'stomatology'],
-    stomatology: ['dentist', 'dentistry'],
-    lab: ['laboratory'],
-    laboratory: ['lab'],
-    кардиолог: ['cardiology', 'cardio'],
-    дерматолог: ['dermatology', 'derma'],
-    'дерматолог-косметолог': ['dermatology', 'derma'],
-    стоматолог: ['dentist', 'dentistry', 'stomatology'],
-    лаборатория: ['laboratory', 'lab'],
-  };
-
-  return Array.from(new Set([normalized, ...(aliases[normalized] || [])]));
-};
 
 /**
  * Легкий адаптер, который подключает макос-панели к новому ModernQueueManager.
  * Вся бизнес-логика очереди вынесена на backend и в кастомные хуки.
  */
 const QueueIntegration = ({
-  specialist = 'Дерматолог',
-  department,
+  specialistId = '',
   onPatientSelect,
   onStartVisit,
 }) => {
   const [availableSpecialists, setAvailableSpecialists] = useState([]);
+  const [authProfile, setAuthProfile] = useState(auth.getState().profile);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,30 +41,39 @@ const QueueIntegration = ({
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = auth.subscribe((state) => {
+      setAuthProfile(state.profile || null);
+    });
+
+    return unsubscribe;
+  }, []);
+
   const resolvedSpecialist = useMemo(() => {
-    const candidates = getSpecialtyCandidates(department || specialist);
-    if (candidates.length === 0 || availableSpecialists.length === 0) {
+    if (availableSpecialists.length === 0) {
       return null;
     }
 
-    return availableSpecialists.find((item) => {
-      const itemCandidates = [
-        ...getSpecialtyCandidates(item.specialty),
-        ...getSpecialtyCandidates(item.specialty_display),
-        ...getSpecialtyCandidates(item.doctor_name),
-      ];
+    const canonicalSpecialistId = specialistId || authProfile?.doctor_id || authProfile?.specialist_id;
+    if (canonicalSpecialistId) {
+      const matchedById = availableSpecialists.find(
+        (item) => String(item.id) === String(canonicalSpecialistId)
+      );
+      if (matchedById) {
+        return matchedById;
+      }
+    }
 
-      return itemCandidates.some((candidate) => candidates.includes(candidate));
-    }) || null;
-  }, [availableSpecialists, department, specialist]);
+    return availableSpecialists[0] || null;
+  }, [availableSpecialists, authProfile?.doctor_id, authProfile?.specialist_id, specialistId]);
 
   const queueDoctors = useMemo(() => (
     availableSpecialists.map((item) => ({
       id: item.id,
       specialty: item.specialty,
       department: item.specialty,
-      full_name: item.doctor_name || item.specialty_display || item.specialty,
-      name: item.doctor_name || item.specialty_display || item.specialty,
+      full_name: item.doctor_name || item.specialty_display || null,
+      name: item.doctor_name || item.specialty_display || null,
       cabinet: item.cabinet,
       active: true,
       user: {
@@ -125,6 +106,7 @@ QueueIntegration.propTypes = {
   department: PropTypes.string,
   onPatientSelect: PropTypes.func,
   onStartVisit: PropTypes.func,
+  specialistId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
 export default QueueIntegration;

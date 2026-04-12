@@ -559,7 +559,6 @@ def get_registrar_services(
         categories = crud_clinic.get_service_categories(
             db, specialty=specialty, active_only=active_only
         )
-        category_specialty_by_id = {cat.id: cat.specialty for cat in categories}
 
         # Получаем услуги из основной таблицы
         query = db.query(Service)
@@ -608,7 +607,7 @@ def get_registrar_services(
             service_data = {
                 "id": service.id,
                 "name": service.name,
-                "code": service.code,
+                "code": service.service_code or get_service_code(service.id, db),
                 "price": float(service.price) if service.price else 0,
                 "currency": service.currency or "UZS",
                 "duration_minutes": service.duration_minutes or 30,
@@ -632,112 +631,24 @@ def get_registrar_services(
                 "group": None,  # Добавим группу для frontend
             }
 
-            # [OK] НОВАЯ ЛОГИКА: определяем группу по category_code
-            category_code = getattr(service, 'category_code', None)
-            category_specialty = category_specialty_by_id.get(service.category_id)
+            # [OK] НОВАЯ ЛОГИКА: определяем группу только по явному routing truth
             resolved_queue_group = resolve_queue_group_key(
-                service_code=service_data["service_code"] or service_data["code"],
+                service_code=service_data["service_code"],
                 queue_tag=service_data["queue_tag"],
                 department_key=service_data["department_key"],
-                category_specialty=category_specialty,
-                category_code=category_code,
             )
 
             if resolved_queue_group:
                 registrar_group = queue_group_to_registrar_group.get(
                     resolved_queue_group, "procedures"
                 )
-                fallback_code_group = resolve_queue_group_key(
-                    service_code=service_data["service_code"] or service_data["code"],
-                    category_code=category_code,
-                )
-                if (
-                    any(
-                        [
-                            service_data["queue_tag"],
-                            service_data["department_key"],
-                            category_specialty,
-                        ]
-                    )
-                    and fallback_code_group
-                    and fallback_code_group != resolved_queue_group
-                ):
-                    logger.info(
-                        "[FIX:ADM-06] registrar service grouping overridden by explicit routing: "
-                        "service_id=%s queue_tag=%s department_key=%s category_specialty=%s "
-                        "fallback_group=%s resolved_group=%s",
-                        service.id,
-                        service_data["queue_tag"],
-                        service_data["department_key"],
-                        category_specialty,
-                        fallback_code_group,
-                        resolved_queue_group,
-                    )
-
                 service_data["group"] = registrar_group
                 grouped_services[registrar_group].append(service_data)
                 continue
 
-            if category_code:
-                # Используем новую систему кодов
-                if category_code == 'L':
-                    service_data["group"] = "laboratory"
-                    grouped_services["laboratory"].append(service_data)
-                elif category_code == 'D':
-                    service_data["group"] = "dermatology"
-                    grouped_services["dermatology"].append(service_data)
-                elif category_code == 'C':
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-                elif category_code == 'K':
-                    service_data["group"] = "cardiology"
-                    grouped_services["cardiology"].append(service_data)
-                elif category_code == 'S':
-                    service_data["group"] = "stomatology"
-                    grouped_services["stomatology"].append(service_data)
-                elif category_code == 'O':
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-                else:
-                    # Неизвестный код - в прочие
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-            else:
-                # Fallback: если нет category_code, пытаемся определить по названию
-                name_lower = service.name.lower()
-                if any(
-                    word in name_lower
-                    for word in ["анализ", "кровь", "моча", "биохим", "гормон"]
-                ):
-                    service_data["group"] = "laboratory"
-                    grouped_services["laboratory"].append(service_data)
-                elif any(
-                    word in name_lower
-                    for word in ["дерматолог", "кожа", "псориаз", "акне"]
-                ):
-                    service_data["group"] = "dermatology"
-                    grouped_services["dermatology"].append(service_data)
-                elif any(
-                    word in name_lower
-                    for word in ["косметолог", "пилинг", "чистка", "ботокс"]
-                ):
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
-                elif any(
-                    word in name_lower
-                    for word in ["кардиолог", "экг", "эхокг", "холтер"]
-                ):
-                    service_data["group"] = "cardiology"
-                    grouped_services["cardiology"].append(service_data)
-                elif any(
-                    word in name_lower for word in ["стоматолог", "зуб", "кариес"]
-                ):
-                    service_data["group"] = "stomatology"
-                    grouped_services["stomatology"].append(service_data)
-                else:
-                    # По умолчанию в прочие процедуры
-                    service_data["group"] = "procedures"
-                    grouped_services["procedures"].append(service_data)
+            # Без явного routing truth держим нейтральную группу, а не угадываем по category/name.
+            service_data["group"] = "procedures"
+            grouped_services["procedures"].append(service_data)
 
         return {
             "services_by_group": grouped_services,
@@ -1409,12 +1320,9 @@ def get_today_queues(
                 service_code_val = (
                     get_service_code(
                         {
-                            'code': service.code,
                             'service_code': getattr(service, 'service_code', None),
-                            'category_code': getattr(service, 'category_code', None),
                         }
                     )
-                    or service.code
                     or 'N/A'
                 )
                 queue_tag_val = service.queue_tag or 'N/A'
@@ -1449,8 +1357,8 @@ def get_today_queues(
                                 service_name,
                                 service_code_val,
                             )
-                    elif service.code:
-                        service_code_upper = str(service.code).upper()
+                    elif service.service_code:
+                        service_code_upper = str(service.service_code).upper()
                         if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
                             is_ecg_service = True
                             logger.debug(
@@ -1780,13 +1688,11 @@ def get_today_queues(
                     daily_queue.specialist_id,
                 )
 
-            # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.specialty
+            # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.department
             # queue_tag - это точное указание очереди, созданное при регистрации
             specialty = None
             if daily_queue.queue_tag:
                 specialty = daily_queue.queue_tag.lower()
-            elif doctor.specialty:
-                specialty = doctor.specialty.lower()
             elif doctor.department:
                 specialty = doctor.department.lower()
             else:
@@ -2317,19 +2223,11 @@ def get_today_queues(
                             if svc:
                                 service_code_to_use = get_service_code(
                                     {
-                                        'code': svc.code,
                                         'service_code': getattr(
                                             svc, 'service_code', None
                                         ),
-                                        'category_code': getattr(
-                                            svc, 'category_code', None
-                                        ),
                                     }
                                 )
-
-                        # Если не нашли через service_id, используем vs.code как fallback
-                        if not service_code_to_use and vs.code:
-                            service_code_to_use = vs.code
 
                         # Если всё ещё нет кода, используем название (нежелательно)
                         if service_code_to_use:
@@ -2596,8 +2494,8 @@ def get_today_queues(
                             except Exception:
                                 pass
 
-                    # ✅ ИСПРАВЛЕНО: Определяем service_name для отображения в таблице и мастере
-                    # Приоритет: 1. Имя из первой услуги 2. Fallback на специальность
+                    # ✅ ИСПРАВЛЕНО: Определяем service_name только из явной service truth
+                    # Приоритет: 1. Имя из первой услуги 2. SSOT lookup по specialty
                     service_name = None
                     if services and len(services) > 0:
                         first = services[0]
@@ -2618,9 +2516,6 @@ def get_today_queues(
                             # ✅ ВАЖНО: Добавляем service_id для правильной работы визарда
                             entry_wrapper["service_id"] = default_service["id"]
                             entry_wrapper["service_code"] = default_service["service_code"]
-                        else:
-                            # Fallback если услуга не найдена в БД
-                            service_name = f"Консультация ({specialty})"
 
                     entry_wrapper["service_name"] = service_name
                     # Добавляем также в data для надежности (frontend может читать из data)
@@ -3154,7 +3049,7 @@ def create_queue_entries_batch(
             queue_tag = None
             if services_list:
                 first_service = db.query(Service).filter(Service.id == services_list[0].service_id).first()
-                queue_tag = getattr(first_service, "queue_tag", None) or doctor.specialty
+                queue_tag = getattr(first_service, "queue_tag", None)
 
             daily_queue = queue_service.get_or_create_daily_queue(
                 db,

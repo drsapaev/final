@@ -17,6 +17,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
+from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
 
@@ -509,8 +510,7 @@ class MorningAssignmentService:
         for vs in visit_services:
             service = self.db.query(Service).filter(Service.id == vs.service_id).first()
             if service and service.queue_tag == queue_tag:
-                # ⭐ Используем service_code если есть, иначе code
-                code = service.service_code or service.code
+                code = service.service_code or get_service_code(service.id, self.db)
                 if code:
                     service_codes_for_entry.append(code.upper() if code else None)
                     services_for_entry.append({
@@ -525,7 +525,7 @@ class MorningAssignmentService:
             for vs in visit_services:
                 service = self.db.query(Service).filter(Service.id == vs.service_id).first()
                 if service:
-                    code = service.service_code or service.code
+                    code = service.service_code or get_service_code(service.id, self.db)
                     if code:
                         service_codes_for_entry.append(code.upper() if code else None)
                         services_for_entry.append({

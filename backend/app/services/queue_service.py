@@ -741,28 +741,12 @@ class QueueBusinessService:
                     .first()
                 )
 
-                # Если не нашли - используем queue_tag напрямую из профиля
+                # Если не нашли - это ошибка сопоставления профиля, а не повод
+                # подставлять случайного активного врача.
                 if not doctor:
-                    # Создаём/получаем очередь по queue_tag профиля
-                    # Используем первый доступный доктор как fallback
-                    fallback_doctor = db.query(Doctor).filter(Doctor.active.is_(True)).first()
-                    if not fallback_doctor:
-                        raise QueueValidationError("Нет доступных врачей")
-
-                    queue_tag = profile_key  # ⭐ Используем ключ профиля как queue_tag
-                    defaults = {
-                        "start_number": fallback_doctor.start_number_online,
-                        "max_online_entries": fallback_doctor.max_online_per_day,
-                    }
-                    daily_queue = self.get_or_create_daily_queue(
-                        db,
-                        day=day,
-                        specialist_id=fallback_doctor.id,
-                        queue_tag=queue_tag,
-                        defaults=defaults,
+                    raise QueueValidationError(
+                        f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
                     )
-                    specialist_name = queue_profile.title_ru or queue_profile.title
-                    cabinet = None
                 else:
                     # Нашли врача - используем его данные
                     queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty

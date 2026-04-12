@@ -14,6 +14,8 @@ from app.api.deps import get_db, require_roles
 from app.crud import service as crud
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
+from app.models.visit import VisitService
+from app.models.user import User
 from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
@@ -272,7 +274,7 @@ def _row_to_out(r) -> ServiceOut:
         price = None
     return ServiceOut(
         id=r.id,
-        code=r.code,
+        code=r.service_code or r.code,
         name=r.name,
         department=r.department,
         unit=r.unit,
@@ -284,7 +286,7 @@ def _row_to_out(r) -> ServiceOut:
         doctor_id=r.doctor_id,
         # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
         category_code=getattr(r, 'category_code', None),
-        service_code=getattr(r, 'service_code', None),
+        service_code=getattr(r, 'service_code', None) or r.code,
         requires_doctor=getattr(r, 'requires_doctor', None),
         queue_tag=getattr(r, 'queue_tag', None),
         is_consultation=getattr(r, 'is_consultation', None),
@@ -530,6 +532,147 @@ async def get_queue_groups(
     )
 
 
+class ServiceCodeRepairItem(BaseModel):
+    id: int
+    before_code: Optional[str] = None
+    before_service_code: Optional[str] = None
+    after_code: Optional[str] = None
+    after_service_code: Optional[str] = None
+    changed: bool = False
+
+
+class ServiceCodeRepairResponse(BaseModel):
+    dry_run: bool
+    scanned: int
+    updated: int
+    conflicts: List[Dict[str, Any]] = Field(default_factory=list)
+    affected_services: List[ServiceCodeRepairItem] = Field(default_factory=list)
+
+
+@router.post(
+    "/admin/repair-code-drift",
+    response_model=ServiceCodeRepairResponse,
+    summary="Нормализовать code/service_code в каталоге услуг",
+)
+async def repair_service_code_drift(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+    dry_run: bool = Query(
+        True,
+        description="Только показать план исправления без записи в БД",
+    ),
+):
+    """
+    Deterministic repair for legacy service catalog drift.
+
+    Canonical rule for this slice:
+    - prefer `service_code` when present
+    - otherwise fall back to `code`
+    - write the same normalized value back to both fields
+
+    This helper only touches the service catalog rows. It does not rewrite
+    historical `VisitService` snapshots.
+    """
+
+    services = db.query(Service).order_by(Service.id).all()
+    service_by_id = {service.id: service for service in services}
+    seen_canonical_codes: dict[str, int] = {}
+    conflicts: list[dict[str, Any]] = []
+    affected_services: list[ServiceCodeRepairItem] = []
+
+    for service in services:
+        source_code = service.service_code or service.code
+        if not source_code:
+            continue
+
+        canonical_code = normalize_service_code(source_code)
+        if not canonical_code:
+            continue
+
+        owner_id = seen_canonical_codes.get(canonical_code)
+        if owner_id is not None and owner_id != service.id:
+            conflicts.append(
+                {
+                    "canonical_code": canonical_code,
+                    "existing_service_id": owner_id,
+                    "conflicting_service_id": service.id,
+                    "existing_service_name": service_by_id[owner_id].name,
+                    "conflicting_service_name": service.name,
+                }
+            )
+            continue
+
+        seen_canonical_codes[canonical_code] = service.id
+
+        current_code = normalize_service_code(service.code) if service.code else None
+        current_service_code = (
+            normalize_service_code(service.service_code)
+            if service.service_code
+            else None
+        )
+        changed = current_code != canonical_code or current_service_code != canonical_code
+
+        if changed:
+            affected_services.append(
+                ServiceCodeRepairItem(
+                    id=service.id,
+                    before_code=service.code,
+                    before_service_code=service.service_code,
+                    after_code=canonical_code,
+                    after_service_code=canonical_code,
+                    changed=True,
+                )
+            )
+
+    if conflicts:
+        logger.warning(
+            "[FIX:SVC-REPAIR] Conflicts detected for service code repair: %s",
+            conflicts,
+        )
+        if not dry_run:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": (
+                        "Найдены конфликтующие коды услуг. Сначала устраните "
+                        "дубликаты перед применением repair"
+                    ),
+                    "conflicts": conflicts,
+                },
+            )
+
+    if not dry_run and affected_services:
+        for item in affected_services:
+            service = service_by_id[item.id]
+            service.code = item.after_code
+            service.service_code = item.after_service_code
+            db.add(service)
+
+        db.commit()
+        logger.info(
+            "[FIX:SVC-REPAIR] Applied service code repair: scanned=%s updated=%s conflicts=%s",
+            len(services),
+            len(affected_services),
+            len(conflicts),
+        )
+    else:
+        logger.info(
+            "[FIX:SVC-REPAIR] Planned service code repair: scanned=%s updated=%s conflicts=%s dry_run=%s",
+            len(services),
+            len(affected_services),
+            len(conflicts),
+            dry_run,
+        )
+
+    return ServiceCodeRepairResponse(
+        dry_run=dry_run,
+        scanned=len(services),
+        updated=len(affected_services) if not conflicts or dry_run else 0,
+        conflicts=conflicts,
+        affected_services=affected_services,
+    )
+
+
 @router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
 async def get_service(
     service_id: int,
@@ -670,14 +813,54 @@ async def delete_service(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Удалить услугу"""
+    """Деактивировать услугу вместо физического удаления."""
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Услуга не найдена")
 
-    db.delete(service)
+    visit_usage_count = (
+        db.query(VisitService)
+        .filter(VisitService.service_id == service_id)
+        .count()
+    )
+
+    changed = False
+    if service.active:
+        service.active = False
+        changed = True
+
+    if changed:
+        db.add(service)
+
     db.commit()
-    return {"message": "Услуга успешно удалена"}
+    db.refresh(service)
+
+    if visit_usage_count > 0:
+        logger.info(
+            "[FIX:SVC-DELETE] service_id=%s has visit history=%s; soft-deactivated instead of deleting",
+            service_id,
+            visit_usage_count,
+        )
+        return {
+            "message": (
+                "Услуга уже использовалась в истории визитов, поэтому она "
+                "деактивирована вместо удаления"
+            ),
+            "service_id": service_id,
+            "active": service.active,
+            "visit_usage_count": visit_usage_count,
+        }
+
+    logger.info(
+        "[FIX:SVC-DELETE] service_id=%s soft-deactivated instead of deleting",
+        service_id,
+    )
+    return {
+        "message": "Услуга деактивирована вместо удаления",
+        "service_id": service_id,
+        "active": service.active,
+        "visit_usage_count": visit_usage_count,
+    }
 
 
 # ==================== ВРЕМЕННЫЙ ENDPOINT ДЛЯ ВРАЧЕЙ ====================

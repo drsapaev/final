@@ -175,7 +175,8 @@ class ServicesApiService:
             else service_data.dict(exclude_unset=True)
         )
 
-        if "code" in update_data and update_data["code"] != service.code:
+        current_code = service.service_code or service.code
+        if "code" in update_data and normalize_service_code(update_data["code"]) != normalize_service_code(current_code or ""):
             existing = self.repository.get_service_by_code(update_data["code"])
             if existing:
                 raise ValueError(f"Услуга с кодом '{update_data['code']}' уже существует")

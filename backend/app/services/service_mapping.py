@@ -155,8 +155,6 @@ def resolve_queue_group_key(
     service_code: str | None = None,
     queue_tag: str | None = None,
     department_key: str | None = None,
-    category_specialty: str | None = None,
-    category_code: str | None = None,
 ) -> str | None:
     """
     Resolve the canonical queue-group key for registrar/service routing.
@@ -165,7 +163,7 @@ def resolve_queue_group_key(
     the tab/queue chosen in admin configuration.
     """
 
-    for hint in (queue_tag, department_key, category_specialty):
+    for hint in (queue_tag, department_key):
         resolved = _queue_group_from_hint(hint)
         if resolved:
             return resolved
@@ -174,9 +172,6 @@ def resolve_queue_group_key(
         resolved = get_queue_group_for_service(service_code)
         if resolved:
             return resolved
-
-    if category_code:
-        return CATEGORY_CODE_TO_QUEUE_GROUP.get(category_code.strip().upper())
 
     return None
 
@@ -261,8 +256,6 @@ def get_allowed_service_code_prefixes(
     group_key = resolve_queue_group_key(
         queue_tag=queue_tag,
         department_key=department_key,
-        category_specialty=category_specialty,
-        category_code=category_code,
     )
     if not group_key:
         return set()
@@ -348,37 +341,6 @@ def get_default_service_by_specialty(db: "Session", specialty: str) -> dict[str,
             )
             .first()
         )
-
-    # Fallback 2: ищем по category_code (K, D, L, S, C)
-    if not service:
-        category_mapping = {
-            "cardiology": "K",
-            "dermatology": "D",
-            "laboratory": "L",
-            "stomatology": "S",
-            "cosmetology": "C",
-            "procedures": "P",
-        }
-        category_code = category_mapping.get(normalized)
-        if category_code:
-            service = (
-                db.query(Service)
-                .filter(
-                    Service.category_code == category_code,
-                    Service.is_consultation == True,
-                    Service.active == True
-                )
-                .first()
-            )
-            if not service:
-                service = (
-                    db.query(Service)
-                    .filter(
-                        Service.category_code == category_code,
-                        Service.active == True
-                    )
-                    .first()
-                )
 
     if not service:
         logger.warning(f"get_default_service_by_specialty: услуга не найдена для specialty={specialty}")

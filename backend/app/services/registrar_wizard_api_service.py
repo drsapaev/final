@@ -26,7 +26,7 @@ from app.models.visit import Visit, VisitService
 from app.repositories.registrar_wizard_api_repository import RegistrarWizardApiRepository
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
-from app.services.service_mapping import normalize_service_code
+from app.services.service_mapping import get_service_code, normalize_service_code
 
 logger = logging.getLogger(__name__)
 
@@ -602,13 +602,8 @@ def create_cart_appointments(
                 services_data.append(
                     {
                         "service_id": service.id,
-                        # ⭐ ИСПРАВЛЕНО: Используем service_code (K11) с fallback на code
-                        "code": (
-                            service.service_code
-                            or normalize_service_code(service.code)
-                            if (service.service_code or service.code)
-                            else None
-                        ),
+                        # ⭐ SSOT: используем canonical service_code helper
+                        "code": service.service_code or get_service_code(service.id, db),
                         "name": service.name,
                         "qty": service_item.quantity,
                         "price": float(item_price),
@@ -1841,10 +1836,11 @@ def get_all_appointments(
                         )
                         if service:
                             service_names.append(service.name)
-                            if service.code:
-                                service_codes.append(
-                                    normalize_service_code(service.code)
-                                )
+                            service_code = service.service_code or get_service_code(
+                                service.id, db
+                            )
+                            if service_code:
+                                service_codes.append(service_code)
                             if service.price:
                                 total_amount += float(service.price)
                     except (ValueError, TypeError):
@@ -2017,8 +2013,11 @@ def get_all_appointments(
                     )
                     if service:
                         service_names.append(service.name)
-                        if service.code:
-                            service_codes.append(normalize_service_code(service.code))
+                        service_code = service.service_code or get_service_code(
+                            service.id, db
+                        )
+                        if service_code:
+                            service_codes.append(service_code)
 
             # Получаем информацию о номерах в очередях для визита
             queue_numbers = []

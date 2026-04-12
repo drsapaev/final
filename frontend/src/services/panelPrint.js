@@ -889,10 +889,10 @@ function renderPrintableErrorWindow(printWindow, error, row) {
     printWindow.document.open();
     printWindow.document.write(errorHtml);
     printWindow.document.close();
-  } catch (_renderError) {
+  } catch {
     try {
       printWindow.close();
-    } catch (_closeError) {
+    } catch {
       // ignore
     }
   }
@@ -962,7 +962,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
   const serviceRows = services.length > 0
     ? services.map((service) => `
         <tr>
-          <td>${escapeHtml(service?.name || 'Услуга')}</td>
+          <td>${escapeHtml(service?.name || '—')}</td>
           <td class="center">${escapeHtml(service?.quantity || 1)}</td>
           <td class="right">${formatMoney(service?.price, service?.currency || currency)}</td>
           <td class="right">${formatMoney(service?.total, service?.currency || currency)}</td>
@@ -970,7 +970,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
       `).join('')
     : `
       <tr>
-        <td>${escapeHtml('Услуга')}</td>
+        <td>${escapeHtml('—')}</td>
         <td class="center">1</td>
         <td class="right">${formatMoney(payment?.total, currency)}</td>
         <td class="right">${formatMoney(payment?.total, currency)}</td>
