@@ -3,7 +3,7 @@
  * Основана на clsx с дополнительными возможностями
  */
 
-import { clsx } from 'clsx';
+import clsx from 'clsx';
 
 /**
  * Объединяет классы CSS в одну строку
@@ -21,13 +21,13 @@ export function cn(...inputs) {
  */
 export function conditionalClasses(conditions) {
   const classes = [];
-  
+
   for (const [condition, className] of Object.entries(conditions)) {
     if (condition && className) {
       classes.push(className);
     }
   }
-  
+
   return classes.join(' ');
 }
 
@@ -39,13 +39,13 @@ export function conditionalClasses(conditions) {
  */
 export function stateClasses(base, states = {}) {
   const classes = [base];
-  
+
   for (const [state, className] of Object.entries(states)) {
     if (state && className) {
       classes.push(className);
     }
   }
-  
+
   return classes.join(' ');
 }
 
@@ -56,7 +56,7 @@ export function stateClasses(base, states = {}) {
  */
 export function responsiveClasses(breakpoints = {}) {
   const classes = [];
-  
+
   const breakpointMap = {
     xs: 'xs:',
     sm: 'sm:',
@@ -65,14 +65,14 @@ export function responsiveClasses(breakpoints = {}) {
     xl: 'xl:',
     '2xl': '2xl:'
   };
-  
+
   for (const [breakpoint, className] of Object.entries(breakpoints)) {
     if (breakpoint && className) {
       const prefix = breakpointMap[breakpoint] || '';
       classes.push(`${prefix}${className}`);
     }
   }
-  
+
   return classes.join(' ');
 }
 

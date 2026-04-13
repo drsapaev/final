@@ -11,7 +11,7 @@ from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
-from app.services.queue_service import queue_service
+# from app.services.queue_service import queue_service
 
 
 class VisitConfirmationRepository:
@@ -53,6 +53,7 @@ class VisitConfirmationRepository:
         )
 
     def get_or_create_daily_queue(self, day: date, specialist_id: int, queue_tag: str):
+        from app.services.queue_service import queue_service
         return queue_service.get_or_create_daily_queue(
             self.db,
             day=day,

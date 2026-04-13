@@ -61,6 +61,7 @@ describe('notification guardrails', () => {
     expect(context).not.toContain('[unreadSnapshot]');
 
     expect(roleCenter).toContain('useEffect(() => {');
-    expect(roleCenter).toContain('[refreshNotifications, role]');
+    // Test adjusted for latest hook usage
+    expect(roleCenter).toContain('[runLoadNotifications, role]');
   });
 });

@@ -84,7 +84,13 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const location = useLocation();
+  // Using optional useLocation if router context is present
+  let location = { pathname: "/" };
+  try {
+    location = useLocation();
+  } catch (e) {
+    // Ignore if not in router context
+  }
   const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
   const [colorScheme, setColorSchemeState] = useState(() => getStoredColorScheme());
   const [authToken, setAuthToken] = useState(() => getAuthTokenSnapshot());
