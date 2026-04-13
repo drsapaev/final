@@ -301,7 +301,7 @@ const FileManager = () => {void
       }
       onClick={() => toggleFileSelection(file.id)}
       onKeyDown={(event) => handleActivationKeyDown(event, () => toggleFileSelection(file.id))}>
-      
+
           <div className="flex flex-col items-center text-center">
             <div className="mb-3">
               {getFileIcon(file)}
@@ -324,8 +324,9 @@ const FileManager = () => {void
             handlePreview(file.id);
           }}
           className="p-1 text-gray-400 hover:text-blue-600"
-          title="Предварительный просмотр">
-          
+          title="Предварительный просмотр"
+          aria-label="Предварительный просмотр">
+
               <Eye className="w-4 h-4" />
             </button>
             <button
@@ -334,8 +335,9 @@ const FileManager = () => {void
             handleDownload(file.id, file.filename);
           }}
           className="p-1 text-gray-400 hover:text-green-600"
-          title="Скачать">
-          
+          title="Скачать"
+          aria-label="Скачать">
+
               <Download className="w-4 h-4" />
             </button>
             <button
@@ -344,8 +346,9 @@ const FileManager = () => {void
             handleDelete(file.id);
           }}
           className="p-1 text-gray-400 hover:text-red-600"
-          title="Удалить">
-          
+          title="Удалить"
+          aria-label="Удалить">
+
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -371,7 +374,7 @@ const FileManager = () => {void
                   setSelectedFiles([]);
                 }
               }} />
-            
+
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Имя файла
@@ -405,7 +408,7 @@ const FileManager = () => {void
                   setSelectedFiles((prev) => prev.filter((id) => id !== file.id));
                 }
               }} />
-            
+
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
@@ -438,22 +441,25 @@ const FileManager = () => {void
                   <button
                 onClick={() => handlePreview(file.id)}
                 className="text-blue-600 hover:text-blue-900"
-                title="Предварительный просмотр">
-                
+                title="Предварительный просмотр"
+                aria-label="Предварительный просмотр">
+
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
                 onClick={() => handleDownload(file.id, file.filename)}
                 className="text-green-600 hover:text-green-900"
-                title="Скачать">
-                
+                title="Скачать"
+                aria-label="Скачать">
+
                     <Download className="w-4 h-4" />
                   </button>
                   <button
                 onClick={() => handleDelete(file.id)}
                 className="text-red-600 hover:text-red-900"
-                title="Удалить">
-                
+                title="Удалить"
+                aria-label="Удалить">
+
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -478,7 +484,7 @@ const FileManager = () => {void
           <button
             onClick={() => setShowStatsModal(true)}
             className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center">
-            
+
             <BarChart3 className="w-4 h-4 mr-2" />
             Статистика
           </button>
@@ -486,7 +492,7 @@ const FileManager = () => {void
           <button
             onClick={() => setShowUploadModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
-            
+
             <Upload className="w-4 h-4 mr-2" />
             Загрузить
           </button>
@@ -505,7 +511,7 @@ const FileManager = () => {void
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              
+
             </div>
           </div>
 
@@ -514,7 +520,7 @@ const FileManager = () => {void
               value={filters.fileType}
               onChange={(e) => handleFilterChange('fileType', e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-              
+
               <option value="">Все типы</option>
               <option value="image">Изображения</option>
               <option value="video">Видео</option>
@@ -528,7 +534,7 @@ const FileManager = () => {void
               value={filters.permission}
               onChange={(e) => handleFilterChange('permission', e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-              
+
               <option value="">Все права</option>
               <option value="public">Публичные</option>
               <option value="private">Приватные</option>
@@ -539,7 +545,7 @@ const FileManager = () => {void
             <button
               onClick={clearFilters}
               className="px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors">
-              
+
               Очистить
             </button>
           </div>
@@ -552,14 +558,16 @@ const FileManager = () => {void
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setViewMode('grid')}
+              aria-label="Отображать сеткой"
               className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
-              
+
               <Grid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
+              aria-label="Отображать списком"
               className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
-              
+
               <List className="w-4 h-4" />
             </button>
           </div>
@@ -572,7 +580,7 @@ const FileManager = () => {void
               <button
               onClick={() => setSelectedFiles([])}
               className="text-sm text-gray-600 hover:text-gray-800">
-              
+
                 Отменить
               </button>
             </div>
@@ -583,8 +591,9 @@ const FileManager = () => {void
           <button
             onClick={loadFiles}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            title="Обновить">
-            
+            title="Обновить"
+            aria-label="Обновить">
+
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
@@ -603,7 +612,7 @@ const FileManager = () => {void
           <button
           onClick={() => setShowUploadModal(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          
+
             Загрузить файлы
           </button>
         </div> :
@@ -619,8 +628,9 @@ const FileManager = () => {void
               <h3 className="text-lg font-semibold">Загрузить файлы</h3>
               <button
               onClick={() => setShowUploadModal(false)}
+              aria-label="Закрыть"
               className="text-gray-400 hover:text-gray-600">
-              
+
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -632,7 +642,7 @@ const FileManager = () => {void
               className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(event) => handleActivationKeyDown(event, () => fileInputRef.current?.click())}>
-              
+
                 <UploadIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600">Нажмите для выбора файлов или перетащите их сюда</p>
                 <p className="text-sm text-gray-500 mt-1">Поддерживаются все типы файлов</p>
@@ -644,7 +654,7 @@ const FileManager = () => {void
               multiple
               onChange={handleFileUpload}
               className="hidden" />
-            
+
 
               {uploading &&
             <div className="space-y-2">
@@ -666,7 +676,7 @@ const FileManager = () => {void
               <button
               onClick={() => setShowUploadModal(false)}
               className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
-              
+
                 Отмена
               </button>
             </div>
@@ -682,8 +692,9 @@ const FileManager = () => {void
               <h3 className="text-lg font-semibold">Статистика файлов</h3>
               <button
               onClick={() => setShowStatsModal(false)}
+              aria-label="Закрыть"
               className="text-gray-400 hover:text-gray-600">
-              
+
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -758,7 +769,7 @@ const FileManager = () => {void
               <button
               onClick={() => setShowStatsModal(false)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              
+
                 Закрыть
               </button>
             </div>
