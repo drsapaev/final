@@ -326,20 +326,21 @@ const UserManagement = () => {
   {
     key: 'actions',
     title: '',
-    render: (_, user) =>
-    <div onClick={(e) => e.stopPropagation()}>
-          <IconButton
+    render: (_, user) => (
+      <IconButton
+        aria-label="Действия с пользователем"
+        aria-haspopup="true"
+        aria-expanded={anchorEl && selectedUser?.id === user.id ? 'true' : 'false'}
         onClick={(e) => {
           e.stopPropagation();
           setAnchorEl(e.currentTarget);
           setSelectedUser(user);
         }}
-        size="small">
-        
-            <MoreVertical size={16} />
-          </IconButton>
-        </div>
-
+        size="small"
+      >
+        <MoreVertical size={16} />
+      </IconButton>
+    )
   }];
 
 
@@ -354,7 +355,7 @@ const UserManagement = () => {
           variant="primary"
           onClick={() => openUserDialog()}
           startIcon={<Plus size={16} />}>
-          
+
           Добавить пользователя
         </MacOSButton>
       </Box>
@@ -385,7 +386,7 @@ const UserManagement = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ paddingLeft: '32px', width: '100%' }} />
-              
+
             </div>
           </div>
 
@@ -397,7 +398,7 @@ const UserManagement = () => {
               onChange={(e) => setRoleFilter(e.target.value)}
               options={roleOptions}
               placeholder="Все роли" />
-            
+
           </div>
 
           {/* Status Filter */}
@@ -408,7 +409,7 @@ const UserManagement = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
               options={statusOptions}
               placeholder="Все статусы" />
-            
+
           </div>
 
           {/* Refresh Button */}
@@ -419,7 +420,7 @@ const UserManagement = () => {
               onClick={loadUsers}
               style={{ width: '100%', justifyContent: 'center' }}
               disabled={loading}>
-              
+
               <RefreshCw size={16} style={{ marginRight: '8px' }} />
               Обновить
             </MacOSButton>
@@ -434,7 +435,7 @@ const UserManagement = () => {
           data={filteredUsers}
           loading={loading}
           hoverable />
-        
+
       </MacOSCard>
 
       {/* Actions Menu (MUI Legacy for now) */}
@@ -449,7 +450,7 @@ const UserManagement = () => {
             border: '1px solid #e5e7eb'
           }
         }}>
-        
+
         <MenuItem onClick={() => {openUserDialog(selectedUser);setAnchorEl(null);}}>
           <ListItemIcon><Edit size={16} /></ListItemIcon>
           <ListItemText primary="Редактировать" primaryTypographyProps={{ fontSize: '13px' }} />
@@ -464,7 +465,7 @@ const UserManagement = () => {
           <ListItemText
             primary={selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
             primaryTypographyProps={{ fontSize: '13px' }} />
-          
+
         </MenuItem>
         <Divider />
         <MenuItem onClick={() => {
@@ -483,7 +484,7 @@ const UserManagement = () => {
         user={selectedUser}
         onSave={handleSaveUser}
         loading={loading && showUserModal} />
-      
+
 
       {/* Delete Confirmation Dialog (Using MacOSModal) */}
       <MacOSModal
