@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
+from app.models.user import User
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_session import (
     get_or_create_session_id,
@@ -122,7 +123,7 @@ class QueueBusinessService:
             )
 
     @classmethod
-    def get_start_number_for_specialist(cls, specialist: User) -> int:
+    def get_start_number_for_specialist(cls, specialist: "User") -> int:
         """Получить стартовый номер для специалиста"""
         # Определяем специальность по роли или другим атрибутам
         specialty = cls._determine_specialty(specialist)
@@ -131,7 +132,7 @@ class QueueBusinessService:
         )
 
     @classmethod
-    def _determine_specialty(cls, specialist: User) -> str:
+    def _determine_specialty(cls, specialist: "User") -> str:
         """Определить специальность врача"""
         # Можно расширить логику определения специальности
         if hasattr(specialist, 'specialty'):
