@@ -1,25 +1,25 @@
-import { useState, useEffect } from "react";
-import PropTypes from "prop-types";
-import { Printer, AlertCircle, Wifi, WifiOff } from "lucide-react";
-import ModernDialog from "./ModernDialog";
-import { useTheme } from "../../contexts/ThemeContext";
-import { printService } from "../../services/print";
-import { toast } from "react-toastify";
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { Printer, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import ModernDialog from './ModernDialog';
+import { useTheme } from '../../contexts/ThemeContext';
+import { printService } from '../../services/print';
+import { toast } from 'react-toastify';
 
-import logger from "../../utils/logger";
+import logger from '../../utils/logger';
 
 const formatPrintServiceLabel = (service) => {
-  if (service == null) return "";
+  if (service == null) return '';
 
   if (
-    typeof service === "string" ||
-    typeof service === "number" ||
-    typeof service === "bigint"
+    typeof service === 'string' ||
+    typeof service === 'number' ||
+    typeof service === 'bigint'
   ) {
     return String(service).trim();
   }
 
-  if (typeof service === "object") {
+  if (typeof service === 'object') {
     const candidate =
       service.service_name ||
       service.name ||
@@ -28,7 +28,7 @@ const formatPrintServiceLabel = (service) => {
       service.label ||
       service.title ||
       service.value ||
-      "";
+      '';
     return String(candidate).trim();
   }
 
@@ -37,7 +37,7 @@ const formatPrintServiceLabel = (service) => {
 
 const formatPrintServices = (services) => {
   if (Array.isArray(services)) {
-    return services.map(formatPrintServiceLabel).filter(Boolean).join(", ");
+    return services.map(formatPrintServiceLabel).filter(Boolean).join(', ');
   }
 
   return formatPrintServiceLabel(services);
@@ -46,22 +46,22 @@ const formatPrintServices = (services) => {
 const PrintDialog = ({
   isOpen,
   onClose,
-  documentType = "ticket",
+  documentType = 'ticket',
   documentData,
   onPrint,
 }) => {
   const { theme } = useTheme();
   const surfaceStyle = {
-    backgroundColor: "var(--mac-bg-secondary)",
-    border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "var(--mac-border)"}`,
-    borderRadius: "14px",
+    backgroundColor: 'var(--mac-bg-secondary)',
+    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'var(--mac-border)'}`,
+    borderRadius: '14px',
   };
   const [printers, setPrinters] = useState([]);
-  const [selectedPrinter, setSelectedPrinter] = useState("");
+  const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [error, setError] = useState("");
-  const usesBrowserPrint = documentType === "ticket";
+  const [error, setError] = useState('');
+  const usesBrowserPrint = documentType === 'ticket';
 
   // Загрузка списка принтеров
   useEffect(() => {
@@ -72,30 +72,30 @@ const PrintDialog = ({
 
     if (isOpen && usesBrowserPrint) {
       setPrinters([]);
-      setSelectedPrinter("");
-      setError("");
+      setSelectedPrinter('');
+      setError('');
       setIsLoading(false);
     }
   }, [isOpen, usesBrowserPrint]);
 
   const loadPrinters = async () => {
     setIsLoading(true);
-    setError("");
+    setError('');
 
     try {
       const result = await printService.getPrinters();
       if (!result.success) {
         throw new Error(
-          result.error || "Не удалось загрузить список принтеров",
+          result.error || 'Не удалось загрузить список принтеров',
         );
       }
 
       const backendPrinters = Array.isArray(result.data) ? result.data : [];
       const normalizedPrinters = backendPrinters.map((printer) => ({
         id: printer.name || String(printer.id),
-        name: printer.display_name || printer.name || "Принтер",
-        status: printer.status || "offline",
-        type: printer.printer_type || "unknown",
+        name: printer.display_name || printer.name || 'Принтер',
+        status: printer.status || 'offline',
+        type: printer.printer_type || 'unknown',
         isDefault: Boolean(printer.is_default),
       }));
 
@@ -103,16 +103,16 @@ const PrintDialog = ({
 
       // Автовыбор принтера по умолчанию или первого доступного онлайн
       const onlinePrinter =
-        normalizedPrinters.find((p) => p.isDefault && p.status === "online") ||
-        normalizedPrinters.find((p) => p.status === "online");
+        normalizedPrinters.find((p) => p.isDefault && p.status === 'online') ||
+        normalizedPrinters.find((p) => p.status === 'online');
       if (onlinePrinter) {
         setSelectedPrinter(onlinePrinter.id);
       } else {
-        setSelectedPrinter("");
+        setSelectedPrinter('');
       }
     } catch (error) {
-      logger.error("Error loading printers:", error);
-      setError(error.message || "Не удалось загрузить список принтеров");
+      logger.error('Error loading printers:', error);
+      setError(error.message || 'Не удалось загрузить список принтеров');
     } finally {
       setIsLoading(false);
     }
@@ -120,13 +120,13 @@ const PrintDialog = ({
 
   const handlePrint = async () => {
     if (!usesBrowserPrint && !selectedPrinter) {
-      toast.error("Выберите принтер");
+      toast.error('Выберите принтер');
       return;
     }
 
     const printer = printers.find((p) => p.id === selectedPrinter);
-    if (!usesBrowserPrint && printer?.status !== "online") {
-      toast.error("Выбранный принтер недоступен");
+    if (!usesBrowserPrint && printer?.status !== 'online') {
+      toast.error('Выбранный принтер недоступен');
       return;
     }
 
@@ -143,13 +143,13 @@ const PrintDialog = ({
 
       toast.success(
         usesBrowserPrint
-          ? "Открыт диалог печати этого компьютера"
-          : "Документ отправлен на печать",
+          ? 'Открыт диалог печати этого компьютера'
+          : 'Документ отправлен на печать',
       );
       onClose();
     } catch (error) {
-      logger.error("Print error:", error);
-      toast.error("Ошибка при печати: " + error.message);
+      logger.error('Print error:', error);
+      toast.error('Ошибка при печати: ' + error.message);
     } finally {
       setIsPrinting(false);
     }
@@ -157,40 +157,40 @@ const PrintDialog = ({
 
   const getDocumentTitle = () => {
     switch (documentType) {
-      case "ticket":
-        return "Талон пациента";
-      case "receipt":
-        return "Чек об оплате";
-      case "report":
-        return "Отчет";
+      case 'ticket':
+        return 'Талон пациента';
+      case 'receipt':
+        return 'Чек об оплате';
+      case 'report':
+        return 'Отчет';
       default:
-        return "Документ";
+        return 'Документ';
     }
   };
 
   const getDocumentIcon = () => {
     switch (documentType) {
-      case "ticket":
-        return "🎫";
-      case "receipt":
-        return "🧾";
-      case "report":
-        return "📄";
+      case 'ticket':
+        return '🎫';
+      case 'receipt':
+        return '🧾';
+      case 'report':
+        return '📄';
       default:
-        return "📄";
+        return '📄';
     }
   };
 
   const actions = [
     {
-      label: "Отмена",
-      variant: "secondary",
+      label: 'Отмена',
+      variant: 'secondary',
       onClick: onClose,
       disabled: isPrinting,
     },
     {
-      label: isPrinting ? "Печатаем..." : "Печать",
-      variant: "primary",
+      label: isPrinting ? 'Печатаем...' : 'Печать',
+      variant: 'primary',
       icon: isPrinting ? null : <Printer size={16} />,
       onClick: handlePrint,
       disabled:
@@ -205,7 +205,7 @@ const PrintDialog = ({
       title={`${getDocumentIcon()} Печать документа`}
       actions={actions}
       dialogStyle={{
-        backgroundColor: "var(--mac-bg-primary)",
+        backgroundColor: 'var(--mac-bg-primary)',
       }}
       closeOnBackdrop={!isPrinting}
       closeOnEscape={!isPrinting}
@@ -214,17 +214,17 @@ const PrintDialog = ({
         {/* Информация о документе */}
         <div
           style={{
-            marginBottom: "24px",
-            padding: "16px",
+            marginBottom: '24px',
+            padding: '16px',
             ...surfaceStyle,
           }}
         >
           <h4
             style={{
-              color: "var(--color-text-primary)",
-              margin: "0 0 8px 0",
-              fontSize: "16px",
-              fontWeight: "600",
+              color: 'var(--color-text-primary)',
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              fontWeight: '600',
             }}
           >
             {getDocumentTitle()}
@@ -232,14 +232,14 @@ const PrintDialog = ({
 
           {documentData && (
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
             >
               {documentData.patient_fio && (
                 <p
                   style={{
-                    color: "var(--color-text-secondary)",
+                    color: 'var(--color-text-secondary)',
                     margin: 0,
-                    fontSize: "14px",
+                    fontSize: '14px',
                   }}
                 >
                   Пациент: <strong>{documentData.patient_fio}</strong>
@@ -249,9 +249,9 @@ const PrintDialog = ({
               {documentData.services && (
                 <p
                   style={{
-                    color: "var(--color-text-secondary)",
+                    color: 'var(--color-text-secondary)',
                     margin: 0,
-                    fontSize: "14px",
+                    fontSize: '14px',
                   }}
                 >
                   Услуги: {formatPrintServices(documentData.services)}
@@ -261,9 +261,9 @@ const PrintDialog = ({
               {documentData.cost && (
                 <p
                   style={{
-                    color: "var(--color-text-secondary)",
+                    color: 'var(--color-text-secondary)',
                     margin: 0,
-                    fontSize: "14px",
+                    fontSize: '14px',
                   }}
                 >
                   Сумма: <strong>{documentData.cost.toLocaleString()} ₽</strong>
@@ -276,20 +276,20 @@ const PrintDialog = ({
         {usesBrowserPrint ? (
           <div
             style={{
-              padding: "16px",
-              borderRadius: "14px",
+              padding: '16px',
+              borderRadius: '14px',
               backgroundColor:
-                theme === "dark" ? "rgba(59, 130, 246, 0.08)" : "#eff6ff",
-              border: `1px solid ${theme === "dark" ? "rgba(59, 130, 246, 0.24)" : "#bfdbfe"}`,
-              color: "var(--color-text-primary)",
+                theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : '#eff6ff',
+              border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.24)' : '#bfdbfe'}`,
+              color: 'var(--color-text-primary)',
             }}
           >
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "8px",
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '8px',
               }}
             >
               <Printer size={20} />
@@ -297,9 +297,9 @@ const PrintDialog = ({
             </div>
             <p
               style={{
-                margin: "0 0 8px 0",
-                fontSize: "14px",
-                color: "var(--color-text-secondary)",
+                margin: '0 0 8px 0',
+                fontSize: '14px',
+                color: 'var(--color-text-secondary)',
               }}
             >
               Будет открыт системный диалог печати на текущем компьютере.
@@ -307,8 +307,8 @@ const PrintDialog = ({
             <p
               style={{
                 margin: 0,
-                fontSize: "14px",
-                color: "var(--color-text-secondary)",
+                fontSize: '14px',
+                color: 'var(--color-text-secondary)',
               }}
             >
               Список принтеров покажет устройства именно этого ПК, а не сервера.
@@ -320,11 +320,11 @@ const PrintDialog = ({
             <div>
               <label
                 style={{
-                  display: "block",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  marginBottom: "12px",
-                  color: "var(--color-text-primary)",
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '12px',
+                  color: 'var(--color-text-primary)',
                 }}
               >
                 Выберите принтер
@@ -333,50 +333,50 @@ const PrintDialog = ({
               {isLoading ? (
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "40px",
-                    color: "var(--color-text-secondary)",
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '40px',
+                    color: 'var(--color-text-secondary)',
                   }}
                 >
                   <div
                     className="loading-spinner"
-                    style={{ marginRight: "12px" }}
+                    style={{ marginRight: '12px' }}
                   ></div>
                   Загрузка принтеров...
                 </div>
               ) : error ? (
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "16px",
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '16px',
                     backgroundColor:
-                      theme === "dark" ? "rgba(239, 68, 68, 0.10)" : "#fef2f2",
-                    border: `1px solid ${theme === "dark" ? "rgba(239, 68, 68, 0.24)" : "#fecaca"}`,
-                    borderRadius: "14px",
-                    color: theme === "dark" ? "#fca5a5" : "#dc2626",
+                      theme === 'dark' ? 'rgba(239, 68, 68, 0.10)' : '#fef2f2',
+                    border: `1px solid ${theme === 'dark' ? 'rgba(239, 68, 68, 0.24)' : '#fecaca'}`,
+                    borderRadius: '14px',
+                    color: theme === 'dark' ? '#fca5a5' : '#dc2626',
                   }}
                 >
                   <AlertCircle size={20} />
                   <div>
-                    <p style={{ margin: "0 0 8px 0", fontWeight: "500" }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>
                       Ошибка загрузки принтеров
                     </p>
-                    <p style={{ margin: 0, fontSize: "14px" }}>{error}</p>
+                    <p style={{ margin: 0, fontSize: '14px' }}>{error}</p>
                     <button
                       onClick={loadPrinters}
                       style={{
-                        marginTop: "8px",
-                        padding: "4px 8px",
-                        fontSize: "12px",
-                        backgroundColor: "transparent",
-                        border: "1px solid currentColor",
-                        borderRadius: "4px",
-                        color: "inherit",
-                        cursor: "pointer",
+                        marginTop: '8px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        backgroundColor: 'transparent',
+                        border: '1px solid currentColor',
+                        borderRadius: '4px',
+                        color: 'inherit',
+                        cursor: 'pointer',
                       }}
                     >
                       Повторить
@@ -386,84 +386,84 @@ const PrintDialog = ({
               ) : (
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
                   }}
                 >
                   {printers.map((printer) => (
                     <div
                       key={printer.id}
                       role="button"
-                      tabIndex={printer.status === "online" ? 0 : -1}
-                      aria-disabled={printer.status !== "online"}
+                      tabIndex={printer.status === 'online' ? 0 : -1}
+                      aria-disabled={printer.status !== 'online'}
                       onClick={() => {
-                        if (printer.status === "online") {
+                        if (printer.status === 'online') {
                           setSelectedPrinter(printer.id);
                         }
                       }}
                       onKeyDown={(event) => {
                         if (
-                          (event.key === "Enter" || event.key === " ") &&
-                          printer.status === "online"
+                          (event.key === 'Enter' || event.key === ' ') &&
+                          printer.status === 'online'
                         ) {
                           event.preventDefault();
                           setSelectedPrinter(printer.id);
                         }
                       }}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "12px 14px",
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 14px',
                         border: `1px solid ${
                           selectedPrinter === printer.id
-                            ? "#3b82f6"
-                            : theme === "dark"
-                              ? "rgba(255,255,255,0.10)"
-                              : "var(--mac-border)"
+                            ? '#3b82f6'
+                            : theme === 'dark'
+                              ? 'rgba(255,255,255,0.10)'
+                              : 'var(--mac-border)'
                         }`,
-                        borderRadius: "12px",
+                        borderRadius: '12px',
                         backgroundColor:
                           selectedPrinter === printer.id
-                            ? theme === "dark"
-                              ? "rgba(59, 130, 246, 0.16)"
-                              : "#eff6ff"
-                            : theme === "dark"
-                              ? "rgba(255,255,255,0.04)"
-                              : "white",
+                            ? theme === 'dark'
+                              ? 'rgba(59, 130, 246, 0.16)'
+                              : '#eff6ff'
+                            : theme === 'dark'
+                              ? 'rgba(255,255,255,0.04)'
+                              : 'white',
                         cursor:
-                          printer.status === "online"
-                            ? "pointer"
-                            : "not-allowed",
-                        opacity: printer.status === "online" ? 1 : 0.6,
-                        transition: "all 0.2s ease",
+                          printer.status === 'online'
+                            ? 'pointer'
+                            : 'not-allowed',
+                        opacity: printer.status === 'online' ? 1 : 0.6,
+                        transition: 'all 0.2s ease',
                       }}
                     >
                       {/* Радио кнопка */}
                       <div
                         style={{
-                          width: "16px",
-                          height: "16px",
-                          borderRadius: "50%",
-                          border: `2px solid ${selectedPrinter === printer.id ? "#3b82f6" : "#9ca3af"}`,
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          border: `2px solid ${selectedPrinter === printer.id ? '#3b82f6' : '#9ca3af'}`,
                           backgroundColor:
                             selectedPrinter === printer.id
-                              ? "#3b82f6"
-                              : "transparent",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
+                              ? '#3b82f6'
+                              : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           flexShrink: 0,
                         }}
                       >
                         {selectedPrinter === printer.id && (
                           <div
                             style={{
-                              width: "6px",
-                              height: "6px",
-                              borderRadius: "50%",
-                              backgroundColor: "white",
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: 'white',
                             }}
                           />
                         )}
@@ -473,7 +473,7 @@ const PrintDialog = ({
                       <Printer
                         size={20}
                         style={{
-                          color: "var(--color-text-secondary)",
+                          color: 'var(--color-text-secondary)',
                           flexShrink: 0,
                         }}
                       />
@@ -482,27 +482,27 @@ const PrintDialog = ({
                       <div style={{ flex: 1 }}>
                         <div
                           style={{
-                            color: "var(--color-text-primary)",
-                            fontSize: "14px",
-                            fontWeight: "500",
+                            color: 'var(--color-text-primary)',
+                            fontSize: '14px',
+                            fontWeight: '500',
                           }}
                         >
                           {printer.name}
                         </div>
                         <div
                           style={{
-                            color: "var(--color-text-secondary)",
-                            fontSize: "12px",
-                            marginTop: "2px",
+                            color: 'var(--color-text-secondary)',
+                            fontSize: '12px',
+                            marginTop: '2px',
                           }}
                         >
-                          {printer.type === "thermal" ||
-                          printer.type === "ESC/POS"
-                            ? "Термопринтер"
-                            : printer.type === "A4" ||
-                                printer.type === "A5" ||
-                                printer.type === "laser"
-                              ? "Лазерный принтер"
+                          {printer.type === 'thermal' ||
+                          printer.type === 'ESC/POS'
+                            ? 'Термопринтер'
+                            : printer.type === 'A4' ||
+                                printer.type === 'A5' ||
+                                printer.type === 'laser'
+                              ? 'Лазерный принтер'
                               : printer.type}
                         </div>
                       </div>
@@ -510,16 +510,16 @@ const PrintDialog = ({
                       {/* Статус */}
                       <div
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "12px",
-                          fontWeight: "500",
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '12px',
+                          fontWeight: '500',
                           color:
-                            printer.status === "online" ? "#10b981" : "#ef4444",
+                            printer.status === 'online' ? '#10b981' : '#ef4444',
                         }}
                       >
-                        {printer.status === "online" ? (
+                        {printer.status === 'online' ? (
                           <>
                             <Wifi size={14} />
                             Онлайн
@@ -539,14 +539,14 @@ const PrintDialog = ({
               {printers.length === 0 && !isLoading && !error && (
                 <div
                   style={{
-                    textAlign: "center",
-                    padding: "40px",
-                    color: "var(--color-text-secondary)",
+                    textAlign: 'center',
+                    padding: '40px',
+                    color: 'var(--color-text-secondary)',
                   }}
                 >
                   <Printer
                     size={48}
-                    style={{ opacity: 0.3, marginBottom: "16px" }}
+                    style={{ opacity: 0.3, marginBottom: '16px' }}
                   />
                   <p style={{ margin: 0 }}>Принтеры не найдены</p>
                 </div>
@@ -562,7 +562,7 @@ const PrintDialog = ({
 PrintDialog.propTypes = {
   isOpen: PropTypes.bool,
   onClose: PropTypes.func,
-  documentType: PropTypes.oneOf(["ticket", "receipt", "report"]),
+  documentType: PropTypes.oneOf(['ticket', 'receipt', 'report']),
   documentData: PropTypes.shape({
     patient_fio: PropTypes.string,
     services: PropTypes.oneOfType([

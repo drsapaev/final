@@ -18,7 +18,7 @@ describe('MacOSInput', () => {
       />,
     );
 
-    const clearButton = screen.getByRole('button', { name: /clear input/i });
+    const clearButton = screen.getByRole('button', { name: /очистить ввод/i });
     expect(clearButton).toBeInTheDocument();
 
     fireEvent.click(clearButton);
