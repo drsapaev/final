@@ -31,6 +31,7 @@ class MessagesApiService:
         db: Session,
         repository: MessagesApiRepository | None = None,
     ):
+        self.db = db
         self.repository = repository or MessagesApiRepository(db)
 
     @staticmethod
@@ -43,6 +44,11 @@ class MessagesApiService:
             import html
 
             return html.escape(content)
+
+    @staticmethod
+    def build_conversation_id(*, first_user_id: int, second_user_id: int) -> str:
+        ordered_ids = sorted([int(first_user_id), int(second_user_id)])
+        return f"{ordered_ids[0]}:{ordered_ids[1]}"
 
     def validate_recipient(self, *, recipient_id: int, current_user: User) -> User:
         if recipient_id == current_user.id:
@@ -145,6 +151,19 @@ class MessagesApiService:
         from app.ws.chat_ws import chat_manager
 
         enriched_message = self.enrich_message(new_message)
+        await notification_sender_service.send_message_received_notification(
+            db=self.db,
+            recipient=recipient,
+            sender=current_user,
+            message_id=new_message.id,
+            conversation_id=self.build_conversation_id(
+                first_user_id=current_user.id,
+                second_user_id=recipient.id,
+            ),
+            message_type=new_message.message_type,
+            preview=sanitized_content,
+            patient_id=message_data.patient_id,
+        )
         try:
             asyncio.create_task(
                 chat_manager.notify_new_message(
@@ -404,6 +423,19 @@ class MessagesApiService:
         self.repository.refresh(new_message)
 
         enriched_message = self.enrich_message(new_message)
+        await notification_sender_service.send_message_received_notification(
+            db=self.db,
+            recipient=recipient,
+            sender=current_user,
+            message_id=new_message.id,
+            conversation_id=self.build_conversation_id(
+                first_user_id=current_user.id,
+                second_user_id=recipient.id,
+            ),
+            message_type=new_message.message_type,
+            preview=None,
+            patient_id=getattr(new_message, "patient_id", None),
+        )
         try:
             message_data = jsonable_encoder(
                 enriched_message.model_dump()
@@ -463,7 +495,10 @@ class MessagesApiService:
         file: UploadFile,
         current_user: User,
     ) -> MessageOut:
-        self.validate_recipient(recipient_id=recipient_id, current_user=current_user)
+        recipient = self.validate_recipient(
+            recipient_id=recipient_id,
+            current_user=current_user,
+        )
 
         content = await file.read()
         original_filename = os.path.basename(file.filename or "file")
@@ -493,12 +528,25 @@ class MessagesApiService:
         self.repository.refresh(message_obj)
 
         msg_out = self.enrich_message(message_obj)
+        await notification_sender_service.send_message_received_notification(
+            db=self.db,
+            recipient=recipient,
+            sender=current_user,
+            message_id=message_obj.id,
+            conversation_id=self.build_conversation_id(
+                first_user_id=current_user.id,
+                second_user_id=recipient.id,
+            ),
+            message_type=message_obj.message_type,
+            preview=original_filename,
+            patient_id=getattr(message_obj, "patient_id", None),
+        )
         try:
             from app.ws.chat_ws import chat_manager
 
             asyncio.create_task(
                 chat_manager.broadcast_event(
-                    user_ids=[current_user.id, recipient_id],
+                    user_ids=[current_user.id, recipient.id],
                     event_type=MessageEventType.NEW_MESSAGE,
                     data=jsonable_encoder(
                         msg_out.model_dump() if hasattr(msg_out, "model_dump") else msg_out.dict()

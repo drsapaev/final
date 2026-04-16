@@ -101,7 +101,7 @@ def test_frontend_notifications_context_and_inbox_use_canonical_delivery_model()
     role_center = FRONTEND_ROLE_CENTER_JSX.read_text(encoding="utf-8")
 
     for marker in [
-        "queue_update: 'queue_changed'",
+        "queue_changed: 'queue_update'",
         "payment_success: 'payment_notification'",
         "loadNotifications",
         "markAllAsRead",

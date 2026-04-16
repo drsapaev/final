@@ -33,6 +33,92 @@ function getSeverityStyle(severity = 'info') {
   }
 }
 
+function extractMetadata(item) {
+  if (!item) {
+    return {};
+  }
+
+  const payloadSnapshot = item.payloadSnapshot || item.raw?.payload_snapshot || item.raw?.payloadSnapshot;
+  let snapshotData = payloadSnapshot;
+  if (typeof snapshotData === 'string') {
+    try {
+      snapshotData = JSON.parse(snapshotData);
+    } catch {
+      snapshotData = null;
+    }
+  }
+
+  const metadata =
+    snapshotData?.metadata ||
+    item.raw?.metadata ||
+    item.raw?.data ||
+    {};
+
+  return metadata && typeof metadata === 'object' ? metadata : {};
+}
+
+function resolveNotificationTarget(item, role) {
+  const explicitDeepLink = String(item?.deepLink || '').trim();
+  if (explicitDeepLink) {
+    return explicitDeepLink;
+  }
+
+  const type = String(item?.type || item?.eventType || '').trim().toLowerCase();
+  const metadata = extractMetadata(item);
+
+  switch (type) {
+    case 'all_free_requested':
+    case 'all_free_approved':
+    case 'all_free_rejected':
+      return '/admin/all-free-requests';
+    case 'message_received':
+      return metadata.conversation_id ? `/messages?conversation=${metadata.conversation_id}` : '/messages';
+    case 'lab_results':
+      return '/lab/results';
+    case 'lab_critical_result':
+      return '/lab/results?critical=1';
+    case 'new_appointment':
+    case 'queue_status_changed':
+    case 'price_change':
+      return '/registrar';
+    case 'patient_registered':
+      return '/registrar/patients';
+    case 'queue_call':
+    case 'queue_position':
+    case 'queue_reminder':
+    case 'queue_update':
+    case 'queue_changed':
+    case 'diagnostics_return_needed':
+      return '/queue';
+    case 'security_alert':
+    case 'billing_alert':
+      return '/admin';
+    case 'registrar_system_alert':
+      return '/registrar';
+    case 'system_alert':
+      return role === 'admin' ? '/admin' : '/registrar';
+    default:
+      return null;
+  }
+}
+
+function navigateToNotificationTarget(target) {
+  if (!target || typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const current = `${window.location.pathname || ''}${window.location.search || ''}`;
+    if (current === target) {
+      return;
+    }
+    window.history.pushState({}, '', target);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  } catch (error) {
+    logger.warn('[NotificationInbox] failed to navigate by notification target', error);
+  }
+}
+
 export default function NotificationInbox({ role, onClose }) {
   const {
     getNotificationsByRole,
@@ -105,6 +191,9 @@ export default function NotificationInbox({ role, onClose }) {
       if (!item.isRead && !item.isArchived) {
         await markAsRead(item.id);
       }
+
+      const target = resolveNotificationTarget(item, role);
+      navigateToNotificationTarget(target);
     } catch (error) {
       logger.warn('[NotificationInbox] failed to mark notification open state', error);
     }

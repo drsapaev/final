@@ -67,6 +67,7 @@ describe('NotificationInbox', () => {
   it('renders a keyboard-accessible inbox item and wires read/archive actions', async () => {
     // eslint-disable-next-line jsx-a11y/aria-role
     render(<NotificationInbox role="admin" onClose={vi.fn()} />);
+    window.history.pushState({}, '', '/');
 
     expect(screen.getByRole('dialog', { name: /центр уведомлений/i })).toBeInTheDocument();
 
@@ -77,6 +78,9 @@ describe('NotificationInbox', () => {
     await waitFor(() => {
       expect(notificationCenterState.markAsSeen).toHaveBeenCalledWith('delivery-1');
       expect(notificationCenterState.markAsRead).toHaveBeenCalledWith('delivery-1');
+    });
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/queue');
     });
 
     fireEvent.click(screen.getByRole('button', { name: /^Прочитать все$/i }));

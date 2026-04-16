@@ -3,6 +3,7 @@ API endpoints для мастера регистрации с поддержко
 Расширение существующего registrar_integration.py
 """
 
+import asyncio
 import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -23,6 +24,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.feature_flags import is_feature_enabled
+from app.services.notifications import notification_sender_service
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import get_service_code, normalize_service_code
@@ -983,6 +985,29 @@ def create_cart_appointments(
         db.commit()
         logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
 
+        if effective_discount_mode == "all_free":
+            for visit in created_visits:
+                if visit.approval_status != "pending":
+                    continue
+                try:
+                    asyncio.run(
+                        notification_sender_service.send_all_free_request_notification(
+                            db=db,
+                            visit=visit,
+                            actor_user=current_user,
+                        )
+                    )
+                except Exception as notification_error:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] failed to publish all_free_requested after cart commit",
+                        extra={
+                            "visit_id": visit.id,
+                            "patient_id": cart_data.patient_id,
+                            "actor_id": current_user.id,
+                            "error": str(notification_error),
+                        },
+                    )
+
         # Формируем талоны для визитов с присвоенными номерами очередей
         print_tickets = []
         # Блок формирования талонов пропускаем, так как queue_numbers пустой
@@ -1461,6 +1486,26 @@ def approve_all_free_request(
 
         db.commit()
         db.refresh(visit)
+
+        try:
+            asyncio.run(
+                notification_sender_service.send_all_free_decision_notification(
+                    db=db,
+                    visit=visit,
+                    actor_user=current_user,
+                    rejection_reason=approval_data.rejection_reason,
+                )
+            )
+        except Exception as notification_error:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] failed to publish all_free decision notification",
+                extra={
+                    "visit_id": visit.id,
+                    "approval_status": visit.approval_status,
+                    "actor_id": current_user.id,
+                    "error": str(notification_error),
+                },
+            )
 
         return {
             "success": True,
