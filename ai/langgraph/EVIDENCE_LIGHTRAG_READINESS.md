@@ -2106,3 +2106,266 @@ PLEASE IMPLEMENT THIS PLAN: Repeat Auto-Suggestion v1 (Hint-Only) for Registrar 
 - current stack sufficient: yes
 - would LightRAG likely help here: no
 - Once the gate retry included the known root-cause path, the change was a bounded two-file implementation with no unresolved cross-domain mapping gaps.
+
+## Task 61 - Unified notification catalog and SSOT completion
+
+### User task
+PLEASE IMPLEMENT THIS PLAN: Full Plan: Unified Notification Catalog and SSOT Completion
+
+### Gate result
+- mode: gate
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/notification_platform_service.py
+
+### What handoff solved well
+- It confirmed the task is risky and should not be handled as a casual direct-execute change.
+- It preserved a narrow-stop posture instead of allowing broad cross-domain edits without a validated ownership map.
+
+### Missing relationship mapping
+- The gate missed the actual cross-domain ownership set for this task: notifications platform, notifications service, registrar wizard, messages service, lab notification service, registrar notification service, patient create flow, frontend notification context, and notification UI/tests/docs.
+- It collapsed a multi-producer/frontend-parity task into a single approved file, which is insufficient for safe execution.
+
+### Manual reconstruction needed
+- Manually confirmed from repo inspection that the requested plan spans multiple backend producers plus frontend consumer parity and cannot be completed inside `notification_platform_service.py` alone.
+- Manually determined that proceeding under the narrow override prompt would violate the first-slice stop condition because the smallest safe implementation spills beyond the approved file set.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: no
+- would LightRAG likely help here: yes
+- The task needs a better multi-hop ownership map across notification producers and frontend consumers. The current gate/handoff path misrouted to a single root file and was not sufficient to safely execute the requested plan.
+
+## Task 62 - Unified notification catalog slice 2 canonical helpers
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/notifications.py
+
+### What handoff solved well
+- It constrained this retry to a single safe file and prevented accidental multi-file scope spread.
+- It gave an explicit narrow verification target (`py_compile`) for the approved file.
+
+### Missing relationship mapping
+- The gate still did not recover the full slice-2 ownership map (lab producer wiring, registrar legacy producer wiring, patient create flow, tests/frontend parity).
+- It reduced a multi-producer implementation slice to one helper file, requiring phased execution by manual decomposition.
+
+### Manual reconstruction needed
+- Manually converted slice 2 into a safe sub-slice: implement typed canonical producer helpers in `notifications.py` first.
+- Manually deferred cross-file wiring and tests to next slices because they are outside the approved override scope.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Relationship-aware retrieval would likely reduce repeated gate misroutes and better surface the multi-file ownership graph for planned notification SSOT slices.
+
+## Task 63 - Unified notification catalog slice 2 lab producer wiring
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/lab_notification_service.py
+
+### What handoff solved well
+- It constrained the patch to one lab domain file and prevented accidental spill into other producers.
+- It provided a direct compile verification target for the first safe change.
+
+### Missing relationship mapping
+- The gate still did not return the planned multi-file slice ownership (lab service + tests + downstream consumers).
+- Transport vs canonical producer sequencing had to be reasoned manually from code.
+
+### Manual reconstruction needed
+- Manually inserted canonical producer-first calls for `lab_results` and `lab_critical_result` before/alongside Telegram transport.
+- Manually mapped follow-up reminders to canonical `diagnostics_return_needed` while preserving existing channel behavior.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better relationship retrieval would likely reduce repeated narrow-override cycles and surface the intended producer/consumer slices directly.
+
+## Task 64 - Unified notification catalog slice 2 registrar producer wiring
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/registrar_notification_service.py
+
+### What handoff solved well
+- It constrained the change to the registrar notification service and avoided endpoint/frontend sprawl.
+- It provided a clear compile verification target for the approved file.
+
+### Missing relationship mapping
+- The gate did not surface producer mapping details for each registrar event type from the requested catalog.
+- Recipient role and alert-type canonicalization (`registrar_system_alert` vs `security_alert` vs `billing_alert`) still had to be derived manually.
+
+### Manual reconstruction needed
+- Manually added canonical producer-first calls for `new_appointment`, `price_change`, `queue_status_changed`, `system_alert` variants, and daily/services summary signals.
+- Manually preserved Telegram/email/SMS sends as secondary transports after canonical record attempt.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Relationship-aware retrieval would likely reduce repeated manual mapping of event-type semantics and recipient routing for registrar flows.
+
+## Task 65 - Unified notification catalog slice 2 patient create producer wiring
+
+### User task
+продолжай
+
+### Gate result
+- mode: canonical
+- handoff required: no
+- handoff used: no
+
+### What handoff solved well
+- none
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually attached `patient_registered` creation to `PatientService.create_patient` only, after successful commit.
+- Manually preserved update/delete flows without emitting this event.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- This was a direct single-owner service path once the canonical helper API already existed.
+
+## Task 66 - Unified notification catalog frontend context parity
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/contexts/notificationcentercontext.jsx
+
+### What handoff solved well
+- It constrained the frontend catalog fix to a single context file and prevented broad UI refactors.
+- It provided a nearest verification target (frontend lint for the file).
+
+### Missing relationship mapping
+- The gate did not provide canonical event matrix reconciliation details and alias drift list.
+- Backend alias interactions (e.g., `queue_changed` vs `queue_update`) still had to be mapped manually.
+
+### Manual reconstruction needed
+- Manually synchronized role matrices with current canonical event catalog.
+- Manually added alias normalization for legacy frontend/backend drift (`result_ready`, `payment_update`, `appointment_rescheduled`, queue aliases, alert aliases, all-free aliases).
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better relationship retrieval would likely reduce manual catalog reconciliation between producer event names and frontend role/type filters.
+
+## Task 67 - Unified notification catalog frontend inbox routing actions
+
+### User task
+продолжай
+
+### Gate result
+- mode: canonical
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: frontend/src/components/notifications/notificationinbox.jsx
+
+### What handoff solved well
+- It selected the correct inbox UI owner for event-to-screen routing behavior.
+- It kept the first patch slice limited to one component with a focused verification target.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually mapped canonical event types to practical deep-link targets in the existing panel routes.
+- Manually added payload metadata extraction fallback to support both explicit deep links and metadata-based navigation.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The ownership and patch scope were correctly identified by the gate in this slice.
+
+## Mini-review (Tasks 61-67)
+
+- Entries reviewed: 7 risky task entries.
+- `gate_misroute: yes`: 5 / 7
+- `override_used: yes`: 5 / 7
+- Cases with no multi-hop/manual gap: 1 / 7
+- Cases where LightRAG likely helps: 6 / 7
+
+Recommendation:
+- For notification-domain tasks, prioritize relationship retrieval that binds `event_type` catalog -> producer services -> frontend consumer files before generating first-touch sets.
+- Keep known-root-cause retry, but add a catalog-aware ownership heuristic to reduce repeated single-file misroutes on multi-slice work.
