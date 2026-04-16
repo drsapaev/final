@@ -151,7 +151,8 @@ const MacOSInput = React.forwardRef(({
       {showClearButton && (
         <button
           type="button"
-          aria-label="Clear input"
+          aria-label="Очистить ввод"
+          title="Очистить ввод"
           style={clearButtonStyle}
           onClick={(e) => {
             e.stopPropagation();
