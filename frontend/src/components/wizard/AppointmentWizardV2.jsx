@@ -41,6 +41,7 @@ import './AppointmentWizardV2.css';
 
 const API_BASE = '/api/v1';
 const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
+const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
 
 const normalizeServiceSelectionValue = (serviceValue) => {
   if (serviceValue == null) return '';
@@ -175,6 +176,8 @@ const AppointmentWizardV2 = ({
   const [filteredServices, setFilteredServices] = useState([]);
   const [showAllServices, setShowAllServices] = useState(false);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
+  const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({});
+  const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
 
   // ===================== ИНИЦИАЛИЗАЦИЯ (EDIT MODE vs DRAFT) =====================
 
@@ -292,6 +295,8 @@ const AppointmentWizardV2 = ({
       });
       setCurrentStep(1);
       setFormattedBirthDate('');
+      setRepeatEligibilityByItemId({});
+      setIsRepeatEligibilityLoading(false);
     }
   }, [isOpen]);
 
@@ -851,6 +856,214 @@ const AppointmentWizardV2 = ({
     }
   }, [isOpen, loadServices, loadDoctors]); // ✅ Обновляем услуги при смене вкладки
 
+  const getServiceById = useCallback((serviceId) => {
+    if (!serviceId) return null;
+    return servicesData.find((service) => service.id === serviceId) || null;
+  }, [servicesData]);
+
+  const consultationCartItems = useMemo(() =>
+  (wizardData.cart.items || []).
+  map((item) => ({ item, service: getServiceById(item.service_id) })).
+  filter(({ service }) => Boolean(service?.is_consultation)),
+  [wizardData.cart.items, getServiceById]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    if (!consultationCartItems.length) {
+      setRepeatEligibilityByItemId({});
+      setIsRepeatEligibilityLoading(false);
+      return;
+    }
+
+    const patientId = wizardData.patient.id;
+    const todayLocal = (() => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
+    const initialMap = {};
+    const previewCandidates = [];
+
+    consultationCartItems.forEach(({ item, service }) => {
+      if (!service) return;
+      if (!patientId) {
+        initialMap[item.id] = {
+          eligible: false,
+          reason: 'Проверка доступна после выбора существующего пациента',
+          repeat_discount_percent: 0,
+          repeat_window_days: 0
+        };
+        return;
+      }
+
+      if (!item.doctor_id) {
+        initialMap[item.id] = {
+          eligible: false,
+          reason: 'Выберите врача для проверки повторной скидки',
+          repeat_discount_percent: 0,
+          repeat_window_days: 0
+        };
+        return;
+      }
+
+      previewCandidates.push({
+        candidate_key: String(item.id),
+        doctor_id: item.doctor_id,
+        service_id: item.service_id,
+        visit_date: item.visit_date || todayLocal
+      });
+    });
+
+    let isCancelled = false;
+
+    const runPreview = async () => {
+      if (!patientId || previewCandidates.length === 0) {
+        if (!isCancelled) {
+          setRepeatEligibilityByItemId(initialMap);
+          setIsRepeatEligibilityLoading(false);
+        }
+        return;
+      }
+
+      if (!isCancelled) {
+        setIsRepeatEligibilityLoading(true);
+      }
+
+      try {
+        const response = await api.post('/registrar/repeat-eligibility-preview', {
+          patient_id: patientId,
+          candidates: previewCandidates
+        });
+
+        const mergedMap = { ...initialMap };
+        (response?.data?.items || []).forEach((resultItem) => {
+          const key = Number(resultItem?.candidate_key);
+          if (!Number.isNaN(key)) {
+            mergedMap[key] = {
+              eligible: Boolean(resultItem?.eligible),
+              reason: resultItem?.reason || '',
+              repeat_discount_percent: Number(resultItem?.repeat_discount_percent || 0),
+              repeat_window_days: Number(resultItem?.repeat_window_days || 0)
+            };
+          }
+        });
+
+        if (!isCancelled) {
+          setRepeatEligibilityByItemId(mergedMap);
+        }
+      } catch (error) {
+        logger.error('❌ Ошибка preview повторной скидки:', error);
+        const fallbackMap = { ...initialMap };
+        previewCandidates.forEach((candidate) => {
+          const key = Number(candidate.candidate_key);
+          if (!Number.isNaN(key)) {
+            fallbackMap[key] = {
+              eligible: false,
+              reason: 'Не удалось проверить повторную скидку',
+              repeat_discount_percent: 0,
+              repeat_window_days: 0
+            };
+          }
+        });
+        if (!isCancelled) {
+          setRepeatEligibilityByItemId(fallbackMap);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsRepeatEligibilityLoading(false);
+        }
+      }
+    };
+
+    runPreview();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, wizardData.patient.id, consultationCartItems]);
+
+  const repeatSuggestionSummary = useMemo(() => {
+    if (!consultationCartItems.length) {
+      return {
+        hasConsultations: false,
+        fullyEligible: false,
+        hasMixed: false,
+        maxDiscountPercent: 0,
+        hasUnknown: false
+      };
+    }
+
+    let eligibleCount = 0;
+    let ineligibleCount = 0;
+    let unknownCount = 0;
+    let maxDiscountPercent = 0;
+
+    consultationCartItems.forEach(({ item }) => {
+      const eligibility = repeatEligibilityByItemId[item.id];
+      if (!eligibility) {
+        unknownCount += 1;
+        return;
+      }
+      if (eligibility.eligible) {
+        eligibleCount += 1;
+        maxDiscountPercent = Math.max(
+          maxDiscountPercent,
+          Number(eligibility.repeat_discount_percent || 0)
+        );
+      } else {
+        ineligibleCount += 1;
+      }
+    });
+
+    const fullyEligible = eligibleCount === consultationCartItems.length && consultationCartItems.length > 0;
+    const hasMixed = eligibleCount > 0 && ineligibleCount > 0;
+
+    return {
+      hasConsultations: true,
+      fullyEligible,
+      hasMixed,
+      maxDiscountPercent,
+      hasUnknown: unknownCount > 0
+    };
+  }, [consultationCartItems, repeatEligibilityByItemId]);
+
+  const applyRepeatSuggestion = useCallback(() => {
+    if (!repeatSuggestionSummary.hasConsultations) {
+      toast.info('Добавьте консультацию, чтобы применить повторную скидку');
+      return;
+    }
+
+    if (repeatSuggestionSummary.hasUnknown || isRepeatEligibilityLoading) {
+      toast.info('Дождитесь завершения проверки повторной скидки');
+      return;
+    }
+
+    if (repeatSuggestionSummary.fullyEligible) {
+      setWizardData((prev) => ({
+        ...prev,
+        cart: {
+          ...prev.cart,
+          discount_mode: 'repeat'
+        }
+      }));
+      const discountPercent = repeatSuggestionSummary.maxDiscountPercent;
+      toast.success(
+        discountPercent > 0 ?
+        `Применена повторная скидка ${discountPercent}%` :
+        'Применен режим повторного визита'
+      );
+      return;
+    }
+
+    toast.warning(MIXED_REPEAT_WARNING);
+  }, [repeatSuggestionSummary, isRepeatEligibilityLoading]);
+
   // 🔧 УПРОЩЕННАЯ ФИЛЬТРАЦИЯ: Показываем все услуги без привязки к врачам
   const filterServices = (allServices) => {
 
@@ -1100,6 +1313,22 @@ const AppointmentWizardV2 = ({
 
   const handleComplete = async () => {
     if (!validateStep(currentStep)) return;
+
+    const isRepeatMode = wizardData.cart.discount_mode === 'repeat' && !wizardData.cart.all_free;
+    if (isRepeatMode) {
+      if (!repeatSuggestionSummary.hasConsultations) {
+        toast.warning('Повторная скидка применяется только к консультациям');
+        return;
+      }
+      if (repeatSuggestionSummary.hasUnknown || isRepeatEligibilityLoading) {
+        toast.info('Дождитесь завершения проверки повторной скидки');
+        return;
+      }
+      if (!repeatSuggestionSummary.fullyEligible) {
+        toast.warning(MIXED_REPEAT_WARNING);
+        return;
+      }
+    }
 
     // Проверяем токен авторизации
     const token = tokenManager.getAccessToken();
@@ -1480,7 +1709,7 @@ const AppointmentWizardV2 = ({
             const visitType = wizardData.cart.discount_mode === 'repeat' ? 'repeat' :
             wizardData.cart.discount_mode === 'benefit' ? 'benefit' : 'paid';
             const discountMode = wizardData.cart.discount_mode || 'none';
-            const allFree = discountMode === 'all_free';
+            const allFree = Boolean(wizardData.cart.all_free);
 
             // logger.log('📤 Вызов updateOnlineQueueEntry:', { ... }); // Removed to reduce noise
 
@@ -2607,7 +2836,7 @@ const AppointmentWizardV2 = ({
             <CartStepV2
               cart={wizardData.cart}
               services={filteredServices}
-              doctors={doctorsData}
+              doctorsData={doctorsData}
               showAllServices={showAllServices}
               onToggleAllServices={() => setShowAllServices(!showAllServices)}
               onAddToCart={addToCart}
@@ -2628,7 +2857,11 @@ const AppointmentWizardV2 = ({
               setActiveCategory={setActiveServiceCategory}
               searchQuery={serviceSearchQuery}
               setSearchQuery={setServiceSearchQuery}
-              isReloading={isReloadingServices} />
+              isReloading={isReloadingServices}
+              repeatEligibilityByItemId={repeatEligibilityByItemId}
+              isRepeatEligibilityLoading={isRepeatEligibilityLoading}
+              onApplyRepeatSuggestion={applyRepeatSuggestion}
+              repeatSuggestionSummary={repeatSuggestionSummary} />
 
             }
 
@@ -3169,11 +3402,17 @@ const CartStepV2 = ({
   onAddToCart,
   onRemoveFromCart,
   servicesData,
+  doctorsData,
   errors,
   // New props from parent
   activeCategory,
   searchQuery,
-  getServiceName // ✅ SSOT: Функция для получения названий услуг
+  getServiceName, // ✅ SSOT: Функция для получения названий услуг
+  onUpdateItem,
+  repeatEligibilityByItemId,
+  isRepeatEligibilityLoading,
+  onApplyRepeatSuggestion,
+  repeatSuggestionSummary
 }) => {
   // Local state removed - lifted to AppointmentWizardV2
 
@@ -3268,6 +3507,49 @@ const CartStepV2 = ({
     });
     return Math.round(total);
   }, [cart?.items, cart?.discount_mode, cart?.all_free, servicesData]);
+
+  const normalizedDoctorsData = useMemo(() => {
+    if (Array.isArray(doctorsData)) {
+      return doctorsData.filter(Boolean);
+    }
+
+    if (!doctorsData || typeof doctorsData !== 'object') {
+      return [];
+    }
+
+    return Object.values(doctorsData)
+      .flatMap((value) => (Array.isArray(value) ? value : [value]))
+      .filter(Boolean);
+  }, [doctorsData]);
+
+  const consultationRows = useMemo(() =>
+  (cart?.items || []).
+  map((item) => {
+    const service = servicesData?.find((s) => s.id === item.service_id);
+    if (!service?.is_consultation) {
+      return null;
+    }
+    const doctor = normalizedDoctorsData.find((d) => String(d.id) === String(item.doctor_id));
+    return {
+      itemId: item.id,
+      serviceName: getServiceName ? getServiceName(item) : service.name,
+      doctorName: doctor?.name || doctor?.full_name || null,
+      eligibility: repeatEligibilityByItemId?.[item.id] || null
+    };
+  }).
+  filter(Boolean),
+  [cart?.items, servicesData, normalizedDoctorsData, getServiceName, repeatEligibilityByItemId]);
+
+  const getDoctorDisplayName = useCallback((doctor) => {
+    if (!doctor) return '';
+    return (
+      doctor.user?.full_name ||
+      doctor.user?.username ||
+      doctor.full_name ||
+      doctor.name ||
+      `Врач #${doctor.id}`
+    );
+  }, []);
 
   return (
     <div style={{
@@ -3385,6 +3667,104 @@ const CartStepV2 = ({
           </span>
         </div>
 
+        {consultationRows.length > 0 &&
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--mac-spacing-2)',
+          padding: 'var(--mac-spacing-2)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-sm)',
+          background: 'var(--mac-bg-secondary)'
+        }}>
+            <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            flexWrap: 'wrap'
+          }}>
+              <span style={{
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 600,
+              color: 'var(--mac-text-primary)'
+            }}>
+                Повторная скидка для консультаций
+              </span>
+              <MacOSButton
+              size="sm"
+              onClick={onApplyRepeatSuggestion}
+              disabled={Boolean(isRepeatEligibilityLoading)}>
+                Применить повторную скидку
+              </MacOSButton>
+            </div>
+
+            {repeatSuggestionSummary?.hasMixed &&
+          <div style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-warning)',
+            fontWeight: 600
+          }}>
+                {MIXED_REPEAT_WARNING}
+              </div>
+          }
+
+            {consultationRows.map((row) => {
+            const isEligible = Boolean(row.eligibility?.eligible);
+            const reason = row.eligibility?.reason || 'Проверка недоступна';
+            const discount = Number(row.eligibility?.repeat_discount_percent || 0);
+            return (
+              <div
+                key={row.itemId}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 'var(--mac-spacing-2)'
+                }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-primary)',
+                    fontWeight: 600,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }} title={row.serviceName}>
+                      {row.serviceName}
+                    </div>
+                    <div style={{
+                    fontSize: '11px',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                      {row.doctorName ? `Врач: ${row.doctorName}` : 'Врач не выбран'}
+                    </div>
+                  </div>
+                  <div style={{
+                  flexShrink: 0,
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: isEligible ? 'var(--mac-success)' : 'var(--mac-warning)',
+                  background: isEligible ?
+                  'color-mix(in srgb, var(--mac-success), transparent 90%)' :
+                  'color-mix(in srgb, var(--mac-warning), transparent 88%)',
+                  border: isEligible ?
+                  '1px solid color-mix(in srgb, var(--mac-success), transparent 75%)' :
+                  '1px solid color-mix(in srgb, var(--mac-warning), transparent 70%)'
+                }} title={reason}>
+                    {isRepeatEligibilityLoading && !row.eligibility ?
+                  'Проверка...' :
+                  isEligible ?
+                  `Доступна повторная скидка ${discount}%` :
+                  `Повторная скидка недоступна (${reason})`}
+                  </div>
+                </div>);
+          })}
+          </div>
+        }
+
         {/* Горизонтальный скролл корзины */}
         {cart?.items?.length > 0 ?
         <div style={{
@@ -3396,35 +3776,75 @@ const CartStepV2 = ({
             {cart.items.map((item) => {
             // ✅ SSOT: Используем единую функцию для получения названия услуги
             const displayName = getServiceName ? getServiceName(item) : item.service_name || 'Неизвестная услуга';
+            const service = servicesData?.find((s) => s.id === item.service_id);
+            const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
+            const doctorOptions = normalizedDoctorsData;
 
             return (
               <div key={item.id} style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 8px',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: '4px',
+                padding: '6px 8px',
                 background: 'var(--mac-bg-secondary)',
                 border: '1px solid var(--mac-border)',
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
-                whiteSpace: 'nowrap'
+                minWidth: requiresDoctor ? '220px' : 'auto'
               }}>
-                  <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
-                    {displayName}
-                  </span>
-                  <button
-                  onClick={() => onRemoveFromCart(item.id)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--mac-danger)',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex'
-                  }}>
+                  <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}>
+                    <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
+                      {displayName}
+                    </span>
+                    <button
+                    onClick={() => onRemoveFromCart(item.id)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--mac-danger)',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex'
+                    }}>
 
-                    <X size={14} />
-                  </button>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {requiresDoctor &&
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{
+                    fontSize: '10px',
+                    color: 'var(--mac-text-secondary)'
+                  }}>
+                        Врач для консультации
+                      </label>
+                      <select
+                    value={item.doctor_id || ''}
+                    onChange={(e) => onUpdateItem?.(item.id, 'doctor_id', e.target.value ? Number(e.target.value) : null)}
+                    style={{
+                      width: '100%',
+                      fontSize: '11px',
+                      padding: '4px 6px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--mac-border)',
+                      background: 'var(--mac-bg-primary)',
+                      color: 'var(--mac-text-primary)'
+                    }}>
+
+                        <option value="">Выберите врача</option>
+                        {doctorOptions.map((doctor) =>
+                    <option key={doctor.id} value={doctor.id}>
+                            {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : ''}{doctor.cabinet ? ` · каб. ${doctor.cabinet}` : ''}
+                          </option>)}
+                      </select>
+                    </div>
+                }
                 </div>);
 
           })}
@@ -3493,10 +3913,16 @@ CartStepV2.propTypes = {
   onAddToCart: PropTypes.func,
   onRemoveFromCart: PropTypes.func,
   servicesData: PropTypes.array,
+  doctorsData: PropTypes.oneOfType([PropTypes.array, PropTypes.object]),
   errors: PropTypes.object,
   activeCategory: PropTypes.string,
   searchQuery: PropTypes.string,
-  getServiceName: PropTypes.func
+  getServiceName: PropTypes.func,
+  onUpdateItem: PropTypes.func,
+  repeatEligibilityByItemId: PropTypes.object,
+  isRepeatEligibilityLoading: PropTypes.bool,
+  onApplyRepeatSuggestion: PropTypes.func,
+  repeatSuggestionSummary: PropTypes.object
 };
 
 

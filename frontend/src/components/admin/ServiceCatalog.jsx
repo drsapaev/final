@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import ServiceAuditHistory from './ServiceAuditHistory';
+import ServiceChangesPreview from './ServiceChangesPreview';
+import ServiceBatchEdit from './ServiceBatchEdit';
 import {
   Package,
   Plus,
@@ -12,16 +15,15 @@ import {
   Save,
   X,
   RefreshCw,
-
-
   AlertCircle,
-
   Heart,
   Scissors,
   Stethoscope,
   TestTube,
-  Users } from
-'lucide-react';
+  Users,
+  History,
+  CheckSquare
+} from 'lucide-react';
 import {
   MacOSCard,
   MacOSButton,
@@ -110,6 +112,9 @@ const ServiceCatalog = () => {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [editingService, setEditingService] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showHistory, setShowHistory] = useState(null); // { serviceId, serviceName }
+  const [showBatchEdit, setShowBatchEdit] = useState(false);
+  const [selectedServiceIds, setSelectedServiceIds] = useState(new Set());
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Иконки специальностей
@@ -200,10 +205,35 @@ const ServiceCatalog = () => {
     try {
       logger.log('🔄 Отправляем данные услуги:', serviceData);
 
+      let savedService;
       if (editingService) {
-        await api.put(`/services/${editingService.id}`, serviceData);
+        // ✅ ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ: Обновляем UI сразу
+        const optimisticService = { ...editingService, ...serviceData };
+        setServices(prevServices =>
+          prevServices.map(s => s.id === editingService.id ? optimisticService : s)
+        );
+
+        try {
+          const response = await api.put(`/services/${editingService.id}`, serviceData);
+          savedService = response.data;
+
+          // Обновляем с реальными данными от сервера
+          setServices(prevServices =>
+            prevServices.map(s => s.id === savedService.id ? savedService : s)
+          );
+        } catch (error) {
+          // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
+          setServices(prevServices =>
+            prevServices.map(s => s.id === editingService.id ? editingService : s)
+          );
+          throw error;
+        }
       } else {
-        await api.post('/services', serviceData);
+        const response = await api.post('/services', serviceData);
+        savedService = response.data;
+
+        // ✅ ОПТИМИСТИЧНОЕ ДОБАВЛЕНИЕ: Добавляем в список сразу
+        setServices(prevServices => [savedService, ...prevServices]);
       }
 
       setMessage({
@@ -212,7 +242,6 @@ const ServiceCatalog = () => {
       });
       setEditingService(null);
       setShowAddForm(false);
-      await loadData();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
 
@@ -248,11 +277,30 @@ const ServiceCatalog = () => {
   const handleDeleteService = async (serviceId) => {
     if (!confirm('Удалить услугу?')) return;
 
+    // Сохраняем старое состояние для отката
+    const oldServices = [...services];
+    const serviceToDelete = services.find(s => s.id === serviceId);
+
     try {
-      await api.delete(`/services/${serviceId}`);
-      setMessage({ type: 'success', text: 'Услуга удалена' });
-      await loadData();
+      // ✅ ОПТИМИСТИЧНОЕ УДАЛЕНИЕ: Деактивируем в UI сразу
+      setServices(prevServices =>
+        prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
+      );
+
+      const response = await api.delete(`/services/${serviceId}`);
+
+      // Обновляем с реальными данными от сервера
+      if (response.data.active === false) {
+        setServices(prevServices =>
+          prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
+        );
+      }
+
+      setMessage({ type: 'success', text: response.data.message || 'Услуга удалена' });
     } catch (error) {
+      // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
+      setServices(oldServices);
+
       logger.error('Ошибка удаления:', error);
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Ошибка удаления услуги' });
     }
@@ -271,6 +319,30 @@ const ServiceCatalog = () => {
   const getSpecialtyIcon = (specialty) => {
     const IconComponent = specialtyIcons[specialty] || Package;
     return IconComponent;
+  };
+
+  const toggleServiceSelection = (serviceId) => {
+    const newSelected = new Set(selectedServiceIds);
+    if (newSelected.has(serviceId)) {
+      newSelected.delete(serviceId);
+    } else {
+      newSelected.add(serviceId);
+    }
+    setSelectedServiceIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedServiceIds.size === filteredServices.length) {
+      setSelectedServiceIds(new Set());
+    } else {
+      setSelectedServiceIds(new Set(filteredServices.map(s => s.id)));
+    }
+  };
+
+  const handleBatchEditComplete = () => {
+    setShowBatchEdit(false);
+    setSelectedServiceIds(new Set());
+    loadData();
   };
 
   if (loading) {
@@ -310,6 +382,16 @@ const ServiceCatalog = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
+          {selectedServiceIds.size > 0 && (
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowBatchEdit(true)}
+              style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'var(--mac-accent)' }}
+            >
+              <CheckSquare size={16} style={{ marginRight: '8px' }} />
+              Редактировать ({selectedServiceIds.size})
+            </MacOSButton>
+          )}
           <MacOSButton variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw size={16} style={{ marginRight: '8px' }} />
             Обновить
@@ -535,13 +617,25 @@ const ServiceCatalog = () => {
 
         <MacOSTable
           columns={[
-          { key: 'service', title: 'Услуга', width: '25%' },
-          { key: 'category', title: 'Категория', width: '15%' },
-          { key: 'price', title: 'Цена', width: '15%' },
-          { key: 'duration', title: 'Длительность', width: '12%' },
-          { key: 'doctor', title: 'Врач', width: '15%' },
+          {
+            key: 'select',
+            title: (
+              <input
+                type="checkbox"
+                checked={selectedServiceIds.size === filteredServices.length && filteredServices.length > 0}
+                onChange={toggleSelectAll}
+                style={{ cursor: 'pointer' }}
+              />
+            ),
+            width: '40px'
+          },
+          { key: 'service', title: 'Услуга', width: '23%' },
+          { key: 'category', title: 'Категория', width: '14%' },
+          { key: 'price', title: 'Цена', width: '13%' },
+          { key: 'duration', title: 'Длительность', width: '10%' },
+          { key: 'doctor', title: 'Врач', width: '12%' },
           { key: 'status', title: 'Статус', width: '10%' },
-          { key: 'actions', title: 'Действия', width: '8%' }]
+          { key: 'actions', title: 'Действия', width: '12%' }]
           }
           data={filteredServices.map((service) => {
               const specialty = getCategorySpecialty(service.category_id);
@@ -555,6 +649,13 @@ const ServiceCatalog = () => {
 
             return {
               id: service.id,
+              select:
+              <input
+                type="checkbox"
+                checked={selectedServiceIds.has(service.id)}
+                onChange={() => toggleServiceSelection(service.id)}
+                style={{ cursor: 'pointer' }}
+              />,
               service:
               <div style={{ display: 'flex', alignItems: 'center' }}>
                   <SpecialtyIcon
@@ -637,6 +738,23 @@ const ServiceCatalog = () => {
                   <MacOSButton
                   size="sm"
                   variant="outline"
+                  onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
+                  style={{
+                    padding: '6px',
+                    minWidth: 'auto',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title="История изменений">
+
+                    <History size={14} />
+                  </MacOSButton>
+                  <MacOSButton
+                  size="sm"
+                  variant="outline"
                   onClick={() => setEditingService(service)}
                   style={{
                     padding: '6px',
@@ -712,6 +830,80 @@ const ServiceCatalog = () => {
         }} />
 
       }
+
+      {/* История изменений */}
+      {showHistory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowHistory(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                zIndex: 1001,
+                backgroundColor: 'var(--mac-bg-primary)'
+              }}
+            >
+              <X size={16} />
+            </MacOSButton>
+            <ServiceAuditHistory
+              serviceId={showHistory.serviceId}
+              serviceName={showHistory.serviceName}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Batch редактирование */}
+      {showBatchEdit && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '700px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <ServiceBatchEdit
+              selectedServices={services.filter(s => selectedServiceIds.has(s.id))}
+              categories={categories}
+              onComplete={handleBatchEditComplete}
+              onCancel={() => setShowBatchEdit(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>);
 
 };
@@ -720,6 +912,7 @@ const ServiceCatalog = () => {
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
 const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
+  const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
     name: service?.name || '',
     code: service?.code || service?.service_code || '', // Unified: use code as primary
@@ -827,6 +1020,16 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
       return;
     }
 
+    // ✅ PREVIEW: Show changes preview for editing (not for new services)
+    if (service) {
+      setShowPreview(true);
+    } else {
+      // For new services, save directly
+      handleConfirmSave();
+    }
+  };
+
+  const handleConfirmSave = () => {
     // Подготавливаем данные для API
     const canonicalCode = normalizedCode || null;
     const apiData = {
@@ -848,6 +1051,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     });
 
     logger.log('📝 Подготовленные данные для API:', apiData);
+    setShowPreview(false);
     onSave(apiData);
   };
 
@@ -1242,6 +1446,37 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           </div>
         </div>
       </form>
+
+      {/* ✅ PREVIEW: Changes preview modal */}
+      {showPreview && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <ServiceChangesPreview
+              oldService={service}
+              newService={formData}
+              onConfirm={handleConfirmSave}
+              onCancel={() => setShowPreview(false)}
+            />
+          </div>
+        </div>
+      )}
     </MacOSCard>);
 
 };

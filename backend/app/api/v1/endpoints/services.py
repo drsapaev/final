@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -15,12 +16,14 @@ from app.crud import service as crud
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
 from app.models.visit import VisitService
+from app.models.service_audit import ServiceAuditLog
 from app.models.user import User
 from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
     resolve_queue_group_key,
 )
+from app.services.service_audit_service import ServiceAuditService
 
 router = APIRouter(tags=["services"])
 logger = logging.getLogger(__name__)
@@ -204,8 +207,6 @@ def _validate_service_code_prefix_alignment(
     expected_group = resolve_queue_group_key(
         queue_tag=queue_tag,
         department_key=department_key,
-        category_specialty=category_specialty,
-        category_code=category_code,
     )
     allowed_prefixes = get_allowed_service_code_prefixes(
         queue_tag=queue_tag,
@@ -735,6 +736,17 @@ async def create_service(
     db.add(service)
     db.commit()
     db.refresh(service)
+
+    # ✅ AUDIT: Log service creation
+    try:
+        audit_service = ServiceAuditService(db)
+        audit_service.log_service_creation(
+            service=service,
+            user_id=None,  # TODO: Get from current_user when auth is enabled
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log service audit: {e}")
+
     return _row_to_out(service)
 
 
@@ -749,6 +761,27 @@ async def update_service(
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Услуга не найдена")
+
+    # ✅ AUDIT: Snapshot old service state before changes
+    audit_service = ServiceAuditService(db)
+    old_service_snapshot = Service(
+        id=service.id,
+        code=service.code,
+        service_code=service.service_code,
+        name=service.name,
+        category_id=service.category_id,
+        category_code=service.category_code,
+        price=service.price,
+        currency=service.currency,
+        duration_minutes=service.duration_minutes,
+        doctor_id=service.doctor_id,
+        department_key=service.department_key,
+        queue_tag=service.queue_tag,
+        requires_doctor=service.requires_doctor,
+        is_consultation=service.is_consultation,
+        allow_doctor_price_override=service.allow_doctor_price_override,
+        active=service.active,
+    )
 
     update_dict = service_data.model_dump(exclude_unset=True)
     canonical_code = _normalize_service_code_payload(update_dict)
@@ -804,6 +837,20 @@ async def update_service(
 
     db.commit()
     db.refresh(service)
+
+    # ✅ AUDIT: Log the update
+    try:
+        audit_service.log_service_update(
+            service_id=service.id,
+            old_service=old_service_snapshot,
+            new_service=service,
+            user_id=None,  # TODO: Get from current_user when auth is enabled
+            # ip_address=request.client.host,  # TODO: Add request dependency
+            # user_agent=request.headers.get("user-agent"),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log service audit: {e}")
+
     return _row_to_out(service)
 
 
@@ -834,6 +881,19 @@ async def delete_service(
 
     db.commit()
     db.refresh(service)
+
+    # ✅ AUDIT: Log service deactivation/deletion
+    try:
+        audit_service = ServiceAuditService(db)
+        audit_service.log_service_change(
+            service_id=service.id,
+            action="deactivate",
+            user_id=None,  # TODO: Get from current_user when auth is enabled
+            changes={"active": {"old": True, "new": False}},
+            comment=f"Soft delete (visit usage: {visit_usage_count})",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log service audit: {e}")
 
     if visit_usage_count > 0:
         logger.info(
@@ -886,6 +946,121 @@ async def list_doctors_temp(
     """Временный endpoint для получения списка врачей"""
     doctors = db.query(Doctor).filter(Doctor.active == True).all()
     return doctors
+
+
+# ==================== ИСТОРИЯ ИЗМЕНЕНИЙ УСЛУГ (AUDIT LOG) ====================
+
+
+class ServiceAuditLogOut(BaseModel):
+    """Response schema for service audit log"""
+
+    id: int
+    service_id: int
+    user_id: Optional[int] = None
+    action: str
+    changes: Optional[dict] = None
+    old_values: Optional[dict] = None
+    new_values: Optional[dict] = None
+    comment: Optional[str] = None
+    created_at: datetime
+
+    # Enriched fields
+    user_name: Optional[str] = None
+    service_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.get(
+    "/{service_id}/history",
+    response_model=List[ServiceAuditLogOut],
+    summary="История изменений услуги",
+)
+async def get_service_history(
+    service_id: int,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Получить историю изменений услуги.
+
+    Возвращает все изменения услуги с информацией о том, кто и когда их сделал.
+    """
+    # Check if service exists
+    service = db.query(Service).filter(Service.id == service_id).first()
+    if not service:
+        raise HTTPException(status_code=404, detail="Услуга не найдена")
+
+    audit_service = ServiceAuditService(db)
+    logs = audit_service.get_service_history(
+        service_id=service_id,
+        limit=limit,
+        offset=offset,
+    )
+
+    # Enrich with user and service names
+    result = []
+    for log in logs:
+        log_dict = {
+            "id": log.id,
+            "service_id": log.service_id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "changes": log.changes,
+            "old_values": log.old_values,
+            "new_values": log.new_values,
+            "comment": log.comment,
+            "created_at": log.created_at,
+            "user_name": log.user.full_name if log.user else "Система",
+            "service_name": service.name,
+        }
+        result.append(ServiceAuditLogOut(**log_dict))
+
+    return result
+
+
+@router.get(
+    "/admin/audit/recent",
+    response_model=List[ServiceAuditLogOut],
+    summary="Последние изменения услуг",
+)
+async def get_recent_service_changes(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Получить последние изменения всех услуг.
+
+    Полезно для мониторинга активности и аудита.
+    """
+    audit_service = ServiceAuditService(db)
+    logs = audit_service.get_recent_changes(
+        limit=limit,
+        offset=offset,
+    )
+
+    # Enrich with user and service names
+    result = []
+    for log in logs:
+        service = db.query(Service).filter(Service.id == log.service_id).first()
+        log_dict = {
+            "id": log.id,
+            "service_id": log.service_id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "changes": log.changes,
+            "old_values": log.old_values,
+            "new_values": log.new_values,
+            "comment": log.comment,
+            "created_at": log.created_at,
+            "user_name": log.user.full_name if log.user else "Система",
+            "service_name": service.name if service else f"Услуга #{log.service_id}",
+        }
+        result.append(ServiceAuditLogOut(**log_dict))
+
+    return result
 
 
 # ==================== РАЗРЕШЕНИЕ УСЛУГ (SSOT) ====================
@@ -942,11 +1117,123 @@ async def resolve_service_endpoint(
 
 class ServiceCodeMappingsResponse(BaseModel):
     """Response schema for service code mappings endpoint"""
-    
+
     specialty_to_code: dict = {}
     code_to_name: dict = {}
     category_mapping: dict = {}
     specialty_aliases: dict = {}
+
+
+class ServiceBatchUpdateRequest(BaseModel):
+    """Request schema for batch update"""
+
+    service_ids: List[int] = Field(..., min_items=1, max_items=100)
+    updates: Dict[str, Any] = Field(..., min_items=1)
+    comment: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ServiceBatchUpdateResponse(BaseModel):
+    """Response schema for batch update"""
+
+    updated_count: int
+    failed_count: int
+    updated_services: List[int] = []
+    failed_services: List[Dict[str, Any]] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.post(
+    "/admin/batch-update",
+    response_model=ServiceBatchUpdateResponse,
+    summary="Массовое обновление услуг",
+)
+async def batch_update_services(
+    request: ServiceBatchUpdateRequest,
+    db: Session = Depends(get_db),
+    # user=Depends(require_roles("Admin")),
+):
+    """
+    Массовое обновление нескольких услуг одновременно.
+
+    Позволяет изменить одинаковые поля у группы услуг.
+    Например: изменить цену, активность, категорию и т.д.
+    """
+    updated_services = []
+    failed_services = []
+    audit_service = ServiceAuditService(db)
+
+    for service_id in request.service_ids:
+        try:
+            service = db.query(Service).filter(Service.id == service_id).first()
+            if not service:
+                failed_services.append({
+                    "service_id": service_id,
+                    "error": "Услуга не найдена"
+                })
+                continue
+
+            # Snapshot old state for audit
+            old_service_snapshot = Service(
+                id=service.id,
+                code=service.code,
+                service_code=service.service_code,
+                name=service.name,
+                category_id=service.category_id,
+                category_code=service.category_code,
+                price=service.price,
+                currency=service.currency,
+                duration_minutes=service.duration_minutes,
+                doctor_id=service.doctor_id,
+                department_key=service.department_key,
+                queue_tag=service.queue_tag,
+                requires_doctor=service.requires_doctor,
+                is_consultation=service.is_consultation,
+                allow_doctor_price_override=service.allow_doctor_price_override,
+                active=service.active,
+            )
+
+            # Apply updates
+            for field, value in request.updates.items():
+                if hasattr(service, field):
+                    setattr(service, field, value)
+
+            db.add(service)
+            db.flush()  # Flush to catch any DB errors before commit
+
+            # Log audit
+            try:
+                audit_service.log_service_update(
+                    service_id=service.id,
+                    old_service=old_service_snapshot,
+                    new_service=service,
+                    user_id=None,
+                    comment=f"Batch update: {request.comment}" if request.comment else "Batch update",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log batch audit for service {service_id}: {e}")
+
+            updated_services.append(service_id)
+
+        except Exception as e:
+            logger.error(f"Failed to update service {service_id}: {e}")
+            failed_services.append({
+                "service_id": service_id,
+                "error": str(e)
+            })
+
+    # Commit all changes
+    if updated_services:
+        db.commit()
+
+    return ServiceBatchUpdateResponse(
+        updated_count=len(updated_services),
+        failed_count=len(failed_services),
+        updated_services=updated_services,
+        failed_services=failed_services,
+    )
 
 
 @router.get(

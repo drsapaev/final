@@ -807,10 +807,10 @@ Do not fix the clinic app bug yet. Instead, fix the dev-brain safety path so `ag
 - manual graph reconstruction: recurring across UI -> endpoint -> persistence chains
 
 ## Count summary
-- tasks reviewed: 41
-- tasks with multi-hop gap: 41
-- tasks with ownership ambiguity: 41
-- tasks with manual reconstruction: 41
+- tasks reviewed: 45
+- tasks with multi-hop gap: 45
+- tasks with ownership ambiguity: 45
+- tasks with manual reconstruction: 45
 
 ## Recommendation
 - LightRAG relevance:
@@ -1403,3 +1403,706 @@ next step is to add or temporarily seed a second active doctor in one specialty 
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - This was another small but real identity-bridge cleanup: the file was found, but the relationship between batch queue resolution and the earlier queue canonicalization work still had to be reconstructed manually. The gate also misrouted before the narrow override was used.
+
+## Task 42 - QueueIntegration specialty-string bridge removal
+
+### User task
+давай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/components/QueueIntegration.jsx
+
+### What handoff solved well
+- The gate narrowed the work to the queue adapter component and kept the change inside the approved first-touch file.
+- The override prompt made it clear that the first safe patch should live only in the adapter, not in the dentist panel or backend queue APIs.
+
+### Missing relationship mapping
+- The stack did not surface that `QueueIntegration` was still resolving a specialist by `department || specialist` text instead of canonical doctor identity.
+- It also did not immediately surface that the only realistic non-text fallback for this adapter was either an explicit doctor id prop or a deterministic canonical default from the loaded specialists list.
+
+### Manual reconstruction needed
+- Manually removed the specialty-string matching helpers from `QueueIntegration.jsx`.
+- Manually switched the adapter to canonical id-based resolution with an explicit `specialistId` prop and a deterministic fallback to the loaded specialists list.
+- Manually verified the file with eslint and diff-check after the edit.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- The bridge was small, but the relationship from the UI adapter to the canonical queue identity still had to be reconstructed manually. The gate misrouted once, and the final fix stayed narrow only because the override prompt kept it inside the approved component.
+
+## Task 43 - DentistPanelUnified queue callsite canonical specialistId
+
+### User task
+давай. И объясни что изменится в интерфейсе с этими изменениями (последные 2-3 шаг) для пользователя
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/pages/DentistPanelUnified.jsx
+
+### What handoff solved well
+- The gate isolated the remaining callsite bridge to the dentist panel and kept the patch from spilling into QueueIntegration or backend queue APIs.
+- The override prompt made the approved file explicit, which was enough to apply a one-line canonical-prop fix safely.
+
+### Missing relationship mapping
+- The stack did not surface that the dentist panel was still passing the legacy specialty string `"Стоматолог"` into `QueueIntegration`.
+- It also did not automatically connect that callsite to the canonical `specialistId` prop added in the adapter in the previous step.
+
+### Manual reconstruction needed
+- Manually replaced the string prop with `specialistId={user?.doctor_id || user?.specialist_id || ''}` so the queue tab now feeds a canonical id when the profile already has one.
+- Manually verified the nearest frontend lint target and diff-check after the edit.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- This was another small but real callsite bridge: the adapter was already canonical, but the dentist panel still passed a specialty string. The gate misrouted again, so the override prompt was what kept the patch narrow enough to finish safely.
+
+## Task 45 - RegistrarPanel specialty-derived service-code fallback removal
+
+### User task
+1
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/pages/registrarpanel.jsx
+
+### What handoff solved well
+- The gate narrowed the work to the registrar panel and kept the fix away from queue/doctor identity files.
+- The override prompt kept the approved scope to a single frontend file, which was enough for a narrow service-code cleanup.
+
+### Missing relationship mapping
+- The stack did not surface that `RegistrarPanel` still derived QR/service codes from `specialty` in the `filterServicesByDepartment()` fallback.
+- It also did not separate canonical `services` and `queue_numbers.service_name` from the legacy specialty heuristics, so the bridge had to be found manually.
+
+### Manual reconstruction needed
+- Manually removed the `SPECIALTY_TO_CODE` fuzzy bridge.
+- Manually removed the specialty-based `matchingQueue` fallback and left only canonical `services` plus `queue_numbers.service_name` resolution.
+- Manually verified the file with eslint and diff-check after the edit.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- This was the last visible registrar-side service-code bridge. The gate misrouted again, and the override prompt was what kept the cleanup narrow enough to avoid accidental changes to payment/status or other registrar flows.
+
+## Task 44 - useQueueManager specialty fallback removal
+
+### User task
+продолжить искать следующий остаточный bridge в регистратуре или очередях
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/hooks/useQueueManager.js
+
+### What handoff solved well
+- The gate narrowed the work to the queue manager hook and kept the change away from the dentist panel and queue APIs.
+- The override prompt made it explicit that the first-touch file was the hook itself, which was enough for a narrow queue-identity cleanup.
+
+### Missing relationship mapping
+- The stack did not surface that `useQueueManager` still had a specialty-based fallback in `pickQueueForDoctor()`.
+- It also did not clearly separate canonical `specialist_id` matching from the legacy queue-specialty fallback, so that bridge had to be found by manual search.
+
+### Manual reconstruction needed
+- Manually removed the specialty fallback from queue lookup so the hook now relies on `specialist_id` only.
+- Manually removed the now-unused `normalizeSpecialty` helper and verified the file with eslint and diff-check.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- This was the last visible queue-matching bridge in the frontend hook layer. The gate misrouted again, and the final fix stayed narrow only because the override prompt kept it inside the approved hook file.
+
+## Task 46 - AppointmentWizardV2 exact service-resolution tightening
+
+### User task
+PLEASE IMPLEMENT THIS PLAN: Service Truth, Linkage, and Legacy Code Cleanup
+
+### Gate result
+- mode: canonical
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+
+### What handoff solved well
+- It narrowed the first safe slice to the wizard/route-registry area instead of letting the change spread into the catalog, billing, or deletion path.
+- It provided a concrete stop condition: keep the first patch inside the approved first-touch files.
+- It gave a useful near-term validation target of source-level diff/syntax inspection for the wizard file.
+
+### Missing relationship mapping
+- The gate did not connect the service-truth cleanup request to the broader backend catalog ownership chain, so the first-touch scope stayed frontend-only.
+- Missing endpoint -> service -> UI linkage for catalog deletion and code repair remained outside the generated slice.
+- The handoff did not surface that removing fuzzy service-name fallback in the wizard is only a partial contract hardening, not the full service truth cleanup.
+
+### Manual reconstruction needed
+- Manually removed partial-name fallback from `AppointmentWizardV2` so service resolution now stays on exact `service_id`, exact `service_code`, or exact service name.
+- Manually verified the patched block with diff inspection and `git diff --check`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- The gate was useful for narrowing the first safe slice, but the broader service-truth cleanup still spans backend catalog ownership, deletion guardrails, and data repair. Relationship-aware retrieval would likely help keep those layers connected instead of stopping at the wizard fallback.
+
+## Task 47 - Service delete guardrail and soft-deactivation
+
+### User task
+PLEASE IMPLEMENT THIS PLAN: Service Truth, Linkage, and Legacy Code Cleanup
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/services.py
+
+### What handoff solved well
+- The retry with a known root-cause hint converted a misrouted catalog task into a narrow backend slice.
+- It kept the approved scope to one file and gave a concrete verification target (`python -m py_compile backend/app/api/v1/endpoints/services.py`).
+- It made the first safe change obvious: replace physical delete with soft-deactivation.
+
+### Missing relationship mapping
+- The first gate pass did not connect the service catalog deletion path to the immutable history table that still references service rows.
+- The stack did not surface the `VisitService` relationship as the key guardrail for preserving historical records.
+- The broader catalog repair work (`code`/`service_code` cleanup and frontend fallback alignment) remained outside this narrow slice.
+
+### Manual reconstruction needed
+- Manually inspected the delete endpoint and added the `VisitService` history check before returning.
+- Manually changed the endpoint to deactivate the service instead of physically deleting it.
+- Manually verified the approved file with `python -m py_compile` and `git diff --check`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- The override made the first safe backend slice possible, but the larger service-truth plan still spans data repair and UI contract cleanup. LightRAG would likely help keep the catalog identity, history guardrails, and frontend consumers connected as one graph instead of separate file searches.
+
+## Task 48 - Service code drift repair endpoint
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/services.py
+
+### What handoff solved well
+- It eventually narrowed the task to the service catalog endpoint after one retry, which was enough to keep the repair slice backend-local.
+- It preserved a single-file scope for the first safe repair implementation.
+- It gave a clear compile verification target for the edited endpoint file.
+
+### Missing relationship mapping
+- The first handoff pass still did not connect the repair task to the catalog SSOT, so the route had to be revisited with the known-root-cause hint.
+- The stack did not directly surface the relationship between catalog drift repair and immutable visit history preservation.
+- Missing frontend linkage was expected here, but the relation to historical `VisitService` rows still had to be reconstructed manually.
+
+### Manual reconstruction needed
+- Manually added an admin-safe repair route that normalizes both `code` and `service_code` from the canonical value.
+- Manually added conflict detection so duplicate canonical codes can be reported before applying changes.
+- Manually kept the repair path from touching `VisitService` snapshots.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- This repair slice was small once the approved file was known, but the stack still missed the catalog/history relationship on the first pass. LightRAG would likely help keep the service identity graph, visit-history preservation, and catalog repair behavior tied together.
+
+## Task 49 - Registrar demo fallback removal
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/pages/registrarpanel.jsx
+
+### What handoff solved well
+- The override prompt isolated a single registrar file and kept the patch from spilling into cashier or queue bridge files.
+- It gave a concrete first-touch boundary that matched the visible problem: local demo doctors/services were masking API truth.
+- It preserved a narrow verification target on the same file.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed the in-file demo doctor/service seed and switched the refresh path to empty-state behavior when API data is unavailable.
+- Manually confirmed that the registrar file still has demo-mode strings, but no longer injects demo truth into the live data path.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- This was a single-file frontend truth cleanup once the root-cause file was identified. The gate misroute was annoying, but the code relationship itself was straightforward and did not require a broader graph to understand.
+
+## Task 50 - Service resolver queue fallback reduction
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/utils/servicecoderesolver.js
+
+### What handoff solved well
+- The override prompt isolated the exact resolver file and kept the change from spilling into cashier or registrar panel code.
+- It preserved a narrow verification target: the resolver file itself plus frontend lint.
+- It made it clear that the first safe fix was to stop guessing services from specialty when queue data is incomplete.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed the specialty-derived queue fallback in `normalizeServicesFromInitialData`.
+- Manually kept only explicit queue data (`service_details`, `service_id`, or exact `service_name`) as the source for resolver output.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The resolver change was a small truth-preservation fix once the file was known. The gate misroute was present, but the underlying code path did not require a broader graph to repair safely.
+
+## Task 51 - Cashier receipt service fallback reduction
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/pages/cashierpanel.jsx
+
+### What handoff solved well
+- The override prompt isolated the cashier receipt file and kept the change away from registrar or backend code.
+- It gave a clear first-touch target for the receipt truth cleanup.
+- It preserved a narrow verification path with the local frontend lint target.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed generic `Услуга` fallback from receipt row building and grouped display.
+- Manually kept only explicit service truth from payment rows, service arrays, or named services.
+- Manually replaced the UI placeholder with a neutral dash when no explicit service name exists.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The cashier change was localized once the file was known. The gate misroute was again real, but the implementation itself was a straightforward single-file cleanup rather than a multi-hop relationship problem.
+
+## Task 52 - Panel print service placeholder cleanup
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/services/panelprint.js
+
+### What handoff solved well
+- The override prompt isolated the panel print service file and kept the patch away from unrelated panel screens.
+- It gave a single-file print target with a clear verification path.
+- It made the service-placeholder issue obvious in the receipt HTML path.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually replaced generic service placeholder labels with neutral empty-state markers in the receipt renderer.
+- Manually removed two unused catch bindings to keep the approved file lint-clean.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- This was another single-file consumer cleanup once the file was known. The gate misroute was still present, but the implementation did not require cross-file relationship reconstruction beyond the print renderer itself.
+
+## Task 53 - Service mapping category fallback removal
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/service_mapping.py
+
+### What handoff solved well
+- The override prompt isolated the mapping file and kept the change in a single backend truth layer.
+- It gave a clear compile verification target and a narrow patch boundary.
+- It made the explicit queue-tag lookup path the obvious safe place to keep.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed the category-code fallback branch from default service lookup.
+- Manually preserved explicit queue-tag and consultation lookups as the only remaining routing path in this function.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The lookup path was straightforward once the file was identified. The gate misroute remained noisy, but the code path itself was a single-file backend mapping cleanup rather than a multi-hop relation problem.
+
+## Task 54 - QueueIntegration specialist label cleanup
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/components/queueintegration.jsx
+
+### What handoff solved well
+- The override prompt isolated the bridge component and kept the patch away from the larger queue manager stack.
+- It gave a clear single-file target with a small frontend lint check.
+- It made the visible bug obvious: specialty label was being used as a doctor-name fallback.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed the fallback that promoted `specialty_display` to a doctor name.
+- Manually left `doctor_name`-driven rendering intact so explicit truth still flows through the bridge.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The component change was a straightforward single-file UI cleanup once the file was known. The gate misroute remained present, but the problem itself did not need a broader relationship graph to repair safely.
+
+## Task 55 - Registrar integration service_name fallback removal
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/registrar_integration.py
+
+### What handoff solved well
+- The override prompt isolated the registrar integration endpoint and kept the patch from spreading into related queue or wizard files.
+- It gave a narrow verification target (`py_compile`) for a backend API handler.
+- It kept the first patch slice focused on the visible truth issue: no synthetic service label when explicit service truth is absent.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed the synthetic `Консультация ({specialty})` fallback from `service_name` assignment.
+- Manually preserved the SSOT lookup path when explicit service truth is unavailable in the source row.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The endpoint change was a local backend cleanup once the file was identified. The gate misroute persisted, but the code change itself did not require a larger relationship graph to understand or implement safely.
+
+## Task 56 - Queue group key category_specialty fallback removal
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/service_mapping.py
+
+### What handoff solved well
+- The override prompt isolated the routing helper and kept the patch inside one backend truth file.
+- It gave a clear compile verification target after the signature change.
+- It made the smallest safe change obvious: remove the specialty-derived hint from queue-group resolution.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed `category_specialty` from `resolve_queue_group_key()` and its local caller.
+- Manually kept the remaining explicit hints in place rather than expanding the slice to broader routing logic.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The routing helper was a small single-file change once the file was known. The gate still misrouted, but the implementation did not require cross-file graph reconstruction.
+
+## Task 57 - Queue manager specialty log cleanup
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/hooks/usequeuemanager.js
+
+### What handoff solved well
+- The override prompt isolated the queue manager hook and kept the patch away from broader queue selection logic.
+- It gave a narrow lint target and a single-file cleanup boundary.
+- It made the smallest safe change obvious: remove legacy specialty framing from debug logs.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed `doctor.specialty` from the debug and warning log payloads.
+- Manually kept the queue matching logic itself untouched so no queue fairness behavior changed.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The hook cleanup was a local logging-only change once the file was identified. The gate misroute remained present, but there was no broader graph problem to solve for this patch.
+
+## Task 58 - Queue group key category_code fallback removal
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/service_mapping.py
+
+### What handoff solved well
+- The override prompt isolated the routing helper and kept the patch in a single backend file.
+- It gave a concrete compile check after the signature cleanup.
+- It made the smallest safe change obvious: remove the remaining code-derived fallback from queue group resolution.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually removed `category_code` from `resolve_queue_group_key()` and its local call-site.
+- Manually left the explicit `queue_tag` / `department_key` resolution path intact.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The routing helper remained a small single-file cleanup once the file was identified. The gate misroute persisted, but the change itself did not need broader graph reconstruction.
+
+## Task 59 - QR queue fallback doctor selection fix
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/queue_service.py
+
+### What handoff solved well
+- The override prompt narrowed the fix to one confirmed root-cause file.
+- It made the fallback doctor selection branch easy to isolate and remove.
+- It kept the validation target narrow with a single py_compile check.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually traced that clinic-wide QR profile routing still fell back to the first active doctor when no profile match existed.
+- Manually replaced that fallback with an explicit validation error so the service no longer invents a doctor owner.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- The fix was a single branch in `queue_service.py` once the route was known. The gate misrouted first, but the actual repair did not require broader graph reconstruction.
+
+## Task 60 - Repeat auto-suggestion preview and wizard apply flow
+
+### User task
+PLEASE IMPLEMENT THIS PLAN: Repeat Auto-Suggestion v1 (Hint-Only) for Registrar Wizard.
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: yes (recovered_on_retry)
+- override_used: no
+- known_root_cause_file: backend/app/api/v1/endpoints/registrar_wizard.py
+
+### What handoff solved well
+- It constrained edits to the exact first-touch set (`registrar_wizard.py` and `AppointmentWizardV2.jsx`) and prevented scope spread into cashier/specialty panels.
+- It kept stop conditions explicit for contract safety (no cart model change, no broad refactor).
+- It narrowed the first patch slice to preview endpoint + wizard hint/apply guard.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually mapped how cart step keeps consultation items and doctor selection state to attach per-item eligibility chips.
+- Manually aligned submit guard with existing backend repeat validation so mixed checkout is blocked before `POST /registrar/cart`.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: yes
+- override_used: no
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- Once the gate retry included the known root-cause path, the change was a bounded two-file implementation with no unresolved cross-domain mapping gaps.

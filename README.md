@@ -144,6 +144,7 @@ cd frontend
 npm run test
 npx playwright test
 ```
+В CI фронтенд gate дополнительно включает `frontend/e2e/registrar-time.spec.js` для проверки времени регистрации пациента в `Asia/Tashkent`.
 
 ### CI/CD
 Система включает полный CI/CD пайплайн с:

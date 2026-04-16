@@ -544,6 +544,22 @@ export const servicesService = {
    */
   async getCodeMappings() {
     return apiRequest('GET', '/services/code-mappings');
+  },
+
+  /**
+   * Получение истории изменений услуги
+   */
+  async getServiceHistory(serviceId, params = {}) {
+    const queryString = buildQueryString(params);
+    return apiRequest('GET', `/services/${serviceId}/history?${queryString}`);
+  },
+
+  /**
+   * Получение последних изменений всех услуг
+   */
+  async getRecentServiceChanges(params = {}) {
+    const queryString = buildQueryString(params);
+    return apiRequest('GET', `/services/admin/audit/recent?${queryString}`);
   }
 };
 

@@ -21,6 +21,19 @@ function isLocalOrigin(value = '') {
   return LOCAL_ORIGIN_PATTERN.test(value);
 }
 
+function isViteDevProxyOrigin(value = '') {
+  if (!isLocalOrigin(value)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return parsed.port === '5173';
+  } catch {
+    return false;
+  }
+}
+
 function parseOriginParts(value = '') {
   if (!value) {
     return null;
@@ -76,7 +89,9 @@ function getBrowserOrigin() {
 function buildRuntimeSnapshot() {
   const currentOrigin = getBrowserOrigin();
   const configuredOrigin = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
-  const apiOrigin = currentOrigin && !isLocalOrigin(currentOrigin) ? currentOrigin : configuredOrigin;
+  const preferBrowserOrigin =
+    currentOrigin && (!isLocalOrigin(currentOrigin) || isViteDevProxyOrigin(currentOrigin));
+  const apiOrigin = preferBrowserOrigin ? currentOrigin : configuredOrigin;
   const apiBaseUrl = `${apiOrigin}/api/v1`;
   const parsedOrigin = parseOriginParts(apiOrigin) || parseOriginParts(configuredOrigin);
   const wsProtocol = parsedOrigin?.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -47,6 +47,7 @@ import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 import { formatNetworkErrorMessage, isNetworkFetchError } from '../utils/networkErrorMessages';
 import { getErrorMessage } from '../utils/errorHandler';
+import { aggregatePatientsForAllDepartments as aggregateRegistrarPatients } from '../utils/registrarAggregation';
 
 // ⭐ SSOT: Centralized service code resolver
 import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
@@ -1054,20 +1055,14 @@ const RegistrarPanel = () => {
 
 
         // Игнорируем ошибки парсинга JSON
-      } // Добавляем недостающие поля для таблицы с значениями по умолчанию
-      // ✅ ИСПРАВЛЕНО: Правильно обрабатываем all_free заявки (только одобренные)
-      const isAllFree = enrichedApt.discount_mode === 'all_free' && enrichedApt.approval_status === 'approved';enrichedApt = {
+      }
+      enrichedApt = {
         ...enrichedApt,
-        // Если поля уже есть в API, используем их, иначе значения по умолчанию
-        // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем visit_type как 'free'
-        visit_type: isAllFree ? 'free' : enrichedApt.visit_type || 'paid', // Платный по умолчанию
-        // ✅ Для all_free устанавливаем payment_type как 'free', иначе определяем по провайдеру
-        payment_type: isAllFree ? 'free' : enrichedApt.payment_type || (enrichedApt.payment_provider === 'online' ? 'online' : 'cash'),
-        // ✅ Если пришел payment_status от API — уважаем его; иначе — выводим из discount_mode или payment_processed_at
-        payment_status: isAllFree ? 'paid' : enrichedApt.payment_status || (enrichedApt.discount_mode === 'paid' ? 'paid' : enrichedApt.payment_processed_at ? 'paid' : enrichedApt.payment_amount > 0 ? 'pending' : 'pending'),
-        services: enrichedApt.services || [], // ✅ ИСПРАВЛЕНО: оставляем пустым если нет услуг
-        // ✅ Для all_free устанавливаем cost = 0, иначе используем payment_amount или cost
-        cost: isAllFree ? 0 : enrichedApt.cost || enrichedApt.payment_amount || 0
+        visit_type: enrichedApt.visit_type ?? null,
+        payment_type: enrichedApt.payment_type ?? null,
+        payment_status: enrichedApt.payment_status ?? 'pending',
+        services: enrichedApt.services || [],
+        cost: Number(enrichedApt.cost ?? 0)
       };
 
       return enrichedApt;
@@ -1767,7 +1762,7 @@ const RegistrarPanel = () => {
     }
   }, [loadAppointments]);
 
-  const handlePayment = async (appointment) => {
+  const handlePayment = async (appointment, paymentData = null) => {
     try {
       logger.info('🔍 handlePayment вызван с данными:', appointment);
       logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
@@ -1802,15 +1797,12 @@ const RegistrarPanel = () => {
         // ✅ ИСПРАВЛЕНИЕ: Проверяем статус КАЖДОЙ записи перед попыткой оплаты
         const paymentStatus = (record.payment_status || '').toLowerCase();
         const status = (record.status || '').toLowerCase();
-        const discountMode = (record.discount_mode || '').toLowerCase();
-
-        logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}, discount_mode=${discountMode}`);
+        logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}`);
 
         // Пропускаем записи, которые уже оплачены
         if (paymentStatus === 'paid' ||
         status === 'paid' ||
-        status === 'queued' ||
-        discountMode === 'paid') {
+        status === 'queued') {
           logger.info(`⏭️ Запись ${recordId} уже оплачена, пропускаем`);
           paymentResults.push({ success: true, recordId, skipped: true, reason: 'already_paid' });
           continue;
@@ -1834,7 +1826,11 @@ const RegistrarPanel = () => {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-            }
+            },
+            body: JSON.stringify({
+              amount: paymentData?.amount ?? null,
+              method: paymentData?.method ?? null
+            })
           });
 
           if (response.ok) {
@@ -2201,177 +2197,7 @@ const RegistrarPanel = () => {
   // Groups entries by patient for visual display (1 patient = 1 row)
   // ✅ ALLOWED by SSOT: This is view-model grouping, NOT business logic
   // ⚠️ Do NOT use for: filtering, routing, department decisions
-  const aggregatePatientsForAllDepartments = useCallback((appointments) => {
-    const patientGroups = {};
-
-    appointments.forEach((appointment) => {
-      // Используем patient_fio как уникальный идентификатор пациента
-      const patientKey = appointment.patient_fio;
-
-      if (!patientGroups[patientKey]) {
-        // ✅ ИСПРАВЛЕНО: Проверяем All Free статус для корректного отображения
-        const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
-        const initialVisitId = appointment.visit_id || appointment.visitId || appointment.id;
-        const initialQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
-
-        patientGroups[patientKey] = {
-          id: appointment.id,
-          visit_id: initialVisitId,
-          appointment_id: appointment.appointment_id || appointment.id,
-          queue_entry_id: initialQueueEntryId,
-          visit_ids: initialVisitId !== null && initialVisitId !== undefined ? [initialVisitId] : [],
-          appointment_ids: [appointment.id],
-          queue_entry_ids: initialQueueEntryId !== null && initialQueueEntryId !== undefined ? [initialQueueEntryId] : [],
-          patient_id: appointment.patient_id,
-          patient_fio: appointment.patient_fio,
-          patient_birth_year: appointment.patient_birth_year,
-          patient_phone: appointment.patient_phone,
-          address: appointment.address,
-          // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем visit_type как 'free'
-          visit_type: isAllFree ? 'free' : appointment.visit_type,
-          // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем payment_type как 'free'
-          payment_type: isAllFree ? 'free' : appointment.payment_type,
-          payment_status: appointment.payment_status,
-          cost: 0, // Будет суммироваться из всех записей
-          status: appointment.status,
-          date: appointment.date,
-          appointment_date: appointment.appointment_date,
-          created_at: appointment.created_at,
-          // Агрегируем услуги из разных отделений
-          services: [],
-          departments: new Set(),
-          doctors: new Set(),
-          // Используем первую попавшуюся запись для остальных полей
-          department: appointment.department,
-          doctor_specialty: appointment.doctor_specialty,
-          queue_numbers: appointment.queue_numbers || [],
-          confirmation_status: appointment.confirmation_status,
-          confirmed_at: appointment.confirmed_at,
-          confirmed_by: appointment.confirmed_by,
-          record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
-          source: appointment.source, // ✅ FIX: Сохраняем источник (online/desk) для Wizard'а
-          // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
-          discount_mode: appointment.discount_mode,
-          approval_status: appointment.approval_status,
-          // ✅ FIX: Собираем ВСЕ ID записей для групповой отмены
-          // Если запись уже агрегирована в loadAppointments, берем её aggregated_ids
-          aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id]
-        };
-      } else {
-        // Добавляем ID в массив агрегированных
-        const newIds = appointment.aggregated_ids || [appointment.id];
-        patientGroups[patientKey].aggregated_ids.push(...newIds);
-        // Убираем возможные дубликаты
-        patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
-        const nextVisitId = appointment.visit_id || appointment.visitId || appointment.id;
-        const nextQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
-        if (nextVisitId !== null && nextVisitId !== undefined) {
-          patientGroups[patientKey].visit_ids.push(nextVisitId);
-          patientGroups[patientKey].visit_ids = [...new Set(patientGroups[patientKey].visit_ids)];
-          if (!patientGroups[patientKey].visit_id) {
-            patientGroups[patientKey].visit_id = nextVisitId;
-          }
-        }
-        if (appointment.id !== null && appointment.id !== undefined) {
-          patientGroups[patientKey].appointment_ids.push(appointment.id);
-          patientGroups[patientKey].appointment_ids = [...new Set(patientGroups[patientKey].appointment_ids)];
-          if (!patientGroups[patientKey].appointment_id) {
-            patientGroups[patientKey].appointment_id = appointment.id;
-          }
-        }
-        if (nextQueueEntryId !== null && nextQueueEntryId !== undefined) {
-          patientGroups[patientKey].queue_entry_ids.push(nextQueueEntryId);
-          patientGroups[patientKey].queue_entry_ids = [...new Set(patientGroups[patientKey].queue_entry_ids)];
-          if (!patientGroups[patientKey].queue_entry_id) {
-            patientGroups[patientKey].queue_entry_id = nextQueueEntryId;
-          }
-        }
-
-        // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
-        const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
-        const existingIsAllFree = patientGroups[patientKey].discount_mode === 'all_free' &&
-        patientGroups[patientKey].approval_status === 'approved';
-
-        if (isAllFree && !existingIsAllFree) {
-          // Новая запись All Free, а существующая нет — обновляем
-          patientGroups[patientKey].visit_type = 'free';
-          patientGroups[patientKey].payment_type = 'free';
-          patientGroups[patientKey].discount_mode = appointment.discount_mode;
-          patientGroups[patientKey].approval_status = appointment.approval_status;
-        }
-
-        // ✅ FIX: Агрегируем queue_numbers (добавляем новые очереди к существующему пациенту в таблице "Все")
-        // ⭐ ИСПРАВЛЕНО: Дедупликация по ID записи, а не по specialty
-        // Это позволяет сохранить несколько записей с одинаковой specialty (например, 2 консультации кардиолога)
-        if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
-          const existingQueueIds = new Set((patientGroups[patientKey].queue_numbers || []).map((qn) =>
-          qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`
-          ));
-
-          appointment.queue_numbers.forEach((qn) => {
-            const queueId = qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`;
-            if (!existingQueueIds.has(queueId)) {
-              patientGroups[patientKey].queue_numbers.push(qn);
-              existingQueueIds.add(queueId);
-            }
-          });
-        }
-
-        // ✅ SSOT: Только source='online' считается QR-записью
-        // confirmation больше не используется — backend теперь всегда возвращает 'online' или 'desk'
-        const isQRSource = (src) => src === 'online';
-        const currentIsQR = isQRSource(appointment.source);
-        const aggregatedIsQR = isQRSource(patientGroups[patientKey].source);
-
-        if (currentIsQR && !aggregatedIsQR) {
-          patientGroups[patientKey].source = appointment.source;
-          patientGroups[patientKey].record_type = appointment.record_type || patientGroups[patientKey].record_type;
-        }
-      }
-
-      // Суммируем стоимость для ВСЕХ записей пациента (включая первую)
-      // ✅ ИСПРАВЛЕНО: Для All Free не суммируем стоимость, оставляем 0
-      const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
-      if (!isAllFree && appointment.cost) {
-        patientGroups[patientKey].cost += appointment.cost;
-      }
-
-      // Добавляем услуги если их еще нет
-      // ⭐ DEBUG: Логируем что приходит в агрегацию
-      // console.log(`🔄 Aggregating ${appointment.patient_fio}: appointment.services=${JSON.stringify(appointment.services)}, current patientGroups[${patientKey}].services=${JSON.stringify(patientGroups[patientKey].services)}`);
-
-      if (appointment.services && Array.isArray(appointment.services)) {
-        appointment.services.forEach((service) => {
-          if (!patientGroups[patientKey].services.includes(service)) {
-            patientGroups[patientKey].services.push(service);
-          }
-        });
-      }
-
-      // ✅ FIX: Агрегируем service_codes для корректной работы Wizard
-      if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-        if (!patientGroups[patientKey].service_codes) patientGroups[patientKey].service_codes = [];
-        appointment.service_codes.forEach((code) => {
-          if (!patientGroups[patientKey].service_codes.includes(code)) {
-            patientGroups[patientKey].service_codes.push(code);
-          }
-        });
-      }
-
-      // Добавляем информацию об отделении
-      if (appointment.department) {
-        patientGroups[patientKey].departments.add(appointment.department);
-      }
-
-      // Добавляем информацию о враче
-      if (appointment.doctor_specialty) {
-        patientGroups[patientKey].doctors.add(appointment.doctor_specialty);
-      }
-    });
-
-    // Преобразуем обратно в массив
-    return Object.values(patientGroups);
-  }, []);
+  const aggregatePatientsForAllDepartments = useCallback((appointments) => aggregateRegistrarPatients(appointments), []);
 
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
@@ -4112,11 +3938,11 @@ const RegistrarPanel = () => {
         isOpen={paymentDialog.open}
         onClose={() => setPaymentDialog({ open: false, row: null, paid: false, source: null })}
         appointment={paymentDialog.row}
-        onPaymentSuccess={async () => {
+        onPaymentSuccess={async (paymentData) => {
           // ✅ ИСПРАВЛЕНО: используем реальный API вызов через handlePayment
           const appointment = paymentDialog.row;
           if (appointment) {
-            const updated = await handlePayment(appointment);
+            const updated = await handlePayment(appointment, paymentData);
             if (updated) {
               // Статус уже правильно установлен в handlePayment (status: 'queued')
               logger.info('PaymentDialog: Оплата успешна, статус обновлен:', updated);

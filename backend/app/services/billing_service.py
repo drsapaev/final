@@ -34,6 +34,15 @@ from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
 
+REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
+
+
+def _normalize_registration_discount_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "none").strip().lower()
+    if normalized in REGISTRATION_DISCOUNT_MODES:
+        return normalized
+    return "none"
+
 
 class BillingService:
     """Сервис для управления счетами и автоматическим выставлением"""
@@ -544,7 +553,6 @@ class BillingService:
         1. Статус визита (paid, in_visit, in_progress, completed, done)
         2. payment_processed_at (явный признак оплаты)
         3. Записи в таблице payments (статус 'paid' или наличие paid_at)
-        4. discount_mode='paid' в сочетании с другими признаками
 
         Args:
             visit: Объект Visit для проверки
@@ -586,36 +594,21 @@ class BillingService:
                 if payment_status == 'paid' or payment_row.paid_at:
                     is_paid = True
 
-        # Приоритет 4: Проверяем discount_mode ТОЛЬКО если есть другие признаки оплаты
-        if not is_paid:
-            discount_mode_value = getattr(visit, 'discount_mode', None)
-            v_status = (getattr(visit, 'status', None) or '').lower()
-
-            if discount_mode_value == 'paid' and v_status in paid_statuses:
-                is_paid = True
-            elif discount_mode_value == 'paid' and getattr(
-                visit, 'payment_processed_at', None
-            ):
-                is_paid = True
-
         return is_paid
 
     def get_discount_mode_for_visit(self, visit: Visit) -> str:
         """
-        Получить discount_mode для визита (SSOT).
+        Получить registration discount_mode для визита (SSOT).
 
         Args:
             visit: Объект Visit
 
         Returns:
-            discount_mode: none|repeat|benefit|all_free|paid
+            discount_mode: none|repeat|benefit|all_free
         """
-        # Если визит оплачен, возвращаем 'paid'
-        if self.is_visit_paid(visit):
-            return 'paid'
-
-        # Иначе возвращаем discount_mode из визита
-        return getattr(visit, 'discount_mode', 'none') or 'none'
+        return _normalize_registration_discount_mode(
+            getattr(visit, 'discount_mode', None)
+        )
 
     def calculate_total(
         self,
@@ -861,32 +854,31 @@ class BillingService:
         force_update: bool = False,
     ) -> bool:
         """
-        Обновить discount_mode визита на основе фактического статуса оплаты (SSOT).
+        Нормализовать registration discount_mode визита (SSOT).
 
-        Если визит оплачен (по любым признакам), но discount_mode не установлен как 'paid',
-        обновляет discount_mode в базе данных.
+        Больше не использует и не сохраняет `paid` как discount_mode.
 
         Args:
             visit: Объект Visit для обновления
-            force_update: Принудительно обновить даже если discount_mode уже 'paid'
+            force_update: Принудительно обновить даже если режим уже нормализован
 
         Returns:
             True если было выполнено обновление, False если нет
         """
-        is_paid = self.is_visit_paid(visit)
+        current_mode = getattr(visit, 'discount_mode', None)
+        normalized_mode = _normalize_registration_discount_mode(current_mode)
 
-        if is_paid:
-            if visit.discount_mode != 'paid' or force_update:
-                visit.discount_mode = 'paid'
-                try:
-                    self.db.commit()
-                    self.db.refresh(visit)
-                    return True
-                except Exception as e:
-                    self.db.rollback()
-                    raise ValueError(
-                        f"Не удалось сохранить discount_mode для Visit {visit.id}: {e}"
-                    )
+        if force_update and normalized_mode != current_mode:
+            visit.discount_mode = normalized_mode
+            try:
+                self.db.commit()
+                self.db.refresh(visit)
+                return True
+            except Exception as e:
+                self.db.rollback()
+                raise ValueError(
+                    f"Не удалось сохранить discount_mode для Visit {visit.id}: {e}"
+                )
 
         return False
 
@@ -1380,14 +1372,14 @@ class BillingService:
 
 def get_discount_mode_for_visit(db: Session, visit: Visit) -> str:
     """
-    Получить discount_mode для визита (SSOT helper function).
+    Получить registration discount_mode для визита (SSOT helper function).
 
     Args:
         db: Database session
         visit: Объект Visit
 
     Returns:
-        discount_mode: none|repeat|benefit|all_free|paid
+        discount_mode: none|repeat|benefit|all_free
     """
     billing_service = BillingService(db)
     return billing_service.get_discount_mode_for_visit(visit)
@@ -1473,28 +1465,26 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
 
 def get_discount_mode_for_appointment(db: Session, appointment) -> str:
     """
-    Получить discount_mode для appointment (SSOT helper function).
+    Получить registration discount_mode для appointment (SSOT helper function).
 
     Args:
         db: Database session
         appointment: Объект Appointment
 
     Returns:
-        discount_mode: none|repeat|benefit|all_free|paid
+        discount_mode: none|repeat|benefit|all_free
     """
-    # Если appointment оплачен, возвращаем 'paid'
-    if is_appointment_paid(db, appointment):
-        return 'paid'
-
-    # Иначе маппим visit_type в discount_mode
-    visit_type = getattr(appointment, 'visit_type', None) or 'paid'
+    # Маппим visit_type в registration discount_mode без payment marker.
+    visit_type = getattr(appointment, 'visit_type', None) or 'none'
     visit_type_lower = visit_type.lower()
 
     if visit_type_lower == 'paid':
         return 'none'
     elif visit_type_lower == 'repeat':
         return 'repeat'
+    elif visit_type_lower == 'benefit':
+        return 'benefit'
     elif visit_type_lower == 'free':
         return 'all_free'
     else:
-        return 'none'
+        return _normalize_registration_discount_mode(visit_type_lower)

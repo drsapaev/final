@@ -1,0 +1,110 @@
+- generic [ref=e2]:
+  - generic [ref=e84]:
+    - generic [ref=e86]:
+      - button "Управление клиникой" [ref=e88] [cursor=pointer]:
+        - generic [ref=e89]:
+          - img [ref=e90]
+          - text: Управление клиникой
+      - generic [ref=e93]:
+        - generic [ref=e95]:
+          - generic: 🔍
+          - textbox "Поиск пациентов, визитов..." [ref=e96]
+          - generic: ⌘K
+        - generic [ref=e97]:
+          - button "Кассир" [ref=e98] [cursor=pointer]:
+            - generic [ref=e99]:
+              - img [ref=e100]
+              - text: Кассир
+          - button "Главная" [ref=e103] [cursor=pointer]:
+            - generic [ref=e104]:
+              - img [ref=e105]
+              - text: Главная
+          - button "Онлайн‑записи" [ref=e108] [cursor=pointer]:
+            - generic [ref=e109]:
+              - img [ref=e110]
+              - text: Онлайн‑записи
+          - button "Новая запись" [ref=e113] [cursor=pointer]:
+            - generic [ref=e114]:
+              - img [ref=e115]
+              - text: Новая запись
+      - generic [ref=e119]:
+        - button "RU" [ref=e121] [cursor=pointer]:
+          - generic [ref=e122]:
+            - img [ref=e123]
+            - text: RU
+        - generic "Подключение..." [ref=e127]:
+          - img [ref=e128]
+          - text: Подключение...
+        - button "Сообщения" [ref=e133] [cursor=pointer]:
+          - img [ref=e134]
+        - button "Выбрать тему" [ref=e138] [cursor=pointer]:
+          - img [ref=e141]
+        - button "Registrar User" [ref=e147] [cursor=pointer]:
+          - generic [ref=e148]:
+            - img [ref=e149]
+            - text: Registrar User
+        - button "Выйти" [ref=e152] [cursor=pointer]:
+          - generic [ref=e153]:
+            - img [ref=e154]
+            - text: Выйти
+    - main [ref=e158]:
+      - main "Панель регистратора" [ref=e159]:
+        - link "Перейти к основному содержимому" [ref=e160] [cursor=pointer]:
+          - /url: "#main-content"
+        - generic [ref=e163]:
+          - button "Все отделения" [ref=e164] [cursor=pointer]:
+            - img [ref=e166]
+            - generic [ref=e169]: Все отделения
+          - generic [ref=e170]:
+            - button "Кардиология" [ref=e171] [cursor=pointer]:
+              - generic [ref=e172]:
+                - img [ref=e174]
+                - generic [ref=e176]: Кардиология
+            - button "ЭКГ" [ref=e177] [cursor=pointer]:
+              - generic [ref=e178]:
+                - img [ref=e180]
+                - generic [ref=e182]: ЭКГ
+            - button "Дерматология" [ref=e183] [cursor=pointer]:
+              - generic [ref=e184]:
+                - img [ref=e186]
+                - generic [ref=e189]: Дерматология
+            - button "Стоматология" [ref=e190] [cursor=pointer]:
+              - generic [ref=e191]:
+                - img [ref=e193]
+                - generic [ref=e196]: Стоматология
+            - button "Лаборатория" [ref=e197] [cursor=pointer]:
+              - generic [ref=e198]:
+                - img [ref=e200]
+                - generic [ref=e202]: Лаборатория
+            - button "Процедуры" [ref=e203] [cursor=pointer]:
+              - generic [ref=e204]:
+                - img [ref=e206]
+                - generic [ref=e210]: Процедуры
+            - button "УЗИ" [ref=e211] [cursor=pointer]:
+              - generic [ref=e212]:
+                - img [ref=e214]
+                - generic [ref=e216]: УЗИ
+            - button "Неврология" [ref=e217] [cursor=pointer]:
+              - generic [ref=e218]:
+                - img [ref=e220]
+                - generic [ref=e224]: Неврология
+        - tabpanel [ref=e226]:
+          - generic [ref=e228]:
+            - generic [ref=e229]: 📋
+            - heading "Очередь пуста" [level=3] [ref=e230]
+            - paragraph [ref=e231]: Сегодня пока нет записей
+            - button "➕ Создать первую запись" [ref=e232] [cursor=pointer]:
+              - generic [ref=e233]: ➕ Создать первую запись
+        - button "Открыть центр уведомлений" [ref=e235] [cursor=pointer]:
+          - img [ref=e236]
+  - region "Notifications Alt+T"
+  - generic [ref=e70]:
+    - generic [ref=e71]:
+      - img [ref=e72]
+      - generic [ref=e75]:
+        - strong [ref=e76]: Включить уведомления?
+        - generic [ref=e77]: Получайте уведомления о новых сообщениях
+    - generic [ref=e78]:
+      - button "Включить" [ref=e79] [cursor=pointer]
+      - button "Закрыть" [ref=e80] [cursor=pointer]:
+        - img [ref=e81]

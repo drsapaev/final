@@ -185,12 +185,7 @@ async def get_pending_payments(
         query = db.query(Visit).options(
             joinedload(Visit.services)
         ).filter(
-            ~Visit.status.in_(excluded_statuses),
-            # Также исключаем визиты с discount_mode='paid' (SSOT признак оплаты)
-            or_(
-                Visit.discount_mode.is_(None),
-                Visit.discount_mode != "paid"
-            )
+            ~Visit.status.in_(excluded_statuses)
         )
         
         # Фильтр по датам
@@ -889,14 +884,11 @@ async def cancel_payment(
         if hasattr(payment, 'note') and cancel_data.reason:
             payment.note = f"Отменён: {cancel_data.reason}"
 
-        # Возвращаем платежный маркер, не ломая operational статус визита.
+        # Возвращаем только operational статус визита; registration type не трогаем.
         if payment.visit_id:
             visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-            if visit and (
-                visit.status == 'paid' or visit.discount_mode == 'paid'
-            ):
+            if visit and visit.status == 'paid':
                 visit.status = _preserve_cashier_visit_status(visit.status)
-                visit.discount_mode = 'none'
                 db.add(visit)
         
         db.commit()
@@ -957,12 +949,12 @@ async def mark_visit_as_paid(
             )
             db.add(new_payment)
         
-        # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита.
+        # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита
+        # и не должна менять registration type.
         visit.status = _preserve_cashier_visit_status(visit.status)
-        visit.discount_mode = "paid"  # SSOT признак оплаты
-        
+
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Визит отмечен как оплаченный",
@@ -1009,12 +1001,11 @@ async def confirm_payment(
         from datetime import datetime
         payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
     
-    # Обновляем платежный маркер визита, сохраняя operational статус.
+    # Обновляем только operational статус визита; registration type не меняем.
     if payment.visit_id:
          visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
          if visit:
               visit.status = _preserve_cashier_visit_status(visit.status)
-              visit.discount_mode = 'paid'
               db.add(visit)
     
     db.commit()
@@ -1067,14 +1058,11 @@ async def refund_payment(
         if new_refunded_amount >= payment.amount:
             payment.status = "refunded"
             
-            # Возвращаем платежный маркер при полном возврате, не ломая operational статус.
+            # Возвращаем только operational статус при полном возврате.
             if payment.visit_id:
                 visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-                if visit and (
-                    visit.status == 'paid' or visit.discount_mode == 'paid'
-                ):
+                if visit and visit.status == 'paid':
                     visit.status = _preserve_cashier_visit_status(visit.status)
-                    visit.discount_mode = 'none'
                     db.add(visit)
         else:
             # Частичный возврат — оставляем "paid" но с пометкой
