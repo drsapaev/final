@@ -538,12 +538,16 @@ const MacOSCardiologistPanelUnified = () => {
                   patient_phone: entry.phone || '',
                   patient_birth_year: entry.patient_birth_year || '',
                   address: entry.address || '',
-                  visit_type: entry.discount_mode === 'paid' ? 'Оплачено' : 'Платный',
+                  visit_type:
+                    entry.discount_mode === 'repeat' ? 'Повторный' :
+                    entry.discount_mode === 'benefit' ? 'Льготный' :
+                    entry.discount_mode === 'all_free' ? 'All Free' :
+                    'Платный',
                   discount_mode: entry.discount_mode || 'none',
                   services: entry.services || [],
                   service_codes: entry.service_codes || [],
-                  payment_type: entry.payment_status || 'Не оплачено',
-                  payment_status: entry.payment_status || (entry.discount_mode === 'paid' ? 'paid' : 'pending'), // ✅ ИСПРАВЛЕНО: берем из entry
+                  payment_type: entry.payment_type || null,
+                  payment_status: entry.payment_status || 'pending',
                   doctor: entry.doctor_name || 'Врач',
                   specialty: queue.specialty,
                   created_at: entry.created_at,
@@ -610,6 +614,7 @@ const MacOSCardiologistPanelUnified = () => {
             appointmentsDBData.forEach((apt) => {
               const appointmentMeta = {
                 payment_status: apt.payment_status || 'pending',
+                payment_type: apt.payment_type || null,
                 visit_id: apt.visit_id || null,
                 appointment_id: apt.appointment_id || (apt.source === 'appointments' ? apt.id : null)
               };
@@ -634,7 +639,7 @@ const MacOSCardiologistPanelUnified = () => {
                 appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
                 visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
                 payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
-                payment_type: appointmentMeta?.payment_status || apt.payment_type
+                payment_type: appointmentMeta?.payment_type || apt.payment_type || null
               };
             });
             appointmentsData = appointmentsData.map((apt) => {
@@ -648,7 +653,7 @@ const MacOSCardiologistPanelUnified = () => {
                 appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
                 visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
                 payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
-                payment_type: appointmentMeta?.payment_status || apt.payment_type
+                payment_type: appointmentMeta?.payment_type || apt.payment_type || null
               };
             });
           }
@@ -843,7 +848,7 @@ const MacOSCardiologistPanelUnified = () => {
         number: row.id,
         source: 'appointments',
         status: row.status || 'waiting',
-        payment_status: row.payment_status || (row.discount_mode === 'paid' ? 'paid' : 'pending'),
+        payment_status: row.payment_status || 'pending',
         discount_mode: row.discount_mode,
         specialty: row.specialty || 'cardiology'
       };
@@ -889,7 +894,7 @@ const MacOSCardiologistPanelUnified = () => {
             number: row.id,
             source: 'appointments',
             status: row.status || 'waiting',
-            payment_status: row.payment_status || (row.discount_mode === 'paid' ? 'paid' : 'pending'),
+            payment_status: row.payment_status || 'pending',
             discount_mode: row.discount_mode,
             specialty: row.specialty || 'cardiology'
           };

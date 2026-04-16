@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import String
 from sqlalchemy.orm import Session
@@ -31,6 +31,8 @@ from app.services.service_mapping import get_service_code, normalize_service_cod
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
 
 
 def _repo(db: Session) -> RegistrarWizardApiRepository:
@@ -78,6 +80,11 @@ class CartResponse(BaseModel):
     )
 
 
+class MarkPaidRequest(BaseModel):
+    amount: Decimal | None = None
+    method: str | None = Field(default="cash")
+
+
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
@@ -112,6 +119,55 @@ def _check_repeat_visit_eligibility(
     )
 
     return len(consultation_services) > 0
+
+
+def _normalize_registration_discount_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "none").strip().lower()
+    if normalized in REGISTRATION_DISCOUNT_MODES:
+        return normalized
+    return "none"
+
+
+def _resolve_payment_truth(
+    db: Session,
+    *,
+    visit_id: int | None = None,
+    legacy_paid_at: datetime | None = None,
+) -> tuple[str, str | None]:
+    if visit_id:
+        try:
+            from app.models.payment import Payment
+
+            payment_row = (
+                db.query(Payment)
+                .filter(Payment.visit_id == visit_id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment_row:
+                payment_status = (
+                    "paid"
+                    if (
+                        str(getattr(payment_row, "status", "") or "").lower() == "paid"
+                        or getattr(payment_row, "paid_at", None)
+                    )
+                    else "pending"
+                )
+                return payment_status, getattr(payment_row, "method", None) or None
+        except Exception:
+            logger.debug(
+                "registrar_wizard_api_service: failed to resolve payment truth for visit %s",
+                visit_id,
+                exc_info=True,
+            )
+
+    return ("paid", None) if legacy_paid_at else ("pending", None)
+
+
+def _preserve_operational_status_on_payment(raw_status: str | None) -> str:
+    if not raw_status or raw_status == "paid":
+        return "waiting"
+    return raw_status
 
 
 # _calculate_visit_price() удалена - используйте billing_service.calculate_total() (SSOT)
@@ -1848,70 +1904,40 @@ def get_all_appointments(
                         service_names.append(str(service_id))
 
             # Определяем payment_status для Appointment
-            payment_status = 'pending'
-            is_paid = False
-            visit_type = getattr(apt, 'visit_type', None)
-            if visit_type == 'paid':
-                payment_status = 'paid'
-                is_paid = True
-            elif apt.status and apt.status.lower() in (
-                'paid',
-                'in_visit',
-                'completed',
-                'done',
-            ):
-                payment_status = 'paid'
-                is_paid = True
-            elif getattr(apt, 'payment_processed_at', None):
-                payment_status = 'paid'
-                is_paid = True
-            else:
-                # Проверяем Payment table
-                try:
-                    from sqlalchemy import and_
+            visit_type = _normalize_registration_discount_mode(
+                getattr(apt, 'visit_type', None)
+            )
+            appointment_payment_processed_at = getattr(
+                apt, 'payment_processed_at', None
+            )
+            try:
+                from sqlalchemy import and_
 
-                    from app.models.payment import Payment
-
-                    # Ищем связанный Visit
-                    related_visit = (
-                        _repo(db).query(Visit)
-                        .filter(
-                            and_(
-                                Visit.patient_id == apt.patient_id,
-                                Visit.visit_date == apt.appointment_date,
-                                Visit.doctor_id == apt.doctor_id,
-                            )
+                related_visit = (
+                    _repo(db).query(Visit)
+                    .filter(
+                        and_(
+                            Visit.patient_id == apt.patient_id,
+                            Visit.visit_date == apt.appointment_date,
+                            Visit.doctor_id == apt.doctor_id,
                         )
-                        .first()
                     )
-                    if related_visit:
-                        payment_row = (
-                            _repo(db).query(Payment)
-                            .filter(Payment.visit_id == related_visit.id)
-                            .order_by(Payment.created_at.desc())
-                            .first()
-                        )
-                        if payment_row and (
-                            str(payment_row.status).lower() == 'paid'
-                            or payment_row.paid_at
-                        ):
-                            payment_status = 'paid'
-                            is_paid = True
-                except Exception:
-                    pass
+                    .first()
+                )
+            except Exception:
+                related_visit = None
 
-            # [OK] ВАЖНО: Сохраняем visit_type в БД для существующих записей
-            if is_paid and apt.visit_type != 'paid':
-                apt.visit_type = 'paid'
-                try:
-                    _repo(db).commit()
-                    _repo(db).refresh(apt)
-                except Exception:
-                    _repo(db).rollback()
+            payment_status, payment_type = _resolve_payment_truth(
+                db,
+                visit_id=related_visit.id if related_visit else None,
+                legacy_paid_at=appointment_payment_processed_at,
+            )
 
             result.append(
                 {
                     'id': apt.id,
+                    'appointment_id': apt.id,
+                    'visit_id': related_visit.id if related_visit else None,
                     'patient_id': apt.patient_id,
                     'patient_fio': patient_fio,
                     'doctor_id': apt.doctor_id,
@@ -1923,6 +1949,7 @@ def get_all_appointments(
                     'service_codes': service_codes,  # Коды услуг для фильтрации
                     'total_amount': total_amount,  # Общая сумма услуг
                     'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                    'payment_type': payment_type,
                     'visit_type': visit_type,  # Тип визита для совместимости
                     'notes': apt.notes,
                     'created_at': apt.created_at,
@@ -2070,91 +2097,33 @@ def get_all_appointments(
             else:
                 confirmation_status = "none"
 
-            # Определяем payment_status для Visit (та же логика что в registrar_integration.py)
-            payment_status = 'pending'
-            is_paid = False
-            try:
-                v_status = (getattr(visit, 'status', None) or '').lower()
-                if v_status in ("paid", "in_visit", "in progress", "completed", "done"):
-                    payment_status = 'paid'
-                    is_paid = True
-                elif getattr(visit, 'payment_processed_at', None):
-                    payment_status = 'paid'
-                    is_paid = True
-                else:
-                    # Проверяем Payment table
-                    from app.models.payment import Payment
-
-                    payment_row = (
-                        _repo(db).query(Payment)
-                        .filter(Payment.visit_id == visit.id)
-                        .order_by(Payment.created_at.desc())
-                        .first()
-                    )
-                    if payment_row and (
-                        str(payment_row.status).lower() == 'paid' or payment_row.paid_at
-                    ):
-                        payment_status = 'paid'
-                        is_paid = True
-                    elif visit.discount_mode == 'paid' and v_status in (
-                        "paid",
-                        "in_visit",
-                        "in progress",
-                        "completed",
-                        "done",
-                    ):
-                        payment_status = 'paid'
-                        is_paid = True
-                    elif visit.discount_mode == 'paid' and getattr(
-                        visit, 'payment_processed_at', None
-                    ):
-                        payment_status = 'paid'
-                        is_paid = True
-            except Exception:
-                # Если не удалось определить, проверяем discount_mode
-                if visit.discount_mode == 'paid':
-                    payment_status = 'paid'
-                    is_paid = True
-
-            # [OK] ИСПРАВЛЕНО: Сохраняем discount_mode в БД для существующих записей
-            # Если визит оплачен (есть платеж), но discount_mode не установлен - обновляем
-            # НО: это GET endpoint, не создаем платежи, только обновляем discount_mode если платеж уже есть
-            if is_paid and visit.discount_mode != 'paid':
-                # Проверяем, что платеж действительно существует
-                from app.models.payment import Payment
-
-                existing_payment = (
-                    _repo(db).query(Payment)
-                    .filter(Payment.visit_id == visit.id, Payment.status == "paid")
-                    .first()
-                )
-
-                if existing_payment:
-                    # Платеж существует - обновляем discount_mode
-                    visit.discount_mode = 'paid'
-                    try:
-                        _repo(db).commit()
-                        _repo(db).refresh(visit)
-                    except Exception:
-                        _repo(db).rollback()
-                # Если платежа нет, но is_paid=True - НЕ создаем платеж в GET endpoint
-                # Платеж должен быть создан через соответствующие POST endpoints
+            payment_status, payment_type = _resolve_payment_truth(
+                db,
+                visit_id=visit.id,
+                legacy_paid_at=getattr(visit, 'payment_processed_at', None),
+            )
+            discount_mode = _normalize_registration_discount_mode(
+                getattr(visit, 'discount_mode', None)
+            )
 
             result.append(
                 {
                     'id': visit.id + 20000,  # Смещение для избежания конфликтов
+                    'appointment_id': None,
+                    'visit_id': visit.id,
                     'patient_id': visit.patient_id,
                     'patient_fio': patient_fio,
                     'doctor_id': visit.doctor_id,
                     'department': visit.department,
                     'appointment_date': visit.visit_date,
                     'appointment_time': visit.visit_time,
-                    'status': visit.status,
+                    'status': _preserve_operational_status_on_payment(visit.status),
                     'services': service_names,  # Реальные названия услуг
                     'service_codes': service_codes,  # Коды услуг для фильтрации
                     'total_amount': total_amount,  # Общая сумма услуг
                     'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
-                    'discount_mode': visit.discount_mode,  # Тип визита для отображения
+                    'payment_type': payment_type,
+                    'discount_mode': discount_mode,  # Тип визита для отображения
                     'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
                     'notes': visit.notes,
                     'created_at': visit.created_at,
@@ -2195,6 +2164,7 @@ def get_all_appointments(
 @router.post("/registrar/visits/{visit_id}/mark-paid")
 def mark_visit_as_paid(
     visit_id: int,
+    payment_req: MarkPaidRequest | None = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
@@ -2227,6 +2197,12 @@ def mark_visit_as_paid(
             _repo(db).query(Payment)
             .filter(Payment.visit_id == visit_id, Payment.status == "paid")
             .first()
+        )
+
+        requested_method = (
+            str(payment_req.method).strip().lower()
+            if payment_req and payment_req.method
+            else "cash"
         )
 
         if not existing_payment:
@@ -2262,7 +2238,7 @@ def mark_visit_as_paid(
                     "visit_id": visit_id,
                     "amount": payment_amount,
                     "currency": currency,
-                    "method": "cash",
+                    "method": requested_method,
                     "status": "paid",
                     "note": note,
                     "paid_at": paid_at,
@@ -2280,10 +2256,11 @@ def mark_visit_as_paid(
             )
 
             logger.info(
-                "mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s",
+                "mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s, method=%s",
                 payment.id,
                 visit_id,
                 payment_amount,
+                requested_method,
             )
         else:
             logger.warning(
@@ -2292,15 +2269,24 @@ def mark_visit_as_paid(
                 existing_payment.id,
             )
 
-        # Обновляем статус и discount_mode
-        visit.status = "paid"
-        visit.discount_mode = "paid"  # [OK] ВАЖНО: устанавливаем discount_mode для корректного отображения payment_status
+        visit.status = _preserve_operational_status_on_payment(visit.status)
         _repo(db).commit()
         _repo(db).refresh(visit)
 
         return {
             "id": visit.id,
             "status": visit.status,
+            "payment_status": "paid",
+            "payment_type": (
+                existing_payment.method
+                if existing_payment and getattr(existing_payment, "method", None)
+                else requested_method
+            ),
+            "amount": (
+                float(existing_payment.amount)
+                if existing_payment and getattr(existing_payment, "amount", None) is not None
+                else payment_amount
+            ),
             "message": "Запись отмечена как оплаченная",
         }
 
@@ -2321,6 +2307,7 @@ def mark_visit_as_paid(
 @router.post("/registrar/queue/entry/{entry_id}/mark-paid")
 def mark_queue_entry_as_paid(
     entry_id: int,
+    payment_req: MarkPaidRequest | None = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
@@ -2376,13 +2363,19 @@ def mark_queue_entry_as_paid(
             if visit:
                 logger.info(f"mark_queue_entry_as_paid: Найден Visit {visit.id} через patient_id и дату")
 
+        requested_method = (
+            str(payment_req.method).strip().lower()
+            if payment_req and payment_req.method
+            else "cash"
+        )
+
         if not visit:
-            # Если Visit не найден, обновляем только статус записи в очереди
+            # Legacy fallback: без Visit нельзя создать Payment SSOT, поэтому оставляем queue marker.
             logger.warning(
                 f"mark_queue_entry_as_paid: Visit не найден для entry {entry_id}. "
-                f"Обновляем только статус очереди."
+                f"Обновляем только платежный статус."
             )
-            entry.status = "paid"
+            entry.status = _preserve_operational_status_on_payment(entry.status)
             entry.discount_mode = "paid"
             _repo(db).commit()
             _repo(db).refresh(entry)
@@ -2390,6 +2383,8 @@ def mark_queue_entry_as_paid(
             return {
                 "id": entry.id,
                 "status": entry.status,
+                "payment_status": "paid",
+                "payment_type": requested_method,
                 "message": "Запись в очереди отмечена как оплаченная (Visit не найден)",
             }
 
@@ -2430,7 +2425,7 @@ def mark_queue_entry_as_paid(
                     "visit_id": visit.id,
                     "amount": payment_amount,
                     "currency": currency,
-                    "method": "cash",
+                    "method": requested_method,
                     "status": "paid",
                     "note": note,
                     "paid_at": paid_at,
@@ -2447,11 +2442,12 @@ def mark_queue_entry_as_paid(
             )
 
             logger.info(
-                "mark_queue_entry_as_paid: Создан платеж ID=%d для визита %d (через entry %d), сумма=%s",
+                "mark_queue_entry_as_paid: Создан платеж ID=%d для визита %d (через entry %d), сумма=%s, method=%s",
                 payment.id,
                 visit.id,
                 entry_id,
                 payment_amount,
+                requested_method,
             )
         else:
             logger.info(
@@ -2460,13 +2456,8 @@ def mark_queue_entry_as_paid(
                 existing_payment.id,
             )
 
-        # Обновляем статус визита
-        visit.status = "paid"
-        visit.discount_mode = "paid"
-
-        # Обновляем статус записи в очереди
-        entry.status = "paid"
-        entry.discount_mode = "paid"
+        visit.status = _preserve_operational_status_on_payment(visit.status)
+        entry.status = _preserve_operational_status_on_payment(entry.status)
 
         _repo(db).commit()
         _repo(db).refresh(visit)
@@ -2476,6 +2467,17 @@ def mark_queue_entry_as_paid(
             "id": entry.id,
             "visit_id": visit.id,
             "status": visit.status,
+            "payment_status": "paid",
+            "payment_type": (
+                existing_payment.method
+                if existing_payment and getattr(existing_payment, "method", None)
+                else requested_method
+            ),
+            "amount": (
+                float(existing_payment.amount)
+                if existing_payment and getattr(existing_payment, "amount", None) is not None
+                else payment_amount
+            ),
             "message": "Запись отмечена как оплаченная",
         }
 

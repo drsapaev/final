@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**⚠️ IMPORTANT:** This file is secondary context. For operational rules, execution modes, and canonical-first discipline, see `AGENTS.md` first. If instructions conflict, prefer the narrower, safer, more canonical rule from `AGENTS.md`.
+
 ## Project Overview
 
 This is a **Medical Clinic Management System** built with FastAPI (Python backend) and React (Vite frontend). The system manages patient appointments, queues, EMR (Electronic Medical Records), payments, and specialized medical panels (cardiology, dermatology, dentistry, laboratory).
@@ -16,6 +18,86 @@ This is a **Medical Clinic Management System** built with FastAPI (Python backen
 - Telegram and Firebase notifications
 - GraphQL API support
 - PWA capabilities
+
+## Execution Mode Selection (from AGENTS.md)
+
+**Before any code changes, classify the task and choose execution mode:**
+
+### Task Classification Modes
+- `analysis` - Understand existing code/architecture
+- `locate` - Find implementation/docs locations
+- `impact` - Understand touched files, tests, docs, risks
+- `canonical` - Separate SSOT from legacy/adapters
+- `plan` - Create patch checklist
+- `dossier` - Curated engineering context
+- `handoff` - Strict execution brief for another agent
+- `execute` - Only after canonical anchors are clear
+
+### Execution Modes
+Before executing any task, choose exactly one:
+
+1. **`direct_execute`**: Local narrow task, root cause known, likely one file, no risky domain, no ownership ambiguity
+2. **`gate`**: Risky task, unclear root cause, multi-file impact, ownership ambiguity, scope-creep risk
+3. **`gate_known_root_cause`**: Risky task with confirmed root-cause file
+4. **`narrow_override`**: Only after gate misroutes twice with explicit basis
+
+### Automatic Strict Mode Triggers
+
+**Automatically use `plan`, `dossier`, or `handoff` before `execute` when touching:**
+- Routing canonicalization or route aliases
+- Queue fairness, specialist/profile/doctor mapping, or `queue_time`
+- Frontend/backend contract alignment
+- Telegram integration
+- EMR, lab, rollout, evidence packs, go/no-go, production-sensitive behavior
+- Any canonical vs legacy ambiguity
+
+### Pre-Execute Gate (for risky tasks)
+
+For `gate` or `gate_known_root_cause` modes, run:
+
+```powershell
+cd C:\final\ai\langgraph
+python scripts\agent_gate.py "<user task>"
+
+# Or with known root cause:
+python scripts\agent_gate.py "<user task>" --known-root-cause "<relative/path.py>"
+```
+
+**Gate Rules:**
+- Execute only inside `First-touch files` from gate output
+- Treat `Stop conditions` as hard stops
+- If gate fails, stop and report instead of editing
+- If gate misroutes, retry once with `--known-root-cause`
+- Record evidence in `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`
+
+## Canonical First Discipline
+
+**Before proposing or changing code:**
+1. Identify canonical/SSOT sources first
+2. Prefer executable source, contract tests, route registries, service layers, migrations
+3. Explicitly distinguish canonical from legacy/adapters/compatibility paths
+4. **Stop instead of guessing** if canonical vs legacy ownership is unclear
+
+**Canonical Anchors in This Project:**
+- Roles: `backend/app/models/role_permission.py` (SINGLE SOURCE OF TRUTH)
+- Routes: `frontend/src/routing/routeRegistry.js`
+- Service codes: `backend/app/services/service_mapping.py`
+- Queue groups: `backend/app/services/service_mapping.py` (QUEUE_GROUPS)
+- Auth flow: `backend/app/services/authentication_service.py`
+
+## Safe Patch Slice
+
+**Before first edit, name:**
+- Canonical anchors
+- Files to read as reference only
+- First-touch files allowed for first iteration
+- Narrow validation target
+
+**For code changes:**
+- Start with smallest safe patch slice
+- Touch only first-touch files first
+- Do not do opportunistic cleanup
+- Do not expand scope without concrete reason and user-visible report
 
 ## Development Commands
 
@@ -242,6 +324,36 @@ npm run lint:check        # Lint check
 
 **Multi-user scenarios:** Clinic systems have concurrent user access patterns - always test with multiple simultaneous users
 
+**Validation Discipline (from AGENTS.md):**
+- After changes, run the narrowest relevant validation first
+- Prefer targeted tests, contract checks, smoke checks over broad unrelated suites
+- Do not run heavy checks without a reason
+- Report exactly what ran, what passed/failed, and what was not checked
+
+## Stop Conditions (from AGENTS.md)
+
+**Stop and report instead of continuing silently if:**
+- Canonical vs legacy conflict is unclear
+- Required edits leave the first safe patch slice
+- Frontend/backend ownership is not obvious
+- No clear verification target exists
+- Scope begins to spread across unrelated areas
+- Contract ambiguity appears
+- A policy, product, rollout, or runtime behavior decision is needed
+
+## Execute Response Format (from AGENTS.md)
+
+**For completed `execute` tasks, answer with:**
+- `Changed` - What files were modified
+- `Why` - Reason for changes
+- `Validation run` - What tests/checks were run
+- `Result` - Pass/fail status
+- `Scope check` - Did we stay within boundaries?
+- `Stop conditions hit` - Any stop conditions encountered?
+- `Next smallest step` - What's the next incremental step?
+
+For risky tasks that should not execute yet, output `plan`, `dossier`, or `handoff` instead.
+
 ### API Integration
 
 - RESTful principles at `/api/v1/*`
@@ -277,6 +389,44 @@ npm run lint:check        # Lint check
 8. **DON'T** mix password hashing schemes
 9. **DON'T** break backward compatibility with existing API endpoints
 10. **DON'T** commit sensitive files (.env, credentials.json)
+11. **DON'T** introduce unrelated edits or opportunistic refactoring (from AGENTS.md)
+12. **DON'T** reintroduce SQLite-first defaults - PostgreSQL + Alembic are SSOT
+13. **DON'T** edit generated evidence in `output/`, `test-results/`, `storage/` unless task explicitly asks
+14. **DON'T** preserve user changes in dirty worktree - never revert unrelated work
+
+## Domain Guardrails (from AGENTS.md)
+
+### Routing
+- Start from routing SSOT: `frontend/src/routing/routeRegistry.js`
+- Verify route contract/snapshot tests before broad cleanup
+- Do not mass-edit unrelated routes in first slice
+
+### Queue System
+- **Protect fairness invariants and `queue_time`**
+- Inspect queue-related tests first
+- Avoid SSOT drift between profile, specialist, doctor, queue, and online queue mapping layers
+- Queue groups defined in: `backend/app/services/service_mapping.py` (QUEUE_GROUPS)
+
+### Telegram Integration
+- Consider both frontend manager files and backend Telegram endpoint/service contracts
+- Do not infer integration behavior from frontend text alone
+- Keep first patch slice narrow even for mixed frontend/backend changes
+- Patterns: `backend/app/api/v1/endpoints/telegram_*.py`
+
+### EMR, Lab, Rollout-Sensitive Areas
+- Prefer canonical runbooks, contract docs, migrations, evidence docs
+- Do not infer production-critical behavior from random overview docs
+- **Stop on ambiguity rather than improvising**
+- All medical operations must include audit logging
+- Patient data requires permission checks
+- Transactions required for critical medical operations
+
+### Service Management (Recently Enhanced)
+- Service audit log: `backend/app/models/service_audit.py`
+- Service codes SSOT: `backend/app/services/service_mapping.py`
+- Batch operations: `/services/admin/batch-update` endpoint
+- All service changes are logged with user, timestamp, and field-level diffs
+- Service code validation: prefix must match category/queue group
 
 ## Key Documentation Files
 
@@ -339,9 +489,72 @@ Each panel uses URL parameters (`?tab=`) for internal navigation and includes sp
 
 GraphQL endpoint available at `/api/graphql` with schema explorer in admin panel (`?section=graphql-explorer`).
 
+## Recent Enhancements (2026-04-14)
+
+### Service Management System Improvements
+
+**Audit Logging:**
+- Full history tracking for all service changes (create, update, delete, activate/deactivate)
+- Field-level change tracking with old → new value diffs
+- User attribution, timestamps, IP addresses, comments
+- Database: `service_audit_logs` table (migration: `0022_service_audit_log`)
+- Backend: `ServiceAuditLog` model, `ServiceAuditService` service
+- Frontend: `ServiceAuditHistory` component with expandable change details
+- API: `GET /services/{id}/history`, `GET /services/admin/audit/recent`
+
+**Optimistic UI Updates:**
+- Immediate UI updates without full page reload
+- Automatic rollback on server errors
+- Better UX with instant feedback
+
+**Change Preview (Diff):**
+- Visual preview of all changes before saving
+- Side-by-side comparison: old value (strikethrough) → new value (green)
+- Highlights important changes (price, code, name, active status)
+- Component: `ServiceChangesPreview`
+
+**Batch Operations:**
+- Mass edit multiple services simultaneously
+- Select services via checkboxes
+- Update common fields: price, category, duration, active status, etc.
+- Detailed success/failure reporting
+- All batch changes logged in audit history
+- API: `POST /services/admin/batch-update`
+- Component: `ServiceBatchEdit`
+
+**Key Files:**
+- Backend: `app/api/v1/endpoints/services.py`, `app/services/service_audit_service.py`, `app/models/service_audit.py`
+- Frontend: `components/admin/ServiceCatalog.jsx`, `components/admin/ServiceAuditHistory.jsx`, `components/admin/ServiceChangesPreview.jsx`, `components/admin/ServiceBatchEdit.jsx`
+- Migration: `alembic/versions/0022_service_audit_log.py`
+
+## Local Dev-Brain Commands (from AGENTS.md)
+
+From `C:\final\ai\langgraph`:
+
+```powershell
+# Execution gate for risky tasks
+python scripts\agent_gate.py "<task>"
+python scripts\agent_gate.py "<task>" --known-root-cause "<path>"
+
+# Planning and analysis
+python scripts\dev_brain.py plan "<task>"
+python scripts\dev_brain.py dossier "<task>"
+python scripts\dev_brain.py handoff "<task>"
+
+# Smoke tests
+python scripts\planner_smoke.py
+python scripts\dossier_smoke.py
+python scripts\handoff_smoke.py
+```
+
+Use `handoff` as the default input contract for the next agent when a real code change is risky or multi-file.
+
 ## Notes
 
 - Backend server must always run from `C:\final\backend` directory
 - Frontend dev server runs on port 5173, backend on 18000
-- Database source of truth: PostgreSQL + Alembic
-- Recent work: macOS UI refactor (current branch: `feat/macos-ui-refactor`)
+- Database source of truth: PostgreSQL + Alembic (never SQLite)
+- **Execution discipline:** Follow AGENTS.md for canonical-first, safe patch slice, and stop conditions
+- **For risky tasks:** Use `agent_gate.py` before editing
+- **Record evidence:** Append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` for risky tasks
+- Recent work: Service management enhancements (audit log, batch ops, optimistic updates, change preview)

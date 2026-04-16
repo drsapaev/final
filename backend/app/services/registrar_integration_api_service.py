@@ -39,6 +39,55 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
+
+
+def _normalize_registration_discount_mode(raw_value: str | None) -> str:
+    """Registrar-facing adapters expose registration type only, not payment markers."""
+    normalized = str(raw_value or "none").strip().lower()
+    if normalized in REGISTRATION_DISCOUNT_MODES:
+        return normalized
+    return "none"
+
+
+def _resolve_payment_truth(
+    db: Session,
+    *,
+    visit_id: int | None = None,
+    legacy_paid_at: datetime | None = None,
+) -> tuple[str, str | None]:
+    """Resolve payment truth from payments, with a narrow processed-at fallback."""
+    if visit_id:
+        try:
+            from app.models.payment import Payment
+
+            payment = (
+                _repo(db).query(Payment)
+                .filter(Payment.visit_id == visit_id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment:
+                status = (
+                    "paid"
+                    if (
+                        str(getattr(payment, "status", "") or "").lower() == "paid"
+                        or getattr(payment, "paid_at", None)
+                    )
+                    else "pending"
+                )
+                method = getattr(payment, "method", None) or None
+                return status, method
+        except Exception:
+            logger.debug(
+                "registrar_integration_api_service: failed to resolve payment truth for visit %s",
+                visit_id,
+                exc_info=True,
+            )
+
+    return ("paid", None) if legacy_paid_at else ("pending", None)
+
+
 def _repo(db: Session) -> RegistrarIntegrationApiRepository:
     return RegistrarIntegrationApiRepository(db)
 
@@ -1125,57 +1174,11 @@ def start_queue_visit(
         if visit:
             # Обновляем статус визита
             visit.status = "in_progress"
-
-            # [OK] ИСПРАВЛЕНО: Сохраняем discount_mode и создаем платеж через SSOT
-            # Не теряем информацию об оплате при обновлении статуса
-            if not visit.discount_mode or visit.discount_mode == "none":
-                from app.models.payment import Payment
-
-                payment = (
-                    _repo(db).query(Payment)
-                    .filter(Payment.visit_id == visit.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    visit.discount_mode = "paid"
-                elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # [OK] ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при начале приема (visit {visit.id})",
-                        )
-                        logger.info(
-                            "start_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
-                    visit.discount_mode = "paid"
+            logger.info(
+                "[FIX:PAYMENT_STATUS] start_queue_visit preserves registration type for visit %d; operational status is %s",
+                visit.id,
+                visit.status,
+            )
 
             _repo(db).commit()
             _repo(db).refresh(visit)
@@ -2362,21 +2365,9 @@ def get_today_queues(
                     entry_status = status_mapping.get(visit.status, "waiting")
 
                     # [OK] Используем единый сервис для определения оплаты (Single Source of Truth)
-                    from app.services.billing_service import (
-                        BillingService,
-                        get_discount_mode_for_visit,
+                    discount_mode = _normalize_registration_discount_mode(
+                        getattr(visit, "discount_mode", None)
                     )
-
-                    # Определяем статус оплаты через SSOT
-                    billing_service = BillingService(db)
-                    is_paid = billing_service.is_visit_paid(visit)
-
-                    # Обновляем discount_mode в БД если визит оплачен
-                    if is_paid:
-                        billing_service.update_visit_discount_mode(visit)
-
-                    # Получаем discount_mode для ответа API
-                    discount_mode = get_discount_mode_for_visit(db, visit)
 
                     # ✅ ДОБАВЛЕНО: Сохраняем department из модели Visit для использования ниже
                     # Это нужно для новых записей из сценария 5
@@ -2460,21 +2451,9 @@ def get_today_queues(
                     entry_status = status_mapping.get(appointment.status, "waiting")
 
                     # [OK] Используем единый сервис для определения оплаты (Single Source of Truth)
-                    from app.services.billing_service import (
-                        get_discount_mode_for_appointment,
-                        is_appointment_paid,
-                        update_appointment_payment_status,
+                    discount_mode = _normalize_registration_discount_mode(
+                        getattr(appointment, "visit_type", None)
                     )
-
-                    # Определяем статус оплаты через единый сервис
-                    is_paid = is_appointment_paid(db, appointment)
-
-                    # Обновляем visit_type в БД если appointment оплачен
-                    if is_paid:
-                        update_appointment_payment_status(db, appointment)
-
-                    # Получаем discount_mode для ответа API
-                    discount_mode = get_discount_mode_for_appointment(db, appointment)
 
                     source = "desk"  # Appointment обычно создается регистратором
 
@@ -2864,10 +2843,22 @@ def get_today_queues(
                         # Другой datetime-like объект
                         queue_time_str = entry_queue_time.isoformat() + "Z"
 
+                entry_visit_id = (
+                    entry_wrapper.get("visit_id")
+                    or getattr(entry_data, "visit_id", None)
+                    or (record_id if entry_type == "visit" else None)
+                )
+                payment_status, payment_type = _resolve_payment_truth(
+                    db,
+                    visit_id=entry_visit_id,
+                    legacy_paid_at=getattr(entry_data, "payment_processed_at", None),
+                )
+
                 entries.append(
                     {
                         "id": record_id,
                         "appointment_id": appointment_id_value,  # Явно добавляем appointment_id
+                        "visit_id": entry_visit_id,
                         "number": queue_entry_number,  # [OK] ИСПРАВЛЕНО: реальный номер из queue_entries
                         "patient_id": patient_id,
                         "patient_name": patient_name,
@@ -2880,9 +2871,8 @@ def get_today_queues(
                         "service_name": entry_wrapper.get("service_name"),  # ✅ НОВОЕ: Название услуги для отображения
                         "service_id": entry_wrapper.get("service_id"),  # ✅ SSOT: ID услуги из БД
                         "cost": total_cost,
-                        "payment_status": (
-                            "paid" if discount_mode == "paid" else "pending"
-                        ),
+                        "payment_status": payment_status,
+                        "payment_type": payment_type,
                         "source": source,
                         "status": entry_status,
                         "created_at": (
@@ -2894,6 +2884,9 @@ def get_today_queues(
                         "called_at": None,
                         "visit_time": visit_time,
                         "discount_mode": discount_mode,
+                        "approval_status": getattr(
+                            entry_data, "approval_status", None
+                        ),
                         "type": entry_type,  # ✅ ИСПРАВЛЕНО: Добавляем type для frontend (online_queue, visit, appointment)
                         "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment' (для совместимости)
                         "queue_entry_id": entry_wrapper.get("queue_entry_id"),  # ✅ SSOT FIX: ID OnlineQueueEntry для QR-записей

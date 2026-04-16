@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import String, func, literal
 from sqlalchemy.orm import Session
@@ -73,17 +73,54 @@ class CartResponse(BaseModel):
     )
 
 
+class MarkPaidRequest(BaseModel):
+    amount: Optional[Decimal] = None
+    method: Optional[str] = Field(default="cash")
+
+
+class RepeatEligibilityCandidate(BaseModel):
+    service_id: int
+    doctor_id: Optional[int] = None
+    visit_date: date
+    candidate_key: Optional[str] = None
+
+
+class RepeatEligibilityPreviewRequest(BaseModel):
+    patient_id: int
+    candidates: List[RepeatEligibilityCandidate] = Field(default_factory=list)
+
+
+class RepeatEligibilityPreviewItem(BaseModel):
+    candidate_key: Optional[str] = None
+    service_id: int
+    doctor_id: Optional[int] = None
+    visit_date: date
+    eligible: bool
+    reason: str
+    repeat_window_days: int
+    repeat_discount_percent: int
+
+
+class RepeatEligibilityPreviewResponse(BaseModel):
+    patient_id: int
+    items: List[RepeatEligibilityPreviewItem]
+
+
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
 def _check_repeat_visit_eligibility(
-    db: Session, patient_id: int, doctor_id: int, service_ids: List[int]
+    db: Session,
+    patient_id: int,
+    doctor_id: int,
+    service_ids: List[int],
+    days_window: int = 21,
 ) -> bool:
     """
-    Проверка права на повторный визит (≤21 день у того же специалиста)
+    Проверка права на повторный визит (≤N дней у того же специалиста)
     """
-    # Получаем консультации этого врача за последние 21 день
-    cutoff_date = date.today() - timedelta(days=21)
+    # Получаем консультации этого врача за последние N дней
+    cutoff_date = date.today() - timedelta(days=days_window)
 
     recent_visits = (
         db.query(Visit)
@@ -107,6 +144,211 @@ def _check_repeat_visit_eligibility(
     )
 
     return len(consultation_services) > 0
+
+
+def _resolve_effective_discount_mode(cart_data: CartRequest) -> str:
+    """All Free checkbox wins over the legacy discount_mode radio."""
+    if cart_data.all_free or cart_data.discount_mode == "all_free":
+        return "all_free"
+    return cart_data.discount_mode or "none"
+
+
+def _load_registration_discount_settings(db: Session) -> Dict[str, Any]:
+    """Load repeat/benefit settings with safe defaults."""
+    defaults = {
+        "repeat_visit_days": 21,
+        "repeat_visit_discount": 0,
+        "benefit_consultation_free": True,
+        "all_free_auto_approve": False,
+    }
+    settings = defaults.copy()
+
+    rows = (
+        db.query(ClinicSettings)
+        .filter(
+            ClinicSettings.key.in_(
+                [
+                    "repeat_visit_days",
+                    "repeat_visit_discount",
+                    "benefit_consultation_free",
+                    "all_free_auto_approve",
+                ]
+            )
+        )
+        .all()
+    )
+
+    for row in rows:
+        if row.key in {"repeat_visit_days", "repeat_visit_discount"}:
+            try:
+                settings[row.key] = int(row.value)
+            except (TypeError, ValueError):
+                pass
+        elif row.key in {"benefit_consultation_free", "all_free_auto_approve"}:
+            settings[row.key] = bool(row.value)
+
+    return settings
+
+
+def _apply_service_discount(
+    base_price: Decimal,
+    discount_mode: str,
+    settings: Dict[str, Any],
+    is_consultation: bool,
+) -> Decimal:
+    """Apply deterministic service pricing rules for the registrar cart."""
+    if discount_mode == "all_free":
+        return Decimal("0")
+
+    if discount_mode == "repeat" and is_consultation:
+        repeat_discount = Decimal(str(settings.get("repeat_visit_discount", 0) or 0))
+        repeat_discount = max(Decimal("0"), min(repeat_discount, Decimal("100")))
+        return (base_price * (Decimal("100") - repeat_discount) / Decimal("100")).quantize(
+            Decimal("0.01")
+        )
+
+    if discount_mode == "benefit" and is_consultation:
+        if settings.get("benefit_consultation_free", True):
+            return Decimal("0")
+
+    return base_price
+
+
+def _visit_has_paid_payment(db: Session, visit_id: int) -> bool:
+    """Payment truth comes from the payments table, not from discount_mode."""
+    try:
+        from app.models.payment import Payment
+
+        payment_row = (
+            db.query(Payment)
+            .filter(Payment.visit_id == visit_id)
+            .order_by(Payment.created_at.desc())
+            .first()
+        )
+        return bool(
+            payment_row
+            and (str(payment_row.status).lower() == "paid" or payment_row.paid_at)
+        )
+    except Exception:
+        return False
+
+
+REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
+
+
+def _normalize_registration_discount_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "none").strip().lower()
+    if normalized in REGISTRATION_DISCOUNT_MODES:
+        return normalized
+    return "none"
+
+
+def _resolve_payment_truth(
+    db: Session,
+    *,
+    visit_id: int | None = None,
+    legacy_paid_at: datetime | None = None,
+) -> tuple[str, str | None]:
+    if visit_id:
+        try:
+            from app.models.payment import Payment
+
+            payment_row = (
+                db.query(Payment)
+                .filter(Payment.visit_id == visit_id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment_row:
+                payment_status = (
+                    "paid"
+                    if (
+                        str(getattr(payment_row, "status", "") or "").lower() == "paid"
+                        or getattr(payment_row, "paid_at", None)
+                    )
+                    else "pending"
+                )
+                return payment_status, getattr(payment_row, "method", None) or None
+        except Exception:
+            logger.debug(
+                "registrar_wizard: failed to resolve payment truth for visit %s",
+                visit_id,
+                exc_info=True,
+            )
+
+    return ("paid", None) if legacy_paid_at else ("pending", None)
+
+
+def _build_repeat_eligibility_preview_item(
+    db: Session,
+    *,
+    patient_id: int,
+    candidate: RepeatEligibilityCandidate,
+    repeat_visit_days: int,
+    repeat_discount_percent: int,
+) -> RepeatEligibilityPreviewItem:
+    service = db.query(Service).filter(Service.id == candidate.service_id).first()
+
+    if not service:
+        return RepeatEligibilityPreviewItem(
+            candidate_key=candidate.candidate_key,
+            service_id=candidate.service_id,
+            doctor_id=candidate.doctor_id,
+            visit_date=candidate.visit_date,
+            eligible=False,
+            reason="Услуга не найдена",
+            repeat_window_days=repeat_visit_days,
+            repeat_discount_percent=repeat_discount_percent,
+        )
+
+    if not service.is_consultation:
+        return RepeatEligibilityPreviewItem(
+            candidate_key=candidate.candidate_key,
+            service_id=candidate.service_id,
+            doctor_id=candidate.doctor_id,
+            visit_date=candidate.visit_date,
+            eligible=False,
+            reason="Повторная скидка доступна только для консультаций",
+            repeat_window_days=repeat_visit_days,
+            repeat_discount_percent=repeat_discount_percent,
+        )
+
+    if not candidate.doctor_id:
+        return RepeatEligibilityPreviewItem(
+            candidate_key=candidate.candidate_key,
+            service_id=candidate.service_id,
+            doctor_id=candidate.doctor_id,
+            visit_date=candidate.visit_date,
+            eligible=False,
+            reason="Выберите врача для проверки повторной скидки",
+            repeat_window_days=repeat_visit_days,
+            repeat_discount_percent=repeat_discount_percent,
+        )
+
+    eligible = _check_repeat_visit_eligibility(
+        db,
+        patient_id,
+        candidate.doctor_id,
+        [candidate.service_id],
+        days_window=repeat_visit_days,
+    )
+
+    reason = (
+        f"Доступна повторная скидка {repeat_discount_percent}%"
+        if eligible
+        else f"Нет консультации у этого врача за последние {repeat_visit_days} дней"
+    )
+
+    return RepeatEligibilityPreviewItem(
+        candidate_key=candidate.candidate_key,
+        service_id=candidate.service_id,
+        doctor_id=candidate.doctor_id,
+        visit_date=candidate.visit_date,
+        eligible=eligible,
+        reason=reason,
+        repeat_window_days=repeat_visit_days,
+        repeat_discount_percent=repeat_discount_percent,
+    )
 
 
 # _calculate_visit_price() удалена - используйте billing_service.calculate_total() (SSOT)
@@ -485,6 +727,42 @@ def check_invoice_status(
         )
 
 
+@router.post(
+    "/registrar/repeat-eligibility-preview",
+    response_model=RepeatEligibilityPreviewResponse,
+    summary="Preview eligibility for repeat discount in registrar wizard",
+)
+def preview_repeat_eligibility(
+    payload: RepeatEligibilityPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    _ = current_user
+
+    patient_exists = (
+        db.query(Patient.id).filter(Patient.id == payload.patient_id).first() is not None
+    )
+    if not patient_exists:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+
+    settings = _load_registration_discount_settings(db)
+    repeat_visit_days = int(settings.get("repeat_visit_days", 21) or 21)
+    repeat_discount_percent = int(settings.get("repeat_visit_discount", 0) or 0)
+
+    items = [
+        _build_repeat_eligibility_preview_item(
+            db,
+            patient_id=payload.patient_id,
+            candidate=candidate,
+            repeat_visit_days=repeat_visit_days,
+            repeat_discount_percent=repeat_discount_percent,
+        )
+        for candidate in payload.candidates
+    ]
+
+    return RepeatEligibilityPreviewResponse(patient_id=payload.patient_id, items=items)
+
+
 # ===================== ОСНОВНОЙ ENDPOINT =====================
 
 
@@ -498,11 +776,14 @@ def create_cart_appointments(
     Создание корзины визитов с единым платежом
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
+    effective_discount_mode = _resolve_effective_discount_mode(cart_data)
     logger.info(
-        "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Payment method: %s",
+        "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Effective discount mode: %s, All free: %s, Payment method: %s",
         cart_data.patient_id,
         len(cart_data.visits),
         cart_data.discount_mode,
+        effective_discount_mode,
+        cart_data.all_free,
         cart_data.payment_method,
     )
 
@@ -512,8 +793,10 @@ def create_cart_appointments(
 
         # Получаем настройки очереди
         queue_settings = crud_clinic.get_queue_settings(db)
+        registration_settings = _load_registration_discount_settings(db)
 
         created_visits = []
+        created_visit_amounts: Dict[int, Decimal] = {}
         total_invoice_amount = Decimal('0')
 
         # Создаём визиты
@@ -528,32 +811,20 @@ def create_cart_appointments(
                 len(visit_req.services),
             )
             # Проверяем право на повторный визит
-            if cart_data.discount_mode == "repeat" and visit_req.doctor_id:
+            if effective_discount_mode == "repeat" and visit_req.doctor_id:
                 service_ids = [s.service_id for s in visit_req.services]
+                repeat_visit_days = int(registration_settings["repeat_visit_days"])
                 if not _check_repeat_visit_eligibility(
-                    db, cart_data.patient_id, visit_req.doctor_id, service_ids
+                    db,
+                    cart_data.patient_id,
+                    visit_req.doctor_id,
+                    service_ids,
+                    days_window=repeat_visit_days,
                 ):
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Повторный визит недоступен: нет консультации у этого врача за последние 21 день",
+                        detail=f"Повторный визит недоступен: нет консультации у этого врача за последние {repeat_visit_days} дней",
                     )
-
-            # Рассчитываем цену визита через SSOT
-            from app.services.billing_service import BillingService
-
-            billing_service = BillingService(db)
-            services_data = [
-                {
-                    "service_id": s.service_id,
-                    "quantity": s.quantity,
-                    "custom_price": s.custom_price,
-                }
-                for s in visit_req.services
-            ]
-            total_info = billing_service.calculate_total(
-                services=services_data, discount_mode=cart_data.discount_mode
-            )
-            visit_amount = Decimal(str(total_info["total"]))
 
             # [OK] ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
             # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
@@ -569,6 +840,7 @@ def create_cart_appointments(
 
             # Подготавливаем услуги для передачи в create_visit
             services_data = []
+            visit_amount = Decimal("0")
             for service_item in visit_req.services:
                 service = (
                     db.query(Service)
@@ -581,18 +853,18 @@ def create_cart_appointments(
                         detail=f"Услуга с ID {service_item.service_id} не найдена",
                     )
 
-                # Цена с учётом скидок
-                if cart_data.discount_mode == "all_free":
-                    item_price = Decimal('0')
-                elif (
-                    cart_data.discount_mode in ["repeat", "benefit"]
-                    and service.is_consultation
-                ):
-                    item_price = Decimal('0')
-                else:
-                    item_price = (
-                        service_item.custom_price or service.price or Decimal('0')
-                    )
+                base_price = (
+                    service_item.custom_price
+                    if service_item.custom_price is not None
+                    else service.price or Decimal("0")
+                )
+                item_price = _apply_service_discount(
+                    Decimal(str(base_price)),
+                    effective_discount_mode,
+                    registration_settings,
+                    service.is_consultation,
+                )
+                visit_amount += item_price * Decimal(service_item.quantity)
 
                 services_data.append(
                     {
@@ -616,11 +888,14 @@ def create_cart_appointments(
                 visit_time=visit_req.visit_time,
                 department=visit_req.department,
                 notes=visit_req.notes,
-                discount_mode=cart_data.discount_mode,
+                discount_mode=effective_discount_mode,
                 services=services_data,
                 status=visit_status,
                 approval_status=(
-                    "approved" if cart_data.discount_mode != "all_free" else "pending"
+                    "approved"
+                    if effective_discount_mode != "all_free"
+                    or registration_settings["all_free_auto_approve"]
+                    else "pending"
                 ),
                 confirmed_at=confirmed_at,
                 confirmed_by=confirmed_by,
@@ -631,6 +906,7 @@ def create_cart_appointments(
             logger.info("REGISTRATION: Визит %d создан через create_visit()", visit.id)
 
             created_visits.append(visit)
+            created_visit_amounts[visit.id] = visit_amount
             total_invoice_amount += visit_amount
             logger.info(
                 "REGISTRATION: Визит %d создан успешно для пациента %d",
@@ -653,16 +929,8 @@ def create_cart_appointments(
         logger.info("REGISTRATION: Инвойс %d создан", invoice.id)
 
         # Связываем визиты с invoice
-        from app.services.billing_service import BillingService
-
-        billing_service = BillingService(db)
         for visit in created_visits:
-            # Рассчитываем цену визита через SSOT
-            total_info = billing_service.calculate_total(
-                visit_id=visit.id, discount_mode=cart_data.discount_mode
-            )
-            visit_amount = Decimal(str(total_info["total"]))
-
+            visit_amount = created_visit_amounts.get(visit.id, Decimal("0"))
             invoice_visit = PaymentInvoiceVisit(
                 invoice_id=invoice.id, visit_id=visit.id, visit_amount=visit_amount
             )
@@ -1861,8 +2129,7 @@ def get_all_appointments(
                         # Если service_id не число, возможно это уже название
                         service_names.append(str(service_id))
 
-            # Определяем payment_status для Appointment.
-            # [FIX:PAYMENT_STATUS] visit_type='paid' is a service type, not completed payment.
+            # Определяем payment_status для Appointment по Payment table.
             try:
                 from sqlalchemy import and_
 
@@ -1880,38 +2147,15 @@ def get_all_appointments(
             except Exception:
                 related_visit = None
 
-            visit_type = getattr(apt, 'visit_type', None) or 'paid'
-            payment_status = 'pending'
-            is_paid = False
-            if getattr(apt, 'payment_processed_at', None):
-                payment_status = 'paid'
-                is_paid = True
-            elif related_visit and (
-                related_visit.discount_mode == 'paid'
-                or getattr(related_visit, 'payment_processed_at', None)
-            ):
-                payment_status = 'paid'
-                is_paid = True
-            else:
-                # Проверяем Payment table
-                try:
-                    from app.models.payment import Payment
-
-                    if related_visit:
-                        payment_row = (
-                            db.query(Payment)
-                            .filter(Payment.visit_id == related_visit.id)
-                            .order_by(Payment.created_at.desc())
-                            .first()
-                        )
-                        if payment_row and (
-                            str(payment_row.status).lower() == 'paid'
-                            or payment_row.paid_at
-                        ):
-                            payment_status = 'paid'
-                            is_paid = True
-                except Exception:
-                    pass
+            visit_type = _normalize_registration_discount_mode(
+                getattr(apt, 'visit_type', None)
+            )
+            appointment_payment_processed_at = getattr(apt, 'payment_processed_at', None)
+            payment_status, payment_type = _resolve_payment_truth(
+                db,
+                visit_id=related_visit.id if related_visit else None,
+                legacy_paid_at=appointment_payment_processed_at,
+            )
 
             result.append(
                 {
@@ -1929,6 +2173,7 @@ def get_all_appointments(
                     'service_codes': service_codes,  # Коды услуг для фильтрации
                     'total_amount': total_amount,  # Общая сумма услуг
                     'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                    'payment_type': payment_type,
                     'visit_type': visit_type,  # Тип визита для совместимости
                     'notes': apt.notes,
                     'created_at': apt.created_at,
@@ -2084,59 +2329,14 @@ def get_all_appointments(
             else:
                 confirmation_status = "none"
 
-            # Определяем payment_status для Visit (та же логика что в registrar_integration.py)
-            payment_status = 'pending'
-            is_paid = False
-            try:
-                if visit.discount_mode == 'paid' or getattr(
-                    visit, 'payment_processed_at', None
-                ):
-                    payment_status = 'paid'
-                    is_paid = True
-                else:
-                    # Проверяем Payment table
-                    from app.models.payment import Payment
-
-                    payment_row = (
-                        db.query(Payment)
-                        .filter(Payment.visit_id == visit.id)
-                        .order_by(Payment.created_at.desc())
-                        .first()
-                    )
-                    if payment_row and (
-                        str(payment_row.status).lower() == 'paid' or payment_row.paid_at
-                    ):
-                        payment_status = 'paid'
-                        is_paid = True
-            except Exception:
-                # Если не удалось определить, проверяем discount_mode
-                if visit.discount_mode == 'paid':
-                    payment_status = 'paid'
-                    is_paid = True
-
-            # [OK] ИСПРАВЛЕНО: Сохраняем discount_mode в БД для существующих записей
-            # Если визит оплачен (есть платеж), но discount_mode не установлен - обновляем
-            # НО: это GET endpoint, не создаем платежи, только обновляем discount_mode если платеж уже есть
-            if is_paid and visit.discount_mode != 'paid':
-                # Проверяем, что платеж действительно существует
-                from app.models.payment import Payment
-
-                existing_payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == visit.id, Payment.status == "paid")
-                    .first()
-                )
-
-                if existing_payment:
-                    # Платеж существует - обновляем discount_mode
-                    visit.discount_mode = 'paid'
-                    try:
-                        db.commit()
-                        db.refresh(visit)
-                    except Exception:
-                        db.rollback()
-                # Если платежа нет, но is_paid=True - НЕ создаем платеж в GET endpoint
-                # Платеж должен быть создан через соответствующие POST endpoints
+            payment_status, payment_type = _resolve_payment_truth(
+                db,
+                visit_id=visit.id,
+                legacy_paid_at=getattr(visit, 'payment_processed_at', None),
+            )
+            discount_mode = _normalize_registration_discount_mode(
+                getattr(visit, 'discount_mode', None)
+            )
 
             result.append(
                 {
@@ -2154,7 +2354,8 @@ def get_all_appointments(
                     'service_codes': service_codes,  # Коды услуг для фильтрации
                     'total_amount': total_amount,  # Общая сумма услуг
                     'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
-                    'discount_mode': visit.discount_mode,  # Тип визита для отображения
+                    'payment_type': payment_type,
+                    'discount_mode': discount_mode,  # Тип визита для отображения
                     'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
                     'notes': visit.notes,
                     'created_at': visit.created_at,
@@ -2202,6 +2403,7 @@ def _preserve_operational_status_on_payment(raw_status: str | None) -> str:
 @router.post("/registrar/visits/{visit_id}/mark-paid")
 def mark_visit_as_paid(
     visit_id: int,
+    payment_req: Optional[MarkPaidRequest] = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
@@ -2234,6 +2436,12 @@ def mark_visit_as_paid(
             db.query(Payment)
             .filter(Payment.visit_id == visit_id, Payment.status == "paid")
             .first()
+        )
+
+        requested_method = (
+            str(payment_req.method).strip().lower()
+            if payment_req and payment_req.method
+            else "cash"
         )
 
         if not existing_payment:
@@ -2269,7 +2477,7 @@ def mark_visit_as_paid(
                     "visit_id": visit_id,
                     "amount": payment_amount,
                     "currency": currency,
-                    "method": "cash",
+                    "method": requested_method,
                     "status": "paid",
                     "note": note,
                     "paid_at": paid_at,
@@ -2287,10 +2495,11 @@ def mark_visit_as_paid(
             )
 
             logger.info(
-                "mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s",
+                "mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s, method=%s",
                 payment.id,
                 visit_id,
                 payment_amount,
+                requested_method,
             )
         else:
             logger.warning(
@@ -2301,7 +2510,6 @@ def mark_visit_as_paid(
 
         # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
         visit.status = _preserve_operational_status_on_payment(visit.status)
-        visit.discount_mode = "paid"  # [OK] ВАЖНО: устанавливаем discount_mode для корректного отображения payment_status
         logger.info(
             "[FIX:PAYMENT_STATUS] Visit marked paid without changing operational status: visit_id=%d, status=%s",
             visit.id,
@@ -2314,6 +2522,16 @@ def mark_visit_as_paid(
             "id": visit.id,
             "status": visit.status,
             "payment_status": "paid",
+            "payment_type": (
+                existing_payment.method
+                if existing_payment and getattr(existing_payment, "method", None)
+                else requested_method
+            ),
+            "amount": (
+                float(existing_payment.amount)
+                if existing_payment and getattr(existing_payment, "amount", None) is not None
+                else payment_amount
+            ),
             "message": "Запись отмечена как оплаченная",
         }
 
@@ -2334,6 +2552,7 @@ def mark_visit_as_paid(
 @router.post("/registrar/queue/entry/{entry_id}/mark-paid")
 def mark_queue_entry_as_paid(
     entry_id: int,
+    payment_req: Optional[MarkPaidRequest] = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
@@ -2389,8 +2608,14 @@ def mark_queue_entry_as_paid(
             if visit:
                 logger.info(f"mark_queue_entry_as_paid: Найден Visit {visit.id} через patient_id и дату")
 
+        requested_method = (
+            str(payment_req.method).strip().lower()
+            if payment_req and payment_req.method
+            else "cash"
+        )
+
         if not visit:
-            # Если Visit не найден, обновляем только платежные поля записи в очереди
+            # Legacy fallback: без Visit нельзя создать Payment SSOT, поэтому оставляем queue marker.
             logger.warning(
                 f"mark_queue_entry_as_paid: Visit не найден для entry {entry_id}. "
                 f"Обновляем только платежный статус."
@@ -2409,6 +2634,7 @@ def mark_queue_entry_as_paid(
                 "id": entry.id,
                 "status": entry.status,
                 "payment_status": "paid",
+                "payment_type": requested_method,
                 "message": "Запись в очереди отмечена как оплаченная (Visit не найден)",
             }
 
@@ -2448,7 +2674,7 @@ def mark_queue_entry_as_paid(
                     "visit_id": visit.id,
                     "amount": payment_amount,
                     "currency": currency,
-                    "method": "cash",
+                    "method": requested_method,
                     "status": "paid",
                     "note": note,
                     "paid_at": paid_at,
@@ -2465,11 +2691,12 @@ def mark_queue_entry_as_paid(
             )
 
             logger.info(
-                "mark_queue_entry_as_paid: Создан платеж ID=%d для визита %d (через entry %d), сумма=%s",
+                "mark_queue_entry_as_paid: Создан платеж ID=%d для визита %d (через entry %d), сумма=%s, method=%s",
                 payment.id,
                 visit.id,
                 entry_id,
                 payment_amount,
+                requested_method,
             )
         else:
             logger.info(
@@ -2478,13 +2705,10 @@ def mark_queue_entry_as_paid(
                 existing_payment.id,
             )
 
-        # [FIX:PAYMENT_STATUS] Payment state belongs to discount_mode/payments, not queue status.
+        # [FIX:PAYMENT_STATUS] Payment is stored separately; queue operational status stays intact.
         visit.status = _preserve_operational_status_on_payment(visit.status)
-        visit.discount_mode = "paid"
         
-        # Обновляем платежные поля записи в очереди, сохраняя operational status.
         entry.status = _preserve_operational_status_on_payment(entry.status)
-        entry.discount_mode = "paid"
         logger.info(
             "[FIX:PAYMENT_STATUS] Queue entry marked paid without changing operational status: entry_id=%d, visit_id=%d, entry_status=%s, visit_status=%s",
             entry.id,
@@ -2502,6 +2726,16 @@ def mark_queue_entry_as_paid(
             "visit_id": visit.id,
             "status": visit.status,
             "payment_status": "paid",
+            "payment_type": (
+                existing_payment.method
+                if existing_payment and getattr(existing_payment, "method", None)
+                else requested_method
+            ),
+            "amount": (
+                float(existing_payment.amount)
+                if existing_payment and getattr(existing_payment, "amount", None) is not None
+                else payment_amount
+            ),
             "message": "Запись отмечена как оплаченная",
         }
 

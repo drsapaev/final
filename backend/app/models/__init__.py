@@ -152,6 +152,7 @@ from .print_config import PrinterConfig, PrintJob, PrintTemplate
 # QueueTicket заменен на новые модели в queue.py
 from .schedule import ScheduleTemplate
 from .service import Service, ServiceCatalog
+from .service_audit import ServiceAuditLog
 from .setting import Setting
 from .telegram_config import (
     TelegramConfig,
@@ -188,6 +189,7 @@ __all__ = [
     "VisitService",
     "Service",
     "ServiceCatalog",
+    "ServiceAuditLog",
     "Payment",
     "PaymentWebhook",
     "PaymentProvider",

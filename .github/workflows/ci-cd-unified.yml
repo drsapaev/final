@@ -20,7 +20,7 @@ env:
 jobs:
   # GitHub-native merge blockers for PRs into `main`:
   # - `🐍 Backend тесты`
-  # - `🎨 Frontend тесты`
+  # - `🎨 Frontend тесты` (includes registrar-time Playwright e2e)
   # - `🧱 Context Boundary Integrity`
   # - `🔄 Frontend-Backend Parity`
   #
@@ -439,7 +439,7 @@ jobs:
   frontend-tests:
     name: 🎨 Frontend тесты
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     
     steps:
     - uses: actions/checkout@v6
@@ -473,6 +473,12 @@ jobs:
       run: |
         cd frontend
         npm run build
+
+    - name: 🧪 Registrar time e2e (Chromium)
+      run: |
+        cd frontend
+        npx playwright install --with-deps chromium
+        npx playwright test e2e/registrar-time.spec.js --project=chromium
 
   # --- Backend тесты ---
   backend-tests:
