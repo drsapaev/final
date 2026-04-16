@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useInRouterContext, useLocation } from 'react-router-dom';
 import tokens, { colors as tokenColors } from '../theme/tokens';
 import {
   applyColorSchemeToDom,
@@ -37,6 +37,16 @@ function getAuthTokenSnapshot() {
 function isPublicPath(pathname) {
   const normalizedPath = String(pathname || '/').toLowerCase();
   return normalizedPath === '/' || PUBLIC_PATH_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
+}
+
+function ThemeRouteSync({ onPathnameChange }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    onPathnameChange(location.pathname);
+  }, [location.pathname, onPathnameChange]);
+
+  return null;
 }
 
 function getCachedThemePreference(token) {
@@ -84,7 +94,10 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const location = useLocation();
+  const hasRouterContext = useInRouterContext();
+  const [pathname, setPathname] = useState(() => (
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  ));
   const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
   const [colorScheme, setColorSchemeState] = useState(() => getStoredColorScheme());
   const [authToken, setAuthToken] = useState(() => getAuthTokenSnapshot());
@@ -93,6 +106,7 @@ export const ThemeProvider = ({ children }) => {
   const skipNextRemoteSaveRef = useRef(false);
   const lastSavedPreferenceRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const routerFallbackLoggedRef = useRef(false);
 
   const theme = resolveThemeMode(colorScheme, systemTheme);
   const isDark = theme === 'dark';
@@ -215,6 +229,17 @@ export const ThemeProvider = ({ children }) => {
   }, [colorScheme, theme]);
 
   useEffect(() => {
+    if (hasRouterContext || routerFallbackLoggedRef.current) {
+      return;
+    }
+
+    routerFallbackLoggedRef.current = true;
+    logger.info('[FIX:THEME] Router context missing, using window pathname fallback', {
+      pathname,
+    });
+  }, [hasRouterContext, pathname]);
+
+  useEffect(() => {
     const root = document.documentElement;
     const computedStyle = window.getComputedStyle(root);
     const macBgPrimary = computedStyle.getPropertyValue('--mac-bg-primary').trim() || tokenColors.semantic.background.primary;
@@ -292,7 +317,7 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     let cancelled = false;
-    const currentPath = location.pathname;
+    const currentPath = pathname;
 
     if (!authToken || isPublicPath(currentPath)) {
       hydratedTokenRef.current = null;
@@ -428,7 +453,7 @@ export const ThemeProvider = ({ children }) => {
     return () => {
       cancelled = true;
     };
-  }, [authToken]);
+  }, [authToken, pathname]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -436,7 +461,7 @@ export const ThemeProvider = ({ children }) => {
       saveTimeoutRef.current = null;
     }
 
-    if (!authToken || !preferencesReady || isPublicPath(location.pathname)) {
+    if (!authToken || !preferencesReady || isPublicPath(pathname)) {
       return undefined;
     }
 
@@ -476,7 +501,7 @@ export const ThemeProvider = ({ children }) => {
         saveTimeoutRef.current = null;
       }
     };
-  }, [authToken, colorScheme, preferencesReady]);
+  }, [authToken, colorScheme, preferencesReady, pathname]);
 
   const value = useMemo(() => ({
     theme,
@@ -510,8 +535,10 @@ export const ThemeProvider = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={value}>
+      {hasRouterContext ? <ThemeRouteSync onPathnameChange={setPathname} /> : null}
       {children}
-    </ThemeContext.Provider>);
+    </ThemeContext.Provider>
+  );
 
 };
 

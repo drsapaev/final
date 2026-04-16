@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
@@ -87,11 +88,13 @@ function mockApiGetState({ statusSequence = [disabledStatus], devices = [], logs
 
 function renderManager() {
   return render(
-    <MacOSThemeProvider>
-      <ThemeProvider>
-        <TwoFactorManager />
-      </ThemeProvider>
-    </MacOSThemeProvider>
+    <MemoryRouter>
+      <MacOSThemeProvider>
+        <ThemeProvider>
+          <TwoFactorManager />
+        </ThemeProvider>
+      </MacOSThemeProvider>
+    </MemoryRouter>
   );
 }
 
