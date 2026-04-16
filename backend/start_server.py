@@ -109,4 +109,10 @@ def main() -> int:
 if __name__ == "__main__":
     exit_code = main()
     if exit_code:
-        sys.exit(exit_code)
+        if debugger_attached():
+            print(
+                f"[FIX:START] Debugger detected; suppressing SystemExit({exit_code}) "
+                "so the launcher can exit cleanly in IDE sessions."
+            )
+        else:
+            sys.exit(exit_code)
