@@ -51,6 +51,20 @@ class NotificationPlatformService:
         "queue_status_changed",
     }
 
+    # Anti-noise runtime guardrail:
+    # suppress repeated realtime queue-family signals in a short burst window,
+    # while keeping canonical inbox persistence untouched.
+    QUEUE_BURST_SUPPRESSION_EVENT_TYPES = {
+        "queue_update",
+        "queue_changed",
+        "queue_position",
+        "queue_reminder",
+        "diagnostics_return_needed",
+        "diagnostics_return",
+        "queue_status_changed",
+    }
+    QUEUE_BURST_SUPPRESSION_WINDOW_SECONDS = 45
+
     REALTIME_PUSH_SETTING_BY_EVENT_TYPE = {
         "appointment_reminder": "push_appointment_reminder",
         "appointment_confirmation": "push_appointment_confirmation",
@@ -271,6 +285,64 @@ class NotificationPlatformService:
 
         return True, "default_allow"
 
+    def _should_suppress_queue_burst_realtime(
+        self,
+        *,
+        delivery: NotificationDelivery,
+        event_type: str,
+    ) -> tuple[bool, str]:
+        normalized_type = self.normalize_event_type(event_type)
+        if normalized_type not in self.QUEUE_BURST_SUPPRESSION_EVENT_TYPES:
+            return False, "not_queue_burst_candidate"
+
+        event = delivery.event
+        if event is None:
+            return False, "missing_event_for_delivery"
+
+        window_start = self._now() - timedelta(
+            seconds=self.QUEUE_BURST_SUPPRESSION_WINDOW_SECONDS
+        )
+        recent_delivery = (
+            self.db.query(NotificationDelivery)
+            .join(NotificationDelivery.event)
+            .filter(
+                NotificationDelivery.recipient_id == delivery.recipient_id,
+                NotificationDelivery.channel == self.INBOX_CHANNEL,
+                NotificationDelivery.delivery_id != delivery.delivery_id,
+                NotificationDelivery.created_at >= window_start,
+                NotificationEvent.event_type.in_(
+                    tuple(self.QUEUE_BURST_SUPPRESSION_EVENT_TYPES)
+                ),
+            )
+            .order_by(
+                NotificationDelivery.created_at.desc(),
+                NotificationDelivery.id.desc(),
+            )
+            .first()
+        )
+        if recent_delivery is None:
+            return False, "no_recent_queue_delivery"
+
+        recent_event = recent_delivery.event
+        if recent_event is None:
+            return False, "missing_recent_event"
+
+        same_entity = bool(
+            event.entity_type
+            and event.entity_id
+            and recent_event.entity_type == event.entity_type
+            and recent_event.entity_id == event.entity_id
+        )
+        recent_type = self.normalize_event_type(recent_event.event_type)
+        same_type_same_message = (
+            recent_type == normalized_type
+            and (recent_event.message or "").strip() == (event.message or "").strip()
+        )
+        if same_entity or same_type_same_message:
+            return True, f"queue_burst_suppression:{recent_delivery.delivery_id}"
+
+        return False, "recent_queue_delivery_not_similar"
+
     async def _broadcast_delivery_with_policy(
         self,
         *,
@@ -294,6 +366,21 @@ class NotificationPlatformService:
                     "delivery_id": delivery.delivery_id,
                     "event_type": event_type,
                     "reason": reason,
+                },
+            )
+            return False
+        suppress_burst, suppress_reason = self._should_suppress_queue_burst_realtime(
+            delivery=delivery,
+            event_type=event_type,
+        )
+        if suppress_burst:
+            logger.info(
+                "[Notifications] websocket broadcast suppressed by anti-noise",
+                extra={
+                    "recipient_id": user.id,
+                    "delivery_id": delivery.delivery_id,
+                    "event_type": event_type,
+                    "reason": suppress_reason,
                 },
             )
             return False
