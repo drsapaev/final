@@ -2591,3 +2591,40 @@ Recommendation:
 - current stack sufficient: yes
 - would LightRAG likely help here: no
 - For this step the bottleneck was git lineage hygiene, not graph retrieval; canonical anchors and tests were already explicit.
+
+## Task 74 - Queue-family realtime burst suppression (anti-noise slice)
+
+### User task
+продолжай
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/notification_platform_service.py
+
+### What handoff solved well
+- It enforced a strict one-file runtime patch boundary for a risky notification-policy slice.
+- It prevented unplanned spread into repository/frontend layers while preserving compile/test verification.
+
+### Missing relationship mapping
+- Gate retry still did not preserve the known root-cause hint and routed to a narrow override with missing first-touch test/doc files.
+- Relationship context between runtime anti-noise policy and its contract-test surface had to be reconstructed manually.
+
+### Manual reconstruction needed
+- Manually selected a service-only implementation path for burst suppression due override constraints.
+- Manually verified that inbox persistence remained intact while only websocket realtime was suppressed for queue-family burst duplicates.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better relationship retrieval should keep known-root-cause anchoring stable and still expose adjacent test/doc ownership without forcing single-file override fallbacks.
