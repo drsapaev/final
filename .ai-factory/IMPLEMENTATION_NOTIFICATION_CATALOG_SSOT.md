@@ -67,6 +67,10 @@ Scope: Unified persistent inbox notifications (`/notifications/inbox`, `/notific
 - Quiet-hours / weekend suppression (queue-family only):
   - respects `UserNotificationSettings.quiet_hours_start`, `quiet_hours_end`, `weekend_notifications`
   - applies to queue family: `queue_update`, `queue_call`, `queue_position`, `queue_reminder`, `diagnostics_return_needed`, `queue_status_changed`
+- Anti-noise realtime burst suppression:
+  - queue-family websocket broadcasts are additionally suppressed when a similar queue-family delivery was already recorded for the same recipient in a short window
+  - persistence stays canonical; only realtime broadcast is skipped
+  - `queue_call` is intentionally excluded from this burst guardrail
 
 ## Producer Wiring Status
 
@@ -108,6 +112,7 @@ Backend:
 - `python -m py_compile backend/app/services/patient_service.py`
 - `python -m pytest backend/tests/integration/test_notification_catalog_slice1.py backend/tests/unit/test_messages_notification_catalog_slice1.py -q`
 - `python -m pytest backend/tests/unit/test_notification_platform_contract.py -q`
+- `python -m pytest backend/tests/unit/test_notification_platform_contract.py -q` (covers quiet-hours, critical override, and queue burst suppression)
 - `python -m pytest backend/tests/integration/test_notification_catalog_slice3_legacy_webhooks.py -q`
 
 Frontend:

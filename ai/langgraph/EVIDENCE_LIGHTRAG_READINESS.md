@@ -2628,3 +2628,41 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better relationship retrieval should keep known-root-cause anchoring stable and still expose adjacent test/doc ownership without forcing single-file override fallbacks.
+
+## Task 75 - Manual override for anti-noise policy coverage
+
+### User task
+делай manual override и выполняй
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/notification_platform_service.py
+
+### What handoff solved well
+- It confirmed the canonical runtime owner for anti-noise policy, even though the gate would not expand scope to tests/docs.
+- It prevented accidental edits outside the notification policy area.
+
+### Missing relationship mapping
+- The gate did not connect runtime anti-noise policy to the adjacent contract-test and SSOT note files the user explicitly wanted updated.
+- That relationship had to be reconstructed manually from the notification policy surface and existing contract test structure.
+
+### Manual reconstruction needed
+- Manually added contract tests for queue-family realtime burst suppression and `queue_call` bypass.
+- Manually refreshed the SSOT note to state that burst suppression is realtime-only and does not affect inbox persistence.
+- Manually appended this evidence entry because the work was a real risky change-task, not just a docs-only cleanup.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- The gap was not the runtime owner itself, but the adjacent test/docs relationships that the gate would not surface without manual override.
