@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -11,6 +12,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.lab import (
@@ -27,6 +29,7 @@ from app.models.lab import (
     LabReportValue,
     LabTemplateServiceBinding,
 )
+from app.models.user import User
 from app.repositories.lab_reporting_api_repository import LabReportingApiRepository
 from app.services.canonical_visit_service import (
     CanonicalVisitResolutionError,
@@ -41,6 +44,7 @@ from app.services.lab_seed_data import DEFAULT_LAB_TEMPLATE_DEFINITIONS
 from app.services.lab_template_binding_seed_data import (
     DEFAULT_LAB_TEMPLATE_BINDING_DEFINITIONS,
 )
+from app.services.notifications import notification_sender_service
 from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
@@ -461,7 +465,7 @@ class LabReportingService:
             service_codes=payload.get("service_codes"),
             service_items=payload.get("service_items"),
         )
-        order = self._resolve_or_create_order(
+        order, created_new_order = self._resolve_or_create_order(
             order_id=payload.get("order_id"),
             patient_id=patient.id,
             visit_id=visit_id,
@@ -486,6 +490,12 @@ class LabReportingService:
         )
         self.repository.add_instance(instance)
         self.repository.commit()
+        if created_new_order and order is not None:
+            self._emit_lab_new_study_notification(
+                order=order,
+                patient_id=patient.id,
+                visit_id=visit_id,
+            )
         logger.info("[LAB] create_instance created instance_id=%s", instance.id)
         return self.get_instance(instance.id)
 
@@ -1134,18 +1144,18 @@ class LabReportingService:
         order_id: int | None,
         patient_id: int,
         visit_id: int | None,
-    ) -> LabOrder | None:
+    ) -> tuple[LabOrder | None, bool]:
         if order_id:
             order = self.repository.get_order(order_id)
             if not order:
                 raise LabReportingDomainError(404, "Lab order not found")
-            return order
+            return order, False
         order = self.repository.find_order_by_visit_and_patient(
             visit_id=visit_id,
             patient_id=patient_id,
         )
         if order:
-            return order
+            return order, False
         logger.info(
             "[LAB] creating synthetic lab order patient_id=%s visit_id=%s",
             patient_id,
@@ -1158,7 +1168,72 @@ class LabReportingService:
                 status="ordered",
                 notes="Auto-created from lab report workflow",
             )
+        ), True
+
+    def _emit_lab_new_study_notification(
+        self,
+        *,
+        order: LabOrder,
+        patient_id: int,
+        visit_id: int | None,
+    ) -> None:
+        recipients = (
+            self.db.query(User)
+            .filter(
+                User.is_active.is_(True),
+                func.lower(User.role).in_(["lab", "labtechnician", "lab_technician"]),
+            )
+            .all()
         )
+        if not recipients:
+            return
+
+        async def _send(recipient: User) -> bool:
+            return await notification_sender_service.send_lab_event_notification(
+                db=self.db,
+                recipient=recipient,
+                event_type="lab_new_study",
+                title="Назначено новое исследование",
+                message=f"Для пациента #{patient_id} создано новое исследование.",
+                metadata={
+                    "order_id": order.id,
+                    "patient_id": patient_id,
+                    "visit_id": visit_id,
+                },
+            )
+
+        for recipient in recipients:
+            try:
+                canonical_created = asyncio.run(_send(recipient))
+                if not canonical_created:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] lab_new_study canonical delivery failed",
+                        extra={
+                            "order_id": order.id,
+                            "patient_id": patient_id,
+                            "recipient_id": recipient.id,
+                        },
+                    )
+            except RuntimeError as exc:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] lab_new_study canonical delivery skipped due runtime context",
+                    extra={
+                        "order_id": order.id,
+                        "patient_id": patient_id,
+                        "recipient_id": recipient.id,
+                        "error": str(exc),
+                    },
+                )
+            except Exception as exc:
+                logger.error(
+                    "[FIX:NOTIFICATIONS] lab_new_study canonical delivery error",
+                    extra={
+                        "order_id": order.id,
+                        "patient_id": patient_id,
+                        "recipient_id": recipient.id,
+                        "error": str(exc),
+                    },
+                )
 
     def _validate_template_selection_for_context(
         self,

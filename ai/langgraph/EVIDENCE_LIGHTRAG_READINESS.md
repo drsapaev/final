@@ -2666,3 +2666,41 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - The gap was not the runtime owner itself, but the adjacent test/docs relationships that the gate would not surface without manual override.
+
+## Task 76 - Lab producer parity follow-up after manual override
+
+### User task
+продолжаем
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/lab_notification_service.py
+
+### What handoff solved well
+- It kept the lab slice anchored to the correct service layer while expanding only to the adjacent tests that validated canonical producer output.
+- It preserved the boundary between runtime producer wiring and doc/evidence updates.
+
+### Missing relationship mapping
+- The gate path did not surface the model-shape mismatch around `LabResult`/`LabOrder` ownership, so the service change had to be reconciled manually against the actual schema.
+- The adjacency between new producer events (`lab_new_study`, `lab_critical_finding`, `lab_result_sent_confirmation`) and their regression tests was not explicit in the handoff.
+
+### Manual reconstruction needed
+- Manually replaced nonexistent dedupe flags with model-compatible canonical delivery flow.
+- Manually fixed the critical-value path to resolve patient ownership through `LabOrder`.
+- Manually aligned the lab SSOT note and validation commands to the real producer/test surface.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- This task benefited from a retrieval layer that can connect service ownership, model shape, tests, and docs in one pass; manual reconstruction was still required, but the gap was adjacent rather than central.
