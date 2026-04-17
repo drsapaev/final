@@ -139,7 +139,7 @@ def _resolve_payment_truth(
             from app.models.payment import Payment
 
             payment_row = (
-                db.query(Payment)
+                _repo(db).query(Payment)
                 .filter(Payment.visit_id == visit_id)
                 .order_by(Payment.created_at.desc())
                 .first()
@@ -659,7 +659,7 @@ def create_cart_appointments(
                     {
                         "service_id": service.id,
                         # ⭐ SSOT: используем canonical service_code helper
-                        "code": service.service_code or get_service_code(service.id, db),
+                        "code": service.service_code or get_service_code(service.id, _repo(db).db),
                         "name": service.name,
                         "qty": service_item.quantity,
                         "price": float(item_price),
@@ -1893,7 +1893,7 @@ def get_all_appointments(
                         if service:
                             service_names.append(service.name)
                             service_code = service.service_code or get_service_code(
-                                service.id, db
+                                service.id, _repo(db).db
                             )
                             if service_code:
                                 service_codes.append(service_code)
@@ -2041,7 +2041,7 @@ def get_all_appointments(
                     if service:
                         service_names.append(service.name)
                         service_code = service.service_code or get_service_code(
-                            service.id, db
+                            service.id, _repo(db).db
                         )
                         if service_code:
                             service_codes.append(service_code)
