@@ -99,6 +99,10 @@ class MockWebSocket {
     this.readyState = MockWebSocket.OPEN;
     this.onopen?.();
   }
+
+  triggerMessage(payload) {
+    this.onmessage?.({ data: JSON.stringify(payload) });
+  }
 }
 
 MockWebSocket.instances = [];
@@ -159,5 +163,54 @@ describe('NotificationWebSocketContext', () => {
 
     expect(MockWebSocket.instances).toHaveLength(0);
     expect(tokenManagerMock.isTokenValid).not.toHaveBeenCalled();
+  });
+
+  it('normalizes legacy queue_changed websocket events to queue_update', async () => {
+    renderProvider('/doctor/cardiology');
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerMessage({
+        notification: {
+          event_type: 'queue_changed',
+          message: 'Пациент вызван',
+        },
+      });
+    });
+
+    expect(notificationCenterMock.appendNotification).toHaveBeenCalledTimes(1);
+    const [notification, source] = notificationCenterMock.appendNotification.mock.calls[0];
+    expect(notification.type).toBe('queue_update');
+    expect(notification.title).toBe('Обновление очереди');
+    expect(source).toBe('ws');
+  });
+
+  it('normalizes diagnostics_return websocket events to diagnostics_return_needed', async () => {
+    renderProvider('/doctor/cardiology');
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const socket = MockWebSocket.instances[0];
+    await act(async () => {
+      socket.triggerMessage({
+        notification: {
+          event_type: 'diagnostics_return',
+          title: 'Повторная диагностика',
+          message: 'Нужно вернуться на диагностику',
+        },
+      });
+    });
+
+    expect(notificationCenterMock.appendNotification).toHaveBeenCalledTimes(1);
+    const [notification, source] = notificationCenterMock.appendNotification.mock.calls[0];
+    expect(notification.type).toBe('diagnostics_return_needed');
+    expect(notification.title).toBe('Повторная диагностика');
+    expect(source).toBe('ws');
   });
 });

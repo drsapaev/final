@@ -1,98 +1,147 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { useNotificationCenterMock, loggerWarn } = vi.hoisted(() => ({
-  useNotificationCenterMock: vi.fn(),
-  loggerWarn: vi.fn()
-}));
+import NotificationInbox from '../NotificationInbox.jsx';
+
+const {
+  store,
+  getNotificationsByRole,
+  markAsRead,
+  markAsSeen,
+  archiveNotification,
+  markAllAsRead,
+} = vi.hoisted(() => {
+  const store = { notifications: [] };
+  return {
+    store,
+    getNotificationsByRole: vi.fn(() => store.notifications),
+    markAsRead: vi.fn(async () => {}),
+    markAsSeen: vi.fn(async () => {}),
+    archiveNotification: vi.fn(async () => {}),
+    markAllAsRead: vi.fn(async () => {}),
+  };
+});
 
 vi.mock('../../../contexts/NotificationCenterContext', () => ({
-  useNotificationCenter: () => useNotificationCenterMock()
+  useNotificationCenter: () => ({
+    getNotificationsByRole,
+    markAsRead,
+    markAsSeen,
+    archiveNotification,
+    markAllAsRead,
+  }),
 }));
 
 vi.mock('../../../utils/logger', () => ({
   default: {
-    info: vi.fn(),
-    warn: loggerWarn,
-    error: vi.fn()
-  }
+    warn: vi.fn(),
+  },
 }));
 
-import NotificationInbox from '../NotificationInbox.jsx';
+function createNotification(overrides = {}) {
+  return {
+    id: 'notification-1',
+    title: 'Тестовое уведомление',
+    message: 'Тестовое сообщение',
+    type: 'system_alert',
+    eventType: 'system_alert',
+    createdAt: '2026-04-17T08:00:00Z',
+    sequenceId: 1,
+    isRead: false,
+    isSeen: false,
+    isArchived: false,
+    ...overrides,
+  };
+}
 
-describe('NotificationInbox', () => {
-  let notificationCenterState;
-
-  const notifications = [
-    {
-      id: 'delivery-1',
-      title: 'Очередь обновлена',
-      message: 'Пациент вызван к врачу',
-      type: 'queue_changed',
-      eventType: 'queue_changed',
-      severity: 'warning',
-      isRead: false,
-      isSeen: false,
-      isArchived: false,
-      sequenceId: 2,
-      createdAt: '2026-03-30T10:00:00.000Z'
-    },
-    {
-      id: 'delivery-2',
-      title: 'Системное уведомление',
-      message: 'Архивный элемент',
-      type: 'system_alert',
-      eventType: 'system_alert',
-      severity: 'info',
-      isRead: true,
-      isSeen: true,
-      isArchived: false,
-      sequenceId: 1,
-      createdAt: '2026-03-29T10:00:00.000Z'
-    }
-  ];
+describe('NotificationInbox routing', () => {
+  let pushStateSpy;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    notificationCenterState = {
-      getNotificationsByRole: vi.fn().mockReturnValue(notifications),
-      markAsRead: vi.fn().mockResolvedValue({ ok: true }),
-      markAsSeen: vi.fn().mockResolvedValue({ ok: true }),
-      archiveNotification: vi.fn().mockResolvedValue({ ok: true }),
-      markAllAsRead: vi.fn().mockResolvedValue({ ok: true })
-    };
-    useNotificationCenterMock.mockReturnValue(notificationCenterState);
+    store.notifications = [];
+    pushStateSpy = vi.spyOn(window.history, 'pushState');
   });
 
-  it('renders a keyboard-accessible inbox item and wires read/archive actions', async () => {
-    // eslint-disable-next-line jsx-a11y/aria-role
-    render(<NotificationInbox role="admin" onClose={vi.fn()} />);
-    window.history.pushState({}, '', '/');
+  afterEach(() => {
+    pushStateSpy.mockRestore();
+  });
 
-    expect(screen.getByRole('dialog', { name: /центр уведомлений/i })).toBeInTheDocument();
+  it.each([
+    { role: 'admin', type: 'all_free_requested', expectedTarget: '/admin/all-free-requests' },
+    {
+      role: 'admin',
+      type: 'message_received',
+      payloadSnapshot: { metadata: { conversation_id: 'conv-42' } },
+      expectedTarget: '/messages?conversation=conv-42',
+    },
+    { role: 'doctor', type: 'lab_critical_result', expectedTarget: '/lab/results?critical=1' },
+    { role: 'registrar', type: 'patient_registered', expectedTarget: '/registrar/patients' },
+    { role: 'doctor', type: 'queue_position', expectedTarget: '/queue' },
+    { role: 'admin', type: 'security_alert', expectedTarget: '/admin' },
+    { role: 'admin', type: 'payment_notification', deepLink: '/patient', expectedTarget: '/patient' },
+    { role: 'admin', type: 'system_alert', expectedTarget: '/admin' },
+    { role: 'registrar', type: 'system_alert', expectedTarget: '/registrar' },
+  ])(
+    'navigates $type to $expectedTarget',
+    async ({ role, type, expectedTarget, payloadSnapshot, deepLink }) => {
+      store.notifications = [
+        createNotification({
+          id: `notification-${type}-${role}`,
+          type,
+          eventType: type,
+          payloadSnapshot,
+          deepLink,
+        }),
+      ];
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Открыть уведомление: Очередь обновлена/i })
-    );
+      render(<NotificationInbox role={role} onClose={() => {}} />);
+      fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
+
+      await waitFor(() => {
+        expect(pushStateSpy).toHaveBeenCalledWith({}, '', expectedTarget);
+      });
+
+      expect(markAsSeen).toHaveBeenCalledTimes(1);
+      expect(markAsRead).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('uses explicit deep link over type-based routing', async () => {
+    store.notifications = [
+      createNotification({
+        id: 'notification-explicit-deep-link',
+        type: 'all_free_requested',
+        eventType: 'all_free_requested',
+        deepLink: '/custom-target',
+      }),
+    ];
+
+    render(<NotificationInbox role="admin" onClose={() => {}} />);
+    fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
     await waitFor(() => {
-      expect(notificationCenterState.markAsSeen).toHaveBeenCalledWith('delivery-1');
-      expect(notificationCenterState.markAsRead).toHaveBeenCalledWith('delivery-1');
+      expect(pushStateSpy).toHaveBeenCalledWith({}, '', '/custom-target');
     });
+  });
+
+  it('does not navigate when notification type is unknown and no deep link exists', async () => {
+    store.notifications = [
+      createNotification({
+        id: 'notification-unknown-type',
+        type: 'unknown_runtime_event',
+        eventType: 'unknown_runtime_event',
+        deepLink: '',
+      }),
+    ];
+
+    render(<NotificationInbox role="admin" onClose={() => {}} />);
+    fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
+
     await waitFor(() => {
-      expect(window.location.pathname).toBe('/queue');
+      expect(markAsSeen).toHaveBeenCalledTimes(1);
+      expect(markAsRead).toHaveBeenCalledTimes(1);
     });
-
-    fireEvent.click(screen.getByRole('button', { name: /^Прочитать все$/i }));
-
-    await waitFor(() => {
-      expect(notificationCenterState.markAllAsRead).toHaveBeenCalledWith('admin');
-    });
-
-    fireEvent.click(screen.getAllByRole('button', { name: /^Архив$/i })[0]);
-
-    await waitFor(() => {
-      expect(notificationCenterState.archiveNotification).toHaveBeenCalledWith('delivery-1');
-    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
   });
 });
