@@ -2556,3 +2556,38 @@ Recommendation:
 - current stack sufficient: yes
 - would LightRAG likely help here: no
 - Gate already selected the correct owner and boundaries; only routine domain mapping was required.
+
+## Task 73 - Slice2 producer parity merge + full notification regression
+
+### User task
+продолжай
+
+### Gate result
+- mode: execute
+- handoff required: no (continuation from prepared slice branch)
+- handoff used: no
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: none
+
+### What handoff solved well
+- none
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manual branch-lineage cleanup was required to remove accidental parent commit drift before PR merge (`rebase --onto` to keep only slice commit).
+- Manual verification bundling was required to run unified backend/frontend notification regression on `main` after merge.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- For this step the bottleneck was git lineage hygiene, not graph retrieval; canonical anchors and tests were already explicit.
