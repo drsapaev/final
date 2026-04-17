@@ -21,14 +21,17 @@ function normalizePayload(payload = {}) {
     payload.event_type ||
     payload.notification_type ||
     'notification';
-  const type = String(rawType).toLowerCase() === 'queue_update'
-    ? 'queue_changed'
-    : String(rawType).toLowerCase();
+  const normalizedRawType = String(rawType).toLowerCase();
+  const typeAliases = {
+    queue_changed: 'queue_update',
+    diagnostics_return: 'diagnostics_return_needed',
+  };
+  const type = typeAliases[normalizedRawType] || normalizedRawType;
 
   const title =
     nested.title ||
     nested.subject ||
-    (type === 'queue_changed' ? 'Обновление очереди' : 'Уведомление');
+    (type === 'queue_update' ? 'Обновление очереди' : 'Уведомление');
   const message = nested.message || nested.content || payload.message || payload.content || '';
 
   return { type, title, message, raw: payload, nested };
@@ -148,7 +151,8 @@ export function NotificationWebSocketProvider({ children }) {
 
       if (
         normalized.type === 'notification' ||
-        normalized.type === 'queue_changed' ||
+        normalized.type === 'queue_update' ||
+        normalized.type === 'diagnostics_return_needed' ||
         normalized.type === 'system_alert'
       ) {
         invalidateNotificationCache();

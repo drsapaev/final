@@ -18,7 +18,9 @@ from app.api import deps
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.patient import Patient
+from app.models.user import User
 from app.services.payment_read_service import PaymentReadService
+from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +152,113 @@ def get_patient_name(patient: Optional[Patient], patient_id: int) -> str:
             if parts:
                 return " ".join(parts)
     return f"Пациент #{patient_id}"
+
+
+def _decimal_to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _emit_payment_notification(
+    *,
+    db: Session,
+    payment: Payment,
+    current_user: Any,
+    change_type: str,
+    patient_id: Optional[int] = None,
+    visit: Optional[Visit] = None,
+    reason: Optional[str] = None,
+    extra_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit canonical payment_notification for patient inbox without breaking cashier flow."""
+    try:
+        resolved_visit = visit
+        if resolved_visit is None and payment.visit_id:
+            resolved_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+
+        resolved_patient_id = patient_id or (resolved_visit.patient_id if resolved_visit else None)
+        if not resolved_patient_id:
+            return
+
+        patient = db.query(Patient).filter(Patient.id == resolved_patient_id).first()
+        if not patient or not patient.user_id:
+            return
+
+        recipient = (
+            db.query(User)
+            .filter(User.id == patient.user_id, User.is_active.is_(True))
+            .first()
+        )
+        if not recipient:
+            return
+
+        amount_value = _decimal_to_float(getattr(payment, "amount", None))
+        metadata: Dict[str, Any] = {
+            "payment_id": payment.id,
+            "visit_id": payment.visit_id,
+            "patient_id": resolved_patient_id,
+            "payment_status": payment.status,
+            "payment_method": getattr(payment, "method", None),
+            "change_type": change_type,
+        }
+        if amount_value is not None:
+            metadata["amount"] = amount_value
+        if reason:
+            metadata["reason"] = reason
+        if extra_metadata:
+            metadata.update(extra_metadata)
+
+        title_map = {
+            "paid": "Оплата подтверждена",
+            "paid_manual": "Оплата подтверждена",
+            "cancelled": "Платеж отменен",
+            "partial_refund": "Частичный возврат выполнен",
+            "full_refund": "Возврат выполнен",
+            "failed": "Платеж не выполнен",
+        }
+        message_map = {
+            "paid": "Ваш платеж успешно проведен.",
+            "paid_manual": "Ваш платеж подтвержден кассиром.",
+            "cancelled": "Платеж был отменен.",
+            "partial_refund": "Выполнен частичный возврат по вашему платежу.",
+            "full_refund": "Средства по вашему платежу полностью возвращены.",
+            "failed": "Не удалось завершить платеж.",
+        }
+        title = title_map.get(change_type, "Обновление статуса платежа")
+        message = message_map.get(change_type, "Статус платежа обновлен.")
+        if amount_value is not None:
+            message = f"{message} Сумма: {amount_value:,.2f} UZS."
+
+        await notification_sender_service.send_canonical_notification_to_user(
+            db=db,
+            recipient=recipient,
+            event_type="payment_notification",
+            title=title,
+            message=message,
+            source_module="cashier",
+            metadata=metadata,
+            deep_link="/patient",
+            severity="warning" if change_type in {"cancelled", "failed", "full_refund"} else "info",
+            priority="high" if change_type in {"cancelled", "failed", "full_refund"} else "normal",
+            actor_id=getattr(current_user, "id", None),
+            actor_role=getattr(current_user, "role", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+        )
+    except Exception as notify_error:
+        logger.warning(
+            "[FIX:NOTIFICATIONS] failed to emit payment_notification",
+            extra={
+                "payment_id": getattr(payment, "id", None),
+                "visit_id": getattr(payment, "visit_id", None),
+                "change_type": change_type,
+                "error": str(notify_error),
+            },
+        )
 
 
 # ===================== API ENDPOINTS =====================
@@ -713,6 +822,7 @@ async def create_payment(
     try:
         # Определяем patient_id
         patient_id = payment_data.patient_id
+        visit = None
         
         if payment_data.visit_id:
             # ✅ FIX: Use lazy load to ensure consistency with get_pending_payments
@@ -777,6 +887,15 @@ async def create_payment(
         db.add(new_payment)
         db.commit()
         db.refresh(new_payment)
+
+        await _emit_payment_notification(
+            db=db,
+            payment=new_payment,
+            current_user=current_user,
+            change_type="paid",
+            patient_id=patient_id,
+            visit=visit,
+        )
         
         # 🔔 WebSocket: Broadcast payment_created event
         try:
@@ -885,6 +1004,7 @@ async def cancel_payment(
             payment.note = f"Отменён: {cancel_data.reason}"
 
         # Возвращаем только operational статус визита; registration type не трогаем.
+        visit = None
         if payment.visit_id:
             visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
             if visit and visit.status == 'paid':
@@ -892,6 +1012,16 @@ async def cancel_payment(
                 db.add(visit)
         
         db.commit()
+
+        await _emit_payment_notification(
+            db=db,
+            payment=payment,
+            current_user=current_user,
+            change_type="cancelled",
+            patient_id=visit.patient_id if visit else None,
+            visit=visit,
+            reason=cancel_data.reason,
+        )
         
         return {
             "success": True,
@@ -955,6 +1085,16 @@ async def mark_visit_as_paid(
 
         db.commit()
 
+        if total_amount > 0:
+            await _emit_payment_notification(
+                db=db,
+                payment=new_payment,
+                current_user=current_user,
+                change_type="paid",
+                patient_id=visit.patient_id,
+                visit=visit,
+            )
+
         return {
             "success": True,
             "message": "Визит отмечен как оплаченный",
@@ -1002,6 +1142,7 @@ async def confirm_payment(
         payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
     
     # Обновляем только operational статус визита; registration type не меняем.
+    visit = None
     if payment.visit_id:
          visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
          if visit:
@@ -1009,6 +1150,15 @@ async def confirm_payment(
               db.add(visit)
     
     db.commit()
+    await _emit_payment_notification(
+        db=db,
+        payment=payment,
+        current_user=current_user,
+        change_type="paid_manual",
+        patient_id=visit.patient_id if visit else None,
+        visit=visit,
+        extra_metadata={"confirmation_mode": "manual"},
+    )
     return {"success": True, "status": "paid"}
 
 
@@ -1070,6 +1220,22 @@ async def refund_payment(
         
         db.commit()
         db.refresh(payment)
+
+        refund_change_type = "full_refund" if payment.status == "refunded" else "partial_refund"
+        refund_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None
+        await _emit_payment_notification(
+            db=db,
+            payment=payment,
+            current_user=current_user,
+            change_type=refund_change_type,
+            patient_id=refund_visit.patient_id if refund_visit else None,
+            visit=refund_visit,
+            reason=refund_data.reason,
+            extra_metadata={
+                "refund_amount": _decimal_to_float(refund_data.amount),
+                "remaining_amount": _decimal_to_float(payment.amount - new_refunded_amount),
+            },
+        )
         
         return RefundResponse(
             id=payment.id,

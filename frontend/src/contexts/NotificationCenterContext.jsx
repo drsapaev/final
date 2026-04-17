@@ -140,6 +140,7 @@ export const ROLE_NOTIFICATION_TYPES = {
 
 const TYPE_ALIASES = {
   queue_changed: 'queue_update',
+  diagnostics_return: 'diagnostics_return_needed',
   queue_status: 'queue_status_changed',
   payment_update: 'payment_notification',
   payment_success: 'payment_notification',

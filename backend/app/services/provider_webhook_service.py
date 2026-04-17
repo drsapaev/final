@@ -67,6 +67,9 @@ class ProviderWebhookService:
                     "merchant_prepare_id": existing_transaction.webhook_id or 0,
                     "error": 0,
                     "error_note": "Already processed",
+                    "payment_id": getattr(existing_transaction, "payment_id", None),
+                    "payment_status": None,
+                    "payment_provider": "click",
                 }
 
             with transaction_ctx(self.db):
@@ -88,6 +91,7 @@ class ProviderWebhookService:
                     webhook.processed_at = datetime.utcnow()
 
                     payment = None
+                    mapped_status = None
                     if result.payment_id:
                         payment_id_from_order = self._extract_payment_id_from_order(
                             result.payment_id
@@ -98,9 +102,8 @@ class ProviderWebhookService:
                             )
 
                     if payment:
-                        payment.status = self._map_provider_status_to_payment_status(
-                            result.status
-                        )
+                        mapped_status = self._map_provider_status_to_payment_status(result.status)
+                        payment.status = mapped_status
                         if payment.status == "paid":
                             payment.paid_at = datetime.utcnow()
 
@@ -131,11 +134,26 @@ class ProviderWebhookService:
                         "merchant_prepare_id": webhook.id,
                         "error": error,
                         "error_note": "" if error == 0 else "Payment processing error",
+                        "payment_id": payment.id if payment else None,
+                        "payment_status": mapped_status,
+                        "payment_provider": "click",
                     }
 
                 webhook.status = "failed"
                 webhook.error_message = result.error_message
                 webhook.processed_at = datetime.utcnow()
+
+                failed_payment = None
+                if result.payment_id:
+                    payment_id_from_order = self._extract_payment_id_from_order(result.payment_id)
+                    if payment_id_from_order:
+                        failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
+                if failed_payment:
+                    failed_payment.status = "failed"
+                    failed_payment.provider_data = {
+                        **(failed_payment.provider_data or {}),
+                        "webhook_error": result.error_message,
+                    }
 
                 return {
                     "click_trans_id": webhook_data.get("click_trans_id"),
@@ -143,6 +161,9 @@ class ProviderWebhookService:
                     "merchant_prepare_id": webhook.id,
                     "error": -1,
                     "error_note": result.error_message or "Processing error",
+                    "payment_id": failed_payment.id if failed_payment else None,
+                    "payment_status": "failed" if failed_payment else None,
+                    "payment_provider": "click",
                 }
 
         except Exception as exc:
@@ -212,6 +233,9 @@ class ProviderWebhookService:
                             "state": 1,
                         },
                         "id": request_id,
+                        "payment_id": getattr(existing_transaction, "payment_id", None),
+                        "payment_status": None,
+                        "payment_provider": "payme",
                     }
                 if method == "PerformTransaction":
                     return {
@@ -221,6 +245,9 @@ class ProviderWebhookService:
                             "state": 2,
                         },
                         "id": request_id,
+                        "payment_id": getattr(existing_transaction, "payment_id", None),
+                        "payment_status": None,
+                        "payment_provider": "payme",
                     }
                 if method == "CancelTransaction":
                     return {
@@ -230,8 +257,17 @@ class ProviderWebhookService:
                             "state": -1,
                         },
                         "id": request_id,
+                        "payment_id": getattr(existing_transaction, "payment_id", None),
+                        "payment_status": None,
+                        "payment_provider": "payme",
                     }
-                return {"result": {}, "id": request_id}
+                return {
+                    "result": {},
+                    "id": request_id,
+                    "payment_id": getattr(existing_transaction, "payment_id", None),
+                    "payment_status": None,
+                    "payment_provider": "payme",
+                }
 
             with transaction_ctx(self.db):
                 webhook_id = f"payme_{uuid.uuid4().hex[:8]}"
@@ -251,6 +287,7 @@ class ProviderWebhookService:
                     webhook.processed_at = datetime.utcnow()
 
                     payment = None
+                    mapped_status = None
                     if result.payment_id:
                         payment_id_from_order = self._extract_payment_id_from_order(
                             result.payment_id
@@ -261,9 +298,8 @@ class ProviderWebhookService:
                             )
 
                     if payment:
-                        payment.status = self._map_provider_status_to_payment_status(
-                            result.status
-                        )
+                        mapped_status = self._map_provider_status_to_payment_status(result.status)
+                        payment.status = mapped_status
                         if payment.status == "paid":
                             payment.paid_at = datetime.utcnow()
 
@@ -288,7 +324,13 @@ class ProviderWebhookService:
                         )
 
                     if method == "CheckPerformTransaction":
-                        return {"result": {"allow": True}, "id": request_id}
+                        return {
+                            "result": {"allow": True},
+                            "id": request_id,
+                            "payment_id": payment.id if payment else None,
+                            "payment_status": mapped_status,
+                            "payment_provider": "payme",
+                        }
                     if method == "CreateTransaction":
                         return {
                             "result": {
@@ -297,6 +339,9 @@ class ProviderWebhookService:
                                 "state": 1,
                             },
                             "id": request_id,
+                            "payment_id": payment.id if payment else None,
+                            "payment_status": mapped_status,
+                            "payment_provider": "payme",
                         }
                     if method == "PerformTransaction":
                         return {
@@ -306,6 +351,9 @@ class ProviderWebhookService:
                                 "state": 2,
                             },
                             "id": request_id,
+                            "payment_id": payment.id if payment else None,
+                            "payment_status": mapped_status,
+                            "payment_provider": "payme",
                         }
                     if method == "CancelTransaction":
                         return {
@@ -315,12 +363,33 @@ class ProviderWebhookService:
                                 "state": -1,
                             },
                             "id": request_id,
+                            "payment_id": payment.id if payment else None,
+                            "payment_status": mapped_status,
+                            "payment_provider": "payme",
                         }
-                    return {"result": {}, "id": request_id}
+                    return {
+                        "result": {},
+                        "id": request_id,
+                        "payment_id": payment.id if payment else None,
+                        "payment_status": mapped_status,
+                        "payment_provider": "payme",
+                    }
 
                 webhook.status = "failed"
                 webhook.error_message = result.error_message
                 webhook.processed_at = datetime.utcnow()
+
+                failed_payment = None
+                if result.payment_id:
+                    payment_id_from_order = self._extract_payment_id_from_order(result.payment_id)
+                    if payment_id_from_order:
+                        failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
+                if failed_payment:
+                    failed_payment.status = "failed"
+                    failed_payment.provider_data = {
+                        **(failed_payment.provider_data or {}),
+                        "webhook_error": result.error_message,
+                    }
 
                 return {
                     "error": {
@@ -328,6 +397,9 @@ class ProviderWebhookService:
                         "message": result.error_message or "Processing error",
                     },
                     "id": request_id,
+                    "payment_id": failed_payment.id if failed_payment else None,
+                    "payment_status": "failed" if failed_payment else None,
+                    "payment_provider": "payme",
                 }
 
         except Exception as exc:
@@ -363,15 +435,15 @@ class ProviderWebhookService:
                 webhook.processed_at = datetime.utcnow()
 
                 payment = None
+                mapped_status = None
                 if result.payment_id:
                     payment = self.repository.get_payment_by_provider_payment_id(
                         result.payment_id
                     )
 
                 if payment:
-                    payment.status = self._map_provider_status_to_payment_status(
-                        result.status
-                    )
+                    mapped_status = self._map_provider_status_to_payment_status(result.status)
+                    payment.status = mapped_status
                     if payment.status == "paid":
                         payment.paid_at = datetime.utcnow()
 
@@ -396,16 +468,35 @@ class ProviderWebhookService:
                     )
 
                 self.db.commit()
-                return {"status": "success", "message": "Webhook processed successfully"}
+                return {
+                    "status": "success",
+                    "message": "Webhook processed successfully",
+                    "payment_id": payment.id if payment else None,
+                    "payment_status": mapped_status,
+                    "payment_provider": "kaspi",
+                }
 
             webhook.status = "failed"
             webhook.error_message = result.error_message
             webhook.processed_at = datetime.utcnow()
+
+            failed_payment = None
+            if result.payment_id:
+                failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
+            if failed_payment:
+                failed_payment.status = "failed"
+                failed_payment.provider_data = {
+                    **(failed_payment.provider_data or {}),
+                    "webhook_error": result.error_message,
+                }
             self.db.commit()
 
             return {
                 "status": "error",
                 "message": result.error_message or "Processing error",
+                "payment_id": failed_payment.id if failed_payment else None,
+                "payment_status": "failed" if failed_payment else None,
+                "payment_provider": "kaspi",
             }
         except Exception as exc:
             logger.error("Kaspi webhook error: %s", exc)
