@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import date
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import delete
@@ -17,7 +18,9 @@ from app.models.lab import (
     LabReportTemplateVersion,
 )
 from app.models.service import Service
+from app.models.user import User
 from app.models.visit import VisitService
+from app.services.notifications import notification_sender_service
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
@@ -744,3 +747,49 @@ class TestLabReportingService:
         assert field["resolved_flag"] == "low"
         assert field["resolved_flag_source"] == "catalog_reference"
         assert field["resolved_flag_meta"]["matched_threshold"]["value"] == "130"
+
+    def test_create_instance_emits_lab_new_study_for_lab_staff(
+        self,
+        db_session,
+        test_patient,
+        test_visit,
+    ):
+        lab_user = db_session.query(User).filter(User.username == "test_lab_user").first()
+        if not lab_user:
+            lab_user = User(
+                username="test_lab_user",
+                email="lab@test.com",
+                full_name="Test Lab",
+                hashed_password="hashed-password",
+                role="Lab",
+                is_active=True,
+                is_superuser=False,
+            )
+            db_session.add(lab_user)
+            db_session.commit()
+            db_session.refresh(lab_user)
+
+        service = LabReportingService(db_session)
+        template = next(
+            template for template in service.list_templates() if template.code == "cbc_oak"
+        )
+        send_mock = AsyncMock(return_value=True)
+        original = notification_sender_service.send_lab_event_notification
+        notification_sender_service.send_lab_event_notification = send_mock
+        try:
+            instance = service.create_instance(
+                {
+                    "patient_id": test_patient.id,
+                    "visit_id": test_visit.id,
+                    "template_id": template.id,
+                }
+            )
+        finally:
+            notification_sender_service.send_lab_event_notification = original
+
+        assert instance.order_id is not None
+        assert send_mock.await_count == 1
+        assert send_mock.await_args.kwargs["event_type"] == "lab_new_study"
+        assert send_mock.await_args.kwargs["recipient"].id == lab_user.id
+        assert send_mock.await_args.kwargs["metadata"]["patient_id"] == test_patient.id
+        assert send_mock.await_args.kwargs["metadata"]["visit_id"] == test_visit.id

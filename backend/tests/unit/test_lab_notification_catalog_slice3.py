@@ -1,9 +1,36 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from app.models.notification import NotificationDelivery, NotificationEvent
+from app.models.lab import LabOrder, LabResult
+from app.models.patient import Patient
+from app.models.user import User
+from app.models.visit import Visit
+from app.services.lab_notification_service import LabNotificationService
 from app.services.notifications import notification_sender_service
+
+
+def _create_user(db_session, *, username: str, role: str, full_name: str) -> User:
+    existing = db_session.query(User).filter(User.username == username).first()
+    if existing:
+        return existing
+
+    user = User(
+        username=username,
+        email=f"{username}@test.com",
+        full_name=full_name,
+        hashed_password="hashed-password",
+        role=role,
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
 
 
 @pytest.mark.asyncio
@@ -109,3 +136,89 @@ async def test_send_lab_event_rejects_unsupported_type(
         .count()
     )
     assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_ready_results_emits_confirmation_event(
+    db_session,
+    test_patient,
+    monkeypatch,
+):
+    patient_user = _create_user(
+        db_session,
+        username="patient_lab_ready",
+        role="patient",
+        full_name="Patient Lab Ready",
+    )
+    test_patient.user_id = patient_user.id
+    db_session.commit()
+
+    order = LabOrder(
+        patient_id=test_patient.id,
+        status="completed",
+    )
+    db_session.add(order)
+    db_session.commit()
+    db_session.refresh(order)
+
+    send_mock = AsyncMock(side_effect=[True, True])
+    monkeypatch.setattr(
+        notification_sender_service,
+        "send_lab_event_notification",
+        send_mock,
+    )
+
+    service = LabNotificationService(db_session)
+    result = await service.check_and_notify_ready_results()
+
+    assert result["notifications_sent"] == 1
+    assert send_mock.await_count == 2
+    assert send_mock.await_args_list[0].kwargs["event_type"] == "lab_results"
+    assert send_mock.await_args_list[1].kwargs["event_type"] == "lab_result_sent_confirmation"
+
+
+@pytest.mark.asyncio
+async def test_check_critical_values_emits_critical_finding_event(
+    db_session,
+    test_patient,
+    test_visit,
+    cardio_user,
+    monkeypatch,
+):
+    order = LabOrder(
+        patient_id=test_patient.id,
+        visit_id=test_visit.id,
+        status="completed",
+    )
+    db_session.add(order)
+    db_session.commit()
+    db_session.refresh(order)
+
+    result = LabResult(
+        order_id=order.id,
+        test_name="Glucose",
+        value="24.4",
+        abnormal=True,
+    )
+    db_session.add(result)
+    db_session.commit()
+    db_session.refresh(result)
+
+    send_mock = AsyncMock(side_effect=[True, True])
+    monkeypatch.setattr(
+        notification_sender_service,
+        "send_lab_event_notification",
+        send_mock,
+    )
+
+    service = LabNotificationService(db_session)
+    outcome = await service.check_critical_values()
+
+    assert outcome["critical_found"] == 1
+    assert send_mock.await_count == 2
+    first_call = send_mock.await_args_list[0]
+    second_call = send_mock.await_args_list[1]
+    assert first_call.kwargs["event_type"] == "lab_critical_result"
+    assert second_call.kwargs["event_type"] == "lab_critical_finding"
+    assert first_call.kwargs["recipient"].id == cardio_user.id
+    assert second_call.kwargs["recipient"].id == cardio_user.id

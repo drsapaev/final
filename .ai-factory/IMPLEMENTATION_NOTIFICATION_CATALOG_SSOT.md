@@ -78,7 +78,7 @@ Scope: Unified persistent inbox notifications (`/notifications/inbox`, `/notific
 |---|---|---|
 | `all_free_*` | `backend/app/api/v1/endpoints/registrar_wizard.py` -> `notification_sender_service` | implemented |
 | `message_received` | `backend/app/services/messages_api_service.py` | implemented |
-| `lab_results`, `lab_critical_result`, `diagnostics_return_needed` | `backend/app/services/lab_notification_service.py` | implemented |
+| `lab_results`, `lab_critical_result`, `lab_new_study`, `lab_critical_finding`, `lab_result_sent_confirmation`, `diagnostics_return_needed` | `backend/app/services/lab_notification_service.py` | implemented |
 | registrar operational (`new_appointment`, `price_change`, `queue_status_changed`, alert family) | `backend/app/services/registrar_notification_service.py` | implemented |
 | `patient_registered` (create only) | `backend/app/services/patient_service.py` | implemented |
 | typed helper catalog (`lab_*`, queue family, registrar/admin family) | `backend/app/services/notifications.py` | implemented |
@@ -110,6 +110,7 @@ Backend:
 - `python -m py_compile backend/app/services/lab_notification_service.py`
 - `python -m py_compile backend/app/services/registrar_notification_service.py`
 - `python -m py_compile backend/app/services/patient_service.py`
+- `python -m pytest backend/tests/unit/test_lab_notification_catalog_slice3.py backend/tests/unit/test_lab_reporting_service.py -q`
 - `python -m pytest backend/tests/integration/test_notification_catalog_slice1.py backend/tests/unit/test_messages_notification_catalog_slice1.py -q`
 - `python -m pytest backend/tests/unit/test_notification_platform_contract.py -q`
 - `python -m pytest backend/tests/unit/test_notification_platform_contract.py -q` (covers quiet-hours, critical override, and queue burst suppression)
