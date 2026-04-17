@@ -235,6 +235,134 @@ def test_realtime_policy_respects_event_push_setting_mapping(db_session):
 
 
 @pytest.mark.asyncio
+async def test_queue_burst_realtime_is_suppressed_but_inbox_persistence_remains(
+    db_session,
+    monkeypatch,
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "_is_within_quiet_hours", lambda **_: False)
+
+    user = SimpleNamespace(
+        id=93001,
+        role="patient",
+        is_superuser=False,
+        profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_system_updates=True,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+
+    first_delivery = await service.record_delivery_for_user(
+        user=user,
+        event_type="queue_update",
+        title="Обновление очереди",
+        message="Пациент вызван к врачу",
+        source_module="queue",
+        severity="info",
+        priority="normal",
+        entity_type="visit",
+        entity_id="visit-100",
+        payload_snapshot={
+            "title": "Обновление очереди",
+            "message": "Пациент вызван к врачу",
+            "metadata": {"source": "queue", "attempt": 1},
+        },
+        deep_link="/queue",
+    )
+    second_delivery = await service.record_delivery_for_user(
+        user=user,
+        event_type="queue_update",
+        title="Обновление очереди",
+        message="Пациент вызван к врачу",
+        source_module="queue",
+        severity="info",
+        priority="normal",
+        entity_type="visit",
+        entity_id="visit-100",
+        payload_snapshot={
+            "title": "Обновление очереди",
+            "message": "Пациент вызван к врачу",
+            "metadata": {"source": "queue", "attempt": 2},
+        },
+        deep_link="/queue",
+    )
+
+    assert first_delivery.delivery_id != second_delivery.delivery_id
+    assert db_session.query(NotificationDelivery).count() == 2
+    assert db_session.query(NotificationEvent).count() == 2
+    assert service.ws_manager.send_json.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_queue_call_is_not_suppressed_by_burst_guard(
+    db_session,
+    monkeypatch,
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "_is_within_quiet_hours", lambda **_: False)
+
+    user = SimpleNamespace(
+        id=93002,
+        role="patient",
+        is_superuser=False,
+        profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_system_updates=True,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+
+    first_delivery = await service.record_delivery_for_user(
+        user=user,
+        event_type="queue_call",
+        title="Пациент вызван",
+        message="Подойдите к кабинету",
+        source_module="queue",
+        severity="info",
+        priority="normal",
+        entity_type="visit",
+        entity_id="visit-200",
+        payload_snapshot={
+            "title": "Пациент вызван",
+            "message": "Подойдите к кабинету",
+            "metadata": {"source": "queue", "attempt": 1},
+        },
+        deep_link="/queue",
+    )
+    second_delivery = await service.record_delivery_for_user(
+        user=user,
+        event_type="queue_call",
+        title="Пациент вызван",
+        message="Подойдите к кабинету",
+        source_module="queue",
+        severity="info",
+        priority="normal",
+        entity_type="visit",
+        entity_id="visit-200",
+        payload_snapshot={
+            "title": "Пациент вызван",
+            "message": "Подойдите к кабинету",
+            "metadata": {"source": "queue", "attempt": 2},
+        },
+        deep_link="/queue",
+    )
+
+    assert first_delivery.delivery_id != second_delivery.delivery_id
+    assert db_session.query(NotificationDelivery).count() == 2
+    assert db_session.query(NotificationEvent).count() == 2
+    assert service.ws_manager.send_json.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_record_delivery_for_users_keeps_inbox_but_filters_realtime_by_settings(
     db_session,
     monkeypatch,
