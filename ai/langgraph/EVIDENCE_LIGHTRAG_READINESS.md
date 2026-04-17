@@ -2369,3 +2369,190 @@ PLEASE IMPLEMENT THIS PLAN: Full Plan: Unified Notification Catalog and SSOT Com
 Recommendation:
 - For notification-domain tasks, prioritize relationship retrieval that binds `event_type` catalog -> producer services -> frontend consumer files before generating first-touch sets.
 - Keep known-root-cause retry, but add a catalog-aware ownership heuristic to reduce repeated single-file misroutes on multi-slice work.
+
+## Task 68 - Notification SSOT Phase 1 alias/type normalization (queue + diagnostics)
+
+### User task
+теперь можешь продолжать
+
+### Gate result
+- mode: canonical
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/notification_platform_service.py
+
+### What handoff solved well
+- It constrained the risky slice to a single confirmed owner file after misroute retry.
+- It preserved stop conditions and prevented broad multi-file edits in one step.
+
+### Missing relationship mapping
+- Gate retry still collapsed a cross-stack alias task (backend + frontend + tests) into one backend file.
+- Missing mapping from canonical alias direction changes to impacted frontend normalization and contract tests.
+
+### Manual reconstruction needed
+- Manually aligned alias decisions with the active dossier/handoff contract.
+- Manually validated impact with the nearest contract test and confirmed expected failure due stale old canonical assertion (`queue_changed`).
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Relationship-aware retrieval should map alias direction changes across backend normalizer, frontend ingress aliases, and contract tests to avoid repeated narrow-file misroutes.
+
+## Task 69 - Legacy webhook path canonical payment_notification alignment
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/payment_webhook_api_service.py
+
+### What handoff solved well
+- It enforced a strict narrow patch scope after misroute and prevented cross-file edits in endpoints/repositories.
+- It preserved a compile-first verification target for the approved root-cause file.
+
+### Missing relationship mapping
+- Retry still did not map that legacy webhook endpoint behavior depends on both repository transaction linkage and notification-platform recipient resolution.
+- Canonical producer insertion point had to be reconstructed manually inside the legacy API service path.
+
+### Manual reconstruction needed
+- Manually derived recipient resolution chain (`PaymentWebhook` -> `PaymentTransaction`/`Payment`/`Visit` -> `Patient.user`).
+- Manually added canonical `payment_notification` emit semantics while preserving legacy response contract (`ok/message/webhook_id`).
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better relationship retrieval should surface the legacy path ownership graph and recipient linkage path up front to reduce narrow-override cycles.
+
+## Task 70 - Legacy webhook duplicate callback idempotency for canonical payment_notification
+
+### User task
+продолжай
+
+### Gate result
+- mode: gate_known_root_cause
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/payment_webhook_api_service.py
+
+### What handoff solved well
+- It constrained the fix to a single approved runtime file and prevented notification-platform wide changes.
+- It provided explicit stop conditions and kept verification narrow (`py_compile` + targeted integration tests).
+
+### Missing relationship mapping
+- Gate did not surface that event dedup in `NotificationPlatformService` includes message/payload fields, so dynamic webhook reason text can break idempotency.
+- This cross-file dedup dependency had to be inferred manually from service internals.
+
+### Manual reconstruction needed
+- Manually traced failing duplicate callback test to dynamic body mutation (`Причина: ...`) in legacy webhook canonical emit path.
+- Manually stabilized canonical payload body so repeated callbacks resolve to existing event/delivery dedup keys.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Relationship-aware retrieval linking producer payload shaping to platform dedup seed fields would shorten this debug loop.
+
+## Task 71 - Runtime policy enforcement for realtime notification broadcast
+
+### User task
+продолжай
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/notification_platform_service.py
+
+### What handoff solved well
+- It enforced strict single-file scope for the first runtime policy slice.
+- It kept verification discipline narrow (`py_compile` + notification regression pack) and prevented broad cross-layer edits.
+
+### Missing relationship mapping
+- Initial handoff misrouted to queue service files despite a clear notification-platform root-cause.
+- Retry still needed manual override to reach the canonical owner (`NotificationPlatformService`).
+
+### Manual reconstruction needed
+- Manually mapped which settings can safely affect realtime behavior without breaking inbox SSOT:
+  - `preferences.desktop_notifications`
+  - `notification_settings.quiet_hours_*`
+  - `notification_settings.weekend_notifications`
+- Manually implemented critical break-through semantics and queue-family quiet-hours suppression in service-level broadcast policy.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph retrieval should directly bind settings models and runtime delivery service ownership to avoid repeated queue-domain misroutes for notification-policy tasks.
+
+## Task 72 - Per-event realtime policy mapping via push settings
+
+### User task
+продолжай
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/app/services/notification_platform_service.py
+
+### What handoff solved well
+- It selected canonical notification owner files and kept first patch slice anchored in `NotificationPlatformService`.
+- Verification targets were aligned with notification contract tests.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Manually mapped canonical event types to existing `UserNotificationSettings.push_*` fields because settings schema is channel-based while event catalog is domain-based.
+- Preserved critical break-through and existing quiet-hours suppression semantics while adding event-level setting enforcement.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- Gate already selected the correct owner and boundaries; only routine domain mapping was required.

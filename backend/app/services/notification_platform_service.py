@@ -8,6 +8,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
@@ -31,6 +32,47 @@ class NotificationPlatformService:
     TRANSPORT_NOTIFICATION = "notification"
     TRANSPORT_QUEUE_UPDATE = "queue_update"
     TRANSPORT_SYSTEM_ALERT = "system_alert"
+    DEFAULT_TIMEZONE = "Asia/Tashkent"
+
+    CRITICAL_EVENT_TYPES = {
+        "security_alert",
+        "billing_alert",
+        "lab_critical_result",
+    }
+
+    QUIET_HOURS_QUEUE_EVENT_TYPES = {
+        "queue_update",
+        "queue_changed",
+        "queue_call",
+        "queue_position",
+        "queue_reminder",
+        "diagnostics_return_needed",
+        "diagnostics_return",
+        "queue_status_changed",
+    }
+
+    REALTIME_PUSH_SETTING_BY_EVENT_TYPE = {
+        "appointment_reminder": "push_appointment_reminder",
+        "appointment_confirmation": "push_appointment_confirmation",
+        "visit_confirmation": "push_appointment_confirmation",
+        "new_appointment": "push_appointment_confirmation",
+        "schedule_change": "push_appointment_cancellation",
+        "payment_notification": "push_payment_receipt",
+        "security_alert": "push_security_alerts",
+        "system_alert": "push_system_updates",
+        "registrar_system_alert": "push_system_updates",
+        "price_change": "push_system_updates",
+        "all_free_requested": "push_system_updates",
+        "all_free_approved": "push_system_updates",
+        "all_free_rejected": "push_system_updates",
+        "queue_update": "push_system_updates",
+        "queue_call": "push_system_updates",
+        "queue_position": "push_system_updates",
+        "queue_reminder": "push_system_updates",
+        "diagnostics_return_needed": "push_system_updates",
+        "queue_status_changed": "push_system_updates",
+        "patient_registered": "push_system_updates",
+    }
 
     ROLE_ALIASES = {
         "admin": "admin",
@@ -67,7 +109,8 @@ class NotificationPlatformService:
     }
 
     LEGACY_EVENT_TYPE_ALIASES = {
-        "queue_update": "queue_changed",
+        "queue_changed": "queue_update",
+        "diagnostics_return": "diagnostics_return_needed",
     }
 
     def __init__(self, db: Session):
@@ -105,6 +148,157 @@ class NotificationPlatformService:
     @staticmethod
     def _now() -> datetime:
         return datetime.utcnow()
+
+    @staticmethod
+    def _parse_hhmm(value: str | None, fallback: tuple[int, int]) -> tuple[int, int]:
+        if not value:
+            return fallback
+        try:
+            hour, minute = str(value).split(":", maxsplit=1)
+            parsed_hour = max(0, min(23, int(hour)))
+            parsed_minute = max(0, min(59, int(minute)))
+            return parsed_hour, parsed_minute
+        except (TypeError, ValueError):
+            return fallback
+
+    def _resolve_timezone_name_for_user(self, user: User) -> str:
+        user_preferences = getattr(user, "preferences", None)
+        user_profile = getattr(user, "profile", None)
+        candidate = (
+            getattr(user_preferences, "timezone", None)
+            or getattr(user_profile, "timezone", None)
+            or self.DEFAULT_TIMEZONE
+        )
+        try:
+            ZoneInfo(candidate)
+            return candidate
+        except Exception:
+            return self.DEFAULT_TIMEZONE
+
+    def _is_within_quiet_hours(self, *, now_local: datetime, start: str | None, end: str | None) -> bool:
+        start_h, start_m = self._parse_hhmm(start, (22, 0))
+        end_h, end_m = self._parse_hhmm(end, (8, 0))
+        now_minutes = now_local.hour * 60 + now_local.minute
+        start_minutes = start_h * 60 + start_m
+        end_minutes = end_h * 60 + end_m
+        if start_minutes == end_minutes:
+            return False
+        if start_minutes < end_minutes:
+            return start_minutes <= now_minutes < end_minutes
+        return now_minutes >= start_minutes or now_minutes < end_minutes
+
+    def _is_critical_breakthrough_event(
+        self,
+        *,
+        event_type: str,
+        severity: str | None,
+        priority: str | None,
+    ) -> bool:
+        normalized_type = self.normalize_event_type(event_type)
+        normalized_severity = self.normalize_slug(severity)
+        normalized_priority = self.normalize_slug(priority)
+        if normalized_type in self.CRITICAL_EVENT_TYPES:
+            return True
+        if normalized_severity in {"critical"}:
+            return True
+        if normalized_priority in {"urgent"}:
+            return True
+        return False
+
+    def _resolve_realtime_push_setting_key(self, *, event_type: str) -> str | None:
+        normalized_type = self.normalize_event_type(event_type)
+        return self.REALTIME_PUSH_SETTING_BY_EVENT_TYPE.get(normalized_type)
+
+    def _is_realtime_event_enabled_in_settings(
+        self,
+        *,
+        notification_settings: Any,
+        event_type: str,
+    ) -> tuple[bool, str]:
+        setting_key = self._resolve_realtime_push_setting_key(event_type=event_type)
+        if not setting_key:
+            return True, "event_not_mapped_to_push_setting"
+        if bool(getattr(notification_settings, setting_key, True)) is False:
+            return False, f"setting_disabled:{setting_key}"
+        return True, f"setting_enabled:{setting_key}"
+
+    def _should_broadcast_realtime(
+        self,
+        *,
+        user: User,
+        event_type: str,
+        severity: str | None,
+        priority: str | None,
+    ) -> tuple[bool, str]:
+        normalized_type = self.normalize_event_type(event_type)
+        if self._is_critical_breakthrough_event(
+            event_type=normalized_type,
+            severity=severity,
+            priority=priority,
+        ):
+            return True, "critical_breakthrough"
+
+        user_preferences = getattr(user, "preferences", None)
+        if user_preferences is not None and getattr(user_preferences, "desktop_notifications", True) is False:
+            return False, "desktop_notifications_disabled"
+
+        notification_settings = getattr(user, "notification_settings", None)
+        if notification_settings is None:
+            return True, "no_notification_settings"
+
+        enabled_in_settings, settings_reason = self._is_realtime_event_enabled_in_settings(
+            notification_settings=notification_settings,
+            event_type=normalized_type,
+        )
+        if not enabled_in_settings:
+            return False, settings_reason
+
+        timezone_name = self._resolve_timezone_name_for_user(user)
+        now_local = datetime.now(ZoneInfo(timezone_name))
+        if (
+            getattr(notification_settings, "weekend_notifications", True) is False
+            and now_local.weekday() >= 5
+            and normalized_type in self.QUIET_HOURS_QUEUE_EVENT_TYPES
+        ):
+            return False, "weekend_suppression"
+
+        if normalized_type in self.QUIET_HOURS_QUEUE_EVENT_TYPES and self._is_within_quiet_hours(
+            now_local=now_local,
+            start=getattr(notification_settings, "quiet_hours_start", None),
+            end=getattr(notification_settings, "quiet_hours_end", None),
+        ):
+            return False, "quiet_hours_queue_suppression"
+
+        return True, "default_allow"
+
+    async def _broadcast_delivery_with_policy(
+        self,
+        *,
+        user: User,
+        delivery: NotificationDelivery,
+        event_type: str,
+        severity: str | None,
+        priority: str | None,
+    ) -> bool:
+        should_broadcast, reason = self._should_broadcast_realtime(
+            user=user,
+            event_type=event_type,
+            severity=severity,
+            priority=priority,
+        )
+        if not should_broadcast:
+            logger.info(
+                "[Notifications] websocket broadcast suppressed by policy",
+                extra={
+                    "recipient_id": user.id,
+                    "delivery_id": delivery.delivery_id,
+                    "event_type": event_type,
+                    "reason": reason,
+                },
+            )
+            return False
+        await self._broadcast_delivery(user.id, delivery)
+        return True
 
     def _hash_seed(self, seed: dict[str, Any]) -> str:
         packed = json.dumps(seed, sort_keys=True, default=str, ensure_ascii=False)
@@ -408,7 +602,7 @@ class NotificationPlatformService:
     async def _broadcast_delivery(self, user_id: int, delivery: NotificationDelivery) -> None:
         event = delivery.event
         transport_type = self.TRANSPORT_NOTIFICATION
-        if event.event_type == "queue_changed":
+        if event.event_type in {"queue_update", "queue_changed"}:
             transport_type = self.TRANSPORT_QUEUE_UPDATE
         elif event.event_type == "system_alert":
             transport_type = self.TRANSPORT_SYSTEM_ALERT
@@ -738,7 +932,13 @@ class NotificationPlatformService:
             payload_snapshot=snapshot,
         )
         self.repository.commit()
-        await self._broadcast_delivery(user.id, delivery)
+        await self._broadcast_delivery_with_policy(
+            user=user,
+            delivery=delivery,
+            event_type=normalized_event_type,
+            severity=severity,
+            priority=priority,
+        )
         return delivery
 
     async def record_delivery_for_users(
@@ -809,7 +1009,13 @@ class NotificationPlatformService:
         self.repository.commit()
 
         for user, delivery in zip(users, deliveries):
-            await self._broadcast_delivery(user.id, delivery)
+            await self._broadcast_delivery_with_policy(
+                user=user,
+                delivery=delivery,
+                event_type=normalized_event_type,
+                severity=severity,
+                priority=priority,
+            )
 
         return deliveries
 
