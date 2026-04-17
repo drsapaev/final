@@ -50,7 +50,7 @@ async def test_notification_platform_service_creates_persistent_delivery_and_ded
         .one()
     )
 
-    assert persisted_event.event_type == "queue_changed"
+    assert persisted_event.event_type == "queue_update"
     assert persisted_delivery.delivery_status == "delivered"
     assert persisted_delivery.role == "admin"
     assert persisted_delivery.sequence_id == 1
@@ -80,7 +80,7 @@ async def test_notification_platform_service_creates_persistent_delivery_and_ded
     assert inbox["total"] == 1
     assert inbox["unread_count"] == 1
     assert inbox["items"][0]["id"] == delivery.delivery_id
-    assert inbox["items"][0]["event_type"] == "queue_changed"
+    assert inbox["items"][0]["event_type"] == "queue_update"
 
     seen_delivery = await service.mark_seen(current_user=admin_user, delivery_id=delivery.delivery_id)
     assert seen_delivery.seen_at is not None
@@ -138,3 +138,227 @@ def test_notification_history_scope_allows_same_recipient_even_if_type_differs(
         recipient_id=admin_user.id,
         recipient_type='doctor',
     )
+
+
+def test_realtime_policy_suppresses_when_desktop_notifications_disabled(db_session):
+    service = NotificationPlatformService(db_session)
+    user = SimpleNamespace(
+        preferences=SimpleNamespace(desktop_notifications=False, timezone="Asia/Tashkent"),
+        profile=SimpleNamespace(timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+
+    allowed, reason = service._should_broadcast_realtime(
+        user=user,
+        event_type="queue_update",
+        severity="info",
+        priority="normal",
+    )
+
+    assert allowed is False
+    assert reason == "desktop_notifications_disabled"
+
+
+def test_realtime_policy_allows_critical_breakthrough_even_when_desktop_disabled(db_session):
+    service = NotificationPlatformService(db_session)
+    user = SimpleNamespace(
+        preferences=SimpleNamespace(desktop_notifications=False, timezone="Asia/Tashkent"),
+        profile=SimpleNamespace(timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=False,
+        ),
+    )
+
+    allowed, reason = service._should_broadcast_realtime(
+        user=user,
+        event_type="security_alert",
+        severity="warning",
+        priority="normal",
+    )
+
+    assert allowed is True
+    assert reason == "critical_breakthrough"
+
+
+def test_realtime_policy_suppresses_queue_events_during_quiet_hours(monkeypatch, db_session):
+    service = NotificationPlatformService(db_session)
+    user = SimpleNamespace(
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        profile=SimpleNamespace(timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+    monkeypatch.setattr(service, "_is_within_quiet_hours", lambda **_: True)
+
+    allowed, reason = service._should_broadcast_realtime(
+        user=user,
+        event_type="queue_position",
+        severity="info",
+        priority="normal",
+    )
+
+    assert allowed is False
+    assert reason == "quiet_hours_queue_suppression"
+
+
+def test_realtime_policy_respects_event_push_setting_mapping(db_session):
+    service = NotificationPlatformService(db_session)
+    user = SimpleNamespace(
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        profile=SimpleNamespace(timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_system_updates=False,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+
+    allowed, reason = service._should_broadcast_realtime(
+        user=user,
+        event_type="queue_update",
+        severity="info",
+        priority="normal",
+    )
+
+    assert allowed is False
+    assert reason == "setting_disabled:push_system_updates"
+
+
+@pytest.mark.asyncio
+async def test_record_delivery_for_users_keeps_inbox_but_filters_realtime_by_settings(
+    db_session,
+    monkeypatch,
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "_is_within_quiet_hours", lambda **_: False)
+
+    user_realtime_off = SimpleNamespace(
+        id=91001,
+        role="patient",
+        is_superuser=False,
+        profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_system_updates=False,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+    user_realtime_on = SimpleNamespace(
+        id=91002,
+        role="patient",
+        is_superuser=False,
+        profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_system_updates=True,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+
+    deliveries = await service.record_delivery_for_users(
+        users=[user_realtime_off, user_realtime_on],
+        event_type="queue_update",
+        title="Обновление очереди",
+        message="Очередь изменилась",
+        source_module="queue",
+        severity="info",
+        priority="normal",
+    )
+
+    assert len(deliveries) == 2
+    assert db_session.query(NotificationDelivery).count() == 2
+    assert db_session.query(NotificationEvent).count() == 1
+    assert service.ws_manager.send_json.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_record_delivery_for_user_persists_inbox_when_realtime_suppressed_by_event_setting(
+    db_session,
+    monkeypatch,
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "_is_within_quiet_hours", lambda **_: False)
+
+    user = SimpleNamespace(
+        id=92001,
+        role="patient",
+        is_superuser=False,
+        profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(desktop_notifications=True, timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_system_updates=False,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=True,
+        ),
+    )
+
+    delivery = await service.record_delivery_for_user(
+        user=user,
+        event_type="queue_update",
+        title="Обновление очереди",
+        message="Очередь изменилась",
+        source_module="queue",
+        severity="info",
+        priority="normal",
+    )
+
+    assert delivery is not None
+    assert db_session.query(NotificationDelivery).count() == 1
+    assert db_session.query(NotificationEvent).count() == 1
+    assert service.ws_manager.send_json.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_record_delivery_for_user_allows_critical_breakthrough_even_if_settings_disabled(
+    db_session,
+    monkeypatch,
+):
+    service = NotificationPlatformService(db_session)
+    service.ws_manager = SimpleNamespace(send_json=AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "_is_within_quiet_hours", lambda **_: True)
+
+    user = SimpleNamespace(
+        id=92002,
+        role="patient",
+        is_superuser=False,
+        profile=SimpleNamespace(department=None, timezone="Asia/Tashkent"),
+        preferences=SimpleNamespace(desktop_notifications=False, timezone="Asia/Tashkent"),
+        notification_settings=SimpleNamespace(
+            push_security_alerts=False,
+            quiet_hours_start="22:00",
+            quiet_hours_end="08:00",
+            weekend_notifications=False,
+        ),
+    )
+
+    delivery = await service.record_delivery_for_user(
+        user=user,
+        event_type="security_alert",
+        title="Security alert",
+        message="Suspicious activity detected",
+        source_module="security",
+        severity="warning",
+        priority="normal",
+    )
+
+    assert delivery is not None
+    assert db_session.query(NotificationDelivery).count() == 1
+    assert db_session.query(NotificationEvent).count() == 1
+    assert service.ws_manager.send_json.await_count == 1

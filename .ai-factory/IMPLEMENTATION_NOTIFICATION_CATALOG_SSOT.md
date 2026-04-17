@@ -1,6 +1,6 @@
 # Notification Catalog SSOT - Active Implementation Note
 
-Updated: 2026-04-16  
+Updated: 2026-04-17  
 Scope: Unified persistent inbox notifications (`/notifications/inbox`, `/notifications/unread-count`, WS sync) without new API surface.
 
 ## Canonical Catalog (Backend SSOT)
@@ -38,11 +38,35 @@ Scope: Unified persistent inbox notifications (`/notifications/inbox`, `/notific
 
 - Persistent inbox (SSOT): all catalog events above are backend-owned records via notification platform APIs.
 - Ephemeral chat realtime only (non-inbox): typing, read receipts, presence, reaction updates.
+- Runtime delivery split:
+  - inbox persistence is always written for canonical events.
+  - websocket realtime delivery is policy-gated in `NotificationPlatformService`.
 - Alias normalization:
   - `result_ready` -> `lab_results`
   - `payment_update` -> `payment_notification`
   - `appointment_rescheduled` -> `schedule_change`
-  - `queue_changed` -> `queue_update` on frontend normalization
+  - `queue_changed` -> `queue_update` (backend + frontend normalization)
+  - `diagnostics_return` -> `diagnostics_return_needed` (backend + frontend normalization)
+
+## Runtime Policy Contract (Realtime Only)
+
+- Policy owner: `backend/app/services/notification_platform_service.py`
+- Critical break-through (always allow realtime):
+  - event types: `security_alert`, `billing_alert`, `lab_critical_result`
+  - or `severity=critical`
+  - or `priority=urgent`
+- Global realtime suppressor:
+  - `UserPreferences.desktop_notifications = false` -> realtime suppressed
+- Event-level realtime suppressor (via `UserNotificationSettings.push_*`):
+  - `appointment_reminder` -> `push_appointment_reminder`
+  - `appointment_confirmation`, `visit_confirmation`, `new_appointment` -> `push_appointment_confirmation`
+  - `schedule_change` -> `push_appointment_cancellation`
+  - `payment_notification` -> `push_payment_receipt`
+  - `security_alert` -> `push_security_alerts`
+  - `system_alert`, `registrar_system_alert`, `price_change`, `all_free_*`, queue family, `patient_registered` -> `push_system_updates`
+- Quiet-hours / weekend suppression (queue-family only):
+  - respects `UserNotificationSettings.quiet_hours_start`, `quiet_hours_end`, `weekend_notifications`
+  - applies to queue family: `queue_update`, `queue_call`, `queue_position`, `queue_reminder`, `diagnostics_return_needed`, `queue_status_changed`
 
 ## Producer Wiring Status
 
@@ -84,6 +108,7 @@ Backend:
 - `python -m py_compile backend/app/services/patient_service.py`
 - `python -m pytest backend/tests/integration/test_notification_catalog_slice1.py backend/tests/unit/test_messages_notification_catalog_slice1.py -q`
 - `python -m pytest backend/tests/unit/test_notification_platform_contract.py -q`
+- `python -m pytest backend/tests/integration/test_notification_catalog_slice3_legacy_webhooks.py -q`
 
 Frontend:
 - `npx eslint src/contexts/NotificationCenterContext.jsx`
