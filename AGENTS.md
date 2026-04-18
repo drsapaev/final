@@ -11,7 +11,17 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Frontend: React 18, Vite, React Router, JavaScript/JSX.
 - Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
 - Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.
-- Dev-brain tools live outside runtime in `ai/llamaindex` and `ai/langgraph`.
+- Dev-brain tools live outside runtime in `ai/llamaindex`, `ai/langgraph`, and `ai/lightrag`.
+
+## LightRAG Status
+
+- Treat LightRAG as an active dev-brain retrieval layer for graph-heavy workflows, but not as a fully accepted `unified brain` yet.
+- Do not call the stack a `unified brain` until keyed ingest has passed the acceptance gate.
+- Acceptance order:
+  1. `simple locate` as a sanity check.
+  2. `Telegram mixed-contract` as an intermediate check.
+  3. `registrar payment/status persistence ownership` as the acceptance gate.
+- Only mark LightRAG useful if keyed ingest measurably improves canonical anchors, first-touch files, verification targets, misroute rate, and manual reconstruction on the registrar case.
 
 ## Default Task Mode
 
@@ -26,6 +36,15 @@ Before acting, classify the request as one mode:
 - Use `dossier` for curated engineering context.
 - Use `handoff` for a strict execution brief for another agent.
 - Use `execute` only after canonical anchors, first-touch files, references, and validation targets are clear.
+
+## Graph-Heavy Defaults
+
+For graph-heavy, mixed-contract, or ownership-sensitive tasks:
+
+- Use `dossier` as the default context layer to understand the shape of the change.
+- Use `handoff` as the default execution brief when the task is risky, multi-file, or needs transfer to another agent.
+- Use `plan` as a supporting change checklist, not as the primary execution contract.
+- Keep `dossier` first unless the task is already a narrow direct execute with a known root cause.
 
 ## Canonical First
 
@@ -49,6 +68,14 @@ For code changes:
 - Touch only first-touch files first.
 - Do not do opportunistic cleanup.
 - Do not expand scope without a concrete reason and user-visible report.
+
+## Execution Posture
+
+- Do not silently choose between multiple plausible interpretations when the choice changes behavior, scope, or ownership. Surface the assumption or stop.
+- Prefer the simplest change that satisfies the requested behavior. Do not add speculative abstractions, configuration, or flexibility that the task did not ask for.
+- Keep edits surgical. Every changed line should trace directly to the requested behavior or to cleanup made unused by your own change.
+- For multi-step work, express the implementation as a short goal-driven loop: `step -> verify`, then execute against that loop.
+- If success is not mechanically checkable yet, tighten the validation target before editing instead of coding against a vague goal.
 
 ## Execution Mode Selection
 
