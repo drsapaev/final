@@ -125,6 +125,8 @@ export const API_ENDPOINTS = {
     HISTORY: '/notifications/history',
     SYNC: '/notifications/sync',
     UNREAD_COUNT: '/notifications/unread-count',
+    SETTINGS: (userId) => `/notifications/settings/${userId}`,
+    SETTINGS_POLICY: (userId) => `/notifications/settings/${userId}/policy`,
     MARK_SEEN: (id) => `/notifications/${id}/seen`,
     MARK_READ: (id) => `/notifications/${id}/read`,
     ARCHIVE: (id) => `/notifications/${id}/archive`,

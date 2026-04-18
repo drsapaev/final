@@ -714,6 +714,46 @@ export const notificationsService = {
   },
 
   /**
+   * Notification channel settings for a user
+   */
+  async getSettings(userId) {
+    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.SETTINGS(userId));
+  },
+
+  /**
+   * Update notification channel settings for a user
+   */
+  async updateSettings(userId, settingsPayload) {
+    const response = await apiRequest(
+      'PUT',
+      API_ENDPOINTS.NOTIFICATIONS.SETTINGS(userId),
+      { data: settingsPayload }
+    );
+    clearNotificationQueryCache();
+    return response;
+  },
+
+  /**
+   * Runtime anti-noise policy for a user
+   */
+  async getPolicy(userId) {
+    return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.SETTINGS_POLICY(userId));
+  },
+
+  /**
+   * Update runtime anti-noise policy for a user
+   */
+  async updatePolicy(userId, policyPayload) {
+    const response = await apiRequest(
+      'PUT',
+      API_ENDPOINTS.NOTIFICATIONS.SETTINGS_POLICY(userId),
+      { data: policyPayload }
+    );
+    clearNotificationQueryCache();
+    return response;
+  },
+
+  /**
    * Mark a notification as seen
    */
   async markSeen(id) {

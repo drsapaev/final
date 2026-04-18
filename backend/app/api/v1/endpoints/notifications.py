@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -13,6 +14,7 @@ from app.crud.user_management import (
     user_profile as crud_user_profile,
 )
 from app.models.user import User
+from app.models.user_profile import UserPreferences
 from app.schemas.notification import (
     BulkNotificationRequest,
     NotificationInboxResponse,
@@ -34,6 +36,7 @@ from app.services.notification_platform_service import get_notification_platform
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_TIME_PATTERN = re.compile(r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
 
 
 def _combine_date_and_time(date_value, time_value: str | None) -> datetime:
@@ -87,6 +90,173 @@ def get_or_create_notification_settings(db: Session, user_id: int):
 
     create_data = UserNotificationSettingsCreate(user_id=user_id, profile_id=profile.id)
     return crud_user_notification_settings.create(db, obj_in=create_data)
+
+
+def get_or_create_user_preferences(db: Session, user_id: int):
+    preferences = (
+        db.query(UserPreferences)
+        .filter(UserPreferences.user_id == user_id)
+        .first()
+    )
+    if preferences:
+        return preferences
+
+    profile = crud_user_profile.get_by_user_id(db, user_id=user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Профиль пользователя не найден")
+
+    preferences = UserPreferences(
+        user_id=user_id,
+        profile_id=profile.id,
+    )
+    db.add(preferences)
+    db.commit()
+    db.refresh(preferences)
+    return preferences
+
+
+def _assert_notification_policy_access(current_user: User, user_id: int) -> None:
+    if current_user.id != user_id and (
+        not hasattr(current_user, "role") or current_user.role != "Admin"
+    ):
+        raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+
+def _parse_policy_datetime(value: Any, *, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be ISO datetime string")
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{field_name} has invalid ISO datetime") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.isoformat()
+
+
+def _normalize_realtime_control(control: Any, *, field_name: str) -> bool | dict[str, Any]:
+    if isinstance(control, bool):
+        return control
+    if not isinstance(control, dict):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be boolean or object")
+
+    normalized: dict[str, Any] = {}
+    for key in ("enabled", "realtime_enabled", "desktop"):
+        value = control.get(key)
+        if isinstance(value, bool):
+            normalized[key] = value
+
+    channels = control.get("channels")
+    if channels is not None:
+        if not isinstance(channels, dict):
+            raise HTTPException(status_code=422, detail=f"{field_name}.channels must be an object")
+        normalized_channels: dict[str, bool] = {}
+        for channel_name in ("desktop", "push", "email", "sms"):
+            channel_value = channels.get(channel_name)
+            if isinstance(channel_value, bool):
+                normalized_channels[channel_name] = channel_value
+        if normalized_channels:
+            normalized["channels"] = normalized_channels
+
+    if not normalized:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field_name} has no supported keys (enabled/realtime_enabled/desktop/channels)",
+        )
+    return normalized
+
+
+def _normalize_notification_policy_payload(
+    *,
+    policy_data: Dict[str, Any],
+    platform_service,
+) -> Dict[str, Any]:
+    supported_keys = {
+        "muted_until",
+        "snooze_until",
+        "dnd",
+        "event_controls",
+        "family_controls",
+        "channel_controls",
+    }
+    normalized_policy: Dict[str, Any] = {}
+
+    for key in supported_keys:
+        if key not in policy_data:
+            continue
+        value = policy_data.get(key)
+        if key in {"muted_until", "snooze_until"}:
+            parsed_datetime = _parse_policy_datetime(value, field_name=key)
+            if parsed_datetime:
+                normalized_policy[key] = parsed_datetime
+            continue
+
+        if key == "dnd":
+            if value is None:
+                continue
+            if not isinstance(value, dict):
+                raise HTTPException(status_code=422, detail="dnd must be an object")
+            dnd: dict[str, Any] = {}
+            if "enabled" in value:
+                if not isinstance(value["enabled"], bool):
+                    raise HTTPException(status_code=422, detail="dnd.enabled must be boolean")
+                dnd["enabled"] = value["enabled"]
+            if "always_on" in value:
+                if not isinstance(value["always_on"], bool):
+                    raise HTTPException(status_code=422, detail="dnd.always_on must be boolean")
+                dnd["always_on"] = value["always_on"]
+            for time_key in ("start", "end"):
+                if time_key not in value:
+                    continue
+                time_value = value[time_key]
+                if time_value is None:
+                    continue
+                if not isinstance(time_value, str) or not _TIME_PATTERN.match(time_value):
+                    raise HTTPException(status_code=422, detail=f"dnd.{time_key} must be HH:MM")
+                dnd[time_key] = time_value
+            if dnd:
+                normalized_policy["dnd"] = dnd
+            continue
+
+        if key == "channel_controls":
+            if value is None:
+                continue
+            normalized_policy["channel_controls"] = _normalize_realtime_control(
+                value,
+                field_name="channel_controls",
+            )
+            continue
+
+        if key in {"event_controls", "family_controls"}:
+            if value is None:
+                continue
+            if not isinstance(value, dict):
+                raise HTTPException(status_code=422, detail=f"{key} must be an object")
+            normalized_controls: dict[str, Any] = {}
+            for raw_name, raw_control in value.items():
+                if not isinstance(raw_name, str):
+                    continue
+                if key == "event_controls":
+                    normalized_name = platform_service.normalize_event_type(raw_name)
+                else:
+                    normalized_name = platform_service.normalize_slug(raw_name) or ""
+                if not normalized_name:
+                    continue
+                normalized_controls[normalized_name] = _normalize_realtime_control(
+                    raw_control,
+                    field_name=f"{key}.{raw_name}",
+                )
+            if normalized_controls:
+                normalized_policy[key] = normalized_controls
+
+    return normalized_policy
 
 
 @router.post("/send-appointment-reminder")
@@ -628,11 +798,7 @@ async def get_user_notification_settings(
     db: Session = Depends(get_db),
 ):
     """Получение настроек уведомлений пользователя"""
-    # Проверяем права доступа
-    if current_user.id != user_id and (
-        not hasattr(current_user, "role") or current_user.role != "Admin"
-    ):
-        raise HTTPException(status_code=403, detail="Нет прав доступа")
+    _assert_notification_policy_access(current_user=current_user, user_id=user_id)
     
     # Используем UserNotificationSettings
     return get_or_create_notification_settings(db, user_id)
@@ -646,15 +812,61 @@ async def update_user_notification_settings(
     db: Session = Depends(get_db),
 ):
     """Обновление настроек уведомлений пользователя"""
-    # Проверяем права доступа
-    if current_user.id != user_id and (
-        not hasattr(current_user, "role") or current_user.role != "Admin"
-    ):
-        raise HTTPException(status_code=403, detail="Нет прав доступа")
+    _assert_notification_policy_access(current_user=current_user, user_id=user_id)
 
     settings = get_or_create_notification_settings(db, user_id)
 
     return crud_user_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
+
+
+@router.get("/settings/{user_id}/policy")
+async def get_user_notification_policy(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Получение runtime policy-override для anti-noise (mute/snooze/DND + controls)."""
+    _assert_notification_policy_access(current_user=current_user, user_id=user_id)
+    preferences = get_or_create_user_preferences(db, user_id)
+    security_settings = preferences.security_settings if isinstance(preferences.security_settings, dict) else {}
+    policy = security_settings.get("notification_policy")
+    if not isinstance(policy, dict):
+        policy = {}
+    return {
+        "user_id": user_id,
+        "policy": policy,
+        "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else None,
+    }
+
+
+@router.put("/settings/{user_id}/policy")
+async def update_user_notification_policy(
+    user_id: int,
+    policy_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Обновление runtime policy-override для anti-noise (mute/snooze/DND + controls)."""
+    _assert_notification_policy_access(current_user=current_user, user_id=user_id)
+    platform_service = get_notification_platform_service(db)
+    normalized_policy = _normalize_notification_policy_payload(
+        policy_data=policy_data,
+        platform_service=platform_service,
+    )
+
+    preferences = get_or_create_user_preferences(db, user_id)
+    security_settings = preferences.security_settings if isinstance(preferences.security_settings, dict) else {}
+    security_settings["notification_policy"] = normalized_policy
+    preferences.security_settings = security_settings
+    db.add(preferences)
+    db.commit()
+    db.refresh(preferences)
+
+    return {
+        "user_id": user_id,
+        "policy": normalized_policy,
+        "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else None,
+    }
 
 
 # Отправка уведомлений с шаблонами

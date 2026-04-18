@@ -127,6 +127,37 @@ class NotificationPlatformService:
         "diagnostics_return": "diagnostics_return_needed",
     }
 
+    EVENT_FAMILY_BY_TYPE = {
+        "appointment_reminder": "appointment",
+        "appointment_confirmation": "appointment",
+        "visit_confirmation": "appointment",
+        "schedule_change": "appointment",
+        "new_appointment": "appointment",
+        "payment_notification": "payment",
+        "queue_update": "queue",
+        "queue_call": "queue",
+        "queue_position": "queue",
+        "queue_reminder": "queue",
+        "queue_status_changed": "queue",
+        "diagnostics_return_needed": "queue",
+        "lab_results": "lab",
+        "lab_critical_result": "lab",
+        "lab_new_study": "lab",
+        "lab_critical_finding": "lab",
+        "lab_result_sent_confirmation": "lab",
+        "prescription_ready": "lab",
+        "all_free_requested": "all_free",
+        "all_free_approved": "all_free",
+        "all_free_rejected": "all_free",
+        "message_received": "message",
+        "patient_registered": "patient",
+        "system_alert": "system",
+        "registrar_system_alert": "system",
+        "price_change": "system",
+        "security_alert": "security",
+        "billing_alert": "billing",
+    }
+
     def __init__(self, db: Session):
         self.db = db
         self.repository = NotificationPlatformRepository(db)
@@ -201,6 +232,132 @@ class NotificationPlatformService:
             return start_minutes <= now_minutes < end_minutes
         return now_minutes >= start_minutes or now_minutes < end_minutes
 
+    def _parse_policy_datetime(
+        self,
+        *,
+        value: Any,
+        timezone_name: str,
+    ) -> datetime | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if normalized.endswith("Z"):
+            normalized = f"{normalized[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+        target_tz = ZoneInfo(timezone_name)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=target_tz)
+        return parsed.astimezone(target_tz)
+
+    def _resolve_event_family(self, *, event_type: str) -> str:
+        normalized_type = self.normalize_event_type(event_type)
+        return self.EVENT_FAMILY_BY_TYPE.get(normalized_type, "other")
+
+    @staticmethod
+    def _extract_realtime_control_state(control: Any) -> bool | None:
+        if isinstance(control, bool):
+            return control
+        if not isinstance(control, dict):
+            return None
+
+        for key in ("desktop", "realtime_enabled", "enabled"):
+            value = control.get(key)
+            if isinstance(value, bool):
+                return value
+
+        channels = control.get("channels")
+        if isinstance(channels, dict):
+            desktop_channel = channels.get("desktop")
+            if isinstance(desktop_channel, bool):
+                return desktop_channel
+        return None
+
+    def _load_notification_policy_overrides(self, *, user: User) -> dict[str, Any]:
+        user_preferences = getattr(user, "preferences", None)
+        if user_preferences is None:
+            return {}
+
+        security_settings = getattr(user_preferences, "security_settings", None)
+        if not isinstance(security_settings, dict):
+            return {}
+
+        policy = security_settings.get("notification_policy")
+        if not isinstance(policy, dict):
+            return {}
+        return policy
+
+    def _evaluate_realtime_policy_overrides(
+        self,
+        *,
+        user: User,
+        event_type: str,
+        now_local: datetime,
+    ) -> tuple[bool | None, str]:
+        policy = self._load_notification_policy_overrides(user=user)
+        if not policy:
+            return None, "no_policy_overrides"
+
+        timezone_name = self._resolve_timezone_name_for_user(user)
+
+        muted_until = self._parse_policy_datetime(
+            value=policy.get("muted_until"),
+            timezone_name=timezone_name,
+        )
+        if muted_until and now_local <= muted_until:
+            return False, "policy_muted_until"
+
+        snooze_until = self._parse_policy_datetime(
+            value=policy.get("snooze_until"),
+            timezone_name=timezone_name,
+        )
+        if snooze_until and now_local <= snooze_until:
+            return False, "policy_snoozed_until"
+
+        dnd = policy.get("dnd")
+        if isinstance(dnd, dict) and bool(dnd.get("enabled", False)):
+            if bool(dnd.get("always_on", False)):
+                return False, "policy_dnd_always_on"
+            dnd_start = dnd.get("start")
+            dnd_end = dnd.get("end")
+            if dnd_start or dnd_end:
+                if self._is_within_quiet_hours(
+                    now_local=now_local,
+                    start=dnd_start,
+                    end=dnd_end,
+                ):
+                    return False, "policy_dnd_window"
+
+        global_controls = policy.get("channel_controls")
+        if isinstance(global_controls, dict):
+            global_realtime_state = self._extract_realtime_control_state(global_controls)
+            if global_realtime_state is False:
+                return False, "policy_channel_controls_disabled"
+
+        normalized_type = self.normalize_event_type(event_type)
+        event_controls = policy.get("event_controls")
+        if isinstance(event_controls, dict):
+            event_state = self._extract_realtime_control_state(
+                event_controls.get(normalized_type)
+            )
+            if event_state is False:
+                return False, f"policy_event_disabled:{normalized_type}"
+
+        event_family = self._resolve_event_family(event_type=normalized_type)
+        family_controls = policy.get("family_controls")
+        if isinstance(family_controls, dict):
+            family_state = self._extract_realtime_control_state(
+                family_controls.get(event_family)
+            )
+            if family_state is False:
+                return False, f"policy_family_disabled:{event_family}"
+
+        return None, "policy_no_suppression"
+
     def _is_critical_breakthrough_event(
         self,
         *,
@@ -252,6 +409,16 @@ class NotificationPlatformService:
         ):
             return True, "critical_breakthrough"
 
+        timezone_name = self._resolve_timezone_name_for_user(user)
+        now_local = datetime.now(ZoneInfo(timezone_name))
+        policy_decision, policy_reason = self._evaluate_realtime_policy_overrides(
+            user=user,
+            event_type=normalized_type,
+            now_local=now_local,
+        )
+        if policy_decision is False:
+            return False, policy_reason
+
         user_preferences = getattr(user, "preferences", None)
         if user_preferences is not None and getattr(user_preferences, "desktop_notifications", True) is False:
             return False, "desktop_notifications_disabled"
@@ -267,8 +434,6 @@ class NotificationPlatformService:
         if not enabled_in_settings:
             return False, settings_reason
 
-        timezone_name = self._resolve_timezone_name_for_user(user)
-        now_local = datetime.now(ZoneInfo(timezone_name))
         if (
             getattr(notification_settings, "weekend_notifications", True) is False
             and now_local.weekday() >= 5

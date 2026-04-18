@@ -46,4 +46,34 @@ describe('notificationsService cache', () => {
 
     expect(apiRequest).toHaveBeenCalledTimes(3);
   });
+
+  it('supports canonical settings and policy endpoints', async () => {
+    apiRequest
+      .mockResolvedValueOnce({ email_appointment_reminder: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ policy: { dnd: { enabled: true } } })
+      .mockResolvedValueOnce({ ok: true });
+
+    const userId = 20;
+    const settingsPayload = { email_appointment_reminder: false };
+    const policyPayload = { dnd: { enabled: true, always_on: false, start: '22:00', end: '07:00' } };
+
+    await expect(notificationsService.getSettings(userId)).resolves.toEqual({
+      email_appointment_reminder: true
+    });
+    await expect(notificationsService.updateSettings(userId, settingsPayload)).resolves.toEqual({ ok: true });
+    await expect(notificationsService.getPolicy(userId)).resolves.toEqual({
+      policy: { dnd: { enabled: true } }
+    });
+    await expect(notificationsService.updatePolicy(userId, policyPayload)).resolves.toEqual({ ok: true });
+
+    expect(apiRequest).toHaveBeenNthCalledWith(1, 'GET', '/notifications/settings/20');
+    expect(apiRequest).toHaveBeenNthCalledWith(2, 'PUT', '/notifications/settings/20', {
+      data: settingsPayload
+    });
+    expect(apiRequest).toHaveBeenNthCalledWith(3, 'GET', '/notifications/settings/20/policy');
+    expect(apiRequest).toHaveBeenNthCalledWith(4, 'PUT', '/notifications/settings/20/policy', {
+      data: policyPayload
+    });
+  });
 });
