@@ -97,7 +97,7 @@ def _resolve_payment_truth(
             from app.models.payment import Payment
 
             payment = (
-                _repo(db).query(Payment)
+                db.query(Payment)
                 .filter(Payment.visit_id == visit_id)
                 .order_by(Payment.created_at.desc())
                 .first()
@@ -205,28 +205,28 @@ def get_queue_profiles(
 ):
     """
     Получить список профилей очередей для динамических вкладок.
-    
+
     Каждый профиль определяет:
     - key: уникальный ключ (cardiology, ecg, dermatology и т.д.)
     - title/title_ru: названия для отображения
     - queue_tags: список queue_tag значений, которые относятся к этому профилю
     - icon/color: UI конфигурация
-    
+
     Frontend использует queue_tags для фильтрации записей по вкладкам.
-    
+
     SSOT: Вкладки определяются в БД, НЕ хардкодятся в frontend.
     """
     try:
         from app.models.queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
-        
+
         # Пытаемся получить из БД
         query = db.query(QueueProfile)
-        
+
         if active_only:
             query = query.filter(QueueProfile.is_active == True)
-        
+
         profiles = query.order_by(QueueProfile.display_order).all()
-        
+
         # Если таблица не существует или пуста - возвращаем fallback
         if not profiles:
             logger.warning("Queue profiles table is empty, returning hardcoded fallback")
@@ -247,7 +247,7 @@ def get_queue_profiles(
                 ],
                 "source": "fallback",
             }
-        
+
         return {
             "success": True,
             "profiles": [
@@ -267,12 +267,12 @@ def get_queue_profiles(
             ],
             "source": "database",
         }
-        
+
     except Exception as e:
         # При любой ошибке (включая отсутствие таблицы) возвращаем fallback
         logger.error("Error fetching queue profiles: %s", e)
         from app.models.queue_profile import INITIAL_QUEUE_PROFILES
-        
+
         return {
             "success": True,
             "profiles": [
@@ -299,15 +299,15 @@ def get_queue_profiles_public(
 ):
     """
     ⭐ PUBLIC ENDPOINT: Получить список профилей для QR-страницы регистрации.
-    
+
     Не требует авторизации - используется пациентами при самостоятельной регистрации.
     Возвращает только профили с is_active=True И show_on_qr_page=True.
-    
+
     Используется на странице /queue/join для выбора специальности.
     """
     try:
         from app.models.queue_profile import QueueProfile, INITIAL_QUEUE_PROFILES
-        
+
         # Получаем только активные профили, которые видны на QR странице
         profiles = (
             db.query(QueueProfile)
@@ -318,7 +318,7 @@ def get_queue_profiles_public(
             .order_by(QueueProfile.display_order)
             .all()
         )
-        
+
         if not profiles:
             # Fallback: возвращаем все из INITIAL_QUEUE_PROFILES (кроме general и ecg)
             logger.warning("Queue profiles table is empty for QR page, returning fallback")
@@ -337,7 +337,7 @@ def get_queue_profiles_public(
                 ],
                 "source": "fallback",
             }
-        
+
         return {
             "success": True,
             "specialists": [
@@ -352,7 +352,7 @@ def get_queue_profiles_public(
             ],
             "source": "database",
         }
-        
+
     except Exception as e:
         logger.error("Error fetching queue profiles for QR page: %s", e)
         # Fallback на базовый список
@@ -427,17 +427,17 @@ def create_queue_profile(
 ):
     """
     Create a new QueueProfile (admin only).
-    
+
     SSOT: Tabs are defined in DB, not hardcoded in frontend.
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         # Check if key already exists
         existing = db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
         if existing:
             raise HTTPException(status_code=400, detail=f"Profile with key '{profile_data.key}' already exists")
-        
+
         # Create new profile
         new_profile = QueueProfile(
             key=profile_data.key,
@@ -450,13 +450,13 @@ def create_queue_profile(
             icon=profile_data.icon,
             color=profile_data.color,
         )
-        
+
         db.add(new_profile)
         db.commit()
         db.refresh(new_profile)
-        
+
         logger.info(f"Created QueueProfile: {new_profile.key}")
-        
+
         return {
             "success": True,
             "profile": {
@@ -472,7 +472,7 @@ def create_queue_profile(
                 "color": new_profile.color,
             },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -490,28 +490,28 @@ def update_queue_profile(
 ):
     """
     Update an existing QueueProfile by key (admin only).
-    
+
     SSOT: Changes here reflect immediately in Registrar Panel tabs.
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
-        
+
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
         for field, value in update_data.items():
             if hasattr(profile, field):
                 setattr(profile, field, value)
-        
+
         db.commit()
         db.refresh(profile)
-        
+
         logger.info(f"Updated QueueProfile: {profile.key}")
-        
+
         return {
             "success": True,
             "profile": {
@@ -527,7 +527,7 @@ def update_queue_profile(
                 "color": profile.color,
             },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -544,27 +544,27 @@ def delete_queue_profile(
 ):
     """
     Delete a QueueProfile by key (admin only).
-    
+
     Warning: This will remove the tab from Registrar Panel.
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
-        
+
         db.delete(profile)
         db.commit()
-        
+
         logger.info(f"Deleted QueueProfile: {profile_key}")
-        
+
         return {
             "success": True,
             "message": f"Profile '{profile_key}' deleted successfully",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -581,28 +581,28 @@ def reorder_queue_profiles(
 ):
     """
     Batch update display_order for multiple profiles (admin only).
-    
+
     Request body: {"cardiology": 1, "ecg": 2, "dermatology": 3, ...}
     """
     try:
         from app.models.queue_profile import QueueProfile
-        
+
         updated = 0
         for key, order in orders.items():
             profile = db.query(QueueProfile).filter(QueueProfile.key == key).first()
             if profile:
                 profile.display_order = order
                 updated += 1
-        
+
         db.commit()
-        
+
         logger.info(f"Reordered {updated} QueueProfiles")
-        
+
         return {
             "success": True,
             "updated": updated,
         }
-        
+
     except Exception as e:
         logger.error(f"Error reordering queue profiles: {e}")
         db.rollback()
@@ -1343,7 +1343,7 @@ def get_today_queues(
                     visit.id,
                 )
                 continue
-            
+
             # ✅ Только Visit БЕЗ OQE добавляем в seen_visit_ids
             seen_visit_ids.add(visit.id)
 
@@ -1628,7 +1628,7 @@ def get_today_queues(
 
             # ⭐ PHASE 1.2: Visit без OQE всегда type='visit'
             # Visit с source='online' уже пропущен выше (имеет OnlineQueueEntry)
-            
+
             queues_by_specialty[specialty]["entries"].append(
                 {
                     "type": "visit",  # ✅ PHASE 1.2: Всегда 'visit' для Visit без OQE
@@ -1664,8 +1664,8 @@ def get_today_queues(
                     online_entry.visit_id,
                 )
                 continue
-            
-            # ⭐ ДОПОЛНИТЕЛЬНО: Пропускаем "сиротские" OnlineQueueEntry (без visit_id) 
+
+            # ⭐ ДОПОЛНИТЕЛЬНО: Пропускаем "сиротские" OnlineQueueEntry (без visit_id)
             # если для этого пациента уже есть Visit на сегодня
             # ✅ FIX 11: НО НЕ пропускаем QR-записи! Они должны показывать source='online'
             if not online_entry.visit_id and online_entry.patient_id:
@@ -1680,7 +1680,7 @@ def get_today_queues(
                 else:
                     # Проверяем есть ли Visit для этого пациента на сегодня
                     patient_has_visit = any(
-                        v.patient_id == online_entry.patient_id 
+                        v.patient_id == online_entry.patient_id
                         for v in visits
                     )
                     if patient_has_visit:
@@ -1690,7 +1690,7 @@ def get_today_queues(
                             online_entry.patient_id,
                         )
                         continue
-            
+
             daily_queue = (
                 db.query(DailyQueue)
                 .filter(DailyQueue.id == online_entry.queue_id)
@@ -2028,18 +2028,18 @@ def get_today_queues(
 
             entries = []
             seen_entry_keys = set()  # Для дедупликации записей в одной специальности
-            
+
             # ⭐ FIX: Улучшенная дедупликация для поддержки множественных записей одной сессии
             # Каждая новая услуга (добавленная через edit) создаёт отдельную OnlineQueueEntry.
             # Мы не должны их скрывать/объединять здесь, они должны быть видны как отдельные элементы
             # или сгруппированы корректно на frontend.
             # Поэтому в ключ добавляем ID записи, чтобы уникальные ID не склеивались.
-            
+
             for idx, entry_wrapper in enumerate(entries_list, 1):
                 # ⭐ FIX ROOT CAUSE: Strict SSOT - 1 Row = 1 OnlineQueueEntry
                 # No aggregation here. We only deduplicate IDENTICAL record instances
                 # that might appear due to SQL joins.
-                
+
                 entry_id = entry_wrapper.get('id')
                 if entry_id:
                      unique_key = f"id_{entry_id}"
@@ -2385,7 +2385,7 @@ def get_today_queues(
                 elif entry_type == "online_queue":
                     # ✅ SSOT FIX: entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
                     is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
-                    
+
                     if is_visit_object:
                         # entry_data это Visit с source='online'
                         visit = entry_data
@@ -2411,7 +2411,7 @@ def get_today_queues(
                         source = visit.source or "online"  # SSOT: Visit.source
                         discount_mode = visit.discount_mode or "none"
                         visit_time = str(visit.visit_time) if hasattr(visit, 'visit_time') and visit.visit_time else None
-                        
+
                         # Загружаем пациента для получения данных
                         patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
                         if patient:
@@ -2497,7 +2497,7 @@ def get_today_queues(
                     if not service_name:
                         # ✅ SSOT: Используем единственный источник истины для маппинга
                         from app.services.service_mapping import get_default_service_by_specialty
-                        
+
                         default_service = get_default_service_by_specialty(db, specialty)
                         if default_service:
                             service_name = default_service["name"]
@@ -2534,7 +2534,7 @@ def get_today_queues(
 
                     # ⭐ PHASE 1 FIX: total_cost - приоритет: oqe_total_amount, entry_data.total_amount, VisitService
                     total_cost = entry_wrapper.get("oqe_total_amount") or getattr(entry_data, 'total_amount', 0) or 0
-                    
+
                     # ⭐ PHASE 1 FIX: Для desk записей total_amount=0 — вычисляем из VisitService
                     if total_cost == 0:
                         linked_visit_id = getattr(entry_data, 'visit_id', None) or entry_wrapper.get("visit_id")
@@ -2548,7 +2548,7 @@ def get_today_queues(
                                     total_cost = float(cost_row.total)
                             except Exception:
                                 pass  # Fallback на 0
-                    
+
                     appointment_id_value = record_id
 
                     # ⭐ PHASE 1 FIX: Формируем service_details из entry_data.services (не online_entry!)
@@ -2560,7 +2560,7 @@ def get_today_queues(
                                 parsed_services = json.loads(parsed_services)
                             except:
                                 parsed_services = []
-                        
+
                         if isinstance(parsed_services, list):
                             for svc in parsed_services:
                                 if isinstance(svc, dict):
@@ -2618,7 +2618,7 @@ def get_today_queues(
                             # ✅ SSOT FIX: entry_data может быть Visit (для QR-записей) или OnlineQueueEntry
                             # Проверяем тип объекта
                             is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
-                            
+
                             if is_visit_object:
                                 # ⭐ PHASE 1 FIX: Используем уже полученные данные из entry_wrapper
                                 queue_entry_number = entry_wrapper.get("oqe_number") or idx
