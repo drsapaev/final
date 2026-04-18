@@ -2937,3 +2937,40 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval would have reduced manual tracing across nested sender helpers and made the canonical alias normalization path easier to reconstruct end-to-end.
+
+## Task 83 - Frontend notification context event-field canonicalization
+
+### User task
+Да.
+
+### Gate result
+- mode: canonical
+- handoff required: yes
+- handoff used: yes, via narrow override retry
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/contexts/notificationcentercontext.jsx
+
+### What handoff solved well
+- It narrowed the slice to a single frontend context file and prevented scope spill into settings or websocket files.
+- It surfaced the exact approved root-cause file after the retry.
+
+### Missing relationship mapping
+- The first gate pass anchored to backend files and missed the frontend state-normalization path.
+- Manual inspection was still required to confirm that `type` was already canonicalized, while `notificationType` and `eventType` still carried raw legacy values.
+
+### Manual reconstruction needed
+- Updated `normalizeNotification` so `notificationType` and `eventType` now follow the canonical normalized `type`.
+- Verified the existing frontend context and websocket tests still passed after the change.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should have connected the state-shape leak in the context object to the canonical type-normalization path faster, reducing retry churn.
