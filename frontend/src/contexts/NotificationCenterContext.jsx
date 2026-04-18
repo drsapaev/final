@@ -277,9 +277,8 @@ function normalizeNotification(input, source = 'api') {
     eventId: input.event_id || input.eventId || null,
     sequenceId: Number(input.sequence_id || input.sequenceId || 0),
     type,
-    notificationType:
-      input.notification_type || input.notificationType || input.event_type || type,
-    eventType: input.event_type || input.eventType || type,
+    notificationType: type,
+    eventType: type,
     title: input.title || input.subject || 'Уведомление',
     message: input.message || input.body || input.content || '',
     severity: input.severity || 'info',
