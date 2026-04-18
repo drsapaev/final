@@ -28,6 +28,74 @@ from app.services.telegram.bot import telegram_bot
 logger = logging.getLogger(__name__)
 
 
+NOTIFICATION_EVENT_TYPE_ALIASES = {
+    "queue_changed": "queue_update",
+    "diagnostics_return": "diagnostics_return_needed",
+    "queue_status": "queue_status_changed",
+    "payment_update": "payment_notification",
+    "payment_success": "payment_notification",
+    "result_ready": "lab_results",
+    "lab_result_ready": "lab_results",
+    "appointment_rescheduled": "schedule_change",
+    "appointment_cancelled": "schedule_change",
+    "all_free_pending": "all_free_requested",
+    "all_free_declined": "all_free_rejected",
+    "allfree_requested": "all_free_requested",
+    "allfree_approved": "all_free_approved",
+    "allfree_rejected": "all_free_rejected",
+    "notification_message_received": "message_received",
+    "lab_critical": "lab_critical_result",
+    "lab_new_assignment": "lab_new_study",
+    "lab_result_sent": "lab_result_sent_confirmation",
+    "registrar_alert": "registrar_system_alert",
+    "security_warning": "security_alert",
+    "billing_warning": "billing_alert",
+    "patient_create": "patient_registered",
+}
+
+LAB_NOTIFICATION_EVENT_TYPES = {
+    "lab_results",
+    "lab_critical_result",
+    "lab_new_study",
+    "lab_critical_finding",
+    "lab_result_sent_confirmation",
+    "diagnostics_return_needed",
+}
+
+REGISTRAR_NOTIFICATION_EVENT_TYPES = {
+    "new_appointment",
+    "price_change",
+    "queue_status_changed",
+    "system_alert",
+    "registrar_system_alert",
+    "security_alert",
+    "billing_alert",
+    "all_free_requested",
+    "all_free_approved",
+    "all_free_rejected",
+    "patient_registered",
+}
+
+QUEUE_NOTIFICATION_EVENT_TYPES = {
+    "queue_call",
+    "queue_position",
+    "queue_reminder",
+    "diagnostics_return_needed",
+    "queue_update",
+}
+
+
+def _normalize_notification_event_type(
+    event_type: str | None,
+    *,
+    fallback: str = "",
+) -> str:
+    normalized = str(event_type or "").strip().lower()
+    if not normalized:
+        return fallback
+    return NOTIFICATION_EVENT_TYPE_ALIASES.get(normalized, normalized)
+
+
 class NotificationSenderService:
     """Сервис для отправки уведомлений (Email, SMS, Telegram)"""
 
@@ -97,17 +165,21 @@ class NotificationSenderService:
     ) -> bool:
         """Record one canonical inbox delivery for a specific recipient."""
         try:
+            normalized_event_type = _normalize_notification_event_type(
+                event_type,
+                fallback="notification",
+            )
             if not recipient or not recipient.is_active:
                 logger.warning(
                     "[FIX:NOTIFICATIONS] canonical notification skipped: inactive/missing recipient",
-                    extra={"event_type": event_type},
+                    extra={"event_type": normalized_event_type},
                 )
                 return False
 
             platform_service = self._platform_service(db)
             await platform_service.record_delivery_for_user(
                 user=recipient,
-                event_type=event_type,
+                event_type=normalized_event_type,
                 title=title,
                 message=message,
                 source_module=source_module,
@@ -124,7 +196,7 @@ class NotificationSenderService:
             logger.info(
                 "[FIX:NOTIFICATIONS] canonical delivery created",
                 extra={
-                    "event_type": event_type,
+                    "event_type": normalized_event_type,
                     "recipient_id": recipient.id,
                     "source_module": source_module,
                 },
@@ -159,9 +231,13 @@ class NotificationSenderService:
         actor_role: str | None = None,
         entity_type: str | None = None,
         entity_id: str | int | None = None,
-    ) -> bool:
+        ) -> bool:
         """Record one canonical inbox delivery fan-out for role recipients."""
         try:
+            normalized_event_type = _normalize_notification_event_type(
+                event_type,
+                fallback="notification",
+            )
             platform_service = self._platform_service(db)
             recipients: dict[int, User] = {}
             for role in roles:
@@ -172,7 +248,7 @@ class NotificationSenderService:
                 logger.warning(
                     "[FIX:NOTIFICATIONS] canonical role delivery skipped: no recipients",
                     extra={
-                        "event_type": event_type,
+                        "event_type": normalized_event_type,
                         "roles": roles,
                         "source_module": source_module,
                     },
@@ -181,7 +257,7 @@ class NotificationSenderService:
 
             await platform_service.record_delivery_for_users(
                 users=list(recipients.values()),
-                event_type=event_type,
+                event_type=normalized_event_type,
                 title=title,
                 message=message,
                 source_module=source_module,
@@ -198,7 +274,7 @@ class NotificationSenderService:
             logger.info(
                 "[FIX:NOTIFICATIONS] canonical role deliveries created",
                 extra={
-                    "event_type": event_type,
+                    "event_type": normalized_event_type,
                     "source_module": source_module,
                     "roles": roles,
                     "recipient_count": len(recipients),
@@ -229,19 +305,14 @@ class NotificationSenderService:
         actor_user: User | None = None,
     ) -> bool:
         """Typed producer helper for canonical lab family events."""
-        allowed_types = {
-            "lab_results",
-            "lab_critical_result",
-            "lab_new_study",
-            "lab_critical_finding",
-            "lab_result_sent_confirmation",
-            "diagnostics_return_needed",
-        }
-        normalized_type = str(event_type or "").strip().lower()
-        if normalized_type not in allowed_types:
+        normalized_type = _normalize_notification_event_type(event_type)
+        if normalized_type not in LAB_NOTIFICATION_EVENT_TYPES:
             logger.warning(
                 "[FIX:NOTIFICATIONS] unsupported lab event type",
-                extra={"event_type": event_type},
+                extra={
+                    "event_type": event_type,
+                    "normalized_event_type": normalized_type,
+                },
             )
             return False
 
@@ -286,24 +357,14 @@ class NotificationSenderService:
         actor_user: User | None = None,
     ) -> bool:
         """Typed producer helper for registrar/admin canonical events."""
-        allowed_types = {
-            "new_appointment",
-            "price_change",
-            "queue_status_changed",
-            "system_alert",
-            "registrar_system_alert",
-            "security_alert",
-            "billing_alert",
-            "all_free_requested",
-            "all_free_approved",
-            "all_free_rejected",
-            "patient_registered",
-        }
-        normalized_type = str(event_type or "").strip().lower()
-        if normalized_type not in allowed_types:
+        normalized_type = _normalize_notification_event_type(event_type)
+        if normalized_type not in REGISTRAR_NOTIFICATION_EVENT_TYPES:
             logger.warning(
                 "[FIX:NOTIFICATIONS] unsupported registrar event type",
-                extra={"event_type": event_type},
+                extra={
+                    "event_type": event_type,
+                    "normalized_event_type": normalized_type,
+                },
             )
             return False
 
@@ -350,18 +411,14 @@ class NotificationSenderService:
         actor_user: User | None = None,
     ) -> bool:
         """Typed producer helper for queue position family events."""
-        allowed_types = {
-            "queue_call",
-            "queue_position",
-            "queue_reminder",
-            "diagnostics_return_needed",
-            "queue_update",
-        }
-        normalized_type = str(event_type or "").strip().lower()
-        if normalized_type not in allowed_types:
+        normalized_type = _normalize_notification_event_type(event_type)
+        if normalized_type not in QUEUE_NOTIFICATION_EVENT_TYPES:
             logger.warning(
                 "[FIX:NOTIFICATIONS] unsupported queue family event type",
-                extra={"event_type": event_type},
+                extra={
+                    "event_type": event_type,
+                    "normalized_event_type": normalized_type,
+                },
             )
             return False
 
@@ -529,7 +586,10 @@ class NotificationSenderService:
     ) -> bool:
         """Отправка Push-уведомления (Mobile + WebSocket)"""
         try:
-            notification_type = data.get("type", "notification") if data else "notification"
+            notification_type = _normalize_notification_event_type(
+                data.get("type") if data else None,
+                fallback="notification",
+            )
             platform_payload = {
                 "type": notification_type,
                 "title": title,
@@ -1341,13 +1401,28 @@ class NotificationSenderService:
     ) -> NotificationHistory:
         """Отправка уведомления с использованием шаблона"""
 
-        # Получаем шаблон
-        template = crud_notification_template.get_by_type_and_channel(
-            db, type=notification_type, channel=channel
+        raw_notification_type = str(notification_type or "").strip().lower()
+        canonical_notification_type = _normalize_notification_event_type(
+            raw_notification_type,
+            fallback="notification",
         )
+        template_lookup_types = [canonical_notification_type]
+        if raw_notification_type and raw_notification_type != canonical_notification_type:
+            template_lookup_types.append(raw_notification_type)
+
+        # Получаем шаблон
+        template = None
+        for template_type in template_lookup_types:
+            template = crud_notification_template.get_by_type_and_channel(
+                db, type=template_type, channel=channel
+            )
+            if template:
+                break
 
         if not template:
-            logger.warning(f"Шаблон не найден: {notification_type}/{channel}")
+            logger.warning(
+                f"Шаблон не найден: {canonical_notification_type}/{channel}"
+            )
             # Используем базовый шаблон
             subject = template_data.get("subject", "Уведомление")
             content = template_data.get("message", "Сообщение")
@@ -1364,7 +1439,7 @@ class NotificationSenderService:
             recipient_type=recipient_type,
             recipient_id=recipient_id,
             recipient_contact=recipient_contact,
-            notification_type=notification_type,
+            notification_type=canonical_notification_type,
             channel=channel,
             template_id=template.id if template else None,
             subject=subject,
@@ -1391,7 +1466,7 @@ class NotificationSenderService:
             if recipient_user:
                 await platform_service.record_delivery_for_user(
                     user=recipient_user,
-                    event_type=notification_type,
+                    event_type=canonical_notification_type,
                     title=subject or "Уведомление",
                     message=content,
                     source_module="notifications",
@@ -1585,6 +1660,11 @@ class NotificationSenderService:
             logger.warning(f"Пациент не найден: {patient_id}")
             return []
 
+        canonical_notification_type = _normalize_notification_event_type(
+            notification_type,
+            fallback="payment_notification",
+        )
+
         # Данные для шаблона
         template_data = {
             "patient_name": patient.full_name
@@ -1613,7 +1693,7 @@ class NotificationSenderService:
             if contact:
                 history = await self.send_templated_notification(
                     db=db,
-                    notification_type=notification_type,
+                    notification_type=canonical_notification_type,
                     channel=channel,
                     recipient_contact=contact,
                     template_data=template_data,
