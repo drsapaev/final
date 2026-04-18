@@ -106,7 +106,7 @@ class DentalApiService:
             "Изменение цены стоматологом\n\n"
             f"Врач: {doctor_name}\n"
             f"{patient_info}\n"
-            f"Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.repository.db)})\n"
+            f"Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.repository._db)})\n"
             f"Цена: {price_override.original_price} -> {price_override.new_price} UZS\n"
             f"Причина: {price_override.reason}\n"
             f"{details_line}"
@@ -282,7 +282,7 @@ class DentalApiService:
                         "name": service.name if service else f"Услуга #{override.service_id}",
                         "code": (
                             service.service_code
-                            or get_service_code(service.id, self.repository.db)
+                            or get_service_code(service.id, self.repository._db)
                             if service
                             else None
                         ),

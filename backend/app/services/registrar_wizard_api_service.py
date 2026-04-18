@@ -98,7 +98,7 @@ def _check_repeat_visit_eligibility(
     cutoff_date = date.today() - timedelta(days=21)
 
     recent_visits = (
-        _repo(db).query(Visit)
+        self.repository._db.query(Visit)
         .filter(
             Visit.patient_id == patient_id,
             Visit.doctor_id == doctor_id,
@@ -113,7 +113,7 @@ def _check_repeat_visit_eligibility(
 
     # Проверяем, есть ли среди выбранных услуг консультации
     consultation_services = (
-        _repo(db).query(Service)
+        self.repository._db.query(Service)
         .filter(Service.id.in_(service_ids), Service.is_consultation == True)
         .all()
     )
@@ -139,7 +139,7 @@ def _resolve_payment_truth(
             from app.models.payment import Payment
 
             payment_row = (
-                db.query(Payment)
+                self.repository._db.query(Payment)
                 .filter(Payment.visit_id == visit_id)
                 .order_by(Payment.created_at.desc())
                 .first()
@@ -188,10 +188,10 @@ def _create_queue_entries(
 
         # Определяем все уникальные типы очередей для услуг визита
         visit_services = (
-            _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            self.repository._db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
         )
         service_ids = [vs.service_id for vs in visit_services]
-        services = _repo(db).query(Service).filter(Service.id.in_(service_ids)).all()
+        services = self.repository._db.query(Service).filter(Service.id.in_(service_ids)).all()
 
         # Собираем все уникальные queue_tag для создания отдельных очередей
         unique_queue_tags = set()
@@ -214,7 +214,7 @@ def _create_queue_entries(
                     from app.models.user import User
 
                     ecg_resource = (
-                        _repo(db).query(User)
+                        self.repository._db.query(User)
                         .filter(User.username == "ecg_resource", User.is_active == True)
                         .first()
                     )
@@ -231,14 +231,14 @@ def _create_queue_entries(
                     from app.models.user import User
 
                     lab_resource = (
-                        _repo(db).query(User)
+                        self.repository._db.query(User)
                         .filter(User.username == "lab_resource", User.is_active == True)
                         .first()
                     )
                     if lab_resource:
                         # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
                         lab_doctor = (
-                            _repo(db).query(Doctor)
+                            self.repository._db.query(Doctor)
                             .filter(Doctor.user_id == lab_resource.id)
                             .first()
                         )
@@ -331,7 +331,7 @@ def init_invoice_payment(
     try:
         # Получаем invoice
         invoice = (
-            _repo(db).query(PaymentInvoice)
+            self.repository._db.query(PaymentInvoice)
             .filter(PaymentInvoice.id == payment_req.invoice_id)
             .first()
         )
@@ -393,7 +393,7 @@ def init_invoice_payment(
             invoice.provider = payment_req.provider
             invoice.status = "processing"
             invoice.provider_data = result.provider_data
-            _repo(db).commit()
+            self.repository._db.commit()
 
             return InvoicePaymentResponse(
                 success=True,
@@ -424,7 +424,7 @@ def check_invoice_status(
     """
     try:
         invoice = (
-            _repo(db).query(PaymentInvoice).filter(PaymentInvoice.id == invoice_id).first()
+            self.repository._db.query(PaymentInvoice).filter(PaymentInvoice.id == invoice_id).first()
         )
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice не найден")
@@ -483,21 +483,21 @@ def check_invoice_status(
 
                         # Помечаем все визиты как оплаченные и создаем платежи
                         invoice_visits = (
-                            _repo(db).query(PaymentInvoiceVisit)
+                            self.repository._db.query(PaymentInvoiceVisit)
                             .filter(PaymentInvoiceVisit.invoice_id == invoice.id)
                             .all()
                         )
 
                         for iv in invoice_visits:
                             visit = (
-                                _repo(db).query(Visit).filter(Visit.id == iv.visit_id).first()
+                                self.repository._db.query(Visit).filter(Visit.id == iv.visit_id).first()
                             )
                             if visit:
                                 # Проверяем, не создан ли уже платеж
                                 from app.models.payment import Payment
 
                                 existing_payment = (
-                                    _repo(db).query(Payment)
+                                    self.repository._db.query(Payment)
                                     .filter(
                                         Payment.visit_id == visit.id,
                                         Payment.status == "paid",
@@ -524,10 +524,10 @@ def check_invoice_status(
 
                                 visit.status = "confirmed"  # Оплачено и подтверждено
 
-                        _repo(db).commit()
+                        self.repository._db.commit()
                     elif result.status in ["failed", "cancelled"]:
                         invoice.status = result.status
-                        _repo(db).commit()
+                        self.repository._db.commit()
 
         return {
             "invoice_id": invoice.id,
@@ -632,7 +632,7 @@ def create_cart_appointments(
             services_data = []
             for service_item in visit_req.services:
                 service = (
-                    _repo(db).query(Service)
+                    self.repository._db.query(Service)
                     .filter(Service.id == service_item.service_id)
                     .first()
                 )
@@ -709,8 +709,8 @@ def create_cart_appointments(
             payment_method=cart_data.payment_method,
             notes=cart_data.notes,
         )
-        _repo(db).add(invoice)
-        _repo(db).flush()  # Получаем ID invoice
+        self.repository._db.add(invoice)
+        self.repository._db.flush()  # Получаем ID invoice
         logger.info("REGISTRATION: Инвойс %d создан", invoice.id)
 
         # Связываем визиты с invoice
@@ -727,7 +727,7 @@ def create_cart_appointments(
             invoice_visit = PaymentInvoiceVisit(
                 invoice_id=invoice.id, visit_id=visit.id, visit_amount=visit_amount
             )
-            _repo(db).add(invoice_visit)
+            self.repository._db.add(invoice_visit)
 
         # Создаём записи в очереди для подтвержденных визитов на сегодня
         # В новом режиме визиты создаются сразу подтвержденными (регистратор)
@@ -773,7 +773,7 @@ def create_cart_appointments(
                     # Не прерываем создание визита из-за ошибки очередей
                     continue
 
-        _repo(db).commit()
+        self.repository._db.commit()
         logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
 
         # Формируем талоны для визитов с присвоенными номерами очередей
@@ -786,7 +786,7 @@ def create_cart_appointments(
             for visit in created_visits:
                 # Получаем данные пациента
                 patient = (
-                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
+                    self.repository._db.query(Patient).filter(Patient.id == visit.patient_id).first()
                 )
                 patient_name = (
                     patient.short_name() if patient else "Неизвестный пациент"
@@ -794,13 +794,13 @@ def create_cart_appointments(
 
                 # Получаем данные врача
                 doctor = (
-                    _repo(db).query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                    self.repository._db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
                     if visit.doctor_id
                     else None
                 )
                 # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
                 if doctor and doctor.user_id:
-                    user = _repo(db).query(User).filter(User.id == doctor.user_id).first()
+                    user = self.repository._db.query(User).filter(User.id == doctor.user_id).first()
                     doctor_name = (
                         (user.full_name or user.username) if user else "Без врача"
                     )
@@ -809,7 +809,7 @@ def create_cart_appointments(
 
                 # Получаем услуги визита
                 visit_services = (
-                    _repo(db).query(VisitService)
+                    self.repository._db.query(VisitService)
                     .filter(VisitService.visit_id == visit.id)
                     .all()
                 )
@@ -883,7 +883,7 @@ def create_cart_appointments(
         logger.error("REGISTRATION: Ошибка создания корзины: %s", str(e), exc_info=True)
         import traceback
 
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания корзины: {str(e)}\nTRACE: {traceback.format_exc()}",
@@ -930,7 +930,7 @@ def get_pending_price_overrides(
     Получить список изменений цен для одобрения регистратурой
     """
     try:
-        query = _repo(db).query(DoctorPriceOverride).join(Service).join(Doctor)
+        query = self.repository._db.query(DoctorPriceOverride).join(Service).join(Doctor)
 
         if status_filter != "all":
             query = query.filter(DoctorPriceOverride.status == status_filter)
@@ -942,7 +942,7 @@ def get_pending_price_overrides(
         result = []
         for override in overrides:
             # Получаем данные визита и пациента
-            visit = _repo(db).query(Visit).filter(Visit.id == override.visit_id).first()
+            visit = self.repository._db.query(Visit).filter(Visit.id == override.visit_id).first()
             patient_name = None
             if visit:
                 # Здесь нужно получить имя пациента из модели Patient
@@ -990,7 +990,7 @@ def approve_price_override(
     try:
         # Получаем изменение цены
         override = (
-            _repo(db).query(DoctorPriceOverride)
+            self.repository._db.query(DoctorPriceOverride)
             .filter(DoctorPriceOverride.id == approval_data.override_id)
             .first()
         )
@@ -1014,7 +1014,7 @@ def approve_price_override(
             override.approved_at = datetime.utcnow()
 
             # Обновляем цену в визите
-            visit = _repo(db).query(Visit).filter(Visit.id == override.visit_id).first()
+            visit = self.repository._db.query(Visit).filter(Visit.id == override.visit_id).first()
             if visit:
                 # Обновляем doctor_price_override в JSON поле
                 if not visit.doctor_price_override:
@@ -1037,8 +1037,8 @@ def approve_price_override(
 
             message = "Изменение цены отклонено"
 
-        _repo(db).commit()
-        _repo(db).refresh(override)
+        self.repository._db.commit()
+        self.repository._db.refresh(override)
 
         return {
             "success": True,
@@ -1050,7 +1050,7 @@ def approve_price_override(
     except HTTPException:
         raise
     except Exception as e:
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обработки изменения цены: {str(e)}",
@@ -1097,7 +1097,7 @@ def get_all_free_requests(
     Получить список заявок All Free для одобрения администратором
     """
     try:
-        query = _repo(db).query(Visit).filter(Visit.discount_mode == "all_free")
+        query = self.repository._db.query(Visit).filter(Visit.discount_mode == "all_free")
 
         if status_filter != "all":
             query = query.filter(Visit.approval_status == status_filter)
@@ -1108,13 +1108,13 @@ def get_all_free_requests(
         for visit in visits:
             # Получаем услуги визита
             visit_services = (
-                _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                self.repository._db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
             )
             service_names = []
             total_original_amount = Decimal('0')
 
             for vs in visit_services:
-                service = _repo(db).query(Service).filter(Service.id == vs.service_id).first()
+                service = self.repository._db.query(Service).filter(Service.id == vs.service_id).first()
                 if service:
                     service_names.append(service.name)
                     total_original_amount += (service.price or Decimal('0')) * vs.qty
@@ -1125,14 +1125,14 @@ def get_all_free_requests(
             if visit.doctor_id:
                 try:
                     doctor = (
-                        _repo(db).query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                        self.repository._db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
                     )
                     if doctor:
                         # Получаем имя врача из связанного пользователя
                         # [OK] ИСПРАВЛЕНО: Используем явный запрос вместо relationship, чтобы избежать ошибок
                         if doctor.user_id:
                             user = (
-                                _repo(db).query(User).filter(User.id == doctor.user_id).first()
+                                self.repository._db.query(User).filter(User.id == doctor.user_id).first()
                             )
                             if user:
                                 # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
@@ -1161,7 +1161,7 @@ def get_all_free_requests(
             patient_phone = None
             if visit.patient_id:
                 patient = (
-                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
+                    self.repository._db.query(Patient).filter(Patient.id == visit.patient_id).first()
                 )
                 if patient:
                     # Формируем ФИО пациента
@@ -1219,7 +1219,7 @@ def approve_all_free_request(
     """
     try:
         # Получаем визит
-        visit = _repo(db).query(Visit).filter(Visit.id == approval_data.visit_id).first()
+        visit = self.repository._db.query(Visit).filter(Visit.id == approval_data.visit_id).first()
 
         if not visit:
             raise HTTPException(
@@ -1252,8 +1252,8 @@ def approve_all_free_request(
 
             message = "Заявка All Free отклонена"
 
-        _repo(db).commit()
-        _repo(db).refresh(visit)
+        self.repository._db.commit()
+        self.repository._db.refresh(visit)
 
         return {
             "success": True,
@@ -1265,7 +1265,7 @@ def approve_all_free_request(
     except HTTPException:
         raise
     except Exception as e:
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обработки заявки All Free: {str(e)}",
@@ -1309,7 +1309,7 @@ def get_benefit_settings(
 
         # Окно повторного визита (дни)
         repeat_days_setting = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(ClinicSettings.key == "repeat_visit_days")
             .first()
         )
@@ -1319,7 +1319,7 @@ def get_benefit_settings(
 
         # Скидка на повторный визит (%)
         repeat_discount_setting = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(ClinicSettings.key == "repeat_visit_discount")
             .first()
         )
@@ -1329,7 +1329,7 @@ def get_benefit_settings(
 
         # Льготные консультации бесплатны
         benefit_free_setting = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(ClinicSettings.key == "benefit_consultation_free")
             .first()
         )
@@ -1339,7 +1339,7 @@ def get_benefit_settings(
 
         # Автоодобрение All Free заявок
         auto_approve_setting = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(ClinicSettings.key == "all_free_auto_approve")
             .first()
         )
@@ -1349,7 +1349,7 @@ def get_benefit_settings(
 
         # Время последнего обновления
         latest_update = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(
                 ClinicSettings.key.in_(
                     [
@@ -1418,7 +1418,7 @@ def update_benefit_settings(
         # Обновляем каждую настройку
         for setting_data in settings_to_update:
             setting = (
-                _repo(db).query(ClinicSettings)
+                self.repository._db.query(ClinicSettings)
                 .filter(ClinicSettings.key == setting_data["key"])
                 .first()
             )
@@ -1437,9 +1437,9 @@ def update_benefit_settings(
                     description=setting_data["description"],
                     updated_by=current_user.id,
                 )
-                _repo(db).add(setting)
+                self.repository._db.add(setting)
 
-        _repo(db).commit()
+        self.repository._db.commit()
 
         return {
             "success": True,
@@ -1453,7 +1453,7 @@ def update_benefit_settings(
         }
 
     except Exception as e:
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления настроек льгот: {str(e)}",
@@ -1483,7 +1483,7 @@ def get_wizard_settings(
     try:
         # Получаем настройку использования нового мастера
         use_new_wizard_setting = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(ClinicSettings.key == "wizard_use_new_version")
             .first()
         )
@@ -1521,7 +1521,7 @@ def update_wizard_settings(
     try:
         # Обновляем или создаем настройку
         use_new_wizard_setting = (
-            _repo(db).query(ClinicSettings)
+            self.repository._db.query(ClinicSettings)
             .filter(ClinicSettings.key == "wizard_use_new_version")
             .first()
         )
@@ -1532,7 +1532,7 @@ def update_wizard_settings(
                 category="wizard",
                 description="Использовать новый мастер регистрации вместо старого",
             )
-            _repo(db).add(use_new_wizard_setting)
+            self.repository._db.add(use_new_wizard_setting)
 
         use_new_wizard_setting.value = {
             "enabled": settings_data.use_new_wizard,
@@ -1541,8 +1541,8 @@ def update_wizard_settings(
         use_new_wizard_setting.updated_by = current_user.id
         use_new_wizard_setting.updated_at = datetime.utcnow()
 
-        _repo(db).commit()
-        _repo(db).refresh(use_new_wizard_setting)
+        self.repository._db.commit()
+        self.repository._db.refresh(use_new_wizard_setting)
 
         settings_response = WizardSettingsResponse(
             use_new_wizard=settings_data.use_new_wizard,
@@ -1609,7 +1609,7 @@ def get_visits(
 
         # 1. ПОЛУЧАЕМ ЗАПИСИ ИЗ СТАРОЙ ТАБЛИЦЫ APPOINTMENTS
         try:
-            appointments_query = _repo(db).query(Appointment)
+            appointments_query = self.repository._db.query(Appointment)
 
             # Фильтры для appointments
             if patient_id:
@@ -1646,7 +1646,7 @@ def get_visits(
                 try:
                     if appointment.patient_id:
                         patient = (
-                            _repo(db).query(Patient)
+                            self.repository._db.query(Patient)
                             .filter(Patient.id == appointment.patient_id)
                             .first()
                         )
@@ -1681,7 +1681,7 @@ def get_visits(
             logger.error("Error processing appointments: %s", e, exc_info=True)
 
         # 2. ПОЛУЧАЕМ ЗАПИСИ ИЗ НОВОЙ ТАБЛИЦЫ VISITS
-        visits_query = _repo(db).query(Visit)
+        visits_query = self.repository._db.query(Visit)
 
         # Фильтры для visits
         if patient_id:
@@ -1709,7 +1709,7 @@ def get_visits(
         for visit in visits:
             # Получаем услуги визита
             visit_services = (
-                _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                self.repository._db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
             )
             service_names = []
             for vs in visit_services:
@@ -1717,7 +1717,7 @@ def get_visits(
                     service_names.append(vs.name)
                 else:  # Fallback - ищем в таблице services
                     service = (
-                        _repo(db).query(Service).filter(Service.id == vs.service_id).first()
+                        self.repository._db.query(Service).filter(Service.id == vs.service_id).first()
                     )
                     if service:
                         service_names.append(service.name)
@@ -1726,11 +1726,11 @@ def get_visits(
             doctor_name = None
             doctor_specialty = None
             if visit.doctor_id:
-                doctor = _repo(db).query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                doctor = self.repository._db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
                 if doctor:
                     # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
                     if doctor.user_id:
-                        user = _repo(db).query(User).filter(User.id == doctor.user_id).first()
+                        user = self.repository._db.query(User).filter(User.id == doctor.user_id).first()
                         doctor_name = (
                             (user.full_name or user.username)
                             if user
@@ -1745,7 +1745,7 @@ def get_visits(
             patient_phone = None
             if visit.patient_id:
                 patient = (
-                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
+                    self.repository._db.query(Patient).filter(Patient.id == visit.patient_id).first()
                 )
                 if patient:
                     patient_fio = patient.short_name()
@@ -1824,7 +1824,7 @@ def get_all_appointments(
         result = []
 
         # 1. Получаем старые appointments с фильтрацией
-        appointments_query = _repo(db).query(Appointment)
+        appointments_query = self.repository._db.query(Appointment)
 
         # Применяем фильтры по дате
         if date_from:
@@ -1870,7 +1870,7 @@ def get_all_appointments(
             # Получаем имя пациента
             patient_fio = None
             if apt.patient_id:
-                patient = _repo(db).query(Patient).filter(Patient.id == apt.patient_id).first()
+                patient = self.repository._db.query(Patient).filter(Patient.id == apt.patient_id).first()
                 if patient:
                     patient_fio = patient.short_name()
 
@@ -1886,7 +1886,7 @@ def get_all_appointments(
                     try:
                         service_id_int = int(service_id)
                         service = (
-                            _repo(db).query(Service)
+                            self.repository._db.query(Service)
                             .filter(Service.id == service_id_int)
                             .first()
                         )
@@ -1914,7 +1914,7 @@ def get_all_appointments(
                 from sqlalchemy import and_
 
                 related_visit = (
-                    _repo(db).query(Visit)
+                    self.repository._db.query(Visit)
                     .filter(
                         and_(
                             Visit.patient_id == apt.patient_id,
@@ -1962,7 +1962,7 @@ def get_all_appointments(
             )
 
         # 2. Получаем новые visits с фильтрацией
-        visits_query = _repo(db).query(Visit)
+        visits_query = self.repository._db.query(Visit)
 
         # Применяем фильтры по дате
         if date_from:
@@ -2001,7 +2001,7 @@ def get_all_appointments(
             patient_fio = None
             if visit.patient_id:
                 patient = (
-                    _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
+                    self.repository._db.query(Patient).filter(Patient.id == visit.patient_id).first()
                 )
                 if patient:
                     patient_fio = patient.short_name()
@@ -2011,7 +2011,7 @@ def get_all_appointments(
             from app.models.visit import VisitService
 
             visit_services = (
-                _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                self.repository._db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
             )
             service_names = []
             service_codes = []
@@ -2023,7 +2023,7 @@ def get_all_appointments(
                     service_price = float(vs.price)
                 elif vs.service_id:  # Fallback - ищем цену в таблице services
                     service = (
-                        _repo(db).query(Service).filter(Service.id == vs.service_id).first()
+                        self.repository._db.query(Service).filter(Service.id == vs.service_id).first()
                     )
                     if service and service.price:
                         service_price = float(service.price)
@@ -2036,7 +2036,7 @@ def get_all_appointments(
                         service_codes.append(normalize_service_code(vs.code))
                 else:  # Fallback - ищем в таблице services
                     service = (
-                        _repo(db).query(Service).filter(Service.id == vs.service_id).first()
+                        self.repository._db.query(Service).filter(Service.id == vs.service_id).first()
                     )
                     if service:
                         service_names.append(service.name)
@@ -2055,14 +2055,14 @@ def get_all_appointments(
                 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
                 queue_entries = (
-                    _repo(db).query(OnlineQueueEntry)
+                    self.repository._db.query(OnlineQueueEntry)
                     .filter(OnlineQueueEntry.visit_id == visit.id)
                     .all()
                 )
 
                 for entry in queue_entries:
                     queue = (
-                        _repo(db).query(DailyQueue)
+                        self.repository._db.query(DailyQueue)
                         .filter(DailyQueue.id == entry.queue_id)
                         .first()
                     )
@@ -2184,7 +2184,7 @@ def mark_visit_as_paid(
         )
 
         # Находим запись
-        visit = _repo(db).query(Visit).filter(Visit.id == visit_id).first()
+        visit = self.repository._db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
@@ -2194,7 +2194,7 @@ def mark_visit_as_paid(
         from app.models.payment import Payment
 
         existing_payment = (
-            _repo(db).query(Payment)
+            self.repository._db.query(Payment)
             .filter(Payment.visit_id == visit_id, Payment.status == "paid")
             .first()
         )
@@ -2226,7 +2226,7 @@ def mark_visit_as_paid(
             paid_at = datetime.now(UTC)
 
             # Создаем платеж через прямой SQL
-            _repo(db).execute(
+            self.repository._db.execute(
                 text(
                     """
                     INSERT INTO payments
@@ -2245,11 +2245,11 @@ def mark_visit_as_paid(
                     "created_at": paid_at,
                 },
             )
-            _repo(db).commit()
+            self.repository._db.commit()
 
             # Получаем созданный платеж
             payment = (
-                _repo(db).query(Payment)
+                self.repository._db.query(Payment)
                 .filter(Payment.visit_id == visit_id)
                 .order_by(Payment.created_at.desc())
                 .first()
@@ -2270,8 +2270,8 @@ def mark_visit_as_paid(
             )
 
         visit.status = _preserve_operational_status_on_payment(visit.status)
-        _repo(db).commit()
-        _repo(db).refresh(visit)
+        self.repository._db.commit()
+        self.repository._db.refresh(visit)
 
         return {
             "id": visit.id,
@@ -2294,7 +2294,7 @@ def mark_visit_as_paid(
         raise
     except Exception as e:
         logger.error("mark_visit_as_paid: Error: %s", str(e), exc_info=True)
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления записи: {str(e)}",
@@ -2332,7 +2332,7 @@ def mark_queue_entry_as_paid(
         )
 
         # Находим запись в очереди
-        entry = _repo(db).query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        entry = self.repository._db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         if not entry:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -2344,7 +2344,7 @@ def mark_queue_entry_as_paid(
 
         # 1. Через visit_id
         if entry.visit_id:
-            visit = _repo(db).query(Visit).filter(Visit.id == entry.visit_id).first()
+            visit = self.repository._db.query(Visit).filter(Visit.id == entry.visit_id).first()
             logger.info(f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id")
 
         # 2. Если visit_id нет, ищем по patient_id и дате
@@ -2352,7 +2352,7 @@ def mark_queue_entry_as_paid(
             from datetime import date
             today = date.today()
             visit = (
-                _repo(db).query(Visit)
+                self.repository._db.query(Visit)
                 .filter(
                     Visit.patient_id == entry.patient_id,
                     Visit.visit_date == today,
@@ -2377,8 +2377,8 @@ def mark_queue_entry_as_paid(
             )
             entry.status = _preserve_operational_status_on_payment(entry.status)
             entry.discount_mode = "paid"
-            _repo(db).commit()
-            _repo(db).refresh(entry)
+            self.repository._db.commit()
+            self.repository._db.refresh(entry)
 
             return {
                 "id": entry.id,
@@ -2392,7 +2392,7 @@ def mark_queue_entry_as_paid(
         from app.models.payment import Payment
 
         existing_payment = (
-            _repo(db).query(Payment)
+            self.repository._db.query(Payment)
             .filter(Payment.visit_id == visit.id, Payment.status == "paid")
             .first()
         )
@@ -2413,7 +2413,7 @@ def mark_queue_entry_as_paid(
             note = f"Оплата визита {visit.id} через запись очереди {entry_id}"
             paid_at = datetime.now(UTC)
 
-            _repo(db).execute(
+            self.repository._db.execute(
                 text(
                     """
                     INSERT INTO payments
@@ -2432,10 +2432,10 @@ def mark_queue_entry_as_paid(
                     "created_at": paid_at,
                 },
             )
-            _repo(db).commit()
+            self.repository._db.commit()
 
             payment = (
-                _repo(db).query(Payment)
+                self.repository._db.query(Payment)
                 .filter(Payment.visit_id == visit.id)
                 .order_by(Payment.created_at.desc())
                 .first()
@@ -2459,9 +2459,9 @@ def mark_queue_entry_as_paid(
         visit.status = _preserve_operational_status_on_payment(visit.status)
         entry.status = _preserve_operational_status_on_payment(entry.status)
 
-        _repo(db).commit()
-        _repo(db).refresh(visit)
-        _repo(db).refresh(entry)
+        self.repository._db.commit()
+        self.repository._db.refresh(visit)
+        self.repository._db.refresh(entry)
 
         return {
             "id": entry.id,
@@ -2485,7 +2485,7 @@ def mark_queue_entry_as_paid(
         raise
     except Exception as e:
         logger.error("mark_queue_entry_as_paid: Error: %s", str(e), exc_info=True)
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления записи: {str(e)}",
@@ -2503,15 +2503,15 @@ def complete_visit(
     try:
         from app.models.visit import Visit
 
-        visit = _repo(db).query(Visit).filter(Visit.id == visit_id).first()
+        visit = self.repository._db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
 
         visit.status = "completed"
-        _repo(db).commit()
-        _repo(db).refresh(visit)
+        self.repository._db.commit()
+        self.repository._db.refresh(visit)
 
         return {"id": visit.id, "status": visit.status, "message": "Запись завершена"}
 
@@ -2534,15 +2534,15 @@ def start_visit(
     try:
         from app.models.visit import Visit
 
-        visit = _repo(db).query(Visit).filter(Visit.id == visit_id).first()
+        visit = self.repository._db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
 
         visit.status = "in_progress"
-        _repo(db).commit()
-        _repo(db).refresh(visit)
+        self.repository._db.commit()
+        self.repository._db.refresh(visit)
 
         return {"id": visit.id, "status": visit.status, "message": "Прием начат"}
 
@@ -2593,7 +2593,7 @@ def confirm_visit_by_registrar(
     """
     try:
         # Находим визит
-        visit = _repo(db).query(Visit).filter(Visit.id == visit_id).first()
+        visit = self.repository._db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
@@ -2631,8 +2631,8 @@ def confirm_visit_by_registrar(
             )
             visit.status = "open"  # Готов к приему
 
-        _repo(db).commit()
-        _repo(db).refresh(visit)
+        self.repository._db.commit()
+        self.repository._db.refresh(visit)
 
         return ConfirmVisitResponse(
             success=True,
@@ -2646,7 +2646,7 @@ def confirm_visit_by_registrar(
     except HTTPException:
         raise
     except Exception as e:
-        _repo(db).rollback()
+        self.repository._db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка подтверждения визита: {str(e)}",
@@ -2664,13 +2664,13 @@ def _assign_queue_numbers_on_confirmation(
 
     # Получаем услуги визита
     visit_services = (
-        _repo(db).query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        self.repository._db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
     )
 
     # Определяем уникальные queue_tag из услуг
     unique_queue_tags = set()
     for vs in visit_services:
-        service = _repo(db).query(Service).filter(Service.id == vs.service_id).first()
+        service = self.repository._db.query(Service).filter(Service.id == vs.service_id).first()
         if service and service.queue_tag:
             unique_queue_tags.add(service.queue_tag)
 
@@ -2704,7 +2704,7 @@ def _assign_queue_numbers_on_confirmation(
         # Для очередей без конкретного врача используем ресурс-врачей
         if queue_tag == "ecg" and not doctor_id:
             ecg_resource = (
-                _repo(db).query(User)
+                self.repository._db.query(User)
                 .filter(User.username == "ecg_resource", User.is_active == True)
                 .first()
             )
@@ -2715,14 +2715,14 @@ def _assign_queue_numbers_on_confirmation(
 
         elif queue_tag == "lab" and not doctor_id:
             lab_resource = (
-                _repo(db).query(User)
+                self.repository._db.query(User)
                 .filter(User.username == "lab_resource", User.is_active == True)
                 .first()
             )
             if lab_resource:
                 # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
                 lab_doctor = (
-                    _repo(db).query(Doctor).filter(Doctor.user_id == lab_resource.id).first()
+                    self.repository._db.query(Doctor).filter(Doctor.user_id == lab_resource.id).first()
                 )
                 if lab_doctor:
                     doctor_id = lab_doctor.id  # Используем doctor_id, а не user_id
@@ -2777,7 +2777,7 @@ def _assign_queue_numbers_on_confirmation(
             queue_time=queue_time,  # Устанавливаем время регистрации
             session_id=session_id,  # ⭐ NEW: Session grouping
         )
-        _repo(db).add(queue_entry)
+        self.repository._db.add(queue_entry)
 
         queue_numbers[queue_tag] = {
             "queue_tag": queue_tag,
@@ -2797,16 +2797,16 @@ def _assign_queue_numbers_on_confirmation(
         }
 
         doctor = (
-            _repo(db).query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+            self.repository._db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
             if visit.doctor_id
             else None
         )
-        patient = _repo(db).query(Patient).filter(Patient.id == visit.patient_id).first()
+        patient = self.repository._db.query(Patient).filter(Patient.id == visit.patient_id).first()
 
         # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
         doctor_name = "Без врача"
         if doctor and doctor.user_id:
-            user = _repo(db).query(User).filter(User.id == doctor.user_id).first()
+            user = self.repository._db.query(User).filter(User.id == doctor.user_id).first()
             doctor_name = (user.full_name or user.username) if user else "Без врача"
 
         print_tickets.append(
