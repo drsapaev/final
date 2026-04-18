@@ -2898,3 +2898,42 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - For test-first requests, retrieval should rank matching test ownership higher so gate first-touch aligns with explicit validation-oriented user intent.
+
+## Task 82 - Backend notification sender alias normalization
+
+### User task
+Продолжить notification catalog parity slice в backend notification sender service.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/app/services/notifications.py
+
+### What handoff solved well
+- It kept the change anchored to a single service file and avoided expanding into frontend or policy files.
+- It surfaced the correct first-touch file for the canonical sender path before any edits.
+
+### Missing relationship mapping
+- The handoff did not enumerate every internal sender call site that needed normalization.
+- Manual inspection was still required to connect templated sends, push payloads, lab/registrar/queue helpers, and payment notifications to the canonical alias map.
+
+### Manual reconstruction needed
+- Added module-level canonical event alias normalization in `backend/app/services/notifications.py`.
+- Normalized event types through canonical send helpers, templated notifications, push payloads, and domain-specific helpers.
+- Stored canonical notification types in history and delivery records for consistency with backend/frontend contract behavior.
+- Validated the slice with targeted pytest runs on notification platform, endpoint inventory, queue, and lab catalog tests.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval would have reduced manual tracing across nested sender helpers and made the canonical alias normalization path easier to reconstruct end-to-end.
