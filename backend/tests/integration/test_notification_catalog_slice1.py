@@ -76,12 +76,107 @@ def _ensure_notification_policy_settings(
     db_session.commit()
 
 
+def _ensure_user_profile(db_session, *, user: User) -> UserProfile:
+    profile = (
+        db_session.query(UserProfile)
+        .filter(UserProfile.user_id == user.id)
+        .first()
+    )
+    if profile is None:
+        profile = UserProfile(user_id=user.id)
+        db_session.add(profile)
+        db_session.commit()
+        db_session.refresh(profile)
+    return profile
+
+
+def _request_policy_endpoint(
+    client,
+    *,
+    method: str,
+    user_id: int,
+    headers: dict[str, str],
+):
+    path = f"/api/v1/notifications/settings/{user_id}/policy"
+    if method == "GET":
+        return client.get(path, headers=headers)
+    if method == "PUT":
+        return client.put(path, headers=headers, json={"channel_controls": {"enabled": True}})
+    raise ValueError(f"Unsupported method: {method}")
+
+
 class _FakeNotificationWsManager:
     def __init__(self) -> None:
         self.sent: list[dict] = []
 
     async def send_json(self, payload, user_id):  # type: ignore[no-untyped-def]
         self.sent.append({"user_id": user_id, "payload": payload})
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+def test_notification_policy_endpoint_allows_self_access(
+    client,
+    db_session,
+    registrar_auth_headers,
+    registrar_user,
+    method,
+):
+    _ensure_user_profile(db_session, user=registrar_user)
+
+    response = _request_policy_endpoint(
+        client,
+        method=method,
+        user_id=registrar_user.id,
+        headers=registrar_auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_id"] == registrar_user.id
+    assert isinstance(payload.get("policy"), dict)
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+def test_notification_policy_endpoint_allows_admin_access_to_another_user(
+    client,
+    db_session,
+    auth_headers,
+    admin_user,
+    registrar_user,
+    method,
+):
+    _ = admin_user
+    _ensure_user_profile(db_session, user=registrar_user)
+
+    response = _request_policy_endpoint(
+        client,
+        method=method,
+        user_id=registrar_user.id,
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_id"] == registrar_user.id
+    assert isinstance(payload.get("policy"), dict)
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+def test_notification_policy_endpoint_forbids_non_admin_access_to_other_user(
+    client,
+    cardio_auth_headers,
+    registrar_user,
+    method,
+):
+    response = _request_policy_endpoint(
+        client,
+        method=method,
+        user_id=registrar_user.id,
+        headers=cardio_auth_headers,
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == "Нет прав доступа"
 
 
 def test_registrar_cart_creates_all_free_request_notification(

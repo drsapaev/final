@@ -5,6 +5,7 @@ import {
   Clock3,
   Mail,
   MessageSquareText,
+  Moon,
   RefreshCw,
   RotateCcw,
   Save,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { api, me } from '../../api/client';
+import { notificationsService } from '../../api/services';
 import {
   Alert,
   Card,
@@ -143,6 +145,212 @@ const generalFields = [
   },
 ];
 
+const policyFamilyFields = [
+  {
+    key: 'queue',
+    label: 'Очередь',
+    hint: 'Обновления позиции, вызовы и напоминания очереди.',
+  },
+  {
+    key: 'lab',
+    label: 'Лаборатория',
+    hint: 'Готовность анализов, критические и подтверждающие уведомления.',
+  },
+  {
+    key: 'all_free',
+    label: 'All Free',
+    hint: 'Запросы и решения по льготному обслуживанию.',
+  },
+  {
+    key: 'message',
+    label: 'Сообщения',
+    hint: 'Сигналы по новым сообщениям между пользователями.',
+  },
+  {
+    key: 'system',
+    label: 'Системные',
+    hint: 'Административные и сервисные уведомления платформы.',
+  },
+];
+
+const policyEventFields = [
+  {
+    key: 'lab_critical_result',
+    label: 'Критический результат лаборатории',
+    hint: 'Повышенный приоритет для критичных медицинских результатов.',
+  },
+  {
+    key: 'security_alert',
+    label: 'Security alert',
+    hint: 'События безопасности аккаунта и доступа.',
+  },
+  {
+    key: 'billing_alert',
+    label: 'Billing alert',
+    hint: 'Ошибки и критичные события биллинга/оплаты.',
+  },
+];
+
+const defaultPolicyFamilies = policyFamilyFields.reduce((acc, item) => {
+  acc[item.key] = { desktop: true };
+  return acc;
+}, {});
+
+const defaultPolicyEvents = policyEventFields.reduce((acc, item) => {
+  acc[item.key] = { desktop: true };
+  return acc;
+}, {});
+
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function toDateTimeLocalValue(value) {
+  if (!value) {
+    return '';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
+
+function normalizePolicyControl(control, fallback = true) {
+  if (typeof control === 'boolean') {
+    return { desktop: control };
+  }
+
+  if (!control || typeof control !== 'object') {
+    return { desktop: fallback };
+  }
+
+  if (typeof control.desktop === 'boolean') {
+    return { desktop: control.desktop };
+  }
+
+  if (typeof control.realtime_enabled === 'boolean') {
+    return { desktop: control.realtime_enabled };
+  }
+
+  if (typeof control.enabled === 'boolean') {
+    return { desktop: control.enabled };
+  }
+
+  const channelDesktop = control.channels?.desktop;
+  if (typeof channelDesktop === 'boolean') {
+    return { desktop: channelDesktop };
+  }
+
+  return { desktop: fallback };
+}
+
+function createDefaultPolicyDraft() {
+  return {
+    muted_until: null,
+    snooze_until: null,
+    dnd: {
+      enabled: false,
+      always_on: false,
+      start: '22:00',
+      end: '07:00',
+    },
+    channel_controls: { desktop: true },
+    family_controls: cloneValue(defaultPolicyFamilies),
+    event_controls: cloneValue(defaultPolicyEvents),
+  };
+}
+
+function normalizePolicyDraft(policy) {
+  const next = createDefaultPolicyDraft();
+  if (!policy || typeof policy !== 'object') {
+    return next;
+  }
+
+  if (typeof policy.muted_until === 'string' && policy.muted_until.trim()) {
+    next.muted_until = policy.muted_until;
+  }
+  if (typeof policy.snooze_until === 'string' && policy.snooze_until.trim()) {
+    next.snooze_until = policy.snooze_until;
+  }
+
+  if (policy.dnd && typeof policy.dnd === 'object') {
+    if (typeof policy.dnd.enabled === 'boolean') {
+      next.dnd.enabled = policy.dnd.enabled;
+    }
+    if (typeof policy.dnd.always_on === 'boolean') {
+      next.dnd.always_on = policy.dnd.always_on;
+    }
+    if (typeof policy.dnd.start === 'string' && policy.dnd.start) {
+      next.dnd.start = policy.dnd.start;
+    }
+    if (typeof policy.dnd.end === 'string' && policy.dnd.end) {
+      next.dnd.end = policy.dnd.end;
+    }
+  }
+
+  next.channel_controls = normalizePolicyControl(policy.channel_controls, true);
+
+  const policyFamilyControls = policy.family_controls;
+  if (policyFamilyControls && typeof policyFamilyControls === 'object') {
+    for (const [familyKey, familyControl] of Object.entries(policyFamilyControls)) {
+      if (!Object.prototype.hasOwnProperty.call(defaultPolicyFamilies, familyKey)) {
+        continue;
+      }
+      next.family_controls[familyKey] = normalizePolicyControl(
+        familyControl,
+        next.family_controls[familyKey]?.desktop ?? true
+      );
+    }
+  }
+
+  const policyEventControls = policy.event_controls;
+  if (policyEventControls && typeof policyEventControls === 'object') {
+    for (const [eventKey, eventControl] of Object.entries(policyEventControls)) {
+      if (!Object.prototype.hasOwnProperty.call(defaultPolicyEvents, eventKey)) {
+        continue;
+      }
+      next.event_controls[eventKey] = normalizePolicyControl(
+        eventControl,
+        next.event_controls[eventKey]?.desktop ?? true
+      );
+    }
+  }
+
+  return next;
+}
+
+function buildPolicyPayload(policyDraft) {
+  const normalized = normalizePolicyDraft(policyDraft);
+  return {
+    muted_until: normalized.muted_until,
+    snooze_until: normalized.snooze_until,
+    dnd: {
+      enabled: Boolean(normalized.dnd.enabled),
+      always_on: Boolean(normalized.dnd.always_on),
+      start: normalized.dnd.start || '22:00',
+      end: normalized.dnd.end || '07:00',
+    },
+    channel_controls: {
+      desktop: Boolean(normalized.channel_controls?.desktop ?? true),
+    },
+    family_controls: Object.fromEntries(
+      Object.entries(normalized.family_controls || {}).map(([familyKey, familyControl]) => [
+        familyKey,
+        { desktop: Boolean(familyControl?.desktop ?? true) },
+      ])
+    ),
+    event_controls: Object.fromEntries(
+      Object.entries(normalized.event_controls || {}).map(([eventKey, eventControl]) => [
+        eventKey,
+        { desktop: Boolean(eventControl?.desktop ?? true) },
+      ])
+    ),
+  };
+}
+
 
 const NOTIFICATION_SETTINGS_CACHE_MS = 30_000;
 const notificationSettingsCache = new Map();
@@ -175,6 +383,60 @@ function getFreshNotificationSettings(userId) {
   return cached.data;
 }
 
+function shouldFallbackToDirectApi(error) {
+  return !error?.response;
+}
+
+async function requestNotificationSettings(userId) {
+  try {
+    return await notificationsService.getSettings(userId);
+  } catch (error) {
+    if (!shouldFallbackToDirectApi(error)) {
+      throw error;
+    }
+    const response = await api.get(`/notifications/settings/${userId}`);
+    return response.data;
+  }
+}
+
+async function persistNotificationSettings(userId, payload) {
+  try {
+    return await notificationsService.updateSettings(userId, payload);
+  } catch (error) {
+    if (!shouldFallbackToDirectApi(error)) {
+      throw error;
+    }
+    const response = await api.put(`/notifications/settings/${userId}`, payload);
+    return response.data;
+  }
+}
+
+async function requestNotificationPolicy(userId) {
+  try {
+    const payload = await notificationsService.getPolicy(userId);
+    return payload?.policy || {};
+  } catch (error) {
+    if (!shouldFallbackToDirectApi(error)) {
+      throw error;
+    }
+    const response = await api.get(`/notifications/settings/${userId}/policy`);
+    return response?.data?.policy || {};
+  }
+}
+
+async function persistNotificationPolicy(userId, payload) {
+  try {
+    const response = await notificationsService.updatePolicy(userId, payload);
+    return response?.policy || payload;
+  } catch (error) {
+    if (!shouldFallbackToDirectApi(error)) {
+      throw error;
+    }
+    const response = await api.put(`/notifications/settings/${userId}/policy`, payload);
+    return response?.data?.policy || payload;
+  }
+}
+
 async function fetchNotificationSettings(userId, { force = false } = {}) {
   if (!force) {
     const cached = getFreshNotificationSettings(userId);
@@ -188,9 +450,8 @@ async function fetchNotificationSettings(userId, { force = false } = {}) {
     return notificationSettingsRequests.get(userId);
   }
 
-  const request = api
-    .get(`/notifications/settings/${userId}`)
-    .then((response) => rememberNotificationSettings(userId, response.data))
+  const request = requestNotificationSettings(userId)
+    .then((response) => rememberNotificationSettings(userId, response))
     .finally(() => {
       notificationSettingsRequests.delete(userId);
     });
@@ -311,22 +572,38 @@ export default function NotificationPreferences() {
   const [userId, setUserId] = useState(null);
   const [settings, setSettings] = useState(null);
   const [draft, setDraft] = useState(null);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyError, setPolicyError] = useState('');
+  const [policyLoaded, setPolicyLoaded] = useState(false);
+  const [policySettings, setPolicySettings] = useState(null);
+  const [policyDraft, setPolicyDraft] = useState(null);
 
   useEffect(() => {
     void loadSettings();
   }, []);
 
-  const hasChanges = Boolean(
+  const hasSettingsChanges = Boolean(
     settings &&
     draft &&
     JSON.stringify(settings) !== JSON.stringify(draft)
   );
+  const hasPolicyChanges = Boolean(
+    policyLoaded &&
+    policySettings &&
+    policyDraft &&
+    JSON.stringify(policySettings) !== JSON.stringify(policyDraft)
+  );
+  const hasChanges = hasSettingsChanges || hasPolicyChanges;
 
   async function loadSettings({ force = false } = {}) {
     try {
       setLoading(true);
       setError('');
       setSuccess('');
+      setPolicyError('');
+      setPolicyLoaded(false);
+      setPolicySettings(null);
+      setPolicyDraft(null);
 
       let resolvedUserId = resolveCurrentUserId();
       if (!resolvedUserId) {
@@ -356,13 +633,60 @@ export default function NotificationPreferences() {
     setSuccess('');
   }
 
+  function updatePolicyDraft(updater) {
+    setPolicyDraft((prev) => {
+      const base = normalizePolicyDraft(prev || policySettings || createDefaultPolicyDraft());
+      return updater(base);
+    });
+    setSuccess('');
+    setPolicyError('');
+  }
+
+  async function loadPolicy({ force = false } = {}) {
+    if (!userId) {
+      return;
+    }
+
+    if (policyLoading) {
+      return;
+    }
+
+    if (!force && policyLoaded && policyDraft) {
+      return;
+    }
+
+    try {
+      setPolicyLoading(true);
+      setPolicyError('');
+
+      const policy = await requestNotificationPolicy(userId);
+      const normalizedPolicy = normalizePolicyDraft(policy || {});
+      setPolicySettings(cloneValue(normalizedPolicy));
+      setPolicyDraft(cloneValue(normalizedPolicy));
+      setPolicyLoaded(true);
+      logger.info('[FIX:PROFILE] Loaded notification runtime policy', { userId });
+    } catch (err) {
+      logger.warn('[FIX:PROFILE] Failed to load notification runtime policy', err);
+      setPolicyError(
+        err?.response?.data?.detail ||
+          'Не удалось загрузить anti-noise policy. Основные настройки продолжают работать.'
+      );
+    } finally {
+      setPolicyLoading(false);
+    }
+  }
+
   function handleReset() {
     if (!settings) {
       return;
     }
     setDraft(getInitialDraft(settings));
+    if (policyLoaded && policySettings) {
+      setPolicyDraft(cloneValue(policySettings));
+    }
     setSuccess('');
     setError('');
+    setPolicyError('');
   }
 
   async function handleSave() {
@@ -370,20 +694,51 @@ export default function NotificationPreferences() {
       return;
     }
 
+    if (!hasChanges) {
+      return;
+    }
+
+    const savedParts = [];
+
     try {
       setSaving(true);
       setError('');
       setSuccess('');
-      const response = await api.put(`/notifications/settings/${userId}`, draft);
-      const nextSettings = rememberNotificationSettings(userId, response?.data || draft);
-      setSettings(nextSettings);
-      setDraft(getInitialDraft(nextSettings));
+      setPolicyError('');
+
+      if (hasSettingsChanges) {
+        const updatedSettings = await persistNotificationSettings(userId, draft);
+        const nextSettings = rememberNotificationSettings(userId, updatedSettings || draft);
+        setSettings(nextSettings);
+        setDraft(getInitialDraft(nextSettings));
+        savedParts.push('каналы и базовые правила');
+      }
+
+      if (policyLoaded && policyDraft && hasPolicyChanges) {
+        const policyPayload = buildPolicyPayload(policyDraft);
+        const updatedPolicy = await persistNotificationPolicy(userId, policyPayload);
+        const nextPolicy = normalizePolicyDraft(updatedPolicy || policyPayload);
+        setPolicySettings(cloneValue(nextPolicy));
+        setPolicyDraft(cloneValue(nextPolicy));
+        savedParts.push('anti-noise policy');
+      }
+
       setLastSavedAt(new Date());
-      setSuccess('Настройки уведомлений сохранены.');
+      setSuccess(
+        savedParts.length > 1
+          ? `Сохранено: ${savedParts.join(' + ')}.`
+          : 'Настройки уведомлений сохранены.'
+      );
       logger.info('[FIX:PROFILE] Saved notification preferences', { userId });
     } catch (err) {
       logger.error('Failed to save settings:', err);
-      setError(err?.response?.data?.detail || 'Не удалось сохранить настройки уведомлений.');
+      if (savedParts.length > 0) {
+        setError(
+          `Часть изменений сохранена (${savedParts.join(' + ')}), но завершить сохранение не удалось.`
+        );
+      } else {
+        setError(err?.response?.data?.detail || 'Не удалось сохранить настройки уведомлений.');
+      }
     } finally {
       setSaving(false);
     }
@@ -576,6 +931,277 @@ export default function NotificationPreferences() {
             label="Уведомления в выходные"
             onChange={(nextValue) => updateDraft('weekend_notifications', nextValue)}
           />
+        </CardContent>
+      </Card>
+
+      <Card shadow="default">
+        <CardHeader style={{ paddingBottom: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 16,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 14,
+                  background: accentGradients.purple,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  flexShrink: 0,
+                  boxShadow: 'var(--mac-shadow-md)',
+                }}
+              >
+                <Moon size={18} />
+              </div>
+              <div>
+                <CardTitle>Anti-noise policy</CardTitle>
+                <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
+                  Runtime-правила для mute/snooze/DND и granular realtime-контроля.
+                </div>
+              </div>
+            </div>
+
+            <MacOSButton
+              variant="outline"
+              onClick={() => loadPolicy({ force: true })}
+              disabled={saving || policyLoading || !userId}
+              startIcon={<RefreshCw size={16} />}
+            >
+              {policyLoading
+                ? 'Загрузка...'
+                : policyLoaded
+                  ? 'Обновить anti-noise policy'
+                  : 'Загрузить anti-noise policy'}
+            </MacOSButton>
+          </div>
+        </CardHeader>
+        <CardContent style={{ display: 'grid', gap: 16 }}>
+          {policyError && <Alert severity="warning">{policyError}</Alert>}
+
+          {!policyLoaded && (
+            <Alert severity="info">
+              Этот блок использует backend runtime policy endpoint и не влияет на базовые channel toggles, пока вы его не загрузите.
+            </Alert>
+          )}
+
+          {policyLoaded && policyDraft && (
+            <>
+              <div
+                className="theme-soft-surface"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr minmax(180px, 240px)',
+                  gap: 16,
+                  alignItems: 'center',
+                  padding: '14px 16px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    Временно отключить realtime до
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                    `muted_until`: полное подавление realtime-сигналов до указанного времени.
+                  </div>
+                </div>
+                <MacOSInput
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(policyDraft.muted_until)}
+                  disabled={saving}
+                  onChange={(event) => {
+                    const rawValue = event.target.value;
+                    updatePolicyDraft((prev) => ({
+                      ...prev,
+                      muted_until: rawValue ? new Date(rawValue).toISOString() : null,
+                    }));
+                  }}
+                />
+              </div>
+
+              <div
+                className="theme-soft-surface"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr minmax(180px, 240px)',
+                  gap: 16,
+                  alignItems: 'center',
+                  padding: '14px 16px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    Snooze realtime до
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                    `snooze_until`: временное подавление без отключения policy.
+                  </div>
+                </div>
+                <MacOSInput
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(policyDraft.snooze_until)}
+                  disabled={saving}
+                  onChange={(event) => {
+                    const rawValue = event.target.value;
+                    updatePolicyDraft((prev) => ({
+                      ...prev,
+                      snooze_until: rawValue ? new Date(rawValue).toISOString() : null,
+                    }));
+                  }}
+                />
+              </div>
+
+              <PreferenceRow
+                checked={Boolean(policyDraft.channel_controls?.desktop ?? true)}
+                description="Глобальный realtime switch для desktop канала."
+                disabled={saving}
+                label="Realtime desktop канал"
+                onChange={(nextValue) =>
+                  updatePolicyDraft((prev) => ({
+                    ...prev,
+                    channel_controls: {
+                      ...(prev.channel_controls || {}),
+                      desktop: nextValue,
+                    },
+                  }))
+                }
+              />
+
+              <PreferenceRow
+                checked={Boolean(policyDraft.dnd?.enabled)}
+                description="Активирует режим Do Not Disturb для desktop realtime."
+                disabled={saving}
+                label="Do Not Disturb"
+                onChange={(nextValue) =>
+                  updatePolicyDraft((prev) => ({
+                    ...prev,
+                    dnd: {
+                      ...(prev.dnd || {}),
+                      enabled: nextValue,
+                    },
+                  }))
+                }
+              />
+
+              <PreferenceRow
+                checked={Boolean(policyDraft.dnd?.always_on)}
+                description="Если включено, DND действует постоянно и игнорирует окно времени."
+                disabled={saving || !policyDraft.dnd?.enabled}
+                label="DND всегда включён"
+                onChange={(nextValue) =>
+                  updatePolicyDraft((prev) => ({
+                    ...prev,
+                    dnd: {
+                      ...(prev.dnd || {}),
+                      always_on: nextValue,
+                    },
+                  }))
+                }
+              />
+
+              <div
+                className="theme-soft-surface"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr minmax(180px, 240px)',
+                  gap: 16,
+                  alignItems: 'center',
+                  padding: '14px 16px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    Окно DND (start/end)
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                    Используется если DND включён и `always_on = false`.
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <MacOSInput
+                    type="time"
+                    value={policyDraft.dnd?.start || '22:00'}
+                    disabled={saving || !policyDraft.dnd?.enabled || policyDraft.dnd?.always_on}
+                    onChange={(event) =>
+                      updatePolicyDraft((prev) => ({
+                        ...prev,
+                        dnd: {
+                          ...(prev.dnd || {}),
+                          start: event.target.value || '22:00',
+                        },
+                      }))
+                    }
+                  />
+                  <MacOSInput
+                    type="time"
+                    value={policyDraft.dnd?.end || '07:00'}
+                    disabled={saving || !policyDraft.dnd?.enabled || policyDraft.dnd?.always_on}
+                    onChange={(event) =>
+                      updatePolicyDraft((prev) => ({
+                        ...prev,
+                        dnd: {
+                          ...(prev.dnd || {}),
+                          end: event.target.value || '07:00',
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {policyFamilyFields.map((family) => (
+                <PreferenceRow
+                  key={family.key}
+                  checked={Boolean(policyDraft.family_controls?.[family.key]?.desktop ?? true)}
+                  description={family.hint}
+                  disabled={saving}
+                  label={`Realtime: ${family.label}`}
+                  onChange={(nextValue) =>
+                    updatePolicyDraft((prev) => ({
+                      ...prev,
+                      family_controls: {
+                        ...(prev.family_controls || {}),
+                        [family.key]: {
+                          ...(prev.family_controls?.[family.key] || {}),
+                          desktop: nextValue,
+                        },
+                      },
+                    }))
+                  }
+                />
+              ))}
+
+              {policyEventFields.map((eventField) => (
+                <PreferenceRow
+                  key={eventField.key}
+                  checked={Boolean(policyDraft.event_controls?.[eventField.key]?.desktop ?? true)}
+                  description={eventField.hint}
+                  disabled={saving}
+                  label={`Realtime: ${eventField.label}`}
+                  onChange={(nextValue) =>
+                    updatePolicyDraft((prev) => ({
+                      ...prev,
+                      event_controls: {
+                        ...(prev.event_controls || {}),
+                        [eventField.key]: {
+                          ...(prev.event_controls?.[eventField.key] || {}),
+                          desktop: nextValue,
+                        },
+                      },
+                    }))
+                  }
+                />
+              ))}
+            </>
+          )}
         </CardContent>
       </Card>
 

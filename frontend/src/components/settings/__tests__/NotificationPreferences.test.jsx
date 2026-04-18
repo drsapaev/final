@@ -4,11 +4,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
-const { apiGet, apiPut, me, getAuthState } = vi.hoisted(() => ({
+const {
+  apiGet,
+  apiPut,
+  me,
+  getAuthState,
+  notificationGetSettings,
+  notificationUpdateSettings,
+  notificationGetPolicy,
+  notificationUpdatePolicy,
+} = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPut: vi.fn(),
   me: vi.fn(),
   getAuthState: vi.fn(),
+  notificationGetSettings: vi.fn(),
+  notificationUpdateSettings: vi.fn(),
+  notificationGetPolicy: vi.fn(),
+  notificationUpdatePolicy: vi.fn(),
 }));
 
 vi.mock('../../../api/client', () => ({
@@ -21,6 +34,15 @@ vi.mock('../../../api/client', () => ({
 
 vi.mock('../../../stores/auth', () => ({
   getState: getAuthState,
+}));
+
+vi.mock('../../../api/services', () => ({
+  notificationsService: {
+    getSettings: notificationGetSettings,
+    updateSettings: notificationUpdateSettings,
+    getPolicy: notificationGetPolicy,
+    updatePolicy: notificationUpdatePolicy,
+  },
 }));
 
 vi.mock('../../../utils/logger', () => ({
@@ -68,11 +90,15 @@ describe('NotificationPreferences', () => {
     me.mockResolvedValue({ id: 20 });
     apiGet.mockResolvedValue({ data: baseSettings });
     apiPut.mockResolvedValue({ data: baseSettings });
+    notificationGetSettings.mockResolvedValue(baseSettings);
+    notificationUpdateSettings.mockResolvedValue(baseSettings);
+    notificationGetPolicy.mockResolvedValue({ policy: {} });
+    notificationUpdatePolicy.mockResolvedValue({ policy: {} });
   });
 
   it('reuses one in-flight settings request across StrictMode remounts', async () => {
     let resolveRequest;
-    apiGet.mockReturnValue(
+    notificationGetSettings.mockReturnValue(
       new Promise((resolve) => {
         resolveRequest = resolve;
       })
@@ -85,21 +111,19 @@ describe('NotificationPreferences', () => {
     );
 
     await waitFor(() => {
-      expect(apiGet).toHaveBeenCalledTimes(1);
-      expect(apiGet).toHaveBeenCalledWith('/notifications/settings/20');
+      expect(notificationGetSettings).toHaveBeenCalledTimes(1);
+      expect(notificationGetSettings).toHaveBeenCalledWith(20);
     });
 
-    resolveRequest({ data: baseSettings });
+    resolveRequest(baseSettings);
 
     expect(await screen.findByText('Каналы уведомлений')).toBeInTheDocument();
   });
 
   it('saves edited notification settings as a batch', async () => {
-    apiPut.mockResolvedValue({
-      data: {
-        ...baseSettings,
-        email_appointment_reminder: false,
-      },
+    notificationUpdateSettings.mockResolvedValue({
+      ...baseSettings,
+      email_appointment_reminder: false,
     });
 
     renderPreferences(<NotificationPreferences />);
@@ -114,8 +138,8 @@ describe('NotificationPreferences', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(apiPut).toHaveBeenCalledWith(
-        '/notifications/settings/20',
+      expect(notificationUpdateSettings).toHaveBeenCalledWith(
+        20,
         expect.objectContaining({
           email_appointment_reminder: false,
         })
