@@ -125,6 +125,26 @@ class NotificationPlatformService:
     LEGACY_EVENT_TYPE_ALIASES = {
         "queue_changed": "queue_update",
         "diagnostics_return": "diagnostics_return_needed",
+        "queue_status": "queue_status_changed",
+        "payment_update": "payment_notification",
+        "payment_success": "payment_notification",
+        "result_ready": "lab_results",
+        "lab_result_ready": "lab_results",
+        "appointment_rescheduled": "schedule_change",
+        "appointment_cancelled": "schedule_change",
+        "all_free_pending": "all_free_requested",
+        "all_free_declined": "all_free_rejected",
+        "allfree_requested": "all_free_requested",
+        "allfree_approved": "all_free_approved",
+        "allfree_rejected": "all_free_rejected",
+        "notification_message_received": "message_received",
+        "lab_critical": "lab_critical_result",
+        "lab_new_assignment": "lab_new_study",
+        "lab_result_sent": "lab_result_sent_confirmation",
+        "registrar_alert": "registrar_system_alert",
+        "security_warning": "security_alert",
+        "billing_warning": "billing_alert",
+        "patient_create": "patient_registered",
     }
 
     EVENT_FAMILY_BY_TYPE = {
