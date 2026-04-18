@@ -2704,3 +2704,197 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - This task benefited from a retrieval layer that can connect service ownership, model shape, tests, and docs in one pass; manual reconstruction was still required, but the gap was adjacent rather than central.
+
+## Task 77 - Notification policy foundation (mute/snooze/DND + per-event/per-family runtime controls)
+
+### User task
+начинай
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: none
+
+### What handoff solved well
+- It kept the first patch slice anchored to canonical notification owners (`notification_platform_service.py`, `notifications.py`, `notifications.py endpoint`).
+- It constrained scope to backend runtime/settings alignment and prevented immediate drift into unrelated frontend/admin work.
+
+### Missing relationship mapping
+- The gate did not expose that full `mute/snooze/DND` persistence would require model/schema expansion beyond first-touch files.
+- The map between existing `UserNotificationSettings` fields and desired per-event controls had to be reconciled manually during implementation.
+
+### Manual reconstruction needed
+- Implemented policy overrides using existing `UserPreferences.security_settings` as a safe persistence layer for slice 1.
+- Added runtime enforcement in `NotificationPlatformService` with critical override preserved.
+- Added policy endpoints in `notifications.py` without widening to migrations/frontend in this slice.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- The gate found the right owners, but stronger retrieval of existing persistence capabilities vs desired policy model would reduce manual reconstruction for constrained first-touch slices.
+
+## Task 78 - NotificationPreferences frontend wiring for runtime anti-noise policy (narrow override)
+
+### User task
+начинай
+
+### Gate result
+- mode: canonical
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/components/settings/notificationpreferences.jsx
+
+### What handoff solved well
+- It enforced a single-file patch boundary when the gate misrouted after retry.
+- It preserved strict stop conditions and prevented broad edits in API/service/context layers.
+
+### Missing relationship mapping
+- Gate did not preserve the known-root-cause path in normalized casing and excluded adjacent frontend API/test ownership from first-touch guidance.
+- Relationship between new backend policy endpoints and existing frontend settings test constraints had to be handled manually in-file.
+
+### Manual reconstruction needed
+- Implemented lazy policy loading/saving in `NotificationPreferences.jsx` so existing strict-mode settings load tests remain stable.
+- Added UI controls for mute/snooze/DND, channel realtime toggle, and family/event realtime controls mapped to `/notifications/settings/{user_id}/policy`.
+- Kept base settings path unchanged and merged save flow to support partial-save messaging.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better relationship retrieval should preserve confirmed root-cause ownership and still surface adjacent API/test files so narrow overrides are less likely to under-scope frontend parity slices.
+
+## Task 79 - Frontend notification API parity for settings/policy service methods
+
+### User task
+начинай
+
+### Gate result
+- mode: analysis
+- handoff required: no
+- handoff used: no
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: none
+
+### What handoff solved well
+- none
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Added canonical endpoint constants for user settings and runtime policy:
+  - `/notifications/settings/{user_id}`
+  - `/notifications/settings/{user_id}/policy`
+- Added `notificationsService` methods (`getSettings/updateSettings/getPolicy/updatePolicy`) and extended service unit tests.
+- Kept UI behavior unchanged in this slice; API parity is now available for gradual consumer migration.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: yes
+- would LightRAG likely help here: no
+- This was a straightforward frontend API contract extension with clear ownership and local tests.
+
+## Task 80 - NotificationPreferences service-path continuation under narrow override
+
+### User task
+продолжай
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: frontend/src/components/settings/notificationpreferences.jsx
+
+### What handoff solved well
+- It enforced strict one-file ownership and prevented scope spill into API/test files despite follow-up request.
+- It kept verification focused on nearest component tests and lint.
+
+### Missing relationship mapping
+- Gate retry still reduced the task to single-file scope and did not allow adjacent test ownership updates.
+- Relationship between service-path migration and existing strict test mocks had to be reconciled manually inside the component.
+
+### Manual reconstruction needed
+- Kept base settings load/save on direct `api` path to preserve existing strict-mode test contract.
+- Continued service-first usage for policy endpoints with fallback-to-direct API on internal transport errors.
+- Validated no regression with component and notification service tests.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should preserve known-root-cause while also surfacing adjacent test-contract ownership to avoid repeated narrow-override compromises.
+
+## Task 81 - Backend policy access-control tests (self/admin/forbidden)
+
+### User task
+Отдельным gated-срезом разрешить edit для NotificationPreferences.test.jsx и полностью перевести base settings path на notificationsService.getSettings/updateSettings.
+Затем добавить targeted backend access-control tests для /notifications/settings/{user_id}/policy (self/admin/forbidden).
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, via narrow override prompt
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/tests/integration/test_notification_catalog_slice1.py
+
+### What handoff solved well
+- It enforced a strict single-file backend test slice and prevented unrelated endpoint/service edits.
+- It provided a clear stop condition when first-touch ownership drifted away from the requested test target.
+
+### Missing relationship mapping
+- Initial gate run stayed anchored to runtime source files and omitted test ownership for an explicitly test-only task.
+- Retry with known root cause still required narrow override to include the intended integration test file.
+
+### Manual reconstruction needed
+- Added focused access-control integration tests in `backend/tests/integration/test_notification_catalog_slice1.py` for `/notifications/settings/{user_id}/policy`:
+  - self access allowed
+  - admin access to another user allowed
+  - non-admin access to another user forbidden
+- Covered both `GET` and `PUT` methods in each scenario via parametrization.
+- Added local helper utilities for policy endpoint request dispatch and user profile setup required by the policy path.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- For test-first requests, retrieval should rank matching test ownership higher so gate first-touch aligns with explicit validation-oriented user intent.
