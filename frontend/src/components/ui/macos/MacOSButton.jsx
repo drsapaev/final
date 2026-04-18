@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 const MacOSButton = ({
   children,
@@ -11,8 +12,18 @@ const MacOSButton = ({
   style = {},
   startIcon, // Destructure to prevent passing to DOM (not implemented yet)
   endIcon,   // Destructure to prevent passing to DOM (not implemented yet)
+  onMouseEnter,
+  onMouseLeave,
+  onMouseDown,
+  onMouseUp,
+  onFocus,
+  onBlur,
   ...props
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+
   // Размеры кнопок
   const sizeStyles = {
     sm: {
@@ -158,44 +169,70 @@ const MacOSButton = ({
     }
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnterEvent = (e) => {
     if (disabled || loading) return;
-    const hoverStyles = variantStyles[variant]['&:hover'];
-    if (hoverStyles) {
-      Object.keys(hoverStyles).forEach(key => {
-        if (key.startsWith('&:')) return;
-        e.target.style[key] = hoverStyles[key];
-      });
-    }
+    setIsHovered(true);
+    if (onMouseEnter) onMouseEnter(e);
   };
 
-  const handleMouseLeave = (e) => {
+  const handleMouseLeaveEvent = (e) => {
     if (disabled || loading) return;
-    const baseVariantStyles = variantStyles[variant];
+    setIsHovered(false);
+    setIsActive(false);
+    if (onMouseLeave) onMouseLeave(e);
+  };
+
+  const handleMouseDownEvent = (e) => {
+    if (disabled || loading) return;
+    setIsActive(true);
+    if (onMouseDown) onMouseDown(e);
+  };
+
+  const handleMouseUpEvent = (e) => {
+    if (disabled || loading) return;
+    setIsActive(false);
+    if (onMouseUp) onMouseUp(e);
+  };
+
+  const handleFocusEvent = (e) => {
+    if (disabled || loading) return;
+    setIsFocused(true);
+    if (onFocus) onFocus(e);
+  };
+
+  const handleBlurEvent = (e) => {
+    if (disabled || loading) return;
+    setIsFocused(false);
+    if (onBlur) onBlur(e);
+  };
+
+  // Compile final dynamic styles based on state
+  const getDynamicStyles = () => {
+    const baseVariantStyles = { ...variantStyles[variant] };
+    const hoverStyles = variantStyles[variant]['&:hover'] || {};
+    const activeStyles = variantStyles[variant]['&:active'] || {};
+
+    // Remove nested pseudo-classes from base output
     Object.keys(baseVariantStyles).forEach(key => {
-      if (key.startsWith('&:')) return;
-      e.target.style[key] = baseVariantStyles[key];
+      if (key.startsWith('&')) {
+        delete baseVariantStyles[key];
+      }
     });
-  };
 
-  const handleMouseDown = (e) => {
-    if (disabled || loading) return;
-    const activeStyles = variantStyles[variant]['&:active'];
-    if (activeStyles) {
-      Object.keys(activeStyles).forEach(key => {
-        if (key.startsWith('&:')) return;
-        e.target.style[key] = activeStyles[key];
-      });
+    let stateStyles = { ...baseVariantStyles };
+
+    if (isActive) {
+      stateStyles = { ...stateStyles, ...activeStyles };
+    } else if (isHovered) {
+      stateStyles = { ...stateStyles, ...hoverStyles };
     }
-  };
 
-  const handleMouseUp = (e) => {
-    if (disabled || loading) return;
-    const baseVariantStyles = variantStyles[variant];
-    Object.keys(baseVariantStyles).forEach(key => {
-      if (key.startsWith('&:')) return;
-      e.target.style[key] = baseVariantStyles[key];
-    });
+    if (isFocused) {
+      stateStyles.outline = '2px solid var(--mac-accent-blue)';
+      stateStyles.outlineOffset = '2px';
+    }
+
+    return stateStyles;
   };
 
   return (
@@ -204,15 +241,19 @@ const MacOSButton = ({
       className={className}
       style={{
         ...baseStyles,
+        ...getDynamicStyles(),
         ...style
       }}
       disabled={disabled || loading}
       onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
+      onMouseEnter={handleMouseEnterEvent}
+      onMouseLeave={handleMouseLeaveEvent}
+      onMouseDown={handleMouseDownEvent}
+      onMouseUp={handleMouseUpEvent}
+      onFocus={handleFocusEvent}
+      onBlur={handleBlurEvent}
       aria-busy={loading}
+      title={props.title || props['aria-label']}
       {...props}
     >
       {loading && (
@@ -254,6 +295,12 @@ MacOSButton.propTypes = {
   style: PropTypes.any,
   type: PropTypes.any,
   variant: PropTypes.any,
+  onMouseEnter: PropTypes.func,
+  onMouseLeave: PropTypes.func,
+  onMouseDown: PropTypes.func,
+  onMouseUp: PropTypes.func,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
 };
 
 export default MacOSButton;
