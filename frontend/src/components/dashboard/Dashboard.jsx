@@ -337,7 +337,7 @@ const Dashboard = ({ user }) => {
                 <Typography variant="h6">
                   Последние уведомления
                 </Typography>
-                <IconButton>
+                <IconButton aria-label="More options" title="More options">
                   <MoreVert />
                 </IconButton>
               </Box>
