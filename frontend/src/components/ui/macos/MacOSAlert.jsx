@@ -193,7 +193,8 @@ const MacOSAlert = ({
           onClick={handleDismiss}
           onMouseEnter={handleDismissMouseEnter}
           onMouseLeave={handleDismissMouseLeave}
-          aria-label="Закрыть уведомление"
+          aria-label="Dismiss alert"
+          title="Dismiss alert"
         >
           <X size={16} />
         </button>

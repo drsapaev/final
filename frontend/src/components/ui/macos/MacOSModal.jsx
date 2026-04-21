@@ -209,7 +209,8 @@ const MacOSModal = ({
                 onClick={handleClose}
                 onMouseEnter={handleCloseMouseEnter}
                 onMouseLeave={handleCloseMouseLeave}
-                aria-label="Закрыть модальное окно"
+                aria-label="Close modal"
+                title="Close modal"
               >
                 <X size={20} />
               </button>
