@@ -2,20 +2,21 @@
 Тесты для системы аудит-логирования.
 Проверяет, что все критические операции логируются корректно.
 """
-import pytest  # pyright: ignore[reportMissingImports]
 from datetime import date
+
+import pytest  # pyright: ignore[reportMissingImports]
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.audit import (
-    log_critical_change,
-    CRITICAL_TABLES,
     calculate_diff_hash,
+    CRITICAL_TABLES,
     extract_model_changes,
+    log_critical_change,
 )
-from app.models.user_profile import UserAuditLog
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
 
 

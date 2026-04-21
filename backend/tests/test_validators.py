@@ -4,25 +4,26 @@ Tests for validation utilities.
 Run: pytest tests/test_validators.py -v
 """
 
-import pytest
 from datetime import date, time
 from decimal import Decimal
 
+import pytest
+
 from app.utils.validators import (
-    validate_phone_uz,
-    normalize_phone_uz,
-    format_phone_display,
-    validate_email,
-    normalize_email,
-    validate_date_range,
-    validate_future_date,
-    validate_time_range,
-    validate_amount,
     format_currency_uzs,
-    validate_length,
+    format_phone_display,
+    normalize_email,
+    normalize_phone_uz,
     sanitize_string,
+    validate_amount,
+    validate_date_range,
+    validate_email,
+    validate_future_date,
     validate_id,
     validate_ids_list,
+    validate_length,
+    validate_phone_uz,
+    validate_time_range,
 )
 
 

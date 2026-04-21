@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 
 from app.core.tenant_scope import (
-    TenantScope,
     parse_branch_id,
     require_branch_scope,
     resolve_tenant_scope,
+    TenantScope,
 )
 
 

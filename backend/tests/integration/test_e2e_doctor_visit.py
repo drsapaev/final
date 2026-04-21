@@ -26,7 +26,6 @@ from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================

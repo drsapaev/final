@@ -2,8 +2,8 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models.visit import Visit
 from app.models.payment import Payment, PaymentVisit
+from app.models.visit import Visit
 
 
 def test_payment_and_payment_visit_relationships(db_session: Session):

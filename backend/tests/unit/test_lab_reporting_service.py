@@ -20,11 +20,11 @@ from app.models.lab import (
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import VisitService
-from app.services.notifications import notification_sender_service
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
 )
+from app.services.notifications import notification_sender_service
 
 
 @pytest.mark.unit

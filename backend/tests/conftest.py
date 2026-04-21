@@ -25,10 +25,10 @@ os.environ.setdefault("TESTING", "1")
 from app.main import app
 
 # ✅ Импортируем все модели явно для гарантии регистрации
+from app.models import billing  # ✅ FIX: Import billing models for tests
 from app.models import (  # noqa: F401
     appointment,
     authentication,
-    billing,  # ✅ FIX: Import billing models for tests
     clinic,
     department,
     emr,

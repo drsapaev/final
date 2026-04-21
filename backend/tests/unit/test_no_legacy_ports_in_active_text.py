@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 ACTIVE_TEXT_EXTENSIONS = {".py", ".ps1", ".bat", ".md"}
 LEGACY_PORT = "".join(["8", "000"])
 LEGACY_PORT_RX = re.escape(LEGACY_PORT)

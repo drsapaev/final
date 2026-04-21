@@ -1,8 +1,11 @@
 
 import time
+
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
+
 
 class TestAPIIntegration:
     """Базовые интеграционные тесты API"""

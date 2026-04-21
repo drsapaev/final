@@ -8,8 +8,7 @@ import pytest
 
 from app.api.v1.endpoints.registrar_integration import _serialize_registrar_datetime
 from app.models.appointment import Appointment
-from app.models.online_queue import DailyQueue
-from app.models.online_queue import OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment import Payment
 
 

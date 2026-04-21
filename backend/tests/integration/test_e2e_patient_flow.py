@@ -23,7 +23,6 @@ from app.models.lab import LabOrder
 from app.models.patient import Patient
 from app.models.user import User
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================

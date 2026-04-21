@@ -6,10 +6,11 @@
 - Контроль доступа по ролям
 """
 
+from io import BytesIO
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from io import BytesIO
 
 from app.models.file_system import File, FileVersion
 from app.models.user import User

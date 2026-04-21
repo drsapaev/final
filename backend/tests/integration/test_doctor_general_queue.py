@@ -4,12 +4,12 @@ from datetime import date
 
 import pytest
 
+from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
-from app.models.visit import Visit
-from app.core.security import get_password_hash
 from app.models.user import User
+from app.models.visit import Visit
 
 
 @pytest.mark.integration

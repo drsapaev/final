@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from app.core.messaging_contract import (
-    CONTRACT_VERSION,
-    MessageEventType,
     build_ws_event_payload,
+    CONTRACT_VERSION,
     is_ephemeral_message_event,
     is_reliable_message_event,
     is_supported_contract_version,
+    MessageEventType,
 )
 
 

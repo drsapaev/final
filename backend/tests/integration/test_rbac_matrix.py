@@ -11,14 +11,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit
-from app.models.payment import Payment
-from app.models.emr import EMR
-from app.models.appointment import Appointment
 from app.core.security import get_password_hash
-
+from app.models.appointment import Appointment
+from app.models.emr import EMR
+from app.models.patient import Patient
+from app.models.payment import Payment
+from app.models.user import User
+from app.models.visit import Visit
 
 # ===================== FIXTURES =====================
 
@@ -158,6 +157,7 @@ class TestPositiveRBAC:
     def test_registrar_can_create_patient(self, client: TestClient, registrar_token: str, db_session: Session):
         """Registrar может создавать пациентов"""
         import random
+
         # Используем уникальный телефон для каждого теста
         phone = f"+99890{random.randint(1000000, 9999999)}"
         response = client.post(
@@ -229,6 +229,7 @@ class TestNegativeRBAC:
     def test_patient_cannot_create_patient(self, client: TestClient, patient_token: str, db_session: Session):
         """Patient НЕ может создавать пациентов"""
         import random
+
         # Используем уникальный телефон для каждого теста
         phone = f"+99890{random.randint(1000000, 9999999)}"
         response = client.post(
@@ -246,6 +247,7 @@ class TestNegativeRBAC:
     def test_doctor_cannot_create_patient(self, client: TestClient, doctor_token: str, db_session: Session):
         """Doctor НЕ может создавать пациентов"""
         import random
+
         # Используем уникальный телефон для каждого теста
         phone = f"+99890{random.randint(1000000, 9999999)}"
         response = client.post(
@@ -263,6 +265,7 @@ class TestNegativeRBAC:
     def test_cashier_cannot_create_patient(self, client: TestClient, cashier_token: str, db_session: Session):
         """Cashier НЕ может создавать пациентов"""
         import random
+
         # Используем уникальный телефон для каждого теста
         phone = f"+99890{random.randint(1000000, 9999999)}"
         response = client.post(
@@ -307,6 +310,7 @@ class TestUnauthorizedRBAC:
     def test_unauthorized_create_patient(self, client: TestClient, db_session: Session):
         """Неавторизованный запрос создания пациента"""
         import random
+
         # Используем уникальный телефон для каждого теста
         phone = f"+99890{random.randint(1000000, 9999999)}"
         response = client.post(
@@ -364,6 +368,7 @@ class TestAuditLog403:
 
         # Выполняем запрос, который должен вернуть 403
         import random
+
         # Используем уникальный телефон для каждого теста
         phone = f"+99890{random.randint(1000000, 9999999)}"
         response = client.post(

@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[3]
 BACKEND_NOTIFICATIONS_PY = ROOT / "backend" / "app" / "api" / "v1" / "endpoints" / "notifications.py"
 BACKEND_WS_PY = ROOT / "backend" / "app" / "api" / "v1" / "endpoints" / "notification_websocket.py"

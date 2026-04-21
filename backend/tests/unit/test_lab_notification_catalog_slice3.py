@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.lab import LabOrder, LabResult
+from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.context_registry import DomainContext, detect_context
+from app.domain.context_registry import detect_context, DomainContext
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = BACKEND_ROOT / "app"

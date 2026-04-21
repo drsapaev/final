@@ -2,7 +2,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.v1.endpoints.display_websocket import authenticate_websocket_token as authenticate_display_token
+from app.api.v1.endpoints.display_websocket import (
+    authenticate_websocket_token as authenticate_display_token,
+)
 from app.api.v1.endpoints.websocket_auth import authenticate_websocket_token
 from app.ws.chat_ws import authenticate_websocket as authenticate_chat_websocket
 

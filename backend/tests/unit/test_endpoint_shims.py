@@ -4,7 +4,6 @@ import ast
 import re
 from pathlib import Path
 
-
 SHIM_IMPORT_RE = re.compile(
     r"from app\.services\.(?P<service_module>[a-z0-9_]+)_service import \*"
 )

@@ -3,8 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from fastapi import HTTPException
 import pytest
+from fastapi import HTTPException
 
 from app.api.v1.endpoints.notifications import _validate_recipient_scope
 from app.models.notification import NotificationDelivery, NotificationEvent

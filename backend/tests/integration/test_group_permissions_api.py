@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from app.models.role_permission import (
+    group_roles_table,
     Permission,
     Role,
-    UserGroup,
-    group_roles_table,
     user_groups_table,
     user_roles_table,
+    UserGroup,
 )
 
 

@@ -17,7 +17,6 @@ from app.models.payment import Payment
 from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
 
-
 # Используем фикстуру client из conftest.py
 # Не создаем новую, чтобы избежать проблем с потоками SQLite
 

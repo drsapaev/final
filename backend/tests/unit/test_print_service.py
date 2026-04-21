@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from app.crud import print_config as crud_print
 from app.api.v1.endpoints import print_api as print_api_module
+from app.crud import print_config as crud_print
 from app.models.print_config import PrinterConfig, PrintTemplate
 from app.services.print_service import PrintService
 
