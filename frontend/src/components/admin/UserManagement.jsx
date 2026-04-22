@@ -334,7 +334,7 @@ const UserManagement = () => {
           setAnchorEl(e.currentTarget);
           setSelectedUser(user);
         }}
-        size="small">
+        size="small" aria-label="Действия с пользователем" title="Действия с пользователем">
         
             <MoreVertical size={16} />
           </IconButton>
