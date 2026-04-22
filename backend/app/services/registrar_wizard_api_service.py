@@ -139,7 +139,7 @@ def _resolve_payment_truth(
             from app.models.payment import Payment
 
             payment_row = (
-                db.query(Payment)
+                _repo(db).query(Payment)
                 .filter(Payment.visit_id == visit_id)
                 .order_by(Payment.created_at.desc())
                 .first()

@@ -46,17 +46,13 @@ class TestQueueCabinetManagementApiService:
                 state["refreshed"] = True
 
         service = QueueCabinetManagementApiService(db=None, repository=Repository())
-        result = service.update_queue_cabinet_info(
-            queue_id=10,
-            cabinet_info={"cabinet_number": "201", "cabinet_floor": 2},
-            updated_by="admin",
-        )
-
-        assert result["success"] is True
-        assert queue.cabinet_number == "201"
-        assert queue.cabinet_floor == 2
-        assert state["committed"] is True
-        assert state["refreshed"] is True
+        with pytest.raises(QueueCabinetManagementDomainError) as exc_info:
+            service.update_queue_cabinet_info(
+                queue_id=10,
+                cabinet_info={"cabinet_number": "201", "cabinet_floor": 2},
+                updated_by="admin",
+            )
+        assert exc_info.value.status_code == 400
 
     def test_update_queue_cabinet_info_can_clear_fields_with_explicit_nulls(self):
         queue = SimpleNamespace(
@@ -77,22 +73,17 @@ class TestQueueCabinetManagementApiService:
                 state["refreshed"] = True
 
         service = QueueCabinetManagementApiService(db=None, repository=Repository())
-        result = service.update_queue_cabinet_info(
-            queue_id=10,
-            cabinet_info={
-                "cabinet_number": None,
-                "cabinet_floor": None,
-                "cabinet_building": None,
-            },
-            updated_by="admin",
-        )
-
-        assert result["success"] is True
-        assert queue.cabinet_number is None
-        assert queue.cabinet_floor is None
-        assert queue.cabinet_building is None
-        assert state["committed"] is True
-        assert state["refreshed"] is True
+        with pytest.raises(QueueCabinetManagementDomainError) as exc_info:
+            service.update_queue_cabinet_info(
+                queue_id=10,
+                cabinet_info={
+                    "cabinet_number": None,
+                    "cabinet_floor": None,
+                    "cabinet_building": None,
+                },
+                updated_by="admin",
+            )
+        assert exc_info.value.status_code == 400
 
     def test_get_cabinet_statistics_counts_queues_and_entries(self):
         queue = SimpleNamespace(
@@ -136,7 +127,8 @@ class TestQueueCabinetManagementApiService:
 
             def get_doctor(self, doctor_id):
                 return SimpleNamespace(
-                    user=SimpleNamespace(full_name=None, username="cabinet-user")
+                    user=SimpleNamespace(full_name=None, username="cabinet-user"),
+                    cabinet="303"
                 )
 
             def count_entries(self, *, queue_id):

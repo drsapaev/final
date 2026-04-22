@@ -515,10 +515,21 @@ def _normalize_route_path(path: str) -> str:
 
 def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
     content = frontend_app_path.read_text(encoding="utf-8")
-    pattern = re.compile(
-        r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
-        re.DOTALL,
-    )
+
+    # Check if we're parsing the new routeRegistry.js or the old App.jsx
+    if "routeRegistry.js" in frontend_app_path.name:
+        # Match objects in ROUTE_REGISTRY array (handles multiple paths and legacyRedirectFrom)
+        # Note: JavaScript arrays might contain newlines.
+        pattern = re.compile(
+            r"path:\s*['\"](?P<path>[^'\"]+)['\"].*?roles:\s*\[(?P<roles>[^\]]*)\]",
+            re.DOTALL
+        )
+    else:
+        # Legacy App.jsx pattern
+        pattern = re.compile(
+            r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
+            re.DOTALL,
+        )
 
     role_to_paths: dict[str, set[str]] = defaultdict(set)
     for match in pattern.finditer(content):

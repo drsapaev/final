@@ -150,7 +150,7 @@ def test_init_payment_provider_failure_sets_failed_status(
 ) -> None:
     repo = Mock()
     repo.db = Mock()
-    repo.get_visit.return_value = SimpleNamespace(id=12)
+    repo.get_visit.return_value = SimpleNamespace(id=12, patient_id=44)
     payment = SimpleNamespace(id=777, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
     billing.create_payment.return_value = payment

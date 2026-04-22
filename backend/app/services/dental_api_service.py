@@ -102,11 +102,12 @@ class DentalApiService:
         patient_info = f"Пациент #{visit.patient_id}" if visit else "Неизвестный пациент"
         details_line = f"Детали: {price_override.details}\n" if price_override.details else ""
 
+        service_code = service.service_code or getattr(service, "code", f"#{service.id}")
         message = (
             "Изменение цены стоматологом\n\n"
             f"Врач: {doctor_name}\n"
             f"{patient_info}\n"
-            f"Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.repository.db)})\n"
+            f"Услуга: {service.name} ({service_code})\n"
             f"Цена: {price_override.original_price} -> {price_override.new_price} UZS\n"
             f"Причина: {price_override.reason}\n"
             f"{details_line}"
@@ -281,8 +282,7 @@ class DentalApiService:
                         "id": service.id if service else None,
                         "name": service.name if service else f"Услуга #{override.service_id}",
                         "code": (
-                            service.service_code
-                            or get_service_code(service.id, self.repository.db)
+                            service.service_code or getattr(service, "code", None)
                             if service
                             else None
                         ),
