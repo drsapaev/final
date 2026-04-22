@@ -12,6 +12,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings
@@ -20,6 +21,9 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_session import (
     get_or_create_session_id,
 )
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +126,7 @@ class QueueBusinessService:
             )
 
     @classmethod
-    def get_start_number_for_specialist(cls, specialist: User) -> int:
+    def get_start_number_for_specialist(cls, specialist: "User") -> int:
         """Получить стартовый номер для специалиста"""
         # Определяем специальность по роли или другим атрибутам
         specialty = cls._determine_specialty(specialist)
@@ -131,7 +135,7 @@ class QueueBusinessService:
         )
 
     @classmethod
-    def _determine_specialty(cls, specialist: User) -> str:
+    def _determine_specialty(cls, specialist: "User") -> str:
         """Определить специальность врача"""
         # Можно расширить логику определения специальности
         if hasattr(specialist, 'specialty'):
