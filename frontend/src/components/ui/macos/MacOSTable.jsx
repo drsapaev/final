@@ -217,7 +217,7 @@ const MacOSTable = ({
 
   if (loading) {
     return (
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto' }} aria-busy="true">
         <table className={className} style={tableStyle}>
           <thead>
             <tr>

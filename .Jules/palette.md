@@ -1,0 +1,3 @@
+## 2024-05-19 - Added aria-busy to MacOS loading states
+**Learning:** Found that custom loading states across the MacOS design system components (`MacOSList`, `MacOSMetricCard`, `MacOSStatCard`, `MacOSTable`) lacked `aria-busy` attributes to communicate their state to screen readers. This is a common pattern in custom UI components where visual loading indicators are built but semantic cues are forgotten.
+**Action:** Always ensure any component that visually communicates a loading or processing state (via skeletons, spinners, or text) explicitly sets `aria-busy="true"` on the relevant container to maintain an accessible experience.

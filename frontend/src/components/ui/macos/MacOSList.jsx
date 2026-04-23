@@ -168,7 +168,7 @@ const MacOSList = ({
 
   if (loading) {
     return (
-      <div className={className} style={listStyle}>
+      <div className={className} style={listStyle} aria-busy="true">
         {renderLoadingState()}
       </div>);
 
