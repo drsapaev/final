@@ -15,7 +15,6 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings
-from app.models.user import User
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.services.queue_session import (
