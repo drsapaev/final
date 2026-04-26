@@ -17,6 +17,9 @@ class DentalApiRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def get_db(self) -> Session:
+        return self.db
+
     def list_registrars(self) -> list[User]:
         return self.db.query(User).filter(User.role == "Registrar").all()
 
