@@ -133,6 +133,8 @@ const Header = React.forwardRef(({
           variant="ghost"
           size="small"
           onClick={onSettingsClick}
+          aria-label="Настройки"
+          title="Настройки"
           style={{
             width: '32px',
             height: '32px',
@@ -337,6 +339,8 @@ export const HeaderSearch = React.forwardRef(({
         variant="ghost"
         size="small"
         onClick={onClear}
+        aria-label="Очистить поиск"
+        title="Очистить поиск"
         style={{
           width: '16px',
           height: '16px',
