@@ -82,3 +82,7 @@ class DentalApiRepository:
 
     def rollback(self) -> None:
         self.db.rollback()
+
+    def get_service_code(self, service_id: int) -> str | None:
+        from app.services.service_mapping import get_service_code as _get_service_code
+        return _get_service_code(service_id, self.db)
