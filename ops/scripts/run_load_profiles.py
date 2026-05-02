@@ -143,7 +143,7 @@ def main() -> int:
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--workspace", default=Path.cwd(), type=Path)
     parser.add_argument("--artifacts-dir", required=True, type=Path)
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--base-url", default="http://127.0.0.1:18000")
     parser.add_argument("--docker-image", default="grafana/k6:latest")
     parser.add_argument("--api-ready", default=1, type=int)
     args = parser.parse_args()
