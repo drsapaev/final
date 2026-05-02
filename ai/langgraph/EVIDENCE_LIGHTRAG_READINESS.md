@@ -3162,3 +3162,40 @@ Continue the QA sweep by stopping tracked local `.env.local.restore` files from 
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect tracked env restore artifacts to the ignore exception and both frontend/backend local runtime surfaces.
+
+## Task 89 - Ops env example compose contract alignment
+
+### User task
+Continue the QA sweep by aligning the ops env example with the hardened Postgres Docker compose contract.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ops/.env.example
+
+### What handoff solved well
+- It identified runtime packaging and database SSOT risk.
+- It kept the first patch slice on the env example instead of reopening entrypoint and compose files already fixed in prior tasks.
+
+### Missing relationship mapping
+- The gate did not include `ops/README.md`, even though the QA grep found matching stale operator guidance there.
+- Manual reconstruction was required to compare `ops/.env.example` against `ops/docker-compose.yml`.
+
+### Manual reconstruction needed
+- Replaced runnable-looking placeholder secrets with empty required values.
+- Removed SQLite Docker runtime guidance and aligned ports, CORS variable names, Postgres port, and Alembic startup variables with compose.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect compose-required variables to the env sample and docs so stale operator guidance is found in one pass.
