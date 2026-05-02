@@ -143,7 +143,7 @@ async def get_detailed_endpoints_documentation(
                             "password": {
                                 "type": "string",
                                 "required": True,
-                                "example": "password123",
+                                "example": "REPLACE_WITH_STRONG_PASSWORD",
                             },
                             "role": {
                                 "type": "string",
