@@ -3312,3 +3312,41 @@ Continue the QA sweep by fixing backup verification so PostgreSQL dump files are
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect backup filename conventions, database driver ownership, and verify/restore behavior instead of routing through container packaging files.
+
+## Task 93 - VPS rollout placeholder hardening
+
+### User task
+Continue the QA sweep by removing runnable-looking `change-me` placeholders from VPS rollout samples and docs.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ops/vps/backend.env.sample
+
+### What handoff solved well
+- It identified the env sample as the root deployment artifact to inspect first.
+- It kept the change in VPS rollout configuration instead of broad runtime code.
+
+### Missing relationship mapping
+- The gate only returned `ops/vps/backend.env.sample` even though the same placeholder contract appeared in `clinic_lifecycle.env.sample` and README bootstrap commands.
+- Manual reconstruction was required to connect bootstrap password generation to both backend and lifecycle `DATABASE_URL` values.
+
+### Manual reconstruction needed
+- Replaced runnable-looking DB/JWT/admin placeholders with empty required values in VPS env samples.
+- Switched the backend sample to the canonical `BACKEND_CORS_ORIGINS` name.
+- Updated README bootstrap snippets to generate a unique DB password and pass it to `bootstrap_postgres.sh`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect env samples, lifecycle scripts, and bootstrap runbooks when searching for deployment-secret placeholders.
